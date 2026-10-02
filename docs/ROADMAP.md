@@ -1,3 +1,99 @@
+# Backtest Lab — master roadmap
+
+```json
+{"AUTHORITY":"roadmap","FINAL_PHASE":"75"}
+```
+
+This existing roadmap is the sole long-term plan. It was normalized in Phase 7.6 rather than creating a competing AI_CONTEXT roadmap. [Current phase/authorization](../AI_CONTEXT/04_CURRENT_PHASE.md) controls work; [completed history](../AI_CONTEXT/03_PHASE_HISTORY.md) controls historical facts; [workflow/Definition of Done](../AI_CONTEXT/06_WORKFLOW_RULES.md) controls execution. Do not maintain a second current-phase tracker here.
+
+The human supplied coverage through Phase 75 and checkpoint 14.5, but no detailed future phase scopes. Reserved rows are planning placeholders, not approved deliverables, estimates or authority to implement. Known Phase 1–3 records are grouped historically; no more precise achievements are invented. Milestone completion is read from history, active/next authorization from the pointer. Refine future scope only with human direction; preserve fractional IDs as strings.
+
+| Phase | Milestone / planning scope | Status source / planning state |
+| --- | --- | --- |
+| 1 | Trading/drawing separation foundation | Recorded in completed history |
+| 2 | Trading/drawing protection (historical Phase 1–3 group) | Recorded in completed history |
+| 3 | Trading/drawing protection (historical Phase 1–3 group) | Recorded in completed history |
+| 4 | Retire legacy drawing/indicator runtime | Recorded in completed history |
+| 5 | Official primitive Trend Line foundation | Recorded in completed history |
+| 6 | Selection and canonical drag interaction | Recorded in completed history |
+| 6.5 | Multi-AI context/bundle infrastructure | Recorded in completed history |
+| 7 | Canonical persistence/history/lock/visibility | Recorded in completed history |
+| 7.5 | Repository cleanup/source-of-truth hardening | Recorded in completed history |
+| 7.6 | Extend existing project-control authorities | Operational pointer determines checkpoint status |
+| 8 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 9 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 10 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 11 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 12 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 13 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 14 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 14.5 | Reserved fractional checkpoint; scope must be defined by the human | Planning slot; no implementation authorization |
+| 15 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 16 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 17 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 18 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 19 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 20 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 21 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 22 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 23 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 24 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 25 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 26 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 27 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 28 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 29 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 30 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 31 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 32 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 33 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 34 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 35 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 36 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 37 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 38 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 39 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 40 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 41 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 42 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 43 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 44 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 45 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 46 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 47 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 48 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 49 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 50 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 51 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 52 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 53 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 54 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 55 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 56 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 57 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 58 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 59 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 60 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 61 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 62 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 63 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 64 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 65 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 66 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 67 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 68 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 69 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 70 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 71 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 72 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 73 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 74 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+| 75 | Reserved: scope must be defined by the human | Planning slot; no implementation authorization |
+
+## Historical prototype/backend roadmap — preserved verbatim
+
+The following initial roadmap is historical evidence, not a second authority. Its old phase numbering and feature statements describe the prototype/backend checkpoint and are not mapped automatically onto the current phase sequence.
+
 > HISTORICAL: roadmap prototipe/backend awal. Penomoran dan status di bawah bukan status produk saat ini. Lihat AI_CONTEXT/01_PROJECT_STATE.md dan 04_CURRENT_PHASE.md untuk kondisi aktual serta izin fase.
 
 # Backtest Lab — Roadmap

@@ -7,7 +7,8 @@
     "AI_CONTEXT/04_CURRENT_PHASE.md",
     "AI_CONTEXT/05_PROTECTED_SYSTEMS.md",
     "AI_CONTEXT/06_WORKFLOW_RULES.md",
-    "AI_CONTEXT/07_TEST_COMMANDS.md"
+    "AI_CONTEXT/07_TEST_COMMANDS.md",
+    "docs/ROADMAP.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",
@@ -32,5 +33,5 @@
     "frontend/package.json",
     "OPEN_SOURCE_NOTICES.md"
   ],
-  "currentTask": "Phase 7.5 repository cleanup verified. Phase 8 is next; await its concrete task. Do not start it as part of this checkpoint."
+  "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

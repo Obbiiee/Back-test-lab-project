@@ -1,11 +1,21 @@
 # Start here
 
-Backtest Lab is a manual trading backtesting application. The master repository at Obbiiee/Back-test-lab-project is the single source of truth; AI_BUNDLE is a disposable reference package.
+Backtest Lab master repository is authoritative. AI_BUNDLE is a disposable reference, never another source tree.
 
-Read AI_CONTEXT before coding, then inspect only relevant source. Work only on the explicitly authorized current phase, avoid broad refactors, and respect protected systems.
+Read these existing owners in order before work:
 
-> Do not assume that an old phase report represents the current implementation. The current repository state is authoritative.
+| Responsibility | Single owner |
+| --- | --- |
+| Onboarding | This file |
+| Factual product/repository state | [01_PROJECT_STATE](01_PROJECT_STATE.md) |
+| Architecture | [02_ARCHITECTURE](02_ARCHITECTURE.md) |
+| Completed phase history | [03_PHASE_HISTORY](03_PHASE_HISTORY.md) |
+| Operational status and authorization | [04_CURRENT_PHASE](04_CURRENT_PHASE.md) |
+| Protected boundaries | [05_PROTECTED_SYSTEMS](05_PROTECTED_SYSTEMS.md) |
+| Workflow, Definition of Done, Git policy and next prompt | [06_WORKFLOW_RULES](06_WORKFLOW_RULES.md) |
+| Validation commands | [07_TEST_COMMANDS](07_TEST_COMMANDS.md) |
+| Long-term roadmap | [Existing repository roadmap](../docs/ROADMAP.md) |
 
-Implementation → required automated tests → browser verification for interaction changes → report → commit → normal GitHub push → verify remote → STOP. Never start the next phase without instruction.
+Status values live only in 04_CURRENT_PHASE. History records completed work; roadmap describes planning slots, not permission. Historical reports never override these owners. Read the workflow before accepting a next task; authorization comes from the human.
 
-Repository map: root README and `docs/README.md`; cleanup evidence in `docs/PHASE7_5_REPOSITORY_AUDIT.md`. Production lives only in `frontend/src/`; archives are reference/test material, and generated evidence/bundles are disposable.
+Production lives only in frontend/src/. Root README and docs/README.md explain the repository map; Phase 7.5 audit records cleanup evidence. Preserve useful archives and fixtures.

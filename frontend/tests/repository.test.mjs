@@ -31,3 +31,47 @@ const pkg=JSON.parse(read('frontend/package.json')),lock=JSON.parse(read('fronte
 for(const section of ['dependencies','devDependencies'])assert.deepEqual(pkg[section],lock.packages[''][section],'Lock manifest drift');
 for(const rule of ['/AI_BUNDLE/','/frontend/tests/artifacts/','/docs/_generated/','node_modules/','dist/','.env'])assert.ok(read('.gitignore').split(/\r?\n/).includes(rule),'Missing ignore boundary: '+rule);
 console.log(`PASS repository boundaries: ${reachable.size} reachable production files, two retained compatibility exports, preserved fixtures, small bundle allowlist and synchronized lock manifest.`);
+
+// Phase 7.6: authority ownership and drift checks. Existing test owner extended.
+const contextFiles=readdirSync(path.join(root,'AI_CONTEXT')).filter(p=>p.endsWith('.md')).sort();
+const owners={
+  onboarding:'AI_CONTEXT/00_START_HERE.md',state:'AI_CONTEXT/01_PROJECT_STATE.md',architecture:'AI_CONTEXT/02_ARCHITECTURE.md',history:'AI_CONTEXT/03_PHASE_HISTORY.md',
+  'current-phase':'AI_CONTEXT/04_CURRENT_PHASE.md',protected:'AI_CONTEXT/05_PROTECTED_SYSTEMS.md',workflow:'AI_CONTEXT/06_WORKFLOW_RULES.md',tests:'AI_CONTEXT/07_TEST_COMMANDS.md',roadmap:'docs/ROADMAP.md',
+};
+assert.deepEqual(contextFiles,Object.values(owners).filter(p=>p.startsWith('AI_CONTEXT/')).map(p=>path.posix.basename(p)).sort(),'No competing context entrypoints/trackers/workflows');
+function authority(document){const blocks=[...document.matchAll(/```json\s*([\s\S]*?)```/g)].map(match=>JSON.parse(match[1]));return blocks.find(block=>block.AUTHORITY);}
+function documentationFiles(directory){return readdirSync(path.join(root,directory),{withFileTypes:true}).flatMap(entry=>{const file=directory+'/'+entry.name;if(entry.name==='_generated')return [];return entry.isDirectory()?documentationFiles(file):entry.name.endsWith('.md')?[file]:[];});}
+const documents=Object.fromEntries([...contextFiles.map(p=>'AI_CONTEXT/'+p),...documentationFiles('docs')].map(p=>[p,read(p)]));
+function validateControl(docs,bundleConfig){
+  for(const kind of ['current-phase','workflow','roadmap']){
+    const found=Object.keys(docs).filter(p=>authority(docs[p])?.AUTHORITY===kind);
+    assert.deepEqual(found,[owners[kind]],'Exactly one '+kind+' authority');
+    assert.ok(bundleConfig.context.includes(owners[kind]),'Authority missing from AI bundle: '+kind);
+  }
+  const start=docs[owners.onboarding],workflow=docs[owners.workflow],pointer=authority(docs[owners['current-phase']]);
+  for(const [kind,file] of Object.entries(owners)){assert.ok(bundleConfig.context.includes(file),'Bundle missing '+kind);if(kind!=='onboarding')assert.ok(start.includes(path.posix.basename(file)),'Onboarding missing '+kind);}
+  assert.ok(workflow.includes('04_CURRENT_PHASE.md'),'Workflow must link to status authority');
+  for(const key of ['LAST_COMPLETED_PHASE','CURRENT_IMPLEMENTATION_PHASE','NEXT_PHASE','NEXT_PHASE_STATUS','AUTHORIZED_IMPLEMENTATION_PHASE','TARGET_CHECKPOINT','FINAL_ROADMAP_PHASE']){
+    assert.ok(Object.hasOwn(pointer,key),'Missing operational field '+key);
+    for(const [file,doc] of Object.entries(docs))if(file!==owners['current-phase'])assert.ok(!doc.includes('"'+key+'"'),'Operational field duplicated: '+key);
+  }
+  assert.equal(pointer.FINAL_ROADMAP_PHASE,'75');
+  assert.ok(pointer.CURRENT_IMPLEMENTATION_PHASE===null||pointer.CURRENT_IMPLEMENTATION_PHASE===pointer.AUTHORIZED_IMPLEMENTATION_PHASE,'Active phase must be authorized');
+  if(pointer.CURRENT_IMPLEMENTATION_PHASE===null)assert.equal(pointer.AUTHORIZED_IMPLEMENTATION_PHASE,null,'Idle state cannot pre-authorize a next phase');
+  const policy=authority(workflow);
+  for(const gate of ['REQUIRE_HUMAN_AUTHORIZATION','ONE_PHASE_ONLY','REQUIRE_TESTS','REQUIRE_DIFF_REVIEW','REQUIRE_CONTEXT_STATUS_UPDATE','REQUIRE_GITHUB_COMMIT','REQUIRE_GITHUB_PUSH','REQUIRE_REMOTE_HEAD_VERIFICATION','REQUIRE_CLEAN_WORKING_TREE','REQUIRE_STOP','REQUIRE_NEXT_PROMPT'])assert.equal(policy[gate],true,'Mandatory gate '+gate);
+  assert.equal(policy.BROWSER_POLICY,'PRODUCT_CHANGES_REQUIRED_DOCS_ONLY_EXEMPT_WITH_REASON');
+  assert.ok(workflow.includes('NEXT-PROMPT REQUIREMENT'),'Final-report next-prompt policy missing');
+  const phases=[...docs[owners.roadmap].matchAll(/^\| (\d+(?:\.\d+)?) \|/gm)].map(m=>m[1]);
+  assert.equal(new Set(phases).size,phases.length,'Duplicate roadmap phase');
+  for(let phase=1;phase<=75;phase++)assert.ok(phases.includes(String(phase)),'Missing roadmap phase '+phase);
+  assert.ok(phases.includes('14.5'),'Missing fractional checkpoint 14.5');
+  assert.equal(authority(docs[owners.roadmap]).FINAL_PHASE,'75');
+}
+validateControl(documents,config);
+// Negative cases demonstrate the checks reject drift rather than just matching today.
+assert.throws(()=>validateControl({...documents,'AI_CONTEXT/duplicate.md':documents[owners['current-phase']]},config));
+assert.throws(()=>validateControl({...documents,[owners.workflow]:documents[owners.workflow].replace('"REQUIRE_GITHUB_PUSH": true','"REQUIRE_GITHUB_PUSH": false')},config));
+assert.throws(()=>validateControl({...documents,[owners.roadmap]:documents[owners.roadmap].replace(/^\| 14\.5 \|.*\r?\n/m,'')},config));
+assert.throws(()=>validateControl(documents,{...config,context:config.context.filter(p=>p!==owners.roadmap)}));
+console.log('PASS Phase 7.6 single authorities, operational fields, authorization/checkpoint/STOP/next-prompt gates, roadmap 1–75/14.5 and authoritative bundle inclusion; negative drift cases rejected.');

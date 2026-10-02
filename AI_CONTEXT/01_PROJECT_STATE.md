@@ -1,4 +1,4 @@
-# Actual state after Phase 7.5
+# Actual product and repository state
 
 - React 19 / Vite 8; installed Lightweight Charts 5.2.1 (package range ^5.2.1).
 - XAUUSD approximately ten years: 3,486,461 validated M1 candles; eleven aggregated timeframes; progressive historical loading.

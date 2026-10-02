@@ -1,5 +1,18 @@
-# Current checkpoint
+# Operational phase authority
 
-Phase 7.5 COMPLETE after repository audit, conservative cleanup, full regression and real browser validation. Phase 7 product behavior is preserved.
+This is the sole operational phase pointer. String phase IDs preserve fractional checkpoints; null means no active/authorized implementation. Roadmap slots do not grant authorization.
 
-Next authorized implementation phase: Phase 8. Phase 8 has NOT started. This request ends with the Phase 7.5 GitHub checkpoint; wait for the concrete next-phase task before implementation.
+```json
+{
+  "AUTHORITY": "current-phase",
+  "LAST_COMPLETED_PHASE": "7.6",
+  "CURRENT_IMPLEMENTATION_PHASE": null,
+  "NEXT_PHASE": "8",
+  "NEXT_PHASE_STATUS": "AWAITING_HUMAN_SCOPE_AND_AUTHORIZATION",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
+  "TARGET_CHECKPOINT": "origin/main: Phase 7.6 project-control hardening",
+  "FINAL_ROADMAP_PHASE": "75"
+}
+```
+
+The context/control infrastructure checkpoint is validated; no product implementation is active or pre-authorized. Follow [workflow](06_WORKFLOW_RULES.md); consult [roadmap](../docs/ROADMAP.md) for planning and [history](03_PHASE_HISTORY.md) for completed work. Stop after this checkpoint. A future request must supply the next phase's concrete scope and authorization.

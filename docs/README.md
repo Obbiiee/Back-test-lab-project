@@ -4,6 +4,8 @@ Current source of truth: [AI_CONTEXT](../AI_CONTEXT/00_START_HERE.md), especiall
 
 [Phase 7.5 cleanup results and repository map](PHASE7_5_REPOSITORY_CLEANUP.md).
 
+[Master roadmap](ROADMAP.md) owns long-term planning; operational status remains in AI_CONTEXT/04_CURRENT_PHASE.md.
+
 ## Current domain contracts
 
 - [Phase 7 drawing persistence/history](PHASE7_DRAWING_PERSISTENCE.md).
@@ -17,7 +19,7 @@ Phase reports describe their checkpoint, including then-current restrictions; ne
 
 ## Historical design/prototype material
 
-ROADMAP.md, FXREPLAY_REFERENCE.md, FX_REPLAY_WORKFLOW.md, UI_FIGMA_PROGRESS.md, LIVE_XAU_RISK_REWARD.md and earlier drawing/UI captures document previous plans/checkpoints. They do not authorize work or assert current runtime features. The old roadmap phase numbering refers to the initial prototype/backend plan, not the current drawing phase sequence.
+The historical appendix within [ROADMAP.md](ROADMAP.md), FXREPLAY_REFERENCE.md, FX_REPLAY_WORKFLOW.md, UI_FIGMA_PROGRESS.md, LIVE_XAU_RISK_REWARD.md and earlier drawing/UI captures document previous plans/checkpoints. They do not authorize work or assert current runtime features. The roadmap main section is the sole long-term plan; its preserved appendix uses the initial prototype/backend numbering.
 
 ## Future disposable output
 
