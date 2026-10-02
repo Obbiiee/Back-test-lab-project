@@ -22,3 +22,14 @@ __pycache__/
 
 # Disposable AI reference package; context/config/generator remain tracked.
 /AI_BUNDLE/
+
+# Disposable verification output (durable reports/fixtures remain tracked)
+/frontend/tests/artifacts/
+/docs/_generated/
+coverage/
+.vite/
+.cache/
+playwright-report/
+test-results/
+Thumbs.db
+Desktop.ini

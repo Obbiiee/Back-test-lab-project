@@ -1,16 +1,12 @@
-# React + Vite
+# Frontend Backtest Lab
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Source aktif: `src/main.jsx` → `src/FigmaWorkspace.jsx`, chart `src/components/CandleChart.jsx`.
+Market/replay, trading/RiskReward, dan drawing memiliki domain terpisah. `src/` adalah source produksi; jangan membuat source tree pengganti.
 
-Currently, two official plugins are available:
+Jalankan `npm ci`, `npm run dev`. Validasi lengkap dan batas arsitektur dijelaskan di [AI_CONTEXT](../AI_CONTEXT/07_TEST_COMMANDS.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+`legacy/phase3/` adalah referensi dan fixture geometry historis, bukan runtime aktif. Dua compatibility export (`components/TradingLevels.jsx`, `drawings/position.js`) sengaja dipertahankan.
 
-## React Compiler
+`tests/browser/` menyimpan harness disposable; gunakan origin pengujian terpisah, jangan menimpa storage preview pengguna. Hasil screenshot/console baru disimpan di `tests/artifacts/` atau `docs/_generated/` yang diabaikan Git. Bukti fase lama yang sudah tercatat tetap dipertahankan.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Generator/reference bundle: `scripts/ai-bundle.mjs`; output `../AI_BUNDLE/` disposable, tidak di-commit. Dependencies, `dist/`, cache dan data download sementara juga diabaikan Git. Data tervalidasi `public/market/` tetap tracked.

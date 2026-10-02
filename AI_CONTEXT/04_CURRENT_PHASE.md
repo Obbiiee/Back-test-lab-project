@@ -1,7 +1,5 @@
 # Current checkpoint
 
-Completed: Phase 1–7, including Phase 6.5 context/bundle infrastructure.
+Phase 7.5 COMPLETE after repository audit, conservative cleanup, full regression and real browser validation. Phase 7 product behavior is preserved.
 
-Phase 7 persistence/history/lock/hide passed automated and browser verification.
-
-Phase 7.5 and Phase 8 are NOT authorized. Wait for explicit instruction; no next-phase implementation is currently authorized.
+Next authorized implementation phase: Phase 8. Phase 8 has NOT started. This request ends with the Phase 7.5 GitHub checkpoint; wait for the concrete next-phase task before implementation.

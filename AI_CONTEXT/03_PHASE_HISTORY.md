@@ -8,4 +8,6 @@ Phase 6: Trend Line selection, endpoint/body drag, cancellation, deletion and ar
 Phase 6.5: multi-AI context and disposable bundle infrastructure.
 Phase 7: canonical persistence/history, reload restoration, lock and hide/show, verified with protected-domain regressions.
 
-Phase 1–7 COMPLETE. Phase 7.5 and Phase 8 NOT STARTED. Historical reports are evidence, not authoritative implementation descriptions.
+Phase 7.5: proven unreachable duplicate cleanup, current documentation, generated-output boundaries and repository regression checks; product behavior preserved.
+
+Phase 1–7.5 COMPLETE. Phase 8 NOT STARTED. Historical reports are evidence, not authoritative implementation descriptions.

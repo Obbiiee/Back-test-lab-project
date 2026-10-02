@@ -1,3 +1,5 @@
+> HISTORICAL: roadmap prototipe/backend awal. Penomoran dan status di bawah bukan status produk saat ini. Lihat AI_CONTEXT/01_PROJECT_STATE.md dan 04_CURRENT_PHASE.md untuk kondisi aktual serta izin fase.
+
 # Backtest Lab — Roadmap
 
 ## Hasil inspeksi kode yang ada (index.html v0.3)

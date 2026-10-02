@@ -1,4 +1,4 @@
-# Actual state after Phase 7
+# Actual state after Phase 7.5
 
 - React 19 / Vite 8; installed Lightweight Charts 5.2.1 (package range ^5.2.1).
 - XAUUSD approximately ten years: 3,486,461 validated M1 candles; eleven aggregated timeframes; progressive historical loading.
@@ -8,3 +8,5 @@
 - Indicator runtime remains retired; native chart Volume series remains available.
 
 New Trend Lines persist in a separate version-1 localStorage namespace across reload, timeframe and replay changes. Canonical commit snapshots provide independent Undo/Redo (100 actions, runtime only), lock/unlock and hide/show. Malformed/future storage is preserved without overwrite; valid records can be recovered read-only. No magnet integration, additional new tools, Indicator Engine, properties UI, object tree or legacy migration. Existing trading controls/history remain separate and do not imply these features exist for the new drawing domain.
+
+Phase 7.5 repository cleanup removed ten unreachable copies already preserved byte-identically in Phase 3. The 41-file production import graph, compatibility exports, datasets, archives and existing test assertions remain unchanged. Root/frontend/docs READMEs identify the single active source; repository boundary tests and ignore rules protect future hygiene.

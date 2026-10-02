@@ -32,5 +32,5 @@
     "frontend/package.json",
     "OPEN_SOURCE_NOTICES.md"
   ],
-  "currentTask": "Phase 7 verified. Await explicit authorization before Phase 7.5 or Phase 8."
+  "currentTask": "Phase 7.5 repository cleanup verified. Phase 8 is next; await its concrete task. Do not start it as part of this checkpoint."
 }

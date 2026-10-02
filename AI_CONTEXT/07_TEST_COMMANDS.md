@@ -6,6 +6,7 @@ Run in `frontend/`:
 | --- | --- |
 | npm run build | Production compilation |
 | npm run lint | Source lint/hook rules |
+| npm run test:repository | Production/archive boundaries, reviewed compatibility, fixture/config/ignore safety |
 | npm run test:phase4 | Runtime retirement and legacy preservation |
 | npm run test:phase5 | Manager/model/primitive/creation foundation |
 | npm run test:phase6 | Selection/hit testing/drag/cancel/arbitration |
@@ -19,3 +20,5 @@ Run in `frontend/`:
 | npm run ai:bundle:verify | Read-only hash/config freshness check |
 
 Run full regression in master, not the partial bundle. Browser verification is required for product interaction changes; Phase 7 evidence and limitations: `docs/PHASE7_DRAWING_PERSISTENCE.md`.
+
+Phase 7.5 no-behavior-change verification is recorded in `docs/PHASE7_5_REPOSITORY_CLEANUP.md`; disposable captures are ignored under `frontend/tests/artifacts/`. Backend tests are a standalone Python workflow, not proof of active frontend features.
