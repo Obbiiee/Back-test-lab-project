@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DRAWING_TOOLS, logicalAtTime, timeAtLogical, regression, anchoredVWAP, volumeProfile } from "../src/drawings/tools.js";
+import { DRAWING_TOOLS, logicalAtTime, timeAtLogical, regression, anchoredVWAP, volumeProfile } from "../legacy/phase3/src/drawings/tools.js";
 
 const irregular = [{ time: 100 }, { time: 160 }, { time: 400 }, { time: 460 }];
 assert.equal(timeAtLogical(irregular, 2), 400);
@@ -23,7 +23,7 @@ assert.deepEqual(volumeProfile([]), []);
 
 const server = await createServer({ server: { middlewareMode: true }, appType: "custom" });
 try {
-  const { default: Geometry } = await server.ssrLoadModule("/src/components/DrawingGeometry.jsx");
+  const { default: Geometry } = await server.ssrLoadModule("/legacy/phase3/src/components/DrawingGeometry.jsx");
   const bars = Array.from({ length: 100 }, (_, i) => ({ time: 100 + i * 60, open: 100 + Math.sin(i), close: 101 + Math.sin(i), high: 103 + Math.sin(i), low: 99 + Math.sin(i), volume: 100 + i }));
   const anchors = [10, 35, 50, 60, 70, 80, 85, 90].map((i, j) => ({ time: bars[i].time, price: 100 + (j % 2 ? 2 : -2) }));
   const project = point => ({ x: logicalAtTime(bars, point.time) * 7, y: 280 - (point.price - 95) * 20 });

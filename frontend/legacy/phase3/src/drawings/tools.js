@@ -1,3 +1,5 @@
+import { RISK_REWARD_TOOLS } from "../trading/RiskRewardController.js";
+
 // Drawing names come from the user's Figma reference; this is the shared tool registry.
 const groups = {
   trend: [
@@ -30,7 +32,6 @@ const groups = {
     ["Elliott Triple Combo Wave", "elliott-triple", 8], ["Cyclic Lines", "cyclic-lines", 2], ["Time Cycles", "time-cycles", 2],
   ],
   measure: [
-    ["Long Position", "long-position", 1], ["Short Position", "short-position", 1],
     ["Position Forecast", "forecast", 2], ["Bars Pattern", "bars-pattern", 3],
     ["Ghost Feed", "ghost-feed", 3], ["Sector", "sector", 3],
     ["Anchored VWAP", "anchored-vwap", 1], ["Fixed Range Volume Profile", "volume-profile", 2],
@@ -55,7 +56,7 @@ const groups = {
   ],
   smile: [["Smile", "emoji-smile", 1], ["Star", "emoji-star", 1], ["Check", "emoji-check", 1], ["Warning", "emoji-warning", 1]],
 };
-export const DRAWING_TOOLS = Object.fromEntries(Object.entries(groups).flatMap(([group, rows]) => rows.map(([name, type, points]) => [type, { name, type, points, group }])));
+export const DRAWING_TOOLS = { ...RISK_REWARD_TOOLS, ...Object.fromEntries(Object.entries(groups).flatMap(([group, rows]) => rows.map(([name, type, points]) => [type, { name, type, points, group }]))) };
 export function resolveTool(name, group) {
   if (group === "cursor") return ({ Cross: "none", Dot: "cursor-dot", Arrow: "cursor-arrow", Demonstration: "demonstration", Eraser: "eraser" })[name];
   return Object.values(DRAWING_TOOLS).find(tool => tool.name === name && tool.group === group)?.type;
@@ -65,24 +66,7 @@ export const FREEHAND_TOOLS = new Set(["brush", "highlighter"]);
 export const PATTERN_TOOLS = new Set(Object.values(DRAWING_TOOLS).filter(tool => tool.group === "pattern").map(tool => tool.type));
 export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
-export function timeAtLogical(candles, logical) {
-  if (!candles.length || logical == null) return null;
-  const index = Math.round(logical);
-  const step = candles.intervalSeconds ?? (candles.length > 1 ? candles[1].time - candles[0].time : 1800);
-  if (index < 0) return candles[0].time + index * step;
-  if (index >= candles.length) return candles.at(-1).time + (index - candles.length + 1) * step;
-  return candles[index].time;
-}
-export function logicalAtTime(candles, time) {
-  if (!candles.length) return null;
-  const step = candles.intervalSeconds ?? (candles.length > 1 ? candles[1].time - candles[0].time : 1800);
-  if (time < candles[0].time) return (time - candles[0].time) / step;
-  if (time > candles.at(-1).time) return candles.length - 1 + (time - candles.at(-1).time) / step;
-  let left = 0, right = candles.length - 1;
-  while (left < right) { const mid = Math.floor((left + right) / 2); if (candles[mid].time < time) left = mid + 1; else right = mid; }
-  if (candles[left].time === time || !left) return left;
-  return left - 1 + (time - candles[left - 1].time) / (candles[left].time - candles[left - 1].time);
-}
+export { timeAtLogical, logicalAtTime } from "../chart/coordinates.js";
 export function selectedBars(candles, points, anchored = false) {
   const start = Math.min(points[0].time, anchored ? points[0].time : points[1]?.time ?? points[0].time);
   const end = anchored ? Infinity : Math.max(points[0].time, points[1]?.time ?? points[0].time);

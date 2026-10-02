@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { FREEHAND_TOOLS, logicalAtTime, timeAtLogical } from "../drawings/tools";
-import DrawingGeometry from "./DrawingGeometry";
-import { positionStats } from "../drawings/position";
+import { logicalAtTime, timeAtLogical } from "../chart/coordinates";
 
-function DrawingsLayer({ chart, series, candles = [], drawings, selectedId, drawingMode = "none", onSelect, onStartDrag, onEndDrag, onUpdatePoint, onMoveDrawing, onContextMenu, onCreateStroke, onErase, onPlacePoint, onPreviewPoint, magnet = false }) {
+function ChartObjectOverlay({ chart, series, candles = [], drawings, selectedId, drawingMode = "none", onSelect, onStartDrag, onEndDrag, onUpdatePoint, onMoveDrawing, onContextMenu, onCreateStroke, onErase, onPlacePoint, onPreviewPoint, magnet = false, renderGeometry, isFreehand = () => false, isPriceOnlyAnchor = () => false, handleProjection, layerName = "Drawing objects", layerClass = "" }) {
   const svgRef = useRef(null), dragging = useRef(null), stroke = useRef(null);
   const [strokePreview, setStrokePreview] = useState(null);
   const [pointer, setPointer] = useState(null);
   const [, refreshProjection] = useState(0);
-  const freehand = FREEHAND_TOOLS.has(drawingMode);
+  const freehand = isFreehand(drawingMode);
   const neutral = ["none", "cursor-dot", "cursor-arrow", "eraser"].includes(drawingMode);
   const placing = !neutral && !freehand && drawingMode !== "demonstration";
 
@@ -52,7 +50,7 @@ function DrawingsLayer({ chart, series, candles = [], drawings, selectedId, draw
     if (!point) return;
     svgRef.current.setPointerCapture(event.pointerId);
     onStartDrag();
-    dragging.current = { id: drawing.id, pointIndex: drawing.screenAnchor ? null : pointIndex, start: point, drawing, points: drawing.points };
+    dragging.current = { id: drawing.id, pointIndex: drawing.screenAnchor ? null : pointIndex, start: point, drawing: { ...drawing }, points: drawing.points.map(point => ({ ...point })) };
   }
   function movePointer(event) {
     const point = coordinates(event);
@@ -72,7 +70,7 @@ function DrawingsLayer({ chart, series, candles = [], drawings, selectedId, draw
       onMoveDrawing(drag.id, points, screenAnchor);
     } else {
       // Stop and target handles change price only, rather than shifting the position's entry time.
-      const positionLevel = drag.drawing.type.includes("position") && [1, 2].includes(drag.pointIndex);
+      const positionLevel = isPriceOnlyAnchor(drag.drawing, drag.pointIndex);
       onUpdatePoint(drag.id, drag.pointIndex, { time: positionLevel ? drag.points[drag.pointIndex].time : point.time, price: point.price });
     }
   }
@@ -112,43 +110,26 @@ function DrawingsLayer({ chart, series, candles = [], drawings, selectedId, draw
     const width = chart.timeScale().width(), height = chart.paneSize().height;
     if (drawing.screenAnchor) p[0] = { x: drawing.screenAnchor.x * width, y: drawing.screenAnchor.y * height };
     const selected = selectedId === drawing.id;
-    let geometry;
-    if (drawing.type === "long-position" || drawing.type === "short-position") {
-      const entry = p[0], stop = p[1], target = p[2];
-      if (!stop || !target) return null;
-      const end = p[3]?.x ?? entry.x + 150, boxWidth = Math.max(20, end - entry.x);
-      const stats = positionStats(drawing, candles.at(-1)?.close ?? drawing.points[0].price);
-      const labelWidth = Math.max(boxWidth, 310);
-      const label = (y, text, color, key) => <g key={key}><rect x={entry.x + boxWidth / 2 - labelWidth / 2} y={y-13} width={labelWidth} height="23" rx="3" fill={color} /><text x={entry.x + boxWidth / 2} y={y+2} textAnchor="middle" className="position-label" style={{fontSize: drawing.fontSize || 11}}>{text}</text></g>;
-      geometry = <>
-        <rect x={entry.x} y={Math.min(entry.y, target.y)} width={boxWidth} height={Math.max(1, Math.abs(target.y - entry.y))} fill="#25c99632" />
-        <rect x={entry.x} y={Math.min(entry.y, stop.y)} width={boxWidth} height={Math.max(1, Math.abs(stop.y - entry.y))} fill="#f0647430" />
-        {[entry, stop, target].map((point, i) => <line key={i} x1={entry.x} y1={point.y} x2={entry.x + boxWidth} y2={point.y} stroke={["#58a6ff", "#f06474", "#25c996"][i]} strokeWidth={drawing.lineWidth || 1.5} />)}
-        {(selected || drawing.alwaysShowStats !== false) && <>
-          {label(target.y + (target.y < entry.y ? -14 : 22), `Target: ${stats.reward.toFixed(2)} (${stats.rewardPercent.toFixed(2)}%) ${stats.targetTicks.toFixed(0)} ticks · Amount: ${stats.targetBalance.toFixed(2)}`, '#16866b', 'target')}
-          {label(entry.y, `Open P&L: ${stats.openPnl.toFixed(2)} · Qty: ${stats.quantity} · Risk/Reward Ratio: ${stats.ratio.toFixed(2)}`, '#263d52', 'entry')}
-          {label(stop.y + (stop.y < entry.y ? -14 : 22), `Stop: ${stats.risk.toFixed(2)} (${stats.riskPercent.toFixed(2)}%) ${stats.stopTicks.toFixed(0)} ticks · Amount: ${stats.stopBalance.toFixed(2)}`, '#aa3948', 'stop')}
-        </>}
-        {[entry,stop,target].map((point,index)=><g key={'price-'+index}><rect x={Math.max(0,width-60)} y={point.y-10} width="60" height="20" fill={['#345f8a','#aa3948','#16866b'][index]} /><text x={width-4} y={point.y+4} textAnchor="end" className="position-label">{drawing.points[index].price.toFixed(2)}</text></g>)}
-        <rect x={entry.x} y={Math.min(entry.y, stop.y, target.y)} width={boxWidth} height={Math.max(12, Math.max(entry.y, stop.y, target.y) - Math.min(entry.y, stop.y, target.y))} fill="transparent" className="position-hit" />
-      </>;
-      if (selected) { p[1] = { x: entry.x + boxWidth, y: stop.y }; p[2] = { x: entry.x + boxWidth, y: target.y }; }
-    } else geometry = <DrawingGeometry drawing={drawing} projected={p} project={project} candles={candles} width={width} height={height} />;
+    const geometry = renderGeometry({ drawing, projected: p, project, candles, width, height, selected });
+    const handles = handleProjection ? handleProjection(p) : p;
+    // Pointer callbacks read capture/drag refs only when an event fires, never during render.
+    // eslint-disable-next-line react-hooks/refs
+    const onPointerDown = event => beginDrag(event, drawing);
     return <g key={drawing.id} data-drawing-id={drawing.id} data-drawing-type={drawing.type} data-anchors={JSON.stringify(drawing.points)} data-locked={Boolean(drawing.locked)} className={drawing.id === "draft" ? "drawing-draft" : ""}
       onContextMenu={event => { event.preventDefault(); event.stopPropagation(); onSelect(drawing.id); onContextMenu({ id: drawing.id, x: event.clientX, y: event.clientY }); }}
       onDoubleClick={event => { event.stopPropagation(); onSelect(drawing.id); onContextMenu({ id: drawing.id, x: event.clientX, y: event.clientY, edit: true }); }}
-      onPointerDown={event => beginDrag(event, drawing)}>
+      onPointerDown={onPointerDown}>
       {geometry}
-      {selected && !drawing.locked && p.filter((_, index) => !FREEHAND_TOOLS.has(drawing.type) || index === 0 || index === p.length - 1).map((point, index) => handle(drawing, FREEHAND_TOOLS.has(drawing.type) && index === 1 ? p.length - 1 : index, point))}
+      {selected && !drawing.locked && handles.filter((_, index) => !isFreehand(drawing.type) || index === 0 || index === handles.length - 1).map((point, index) => handle(drawing, isFreehand(drawing.type) && index === 1 ? handles.length - 1 : index, point))}
       {selected && drawing.locked && <text x={p[0].x + 10} y={p[0].y - 10} className="geometry-label" fill="#a5a8ad">🔒</text>}
     </g>;
   }
-  return <svg ref={svgRef} className={"drawings-layer " + (!neutral ? "tool-active " : "") + (placing ? "placement-active " : "") + (freehand || drawingMode === "demonstration" ? "freehand-active " : "") + (drawingMode === "eraser" ? "erase-active" : "")}
+  return <svg ref={svgRef} className={"drawings-layer " + layerClass + " " + (!neutral ? "tool-active " : "") + (placing ? "placement-active " : "") + (freehand || drawingMode === "demonstration" ? "freehand-active " : "") + (drawingMode === "eraser" ? "erase-active" : "")}
     onClick={event => { if (placing) { const point = coordinates(event); if (point) { event.stopPropagation(); onPlacePoint?.({ point: { x: point.x, y: point.y }, time: point.time }); } } }}
-    onPointerDown={startStroke} onPointerMove={movePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={() => { if (dragging.current) { dragging.current = null; onEndDrag?.(); } }} aria-label="Drawing objects">
+    onPointerDown={startStroke} onPointerMove={movePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={() => { if (dragging.current) { dragging.current = null; onEndDrag?.(); } }} aria-label={layerName}>
     {drawings.map(renderDrawing)}
     {strokePreview && renderDrawing(strokePreview)}
     {drawingMode === "demonstration" && pointer && <circle cx={pointer.x} cy={pointer.y} r="14" fill="#ff465566" stroke="#ff4655" strokeWidth="2" pointerEvents="none" />}
   </svg>;
 }
-export default DrawingsLayer;
+export default ChartObjectOverlay;

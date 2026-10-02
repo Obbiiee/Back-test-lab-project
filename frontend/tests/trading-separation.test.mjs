@@ -1,0 +1,128 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { RiskRewardController, normalizeRiskRewardSettings } from '../src/trading/RiskRewardController.js';
+import { positionStats, riskRewardOrderSeed } from '../src/trading/riskReward.js';
+import { positionStats as legacyStats } from '../src/drawings/position.js';
+import { ChartObjectBridge } from '../src/chart/ChartObjectBridge.js';
+import { LegacyObjectPersistence } from '../src/chart/LegacyObjectPersistence.js';
+import { syncTradingAnnotations } from '../src/trading/chartAnnotations.js';
+import { initialAccount, placeOrder, processCandle } from '../src/trading/simulator.js';
+
+const candles = Array.from({ length: 100 }, (_, index) => ({ time: 1000 + index * 60, open: 2000, high: 2005, low: 1995, close: 2000 }));
+candles.intervalSeconds = 60;
+const controller = new RiskRewardController();
+const series = { coordinateToPrice: y => 2050 - y, priceToCoordinate: price => 2050 - price };
+const point = { time: candles[10].time, price: 2000 };
+const line = { id: 'line', type: 'trendline', points: [point, { time: candles[20].time, price: 2020 }] };
+const positions = [];
+for (const type of ['long-position', 'short-position']) {
+  const object = controller.create(type, point, { y: 50 }, series, candles, type);
+  assert.equal(object.points.length, 4);
+  assert.equal(object.points[3].time, candles[40].time);
+  assert.equal(positionStats(object, 2000).ratio, 1, 'Default 1:1 remains unchanged');
+  const frozen = JSON.parse(JSON.stringify(object));
+  frozen.points.forEach(Object.freeze); Object.freeze(frozen.points); Object.freeze(frozen);
+  const direction = type === 'long-position' ? 1 : -1;
+  const resizedStop = controller.resize(frozen, 1, { time: 9999, price: 2000 + 100 * direction }, candles);
+  assert.ok(Math.abs(resizedStop.points[0].price - resizedStop.points[1].price) < .002);
+  assert.equal(resizedStop.points[1].time, point.time);
+  assert.ok(positionStats(resizedStop, 2000).valid);
+  const resizedTarget = controller.resize(frozen, 2, { time: 9999, price: 2000 - 100 * direction }, candles);
+  assert.equal(resizedTarget.points[2].time, point.time);
+  assert.ok(positionStats(resizedTarget, 2000).valid);
+  const movedEntry = controller.resize(frozen, 0, { time: candles[12].time, price: 2010 }, candles);
+  assert.equal(movedEntry.points[1].price, object.points[1].price + 10);
+  assert.equal(movedEntry.points[2].price, object.points[2].price + 10);
+  assert.equal(movedEntry.points[1].time, candles[12].time);
+  const resizedWidth = controller.resize(frozen, 3, { time: 0, price: 1800 }, candles);
+  assert.equal(resizedWidth.points[3].time, candles[11].time);
+  assert.equal(resizedWidth.points[3].price, 2000);
+  assert.deepEqual(frozen, object, 'Resize must not mutate history snapshots');
+  const normalized = normalizeRiskRewardSettings({ ...object, points: object.points.map((p, index) => ({ ...p, time: index === 1 ? 9999 : p.time })) });
+  assert.equal(normalized.points[1].time, normalized.points[0].time);
+  assert.equal(normalized.points[3].price, normalized.points[0].price);
+  const seed = riskRewardOrderSeed(object, 2000);
+  assert.equal(seed.side, direction === 1 ? 'Buy' : 'Sell');
+  assert.equal(seed.type, 'Market');
+  assert.equal(seed.sl, object.points[1].price);
+  assert.equal(seed.tp, object.points[2].price);
+  assert.equal(seed.size, positionStats(object, 2000).quantity / 100);
+  assert.equal(riskRewardOrderSeed(object, 2000 + 10 * direction).type, 'Limit');
+  assert.equal(riskRewardOrderSeed(object, 2000 - 10 * direction).type, 'Stop');
+  let account = placeOrder(initialAccount(), { ...seed, id: type }, candles[10]);
+  assert.equal(account.positions.length, 1);
+  account = processCandle(account, { ...candles[11], high: 2005, low: 1995 });
+  assert.equal(account.positions.length, 1, 'Open position survives an ordinary replay step');
+  account = processCandle(account, { ...candles[12], open: seed.tp, high: seed.tp, low: seed.tp, close: seed.tp });
+  assert.equal(account.positions.length, 0);
+  assert.equal(account.trades[0].reason, 'Take profit');
+  positions.push(object);
+}
+assert.strictEqual(legacyStats, positionStats, 'Legacy imports resolve to trading calculation');
+
+const bridge = new ChartObjectBridge();
+bridge.replace([line, positions[0], positions[1]]);
+assert.deepEqual(bridge.drawings, [line]);
+assert.deepEqual(bridge.riskReward.objects, positions);
+assert.deepEqual(bridge.objects, [line, ...positions], 'Keep combined legacy ordering');
+const snapshot = bridge.objects;
+bridge.replace(snapshot.map(object => object.id === line.id ? { ...object, hidden: true } : object));
+assert.deepEqual(bridge.riskReward.objects, positions, 'Drawing property changes do not mutate trading');
+bridge.drawings = [];
+assert.deepEqual(bridge.riskReward.objects, positions, 'Retiring drawing state cannot clear risk/reward');
+assert.deepEqual(bridge.objects, positions);
+bridge.replace(snapshot);
+assert.deepEqual(bridge.objects, snapshot, 'Shared undo restores both independent collections');
+bridge.replace([positions[1]]);
+assert.deepEqual(bridge.riskReward.objects, [positions[1]]);
+bridge.replace(snapshot);
+assert.equal(bridge.riskReward.get('long-position').id, 'long-position');
+
+const key = 'backtest-drawings-v2:XAUUSD-live-30m';
+const unsupported = { id: 'future', type: 'future-tool', custom: { preserve: true } };
+const malformedObject = { id: 'invalid', type: 'trendline', points: [{ time: null, price: 2 }] };
+const original = JSON.stringify([line, ...positions, unsupported, malformedObject]);
+const values = new Map([[key, original]]);
+const storage = { getItem: name => values.get(name) ?? null, setItem: (name, value) => values.set(name, value) };
+const accepts = object => ['trendline', 'long-position', 'short-position'].includes(object?.type)
+  && Array.isArray(object.points) && object.points.every(p => Number.isFinite(p.time) && Number.isFinite(p.price));
+const persistence = new LegacyObjectPersistence();
+const restored = persistence.load(storage, key, accepts);
+assert.deepEqual(restored, [line, ...positions]);
+assert.equal(values.get(key + ':before-trading-separation'), original);
+persistence.save(storage, key, [positions[0]]);
+assert.deepEqual(JSON.parse(values.get(key)), [positions[0], unsupported, malformedObject]);
+assert.equal(values.get(key + ':before-trading-separation'), original, 'Backup is never overwritten');
+assert.equal(persistence.save(storage, key + '-wrong-session', []), false, 'Prevent stale session writes');
+const wrongKey = 'broken'; values.set(wrongKey, '{invalid JSON');
+assert.deepEqual(persistence.load(storage, wrongKey, accepts), []);
+assert.equal(persistence.save(storage, wrongKey, []), false);
+assert.equal(values.get(wrongKey), '{invalid JSON', 'Invalid JSON is not silently overwritten');
+const disabledStorage = { getItem() { throw new Error('Storage unavailable'); } };
+assert.deepEqual(persistence.load(disabledStorage, key, accepts), []);
+assert.equal(persistence.save(disabledStorage, key, []), false);
+assert.deepEqual(persistence.load(() => { throw new Error('Storage access denied'); }, key, accepts), []);
+
+let markers = [];
+const removed = [], created = [];
+const chartSeries = { removePriceLine: line => removed.push(line), createPriceLine: line => { created.push(line); return line; } };
+const open = { id: 'open', side: 'Buy', entry: 2000, sl: 1990, tp: 2020, entryTime: candles[10].time + 15, size: 1 };
+const pending = { id: 'pending', side: 'Sell', type: 'Limit', entry: 2010, sl: 2020, tp: 1990, placedTime: candles[11].time + 20 };
+const lines = syncTradingAnnotations({ series: chartSeries, markerPlugin: { setMarkers: value => { markers = value; } },
+  priceLines: ['old'], candles, positions: [open], orders: [pending], simulatedTrades: [], trades: [] });
+assert.deepEqual(removed, ['old']);
+assert.equal(lines.length, 6);
+assert.equal(markers.length, 2);
+assert.equal(markers[0].time, candles[10].time, 'Trade time maps to its visible candle');
+assert.equal(markers[0].shape, 'arrowUp');
+assert.equal(markers[1].shape, 'arrowDown');
+assert.equal(created.filter(line => line.title === 'SL').length, 2);
+assert.equal(created.filter(line => line.title === 'TP').length, 2);
+assert.ok(created.every(line => line.axisLabelVisible && line.lineStyle === 2));
+
+for (const file of ['RiskRewardController.js', 'riskReward.js', 'RiskRewardLayer.jsx', 'RiskRewardGeometry.jsx', 'RiskRewardSettings.jsx', 'TradingLayer.jsx', 'chartAnnotations.js']) {
+  const source = readFileSync(new URL('../src/trading/' + file, import.meta.url), 'utf8');
+  assert.ok(!/from ['"][^'"]*drawings\//.test(source), file + ' must not import a drawing engine');
+}
+assert.ok(!readFileSync(new URL('../legacy/phase3/src/components/DrawingsLayer.jsx', import.meta.url), 'utf8').includes('positionStats'));
+console.log('PASS: independent trading ownership, long/short creation and resize, unchanged sizing/order seeds, replay exits, native markers/price lines, undo compatibility and lossless legacy persistence.');

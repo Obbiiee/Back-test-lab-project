@@ -125,14 +125,29 @@ button { cursor: pointer; }
 .goto-menu .custom-go { border-top: 1px solid var(--line); margin-top: 3px; height: 42px; }
 
 .dialog-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.62); display: grid; place-items: center; }
+.indicator-dialog, .order-dialog { background: #151618; border: 1px solid #3a3d42; border-radius: 10px; box-shadow: 0 24px 70px #000; overflow: hidden; }
+.indicator-dialog { width: min(660px, 90vw); height: min(500px, 78vh); padding: 16px; }
 .order-dialog { width: min(655px, 92vw); max-height: 88vh; overflow-y: auto; background: #050505; }
 .dialog-title { height: 49px; display: flex; align-items: center; justify-content: space-between; font-size: 19px; padding: 0 4px 0 2px; }
 .order-dialog .dialog-title { padding: 0 16px; border-bottom: 1px solid var(--line); }
 .dialog-title button { border: 0; background: transparent; font-size: 24px; color: #a9abb0; }
 .dialog-title > div { display: flex; align-items: center; gap: 8px; }
 .dialog-title .preset { padding: 0 19px; height: 39px; border-radius: 21px; background: #4d4f54; color: white; font-size: 13px; }
-.journal-search { border: 1px solid #bfc2c7; height: 44px; border-radius: 9px; display: flex; align-items: center; gap: 9px; padding: 0 11px; }
-.journal-search input { flex: 1; border: 0; outline: 0; background: transparent; color: white; }
+.indicator-search, .journal-search { border: 1px solid #bfc2c7; height: 44px; border-radius: 9px; display: flex; align-items: center; gap: 9px; padding: 0 11px; }
+.indicator-search input, .journal-search input { flex: 1; border: 0; outline: 0; background: transparent; color: white; }
+.indicator-main-tabs { height: 68px; display: grid; grid-template-columns: 1fr 1fr; align-items: end; border-bottom: 1px solid var(--line); }
+.indicator-main-tabs button { height: 45px; border: 0; background: transparent; color: #a4a7ad; font-size: 14px; }
+.indicator-main-tabs button.active { color: white; font-weight: 600; }
+.indicator-filters { display: flex; gap: 8px; padding: 30px 8px 17px; }
+.indicator-filters button { height: 37px; border: 0; padding: 0 14px; border-radius: 19px; background: #242629; color: #aaaeb4; }
+.indicator-filters button.active { background: #0877ff; color: white; }
+.indicator-filters small { margin-left: 7px; color: white; background: #0877ff; border-radius: 5px; padding: 1px 4px; }
+.indicator-columns, .indicator-list button { display: grid; grid-template-columns: 1.7fr .9fr .8fr; align-items: center; }
+.indicator-columns { padding: 0 17px 8px; color: #747880; font-size: 9px; }
+.indicator-list { height: 180px; overflow-y: auto; }
+.indicator-list button { width: 100%; height: 43px; border: 0; background: transparent; text-align: left; padding: 0 17px; }
+.indicator-list button:hover { background: #222428; }
+.indicator-list b { color: #3b8ef6; font-weight: 400; }
 
 .order-form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 9px; padding: 14px 24px 20px; }
 .order-form label, .strategy-label { display: flex; flex-direction: column; gap: 8px; color: #afb2b8; }
@@ -240,8 +255,12 @@ button { cursor: pointer; }
 button:focus-visible { outline: 2px solid #4285f4; outline-offset: -2px; }
 select { font: inherit; color: inherit; }
 .geometry-label { pointer-events: none; font-family: Inter, sans-serif; user-select: none; }
+.drawings-layer.freehand-active { pointer-events: all; touch-action: none; cursor: crosshair; }
 .drawings-layer.placement-active { pointer-events: all; touch-action: none; cursor: crosshair; }
-.drawings-layer.tool-active > g * { pointer-events: none !important; }
+.drawings-layer.erase-active > g { pointer-events: visiblePainted; cursor: not-allowed; }
+.drawings-layer .drawing-draft { pointer-events: none !important; opacity: .65; }
+.drawings-layer .drawing-draft * { pointer-events: none !important; }
+.drawings-layer.tool-active:not(.erase-active) > g * { pointer-events: none !important; }
 .drawings-layer > g[data-locked="true"] { cursor: default; }
 .cursor-cursor-arrow .candle-chart { cursor: default; }
 .cursor-cursor-dot .candle-chart { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Ccircle cx='4' cy='4' r='3' fill='white' stroke='%23222'/%3E%3C/svg%3E") 4 4, crosshair; }

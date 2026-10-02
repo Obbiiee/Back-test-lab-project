@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { LegacyObjectPersistence } from '../src/chart/LegacyObjectPersistence.js';
+import { isRiskReward } from '../src/trading/RiskRewardController.js';
+
+const key = 'backtest-drawings-v2:test';
+const legacy = { id: 'legacy', type: 'rectangle', points: [], unknown: { intact: true } };
+const risk = { id: 'long', type: 'long-position', points: [], custom: 'keep' };
+const unknown = { id: 'future', type: 'future-tool', opaque: ['a', 2] };
+assert.equal(isRiskReward({ type: 'constructor' }), false, 'Unknown prototype names are not trading types');
+const raw = ' ' + JSON.stringify([legacy, risk, null, unknown]) + '\n';
+const backup = '[{"originalBackup":true}]';
+const values = new Map([[key, raw], [key + ':before-trading-separation', backup]]);
+let writes = 0;
+const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => { writes++; values.set(key, value); } };
+const persistence = new LegacyObjectPersistence();
+const restored = persistence.load(storage, key, isRiskReward);
+assert.deepEqual(restored, [risk]);
+assert.equal(persistence.save(storage, key, restored), true);
+assert.equal(writes, 0, 'Reload must not rewrite unchanged bytes or existing backup');
+assert.equal(values.get(key), raw);
+persistence.save(storage, key, [{ ...risk, locked: true }]);
+assert.deepEqual(JSON.parse(values.get(key)), [legacy, { ...risk, locked: true }, null, unknown], 'Trading edits retain opaque records, fields and interleaved order');
+persistence.save(storage, key, []);
+assert.deepEqual(JSON.parse(values.get(key)), [legacy, null, unknown], 'Clearing active trading objects does not erase retired drawings');
+persistence.save(storage, key, restored);
+assert.deepEqual(JSON.parse(values.get(key)), [legacy, null, unknown, risk], 'Undo can reintroduce trading objects without dropping legacy data');
+assert.equal(values.get(key + ':before-trading-separation'), backup);
+const empty = new LegacyObjectPersistence();
+assert.deepEqual(empty.load(storage, key + '-uncreated', isRiskReward), []);
+empty.save(storage, key + '-uncreated', []);
+assert.equal(values.has(key + '-uncreated'), false, 'Do not create empty namespaces on read');
+for (const value of ['{broken', '{}']) {
+  values.set(key, value);
+  assert.deepEqual(persistence.load(storage, key, isRiskReward), []);
+  assert.equal(persistence.save(storage, key, []), false);
+  assert.equal(values.get(key), value);
+}
+const chart = readFileSync(new URL('../src/components/CandleChart.jsx', import.meta.url), 'utf8');
+const workspace = readFileSync(new URL('../src/FigmaWorkspace.jsx', import.meta.url), 'utf8');
+assert.ok(!/DrawingsLayer|DrawingGeometry|DRAWING_TOOLS|FREEHAND_TOOLS|movingAverage|LineSeries|add-horizontal|add-vertical|draftPointRef|indicator:/.test(chart), 'No retired renderer, creation shortcut, subscription or indicators in active chart');
+assert.ok(chart.includes('<TradingLayer'));
+assert.ok(workspace.includes('Long Position') && workspace.includes('Short Position'));
+assert.ok(!/setDialog\("indicators"\)|Fib Retracement|price-range|zoom-region|Alt\+T/.test(workspace));
+const dependencies = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies;
+assert.equal(dependencies['lightweight-charts-drawing'], undefined);
+assert.ok(dependencies['lightweight-charts']);
+console.log('PASS: Phase 4 runtime retirement, byte-preserving reload, mixed/unknown records, editing/deleting/undo, backup protection, corrupt JSON and empty namespaces.');

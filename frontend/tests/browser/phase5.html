@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Phase 5 storage regression fixture</title>
+<body>
+<h1>Phase 5 disposable test origin</h1>
+<p>Run only on the dedicated test server port, never on the user's main preview origin.</p>
+<button id="seed">Seed disposable fixture</button>
+<button id="snapshot">Snapshot drawing storage</button>
+<button id="load">Load application</button>
+<button id="reload">Reload application</button>
+<pre id="storage"></pre><iframe id="app" title="Backtest Lab test application" width="1280" height="900"></iframe>
+<script type="module">
+const key = 'backtest-drawings-v2:XAUUSD-live-30m';
+const stamp = Date.parse('2024-05-29T12:00:00Z') / 1000;
+const point = (offset, price) => ({time: stamp + offset * 1800, price});
+document.querySelector('#seed').onclick = () => {
+  if (location.port !== '5181') throw new Error('Fixture requires isolated port 5181.');
+  if (localStorage.getItem(key) != null) throw new Error('Refusing to overwrite existing drawing data.');
+  const records = [
+    {id:'legacy-trend',type:'trendline',points:[point(0,2340),point(30,2350)],color:'#abcdef',migrationNote:{retain:true}},
+    {id:'fixture-long',type:'long-position',points:[point(4,2340),point(4,2330),point(4,2360),point(34,2340)],riskValue:1,customField:'preserve'},
+    {id:'legacy-rectangle',type:'rectangle',points:[point(10,2320),point(20,2330)],locked:true},
+    {id:'legacy-text',type:'text',points:[point(20,2335)],text:'Preserve this note',hidden:false},
+    {id:'fixture-short',type:'short-position',points:[point(40,2340),point(40,2350),point(40,2310),point(70,2340)]},
+    {id:'legacy-fib',type:'fib-retracement',points:[point(4,2340),point(24,2320)],levels:[0,0.5,1]},
+    {id:'unknown-record',type:'future-drawing-v9',custom:{keep:true}},
+  ];
+  localStorage.setItem(key, JSON.stringify(records));
+  localStorage.setItem(key + ':before-trading-separation', '[{"id":"earlier-backup","type":"opaque","snapshot":true}]');
+  localStorage.setItem('backtest-drawings-v2:XAUUSD-live-1h', ' [ {"id":"unopened-namespace","type":"custom","unknown":"keep"} ] ');
+  localStorage.setItem('backtest-drawings-v2:XAUUSD-live-1h:before-trading-separation', ' [ {"id":"unopened-namespace","type":"custom","unknown":"keep"} ] ');
+  localStorage.setItem('backtest-replay-time-v1', '2024-06-03T12:00:00.000Z');
+  localStorage.setItem('backtest-workspace-interval-v1', '30m');
+};
+document.querySelector('#snapshot').onclick = () => {
+  const values = Object.fromEntries(Object.keys(localStorage).filter(name=>name.startsWith('backtest-drawings-v2:')).sort().map(name=>[name,localStorage.getItem(name)]));
+  document.querySelector('#storage').textContent = JSON.stringify(values,null,2);
+};
+document.querySelector('#load').onclick = () => { document.querySelector('#app').src = '/'; };
+document.querySelector('#reload').onclick = () => { document.querySelector('#app').contentWindow.location.reload(); };
+</script>
+</body></html>
+

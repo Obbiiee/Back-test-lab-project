@@ -1,0 +1,29 @@
+{
+  "anchors": [
+    {
+      "id": "998cda86-3b3b-46e1-a236-c27514064958",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717380900,
+          "price": 2311.2296244472523
+        },
+        {
+          "time": 1717399800,
+          "price": 2325.1022950094757
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "timeframeRoundtripAndReplayPreserved": true,
+  "consoleErrors": []
+}

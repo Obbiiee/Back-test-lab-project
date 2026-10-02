@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { RISK_REWARD_TOOLS } from "./trading/RiskRewardController";
+import { DRAWING_TOOLS, resolveTool } from "./drawings/tools";
 import useGoldMarket from "./market/useGoldMarket";
 import {TIMEFRAMES} from "./market/candles";
 import OrderTicket from "./trading/OrderTicket";
@@ -54,11 +54,157 @@ function Icon({ name, size = 20 }) {
 	return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shapes[name]}</svg>;
 }
 const toolGroups = {
-  trend: [{ title: "LINES", items: ["Trend Line"] }],
-  cursor: [{ title: "", items: ["Cross", "Dot", "Arrow"] }],
-  measure: [{ title: "RISK / REWARD", items: ["Long Position", "Short Position"] }],
+ smile: [{ title: "ICONS", items: ["Smile", "Star", "Check", "Warning"] }],
+	cursor: [{
+		title: "",
+		items: [
+			"Cross",
+			"Dot",
+			"Arrow",
+			"Demonstration",
+			"Eraser"
+		]
+	}],
+	trend: [{
+		title: "LINES",
+		items: [
+			"Trend Line",
+			"Ray",
+			"Info Line",
+			"Extended Line",
+			"Trend Angle",
+			"Horizontal Line",
+			"Horizontal Ray",
+			"Vertical Line",
+			"Cross Line"
+		]
+	}, {
+		title: "CHANNELS",
+		items: [
+			"Parallel Channel",
+			"Regression Trend",
+			"Flat Top / Bottom",
+			"Disjoint Channel"
+		]
+	}, {title:"PITCHFORKS",items:["Pitchfork","Schiff Pitchfork","Modified Schiff Pitchfork","Inside Pitchfork"]}],
+	fib: [{
+		title: "FIBONACCI",
+		items: [
+			"Fib Retracement",
+			"Trend-Based Fib Extension",
+			"Fib Channel",
+			"Fib Time Zone",
+			"Fib Speed Resistance Fan",
+			"Trend-Based Fib Time",
+			"Fib Circles",
+			"Fib Spiral",
+			"Fib Speed Resistance Arcs",
+			"Fib Wedge",
+			"Pitchfan"
+		]
+	}, {
+		title: "GANN",
+		items: [
+			"Gann Box",
+			"Gann Square Fixed",
+			"Gann Square",
+            "Gann Fan"
+		]
+	}],
+	pattern: [{
+		title: "PATTERNS",
+		items: [
+			"XABCD Pattern",
+			"Cypher Pattern",
+			"Head and Shoulders",
+			"ABCD Pattern",
+			"Triangle Pattern",
+			"Three Drives Pattern"
+		]
+	}, {
+		title: "ELLIOTT WAVES",
+		items: [
+			"Elliott Impulse Wave (12345)",
+			"Elliott Correction Wave (ABC)",
+			"Elliott Triangle Wave (ABCDE)",
+			"Elliott Double Combo Wave",
+            "Elliott Triple Combo Wave"
+		]
+	}],
+	measure: [
+		{
+			title: "FORECASTING",
+			items: [
+				"Long Position",
+				"Short Position",
+				"Position Forecast",
+				"Bars Pattern",
+				"Ghost Feed",
+				"Sector"
+			]
+		},
+		{
+			title: "VOLUME-BASED",
+			items: [
+				"Anchored VWAP",
+				"Fixed Range Volume Profile",
+				"Anchored Volume Profile"
+			]
+		},
+		{
+			title: "MEASURER",
+			items: [
+				"Price Range",
+				"Date Range",
+				"Date and Price Range"
+			]
+		}
+	],
+	brush: [
+		{
+			title: "BRUSHES",
+			items: ["Brush", "Highlighter"]
+		},
+		{
+			title: "ARROWS",
+			items: [
+				"Arrow Marker",
+				"Arrow",
+				"Arrow Mark Up",
+				"Arrow Mark Down",
+				"Arrow Mark Left",
+				"Arrow Mark Right"
+			]
+		},
+		{
+			title: "SHAPES",
+			items: [
+				"Rectangle",
+				"Rotated Rectangle",
+				"Path",
+				"Circle",
+				"Ellipse", "Polyline", "Triangle", "Arc", "Curve", "Double Curve"
+			]
+		}
+	],
+	text: [{
+		title: "TEXT & NOTES",
+		items: [
+			"Text",
+			"Anchored Text",
+			"Note",
+			"Price Note",
+			"Pin",
+			"Table",
+			"Callout",
+			"Comment",
+			"Price Label",
+			"Signpost",
+			"Flag Mark"
+		]
+	}]
 };
-const resolveTool = name => ({ Cross: 'none', Dot: 'cursor-dot', Arrow: 'cursor-arrow', 'Trend Line': 'trend-line', 'Long Position': 'long-position', 'Short Position': 'short-position' })[name];
+toolGroups.pattern.push({title:"CYCLES",items:["Cyclic Lines","Time Cycles"]});
 function App() {
 	const [drawingMode, setDrawingMode] = useState("none");
 	const [chartPreferences, setChartPreferences] = useState({
@@ -75,6 +221,7 @@ function App() {
 	});
 	const [speed, setSpeed] = useState(3);
 	const [notice, setNotice] = useState("");
+	const [indicatorSearch, setIndicatorSearch] = useState("");
  const [timeframe,setTimeframe]=useState(()=>{try{const saved=localStorage.getItem('backtest-workspace-interval-v1');return saved in TIMEFRAMES?saved:'30m';}catch{return '30m';}});
  useEffect(()=>{try{localStorage.setItem('backtest-workspace-interval-v1',timeframe);}catch{/* The current interval remains usable without storage. */}},[timeframe]);
  const [intervalOpen,setIntervalOpen]=useState(false);
@@ -97,7 +244,7 @@ function App() {
  const pickCallback=useRef(null);
  const resizePositions=event=>{event.preventDefault();const start=event.clientY,height=terminalHeight;const move=point=>setTerminalHeight(Math.max(95,Math.min(window.innerHeight-280,height+start-point.clientY)));const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);};
  const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('backtest-favorites-v1'))??['Trend Line','Long Position','Short Position'];}catch{return ['Trend Line','Long Position','Short Position'];}});
- const [favoritesVisible,setFavoritesVisible]=useState(true),[lastTools,setLastTools]=useState({cursor:'Cross',trend:'Trend Line',measure:'Long Position'});
+ const [favoritesVisible,setFavoritesVisible]=useState(true),[lastTools,setLastTools]=useState({cursor:'Cross',trend:'Trend Line',fib:'Fib Retracement',pattern:'XABCD Pattern',measure:'Long Position',brush:'Brush',text:'Text',smile:'Smile'});
  const openTicket=(side=tradeSide,seed=null)=>{if(!trading.quote){setNotice('Loading price…');return;}setTradeSide(side);setOrderSeed(seed);setTicketId(value=>value+1);setDialog('order');};
  const fromDrawing=object=>{const seed=riskRewardOrderSeed(object,trading.quote?.close);openTicket(seed.side,seed);};
  const beginReplay=async()=>{setPlaying(false);try{const time=await replay.start(replayDate+'Z');trading.reset(time);setDateOpen(false);}catch{/* The replay form displays the loading error. */}};
@@ -108,15 +255,78 @@ function App() {
  useEffect(()=>{if(!playing||!replayActive||replayAtEnd)return;const timer=setInterval(()=>replayStep(),1000/speed);return()=>clearInterval(timer);},[playing,replayActive,replayAtEnd,replayStep,speed]);
  const data=replay.loading?[]:replay.active?replay.candles:market.candles;
  const chooseTool = (name,group=activeTool) => { const mode = resolveTool(name,group); if (mode) setDrawingMode(mode); if(group)setLastTools(current=>({...current,[group]:name}));setPlaying(false); setActiveTool(null); };
- const toolButtons = [
-  { icon: "cursor", key: "cursor", title: "Cursor" },
-  { icon: "trend", key: "trend", title: "Trend Line" },
-  { icon: "measure", key: "measure", title: "Risk / Reward" },
-  { icon: "magnet", key: "magnet", title: "Magnet" },
-  { icon: "lock", key: "lock", title: "Lock drawings" },
-  { icon: "eye", key: "eye", title: "Hide drawings" },
-  { icon: "trash", key: "trash", title: "Remove drawings" },
- ];
+	const toolButtons = [{ icon: "brush", key: "keep", title: "Keep drawing" },
+		{
+			icon: "cursor",
+			key: "cursor",
+			title: "Cursor"
+		},
+		{
+			icon: "trend",
+			key: "trend",
+			title: "Trend line tools"
+		},
+		{
+			icon: "fib",
+			key: "fib",
+			title: "Fibonacci tools"
+		},
+		{
+			icon: "pattern",
+			key: "pattern",
+			title: "Pattern tools"
+		},
+		{
+			icon: "measure",
+			key: "measure",
+			title: "Prediction and measurement"
+		},
+		{
+			icon: "brush",
+			key: "brush",
+			title: "Brushes and shapes"
+		},
+		{
+			icon: "text",
+			key: "text",
+			title: "Text and notes"
+		},
+		{
+			icon: "smile",
+			key: "smile",
+			title: "Icons"
+		},
+		{
+			icon: "ruler",
+			key: "ruler",
+			title: "Measure"
+		},
+		{
+			icon: "zoom",
+			key: "zoom",
+			title: "Zoom"
+		},
+		{
+			icon: "magnet",
+			key: "magnet",
+			title: "Magnet"
+		},
+		{
+			icon: "lock",
+			key: "lock",
+			title: "Lock drawings"
+		},
+		{
+			icon: "eye",
+			key: "eye",
+			title: "Hide drawings"
+		},
+		{
+			icon: "trash",
+			key: "trash",
+			title: "Remove drawings"
+		}
+	];
 	return <div className="replay-app">
       {notice && <button className="design-notice" onClick={() => setNotice("")}>{notice} ×</button>}
       <header className="main-toolbar">
@@ -132,6 +342,7 @@ function App() {
 		sendChartCommand("new-layout");
 		setDrawingMode("none");
 	}}>New Layout</button>
+        <button className="nav-action" onClick={() => setDialog("indicators")}><Icon name="indicator" size={18} />Indicators</button>
         <button className="tool-icon" title="Undo drawing" disabled={!drawingState.canUndo} onClick={() => sendChartCommand("undo")}><Icon name="undo" size={18} /></button>
         <button className="tool-icon" title="Redo drawing" disabled={!drawingState.canRedo} onClick={() => sendChartCommand("redo")}><Icon name="redo" size={18} /></button>
         <div className="toolbar-fill" />
@@ -149,7 +360,7 @@ function App() {
         <aside className="left-tools">
           {toolButtons.filter(tool=>tool.key!=='keep').map(tool=><div className="drawing-tool-slot" key={tool.key}><button title={tool.title} className={`side-tool ${activeTool===tool.key?'active':''}`} onClick={()=>{
             if(toolGroups[tool.key])chooseTool(lastTools[tool.key],tool.key);
-            else sendChartCommand({'trash':'clear','lock':'lock-all','eye':'hide-all','magnet':'magnet'}[tool.key]);
+            else if(tool.key==='ruler')setDrawingMode('price-range');else if(tool.key==='zoom')setDrawingMode('zoom-region');else sendChartCommand({'trash':'clear','lock':'lock-all','eye':'hide-all','magnet':'magnet'}[tool.key]);
           }}><Icon name={tool.icon}/></button>{toolGroups[tool.key]&&<button className="tool-expander" aria-label={`Expand ${tool.title}`} aria-expanded={activeTool===tool.key} onClick={()=>setActiveTool(activeTool===tool.key?null:tool.key)}>›</button>}</div>)}
           <button className={`side-tool ${drawingState.keepDrawing?'active':''}`} title="Keep drawing mode" onClick={()=>sendChartCommand('keep-drawing')}><Icon name="brush"/></button>
           <button className={`side-tool ${favoritesVisible?'active':''}`} title="Toggle favorites bar" onClick={()=>setFavoritesVisible(value=>!value)}>☆</button>
@@ -159,7 +370,7 @@ function App() {
           <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={trading.update} onClosePosition={trading.close} onCancelOrder={trading.cancel} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} /></Suspense>
 
           <div className="chart-meta"><strong>XAU / USD · {timeframe} · Backtest Lab</strong><i /><span className="up-text">O {data.at(-1)?.open.toFixed(3)}&nbsp;&nbsp; H {data.at(-1)?.high.toFixed(3)}&nbsp;&nbsp; L {data.at(-1)?.low.toFixed(3)}&nbsp;&nbsp; C {data.at(-1)?.close.toFixed(3)}</span><small>Volume&nbsp; <b>{marketMode === "live" ? "—" : data.at(-1)?.volume}</b></small></div>
-          {favoritesVisible&&favorites.length>0&&<div className="drawing-favorites" aria-label="Favorite drawing tools">{favorites.filter(name=>RISK_REWARD_TOOLS[resolveTool(name)]).map(name=><button key={name} title={name} onClick={()=>chooseTool(name,Object.keys(toolGroups).find(group=>toolGroups[group].some(section=>section.items.includes(name))))}>{name==='Long Position'?'↗':name==='Short Position'?'↘':name==='Trend Line'?'╱':name==='Horizontal Line'?'―':name.slice(0,2)}</button>)}</div>}
+          {favoritesVisible&&favorites.length>0&&<div className="drawing-favorites" aria-label="Favorite drawing tools">{favorites.map(name=><button key={name} title={name} onClick={()=>chooseTool(name,Object.keys(toolGroups).find(group=>toolGroups[group].some(section=>section.items.includes(name))))}>{name==='Long Position'?'↗':name==='Short Position'?'↘':name==='Trend Line'?'╱':name==='Horizontal Line'?'―':name.slice(0,2)}</button>)}</div>}
           <div className="range-bar"><div>{[
 		"5y",
 		"1y",
@@ -171,7 +382,7 @@ function App() {
 	].map((r) => <button key={r} onClick={() => sendChartCommand(`range:${r}`)}>{r}</button>)}<button aria-label="Go to a date" onClick={()=>setDateOpen(true)}><Icon name="calendar" size={17} /></button></div><div><strong>{(data.length ? new Date(data.at(-1).time * 1e3).toISOString().slice(11, 19) : "—")} UTC</strong><button onClick={() => sendChartCommand("percent")}>%</button><button onClick={() => sendChartCommand("log")}>log</button><button className="auto-active" onClick={() => sendChartCommand("fit")}>auto</button></div></div>
           {objectsOpen && <aside className="drawing-object-tree"><header><strong>Drawing objects ({drawingState.drawings.length})</strong><button onClick={() => setObjectsOpen(false)}>×</button></header>{!drawingState.drawings.length && <p>No drawings yet</p>}{drawingState.drawings.map((item, index) => <div key={item.id} className={drawingState.selectedId === item.id ? "selected" : ""}><button onClick={() => sendChartCommand("object:select:" + item.id)}>{index + 1}. {item.type.replaceAll("-", " ")}</button><button title="Edit drawing" onClick={() => sendChartCommand("object:edit:" + item.id)}>✎</button><button title={item.hidden ? "Show drawing" : "Hide drawing"} onClick={() => sendChartCommand("object:hide:" + item.id)}>{item.hidden ? "◌" : "◉"}</button><button title={item.locked ? "Unlock drawing" : "Lock drawing"} onClick={() => sendChartCommand("object:lock:" + item.id)}>{item.locked ? "🔒" : "🔓"}</button><button title="Delete drawing" onClick={() => sendChartCommand("object:delete:" + item.id)}>×</button></div>)}</aside>}
           {menu && <div className="tool-menu">
-            {menu.map((group,gi)=><div className="menu-group" key={gi}>{group.title&&<div className="menu-title">{group.title}</div>}{group.items.map(item=><div className="drawing-menu-row" key={item}><button aria-label={item} data-tool-type={resolveTool(item,activeTool)} data-anchor-count={item === "Trend Line" ? 2 : RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points} aria-pressed={resolveTool(item,activeTool)===drawingMode} onClick={()=>chooseTool(item)}><Icon name={activeTool==='measure'?'measure':activeTool} size={17}/><span>{item}</span></button><button className="about-drawing" aria-label={`About ${item}`} onClick={()=>setNotice(`${item} · ${item === "Trend Line" ? 2 : RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points??1} anchor points. Select the tool, then click on the chart.`)}>ⓘ</button><button aria-label={`Favorite ${item}`} aria-pressed={favorites.includes(item)} onClick={()=>toggleFavorite(item)}>{favorites.includes(item)?'★':'☆'}</button></div>)}</div>)}
+            {menu.map((group,gi)=><div className="menu-group" key={gi}>{group.title&&<div className="menu-title">{group.title}</div>}{group.items.map(item=><div className="drawing-menu-row" key={item}><button aria-label={item} data-tool-type={resolveTool(item,activeTool)} data-anchor-count={DRAWING_TOOLS[resolveTool(item,activeTool)]?.points} aria-pressed={resolveTool(item,activeTool)===drawingMode} onClick={()=>chooseTool(item)}><Icon name={activeTool==='measure'?'measure':activeTool} size={17}/><span>{item}</span>{item==='Trend Line'&&<kbd>Alt+T</kbd>}</button><button className="about-drawing" aria-label={`About ${item}`} onClick={()=>setNotice(`${item} · ${DRAWING_TOOLS[resolveTool(item,activeTool)]?.points??1} anchor points. Select the tool, then click on the chart.`)}>ⓘ</button><button aria-label={`Favorite ${item}`} aria-pressed={favorites.includes(item)} onClick={()=>toggleFavorite(item)}>{favorites.includes(item)?'★':'☆'}</button></div>)}</div>)}
 
           </div>}
         </div>
@@ -193,9 +404,35 @@ function App() {
 
       {dateOpen&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();beginReplay();}}><header><strong>Bar replay</strong><button type="button" aria-label="Close replay date" onClick={()=>setDateOpen(false)}>×</button></header><label>Start date and time (UTC)<input type="datetime-local" min="2016-10-03T00:00" max="2026-09-25T00:58" value={replayDate} onChange={event=>setReplayDate(event.target.value)} required/></label><p>Start a new session with a $100,000 account. Candles after the selected time stay hidden until you advance replay.</p>{replay.error&&<p role="alert" className="ticket-error">{replay.error}</p>}<button type="submit" className="place-order" disabled={replay.loading}>{replay.loading?'Loading candles…':'Start replay'}</button></form></div>}
       {editPosition&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();try{trading.update(editPosition.id,{sl:editPosition.sl===''?null:Number(editPosition.sl),tp:editPosition.tp===''?null:Number(editPosition.tp)});setEditPosition(null);}catch(error){setEditError(error.message);}}}><header><strong>Edit {editPosition.side} · XAUUSD</strong><button type="button" aria-label="Close position edit" onClick={()=>setEditPosition(null)}>×</button></header>{['sl','tp'].map(key=><label key={key}>{key==='sl'?'Stop loss':'Take profit'}<input type="number" step="any" value={editPosition[key]??''} placeholder="None" onChange={event=>setEditPosition(current=>({...current,[key]:event.target.value}))}/></label>)}{editError&&<p role="alert" className="ticket-error">{editError}</p>}<button className="place-order" type="submit">Save changes</button></form></div>}
-
+      {dialog === "indicators" && <div className="dialog-backdrop" onMouseDown={() => setDialog(null)}>
+        {<section className="indicator-dialog" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="dialog-title"><strong>Indicators</strong><button onClick={() => setDialog(null)}>×</button></div>
+          <div className="indicator-search"><Icon name="search" size={19} /><input autoFocus value={indicatorSearch} onChange={(event) => setIndicatorSearch(event.target.value)} placeholder="Search indicator" /></div>
+          <div className="indicator-main-tabs"><button>♙&nbsp; My scripts</button><button className="active">◎&nbsp; Discover</button></div>
+          <div className="indicator-filters">{[
+		"All",
+		"Top Rated",
+		"Community",
+		"Built-in",
+		"By FXR"
+	].map((item) => <button key={item} className={item === "All" ? "active" : ""}>{item}{item === "Community" && <small>new</small>}</button>)}</div>
+          <div className="indicator-columns"><span>NAME</span><span>AUTHOR</span><span>UPVOTES</span></div>
+          <div className="indicator-list">
+            {[
+		"SMA 20",
+		"EMA 20",
+		"EMA 50",
+		"Volume"
+	].filter((name) => name.toLowerCase().includes(indicatorSearch.toLowerCase())).map((name) => <button key={name} onClick={() => {
+		sendChartCommand(`indicator:${name}`);
+		setDialog(null);
+	}}><span>{name}</span><b>Built-in</b><span>0</span></button>)}
+          </div>
+        </section>}
+      </div>}
 
 
     </div>;
 }
 export default App;
+

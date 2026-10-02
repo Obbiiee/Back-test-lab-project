@@ -1,0 +1,127 @@
+{
+  "original": [
+    {
+      "id": "fbe6ceb0-23e8-40e3-97e8-dfd9f4831461",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717399800,
+          "price": 2315.243848007465
+        },
+        {
+          "time": 1717413300,
+          "price": 2328.281812951311
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterM15H1M15": [
+    {
+      "id": "fbe6ceb0-23e8-40e3-97e8-dfd9f4831461",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717399800,
+          "price": 2315.243848007465
+        },
+        {
+          "time": 1717413300,
+          "price": 2328.281812951311
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterReplay": [
+    {
+      "id": "fbe6ceb0-23e8-40e3-97e8-dfd9f4831461",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717399800,
+          "price": 2315.243848007465
+        },
+        {
+          "time": 1717413300,
+          "price": 2328.281812951311
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterViewChanges": [
+    {
+      "id": "fbe6ceb0-23e8-40e3-97e8-dfd9f4831461",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717399800,
+          "price": 2315.243848007465
+        },
+        {
+          "time": 1717413300,
+          "price": 2328.281812951311
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterHistory": [
+    {
+      "id": "fbe6ceb0-23e8-40e3-97e8-dfd9f4831461",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717399800,
+          "price": 2315.243848007465
+        },
+        {
+          "time": 1717413300,
+          "price": 2328.281812951311
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ]
+}

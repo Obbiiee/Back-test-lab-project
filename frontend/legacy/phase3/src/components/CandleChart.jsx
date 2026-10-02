@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CandlestickSeries, createChart, createSeriesMarkers, HistogramSeries } from "lightweight-charts";
+import { CandlestickSeries, createChart, createSeriesMarkers, HistogramSeries, LineSeries } from "lightweight-charts";
+import DrawingsLayer from "./DrawingsLayer";
 import TradingLayer from "../trading/TradingLayer";
 import { syncTradingAnnotations } from "../trading/chartAnnotations";
 import { positionStats } from "../trading/riskReward";
@@ -7,11 +8,27 @@ import { isRiskReward, normalizeRiskRewardSettings, RISK_REWARD_TOOLS } from "..
 import RiskRewardSettings from "../trading/RiskRewardSettings";
 import { ChartObjectBridge } from "../chart/ChartObjectBridge";
 import { LegacyObjectPersistence } from "../chart/LegacyObjectPersistence";
-import { logicalAtTime, timeAtLogical } from "../chart/coordinates";
-import useDrawingTools from "../drawings/useDrawingTools";
-import { TREND_LINE } from "../drawings/DrawingTypes";
+import { DRAWING_TOOLS, FREEHAND_TOOLS, logicalAtTime, TEXT_TOOLS, timeAtLogical } from "../drawings/tools";
 
 const EMPTY_TRADES = [];
+
+function movingAverage(candles, period, exponential = false) {
+  if (exponential) {
+    const multiplier = 2 / (period + 1);
+    let average = 0;
+    return candles.map((candle, index) => {
+      average = index === 0 ? candle.close : candle.close * multiplier + average * (1 - multiplier);
+      return { time: candle.time, value: average };
+    });
+  }
+
+  let rollingSum = 0;
+  return candles.flatMap((candle, index) => {
+    rollingSum += candle.close;
+    if (index >= period) rollingSum -= candles[index - period].close;
+    return index < period - 1 ? [] : [{ time: candle.time, value: rollingSum / period }];
+  });
+}
 
 function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange }) {
   const chartContainer = useRef(null);
@@ -19,16 +36,19 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   const seriesRef = useRef(null);
   const [chartForOverlay, setChartForOverlay] = useState(null);
   const [seriesForOverlay, setSeriesForOverlay] = useState(null);
-  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1) });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
+  const indicatorSeriesRef = useRef({});
   const [objectBridge] = useState(() => new ChartObjectBridge());
   const [persistence] = useState(() => new LegacyObjectPersistence());
   const undoStackRef = useRef([]);
   const redoStackRef = useRef([]);
+  const draftPointRef = useRef(null);
   const placementRef = useRef(null);
+  const previewRef = useRef(null);
   const [drawings, setDrawings] = useState([]);
+  const [draftDrawing, setDraftDrawing] = useState(null);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const [selectedDrawingId, setSelectedDrawingId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -38,6 +58,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   const viewportSessionRef = useRef(null);
   const previousCandleCountRef = useRef(0);
   const previousFirstCandleRef = useRef(null);
+  const [indicators, setIndicators] = useState({ sma20: false, ema20: false, ema50: false });
   const showVolume = chartPreferences.showVolume;
   const magnetRef = useRef(false);
   const [magnetEnabled, setMagnetEnabled] = useState(false);
@@ -52,14 +73,15 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       if (!storageKey || restoredSessionRef.current === storageKey) return;
-      const saved = persistence.load(() => localStorage, storageKey, item => Boolean(item && isRiskReward(item)
-        && Array.isArray(item.points) && item.points.length >= 3
+      const saved = persistence.load(() => localStorage, storageKey, item => Boolean(item && (isRiskReward(item) || DRAWING_TOOLS[item.type])
+        && Array.isArray(item.points) && item.points.length > 0
+        && (!isRiskReward(item) || item.points.length >= 3)
         && item.points.every(point => point && Number.isFinite(point.time) && Number.isFinite(point.price))));
       restoredSessionRef.current = storageKey;
       objectBridge.replace(saved); setDrawings(saved);
       undoStackRef.current = []; redoStackRef.current = [];
       setHistoryState({ canUndo: false, canRedo: false }); setSelectedDrawingId(null);
-      setDrawingSettings(null);
+      setDrawingSettings(null); setDraftDrawing(null); draftPointRef.current = [];
     });
     return () => cancelAnimationFrame(frame);
   }, [storageKey, objectBridge, persistence]);
@@ -115,11 +137,17 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       base: 0,
     });
     chart.priceScale("").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    const indicatorSeries = {
+      sma20: chart.addSeries(LineSeries, { color: "#f3bd55", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+      ema20: chart.addSeries(LineSeries, { color: "#58a6ff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+      ema50: chart.addSeries(LineSeries, { color: "#bc8cff", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+    };
     const markers = createSeriesMarkers(series, []);
     chartRef.current = chart;
     seriesRef.current = series;
     volumeSeriesRef.current = volumeSeries;
     markersRef.current = markers;
+    indicatorSeriesRef.current = indicatorSeries;
     const overlayFrame = window.requestAnimationFrame(() => {
       setChartForOverlay(chart);
       setSeriesForOverlay(series);
@@ -140,6 +168,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       seriesRef.current = null;
       volumeSeriesRef.current = null;
       markersRef.current = null;
+      indicatorSeriesRef.current = {};
       priceLinesRef.current = [];
     };
   }, []);
@@ -164,8 +193,8 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     }));
   }
 
-  function moveDrawing(id, points) {
-    replaceDrawings((current) => current.map((drawing) => drawing.id === id ? { ...drawing, points } : drawing));
+  function moveDrawing(id, points, screenAnchor) {
+    replaceDrawings((current) => current.map((drawing) => drawing.id === id ? { ...drawing, points, ...(screenAnchor ? { screenAnchor } : {}) } : drawing));
   }
 
   function replaceDrawings(nextValue) {
@@ -241,6 +270,11 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
           chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0,index), to: candles.length + 4 });
         }
       }
+      if (action.startsWith("indicator:")) {
+        const key = { "SMA 20": "sma20", "EMA 20": "ema20", "EMA 50": "ema50" }[action.slice(10)];
+        if (key) setIndicators(value => ({ ...value, [key]: !value[key] }));
+        else onChartPreferencesChange(value => ({ ...value, showVolume: !value.showVolume }));
+      }
       if (action === "screenshot") {
         setExportStatus("Preparing chart image…");
         const baseCanvas = chartRef.current?.takeScreenshot();
@@ -259,7 +293,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
             const chartBounds = chartContainer.current.getBoundingClientRect();
             copy.setAttribute("viewBox", "0 0 " + bounds.width + " " + chartBounds.height);
             copy.setAttribute("preserveAspectRatio", "none");
-            copy.querySelectorAll(".drawing-handle-hit,.drawing-handle").forEach(element => element.remove());
+            copy.querySelectorAll(".drawing-handle-hit,.drawing-handle,.drawing-draft").forEach(element => element.remove());
             copy.querySelectorAll(".geometry-label,.position-label").forEach(text => { text.setAttribute("fill", text.getAttribute("fill") || "#eaf2fb"); text.style.fontFamily = "sans-serif"; });
             const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml" }));
             const image = new Image();
@@ -282,6 +316,19 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     if (!drawing) {
       if (action === "reset") chartRef.current?.timeScale().fitContent();
       if (action === "undo") undoDrawing();
+      if (["add-horizontal", "add-vertical"].includes(action) && contextMenu) {
+        const bounds = chartContainer.current?.getBoundingClientRect();
+        if (!bounds) return;
+        const x = contextMenu.x - bounds.left;
+        const y = contextMenu.y - bounds.top;
+        const time = chartRef.current?.timeScale().coordinateToTime(x);
+        const price = seriesRef.current?.coordinateToPrice(y);
+        if (time == null || price == null) return;
+        const type = action === "add-horizontal" ? "horizontal" : "vertical";
+        const nextDrawing = { id: crypto.randomUUID(), type, points: [{ time, price: Number(price) }] };
+        commitDrawings((current) => [...current, nextDrawing]);
+        setSelectedDrawingId(nextDrawing.id);
+      }
       return;
     }
     if (action === "delete") {
@@ -301,6 +348,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
         id: crypto.randomUUID(),
         locked: false,
         hidden: false,
+        ...(drawing.screenAnchor ? { screenAnchor: { x: Math.min(.95, drawing.screenAnchor.x + .03), y: Math.max(.05, drawing.screenAnchor.y - .03) } } : {}),
         points: drawing.points.map((point) => ({ time: timeAtLogical(candles, logicalAtTime(candles, point.time) + 1) ?? Number(point.time) + timeStep, price: point.price + (steppedPrice - price) })),
       };
       commitDrawings((current) => [...current, clone]);
@@ -330,6 +378,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     function handleDrawingShortcut(event) {
       const target = event.target;
       if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if(event.altKey){const shortcuts={t:'trendline',h:'horizontal',j:'horizontal-ray',v:'vertical',c:'cross-line',f:'fib-retracement',r:event.shiftKey?'rectangle':undefined};const mode=shortcuts[event.key.toLowerCase()];if(mode){event.preventDefault();draftPointRef.current=null;setDraftDrawing(null);onDrawingModeChange(mode);return;}}
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
         if (event.shiftKey) redoDrawing(); else undoDrawing();
@@ -340,8 +389,17 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
         event.preventDefault();
         deleteSelectedDrawing();
       } else if (event.key === "Escape") {
+        draftPointRef.current = null;
+        setDraftDrawing(null);
         onDrawingModeChange("none");
         setSelectedDrawingId(null);
+      } else if (event.key === "Enter" && ["path","polyline"].includes(drawingMode) && draftPointRef.current?.length >= 2) {
+        const object = { id: crypto.randomUUID(), type: drawingMode, points: draftPointRef.current };
+        commitDrawings(current => [...current, object]);
+        draftPointRef.current = null; setDraftDrawing(null); setSelectedDrawingId(object.id);
+        if (!keepDrawing) onDrawingModeChange("none");
+      } else if (event.altKey && event.key.toLowerCase() === "t") {
+        event.preventDefault(); onDrawingModeChange("trendline");
       }
     }
     window.addEventListener("keydown", handleDrawingShortcut);
@@ -351,10 +409,12 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   useEffect(() => {
     const chart = chartRef.current, series = seriesRef.current;
     if (!chart || !series) return;
-    const tool = RISK_REWARD_TOOLS[drawingMode];
-    const placing = Boolean(tool) || drawingMode === TREND_LINE;
-    chart.applyOptions({ handleScroll: { pressedMouseMove: !placing, horzTouchDrag: !placing, vertTouchDrag: !placing }, handleScale: { mouseWheel: true } });
+    const tool = drawingMode === "zoom-region" ? { name: "Zoom area", points: 2 } : RISK_REWARD_TOOLS[drawingMode] ?? DRAWING_TOOLS[drawingMode];
+    const freehand = FREEHAND_TOOLS.has(drawingMode);
+    const placing = Boolean(tool) || drawingMode === "demonstration";
+    chart.applyOptions({ handleScroll: { pressedMouseMove: !placing, horzTouchDrag: !placing, vertTouchDrag: !placing }, handleScale: { mouseWheel: !freehand } });
     chart.applyOptions({ crosshair: { vertLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" }, horzLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" } } });
+    draftPointRef.current = [];
     function pointFor(param) {
       if (!param.point) return null;
       const logical = chart.timeScale().coordinateToLogical(param.point.x);
@@ -367,17 +427,53 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     function handleChartClick(param) {
       const point = pointFor(param); if (!point) return;
       if (drawingMode === "order") { onPriceSelect?.(point.price); onDrawingModeChange("none"); return; }
-      if (!tool) { if (["none", "cursor-dot", "cursor-arrow"].includes(drawingMode)) setSelectedDrawingId(null); return; }
-      const object = objectBridge.riskReward.create(drawingMode, point, param.point, series, candles, crypto.randomUUID());
-      if (!object) return;
-      commitDrawings(current => [...current, object]);
-      setSelectedDrawingId(object.id);
-      if (!keepDrawing) onDrawingModeChange("none");
+      if (!tool || freehand) { if (["none", "cursor-dot", "cursor-arrow"].includes(drawingMode)) setSelectedDrawingId(null); return; }
+      let points = [...(draftPointRef.current || []), point];
+      if (isRiskReward(drawingMode)) {
+        const object = objectBridge.riskReward.create(drawingMode, point, param.point, series, candles, crypto.randomUUID());
+        if (!object) return;
+        commitDrawings(current => [...current, object]);
+        setSelectedDrawingId(object.id); setDraftDrawing(null); draftPointRef.current = [];
+        if (!keepDrawing) onDrawingModeChange("none");
+        return;
+      }
+      if (tool.points > 0 && points.length >= tool.points) {
+        if (drawingMode === "zoom-region") {
+          const from = logicalAtTime(candles, Math.min(points[0].time, points[1].time)), to = logicalAtTime(candles, Math.max(points[0].time, points[1].time));
+          chart.timeScale().setVisibleLogicalRange({ from, to: Math.max(from + 1, to) });
+          const low = Math.min(points[0].price, points[1].price), high = Math.max(points[0].price, points[1].price);
+          chart.priceScale("right").setVisibleRange({ from: low, to: Math.max(low + .001, high) });
+          setDraftDrawing(null); draftPointRef.current = []; onDrawingModeChange("none"); return;
+        }
+        const object = { id: crypto.randomUUID(), type: drawingMode, points, ...(TEXT_TOOLS.has(drawingMode) ? { text: drawingMode === "table" ? "Plan | Price\nEntry | " + point.price.toFixed(3) + "\nTarget | —" : tool.name } : {}) };
+        if (drawingMode === "anchored-text") object.screenAnchor = { x: param.point.x / chart.timeScale().width(), y: param.point.y / chart.paneSize().height };
+        commitDrawings(current => [...current, object]);
+        setSelectedDrawingId(object.id); setDraftDrawing(null); draftPointRef.current = [];
+        if (TEXT_TOOLS.has(drawingMode)) setDrawingSettings({ ...object, points: object.points.map(item => ({ ...item })) });
+        if (!keepDrawing) onDrawingModeChange("none");
+      } else {
+        draftPointRef.current = points;
+        setDraftDrawing({ id: "draft", type: drawingMode, points: [...points, point] });
+      }
     }
-    placementRef.current = handleChartClick;
-    chart.subscribeClick(handleChartClick);
-    return () => { chart.unsubscribeClick(handleChartClick); placementRef.current = null; };
+    function preview(param) {
+      const point = pointFor(param);
+      if (!point || !tool || !draftPointRef.current?.length) return;
+      const points = [...draftPointRef.current, point];
+      while (tool.points > 0 && points.length < tool.points) points.push(point);
+      setDraftDrawing({ id: "draft", type: drawingMode, points });
+    }
+    placementRef.current = handleChartClick; previewRef.current = preview;
+    chart.subscribeClick(handleChartClick); chart.subscribeCrosshairMove(preview);
+    return () => { chart.unsubscribeClick(handleChartClick); chart.unsubscribeCrosshairMove(preview); placementRef.current = null; previewRef.current = null; draftPointRef.current = []; };
   }, [drawingMode, onDrawingModeChange, onPriceSelect, commitDrawings, candles, keepDrawing, chartPreferences.showCrosshair, objectBridge]);
+
+  useEffect(() => {
+    if (!candles.length) return;
+    indicatorSeriesRef.current.sma20?.setData(indicators.sma20 ? movingAverage(candles, 20) : []);
+    indicatorSeriesRef.current.ema20?.setData(indicators.ema20 ? movingAverage(candles, 20, true) : []);
+    indicatorSeriesRef.current.ema50?.setData(indicators.ema50 ? movingAverage(candles, 50, true) : []);
+  }, [candles, indicators]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -449,12 +545,16 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       priceLines: priceLinesRef.current, candles, positions, orders, position, pendingOrder, simulatedTrades, trades });
   }, [position,pendingOrder,positions,orders,simulatedTrades,trades,candles]);
 
-  const activeSpec = RISK_REWARD_TOOLS[drawingMode];
-  const toolHint = drawingMode === TREND_LINE ? "Trend Line · Klik titik A dan B · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
+  const activeSpec = drawingMode === "zoom-region" ? { name: "Zoom area", points: 2 } : RISK_REWARD_TOOLS[drawingMode] ?? DRAWING_TOOLS[drawingMode];
+  const toolHint = FREEHAND_TOOLS.has(drawingMode) ? "Drag untuk menggambar. Lepas untuk selesai." : ["path","polyline"].includes(drawingMode) ? "Klik titik path. Tekan Enter untuk selesai; Escape untuk batal." : drawingMode === "eraser" ? "Klik gambar untuk menghapus. Gambar terkunci dilindungi." : drawingMode === "demonstration" ? "Gerakkan pointer untuk menunjukkan area chart." : activeSpec ? activeSpec.name + " · Klik " + activeSpec.points + " titik" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
 
   return (
     <div className="chart-wrap" onContextMenu={handleChartContextMenu} onClick={() => setContextMenu(null)}>
-      <div className="chart-tools" aria-label="Chart trading controls">
+      <div className="chart-tools" aria-label="Chart indicators">
+        <span>Indikator</span>
+        <button type="button" className={indicators.sma20 ? "active" : ""} aria-pressed={indicators.sma20} onClick={() => setIndicators((value) => ({ ...value, sma20: !value.sma20 }))}>SMA 20</button>
+        <button type="button" className={indicators.ema20 ? "active" : ""} aria-pressed={indicators.ema20} onClick={() => setIndicators((value) => ({ ...value, ema20: !value.ema20 }))}>EMA 20</button>
+        <button type="button" className={indicators.ema50 ? "active" : ""} aria-pressed={indicators.ema50} onClick={() => setIndicators((value) => ({ ...value, ema50: !value.ema50 }))}>EMA 50</button>
         <button type="button" className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>
         <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pilih harga order</button>
         <span className="tool-divider" />
@@ -468,8 +568,9 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       </div>
       {toolHint && <div className="chart-action-hint" role="status">{toolHint}</div>}
       <div className="chart-canvas-layer">
-        <div ref={chartContainer} className="candle-chart" data-primitive-drawings={JSON.stringify(primitiveDrawings.objects)} data-primitive-draft={primitiveDrawings.draftActive} />
-        <TradingLayer positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
+        <div ref={chartContainer} className="candle-chart" />
+        <DrawingsLayer chart={chartForOverlay} series={seriesForOverlay} candles={candles} drawings={draftDrawing && draftDrawing.type === drawingMode ? [...objectBridge.drawings, draftDrawing] : objectBridge.drawings} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} onPreviewPoint={param => previewRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: !FREEHAND_TOOLS.has(drawingMode), horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onErase={id => commitDrawings(current => current.filter(item => item.id !== id))} onCreateStroke={(type, points) => { const object = { id: crypto.randomUUID(), type, points }; commitDrawings(current => [...current, object]); setSelectedDrawingId(object.id); if (!keepDrawing) onDrawingModeChange("none"); }} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
+        <TradingLayer positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} onPreviewPoint={param => previewRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: !FREEHAND_TOOLS.has(drawingMode), horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onErase={id => commitDrawings(current => current.filter(item => item.id !== id))} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
       </div>
       {selectedDrawingId&&drawings.find(item=>item.id===selectedDrawingId)&&<div className="selected-drawing-toolbar" aria-label="Selected drawing actions">
         <button aria-label="Drawing settings" onClick={()=>{const item=objectBridge.objects.find(item=>item.id===selectedDrawingId);setDrawingSettings({...item,points:item.points.map(point=>({...point}))});}}>⚙</button>
@@ -488,17 +589,20 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
           <button type="button" role="menuitem" className="danger" onClick={() => handleContextAction("delete")}>Delete</button>
         </> : <>
           <button type="button" role="menuitem" onClick={() => handleContextAction("undo")}>Undo drawing</button>
+          <button type="button" role="menuitem" onClick={() => handleContextAction("add-horizontal")}>Add Horizontal Line</button>
+          <button type="button" role="menuitem" onClick={() => handleContextAction("add-vertical")}>Add Vertical Line</button>
           <button type="button" role="menuitem" onClick={() => handleContextAction("reset")}>Reset chart view</button>
         </>}
       </div>}
       {drawingSettings && <form className="drawing-settings" onSubmit={saveDrawingSettings}>
         <div><strong>{isRiskReward(drawingSettings) ? (drawingSettings.type === "long-position" ? "Long Position" : "Short Position") : "Object settings"}</strong><button type="button" aria-label="Tutup settings" onClick={() => setDrawingSettings(null)}>×</button></div>
+        {TEXT_TOOLS.has(drawingSettings.type) && <label>Text<textarea value={drawingSettings.text} onChange={(event) => setDrawingSettings((value) => ({ ...value, text: event.target.value }))} autoFocus /></label>}
         {isRiskReward(drawingSettings) && <RiskRewardSettings drawingSettings={drawingSettings} setDrawingSettings={setDrawingSettings} candles={candles} />}
         <label>Line width<input type="number" min="1" max="24" value={drawingSettings.lineWidth || 2} onChange={event => setDrawingSettings(value => ({ ...value, lineWidth: Math.max(1, Math.min(24, Number(event.target.value))) }))} /></label>
         <label>Font size<input type="number" min="8" max="48" value={drawingSettings.fontSize || 12} onChange={event => setDrawingSettings(value => ({ ...value, fontSize: Math.max(8, Math.min(48, Number(event.target.value))) }))} /></label>
         <label>Color<input type="color" value={drawingSettings.color || "#58a6ff"} onInput={event => setDrawingSettings(value => ({ ...value, color: event.target.value }))} onChange={(event) => setDrawingSettings((value) => ({ ...value, color: event.target.value }))} /></label>
         <details><summary>Coordinates (UTC)</summary>
-          {drawingSettings.points.map((point, index) => <div key={index} className="coordinate-fields">
+          {drawingSettings.points.map((point, index) => FREEHAND_TOOLS.has(drawingSettings.type) && index !== 0 && index !== drawingSettings.points.length - 1 ? null : <div key={index} className="coordinate-fields">
             <label>Point {index + 1} time<input type="datetime-local" step="60" value={new Date(point.time * 1000).toISOString().slice(0, 16)} onChange={event => { if (!event.target.value) return; const time = Date.parse(event.target.value + "Z") / 1000; if (Number.isFinite(time)) setDrawingSettings(value => ({ ...value, points: value.points.map((item, i) => i === index ? { ...item, time } : item) })); }} /></label>
             <label>Point {index + 1} price<input type="number" step="any" value={point.price} onChange={event => setDrawingSettings(value => ({ ...value, points: value.points.map((item, i) => i === index ? { ...item, price: Number(event.target.value) } : item) }))} /></label>
           </div>)}
