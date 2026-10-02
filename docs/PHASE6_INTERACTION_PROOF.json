@@ -1,0 +1,180 @@
+{
+  "before": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717385400,
+          "price": 2316.66011951239
+        },
+        {
+          "time": 1717405200,
+          "price": 2325.364073213606
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterA": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717387396.039604,
+          "price": 2317.820646672552
+        },
+        {
+          "time": 1717405200,
+          "price": 2325.364073213606
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterB": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717387396.039604,
+          "price": 2317.820646672552
+        },
+        {
+          "time": 1717406777.227723,
+          "price": 2324.203546053444
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterBody": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717388732.6732671,
+          "price": 2318.9811738327135
+        },
+        {
+          "time": 1717408113.861386,
+          "price": 2325.3640732136064
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterH1Drag": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717391272.2772276,
+          "price": 2320.213648139797
+        },
+        {
+          "time": 1717408113.861386,
+          "price": 2325.3640732136064
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterM15Roundtrip": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717391272.2772276,
+          "price": 2320.213648139797
+        },
+        {
+          "time": 1717408113.861386,
+          "price": 2325.3640732136064
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterHistoryDrag": [
+    {
+      "id": "dbb7e549-80bb-4076-a91c-c42dc146400b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717391951.7326732,
+          "price": 2320.7939117198785
+        },
+        {
+          "time": 1717408793.3168316,
+          "price": 2325.9443367936874
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "deleted": true,
+  "editableProtected": true,
+  "legacyByteIdentical": true
+}

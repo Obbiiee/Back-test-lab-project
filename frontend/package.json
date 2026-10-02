@@ -15,7 +15,8 @@
     "history:download": "node scripts/download-history.mjs",
     "history:decade": "node scripts/download-decade.mjs",
     "test:phase4": "node tests/phase4.test.mjs",
-    "test:phase5": "node tests/phase5.test.mjs"
+    "test:phase5": "node tests/phase5.test.mjs",
+    "test:phase6": "node tests/phase6.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",

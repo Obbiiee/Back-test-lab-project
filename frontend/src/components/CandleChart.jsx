@@ -19,7 +19,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   const seriesRef = useRef(null);
   const [chartForOverlay, setChartForOverlay] = useState(null);
   const [seriesForOverlay, setSeriesForOverlay] = useState(null);
-  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1) });
+  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
@@ -468,7 +468,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       </div>
       {toolHint && <div className="chart-action-hint" role="status">{toolHint}</div>}
       <div className="chart-canvas-layer">
-        <div ref={chartContainer} className="candle-chart" data-primitive-drawings={JSON.stringify(primitiveDrawings.objects)} data-primitive-draft={primitiveDrawings.draftActive} />
+        <div ref={chartContainer} tabIndex={-1} className="candle-chart" data-primitive-drawings={JSON.stringify(primitiveDrawings.objects)} data-primitive-selected={primitiveDrawings.selectedId ?? ''} data-primitive-draft={primitiveDrawings.draftActive} />
         <TradingLayer positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
       </div>
       {selectedDrawingId&&drawings.find(item=>item.id===selectedDrawingId)&&<div className="selected-drawing-toolbar" aria-label="Selected drawing actions">

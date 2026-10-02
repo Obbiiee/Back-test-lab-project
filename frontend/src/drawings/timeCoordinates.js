@@ -43,3 +43,23 @@ export function pointFromPointer(chart, series, param, bars) {
   const price = series.coordinateToPrice(param.point.y);
   return Number.isFinite(time) && Number.isFinite(price) ? { time, price } : null;
 }
+
+// Inverse of projectTimestamp using actual chart coordinates, never local/global
+// logical-index assumptions or nearest-bar snapping. CSS pixels are transient.
+export function continuousPointFromPointer(chart, series, point, bars) {
+  if (!point || bars.length < 2) return null;
+  const scale = chart.timeScale();
+  let low = 0, high = bars.length - 1;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    const x = scale.timeToCoordinate(bars[mid].time);
+    if (x == null) return null;
+    if (x < point.x) low = mid + 1; else high = mid;
+  }
+  const left = Math.max(0, Math.min(bars.length - 2, low - 1));
+  const x1 = scale.timeToCoordinate(bars[left].time), x2 = scale.timeToCoordinate(bars[left + 1].time);
+  const price = series.coordinateToPrice(point.y);
+  if (x1 == null || x2 == null || x1 === x2 || !Number.isFinite(price)) return null;
+  const time = bars[left].time + (point.x - x1) / (x2 - x1) * (bars[left + 1].time - bars[left].time);
+  return Number.isFinite(time) ? { time, price } : null;
+}

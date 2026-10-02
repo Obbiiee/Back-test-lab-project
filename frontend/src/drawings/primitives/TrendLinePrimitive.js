@@ -11,13 +11,21 @@ class TrendLinePaneRenderer {
       context.save();
       try {
         context.strokeStyle = source.model.options.color;
-        context.lineWidth = source.model.options.lineWidth;
+        context.lineWidth = source.model.options.lineWidth + (source.selected ? 1 : 0);
         context.lineCap = 'round';
         context.setLineDash(source.draft ? [5, 4] : []);
         context.beginPath();
         context.moveTo(projected[0].x, projected[0].y);
         context.lineTo(projected[1].x, projected[1].y);
         context.stroke();
+        if (source.selected && !source.draft) {
+          context.setLineDash([]); context.lineWidth = 1.5;
+          context.fillStyle = '#10141b';
+          for (const point of projected) {
+            context.beginPath(); context.arc(point.x, point.y, 5, 0, Math.PI * 2);
+            context.fill(); context.stroke();
+          }
+        }
       } finally { context.restore(); }
     });
   }
@@ -42,6 +50,7 @@ export class TrendLinePrimitive {
   chart = null;
   series = null;
   requestUpdate = null;
+  selected = false;
   constructor(model, bars = [], draft = false) {
     this.model = model; this.bars = bars; this.draft = draft;
     this.views = [new TrendLinePaneView(this)];
@@ -57,6 +66,7 @@ export class TrendLinePrimitive {
   paneViews() { return this.views; }
   updateAllViews() { this.views.forEach(view => view.update()); }
   setModel(model) { this.model = model; this.requestUpdate?.(); }
+  setSelected(selected) { this.selected = selected; this.requestUpdate?.(); }
   setTimePoints(bars) { this.bars = bars; this.requestUpdate?.(); }
   // No autoscaleInfo: annotations do not change the market's price-scale range.
 }
