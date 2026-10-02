@@ -267,3 +267,8 @@ select { font: inherit; color: inherit; }
 .drawing-settings select {background:#0f1822;color:#e7edf4;border:1px solid #334253;min-height:31px;}
 .drawing-settings input[type="checkbox"] {width:16px;min-height:16px;}
 .drawing-settings output {color:#58a6ff;font-size:11px;}
+
+.primitive-drawing-controls { position: absolute; z-index: 12; right: 85px; top: 62px; display: flex; gap: 4px; align-items: center; padding: 4px; border: 1px solid #34373b; border-radius: 4px; background: #202327; font-size: 11px; }
+.primitive-drawing-controls button { color: #d8dce3; background: transparent; border: 0; padding: 4px 7px; cursor: pointer; }
+.primitive-drawing-controls button:disabled { opacity: .35; cursor: default; }
+.primitive-drawing-controls [role=status] { max-width: 260px; }

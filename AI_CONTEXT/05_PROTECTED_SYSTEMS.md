@@ -13,3 +13,5 @@ Change these only when the authorized task explicitly requires it, with relevant
 - Regression assertions/evidence: `frontend/tests/`, `backend/tests/`, storage fixtures in `docs/` referenced by tests. Never weaken tests or remove required evidence.
 
 This is not blanket protection of the entire repository. Narrow infrastructure/context work is permitted within its own scope.
+
+- New drawing persistence/history: `DrawingPersistence.js`, `DrawingHistory.js`; `backtest-drawing-manager-v1:*`. Preserve schema, canonical fields, commit boundaries and trading isolation. History resets on reload; no cross-tab merge/backend sync.

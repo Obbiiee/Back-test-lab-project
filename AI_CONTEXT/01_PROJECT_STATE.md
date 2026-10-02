@@ -1,4 +1,4 @@
-# Actual state after Phase 6
+# Actual state after Phase 7
 
 - React 19 / Vite 8; installed Lightweight Charts 5.2.1 (package range ^5.2.1).
 - XAUUSD approximately ten years: 3,486,461 validated M1 candles; eleven aggregated timeframes; progressive historical loading.
@@ -7,4 +7,4 @@
 - Drawing: DrawingManager/Registry, immutable TIME + PRICE Trend Line model, official series primitive, separate creation/interaction controllers, A/B creation, draft, selection, finite-segment hit testing, handles, endpoint/body drag, keyboard delete, ESC/cancel and cross-timeframe projection.
 - Indicator runtime remains retired; native chart Volume series remains available.
 
-New drawings are in memory; reload loses them. No new persistence, drawing undo/redo, magnet integration, additional new tools, Indicator Engine, properties UI, object tree or legacy migration. Existing trading controls/history remain separate and do not imply these features exist for the new drawing domain.
+New Trend Lines persist in a separate version-1 localStorage namespace across reload, timeframe and replay changes. Canonical commit snapshots provide independent Undo/Redo (100 actions, runtime only), lock/unlock and hide/show. Malformed/future storage is preserved without overwrite; valid records can be recovered read-only. No magnet integration, additional new tools, Indicator Engine, properties UI, object tree or legacy migration. Existing trading controls/history remain separate and do not imply these features exist for the new drawing domain.

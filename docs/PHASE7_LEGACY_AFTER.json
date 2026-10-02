@@ -1,0 +1,10 @@
+{
+  "backtest-drawings-v2:XAUUSD-live-15m": " [{\"id\":\"old-line\",\"type\":\"trendline\",\"points\":[{\"time\":1717396200,\"price\":2310},{\"time\":1717405200,\"price\":2320}]},{\"id\":\"future\",\"type\":\"unknown\",\"extra\":true}] ",
+  "backtest-drawings-v2:XAUUSD-live-15m:before-trading-separation": " [{\"id\":\"old-line\",\"type\":\"trendline\",\"points\":[{\"time\":1717396200,\"price\":2310},{\"time\":1717405200,\"price\":2320}]},{\"id\":\"future\",\"type\":\"unknown\",\"extra\":true}] ",
+  "backtest-drawings-v2:XAUUSD-live-1h": " [{\"id\":\"future-h1\",\"type\":\"unknown\",\"extra\":42}] ",
+  "backtest-drawings-v2:XAUUSD-live-1h:before-trading-separation": " [{\"id\":\"future-h1\",\"type\":\"unknown\",\"extra\":42}] ",
+  "backtest-drawings-v2:XAUUSD-live-30m": "[{\"id\":\"legacy-risk\",\"type\":\"long-position\",\"points\":[{\"time\":1717396200,\"price\":2300},{\"time\":1717396200,\"price\":2290},{\"time\":1717396200,\"price\":2310},{\"time\":1717405200,\"price\":2300}]},{\"id\":\"opaque\",\"type\":\"future\"}]",
+  "backtest-drawings-v2:XAUUSD-live-30m:before-trading-separation": "[{\"id\":\"legacy-risk\",\"type\":\"long-position\",\"points\":[{\"time\":1717396200,\"price\":2300},{\"time\":1717396200,\"price\":2290},{\"time\":1717396200,\"price\":2310},{\"time\":1717405200,\"price\":2300}]},{\"id\":\"opaque\",\"type\":\"future\"}]",
+  "backtest-drawings-v2:XAUUSD-live-3m": "{malformed legacy",
+  "backtest-drawings-v2:XAUUSD-live-3m:before-trading-separation": "{malformed legacy"
+}

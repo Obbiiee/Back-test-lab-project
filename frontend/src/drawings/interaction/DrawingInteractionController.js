@@ -6,7 +6,7 @@ export function isEditable(target) {
 }
 export class DrawingInteractionController {
   drag = null;
-  constructor(manager, chart, series) { this.manager = manager; this.chart = chart; this.series = series; }
+  constructor(manager, chart, series, history = null) { this.manager = manager; this.chart = chart; this.series = series; this.history = history; }
   hit(point) { return hitDrawing(this.manager, this.chart, this.series, point); }
   point(pointer) { return continuousPointFromPointer(this.chart, this.series, pointer, this.manager.bars); }
   begin(hit, pointer) {
@@ -19,8 +19,9 @@ export class DrawingInteractionController {
   move(pointer) {
     const drag = this.drag, point = this.point(pointer);
     if (!drag || !point) return;
+    if (point.time === drag.start.time && point.price === drag.start.price) { this.manager.update(drag.id, drag.original, false); return; }
     const points = drag.original.map((anchor, index) => {
-      if (drag.type === HIT.BODY) return { time: anchor.time + point.time - drag.start.time, price: anchor.price + point.price - drag.start.price };
+      if (drag.type === HIT.BODY) return { time: anchor.time + (point.time - drag.start.time), price: anchor.price + (point.price - drag.start.price) };
       return index === (drag.type === HIT.A ? 0 : 1) ? point : anchor;
     });
     this.manager.update(drag.id, points, false);
@@ -28,7 +29,7 @@ export class DrawingInteractionController {
   finish(cancel = false) {
     if (!this.drag) return;
     if (cancel) this.manager.update(this.drag.id, this.drag.original, false);
-    this.drag = null; this.manager.notify();
+    this.drag = null; this.manager.commit(); this.manager.notify();
   }
   escape() {
     if (this.drag) this.finish(true);
@@ -52,13 +53,16 @@ export class DrawingInteractionController {
     };
     const trading = event => Boolean(event.target.closest?.('[data-drawing-type],.trading-levels'));
     const down = event => {
-      if (event.button !== 0 || trading(event) || !element.contains(event.target)) return;
+      if (trading(event)) { this.manager.historyFocus = 'trading'; return; }
+      if (event.button !== 0 || !element.contains(event.target)) return;
+      this.manager.historyFocus = 'drawing';
       const point = pointer(event);
       if (point.x < 0 || point.y < 0 || point.x > this.chart.timeScale().width() || point.y > this.chart.paneSize().height) return;
       const hit = this.hit(point);
       if (!hit.id) { this.manager.select(null); cursor(''); return; }
-      if (!this.begin(hit, point)) return;
+      const draggable = this.begin(hit, point);
       element.focus({ preventScroll: true });
+      if (!draggable) { event.stopPropagation(); return; }
       savedScroll = { ...this.chart.options().handleScroll };
       this.chart.applyOptions({ handleScroll: { pressedMouseMove: false, horzTouchDrag: false, vertTouchDrag: false } });
       event.preventDefault(); event.stopPropagation();
@@ -68,12 +72,18 @@ export class DrawingInteractionController {
       if (this.drag) { event.preventDefault(); event.stopPropagation(); this.move(pointer(event)); return; }
       if (trading(event) || !element.contains(event.target)) { cursor(''); return; }
       const hit = this.hit(pointer(event));
-      cursor(hit.type === HIT.NONE ? '' : hit.type === HIT.BODY ? 'move' : 'crosshair');
+      cursor(hit.type === HIT.NONE ? '' : this.manager.get(hit.id)?.locked ? 'pointer' : hit.type === HIT.BODY ? 'move' : 'crosshair');
     };
     const up = event => { if (this.drag) { event.stopPropagation(); restore(false); } };
     const cancel = () => restore(true);
     const key = event => {
       if (isEditable(event.target)) return;
+      const drawingFocus = element.contains(event.target) || event.target?.tagName === 'BODY' || event.target?.closest?.('.primitive-drawing-controls');
+      if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && this.history && this.manager.historyFocus !== 'trading' && drawingFocus) {
+        event.preventDefault(); event.stopImmediatePropagation(); restore(true);
+        if (event.key.toLowerCase() === 'y' || event.shiftKey) this.history.redo(); else this.history.undo();
+        return;
+      }
       if (event.key === 'Escape' && (this.drag || this.manager.selectedId)) { event.stopImmediatePropagation(); if (this.drag) restore(true); else this.escape(); cursor(''); }
       if (['Delete', 'Backspace'].includes(event.key) && this.manager.selectedId) { event.preventDefault(); event.stopImmediatePropagation(); restore(true); this.deleteSelected(); }
     };

@@ -1,8 +1,7 @@
 # Current checkpoint
 
-Completed: Phase 1–6.5.
-Next planned product phase: Phase 7.
+Completed: Phase 1–7, including Phase 6.5 context/bundle infrastructure.
 
-> Phase 7 is NOT authorized to start. Wait for explicit instruction.
+Phase 7 persistence/history/lock/hide passed automated and browser verification.
 
-No product implementation is currently authorized. Await Phase 7 instructions.
+Phase 7.5 and Phase 8 are NOT authorized. Wait for explicit instruction; no next-phase implementation is currently authorized.

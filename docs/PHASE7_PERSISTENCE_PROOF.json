@@ -1,0 +1,206 @@
+{
+  "created": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717384500,
+          "price": 2317.813399750526
+        },
+        {
+          "time": 1717404300,
+          "price": 2325.90779730365
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterA": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717386451.4851484,
+          "price": 2318.892652757609
+        },
+        {
+          "time": 1717404300,
+          "price": 2325.90779730365
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterB": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717386451.4851484,
+          "price": 2318.892652757609
+        },
+        {
+          "time": 1717405832.6732674,
+          "price": 2324.828544296567
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "afterBody": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717387743.5643563,
+          "price": 2319.9719057646926
+        },
+        {
+          "time": 1717407124.7524753,
+          "price": 2325.9077973036506
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "locked": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717387743.5643563,
+          "price": 2319.9719057646926
+        },
+        {
+          "time": 1717407124.7524753,
+          "price": 2325.9077973036506
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": true,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "hidden": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717388389.6039603,
+          "price": 2319.432279261151
+        },
+        {
+          "time": 1717407770.7920792,
+          "price": 2325.368170800109
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": false,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "shown": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717388389.6039603,
+          "price": 2319.432279261151
+        },
+        {
+          "time": 1717407770.7920792,
+          "price": 2325.368170800109
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "H1EditedAndReloaded": [
+    {
+      "id": "4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b",
+      "type": "trend-line",
+      "points": [
+        {
+          "time": 1717390595.049505,
+          "price": 2320.511532268234
+        },
+        {
+          "time": 1717407770.7920792,
+          "price": 2325.368170800109
+        }
+      ],
+      "options": {
+        "color": "#58a6ff",
+        "lineWidth": 2
+      },
+      "visible": true,
+      "locked": false,
+      "metadata": {
+        "createdOnTimeframe": "15m"
+      }
+    }
+  ],
+  "persisted": {
+    "backtest-drawing-manager-v1:main%3AXAUUSD": "{\"version\":1,\"workspace\":\"main:XAUUSD\",\"drawings\":[{\"id\":\"4c6a7008-0ec0-4746-bc4d-5ae2446a4b4b\",\"type\":\"trend-line\",\"points\":[{\"time\":1717390595.049505,\"price\":2320.511532268234},{\"time\":1717407770.7920792,\"price\":2325.368170800109}],\"options\":{\"color\":\"#58a6ff\",\"lineWidth\":2},\"visible\":true,\"locked\":false,\"metadata\":{\"createdOnTimeframe\":\"15m\"}}]}"
+  },
+  "legacyByteIdentical": true
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Phase 7 isolated fixture</title>
+<body><h1>Phase 7 disposable origin</h1>
+<button id="seed">Seed fixture</button><button id="snapshot">Snapshot storage</button><pre id="storage"></pre>
+<script type="module">
+document.querySelector('#seed').onclick = () => {
+  if (location.port !== '5182') throw Error('Requires isolated port 5182');
+  const records = {
+    'backtest-drawings-v2:XAUUSD-live-15m': ' [{"id":"old-line","type":"trendline","points":[{"time":1717396200,"price":2310},{"time":1717405200,"price":2320}]},{"id":"future","type":"unknown","extra":true}] ',
+    'backtest-drawings-v2:XAUUSD-live-1h': ' [{"id":"future-h1","type":"unknown","extra":42}] ',
+    'backtest-drawings-v2:XAUUSD-live-30m': '[{"id":"legacy-risk","type":"long-position","points":[{"time":1717396200,"price":2300},{"time":1717396200,"price":2290},{"time":1717396200,"price":2310},{"time":1717405200,"price":2300}]},{"id":"opaque","type":"future"}]',
+    'backtest-drawings-v2:XAUUSD-live-3m': '{malformed legacy',
+  };
+  if (Object.keys(records).some(key=>localStorage.getItem(key)!=null)) throw Error('Refusing to overwrite fixture');
+  for (const [key,value] of Object.entries(records)) {localStorage.setItem(key,value);localStorage.setItem(key+':before-trading-separation',value);}
+  localStorage.setItem('backtest-replay-time-v1','2024-06-03T12:00:00.000Z');
+  localStorage.setItem('backtest-workspace-interval-v1','15m');
+};
+document.querySelector('#snapshot').onclick = () => {
+  const legacy=Object.fromEntries(Object.keys(localStorage).filter(key=>key.startsWith('backtest-drawings-v2:')).sort().map(key=>[key,localStorage.getItem(key)]));
+  const drawings=Object.fromEntries(Object.keys(localStorage).filter(key=>key.startsWith('backtest-drawing-manager-v1:')).sort().map(key=>[key,localStorage.getItem(key)]));
+  document.querySelector('#storage').textContent=JSON.stringify({legacy,drawings},null,2);
+};
+</script></body></html>
