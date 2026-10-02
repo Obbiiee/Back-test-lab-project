@@ -16,7 +16,10 @@
     "history:decade": "node scripts/download-decade.mjs",
     "test:phase4": "node tests/phase4.test.mjs",
     "test:phase5": "node tests/phase5.test.mjs",
-    "test:phase6": "node tests/phase6.test.mjs"
+    "test:phase6": "node tests/phase6.test.mjs",
+    "ai:bundle": "node scripts/ai-bundle.mjs",
+    "ai:bundle:verify": "node scripts/ai-bundle.mjs --verify",
+    "test:ai-bundle": "node tests/ai-bundle.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",

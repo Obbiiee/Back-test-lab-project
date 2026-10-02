@@ -1,0 +1,15 @@
+# Protected boundaries
+
+Change these only when the authorized task explicitly requires it, with relevant regression coverage:
+
+- Market/Data: `frontend/src/market/{candles,history,useGoldMarket,useReplayMarket}.js`; historical files `frontend/public/market/`, `data/`.
+- Replay: `frontend/src/market/useReplayMarket.js`, replay controls in `frontend/src/FigmaWorkspace.jsx`; separate backend code `backend/engine/replay/`, `backend/services/replay_service.py`.
+- Trading/orders: `frontend/src/trading/{simulator,useTrading}.js`, OrderTicket/PositionsPanel/Journal; `backend/engine/trading/`.
+- Risk/Reward: `frontend/src/trading/RiskReward*`, `TradingLayer.jsx`.
+- Native annotations: `frontend/src/trading/{chartAnnotations.js,TradingLevels.jsx}`; CandleChart integration.
+- Legacy storage/compatibility: `frontend/src/chart/{LegacyObjectPersistence.js,ChartObjectBridge.js,ChartObjectOverlay.jsx}`; `backtest-drawings-v2:*` and backups. Do not migrate, drop unknown records or overwrite backups casually.
+- Drawing foundation: `frontend/src/drawings/{DrawingManager,DrawingRegistry,DrawingTypes}.js`, `models/TrendLine.js`, primitives and creation/interaction controllers. Preserve TIME + PRICE.
+- Archives: `frontend/legacy/`, `legacy/`; do not reorganize or reactivate.
+- Regression assertions/evidence: `frontend/tests/`, `backend/tests/`, storage fixtures in `docs/` referenced by tests. Never weaken tests or remove required evidence.
+
+This is not blanket protection of the entire repository. Narrow infrastructure/context work is permitted within its own scope.

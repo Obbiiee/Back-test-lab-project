@@ -1,0 +1,10 @@
+# Actual state after Phase 6
+
+- React 19 / Vite 8; installed Lightweight Charts 5.2.1 (package range ^5.2.1).
+- XAUUSD approximately ten years: 3,486,461 validated M1 candles; eleven aggregated timeframes; progressive historical loading.
+- Active frontend replay: `frontend/src/market/useReplayMarket.js` loads date-selected M1 chunks, aggregates the revealed prefix, steps timeframe buckets, loads older history, extends forward chunks, restores/saves replay date. Workspace controls play/pause/speed and stepping; engine also exposes backward step, while UI previous-candle control is disabled. Archived/backend modules are not evidence of active frontend capabilities.
+- Trading: market/limit/stop and pending simulation, buy/sell positions, entry/SL/TP, independent Long/Short Risk/Reward, native markers and price lines.
+- Drawing: DrawingManager/Registry, immutable TIME + PRICE Trend Line model, official series primitive, separate creation/interaction controllers, A/B creation, draft, selection, finite-segment hit testing, handles, endpoint/body drag, keyboard delete, ESC/cancel and cross-timeframe projection.
+- Indicator runtime remains retired; native chart Volume series remains available.
+
+New drawings are in memory; reload loses them. No new persistence, drawing undo/redo, magnet integration, additional new tools, Indicator Engine, properties UI, object tree or legacy migration. Existing trading controls/history remain separate and do not imply these features exist for the new drawing domain.

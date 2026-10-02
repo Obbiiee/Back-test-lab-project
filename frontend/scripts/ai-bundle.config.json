@@ -1,0 +1,7 @@
+{
+  "context": ["AI_CONTEXT/00_START_HERE.md", "AI_CONTEXT/01_PROJECT_STATE.md", "AI_CONTEXT/02_ARCHITECTURE.md", "AI_CONTEXT/03_PHASE_HISTORY.md", "AI_CONTEXT/04_CURRENT_PHASE.md", "AI_CONTEXT/05_PROTECTED_SYSTEMS.md", "AI_CONTEXT/06_WORKFLOW_RULES.md", "AI_CONTEXT/07_TEST_COMMANDS.md"],
+  "implementation": ["frontend/src/drawings/DrawingManager.js", "frontend/src/drawings/DrawingRegistry.js", "frontend/src/drawings/DrawingTypes.js", "frontend/src/drawings/models/TrendLine.js", "frontend/src/drawings/primitives/TrendLinePrimitive.js", "frontend/src/drawings/TrendLineCreation.js", "frontend/src/drawings/timeCoordinates.js", "frontend/src/drawings/useDrawingTools.js", "frontend/src/drawings/interaction/hitTesting.js", "frontend/src/drawings/interaction/DrawingInteractionController.js"],
+  "tests": ["frontend/tests/phase6.test.mjs"],
+  "supporting": ["frontend/package.json", "OPEN_SOURCE_NOTICES.md"],
+  "currentTask": "No product implementation is currently authorized. Await Phase 7 instructions."
+}
