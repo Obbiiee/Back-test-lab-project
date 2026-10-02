@@ -1,0 +1,3488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Backtest Lab v0.3</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+:root{
+    --bg:#e0e5ec;
+    --text:#303b4d;
+    --muted:#718096;
+    --green:#20a86b;
+    --red:#e05252;
+    --blue:#4776e6;
+    --orange:#e5a93d;
+    --shadow-light:-7px -7px 16px rgba(255,255,255,.95);
+    --shadow-dark:7px 7px 16px rgba(163,177,198,.65);
+    --inset-light:inset -4px -4px 9px rgba(255,255,255,.9);
+    --inset-dark:inset 4px 4px 9px rgba(163,177,198,.55);
+}
+
+body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Poppins",sans-serif;
+    min-height:100vh;
+}
+
+button,
+input,
+select{
+    font-family:"Poppins",sans-serif;
+}
+
+.app{
+    width:min(1500px,94%);
+    margin:auto;
+    padding:28px 0 45px;
+}
+
+/* HEADER */
+
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:20px;
+    margin-bottom:28px;
+}
+
+.brand{
+    display:flex;
+    align-items:center;
+    gap:16px;
+}
+
+.logo{
+    width:54px;
+    height:54px;
+    border-radius:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:21px;
+    font-weight:700;
+    color:var(--blue);
+    box-shadow:var(--shadow-light),var(--shadow-dark);
+}
+
+.brand-title{
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:.3px;
+}
+
+.brand-sub{
+    color:var(--muted);
+    font-size:12px;
+    margin-top:2px;
+}
+
+.account{
+    padding:13px 20px;
+    border-radius:16px;
+    box-shadow:var(--inset-light),var(--inset-dark);
+    color:var(--muted);
+    font-size:13px;
+}
+
+.account strong{
+    color:var(--text);
+}
+
+/* TOP BAR */
+
+.market-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:22px;
+}
+
+.market-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.symbol{
+    font-size:26px;
+    font-weight:700;
+}
+
+.badge{
+    padding:6px 12px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:600;
+    box-shadow:var(--shadow-light),var(--shadow-dark);
+}
+
+.badge.blue{
+    color:var(--blue);
+}
+
+.badge.green{
+    color:var(--green);
+}
+
+.market-price{
+    font-size:25px;
+    font-weight:700;
+}
+
+/* MAIN GRID */
+
+.main-grid{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 340px;
+    gap:24px;
+}
+
+/* PANEL */
+
+.panel{
+    background:var(--bg);
+    border-radius:24px;
+    padding:22px;
+    box-shadow:var(--shadow-light),var(--shadow-dark);
+}
+
+.panel-title{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:17px;
+}
+
+.panel-title h3{
+    margin:0;
+    font-size:15px;
+}
+
+.panel-title span{
+    font-size:11px;
+    color:var(--muted);
+}
+
+/* CHART */
+
+.chart-wrapper{
+    min-width:0;
+}
+
+.chart{
+    position:relative;
+    height:470px;
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:var(--inset-light),var(--inset-dark);
+    background:#dce1e8;
+}
+
+.chart-grid{
+    position:absolute;
+    inset:0;
+    background-image:
+        linear-gradient(rgba(120,130,145,.10) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(120,130,145,.08) 1px,transparent 1px);
+    background-size:20% 20%;
+}
+
+.candle-area{
+    position:absolute;
+    inset:24px 60px 38px 20px;
+}
+
+.candle{
+    position:absolute;
+    width:14px;
+    transform:translateX(-50%);
+}
+
+.wick{
+    position:absolute;
+    width:2px;
+    left:6px;
+    border-radius:3px;
+}
+
+.body{
+    position:absolute;
+    left:0;
+    width:14px;
+    min-height:3px;
+    border-radius:4px;
+}
+
+.up{
+    background:var(--green);
+}
+
+.down{
+    background:var(--red);
+}
+
+.price-scale{
+    position:absolute;
+    right:6px;
+    top:20px;
+    bottom:30px;
+    width:50px;
+    color:var(--muted);
+    font-size:10px;
+}
+
+.price-tick{
+    position:absolute;
+    right:0;
+    transform:translateY(-50%);
+}
+
+.price-line{
+    position:absolute;
+    left:0;
+    right:0;
+    border-top:1px dashed var(--orange);
+    z-index:5;
+}
+
+.price-label{
+    position:absolute;
+    right:5px;
+    top:-11px;
+    background:var(--orange);
+    color:white;
+    font-size:10px;
+    font-weight:600;
+    padding:3px 7px;
+    border-radius:5px;
+}
+
+.trade-line{
+    position:absolute;
+    left:0;
+    right:0;
+    border-top:1px dashed;
+    z-index:4;
+    display:none;
+}
+
+.trade-line span{
+    position:absolute;
+    left:5px;
+    top:-10px;
+    font-size:9px;
+    padding:2px 5px;
+    border-radius:4px;
+    color:white;
+}
+
+.entry-line{
+    border-color:var(--blue);
+}
+
+.entry-line span{
+    background:var(--blue);
+}
+
+.sl-line{
+    border-color:var(--red);
+}
+
+.sl-line span{
+    background:var(--red);
+}
+
+.tp-line{
+    border-color:var(--green);
+}
+
+.tp-line span{
+    background:var(--green);
+}
+
+.chart-footer{
+    display:flex;
+    justify-content:space-between;
+    color:var(--muted);
+    font-size:10px;
+    margin-top:10px;
+}
+
+/* STATS */
+
+.stats{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:14px;
+    margin-top:24px;
+}
+
+.stat{
+    padding:16px;
+    border-radius:17px;
+    box-shadow:var(--shadow-light),var(--shadow-dark);
+}
+
+.stat-label{
+    color:var(--muted);
+    font-size:10px;
+    margin-bottom:6px;
+}
+
+.stat-value{
+    font-size:17px;
+    font-weight:700;
+}
+
+/* EXECUTION */
+
+.execution{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+}
+
+.position-card{
+    padding:18px;
+    border-radius:18px;
+    box-shadow:var(--inset-light),var(--inset-dark);
+}
+
+.position-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:15px;
+}
+
+.position-header h3{
+    margin:0;
+    font-size:14px;
+}
+
+.position-status{
+    font-size:10px;
+    font-weight:600;
+    color:var(--muted);
+}
+
+.position-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+}
+
+.data-box{
+    padding:10px;
+    border-radius:12px;
+    box-shadow:var(--shadow-light),var(--shadow-dark);
+}
+
+.data-label{
+    font-size:9px;
+    color:var(--muted);
+}
+
+.data-value{
+    font-size:12px;
+    font-weight:600;
+    margin-top:3px;
+}
+
+/* FORM */
+
+.settings{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+}
+
+.field{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.field.full{
+    grid-column:1 / -1;
+}
+
+.field label{
+    font-size:10px;
+    color:var(--muted);
+}
+
+.field input,
+.field select{
+    width:100%;
+    border:0;
+    outline:none;
+    background:var(--bg);
+    color:var(--text);
+    border-radius:11px;
+    padding:10px;
+    font-size:11px;
+    box-shadow:var(--inset-light),var(--inset-dark);
+}
+
+.field input:focus,
+.field select:focus{
+    box-shadow:inset 3px 3px 6px rgba(163,177,198,.55),
+               inset -3px -3px 6px rgba(255,255,255,.9);
+}
+
+/* BUTTONS */
+
+.buttons{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+button{
+    border:0;
+    padding:12px 10px;
+    border-radius:13px;
+    cursor:pointer;
+    font-size:11px;
+    font-weight:600;
+    background:var(--bg);
+    color:var(--text);
+    box-shadow:var(--shadow-light),var(--shadow-dark);
+    transition:.15s;
+}
+
+button:hover{
+    transform:translateY(-1px);
+}
+
+button:active{
+    transform:translateY(1px);
+    box-shadow:var(--inset-light),var(--inset-dark);
+}
+
+.buy{
+    color:var(--green);
+}
+
+.sell{
+    color:var(--red);
+}
+
+.next{
+    color:var(--blue);
+}
+
+.close{
+    color:var(--orange);
+}
+
+.primary{
+    color:var(--blue);
+}
+
+.danger{
+    color:var(--red);
+}
+
+.full-btn{
+    grid-column:1 / -1;
+}
+
+.playing{
+    box-shadow:var(--inset-light),var(--inset-dark);
+}
+
+/* STATUS */
+
+.status{
+    padding:13px;
+    border-radius:13px;
+    box-shadow:var(--inset-light),var(--inset-dark);
+    font-size:10px;
+    color:var(--muted);
+    min-height:42px;
+    display:flex;
+    align-items:center;
+}
+
+/* EQUITY */
+
+.equity{
+    margin-top:24px;
+}
+
+.equity-canvas{
+    width:100%;
+    height:190px;
+    display:block;
+    border-radius:17px;
+    box-shadow:var(--inset-light),var(--inset-dark);
+}
+
+/* HISTORY */
+
+.history{
+    margin-top:24px;
+}
+
+.table-wrap{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:750px;
+}
+
+th,
+td{
+    padding:12px 9px;
+    text-align:left;
+    font-size:10px;
+    border-bottom:1px solid rgba(130,140,155,.14);
+}
+
+th{
+    color:var(--muted);
+    font-size:9px;
+    font-weight:600;
+}
+
+.win{
+    color:var(--green);
+    font-weight:600;
+}
+
+.loss{
+    color:var(--red);
+    font-weight:600;
+}
+
+.neutral{
+    color:var(--muted);
+}
+
+/* RESPONSIVE */
+
+@media(max-width:1100px){
+    .main-grid{
+        grid-template-columns:1fr;
+    }
+
+    .execution{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+    }
+
+    .execution .status{
+        grid-column:1 / -1;
+    }
+}
+
+@media(max-width:800px){
+    .stats{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .header{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .account{
+        width:100%;
+    }
+
+    .market-bar{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .chart{
+        height:390px;
+    }
+}
+
+@media(max-width:600px){
+    .app{
+        width:92%;
+        padding-top:18px;
+    }
+
+    .execution{
+        display:flex;
+    }
+
+    .stats{
+        grid-template-columns:1fr 1fr;
+    }
+
+    .panel{
+        padding:16px;
+        border-radius:19px;
+    }
+
+    .symbol{
+        font-size:21px;
+    }
+
+    .market-price{
+        font-size:21px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- HEADER -->
+
+    <header class="header">
+
+        <div class="brand">
+
+            <div class="logo">BL</div>
+
+            <div>
+                <div class="brand-title">
+                    Backtest Lab
+                </div>
+
+                <div class="brand-sub">
+                    Professional Strategy Testing Engine
+                </div>
+            </div>
+
+        </div>
+
+        <div class="account">
+            Starting Balance:
+            <strong id="startingBalanceHeader">$10,000.00</strong>
+        </div>
+
+    </header>
+
+
+    <!-- MARKET -->
+
+    <div class="market-bar">
+
+        <div class="market-left">
+
+            <div class="symbol">
+                XAUUSD
+            </div>
+
+            <div class="badge blue">
+                GOLD
+            </div>
+
+            <div class="badge green">
+                SIMULATION
+            </div>
+
+        </div>
+
+        <div class="market-price">
+            $<span id="price">3800.00</span>
+        </div>
+
+    </div>
+
+
+    <!-- MAIN -->
+
+    <div class="main-grid">
+
+        <!-- LEFT -->
+
+        <section>
+
+            <div class="panel chart-wrapper">
+
+                <div class="panel-title">
+
+                    <h3>
+                        Price Chart
+                    </h3>
+
+                    <span id="candleInfo">
+                        Candle 1 / 80
+                    </span>
+
+                </div>
+
+                <div class="chart" id="chart">
+
+                    <div class="chart-grid"></div>
+
+                    <div class="candle-area" id="candleArea"></div>
+
+                    <div class="price-line"
+                         id="priceLine">
+
+                        <div class="price-label">
+                            $<span id="chartPrice">
+                                3800.00
+                            </span>
+                        </div>
+
+                    </div>
+
+                    <div class="trade-line entry-line"
+                         id="entryLine">
+
+                        <span>ENTRY</span>
+
+                    </div>
+
+                    <div class="trade-line sl-line"
+                         id="slLine">
+
+                        <span>SL</span>
+
+                    </div>
+
+                    <div class="trade-line tp-line"
+                         id="tpLine">
+
+                        <span>TP</span>
+
+                    </div>
+
+                    <div class="price-scale"
+                         id="priceScale"></div>
+
+                </div>
+
+                <div class="chart-footer">
+
+                    <span id="timeLabel">
+                        2026-01-01 00:00
+                    </span>
+
+                    <span>
+                        OHLC
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- STATS -->
+
+            <div class="stats">
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        BALANCE
+                    </div>
+
+                    <div class="stat-value"
+                         id="balance">
+                        $10,000.00
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        NET PROFIT
+                    </div>
+
+                    <div class="stat-value"
+                         id="profit">
+                        $0.00
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        WIN RATE
+                    </div>
+
+                    <div class="stat-value"
+                         id="winRate">
+                        0.0%
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        MAX DD
+                    </div>
+
+                    <div class="stat-value"
+                         id="drawdown">
+                        0.00%
+                    </div>
+
+                </div>
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        TRADES
+                    </div>
+
+                    <div class="stat-value"
+                         id="tradeCount">
+                        0
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- EQUITY -->
+
+            <div class="panel equity">
+
+                <div class="panel-title">
+
+                    <h3>
+                        Equity Curve
+                    </h3>
+
+                    <span>
+                        Account performance
+                    </span>
+
+                </div>
+
+                <canvas class="equity-canvas"
+                        id="equityCanvas">
+                </canvas>
+
+            </div>
+
+
+            <!-- HISTORY -->
+
+            <div class="panel history">
+
+                <div class="panel-title">
+
+                    <h3>
+                        Trade History
+                    </h3>
+
+                    <span id="historyCount">
+                        0 trades
+                    </span>
+
+                </div>
+
+                <div class="table-wrap">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>#</th>
+                                <th>TIME</th>
+                                <th>SIDE</th>
+                                <th>ENTRY</th>
+                                <th>EXIT</th>
+                                <th>LOT</th>
+                                <th>NET P&L</th>
+                                <th>R</th>
+                                <th>REASON</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="historyBody">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- RIGHT -->
+
+        <aside class="execution">
+
+            <!-- POSITION -->
+
+            <div class="position-card">
+
+                <div class="position-header">
+
+                    <h3>
+                        Current Position
+                    </h3>
+
+                    <div class="position-status"
+                         id="positionStatus">
+                        NO POSITION
+                    </div>
+
+                </div>
+
+                <div class="position-grid">
+
+                    <div class="data-box">
+                        <div class="data-label">SIDE</div>
+                        <div class="data-value"
+                             id="position">
+                            NONE
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">LOT</div>
+                        <div class="data-value"
+                             id="lot">
+                            -
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">ENTRY</div>
+                        <div class="data-value"
+                             id="entry">
+                            -
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">P&L</div>
+                        <div class="data-value"
+                             id="floatingPnL">
+                            $0.00
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">STOP LOSS</div>
+                        <div class="data-value"
+                             id="sl">
+                            -
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">TAKE PROFIT</div>
+                        <div class="data-value"
+                             id="tp">
+                            -
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- SETTINGS -->
+
+            <div class="position-card">
+
+                <div class="position-header">
+
+                    <h3>
+                        Risk Settings
+                    </h3>
+
+                </div>
+
+                <div class="settings">
+
+                    <div class="field">
+
+                        <label>
+                            Risk / Trade %
+                        </label>
+
+                        <input
+                            id="riskPercent"
+                            type="number"
+                            value="1"
+                            min="0.01"
+                            max="10"
+                            step="0.1">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            SL Distance
+                        </label>
+
+                        <input
+                            id="slDistance"
+                            type="number"
+                            value="40"
+                            min="0.01"
+                            step="1">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            TP Distance
+                        </label>
+
+                        <input
+                            id="tpDistance"
+                            type="number"
+                            value="50"
+                            min="0.01"
+                            step="1">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            Contract Size
+                        </label>
+
+                        <input
+                            id="contractSize"
+                            type="number"
+                            value="100"
+                            min="0.01"
+                            step="1">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            Spread
+                        </label>
+
+                        <input
+                            id="spread"
+                            type="number"
+                            value="0.20"
+                            min="0"
+                            step="0.01">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            Commission / Lot
+                        </label>
+
+                        <input
+                            id="commission"
+                            type="number"
+                            value="0"
+                            min="0"
+                            step="0.01">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            Slippage
+                        </label>
+
+                        <input
+                            id="slippage"
+                            type="number"
+                            value="0"
+                            min="0"
+                            step="0.01">
+
+                    </div>
+
+                    <div class="field">
+
+                        <label>
+                            Execution
+                        </label>
+
+                        <select id="executionModel">
+
+                            <option value="sl-first">
+                                Conservative: SL First
+                            </option>
+
+                            <option value="tp-first">
+                                Optimistic: TP First
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- CALCULATOR -->
+
+            <div class="position-card">
+
+                <div class="position-header">
+
+                    <h3>
+                        Position Calculator
+                    </h3>
+
+                </div>
+
+                <div class="position-grid">
+
+                    <div class="data-box">
+                        <div class="data-label">
+                            RISK $
+                        </div>
+
+                        <div class="data-value"
+                             id="riskDollar">
+                            $100.00
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">
+                            CALCULATED LOT
+                        </div>
+
+                        <div class="data-value"
+                             id="calculatedLot">
+                            0.025
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">
+                            R:R
+                        </div>
+
+                        <div class="data-value"
+                             id="rr">
+                            1 : 1.25
+                        </div>
+                    </div>
+
+                    <div class="data-box">
+                        <div class="data-label">
+                            MAX LOSS
+                        </div>
+
+                        <div class="data-value"
+                             id="maxLoss">
+                            $100.00
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- BUTTONS -->
+
+            <div class="position-card">
+
+                <div class="position-header">
+
+                    <h3>
+                        Execution
+                    </h3>
+
+                </div>
+
+                <div class="buttons">
+
+                    <button class="buy"
+                            id="buyBtn">
+                        BUY
+                    </button>
+
+                    <button class="sell"
+                            id="sellBtn">
+                        SELL
+                    </button>
+
+                    <button class="close"
+                            id="closeBtn">
+                        CLOSE
+                    </button>
+
+                    <button class="next"
+                            id="nextBtn">
+                        NEXT CANDLE ▶
+                    </button>
+
+                    <button class="primary"
+                            id="playBtn">
+                        ▶ PLAY
+                    </button>
+
+                    <button class="primary"
+                            id="prevBtn">
+                        ◀ PREVIOUS
+                    </button>
+
+                    <button class="danger full-btn"
+                            id="resetBtn">
+                        RESET BACKTEST
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- STATUS -->
+
+            <div class="status"
+                 id="status">
+                Ready. Choose BUY or SELL.
+            </div>
+
+        </aside>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   BACKTEST LAB v0.3
+   CORE ENGINE
+========================================================= */
+
+
+/* =========================
+   CONFIG
+========================= */
+
+const INITIAL_BALANCE = 10000;
+
+
+/* =========================
+   STATE
+========================= */
+
+let balance = INITIAL_BALANCE;
+let peakEquity = INITIAL_BALANCE;
+let maxDrawdownDollar = 0;
+
+let candleIndex = 0;
+
+let position = null;
+
+let tradeHistory = [];
+
+let equityHistory = [INITIAL_BALANCE];
+
+let isPlaying = false;
+let playTimer = null;
+
+
+/* =========================
+   SIMULATED OHLC DATA
+========================= */
+
+const marketData = generateMarketData(80);
+
+
+/* =========================
+   GENERATE OHLC
+========================= */
+
+function generateMarketData(count){
+
+    const data = [];
+
+    let close = 3800;
+
+    let timestamp =
+        new Date("2026-01-01T00:00:00");
+
+    for(let i = 0; i < count; i++){
+
+        /*
+            Create different market regimes:
+            trend up
+            pullback
+            trend down
+            range
+        */
+
+        let drift = 0;
+
+        if(i < 18){
+            drift = 4.5;
+        }
+        else if(i < 30){
+            drift = -2.8;
+        }
+        else if(i < 48){
+            drift = 5.0;
+        }
+        else if(i < 62){
+            drift = -4.5;
+        }
+        else{
+            drift = i % 2 === 0 ? 1.2 : -1.2;
+        }
+
+        const open = close;
+
+        const noise =
+            (Math.random() - 0.5) * 16;
+
+        close =
+            open +
+            drift +
+            noise;
+
+        const high =
+            Math.max(open, close) +
+            Math.random() * 10 + 3;
+
+        const low =
+            Math.min(open, close) -
+            Math.random() * 10 - 3;
+
+        data.push({
+
+            time:
+                new Date(timestamp),
+
+            open: open,
+
+            high: high,
+
+            low: low,
+
+            close: close
+
+        });
+
+        timestamp.setHours(
+            timestamp.getHours() + 1
+        );
+
+    }
+
+    return data;
+}
+
+
+/* =========================
+   CURRENT CANDLE
+========================= */
+
+function currentCandle(){
+
+    return marketData[candleIndex];
+
+}
+
+
+/* =========================
+   SETTINGS
+========================= */
+
+function getSettings(){
+
+    const risk =
+        Math.max(
+            0.01,
+            Math.min(
+                10,
+                Number(
+                    document.getElementById(
+                        "riskPercent"
+                    ).value
+                ) || 1
+            )
+        );
+
+    const sl =
+        Math.max(
+            0.01,
+            Number(
+                document.getElementById(
+                    "slDistance"
+                ).value
+            ) || 40
+        );
+
+    const tp =
+        Math.max(
+            0.01,
+            Number(
+                document.getElementById(
+                    "tpDistance"
+                ).value
+            ) || 50
+        );
+
+    const contract =
+        Math.max(
+            0.01,
+            Number(
+                document.getElementById(
+                    "contractSize"
+                ).value
+            ) || 100
+        );
+
+    const spread =
+        Math.max(
+            0,
+            Number(
+                document.getElementById(
+                    "spread"
+                ).value
+            ) || 0
+        );
+
+    const commission =
+        Math.max(
+            0,
+            Number(
+                document.getElementById(
+                    "commission"
+                ).value
+            ) || 0
+        );
+
+    const slippage =
+        Math.max(
+            0,
+            Number(
+                document.getElementById(
+                    "slippage"
+                ).value
+            ) || 0
+        );
+
+    const execution =
+        document.getElementById(
+            "executionModel"
+        ).value;
+
+    return {
+        risk,
+        sl,
+        tp,
+        contract,
+        spread,
+        commission,
+        slippage,
+        execution
+    };
+
+}
+
+
+/* =========================
+   LOT CALCULATION
+========================= */
+
+function calculateLot(){
+
+    const settings =
+        getSettings();
+
+    const riskDollar =
+        balance *
+        (settings.risk / 100);
+
+    const lot =
+        riskDollar /
+        (
+            settings.sl *
+            settings.contract
+        );
+
+    return {
+        riskDollar,
+        lot
+    };
+
+}
+
+
+/* =========================
+   FORMAT
+========================= */
+
+function money(value){
+
+    return "$" +
+        Number(value).toLocaleString(
+            "en-US",
+            {
+                minimumFractionDigits:2,
+                maximumFractionDigits:2
+            }
+        );
+
+}
+
+
+function price(value){
+
+    return Number(value).toFixed(2);
+
+}
+
+
+/* =========================
+   PRICE RANGE
+========================= */
+
+function getChartRange(){
+
+    const visible =
+        marketData.slice(
+            0,
+            candleIndex + 1
+        );
+
+    let min =
+        Math.min(
+            ...visible.map(c => c.low)
+        );
+
+    let max =
+        Math.max(
+            ...visible.map(c => c.high)
+        );
+
+    if(max === min){
+        max += 10;
+        min -= 10;
+    }
+
+    const padding =
+        (max - min) * 0.08;
+
+    return {
+        min:min-padding,
+        max:max+padding
+    };
+
+}
+
+
+/* =========================
+   PRICE TO Y
+========================= */
+
+function priceToPercent(value){
+
+    const range =
+        getChartRange();
+
+    return (
+        100 -
+        (
+            (value - range.min) /
+            (range.max - range.min)
+        ) * 100
+    );
+
+}
+
+
+/* =========================
+   DRAW CHART
+========================= */
+
+function drawChart(){
+
+    const area =
+        document.getElementById(
+            "candleArea"
+        );
+
+    area.innerHTML = "";
+
+    const visible =
+        marketData.slice(
+            0,
+            candleIndex + 1
+        );
+
+    const range =
+        getChartRange();
+
+    const width =
+        area.clientWidth;
+
+    const height =
+        area.clientHeight;
+
+    if(width <= 0 || height <= 0){
+        return;
+    }
+
+    const candleWidth =
+        Math.max(
+            5,
+            Math.min(
+                14,
+                width /
+                Math.max(
+                    visible.length * 1.7,
+                    1
+                )
+            )
+        );
+
+    visible.forEach(
+        (candle,index)=>{
+
+            const x =
+                visible.length === 1
+                ? width / 2
+                : (
+                    index /
+                    (visible.length - 1)
+                ) * width;
+
+            const highY =
+                (
+                    1 -
+                    (
+                        candle.high -
+                        range.min
+                    ) /
+                    (
+                        range.max -
+                        range.min
+                    )
+                ) * height;
+
+            const lowY =
+                (
+                    1 -
+                    (
+                        candle.low -
+                        range.min
+                    ) /
+                    (
+                        range.max -
+                        range.min
+                    )
+                ) * height;
+
+            const openY =
+                (
+                    1 -
+                    (
+                        candle.open -
+                        range.min
+                    ) /
+                    (
+                        range.max -
+                        range.min
+                    )
+                ) * height;
+
+            const closeY =
+                (
+                    1 -
+                    (
+                        candle.close -
+                        range.min
+                    ) /
+                    (
+                        range.max -
+                        range.min
+                    )
+                ) * height;
+
+            const candleElement =
+                document.createElement(
+                    "div"
+                );
+
+            candleElement.className =
+                "candle";
+
+            candleElement.style.left =
+                x + "px";
+
+            candleElement.style.height =
+                height + "px";
+
+
+            /* WICK */
+
+            const wick =
+                document.createElement(
+                    "div"
+                );
+
+            wick.className =
+                "wick " +
+                (
+                    candle.close >= candle.open
+                    ? "up"
+                    : "down"
+                );
+
+            wick.style.top =
+                Math.min(
+                    highY,
+                    lowY
+                ) + "px";
+
+            wick.style.height =
+                Math.max(
+                    2,
+                    Math.abs(
+                        lowY-highY
+                    )
+                ) + "px";
+
+
+            /* BODY */
+
+            const body =
+                document.createElement(
+                    "div"
+                );
+
+            body.className =
+                "body " +
+                (
+                    candle.close >= candle.open
+                    ? "up"
+                    : "down"
+                );
+
+            body.style.top =
+                Math.min(
+                    openY,
+                    closeY
+                ) + "px";
+
+            body.style.height =
+                Math.max(
+                    3,
+                    Math.abs(
+                        closeY-openY
+                    )
+                ) + "px";
+
+            body.style.width =
+                candleWidth + "px";
+
+            body.style.left =
+                (-candleWidth/2) + "px";
+
+
+            candleElement.appendChild(
+                wick
+            );
+
+            candleElement.appendChild(
+                body
+            );
+
+            area.appendChild(
+                candleElement
+            );
+
+        }
+    );
+
+
+    drawPriceScale();
+
+    updateTradeLines();
+
+}
+
+
+/* =========================
+   PRICE SCALE
+========================= */
+
+function drawPriceScale(){
+
+    const scale =
+        document.getElementById(
+            "priceScale"
+        );
+
+    scale.innerHTML = "";
+
+    const range =
+        getChartRange();
+
+    for(let i=0;i<=5;i++){
+
+        const value =
+            range.max -
+            (
+                (range.max-range.min)
+                * i / 5
+            );
+
+        const tick =
+            document.createElement(
+                "div"
+            );
+
+        tick.className =
+            "price-tick";
+
+        tick.style.top =
+            (i/5*100) + "%";
+
+        tick.innerText =
+            price(value);
+
+        scale.appendChild(tick);
+
+    }
+
+}
+
+
+/* =========================
+   UPDATE TRADE LINES
+========================= */
+
+function updateTradeLines(){
+
+    const candle =
+        currentCandle();
+
+    const current =
+        candle.close;
+
+    const priceLine =
+        document.getElementById(
+            "priceLine"
+        );
+
+    priceLine.style.top =
+        priceToPercent(current) + "%";
+
+
+    if(position === null){
+
+        document.getElementById(
+            "entryLine"
+        ).style.display = "none";
+
+        document.getElementById(
+            "slLine"
+        ).style.display = "none";
+
+        document.getElementById(
+            "tpLine"
+        ).style.display = "none";
+
+        return;
+
+    }
+
+
+    const entryLine =
+        document.getElementById(
+            "entryLine"
+        );
+
+    const slLine =
+        document.getElementById(
+            "slLine"
+        );
+
+    const tpLine =
+        document.getElementById(
+            "tpLine"
+        );
+
+
+    entryLine.style.display =
+        "block";
+
+    slLine.style.display =
+        "block";
+
+    tpLine.style.display =
+        "block";
+
+
+    entryLine.style.top =
+        priceToPercent(
+            position.entry
+        ) + "%";
+
+    slLine.style.top =
+        priceToPercent(
+            position.sl
+        ) + "%";
+
+    tpLine.style.top =
+        priceToPercent(
+            position.tp
+        ) + "%";
+
+}
+
+
+/* =========================
+   OPEN BUY
+========================= */
+
+function openBuy(){
+
+    if(position !== null){
+
+        setStatus(
+            "Position already open."
+        );
+
+        return;
+
+    }
+
+
+    const settings =
+        getSettings();
+
+    const lotData =
+        calculateLot();
+
+    const candle =
+        currentCandle();
+
+
+    /*
+       BUY execution:
+       ask = close + half spread
+    */
+
+    const entry =
+        candle.close +
+        settings.spread / 2;
+
+
+    const sl =
+        entry -
+        settings.sl;
+
+    const tp =
+        entry +
+        settings.tp;
+
+
+    position = {
+
+        side:"BUY",
+
+        entry:entry,
+
+        sl:sl,
+
+        tp:tp,
+
+        lot:lotData.lot,
+
+        riskDollar:
+            lotData.riskDollar,
+
+        openedAt:
+            new Date(candle.time)
+
+    };
+
+
+    setStatus(
+        "BUY opened at " +
+        money(entry) +
+        " | Lot " +
+        lotData.lot.toFixed(3)
+    );
+
+
+    updateAll();
+
+}
+
+
+/* =========================
+   OPEN SELL
+========================= */
+
+function openSell(){
+
+    if(position !== null){
+
+        setStatus(
+            "Position already open."
+        );
+
+        return;
+
+    }
+
+
+    const settings =
+        getSettings();
+
+    const lotData =
+        calculateLot();
+
+    const candle =
+        currentCandle();
+
+
+    /*
+       SELL execution:
+       bid = close - half spread
+    */
+
+    const entry =
+        candle.close -
+        settings.spread / 2;
+
+
+    const sl =
+        entry +
+        settings.sl;
+
+    const tp =
+        entry -
+        settings.tp;
+
+
+    position = {
+
+        side:"SELL",
+
+        entry:entry,
+
+        sl:sl,
+
+        tp:tp,
+
+        lot:lotData.lot,
+
+        riskDollar:
+            lotData.riskDollar,
+
+        openedAt:
+            new Date(candle.time)
+
+    };
+
+
+    setStatus(
+        "SELL opened at " +
+        money(entry) +
+        " | Lot " +
+        lotData.lot.toFixed(3)
+    );
+
+
+    updateAll();
+
+}
+
+
+/* =========================
+   CHECK SL / TP
+========================= */
+
+function checkStops(){
+
+    if(position === null){
+        return;
+    }
+
+
+    const candle =
+        currentCandle();
+
+    const settings =
+        getSettings();
+
+
+    let slHit = false;
+    let tpHit = false;
+
+
+    if(position.side === "BUY"){
+
+        slHit =
+            candle.low <=
+            position.sl;
+
+        tpHit =
+            candle.high >=
+            position.tp;
+
+    }
+
+
+    if(position.side === "SELL"){
+
+        slHit =
+            candle.high >=
+            position.sl;
+
+        tpHit =
+            candle.low <=
+            position.tp;
+
+    }
+
+
+    if(!slHit && !tpHit){
+        return;
+    }
+
+
+    let reason;
+
+
+    /*
+       If both SL and TP are touched
+       within the same candle, the
+       selected execution model decides.
+    */
+
+    if(slHit && tpHit){
+
+        if(settings.execution === "sl-first"){
+            reason = "SL";
+        }
+        else{
+            reason = "TP";
+        }
+
+    }
+    else if(slHit){
+
+        reason = "SL";
+
+    }
+    else{
+
+        reason = "TP";
+
+    }
+
+
+    let exitPrice;
+
+
+    if(reason === "SL"){
+
+        exitPrice =
+            position.sl;
+
+    }
+    else{
+
+        exitPrice =
+            position.tp;
+
+    }
+
+
+    /*
+       Slippage is applied against
+       the trader.
+    */
+
+    if(settings.slippage > 0){
+
+        if(position.side === "BUY"){
+
+            if(reason === "TP"){
+                exitPrice -= settings.slippage;
+            }
+            else{
+                exitPrice -= settings.slippage;
+            }
+
+        }
+        else{
+
+            if(reason === "TP"){
+                exitPrice += settings.slippage;
+            }
+            else{
+                exitPrice += settings.slippage;
+            }
+
+        }
+
+    }
+
+
+    closeTrade(
+        reason,
+        exitPrice,
+        true
+    );
+
+}
+
+
+/* =========================
+   CLOSE TRADE
+========================= */
+
+function closeTrade(
+    reason="MANUAL",
+    specifiedExit=null,
+    automatic=false
+){
+
+    if(position === null){
+        return;
+    }
+
+
+    const settings =
+        getSettings();
+
+    const candle =
+        currentCandle();
+
+
+    let exit =
+        specifiedExit !== null
+        ? specifiedExit
+        : candle.close;
+
+
+    /*
+       Manual close uses current
+       close price with spread effect.
+    */
+
+    if(
+        !automatic &&
+        settings.spread > 0
+    ){
+
+        if(position.side === "BUY"){
+
+            exit -=
+                settings.spread / 2;
+
+        }
+        else{
+
+            exit +=
+                settings.spread / 2;
+
+        }
+
+    }
+
+
+    let grossPnL;
+
+
+    if(position.side === "BUY"){
+
+        grossPnL =
+            (
+                exit -
+                position.entry
+            ) *
+            position.lot *
+            settings.contract;
+
+    }
+    else{
+
+        grossPnL =
+            (
+                position.entry -
+                exit
+            ) *
+            position.lot *
+            settings.contract;
+
+    }
+
+
+    const commissionCost =
+        settings.commission *
+        position.lot;
+
+    const netPnL =
+        grossPnL -
+        commissionCost;
+
+
+    balance += netPnL;
+
+
+    if(balance > peakEquity){
+
+        peakEquity =
+            balance;
+
+    }
+
+
+    const drawdownDollar =
+        peakEquity -
+        balance;
+
+
+    if(
+        drawdownDollar >
+        maxDrawdownDollar
+    ){
+
+        maxDrawdownDollar =
+            drawdownDollar;
+
+    }
+
+
+    const riskDollar =
+        position.riskDollar;
+
+    const rMultiple =
+        riskDollar > 0
+        ? netPnL / riskDollar
+        : 0;
+
+
+    tradeHistory.push({
+
+        time:
+            new Date(candle.time),
+
+        side:
+            position.side,
+
+        entry:
+            position.entry,
+
+        exit:
+            exit,
+
+        lot:
+            position.lot,
+
+        grossPnL:
+            grossPnL,
+
+        commission:
+            commissionCost,
+
+        pnl:
+            netPnL,
+
+        r:
+            rMultiple,
+
+        reason:
+            reason
+
+    });
+
+
+    equityHistory.push(
+        balance
+    );
+
+
+    position = null;
+
+
+    setStatus(
+        "Trade closed: " +
+        reason +
+        " | Net P&L " +
+        money(netPnL)
+    );
+
+
+    updateAll();
+
+}
+
+
+/* =========================
+   NEXT CANDLE
+========================= */
+
+function nextCandle(){
+
+    if(
+        candleIndex >=
+        marketData.length - 1
+    ){
+
+        stopPlaying();
+
+        setStatus(
+            "Backtest finished."
+        );
+
+        return;
+
+    }
+
+
+    candleIndex++;
+
+
+    /*
+       IMPORTANT:
+       SL/TP are checked using
+       HIGH / LOW of the new candle.
+    */
+
+    checkStops();
+
+    updateAll();
+
+}
+
+
+/* =========================
+   PREVIOUS CANDLE
+========================= */
+
+function previousCandle(){
+
+    if(candleIndex <= 0){
+
+        setStatus(
+            "Already at first candle."
+        );
+
+        return;
+
+    }
+
+
+    /*
+       We intentionally do not
+       reverse completed trades.
+       Previous is for visual
+       navigation during testing.
+    */
+
+    candleIndex--;
+
+    updateAll();
+
+    setStatus(
+        "Moved to previous candle."
+    );
+
+}
+
+
+/* =========================
+   FLOATING PNL
+========================= */
+
+function floatingPnL(){
+
+    if(position === null){
+        return 0;
+    }
+
+
+    const current =
+        currentCandle().close;
+
+
+    const settings =
+        getSettings();
+
+
+    let pnl;
+
+
+    if(position.side === "BUY"){
+
+        pnl =
+            (
+                current -
+                position.entry
+            ) *
+            position.lot *
+            settings.contract;
+
+    }
+    else{
+
+        pnl =
+            (
+                position.entry -
+                current
+            ) *
+            position.lot *
+            settings.contract;
+
+    }
+
+
+    return pnl;
+
+}
+
+
+/* =========================
+   UPDATE DISPLAY
+========================= */
+
+function updateDisplay(){
+
+    const candle =
+        currentCandle();
+
+
+    const current =
+        candle.close;
+
+
+    document.getElementById(
+        "price"
+    ).innerText =
+        price(current);
+
+
+    document.getElementById(
+        "chartPrice"
+    ).innerText =
+        price(current);
+
+
+    document.getElementById(
+        "candleInfo"
+    ).innerText =
+        "Candle " +
+        (candleIndex + 1) +
+        " / " +
+        marketData.length;
+
+
+    document.getElementById(
+        "timeLabel"
+    ).innerText =
+        formatTime(candle.time);
+
+
+    document.getElementById(
+        "balance"
+    ).innerText =
+        money(balance);
+
+
+    const netProfit =
+        balance -
+        INITIAL_BALANCE;
+
+
+    document.getElementById(
+        "profit"
+    ).innerText =
+        money(netProfit);
+
+
+    const wins =
+        tradeHistory.filter(
+            trade => trade.pnl > 0
+        ).length;
+
+
+    const total =
+        tradeHistory.length;
+
+
+    const winRate =
+        total === 0
+        ? 0
+        : wins / total * 100;
+
+
+    document.getElementById(
+        "winRate"
+    ).innerText =
+        winRate.toFixed(1) + "%";
+
+
+    const maxDD =
+        peakEquity > 0
+        ? (
+            maxDrawdownDollar /
+            peakEquity
+        ) * 100
+        : 0;
+
+
+    document.getElementById(
+        "drawdown"
+    ).innerText =
+        maxDD.toFixed(2) + "%";
+
+
+    document.getElementById(
+        "tradeCount"
+    ).innerText =
+        total;
+
+
+    document.getElementById(
+        "historyCount"
+    ).innerText =
+        total +
+        (total === 1 ? " trade" : " trades");
+
+
+    updatePositionDisplay();
+
+    updateCalculator();
+
+}
+
+
+/* =========================
+   POSITION DISPLAY
+========================= */
+
+function updatePositionDisplay(){
+
+    const positionText =
+        document.getElementById(
+            "position"
+        );
+
+    const status =
+        document.getElementById(
+            "positionStatus"
+        );
+
+
+    if(position === null){
+
+        positionText.innerText =
+            "NONE";
+
+        status.innerText =
+            "NO POSITION";
+
+        document.getElementById(
+            "lot"
+        ).innerText = "-";
+
+        document.getElementById(
+            "entry"
+        ).innerText = "-";
+
+        document.getElementById(
+            "sl"
+        ).innerText = "-";
+
+        document.getElementById(
+            "tp"
+        ).innerText = "-";
+
+        document.getElementById(
+            "floatingPnL"
+        ).innerText =
+            "$0.00";
+
+        return;
+
+    }
+
+
+    positionText.innerText =
+        position.side;
+
+
+    status.innerText =
+        "OPEN";
+
+
+    document.getElementById(
+        "lot"
+    ).innerText =
+        position.lot.toFixed(3);
+
+
+    document.getElementById(
+        "entry"
+    ).innerText =
+        money(position.entry);
+
+
+    document.getElementById(
+        "sl"
+    ).innerText =
+        money(position.sl);
+
+
+    document.getElementById(
+        "tp"
+    ).innerText =
+        money(position.tp);
+
+
+    const floating =
+        floatingPnL();
+
+
+    document.getElementById(
+        "floatingPnL"
+    ).innerText =
+        money(floating);
+
+}
+
+
+/* =========================
+   CALCULATOR DISPLAY
+========================= */
+
+function updateCalculator(){
+
+    const settings =
+        getSettings();
+
+    const data =
+        calculateLot();
+
+
+    document.getElementById(
+        "riskDollar"
+    ).innerText =
+        money(data.riskDollar);
+
+
+    document.getElementById(
+        "calculatedLot"
+    ).innerText =
+        data.lot.toFixed(3);
+
+
+    const rr =
+        settings.tp /
+        settings.sl;
+
+
+    document.getElementById(
+        "rr"
+    ).innerText =
+        "1 : " +
+        rr.toFixed(2);
+
+
+    document.getElementById(
+        "maxLoss"
+    ).innerText =
+        money(data.riskDollar);
+
+}
+
+
+/* =========================
+   HISTORY
+========================= */
+
+function updateHistory(){
+
+    const body =
+        document.getElementById(
+            "historyBody"
+        );
+
+    body.innerHTML = "";
+
+
+    tradeHistory
+        .slice()
+        .reverse()
+        .forEach(
+            (trade,index)=>{
+
+                const row =
+                    document.createElement(
+                        "tr"
+                    );
+
+
+                const pnlClass =
+                    trade.pnl > 0
+                    ? "win"
+                    : trade.pnl < 0
+                    ? "loss"
+                    : "neutral";
+
+
+                row.innerHTML = `
+
+                    <td>${tradeHistory.length - index}</td>
+
+                    <td>
+                        ${formatTime(trade.time)}
+                    </td>
+
+                    <td class="${trade.side === "BUY" ? "win" : "loss"}">
+                        ${trade.side}
+                    </td>
+
+                    <td>
+                        ${money(trade.entry)}
+                    </td>
+
+                    <td>
+                        ${money(trade.exit)}
+                    </td>
+
+                    <td>
+                        ${trade.lot.toFixed(3)}
+                    </td>
+
+                    <td class="${pnlClass}">
+                        ${money(trade.pnl)}
+                    </td>
+
+                    <td class="${pnlClass}">
+                        ${trade.r.toFixed(2)}R
+                    </td>
+
+                    <td>
+                        ${trade.reason}
+                    </td>
+
+                `;
+
+
+                body.appendChild(row);
+
+            }
+        );
+
+}
+
+
+/* =========================
+   EQUITY CURVE
+========================= */
+
+function drawEquity(){
+
+    const canvas =
+        document.getElementById(
+            "equityCanvas"
+        );
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+
+    const dpr =
+        window.devicePixelRatio || 1;
+
+
+    canvas.width =
+        rect.width * dpr;
+
+    canvas.height =
+        rect.height * dpr;
+
+
+    const ctx =
+        canvas.getContext("2d");
+
+
+    ctx.scale(dpr,dpr);
+
+
+    const width =
+        rect.width;
+
+    const height =
+        rect.height;
+
+
+    ctx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    /*
+       Grid
+    */
+
+    ctx.lineWidth = 1;
+
+    ctx.strokeStyle =
+        "rgba(120,130,145,.14)";
+
+
+    for(let i=1;i<5;i++){
+
+        const y =
+            height * i / 5;
+
+        ctx.beginPath();
+
+        ctx.moveTo(0,y);
+
+        ctx.lineTo(width,y);
+
+        ctx.stroke();
+
+    }
+
+
+    if(
+        equityHistory.length < 2
+    ){
+
+        return;
+
+    }
+
+
+    let min =
+        Math.min(
+            ...equityHistory
+        );
+
+    let max =
+        Math.max(
+            ...equityHistory
+        );
+
+
+    if(max === min){
+
+        max += 1;
+        min -= 1;
+
+    }
+
+
+    const padding =
+        (max-min) * .1;
+
+    max += padding;
+    min -= padding;
+
+
+    ctx.beginPath();
+
+
+    equityHistory.forEach(
+        (value,index)=>{
+
+            const x =
+                index /
+                (
+                    equityHistory.length-1
+                ) *
+                width;
+
+
+            const y =
+                height -
+                (
+                    (
+                        value-min
+                    ) /
+                    (
+                        max-min
+                    )
+                ) *
+                height;
+
+
+            if(index === 0){
+                ctx.moveTo(x,y);
+            }
+            else{
+                ctx.lineTo(x,y);
+            }
+
+        }
+    );
+
+
+    ctx.lineWidth = 2.5;
+
+    ctx.strokeStyle =
+        "#4776e6";
+
+    ctx.stroke();
+
+
+    /*
+       Starting balance line
+    */
+
+    const startY =
+        height -
+        (
+            (
+                INITIAL_BALANCE-min
+            ) /
+            (
+                max-min
+            )
+        ) *
+        height;
+
+
+    ctx.beginPath();
+
+    ctx.moveTo(0,startY);
+
+    ctx.lineTo(width,startY);
+
+    ctx.setLineDash([5,5]);
+
+    ctx.lineWidth = 1;
+
+    ctx.strokeStyle =
+        "rgba(100,110,125,.5)";
+
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+
+}
+
+
+/* =========================
+   FORMAT TIME
+========================= */
+
+function formatTime(date){
+
+    const d =
+        new Date(date);
+
+
+    const yyyy =
+        d.getFullYear();
+
+
+    const mm =
+        String(
+            d.getMonth()+1
+        ).padStart(2,"0");
+
+
+    const dd =
+        String(
+            d.getDate()
+        ).padStart(2,"0");
+
+
+    const hh =
+        String(
+            d.getHours()
+        ).padStart(2,"0");
+
+
+    const min =
+        String(
+            d.getMinutes()
+        ).padStart(2,"0");
+
+
+    return (
+        yyyy +
+        "-" +
+        mm +
+        "-" +
+        dd +
+        " " +
+        hh +
+        ":" +
+        min
+    );
+
+}
+
+
+/* =========================
+   STATUS
+========================= */
+
+function setStatus(message){
+
+    document.getElementById(
+        "status"
+    ).innerText =
+        message;
+
+}
+
+
+/* =========================
+   UPDATE EVERYTHING
+========================= */
+
+function updateAll(){
+
+    updateDisplay();
+
+    updateHistory();
+
+    drawChart();
+
+    drawEquity();
+
+}
+
+
+/* =========================
+   PLAY
+========================= */
+
+function startPlaying(){
+
+    if(isPlaying){
+        return;
+    }
+
+
+    if(
+        candleIndex >=
+        marketData.length - 1
+    ){
+
+        setStatus(
+            "Backtest finished. Reset to start again."
+        );
+
+        return;
+
+    }
+
+
+    isPlaying = true;
+
+
+    document.getElementById(
+        "playBtn"
+    ).innerText =
+        "⏸ PAUSE";
+
+
+    document.getElementById(
+        "playBtn"
+    ).classList.add(
+        "playing"
+    );
+
+
+    playTimer =
+        setInterval(
+            ()=>{
+
+                if(
+                    candleIndex >=
+                    marketData.length-1
+                ){
+
+                    stopPlaying();
+
+                    setStatus(
+                        "Backtest finished."
+                    );
+
+                    return;
+
+                }
+
+                nextCandle();
+
+            },
+            500
+        );
+
+}
+
+
+/* =========================
+   STOP PLAYING
+========================= */
+
+function stopPlaying(){
+
+    isPlaying = false;
+
+
+    if(playTimer){
+
+        clearInterval(
+            playTimer
+        );
+
+        playTimer = null;
+
+    }
+
+
+    document.getElementById(
+        "playBtn"
+    ).innerText =
+        "▶ PLAY";
+
+
+    document.getElementById(
+        "playBtn"
+    ).classList.remove(
+        "playing"
+    );
+
+}
+
+
+/* =========================
+   RESET
+========================= */
+
+function resetBacktest(){
+
+    stopPlaying();
+
+
+    balance =
+        INITIAL_BALANCE;
+
+    peakEquity =
+        INITIAL_BALANCE;
+
+    maxDrawdownDollar =
+        0;
+
+    candleIndex =
+        0;
+
+    position =
+        null;
+
+    tradeHistory =
+        [];
+
+    equityHistory =
+        [INITIAL_BALANCE];
+
+
+    /*
+       Generate a fresh
+       simulated market.
+    */
+
+    marketData.splice(
+        0,
+        marketData.length,
+        ...generateMarketData(80)
+    );
+
+
+    setStatus(
+        "Backtest reset. Ready."
+    );
+
+
+    updateAll();
+
+}
+
+
+/* =========================
+   EVENT LISTENERS
+========================= */
+
+document.getElementById(
+    "buyBtn"
+).addEventListener(
+    "click",
+    openBuy
+);
+
+
+document.getElementById(
+    "sellBtn"
+).addEventListener(
+    "click",
+    openSell
+);
+
+
+document.getElementById(
+    "closeBtn"
+).addEventListener(
+    "click",
+    ()=>{
+        closeTrade(
+            "MANUAL",
+            null,
+            false
+        );
+    }
+);
+
+
+document.getElementById(
+    "nextBtn"
+).addEventListener(
+    "click",
+    nextCandle
+);
+
+
+document.getElementById(
+    "prevBtn"
+).addEventListener(
+    "click",
+    previousCandle
+);
+
+
+document.getElementById(
+    "playBtn"
+).addEventListener(
+    "click",
+    ()=>{
+
+        if(isPlaying){
+            stopPlaying();
+        }
+        else{
+            startPlaying();
+        }
+
+    }
+);
+
+
+document.getElementById(
+    "resetBtn"
+).addEventListener(
+    "click",
+    resetBacktest
+);
+
+
+/*
+   Update calculator whenever
+   risk settings change.
+*/
+
+[
+    "riskPercent",
+    "slDistance",
+    "tpDistance",
+    "contractSize",
+    "spread",
+    "commission",
+    "slippage",
+    "executionModel"
+].forEach(
+    id=>{
+
+        document.getElementById(id)
+            .addEventListener(
+                "input",
+                ()=>{
+                    updateCalculator();
+                    updateTradeLines();
+                    updateDisplay();
+                }
+            );
+
+        document.getElementById(id)
+            .addEventListener(
+                "change",
+                ()=>{
+                    updateCalculator();
+                    updateTradeLines();
+                    updateDisplay();
+                }
+            );
+
+    }
+);
+
+
+/* =========================
+   RESIZE
+========================= */
+
+window.addEventListener(
+    "resize",
+    ()=>{
+        drawChart();
+        drawEquity();
+    }
+);
+
+
+/* =========================
+   INITIALIZE
+========================= */
+
+updateAll();
+
+</script>
+
+</body>
+</html>

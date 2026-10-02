@@ -1,0 +1,22 @@
+# Installed dependencies and generated output
+node_modules/
+dist/
+dist-ssr/
+.npm-cache/
+.history-downloads/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+
+# Local credentials and machine-specific files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+.idea/
+.vscode/
+

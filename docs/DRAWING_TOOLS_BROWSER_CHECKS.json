@@ -1,0 +1,527 @@
+{
+  "creation": [
+    {
+      "tool": "Trend Line",
+      "pass": true
+    },
+    {
+      "tool": "Ray",
+      "pass": true
+    },
+    {
+      "tool": "Info Line",
+      "pass": true
+    },
+    {
+      "tool": "Extended Line",
+      "pass": true
+    },
+    {
+      "tool": "Trend Angle",
+      "pass": true
+    },
+    {
+      "tool": "Horizontal Line",
+      "pass": true
+    },
+    {
+      "tool": "Horizontal Ray",
+      "pass": true
+    },
+    {
+      "tool": "Vertical Line",
+      "pass": true
+    },
+    {
+      "tool": "Cross Line",
+      "pass": true
+    },
+    {
+      "tool": "Parallel Channel",
+      "pass": true
+    },
+    {
+      "tool": "Regression Trend",
+      "pass": true
+    },
+    {
+      "tool": "Flat Top / Bottom",
+      "pass": true
+    },
+    {
+      "tool": "Disjoint Channel",
+      "pass": true
+    },
+    {
+      "tool": "Fib Retracement",
+      "pass": true
+    },
+    {
+      "tool": "Trend-Based Fib Extension",
+      "pass": true
+    },
+    {
+      "tool": "Fib Channel",
+      "pass": true
+    },
+    {
+      "tool": "Fib Time Zone",
+      "pass": true
+    },
+    {
+      "tool": "Fib Speed Resistance Fan",
+      "pass": true
+    },
+    {
+      "tool": "Trend-Based Fib Time",
+      "pass": true
+    },
+    {
+      "tool": "Fib Circles",
+      "pass": true
+    },
+    {
+      "tool": "Fib Spiral",
+      "pass": true
+    },
+    {
+      "tool": "Fib Speed Resistance Arcs",
+      "pass": true
+    },
+    {
+      "tool": "Fib Wedge",
+      "pass": true
+    },
+    {
+      "tool": "Pitchfan",
+      "pass": true
+    },
+    {
+      "tool": "Gann Box",
+      "pass": true
+    },
+    {
+      "tool": "Gann Square Fixed",
+      "pass": true
+    },
+    {
+      "tool": "Gann Square",
+      "pass": true
+    },
+    {
+      "tool": "XABCD Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Cypher Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Head and Shoulders",
+      "pass": true
+    },
+    {
+      "tool": "ABCD Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Triangle Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Three Drives Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Impulse Wave (12345)",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Correction Wave (ABC)",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Triangle Wave (ABCDE)",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Double Combo Wave",
+      "pass": true
+    },
+    {
+      "tool": "Long Position",
+      "pass": true
+    },
+    {
+      "tool": "Short Position",
+      "pass": true
+    },
+    {
+      "tool": "Position Forecast",
+      "pass": true
+    },
+    {
+      "tool": "Bars Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Ghost Feed",
+      "pass": true
+    },
+    {
+      "tool": "Sector",
+      "pass": true
+    },
+    {
+      "tool": "Anchored VWAP",
+      "pass": true
+    },
+    {
+      "tool": "Fixed Range Volume Profile",
+      "pass": true
+    },
+    {
+      "tool": "Anchored Volume Profile",
+      "pass": true
+    },
+    {
+      "tool": "Price Range",
+      "pass": true
+    },
+    {
+      "tool": "Date Range",
+      "pass": true
+    },
+    {
+      "tool": "Date and Price Range",
+      "pass": true
+    },
+    {
+      "tool": "Brush",
+      "pass": true
+    },
+    {
+      "tool": "Highlighter",
+      "pass": true
+    },
+    {
+      "tool": "Arrow Marker",
+      "pass": true
+    },
+    {
+      "tool": "Arrow",
+      "pass": true
+    },
+    {
+      "tool": "Arrow Mark Up",
+      "pass": true
+    },
+    {
+      "tool": "Arrow Mark Down",
+      "pass": true
+    },
+    {
+      "tool": "Arrow Mark Left",
+      "pass": true
+    },
+    {
+      "tool": "Arrow Mark Right",
+      "pass": true
+    },
+    {
+      "tool": "Rectangle",
+      "pass": true
+    },
+    {
+      "tool": "Rotated Rectangle",
+      "pass": true
+    },
+    {
+      "tool": "Path",
+      "pass": true
+    },
+    {
+      "tool": "Circle",
+      "pass": true
+    },
+    {
+      "tool": "Ellipse",
+      "pass": true
+    },
+    {
+      "tool": "Text",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Anchored Text",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Note",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Price Note",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Pin",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Table",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Callout",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Comment",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Price Label",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Signpost",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Flag Mark",
+      "pass": true,
+      "editable": true
+    },
+    {
+      "tool": "Smile",
+      "pass": true
+    },
+    {
+      "tool": "Star",
+      "pass": true
+    },
+    {
+      "tool": "Check",
+      "pass": true
+    },
+    {
+      "tool": "Warning",
+      "pass": true
+    }
+  ],
+  "multiPointCommitted": [
+    {
+      "tool": "Parallel Channel",
+      "pass": true
+    },
+    {
+      "tool": "Flat Top / Bottom",
+      "pass": true
+    },
+    {
+      "tool": "Disjoint Channel",
+      "pass": true
+    },
+    {
+      "tool": "Trend-Based Fib Extension",
+      "pass": true
+    },
+    {
+      "tool": "Fib Channel",
+      "pass": true
+    },
+    {
+      "tool": "Trend-Based Fib Time",
+      "pass": true
+    },
+    {
+      "tool": "Fib Wedge",
+      "pass": true
+    },
+    {
+      "tool": "Pitchfan",
+      "pass": true
+    },
+    {
+      "tool": "Gann Square",
+      "pass": true
+    },
+    {
+      "tool": "XABCD Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Cypher Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Head and Shoulders",
+      "pass": true
+    },
+    {
+      "tool": "ABCD Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Triangle Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Three Drives Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Impulse Wave (12345)",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Correction Wave (ABC)",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Triangle Wave (ABCDE)",
+      "pass": true
+    },
+    {
+      "tool": "Elliott Double Combo Wave",
+      "pass": true
+    },
+    {
+      "tool": "Bars Pattern",
+      "pass": true
+    },
+    {
+      "tool": "Ghost Feed",
+      "pass": true
+    },
+    {
+      "tool": "Sector",
+      "pass": true
+    },
+    {
+      "tool": "Rotated Rectangle",
+      "pass": true
+    }
+  ],
+  "twoPointCommitted": [
+    {
+      "tool": "Trend Line",
+      "pass": true
+    },
+    {
+      "tool": "Ray",
+      "pass": true
+    },
+    {
+      "tool": "Info Line",
+      "pass": true
+    },
+    {
+      "tool": "Extended Line",
+      "pass": true
+    },
+    {
+      "tool": "Trend Angle",
+      "pass": true
+    },
+    {
+      "tool": "Regression Trend",
+      "pass": true
+    },
+    {
+      "tool": "Fib Retracement",
+      "pass": true
+    },
+    {
+      "tool": "Fib Time Zone",
+      "pass": true
+    },
+    {
+      "tool": "Fib Speed Resistance Fan",
+      "pass": true
+    },
+    {
+      "tool": "Fib Circles",
+      "pass": true
+    },
+    {
+      "tool": "Fib Spiral",
+      "pass": true
+    },
+    {
+      "tool": "Fib Speed Resistance Arcs",
+      "pass": true
+    },
+    {
+      "tool": "Gann Box",
+      "pass": true
+    },
+    {
+      "tool": "Gann Square Fixed",
+      "pass": true
+    },
+    {
+      "tool": "Position Forecast",
+      "pass": true
+    },
+    {
+      "tool": "Fixed Range Volume Profile",
+      "pass": true
+    },
+    {
+      "tool": "Price Range",
+      "pass": true
+    },
+    {
+      "tool": "Date Range",
+      "pass": true
+    },
+    {
+      "tool": "Date and Price Range",
+      "pass": true
+    },
+    {
+      "tool": "Arrow",
+      "pass": true
+    },
+    {
+      "tool": "Rectangle",
+      "pass": true
+    },
+    {
+      "tool": "Circle",
+      "pass": true
+    },
+    {
+      "tool": "Ellipse",
+      "pass": true
+    }
+  ],
+  "controls": {
+    "endpointDrag": true,
+    "wholeObjectDrag": true,
+    "lock": true,
+    "hideShow": true,
+    "eraser": true,
+    "undo": true,
+    "duplicate": true,
+    "refreshAnchors": true,
+    "magnet": true,
+    "regionZoom": true,
+    "keepDrawingBrush": true,
+    "color": true,
+    "lineWidth": true,
+    "exportWithDrawings": true
+  }
+}
