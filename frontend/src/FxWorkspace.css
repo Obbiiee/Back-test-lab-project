@@ -93,7 +93,30 @@ html {color-scheme:dark;}
 .place-order {width:100%;background:#0064ff;color:white;border:0;border-radius:24px;height:40px;font-size:12px;cursor:pointer;}.place-order:disabled {opacity:.4;}
 .ticket-error {color:#ff8c95;border:1px solid #68222b;background:#2c1014;padding:8px;font-size:11px;border-radius:5px;}
 .ticket-presets {display:grid;gap:3px;margin-bottom:8px;}.ticket-presets button {border:1px solid #383838;background:#1c1c1c;padding:7px;}
-.fx-order-ticket.floating {position:fixed;right:65px;top:65px;width:340px;height:min(720px,calc(100vh - 90px));z-index:35;box-shadow:0 12px 50px #0009;border:1px solid #3b3b3b;border-radius:8px;overflow:hidden;}
+.main-stage .fx-order-ticket.order-popup {position:fixed;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 32px));height:min(730px,calc(100dvh - 40px));z-index:35;background:#101113;border:1px solid #3a3d42;border-radius:12px;overflow:hidden;box-shadow:0 24px 80px #000b;}
+.order-popup header {height:60px;min-height:60px;padding:0 22px;background:#151618;}
+.order-popup header .order-popup-heading {display:grid;gap:3px;}
+.order-popup-heading strong {font-size:17px;font-weight:600;color:#f2f3f5;}
+.order-popup-heading span {font-size:10px;color:#969ba4;letter-spacing:.06em;}
+.order-popup header button {height:32px;padding:0 10px;border-radius:7px;}
+.order-popup header button:hover {background:#303238;}
+.order-popup .ticket-scroll {padding:20px 22px 12px;}
+.order-popup .ticket-caption,.order-popup .ticket-field {font-size:12px;}
+.order-popup .ticket-segment button {height:36px;font-size:12px;}
+.order-popup .balance-basis label {font-size:12px;padding:8px 0;}
+.order-popup .ticket-field input {height:40px;background:#0c0d0f;border-color:#343841;}
+.order-popup .ticket-field>div {border-color:#343841;}
+.order-popup .ticket-summary {padding:16px;background:#1c1e22;}
+.order-popup .ticket-summary>div {font-size:11px;}
+.order-popup .ticket-summary strong {font-size:13px;}
+.order-popup .ticket-switch {padding:12px;border:1px solid #303238;border-radius:8px;background:#191b1f;}
+.order-popup footer {padding:14px 22px 18px;background:#151618;}
+.order-popup footer label {font-size:11px;}
+.order-popup-actions {display:flex;justify-content:flex-end;gap:10px;}
+.order-popup-actions button {height:40px;border-radius:8px;padding:0 20px;font-size:12px;}
+.order-popup-actions .discard-order {border:1px solid #3c4048;background:transparent;color:#d1d4da;}
+.order-popup-actions .place-order {width:auto;min-width:145px;}
+@media(max-width:480px){.order-popup .ticket-scroll{padding:14px;}.order-popup header{padding:0 14px;}.order-popup footer{padding:12px 14px;}.order-popup .balance-basis label{font-size:10px;}}
 .fx-positions {display:flex;flex-direction:column;overflow:hidden;background:#050505;border-top:1px solid #27292c;}
 .positions-resize {height:5px;min-height:5px;cursor:row-resize;background:#151515;touch-action:none;}
 .positions-resize:hover {background:#315997;}

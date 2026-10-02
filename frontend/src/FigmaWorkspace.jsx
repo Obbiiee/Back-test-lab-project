@@ -356,7 +356,7 @@ function App() {
         <button className="tool-icon" title="Fullscreen" onClick={() => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()}><Icon name="expand" /></button>
       </header>
 
-      <section className={`main-stage ${terminalOpen ? "" : "terminal-closed"} ${dialog==="order"?"ticket-open":""} ${journalOpen?"journal-open":""}`} style={{ "--terminal-height": `${terminalHeight}px` }}>
+      <section className={`main-stage ${terminalOpen ? "" : "terminal-closed"}  ${journalOpen?"journal-open":""}`} style={{ "--terminal-height": `${terminalHeight}px` }}>
         <aside className="left-tools">
           {toolButtons.filter(tool=>tool.key!=='keep').map(tool=><div className="drawing-tool-slot" key={tool.key}><button title={tool.title} className={`side-tool ${activeTool===tool.key?'active':''}`} onClick={()=>{
             if(toolGroups[tool.key])chooseTool(lastTools[tool.key],tool.key);

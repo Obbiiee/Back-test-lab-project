@@ -3,7 +3,7 @@ import {CONTRACT_SIZE,validateOrder} from './simulator';
 const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value);
 export default function OrderTicket({side,price,balance,initialBalance,initialSize=1,seed,onPlace,onClose,onPickPrice}){
   const [form,setForm]=useState(()=>({side:seed?.side??side,type:seed?.type??'Market',size:seed?.size??initialSize,entry:seed?.entry??price,sl:seed?.sl??Number((price*(side==='Buy'?.99:1.01)).toFixed(3)),tp:seed?.tp??Number((price*(side==='Buy'?1.02:.98)).toFixed(3)),useSL:seed?.sl!=null,useTP:seed?.tp!=null,basis:'Current balance',risk:null,unit:'Lots',tags:'',strategy:'Session default',journal:false,partials:[]}));
-  const [error,setError]=useState(''),[floating,setFloating]=useState(false),[presetOpen,setPresetOpen]=useState(false);
+  const [error,setError]=useState(''),[presetOpen,setPresetOpen]=useState(false);
   const entry=form.type==='Market'?price:Number(form.entry),riskBase=form.basis==='Initial balance'?initialBalance:balance;
   const distance=Math.abs(entry-Number(form.sl));
   const effectiveSize=form.risk!=null&&form.useSL&&distance>0?Math.floor(riskBase*Number(form.risk)/100/(distance*CONTRACT_SIZE)*10000)/10000:Number(form.size);
@@ -13,8 +13,8 @@ export default function OrderTicket({side,price,balance,initialBalance,initialSi
   const order={side:form.side,type:form.type,size:effectiveSize,entry,sl:form.useSL?Number(form.sl):null,tp:form.useTP?Number(form.tp):null,tags:form.tags,strategy:form.strategy,partials:form.useTP?form.partials.map(item=>({...item,price:Number(item.price),percent:Number(item.percent)})):[]};
   const submit=event=>{event.preventDefault();const message=validateOrder(order,price);if(message){setError(message);return;}try{onPlace(order,form.journal);onClose();}catch(error){setError(error.message);}};
   const input=(label,key,disabled=false)=><label className="ticket-field">{label}<div><input aria-label={label} type="number" step="any" min="0.0001" disabled={disabled} value={disabled?(price?.toFixed(3)??''):form[key]} onChange={event=>{change(key,event.target.value);setError('');}} /><button type="button" disabled={disabled} title={`Pick ${label.toLowerCase()} on chart`} aria-label={`Pick ${label.toLowerCase()} on chart`} onClick={()=>onPickPrice(key,value=>change(key,value))}>⌖</button></div></label>;
-  return <aside className={`fx-order-ticket ${floating?'floating':''}`} aria-label="Order ticket">
-    <header><strong>XAUUSD</strong><div><button type="button" onClick={()=>setPresetOpen(value=>!value)}>☷ Presets</button><button type="button" aria-label="Pop out order ticket" onClick={()=>setFloating(value=>!value)}>↗</button><button type="button" aria-label="Close order panel" onClick={onClose}>×</button></div></header>
+  return <aside className="fx-order-ticket order-popup" role="dialog" aria-labelledby="order-popup-title">
+    <header><div className="order-popup-heading"><strong id="order-popup-title">Place Order</strong><span>XAUUSD</span></div><div><button type="button" onClick={()=>setPresetOpen(value=>!value)}>☷ Presets</button><button type="button" aria-label="Close order panel" onClick={onClose}>×</button></div></header>
     <form onSubmit={submit}>
       <div className="ticket-scroll">
         {presetOpen&&<div className="ticket-presets">{[1,2,3].map(ratio=><button type="button" key={ratio} onClick={()=>{change('useSL',true);change('useTP',true);change('tp',entry+(entry-Number(form.sl))*ratio);setPresetOpen(false);}}>Risk / Reward 1:{ratio}</button>)}</div>}
@@ -31,7 +31,7 @@ export default function OrderTicket({side,price,balance,initialBalance,initialSi
         <label className="ticket-field">Strategy<input list="strategies" value={form.strategy} onChange={event=>change('strategy',event.target.value)} /><datalist id="strategies"><option>Session default</option><option>Breakout</option><option>Trend following</option><option>Reversal</option></datalist></label>
         {error&&<p className="ticket-error" role="alert">{error}</p>}<small className="ticket-account">Risk basis {money(riskBase)}</small>
       </div>
-      <footer><label><input type="checkbox" checked={form.journal} onChange={event=>change('journal',event.target.checked)} />Open journal after placing</label><button type="submit" className="place-order" disabled={!Number.isFinite(price)}>Place order</button></footer>
+      <footer><label><input type="checkbox" checked={form.journal} onChange={event=>change('journal',event.target.checked)} />Open journal after placing</label><div className="order-popup-actions"><button type="button" className="discard-order" onClick={onClose}>Discard</button><button type="submit" className="place-order" disabled={!Number.isFinite(price)}>Place order</button></div></footer>
     </form>
   </aside>;
 }
