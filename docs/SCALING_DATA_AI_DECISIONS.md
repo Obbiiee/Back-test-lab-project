@@ -575,3 +575,76 @@ The intended exchange is simple:
 **Paid = deeper paid capabilities + ad-free workspace.**
 
 Exact partner categories, creative dimensions, placement location, frequency, pricing and affiliate agreements remain future product/business decisions.
+
+
+## 20. Odoo as Modular Business OS
+
+> **Status:** Approved business-architecture direction, not implementation authorization.
+
+Backtest Lab will use **Odoo as the preferred modular back-office / Business OS**, adopted only where it removes real operational work. The product must not become technically dependent on Odoo for research execution or real-time access control.
+
+### Responsibility Boundary
+
+```text
+Payment Provider
+      ↓ verified commerce event
+Backtest Lab Billing
+      ↓
+Entitlement Engine ─────────→ Free / Pro capabilities
+      ↓ asynchronous/integration boundary
+Odoo Business OS
+      ├─ Contacts / customer administration
+      ├─ Invoicing / payment records
+      ├─ Accounting / finance as edition and requirements permit
+      ├─ CRM when useful
+      └─ Additional back-office modules only when justified
+```
+
+Backtest Lab remains authoritative for:
+- application identity/authentication;
+- Free/Pro entitlements and capability authorization;
+- usage metering;
+- experiments, strategies, protocols and Experiment Passports;
+- datasets/research state;
+- replay and research engines.
+
+Odoo must not become the source of truth for research evidence or be required synchronously to authorize an already-valid research session.
+
+### Initial Adoption
+
+Start small:
+1. Contacts/customer administration;
+2. Invoicing/payment records;
+3. accounting/finance capability appropriate to the selected Odoo edition;
+4. CRM only when customer lifecycle volume justifies it.
+
+Do not enable HR, Inventory, Manufacturing, POS, Website, Marketing or other modules merely because they exist.
+
+### Edition Decision
+
+Odoo Community is the preferred low-cost starting candidate when its available capabilities are sufficient. **Do not assume Community contains the complete Odoo Accounting product.** At implementation time, re-check the current official Community vs Enterprise feature matrix, Indonesian localization/tax requirements, reporting needs, upgrade/maintenance burden and total cost.
+
+If full accounting, localization, reporting, bank reconciliation, support or upgrade requirements make Enterprise materially safer or cheaper operationally, migration to Odoo Enterprise is allowed without changing Backtest Lab's product architecture.
+
+Third-party/community accounting add-ons must pass license, maintenance, security and upgrade-compatibility review before production use.
+
+### Integration Contract
+
+Create an Odoo adapter/integration boundary rather than scattering Odoo-specific calls through the product.
+
+Candidate synchronized business objects:
+- customer/contact reference;
+- invoice;
+- payment/settlement record;
+- refund/credit state;
+- subscription/plan reference where useful;
+- tax/fee information where appropriate;
+- reconciliation references.
+
+Synchronization should be idempotent, auditable, retryable and tolerant of temporary Odoo outages. Odoo downtime must not automatically revoke valid Pro access.
+
+### Finance Principle
+
+**Payment collects money. Billing records commerce. Entitlements control product access. Odoo operates the back office. Backtest Lab research engines produce evidence.**
+
+Use Odoo aggressively where it saves commodity business-development work, but preserve replaceable integration boundaries around the unique Backtest Lab product.
