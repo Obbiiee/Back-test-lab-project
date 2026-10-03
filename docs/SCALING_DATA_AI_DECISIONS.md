@@ -265,3 +265,41 @@ Never claim a concurrent-user capacity before load testing representative chart/
 **AI:** Research Engines → Verified Evidence → AI Context → AI Interpretation → Human Decision.
 
 These principles should remain stable even when vendors, server sizes, queues or AI models change.
+
+
+## 16. Infrastructure Upgradeability Principle
+
+> **Start small, but never design ourselves into a corner.**
+
+Backtest Lab may begin with inexpensive and simple infrastructure. A low-cost VPS, a single-node deployment and one PostgreSQL instance are acceptable when they match actual workload.
+
+The constraint is architectural: simplicity today must not create a forced core rewrite tomorrow.
+
+From the beginning, boundaries should allow these components to be separated or scaled independently when justified:
+
+    Web
+     │
+    API
+     │
+     ├── PostgreSQL
+     ├── Research Workers
+     ├── Object Storage
+     ├── AI Gateway / AI Workers
+     └── External Integrations / CRM (e.g. Odoo)
+
+Scaling may happen vertically first when that is the simplest and most economical choice, then horizontally when workload requires it.
+
+User ID, Workspace ID, Experiment ID, dataset versions and Experiment Passport identity must not change merely because:
+- server size changes;
+- a component moves to another machine;
+- additional workers/API instances are added;
+- infrastructure provider changes;
+- CRM/AI/storage providers change.
+
+Before adopting an infrastructure component, ask:
+
+> **If workload grows 10×, can this component be separated, replaced, or multiplied without a brutal migration or rewrite of the core product?**
+
+This does not mean pre-building distributed infrastructure. It means preserving clean boundaries, portable data and replaceable compute while deploying only the capacity currently needed.
+
+CRM systems such as Odoo should remain integration layers rather than the canonical store for Backtest Lab experiments, strategies, trades or research evidence.
