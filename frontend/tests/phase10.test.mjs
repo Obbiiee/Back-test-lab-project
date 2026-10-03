@@ -81,7 +81,8 @@ assert.ok(!Object.hasOwn(revealedInput([{...bars[0],future:bars.slice(1)}])[0],'
 for(const file of readdirSync(new URL('../src/indicators/',import.meta.url))) {
   const source=readFileSync(new URL('../src/indicators/'+file,import.meta.url),'utf8');
   assert.ok(!/from ['"].*(trading|drawings|market)|localStorage|document\.|window\.|fetch\(/.test(source),'Indicator domain has no ownership crossover: '+file);
-  assert.ok(!/movingAverage|SMA|EMA|RSI|MACD/.test(source),'No product indicators');
+  // Phase 11 authorizes SMA/EMA/BB in the same foundation; legacy and excluded products remain forbidden.
+  assert.ok(!/movingAverage|RSI|MACD|Stochastic|TEST_LINE/.test(source),'No legacy, excluded or reference product indicators');
 }
 const chartSource=readFileSync(new URL('../src/components/CandleChart.jsx',import.meta.url),'utf8');
 assert.ok(/series\.setData\(candles\);\s+indicatorEngine\.setCandles\(candles\);/.test(chartSource));

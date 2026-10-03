@@ -1,4 +1,6 @@
 import { DRAWING_SPECS } from './drawings/DrawingTypes.js';
+import IndicatorControls from './components/IndicatorControls.jsx';
+import { overlayRegistry } from './indicators/overlayRegistry.js';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RISK_REWARD_TOOLS } from "./trading/RiskRewardController";
 import useGoldMarket from "./market/useGoldMarket";
@@ -61,6 +63,7 @@ const toolGroups = {
 };
 const resolveTool = name => ({ Cross: 'none', Dot: 'cursor-dot', 'Arrow Cursor': 'cursor-arrow', Arrow: 'arrow', 'Trend Line': 'trend-line', 'Horizontal Line': 'horizontal-line', 'Vertical Line': 'vertical-line', Rectangle: 'rectangle', 'Fibonacci Retracement': 'fibonacci-retracement', Text: 'text', Measure: 'measure', 'Long Position': 'long-position', 'Short Position': 'short-position' })[name];
 function App() {
+  const [indicatorInstances, setIndicatorInstances] = useState([]);
 	const [drawingMode, setDrawingMode] = useState("none");
 	const [chartPreferences, setChartPreferences] = useState({
 		showVolume: true,
@@ -128,6 +131,7 @@ function App() {
         <div className="divider" />
         <div className="interval-picker"><button className="time-button active" onClick={()=>setIntervalOpen(value=>!value)} aria-label="Interval">{timeframe}</button>{intervalOpen&&<div className="interval-menu">{['1m','3m','5m','15m','30m','1h','2h','4h','D','W','M'].map(t=><button key={t} className={timeframe===t?'active':''} onClick={()=>{setTimeframe(t);setIntervalOpen(false);}}>{t}</button>)}</div>}</div>
         <button className="tool-icon"><Icon name="candles" size={19} /></button>
+        <IndicatorControls instances={indicatorInstances} onChange={setIndicatorInstances} />
         <div className="divider" />
         <button className="nav-action" onClick={() => {
 		sendChartCommand("new-layout");
@@ -157,7 +161,7 @@ function App() {
         </aside>
 
         <div className={"chart-shell cursor-" + drawingMode}>
-          <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={trading.update} onClosePosition={trading.close} onCancelOrder={trading.cancel} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} /></Suspense>
+          <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={trading.update} onClosePosition={trading.close} onCancelOrder={trading.cancel} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={overlayRegistry} indicatorInstances={indicatorInstances} /></Suspense>
 
           <div className="chart-meta"><strong>XAU / USD · {timeframe} · Backtest Lab</strong><i /><span className="up-text">O {data.at(-1)?.open.toFixed(3)}&nbsp;&nbsp; H {data.at(-1)?.high.toFixed(3)}&nbsp;&nbsp; L {data.at(-1)?.low.toFixed(3)}&nbsp;&nbsp; C {data.at(-1)?.close.toFixed(3)}</span><small>Volume&nbsp; <b>{marketMode === "live" ? "—" : data.at(-1)?.volume}</b></small></div>
           {favoritesVisible&&favorites.length>0&&<div className="drawing-favorites" aria-label="Favorite drawing tools">{favorites.filter(name=>RISK_REWARD_TOOLS[resolveTool(name)] || DRAWING_SPECS[resolveTool(name)]).map(name=><button key={name} title={name} onClick={()=>chooseTool(name,Object.keys(toolGroups).find(group=>toolGroups[group].some(section=>section.items.includes(name))))}>{name==='Long Position'?'↗':name==='Short Position'?'↘':name==='Trend Line'?'╱':name==='Horizontal Line'?'―':name.slice(0,2)}</button>)}</div>}

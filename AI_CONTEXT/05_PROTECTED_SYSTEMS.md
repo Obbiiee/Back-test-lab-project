@@ -14,7 +14,7 @@ Change these only when the authorized task explicitly requires it, with relevant
 
 This is not blanket protection of the entire repository. Narrow infrastructure/context work is permitted within its own scope.
 
-- Indicator foundation: `frontend/src/indicators/`. Calculators receive only chart-visible candle copies, never raw future data or domain stores; preserve config validation, output timestamp validation, error isolation and owned-series cleanup. Legacy indicator runtime remains retired. Native Volume stays separate. Reference indicator is test-only; production catalog/panes require separate authorization.
+- Indicator foundation: `frontend/src/indicators/`. Calculators receive only chart-visible candle copies, never raw future data or domain stores; preserve config validation, output timestamp validation, error isolation and owned-series cleanup. Legacy indicator runtime remains retired. Native Volume stays separate. Reference indicator is test-only; authorized production catalog is exactly SMA/EMA/Bollinger Bands; additional products, panes and persistence require separate authorization.
 
 - New drawing persistence/history: `DrawingPersistence.js`, `DrawingHistory.js`; `backtest-drawing-manager-v1:*`. Preserve schema, canonical fields, commit boundaries and trading isolation. History resets on reload; no cross-tab merge/backend sync.
 

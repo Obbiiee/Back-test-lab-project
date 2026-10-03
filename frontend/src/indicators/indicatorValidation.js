@@ -39,3 +39,17 @@ export function normalizedOutput(points, candles) {
     return Object.freeze({ time: point.time, value: point.value, ...(point.color === undefined ? {} : { color: point.color }) });
   }).sort((a, b) => a.time - b.time));
 }
+
+export function normalizedIndicatorOutput(spec, result, candles) {
+  // Preserve the Phase 10 array contract for specs using the legacy single output field.
+  if (spec.output !== undefined) return normalizedOutput(result, candles);
+  if (!result || Object.getPrototypeOf(result) !== Object.prototype
+    || Object.keys(result).length !== spec.outputs.length
+    || spec.outputs.some(output => !Object.hasOwn(result, output.key))) throw Error('Incomplete indicator outputs');
+  return Object.freeze(Object.fromEntries(spec.outputs.map(output => [output.key, normalizedOutput(result[output.key], candles)])));
+}
+
+export function emptyIndicatorOutput(spec) {
+  return spec.output !== undefined ? Object.freeze([])
+    : Object.freeze(Object.fromEntries(spec.outputs.map(output => [output.key, Object.freeze([])])));
+}

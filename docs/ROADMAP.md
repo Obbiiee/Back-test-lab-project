@@ -136,17 +136,9 @@ Scoped tools: Fibonacci Retracement, Arrow, Text and Measure, through the existi
 
 Scoped foundation: revealed candles → validated pure calculation → normalized TIME + VALUE output → official Lightweight Charts series adapter. Registry/instance/parameters, warmup/error isolation, replay-safe synchronization and minimal React/chart lifecycle are implemented. Production registry is empty; the reference close-line is test-only. Native Volume remains separate and legacy runtime retired. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This does not authorize Phase 11/12 indicators or panes.
 
-### Phase 11 — OVERLAY INDICATORS (PLANNED)
+### Phase 11 — OVERLAY INDICATORS
 
-Planned examples:
-
-- SMA
-
-- EMA
-
-- Bollinger Bands
-
-Exact indicator set remains subject to phase authorization.
+Completed authorized scope: exactly SMA, EMA and Bollinger Bands through the existing engine, compatible named multi-output, three official Bollinger lines and runtime-only multiple-instance controls. SMA-seeded EMA and population standard deviation are explicit contracts. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). No panes, indicator persistence or additional products are authorized by this entry.
 
 ### Phase 12 — INDICATOR PANES (PLANNED)
 

@@ -14,6 +14,7 @@ Run in `frontend/`:
 | npm run test:phase8 | Core line/rectangle models, creation, geometry/editing, axis constraints, lifecycle, history and v1 restore |
 | npm run test:phase9 | Fib levels/reversal, arrowhead, Text editing, Measure calculations, mixed history/v1 restore and interaction isolation |
 | npm run test:phase10 | Indicator registry/config, revealed-only frozen input, normalized output, warmup, error isolation, replay/prepend/timeframe, series lifecycle and protected boundaries |
+| npm run test:phase11 | SMA/EMA/Bollinger vectors, bounds, warmup, causality, multi-output isolation and lifecycle |
 | npm run test:trading-separation | Independent Risk/Reward ownership |
 | npm run test:trading | Order/position simulation |
 | npm run test:drawings | Existing geometry/math regressions |
@@ -33,3 +34,5 @@ Phase 8 product/browser validation and scope evidence: [checkpoint report](../do
 Phase 9 product/browser validation: [checkpoint report](../docs/PHASE9_ADVANCED_DRAWING_TOOLS.md).
 
 Phase 10 product/browser validation: [checkpoint report](../docs/PHASE10_INDICATOR_ENGINE_FOUNDATION.md). Test-only browser harness: `/tests/phase10.html` on an isolated dev-server origin; reference indicator never enters production UI.
+
+Phase 11 product/browser validation: [checkpoint report](../docs/PHASE11_OVERLAY_INDICATORS.md). Test-only /tests/phase11.html observes real official series on an isolated origin; production uses the same overlay registry and controls. Synthetic volume exists only in the fixture.

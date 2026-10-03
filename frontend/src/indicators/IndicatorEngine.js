@@ -1,5 +1,5 @@
 import { defaultIndicatorRegistry } from './IndicatorRegistry.js';
-import { instanceConfig, revealedInput, normalizedOutput } from './indicatorValidation.js';
+import { instanceConfig, revealedInput, normalizedIndicatorOutput, emptyIndicatorOutput } from './indicatorValidation.js';
 import { IndicatorSeriesAdapter } from './IndicatorSeriesAdapter.js';
 
 export class IndicatorEngine {
@@ -15,11 +15,11 @@ export class IndicatorEngine {
   #run(config) {
     try {
       const spec = this.#registry.get(config.type);
-      const points = normalizedOutput(this.#candles.length < spec.warmup ? [] : spec.calculate(this.#candles, config.parameters), this.#candles);
+      const points = normalizedIndicatorOutput(spec, this.#candles.length < spec.warmup ? emptyIndicatorOutput(spec) : spec.calculate(this.#candles, config.parameters), this.#candles);
       this.#adapter.sync(config, spec, points);
       this.#outputs.set(config.id, points); this.#errors.delete(config.id);
     } catch (error) {
-      this.#outputs.set(config.id, Object.freeze([])); this.#errors.set(config.id, String(error?.message ?? error));
+      this.#outputs.set(config.id, emptyIndicatorOutput(this.#registry.get(config.type))); this.#errors.set(config.id, String(error?.message ?? error));
       // Never leave stale output after a failed calculation/adapter update.
       try { this.#adapter.remove(config.id); } catch { /* retain original instance error */ }
     }

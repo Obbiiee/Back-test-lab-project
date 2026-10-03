@@ -24,7 +24,8 @@
     "test:repository": "node tests/repository.test.mjs",
     "test:phase8": "node tests/phase8.test.mjs",
     "test:phase9": "node tests/phase9.test.mjs",
-    "test:phase10": "node tests/phase10.test.mjs"
+    "test:phase10": "node tests/phase10.test.mjs",
+    "test:phase11": "node tests/phase11.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
