@@ -9,7 +9,7 @@ import { ChartObjectBridge } from "../chart/ChartObjectBridge";
 import { LegacyObjectPersistence } from "../chart/LegacyObjectPersistence";
 import { logicalAtTime, timeAtLogical } from "../chart/coordinates";
 import useDrawingTools from "../drawings/useDrawingTools";
-import { CORE_DRAWINGS } from "../drawings/DrawingTypes";
+import { DRAWING_SPECS } from "../drawings/DrawingTypes";
 import DrawingControls from "../drawings/DrawingControls";
 
 const EMPTY_TRADES = [];
@@ -353,7 +353,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     const chart = chartRef.current, series = seriesRef.current;
     if (!chart || !series) return;
     const tool = RISK_REWARD_TOOLS[drawingMode];
-    const placing = Boolean(tool) || CORE_DRAWINGS[drawingMode];
+    const placing = Boolean(tool) || DRAWING_SPECS[drawingMode];
     chart.applyOptions({ handleScroll: { pressedMouseMove: !placing, horzTouchDrag: !placing, vertTouchDrag: !placing }, handleScale: { mouseWheel: true } });
     chart.applyOptions({ crosshair: { vertLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" }, horzLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" } } });
     function pointFor(param) {
@@ -451,7 +451,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   }, [position,pendingOrder,positions,orders,simulatedTrades,trades,candles]);
 
   const activeSpec = RISK_REWARD_TOOLS[drawingMode];
-  const toolHint = CORE_DRAWINGS[drawingMode] ? CORE_DRAWINGS[drawingMode].name + " · " + (CORE_DRAWINGS[drawingMode].points === 1 ? "Klik chart" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
+  const toolHint = DRAWING_SPECS[drawingMode] ? DRAWING_SPECS[drawingMode].name + " · " + (DRAWING_SPECS[drawingMode].points === 1 ? "Klik chart" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
 
   return (
     <div className="chart-wrap" onContextMenu={handleChartContextMenu} onClick={() => setContextMenu(null)}>

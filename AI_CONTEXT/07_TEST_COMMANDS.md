@@ -12,6 +12,7 @@ Run in `frontend/`:
 | npm run test:phase6 | Selection/hit testing/drag/cancel/arbitration |
 | npm run test:phase7 | Persistence/history/lock/visibility/storage safety |
 | npm run test:phase8 | Core line/rectangle models, creation, geometry/editing, axis constraints, lifecycle, history and v1 restore |
+| npm run test:phase9 | Fib levels/reversal, arrowhead, Text editing, Measure calculations, mixed history/v1 restore and interaction isolation |
 | npm run test:trading-separation | Independent Risk/Reward ownership |
 | npm run test:trading | Order/position simulation |
 | npm run test:drawings | Existing geometry/math regressions |
@@ -27,3 +28,5 @@ Phase 7.5 no-behavior-change verification is recorded in `docs/PHASE7_5_REPOSITO
 Documentation-control changes must run test:repository and test:ai-bundle plus regenerate/verify the bundle. Product changes retain the full regression/browser requirements in [workflow](06_WORKFLOW_RULES.md). Phase 7.6 changes only context, roadmap, tests and bundle config; browser verification is exempt because no product/runtime/build path is modified.
 
 Phase 8 product/browser validation and scope evidence: [checkpoint report](../docs/PHASE8_CORE_DRAWING_TOOLS.md).
+
+Phase 9 product/browser validation: [checkpoint report](../docs/PHASE9_ADVANCED_DRAWING_TOOLS.md).

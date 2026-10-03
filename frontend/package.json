@@ -22,7 +22,8 @@
     "test:ai-bundle": "node tests/ai-bundle.test.mjs",
     "test:phase7": "node tests/phase7.test.mjs",
     "test:repository": "node tests/repository.test.mjs",
-    "test:phase8": "node tests/phase8.test.mjs"
+    "test:phase8": "node tests/phase8.test.mjs",
+    "test:phase9": "node tests/phase9.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",

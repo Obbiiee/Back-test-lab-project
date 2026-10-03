@@ -13,7 +13,7 @@ const bars = Array.from({ length: 40 }, (_, i) => ({ time: origin + i * 900, ope
 const input = { id: 'line', type: 'trend-line', points: [{ time: origin + 900, price: 2300 }, { time: origin + 4500, price: 2310 }], metadata: { createdOnTimeframe: '15m' } };
 const risk = new RiskRewardController(); risk.replace([{ id: 'risk', type: 'long-position', points: input.points }]);
 const manager = new DrawingManager();
-assert.deepEqual([...manager.registry.entries.keys()], ['trend-line', 'horizontal-line', 'vertical-line', 'rectangle']);
+assert.deepEqual([...manager.registry.entries.keys()], ['trend-line', 'horizontal-line', 'vertical-line', 'rectangle', 'fibonacci-retracement', 'arrow', 'text', 'measure']);
 assert.throws(() => createDrawingRegistry().register('trend-line', {}), /already registered/);
 for (const type of ['unknown', 'constructor', 'long-position', 'short-position']) assert.throws(() => manager.add({ ...input, type }), /Unknown drawing type/);
 const model = manager.add(input);

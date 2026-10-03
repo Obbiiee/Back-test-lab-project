@@ -14,4 +14,6 @@ Phase 7.6: audited all eight existing owners; normalized the existing docs/ROADM
 
 Phase 8: Horizontal Line, Vertical Line and Rectangle added to the existing drawing foundation. Shared projection, one/two-click creation and axis/corner editing; v1 schema and protected domains retained. Phase 4–8, trading, geometry, market, repository and AI infrastructure regressions, build/lint and real browser interaction validation passed. Evidence and file inventory: [Phase 8 checkpoint report](../docs/PHASE8_CORE_DRAWING_TOOLS.md). No Phase 9 implementation.
 
+Phase 9: exactly Fibonacci Retracement, Arrow, Text and Measure implemented through the existing registry/Series Primitive architecture. v1 storage preserves Phase 5–8 records; transient labels/arrowheads are excluded. Text create/edit/cancel and mixed history validated; full frontend regressions, build/lint, AI infrastructure and real browser verification passed. Evidence: [Phase 9 checkpoint](../docs/PHASE9_ADVANCED_DRAWING_TOOLS.md). No Phase 10 implementation.
+
 Operational status belongs to [04_CURRENT_PHASE](04_CURRENT_PHASE.md). Historical reports are evidence, not current authorization.

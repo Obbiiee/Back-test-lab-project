@@ -1,7 +1,8 @@
+import { TEXT } from './DrawingTypes.js';
 export const DRAWING_STORAGE_PREFIX = 'backtest-drawing-manager-v1:';
 const allowedKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(key => keys.includes(key));
 function understood(record) {
-  return allowedKeys(record, ['id','type','points','options','visible','locked','metadata']) &&
+  return allowedKeys(record, ['id','type','points','options','visible','locked','metadata', ...(record.type === TEXT ? ['text'] : [])]) &&
     Array.isArray(record.points) && record.points.every(point => allowedKeys(point,['time','price'])) &&
     allowedKeys(record.options,['color','lineWidth']) && allowedKeys(record.metadata,['createdOnTimeframe']) &&
     typeof record.options.color === 'string' && Number.isFinite(record.options.lineWidth) &&

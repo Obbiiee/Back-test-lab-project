@@ -1,3 +1,4 @@
+import { TEXT } from './DrawingTypes.js';
 import { createDrawingRegistry } from './DrawingRegistry.js';
 
 // Drawing domain only: no React, trading, replay, indicators or storage imports.
@@ -43,6 +44,13 @@ export class DrawingManager {
     this.objects.set(id, model); this.primitives.get(id).setModel(model);
     if (notify) { this.commit(); this.notify(); }
     return model;
+  }
+  setText(id, text) {
+    const previous = this.get(id);
+    if (!previous || previous.type !== TEXT || previous.locked) return false;
+    const model = this.registry.get(TEXT).model({ ...previous, text });
+    this.objects.set(id, model); this.primitives.get(id).setModel(model);
+    this.commit(); this.notify(); return true;
   }
   select(id) {
     const next = this.objects.get(id)?.visible ? id : null;

@@ -21,7 +21,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 7.5 | Repository cleanup/source-of-truth hardening | Recorded in completed history |
 | 7.6 | Extend existing project-control authorities | Operational pointer determines checkpoint status |
 | 8 | CORE DRAWING TOOLS | Recorded in completed history |
-| 9 | ADVANCED DRAWING TOOLS | PLANNED; separate human authorization required |
+| 9 | ADVANCED DRAWING TOOLS | Recorded in completed history |
 | 10 | INDICATOR ENGINE FOUNDATION | PLANNED; separate human authorization required |
 | 11 | OVERLAY INDICATORS | PLANNED; separate human authorization required |
 | 12 | INDICATOR PANES | PLANNED; separate human authorization required |
@@ -128,21 +128,9 @@ persistence/history architecture.
 
 Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry does not authorize additional implementation.
 
-### Phase 9 — ADVANCED DRAWING TOOLS (PLANNED)
+### Phase 9 — ADVANCED DRAWING TOOLS
 
-Planned scope includes professional drawing capabilities such as:
-
-- Fibonacci tools
-
-- Arrow
-
-- Text
-
-- Measure
-
-- other justified drawing tools
-
-Exact tool list and behavior will be scoped before implementation.
+Scoped tools: Fibonacci Retracement, Arrow, Text and Measure, through the existing drawing architecture. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry does not authorize additional drawing tools or future implementation.
 
 ### Phase 10 — INDICATOR ENGINE FOUNDATION (PLANNED)
 

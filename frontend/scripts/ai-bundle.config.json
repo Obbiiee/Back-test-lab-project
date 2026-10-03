@@ -25,12 +25,15 @@
     "frontend/src/drawings/DrawingPersistence.js",
     "frontend/src/drawings/DrawingControls.jsx",
     "frontend/src/drawings/models/CoreDrawing.js",
-    "frontend/src/drawings/projectGeometry.js"
+    "frontend/src/drawings/projectGeometry.js",
+    "frontend/src/drawings/advancedGeometry.js",
+    "frontend/src/drawings/DrawingTextEditor.jsx"
   ],
   "tests": [
     "frontend/tests/phase6.test.mjs",
     "frontend/tests/phase7.test.mjs",
-    "frontend/tests/phase8.test.mjs"
+    "frontend/tests/phase8.test.mjs",
+    "frontend/tests/phase9.test.mjs"
   ],
   "supporting": [
     "frontend/package.json",

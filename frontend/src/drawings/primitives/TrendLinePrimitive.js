@@ -1,33 +1,57 @@
 import { projectGeometry } from '../projectGeometry.js';
-import { RECTANGLE, HORIZONTAL_LINE, VERTICAL_LINE } from '../DrawingTypes.js';
+import { RECTANGLE, HORIZONTAL_LINE, VERTICAL_LINE, FIBONACCI, ARROW, TEXT, MEASURE } from '../DrawingTypes.js';
+import { fibonacciLevels, arrowHead, measurementLines, labelBounds } from '../advancedGeometry.js';
 
-// Original application implementation of the official 5.2.1 ISeriesPrimitive
-// lifecycle/view/renderer interfaces; references are recorded in the Phase 5 report.
+// One official Series Primitive lifecycle, retained under its compatible Phase 5 name.
 class TrendLinePaneRenderer {
   constructor(view) { this.view = view; }
   draw(target) {
     const { projected, source } = this.view;
-    if (!source.model.visible || projected.length < 2 || projected.some(p => p == null)) return;
+    const { model } = source;
+    if (!model.visible || projected.length < (model.type === TEXT ? 1 : 2) || projected.some(p => p == null)) return;
     target.useMediaCoordinateSpace(({ context }) => {
       context.save();
       try {
-        context.strokeStyle = source.model.options.color;
-        context.lineWidth = source.model.options.lineWidth + (source.selected ? 1 : 0);
+        context.strokeStyle = model.options.color;
+        context.lineWidth = model.options.lineWidth + (source.selected ? 1 : 0);
         context.lineCap = 'round';
         context.setLineDash(source.draft ? [5, 4] : []);
-        context.beginPath();
-        context.moveTo(projected[0].x, projected[0].y);
-        if (source.model.type === RECTANGLE) {
-          context.lineTo(projected[2].x, projected[2].y);
-          context.lineTo(projected[1].x, projected[1].y);
-          context.lineTo(projected[3].x, projected[3].y);
-          context.closePath();
-        } else context.lineTo(projected[1].x, projected[1].y);
-        context.stroke();
+        const [a,b] = projected;
+        const segment = (from,to) => { context.moveTo(from.x,from.y); context.lineTo(to.x,to.y); };
+        const label = (anchor,lines,background=true) => {
+          const bounds = labelBounds(anchor,lines);
+          context.setLineDash([]); context.font='12px monospace'; context.textBaseline='top';
+          if(background) { context.fillStyle='#10141be8'; context.fillRect(bounds.x,bounds.y,bounds.width,bounds.height); }
+          context.fillStyle=model.options.color;
+          lines.forEach((line,index)=>context.fillText(line,bounds.x+6,bounds.y+4+index*16));
+          if(source.selected && model.type===TEXT) context.strokeRect(bounds.x,bounds.y,bounds.width,bounds.height);
+        };
+        if (model.type === TEXT) label(a,model.text.split('\n'));
+        else {
+          context.beginPath();
+          if (model.type === RECTANGLE) {
+            context.moveTo(a.x,a.y); context.lineTo(projected[2].x,projected[2].y);
+            context.lineTo(b.x,b.y); context.lineTo(projected[3].x,projected[3].y); context.closePath();
+          } else {
+            segment(a,b);
+            if(model.type===ARROW) for(const wing of arrowHead(a,b)) segment(b,wing);
+            if(model.type===MEASURE) { segment(a,{x:b.x,y:a.y}); segment({x:b.x,y:a.y},b); }
+          }
+          context.stroke();
+          if(model.type===FIBONACCI) {
+            for(const level of fibonacciLevels(model.points)) {
+              const y=source.series.priceToCoordinate(level.price);
+              if(!Number.isFinite(y)) continue;
+              context.beginPath();segment({x:a.x,y},{x:b.x,y});context.stroke();
+              label({x:Math.max(a.x,b.x),y},[level.ratio+' · '+level.price.toFixed(3)],false);
+              context.setLineDash(source.draft?[5,4]:[]);
+            }
+          }
+          if(model.type===MEASURE) label({x:(a.x+b.x)/2,y:(a.y+b.y)/2},measurementLines(model.points,source.bars));
+        }
         if (source.selected && !source.draft) {
-          context.setLineDash([]); context.lineWidth = 1.5;
-          context.fillStyle = '#10141b';
-          const handles = [HORIZONTAL_LINE, VERTICAL_LINE].includes(source.model.type) ? [] : projected;
+          context.setLineDash([]); context.lineWidth = 1.5; context.fillStyle = '#10141b';
+          const handles = [HORIZONTAL_LINE, VERTICAL_LINE].includes(model.type) ? [] : projected;
           for (const point of handles) {
             context.beginPath(); context.arc(point.x, point.y, 5, 0, Math.PI * 2);
             context.fill(); context.stroke();

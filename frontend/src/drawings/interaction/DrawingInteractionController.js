@@ -3,7 +3,7 @@ import { hitDrawing, HIT } from './hitTesting.js';
 import { continuousPointFromPointer } from '../timeCoordinates.js';
 
 export function isEditable(target) {
-  return Boolean(target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="spinbutton"],[role="combobox"]'));
+  return Boolean(target?.closest?.('.primitive-text-editor,input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="spinbutton"],[role="combobox"]'));
 }
 export class DrawingInteractionController {
   drag = null;
