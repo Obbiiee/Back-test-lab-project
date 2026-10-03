@@ -1,0 +1,267 @@
+# Backtest Lab — Scaling, Data & AI Architecture Decisions
+
+> **Status:** Living architecture decision memory  
+> **Purpose:** Menyimpan keputusan lintas-phase mengenai scaling, portability data, deployment profiles, dan AI architecture.  
+> **Authority:** Bukan implementation authorization dan tidak mengubah phase status.
+
+## 1. Two Independent Axes
+
+**Roadmap phase = what can the product do.**  
+**Deployment profile = how much workload can infrastructure serve.**
+
+Phase number must not automatically dictate infrastructure size.
+
+> **Design for scale. Deploy for current demand. Scale from measured bottlenecks, not from phase number.**
+
+## 2. Deployment Profiles
+
+### Profile S — Single Node
+
+    Internet
+       ↓
+    Reverse Proxy / TLS
+       ↓
+    Single Server
+    ├── Web
+    ├── API
+    ├── Research Worker
+    └── PostgreSQL
+            ↓
+          Backup
+
+Cheap and operationally simple while measured workload remains safe.
+
+### Profile M — Separated Workloads
+
+    Web / API
+        │
+        ├──────── PostgreSQL
+        └──────── Queue
+                    ↓
+              Research Workers
+                    ↓
+              Object Storage
+
+Separate DB, research compute and bulk storage when measurements justify it.
+
+### Profile L — Distributed Scale
+
+    CDN / Edge
+        ↓
+    Load Balancer
+        ↓
+    API ─ API ─ API
+        │
+    Redis / Queue
+        ↓
+    Worker Pool
+        │
+    PostgreSQL
+        │
+    Object Storage
+
+Add horizontal APIs, worker scaling, managed DB, pooling/replicas, cache and CDN only when required.
+
+## 3. Scale Triggers
+
+Measure P95/P99 API latency, CPU, memory, DB connection pressure, slow queries, queue depth, jobs/hour, failures, candle throughput, storage growth, backup/restore duration, concurrent replay sessions and cost per active user.
+
+Exact thresholds must be benchmarked with real workloads.
+
+## 4. Data Ownership
+
+Shared/canonical candidates:
+- historical candles;
+- ticks later;
+- economic events;
+- instrument metadata;
+- dataset versions.
+
+User/workspace-owned candidates:
+- strategies and versions;
+- protocols;
+- experiments;
+- replay sessions;
+- opportunities/trades;
+- journal;
+- persisted drawings/preferences;
+- research results/reports.
+
+Do not duplicate full canonical market datasets for every user unless a private-data use case requires it.
+
+## 5. Data Portability & Seamless Scaling Contract
+
+1. Stable IDs across migrations.
+2. Critical truth must not live only in one application server's RAM.
+3. Multiple compute instances use canonical persistence.
+4. Database schema changes use versioned migrations.
+5. Experiments remain linked to exact dataset versions.
+6. Large data/artifacts use storage abstraction rather than permanent coupling to one VPS disk.
+7. Backup plus tested restore.
+8. Verify important migrations with integrity checks.
+9. Target safe minimal-downtime migration before premature zero-downtime complexity.
+10. Product identity/domain must not depend on one infrastructure vendor.
+
+## 6. Infrastructure Evolution
+
+Start:
+
+    Server 1
+    ├── Web
+    ├── API
+    ├── Worker
+    └── PostgreSQL
+
+Then separate database if needed:
+
+    App Server → Database Server / PostgreSQL
+
+Then separate research compute:
+
+    App → Queue → Worker 1 / Worker 2 / Worker N
+
+Then horizontally scale APIs if needed:
+
+    Load Balancer → API 1 / API 2 / API N
+                         ↓
+                 PostgreSQL + Queue
+
+Core research/trading engines should not require conceptual rewrites just because process/server count increases.
+
+## 7. Migration Strategy
+
+    Current Infrastructure
+            ↓
+    Backup / Replication
+            ↓
+    Restore / Sync New Infrastructure
+            ↓
+    Integrity Verification
+            ↓
+    Final Sync / Controlled Write Window
+            ↓
+    Application / DNS Cutover
+            ↓
+    Observe
+            ↓
+    Retire Old Infrastructure after confidence window
+
+Exact migration mechanics depend on database size and availability requirements.
+
+## 8. AI Architecture
+
+AI is a separate interpretive/orchestration layer:
+
+    User
+      ↓
+    Backtest Lab
+      ↓
+    Deterministic Research Engines
+      ↓
+    Research Context Builder
+      ↓
+    AI Gateway
+      ↓
+    AI Model
+      ↓
+    Explanation / Hypothesis / Next Experiment
+      ↓
+    Human Decision
+
+> **Deterministic engines calculate evidence. AI interprets verified evidence.**
+
+AI is not the canonical calculator for WR, P/L, PF, expectancy, drawdown, Monte Carlo, FDR, RR execution, regime classification or execution simulation.
+
+## 9. AI Gateway
+
+Backtest Lab should use its own AI abstraction instead of scattering provider-specific calls through product code.
+
+Candidate responsibilities:
+- provider/model routing;
+- request templates;
+- structured tool calls;
+- context limits;
+- usage metering;
+- quotas;
+- retry/fallback policy;
+- observability;
+- cost accounting.
+
+Target abstraction:
+
+    Backtest Lab
+         ↓
+    AI Gateway
+     ├── Model/Provider A
+     ├── Model/Provider B
+     └── Local/Specialized model later
+
+Multiple providers are not required at launch.
+
+## 10. Research Context Builder
+
+Do not send the entire database to AI. Construct the smallest relevant evidence package from Experiment Passport, protocol/strategy versions, dataset/execution versions, selected trade summaries, verified statistics, Monte Carlo, regime, robustness, OOS, Research Integrity and relevant journal context.
+
+Benefits: lower cost, lower latency, less unnecessary data exposure, clearer grounding and easier auditing.
+
+## 11. Tool-Based Research Copilot
+
+Future flow:
+
+    User question
+        ↓
+    AI Research Assistant
+        ↓
+    Get Experiment / Protocol
+        ↓
+    Read Verified Results
+        ↓
+    Optionally request authorized research jobs
+        ↓
+    Receive deterministic results
+        ↓
+    Explain to user
+
+Heavy jobs remain asynchronous. AI does not bypass the research engine.
+
+## 12. AI Scaling
+
+AI workload should scale independently from chart/replay workload:
+
+    Application
+        ↓
+    AI Gateway
+        ↓
+    AI Job Queue
+     ├── AI Worker
+     ├── AI Worker
+     └── AI Worker
+        ↓
+    Provider API
+
+This allows concurrency control, metering, quotas and provider rate-limit handling without freezing replay.
+
+## 13. AI Data & Privacy Principles
+
+- send only needed context;
+- authorize workspace/user before context construction;
+- never leak cross-tenant research data;
+- never expose secrets in prompts;
+- retain provenance of which results grounded an analysis;
+- define provider/retention policies before production;
+- core backtesting remains usable during AI outage.
+
+## 14. Capacity Planning
+
+Never claim a concurrent-user capacity before load testing representative chart/replay, candle delivery, save/resume, concurrent writes, analytics, imports, Monte Carlo, robustness and AI workloads.
+
+## 15. Decision Summary
+
+**Features:** Roadmap Phase 1 → 75.  
+**Capacity:** Profile S → Profile M → Profile L, independently according to measured demand.
+
+**Data:** Canonical Data + Stable IDs → Portable Persistence → Replaceable Compute → Infrastructure can scale/migrate while user/workspace/experiment identity remains stable.
+
+**AI:** Research Engines → Verified Evidence → AI Context → AI Interpretation → Human Decision.
+
+These principles should remain stable even when vendors, server sizes, queues or AI models change.
