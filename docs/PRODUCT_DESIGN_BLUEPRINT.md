@@ -446,3 +446,241 @@ Candidate metrics include non-brand organic clicks, qualified landing sessions, 
 Brand bridge:
 
 **Don't Trust the Claim. Test It.**
+
+
+## Website Product Surface Plan
+
+> **Status:** Approved website/product planning scope. This is a design plan, not implementation authorization and does not change the current implementation phase.
+
+Backtest Lab should be designed as a complete web product rather than only a chart application. Public acquisition, activation, education, trust, support and product feedback surfaces are part of the intended website experience.
+
+### 1. Public Website
+
+The public website should eventually include:
+- homepage with clear problem, positioning, evidence-oriented differentiation and primary CTA;
+- product/backtesting overview;
+- Lab Protocol explanation;
+- Research Labs/capability overview;
+- pricing and Free vs Pro comparison;
+- public methodology/research-integrity explanation;
+- public tools/calculators;
+- Learn/Academy and research content;
+- documentation/help center;
+- changelog/release notes;
+- trust/security/methodology area;
+- system status entry point;
+- contact/support entry point;
+- required legal/disclosure pages.
+
+Public pages should be fast, indexable where appropriate, accessible, mobile-friendly and separated architecturally from the latency-sensitive research workspace.
+
+### 2. Signup, Onboarding & Activation
+
+Do not treat account creation as activation.
+
+Target journey:
+
+```text
+Landing
+→ Try / Sign Up
+→ Choose Free Backtest or Lab Protocol
+→ Load sample/import eligible data
+→ First replay action
+→ First trade/observation
+→ Complete first experiment/backtest
+→ Understand result
+→ Save/return
+```
+
+Provide:
+- short product orientation;
+- sample/demo path that avoids an empty-chart dead end;
+- contextual guidance rather than a mandatory long tour;
+- progress/resume where appropriate;
+- clear first-success moment;
+- contextual explanation of Free vs Pro without blocking core understanding.
+
+Primary activation candidate: **first completed meaningful backtest/experiment**, not merely registration. Exact activation definition must be validated from product analytics.
+
+### 3. Help Center & Backtest Lab Academy
+
+Create an educational layer explaining both product usage and research concepts.
+
+Candidate content:
+- getting started;
+- chart/replay/import workflows;
+- Free Backtest vs Lab Protocol;
+- Strategy Rules and Experiment Passport;
+- RR, expectancy and break-even win rate;
+- drawdown and losing streaks;
+- Monte Carlo and survival;
+- robustness/overfitting;
+- OOS and walk-forward;
+- execution assumptions, spread and slippage;
+- methodology definitions;
+- troubleshooting and FAQs.
+
+Contextual **What does this mean?** links should connect complex metrics to concise explanations without cluttering the research workspace.
+
+Academy/help content should reuse the SEO architecture where useful, but documentation accuracy takes priority over keyword optimization.
+
+### 4. Trust & Transparency Center
+
+Because the brand asks users to test claims, Backtest Lab should expose how its own evidence is produced.
+
+Candidate public trust surfaces:
+- methodology and metric definitions;
+- no-look-ahead principles;
+- execution-model assumptions;
+- Experiment Passport/provenance explanation;
+- data-source/coverage disclosure where licensing permits;
+- security/privacy overview;
+- research-integrity principles;
+- AI role and limitations;
+- affiliate/sponsored-content disclosure;
+- service status and incident communication entry point;
+- changelog/version transparency.
+
+Do not expose secrets, internal security details that increase attack surface, private datasets, or information prohibited by data/provider agreements.
+
+### 5. Support & Feedback Experience
+
+Plan first-class flows for:
+- bug reports;
+- product questions;
+- billing/account issues;
+- data/import issues;
+- feature requests;
+- research/methodology questions;
+- abuse/reporting when public/community content eventually exists.
+
+Support should capture useful context such as app version, experiment ID or sanitized diagnostics where appropriate, with user awareness and privacy safeguards.
+
+Feedback should be classifiable and measurable rather than living only in founder DMs.
+
+### 6. Product Analytics & Experimentation
+
+Instrument the product funnel with privacy-conscious first-party event semantics.
+
+Core funnel:
+
+```text
+Visitor
+→ Signup
+→ First Replay
+→ First Experiment
+→ Completed Experiment
+→ Return / Repeat Research
+→ Pro Conversion
+→ Retention / Churn
+```
+
+Measure feature adoption and failure points, not only pageviews. Candidate measures include activation, experiment completion, repeat research, retention cohorts, Free→Pro conversion, tool/content→product conversion, import failures, abandoned workflows and support burden.
+
+Analytics must not alter deterministic research results or become a hidden dependency of replay/research functionality. Exact vendor is deferred.
+
+### 7. In-Product Communication
+
+Plan restrained product communication:
+- notifications center;
+- release/changelog announcements;
+- relevant experiment/job completion notices;
+- billing/account notices;
+- optional educational/product guidance;
+- user-controlled communication preferences.
+
+Avoid interruptive growth mechanics inside active replay/research sessions.
+
+### 8. Account & User Control Center
+
+Eventually provide coherent controls for:
+- profile;
+- plan and entitlement visibility;
+- billing/subscription entry points;
+- usage/data allowance visibility;
+- preferences;
+- privacy;
+- security/session controls as supported;
+- data export/deletion/request flows as required;
+- notification preferences;
+- public-profile controls if Community is later enabled.
+
+### 9. Reliability & Status Experience
+
+Public SaaS should eventually provide a user-facing way to understand service health and incidents.
+
+Plan:
+- status surface/page;
+- incident communication;
+- maintenance notices where needed;
+- clear degraded-state UX;
+- retry/recovery guidance;
+- preservation of user work where architecture permits.
+
+Do not claim uptime/SLA targets until they are actually supported and measured.
+
+### 10. Accessibility, Responsive UX & Performance
+
+Website quality requirements should include:
+- keyboard accessibility for appropriate controls;
+- semantic structure and accessible labels;
+- readable contrast and focus states;
+- responsive public/account/help surfaces;
+- explicit mobile scope for the research workspace;
+- performance budgets and measurement;
+- graceful loading/error/empty states;
+- localization-ready text architecture without prematurely translating everything.
+
+Accessibility and performance are product-quality requirements, not final cosmetic polish.
+
+### 11. Website Information Architecture
+
+Candidate top-level model:
+
+```text
+PUBLIC
+├── Home
+├── Product
+├── Backtesting
+├── Lab Protocol
+├── Research
+├── Tools
+├── Learn / Academy
+├── Pricing
+├── Trust
+├── Docs / Help
+└── Login / Start Free
+
+APP
+├── Workspace
+├── Experiments
+├── Results / Research Labs
+├── Journal
+├── Data
+├── Dashboard
+├── Notifications
+└── Account / Billing / Settings
+
+LATER
+└── Community
+    ├── Feed
+    ├── Analysis
+    ├── Public Experiments
+    ├── Profiles
+    └── Fork / Replicate
+```
+
+Final navigation labels remain subject to UX testing.
+
+### 12. Website Success Model
+
+The website should optimize for a chain of real user value:
+
+**Discover → Understand → Trust → Try → Complete Research → Return → Upgrade → Advocate.**
+
+Do not optimize one stage at the expense of research integrity. Traffic without activation is not success; signup without completed research is not success; conversion obtained through misleading claims is not success.
+
+### Website Planning Priority
+
+These website surfaces are approved as intended scope, but should be implemented only when their roadmap dependencies are ready. Near-term work remains governed by the current phase authorization. Community remains deferred to the post-roadmap option already recorded in the master roadmap.
+
