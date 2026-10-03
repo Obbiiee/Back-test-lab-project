@@ -296,3 +296,96 @@ Still undecided:
 - whether long-form content publishes full datasets/reports publicly.
 
 Do not force these decisions until the product/content identity is more mature.
+
+
+# Brand Language & Slogan Bank
+
+> **Status:** Candidate language, not final locked brand copy.  
+> Keep these phrases available for website, product UI, research reports, YouTube, Reels, Instagram, campaign concepts and individual Research Labs.
+
+## Primary Brand Candidates
+
+- **Don't Trust the Claim. Test It.**
+- **Test the Idea. Understand the Evidence.**
+- **From Trading Ideas to Research Evidence.**
+- **Measure the Edge. Understand the Uncertainty.**
+- **Don't Predict. Test.**
+- **Your Strategy Is a Hypothesis. Test It.**
+- **Trade Less on Belief. Test More with Evidence.**
+- **What Happened Is Only the Beginning.**
+- **A Backtest Shows What Happened. Research Asks Why.**
+- **Find the Edge. Then Try to Break It.**
+- **If It Has an Edge, It Should Survive the Test.**
+- **Evidence Before Confidence.**
+- **Know What You Know. Measure What You Don't.**
+- **The Market Is Uncertain. Your Research Doesn't Have to Be.**
+- **You Can't Control the Outcome. You Can Control the Exposure.**
+- **Risk Management Doesn't Create Edge. It Gives Edge Time to Show Up.**
+
+## Candidate Brand Hierarchy
+
+Possible structure:
+
+    BACKTEST LAB
+    Don't Trust the Claim. Test It.
+
+    Measure the Edge.
+    Understand the Uncertainty.
+
+The first line can act as the main brand challenge; the second can explain the research philosophy.
+
+## Research Lab Language
+
+### Strategy Destruction Lab
+**Find the Edge. Then Try to Break It.**
+
+### Monte Carlo Lab
+**One Backtest. Thousands of Possible Sequences.**
+
+### OOS / Walk Forward
+**Fresh Data. Same Hypothesis.**
+
+### Research Integrity
+**Evidence Before Confidence.**
+
+### AI Research Assistant
+**Ask the Data, Not the Hype.**
+
+## Usage Ideas
+
+**Homepage / hero**
+- Don't Trust the Claim. Test It.
+- Measure the Edge. Understand the Uncertainty.
+- From Trading Ideas to Research Evidence.
+
+**YouTube / documentary hooks**
+- Your Strategy Is a Hypothesis. Test It.
+- Don't Predict. Test.
+- A Backtest Shows What Happened. Research Asks Why.
+
+**Reels / Shorts**
+- Evidence Before Confidence.
+- Find the Edge. Then Try to Break It.
+- What Happened Is Only the Beginning.
+
+**Risk / survival content**
+- You Can't Control the Outcome. You Can Control the Exposure.
+- Risk Management Doesn't Create Edge. It Gives Edge Time to Show Up.
+
+**Robustness / OOS content**
+- If It Has an Edge, It Should Survive the Test.
+- Fresh Data. Same Hypothesis.
+
+## Brand Language Principle
+
+Backtest Lab language should challenge **claims**, not attack people.
+
+The brand should communicate:
+- curiosity over certainty;
+- evidence over hype;
+- experiments over opinions;
+- uncertainty as something to measure rather than hide;
+- research as a process, not a badge of authority.
+
+Avoid language that implies guaranteed profitability, certainty about future market outcomes, or that Backtest Lab can declare a universally “good” strategy.
+
