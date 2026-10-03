@@ -1307,3 +1307,112 @@ The dataset is evidence.
 The passport makes evidence reproducible.  
 The research engines measure uncertainty.  
 The human remains the decision-maker.
+
+
+---
+
+# 36. Extensible Market Data & Indicator Import Boundary
+
+> **Status:** Architecture direction, not current implementation authorization.
+
+Backtest Lab must not be permanently coupled to Twelve Data, one broker feed, one file format, or only the indicators bundled with the application.
+
+## Market Data Source Adapters
+
+Canonical flow:
+
+```text
+Twelve Data / Broker / CSV / Parquet / Future Provider
+                     ↓
+              Provider Adapter
+                     ↓
+          Normalize + Validate
+                     ↓
+        Canonical Market Dataset
+                     ↓
+     Dataset Version + Content Hash
+                     ↓
+ Replay / OOS / Forward / Research
+```
+
+Initial development candidate:
+- Twelve Data may be used as a low-cost/free trial source for forward-engine development where the selected symbol and account tier permit it.
+- It is not a permanent provider dependency.
+- Commercial display/redistribution rights must be re-verified before public use.
+
+A provider adapter should describe source/provider identity, instrument mapping, price type where known, timestamp/timezone semantics, interval, latency/completeness metadata, and licensing/usage metadata where relevant.
+
+New providers should be addable without rewriting Replay, Execution, Experiment Passport, or Research Compute.
+
+## User Market-Data Import
+
+Backtest Lab should support user-supplied market datasets through a validated import boundary.
+
+Candidate formats:
+- CSV first;
+- additional structured formats such as Parquet later when justified;
+- provider/API adapters separately.
+
+Import must validate schema, timestamps, ordering, duplicates, gaps, numeric values, OHLC invariants, timezone semantics, instrument metadata, and file/resource limits. Imported datasets receive immutable version identity/content hash before research use.
+
+Never silently merge incompatible providers or price semantics into one canonical experiment dataset.
+
+## Indicator Extensibility
+
+Built-in indicators remain deterministic/versioned research components, but the architecture should allow additional indicators to be imported or installed later.
+
+Conceptual boundary:
+
+```text
+Built-in Indicator
+Imported Indicator Definition
+Future Approved Plugin
+          ↓
+   Indicator Contract
+          ↓
+TimeBounded Market View
+          ↓
+Deterministic Output Series
+          ↓
+Chart Pane / Overlay + Research
+```
+
+Minimum indicator contract should eventually define:
+- stable indicator ID and version;
+- name/metadata;
+- parameters and validation schema;
+- required input series;
+- warm-up requirement;
+- output series/panes;
+- deterministic calculation semantics;
+- no-look-ahead/time-bounded input;
+- compatibility/version metadata.
+
+## Safety Boundary for External Indicators
+
+“Import indicator” must **not** mean executing arbitrary untrusted Python/JavaScript in the main application process.
+
+Preferred progression:
+1. import safe declarative indicator definitions/configuration where possible;
+2. support approved/versioned plugin packages only after a plugin security model exists;
+3. arbitrary user code, if ever supported, requires a separately designed sandbox with CPU/memory/time/network/filesystem limits and is not authorized by this blueprint.
+
+External indicators must not gain implicit access to secrets, other users' data, billing, filesystem, network, or future replay observations.
+
+## Reproducibility
+
+An experiment using imported data or an external indicator must record enough identity to reproduce the claim, including applicable:
+- Dataset ID/version/content hash;
+- data provider/source;
+- Indicator ID/version/definition hash;
+- indicator parameters;
+- engine/calculator version;
+- execution model version.
+
+Changing an imported indicator definition after an experiment must create a new version rather than silently changing historical results.
+
+## Design Principle
+
+**Import at the boundary; normalize into canonical contracts; keep the research core provider-neutral.**
+
+This lets Backtest Lab start cheaply while preserving the ability to add better data feeds and a larger indicator ecosystem later.
