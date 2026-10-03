@@ -261,3 +261,188 @@ Do not prematurely lock exact pricing, AI quotas, final navigation, final visual
 > **Backtest Lab should make sophisticated research understandable without pretending uncertainty is simple.**
 
 The UI must distinguish observed facts, benchmarks, statistical inference, exploratory findings, validated/OOS evidence and AI interpretation.
+
+
+## SEO & Organic Growth Architecture
+
+> **Status:** Growth planning direction, not implementation authorization. Exact keywords, volumes and priorities must be validated with current search data before execution.
+
+### Objective
+
+SEO exists to acquire traders with a real research problem and move them through:
+
+```text
+SEARCH / SOCIAL
+      ↓
+Useful Evidence / Education / Free Tool
+      ↓
+Free Backtest or Lab Protocol
+      ↓
+Activated Research User
+      ↓
+Deeper Research Need
+      ↓
+PRO
+```
+
+Optimize for qualified activation and eventual retained research usage, not pageviews alone.
+
+### Search Intent Architecture
+
+**Commercial / product intent**
+- backtesting software;
+- trading backtest tool;
+- forex backtesting software;
+- XAUUSD/gold backtesting;
+- chart replay/backtesting alternatives;
+- strategy testing/research software.
+
+**Problem / research intent**
+- how many trades are enough for a backtest;
+- break-even win rate;
+- risk-reward ratio;
+- maximum drawdown;
+- losing streak probability;
+- Monte Carlo for trading;
+- backtest overfitting;
+- out-of-sample testing;
+- walk-forward testing;
+- slippage/spread impact;
+- backtest vs live performance.
+
+**Free-tool intent**
+Candidate indexable utilities:
+- Break-even Win Rate Calculator;
+- Risk/Reward Calculator;
+- drawdown/risk preview tools;
+- backtest sample-size/evidence explainer;
+- Monte Carlo preview where scientifically defensible.
+
+Tools should provide genuine utility and naturally connect to Backtest Lab research workflows.
+
+### Public Information Architecture
+
+Candidate public routes:
+
+```text
+/
+ /backtesting
+ /forex-backtesting
+ /xauusd-backtesting
+ /tools/<tool>
+ /learn/<topic>
+ /research/<topic>
+ /pricing
+```
+
+Exact slugs remain subject to keyword research and information-architecture review. Private workspace, account, experiment-management and other non-public application surfaces should not be indexed merely to increase page count.
+
+### Content Engine
+
+One strong research idea should be reusable across channels:
+
+```text
+Research Question
+   ├─ Long-form article
+   ├─ YouTube episode
+   ├─ Reels/Shorts
+   ├─ Carousel
+   ├─ Free calculator/tool
+   └─ Product CTA / experiment template
+```
+
+Example: **“Risk 1% itu datang dari mana?”** can become an educational article, short video, risk calculator and entry point to Survival/Find Your Risk.
+
+Content should lead with trader problems and evidence questions rather than feature announcements.
+
+### Technical SEO Requirements
+
+When public pages are implemented, plan for:
+- indexable server-rendered/static public content where appropriate;
+- unique descriptive title, H1 and metadata;
+- canonical URLs;
+- XML sitemap;
+- robots directives;
+- Open Graph/social metadata;
+- semantic HTML and descriptive image alt text;
+- breadcrumb/internal-link architecture;
+- deliberate redirects and 404 behavior;
+- mobile usability;
+- strong Core Web Vitals/performance budgets;
+- structured data only when it truthfully matches visible content;
+- clear index/noindex separation between public acquisition pages and private app surfaces;
+- multilingual/hreflang only when real localized content exists.
+
+SEO requirements must not make the latency-sensitive chart/replay workspace heavier.
+
+### Content Quality & Programmatic SEO Guardrail
+
+Do not mass-produce thin pages by combining instrument/timeframe/RR keywords. A page should exist because it provides distinct user value such as original explanation, calculator, methodology, research visualization, benchmark, or evidence.
+
+AI may assist drafting and repurposing, but publication requires factual/research review. Do not manufacture performance claims, fake statistics, fake testimonials or implied guaranteed profitability.
+
+### Internal Linking
+
+Build topic clusters around:
+- Backtesting Fundamentals;
+- Edge & Statistical Evidence;
+- Risk & Survival;
+- Execution Reality;
+- Robustness & Overfitting;
+- OOS / Walk Forward;
+- Trading Research Methodology.
+
+Educational pages should link to the most relevant tool, experiment workflow or product capability rather than forcing every page directly to checkout.
+
+### Measurement
+
+Track the funnel rather than rankings alone:
+
+```text
+Organic Impression
+→ Search Click
+→ Useful Content/Tool Engagement
+→ Signup
+→ First Replay/Experiment
+→ Completed Experiment
+→ Repeat Research
+→ Pro Conversion
+```
+
+Candidate metrics include non-brand organic clicks, qualified landing sessions, tool usage, signup conversion, activation rate, completed experiments from organic acquisition, retained organic cohorts and paid conversion. Search rankings are diagnostic metrics, not the North Star.
+
+### Rollout
+
+**Stage 0 — Before public launch**
+- keyword/competitor research;
+- public IA;
+- technical SEO baseline;
+- homepage/product positioning;
+- initial cornerstone content;
+- 2–4 genuinely useful free tools/calculators.
+
+**Stage 1 — Launch**
+- commercial landing pages;
+- research/education clusters;
+- sitemap/canonical/indexation QA;
+- connect social/YouTube content to corresponding searchable resources;
+- measure search → activation.
+
+**Stage 2 — Evidence-led growth**
+- expand topics from real search/user questions;
+- publish original Backtest Lab research where scientifically appropriate;
+- improve pages using Search Console/product analytics evidence;
+- build legitimate references/backlinks through useful research/tools rather than spam.
+
+**Stage 3 — International growth**
+- expand English-first/global topics as product/data rights support them;
+- add localized content only when maintained as genuine localization;
+- build market/instrument landing pages only when they provide unique product or research value.
+
+### SEO Principle
+
+> **Do not optimize Backtest Lab to attract the most visitors. Optimize it to become the most useful answer for traders trying to test a claim.**
+
+Brand bridge:
+
+**Don't Trust the Claim. Test It.**
