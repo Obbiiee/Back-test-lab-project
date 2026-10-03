@@ -90,6 +90,36 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 74 | PRODUCTION RELIABILITY & RISK INFRASTRUCTURE | PLANNED; separate human authorization required |
 | 75 | ALGORITHMIC-TRADING READINESS VALIDATION | PLANNED; separate human authorization required |
 
+## Cross-cutting architecture alignment
+
+The numbered roadmap describes **when product capabilities mature**. Cross-cutting engineering contracts apply whenever relevant and are not postponed until a later phase merely because a dedicated audit phase exists.
+
+All future implementation must remain consistent with:
+- [Product System Architecture Blueprint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md);
+- [Scaling, Data & AI Decisions](SCALING_DATA_AI_DECISIONS.md);
+- [Security Architecture](SECURITY_ARCHITECTURE.md);
+- [AI Engineering Guardrails](AI_ENGINEERING_GUARDRAILS.md);
+- [Research Thesis](BACKTEST_LAB_RESEARCH_THESIS.md);
+- the operational workflow/current-phase authorities.
+
+This means:
+- security begins at the first trust boundary; Phase 29 deepens multi-tenant controls and Phase 60 audits the mature SaaS, but earlier phases must not knowingly create insecure foundations;
+- performance discipline begins now; Phase 16 hardens the local product and later cloud/reliability phases expand the evidence required;
+- asynchronous workers, caches, pooling, replicas and specialized databases are **capabilities introduced from measured need**, not mandatory phase prerequisites;
+- PostgreSQL/object storage and a modular monolith remain valid while evidence supports them;
+- payment, billing and entitlement are separate responsibilities; Phase 51 establishes subscription/entitlement architecture and Phase 52 integrates payment lifecycle/provider boundaries;
+- CRM/Odoo is an external business integration, not the research source of truth; its implementation belongs with administration/operations integration when separately scoped;
+- AI remains an interpretation/orchestration layer over deterministic evidence; Phase 67 productizes the Research Assistant and does not move canonical calculations into the model;
+- no-look-ahead, determinism, provenance, migration safety, test integrity and security boundaries apply to every phase they touch.
+
+> **Start small, but never design ourselves into a corner.**
+
+> **Complexity must be earned by evidence.**
+
+> **AI may accelerate implementation. It does not lower the engineering standard.**
+
+Deployment capacity (Profile S/M/L) is independent from phase number. A later product phase may still run on simple infrastructure at low load; an earlier cloud phase may require scaling sooner if measured demand requires it.
+
 ## Human execution-order decision
 
 Human-directed sequence: Phase 14 → Phase 14.5 → Phase 16 planning/implementation under separate authorization → Phase 15 revisited later → final regression/hardening after eventual Phase 15 implementation → Phase 17 Release Candidate → Phase 18 v1.0. This changes execution order only; preserve phase numbering and historical records. Phase 15 remains planned, not completed. Phase 16 is not authorized by Phase 14.5 planning. Phase 17/18 remain blocked until news implementation/validation, deferred UI work and final release prerequisites are satisfied. Operational authorization belongs only to [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md).
@@ -260,8 +290,9 @@ UI redesign must not casually rewrite validated engines.
 ### Phase 16 — FULL QA, PERFORMANCE & HARDENING (PLANNED)
 
 Planned direction:
-System-wide regression, performance, reliability and compatibility
-hardening before release candidate.
+System-wide regression, performance, reliability, compatibility and local security hardening before release candidate.
+
+Phase 16 must validate the architecture and AI-engineering contracts relevant to the local product: regression integrity, no-look-ahead/determinism, resource/performance behavior, dependency/static checks, error handling and release-relevant security. It does not require premature cloud infrastructure, multi-tenant controls or SaaS services.
 
 ### Phase 17 — v1 RELEASE CANDIDATE (PLANNED)
 
@@ -283,7 +314,7 @@ No requirement for production multi-user cloud architecture at v1.0.
 ### Phase 19 — BACKEND ARCHITECTURE (PLANNED)
 
 Plan:
-Establish production-oriented backend/service/API boundaries.
+Establish production-oriented backend/service/API boundaries as a modular-monolith-first foundation. Preserve separable Product DB, Research Compute, Billing/Entitlement, AI Gateway and Integration/CRM boundaries without prematurely extracting microservices. Define trust boundaries, runtime validation and heavy-compute separation points.
 
 ### Phase 20 — PRODUCTION DATABASE (PLANNED)
 
@@ -358,8 +389,7 @@ configuration.
 ### Phase 29 — MULTI-TENANT SECURITY (PLANNED)
 
 Plan:
-Tenant isolation, authorization, validation, rate limiting and
-related security boundaries.
+Implement and validate the multi-user controls defined by the Security Architecture: deny-by-default tenant isolation, server-side authorization, trust-boundary validation, rate/resource controls, protected file/object access and cross-tenant negative tests. This phase deepens security for cloud multi-tenancy; it does not imply security was deferred until Phase 29.
 
 ### Phase 30 — CLOUD QA & MIGRATION (PLANNED)
 
@@ -535,11 +565,11 @@ High-fidelity market simulation platform.
 
 ### Phase 51 — SUBSCRIPTION ARCHITECTURE (PLANNED)
 
-Plan centralized product entitlements for future plan tiers.
+Plan centralized billing-state and product-entitlement boundaries for future plan tiers. Product capability checks must depend on internal entitlements rather than a specific payment provider. Preserve provider portability and server-side authorization.
 
 ### Phase 52 — BILLING & PAYMENT (PLANNED)
 
-Plan subscription/payment lifecycle and entitlement synchronization.
+Plan payment-provider integration, checkout/billing lifecycle, verified/idempotent webhooks, reconciliation, renewal/failure/cancellation/refund/downgrade behavior and synchronization into internal billing/entitlement state. Backtest Lab must not store raw card credentials or trust browser redirects as payment proof.
 
 ### Phase 53 — USAGE & RESOURCE METERING (PLANNED)
 
@@ -584,7 +614,11 @@ who changed what, when, and from which version.
 Plan internal management of users, organizations, subscriptions,
 data jobs, incidents and relevant resources.
 
+This is also the natural planning home for external business-operations/CRM integration (for example Odoo) when separately authorized. CRM receives only required customer/business lifecycle context and never becomes the canonical store for experiments, trades, strategies, research evidence or product authorization.
+
 ### Phase 60 — SaaS SECURITY & RELIABILITY AUDIT (PLANNED)
+
+This is an audit/release gate over security accumulated throughout prior phases, not the point where security first begins.
 
 Plan system-level review of:
 
@@ -643,6 +677,8 @@ Plan systematic study of strategy behavior across market regimes.
 
 ### Phase 67 — AI RESEARCH ASSISTANT (PLANNED)
 
+Plan an AI Gateway/Research Context boundary over deterministic research evidence. AI must be authorization-aware, receive minimum necessary context and remain replaceable/provider-neutral.
+
 Plan AI assistance for:
 
 - reading experiment results
@@ -653,7 +689,7 @@ Plan AI assistance for:
 
 - generating hypotheses
 
-AI has NO live-money trading authority.
+AI has NO live-money trading authority and is not the canonical calculator/source of truth for research evidence.
 
 ### Phase 68 — RESEARCH AUTOMATION PIPELINE (PLANNED)
 
