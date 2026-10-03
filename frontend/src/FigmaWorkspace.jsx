@@ -10,6 +10,8 @@ import PositionsPanel from "./trading/PositionsPanel";
 import {money} from "./trading/format";
 import useTrading from "./trading/useTrading";
 import Journal from "./trading/Journal";
+import ReplayResetConfirmation from './trading/ReplayResetConfirmation';
+import {requestAccountReset} from './trading/replayResetGuard';
 import useReplayPlayback from './market/useReplayPlayback';
 import {PLAYBACK_SPEEDS} from './market/PlaybackScheduler';
 import useReplayMarket from "./market/useReplayMarket";
@@ -99,6 +101,7 @@ function App() {
  const trading=useTrading(replay.loading?[]:replay.active?replay.raw:market.liveBars,replay.active,replay.active?replay.transition:undefined);
  const [quantity,setQuantity]=useState(1),[orderSeed,setOrderSeed]=useState(null),[ticketId,setTicketId]=useState(0);
  const [dateOpen,setDateOpen]=useState(false),[replayDate,setReplayDate]=useState('2024-06-03T12:00');
+ const [resetRequest,setResetRequest]=useState(null);
  const [editPosition,setEditPosition]=useState(null),[editError,setEditError]=useState('');
  const pickCallback=useRef(null);
  const resizePositions=event=>{event.preventDefault();const start=event.clientY,height=terminalHeight;const move=point=>setTerminalHeight(Math.max(95,Math.min(window.innerHeight-280,height+start-point.clientY)));const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);};
@@ -107,6 +110,8 @@ function App() {
  const openTicket=(side=tradeSide,seed=null)=>{if(!trading.quote){setNotice('Loading price…');return;}setTradeSide(side);setOrderSeed(seed);setTicketId(value=>value+1);setDialog('order');};
  const fromDrawing=object=>{const seed=riskRewardOrderSeed(object,trading.quote?.close);openTicket(seed.side,seed);};
  const beginReplay=async()=>{setPlaying(false);try{const time=await replay.start(replayDate+'Z');trading.reset(time);setDateOpen(false);}catch{/* The replay form displays the loading error. */}};
+ const exitReplay=()=>{setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);};
+ const requestReset=action=>requestAccountReset(trading.account,action,confirmedAction=>setResetRequest({action:confirmedAction}));
  const toggleFavorite=item=>setFavorites(current=>current.includes(item)?current.filter(name=>name!==item):[...current,item]);
  useEffect(()=>{try{localStorage.setItem('backtest-favorites-v1',JSON.stringify(favorites));}catch{/* In-memory favorites remain available. */}},[favorites]);
 	const menu = useMemo(() => activeTool ? toolGroups[activeTool] : undefined, [activeTool]);
@@ -186,7 +191,7 @@ function App() {
 
         <section className="trade-controls">
           <button className="buy-pill" onClick={()=>openTicket('Buy')}>↗ Buy</button><button className="sell-pill" onClick={()=>openTicket('Sell')}>↘ Sell</button><div className="quantity"><input aria-label="Quantity" type="number" min="0.0001" step="any" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></div>
-          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>setDateOpen(true)}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>setPlaying(value=>!value)}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!replay.active||replay.atEnd} onClick={()=>{setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>{setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);}}>×</button>}</div>
+          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>setDateOpen(true)}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>setPlaying(value=>!value)}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!replay.active||replay.atEnd} onClick={()=>{setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>requestReset(exitReplay)}>×</button>}</div>
           <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label="Hide positions and orders" onClick={()=>setTerminalOpen(value=>!value)}><Icon name="eye" size={17}/></button>
         </section>
         {terminalOpen&&<PositionsPanel trading={trading} onResize={resizePositions} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
@@ -196,7 +201,8 @@ function App() {
 
       </section>
 
-      {dateOpen&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();beginReplay();}}><header><strong>Bar replay</strong><button type="button" aria-label="Close replay date" onClick={()=>setDateOpen(false)}>×</button></header><label>Start date and time (UTC)<input type="datetime-local" min="2016-10-03T00:00" max="2026-09-25T00:58" value={replayDate} onChange={event=>setReplayDate(event.target.value)} required/></label><p>Start a new session with a $100,000 account. Candles after the selected time stay hidden until you advance replay.</p>{replay.error&&<p role="alert" className="ticket-error">{replay.error}</p>}<button type="submit" className="place-order" disabled={replay.loading}>{replay.loading?'Loading candles…':'Start replay'}</button></form></div>}
+      {dateOpen&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();requestReset(beginReplay);}}><header><strong>Bar replay</strong><button type="button" aria-label="Close replay date" onClick={()=>setDateOpen(false)}>×</button></header><label>Start date and time (UTC)<input type="datetime-local" min="2016-10-03T00:00" max="2026-09-25T00:58" value={replayDate} onChange={event=>setReplayDate(event.target.value)} required/></label><p>Start a new session with a $100,000 account. Candles after the selected time stay hidden until you advance replay.</p>{replay.error&&<p role="alert" className="ticket-error">{replay.error}</p>}<button type="submit" className="place-order" disabled={replay.loading}>{replay.loading?'Loading candles…':'Start replay'}</button></form></div>}
+      {resetRequest&&<ReplayResetConfirmation onCancel={()=>setResetRequest(null)} onConfirm={()=>{const action=resetRequest.action;setResetRequest(null);action();}}/>}
       {editPosition&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();try{trading.update(editPosition.id,{sl:editPosition.sl===''?null:Number(editPosition.sl),tp:editPosition.tp===''?null:Number(editPosition.tp)});setEditPosition(null);}catch(error){setEditError(error.message);}}}><header><strong>Edit {editPosition.side} · XAUUSD</strong><button type="button" aria-label="Close position edit" onClick={()=>setEditPosition(null)}>×</button></header>{['sl','tp'].map(key=><label key={key}>{key==='sl'?'Stop loss':'Take profit'}<input type="number" step="any" value={editPosition[key]??''} placeholder="None" onChange={event=>setEditPosition(current=>({...current,[key]:event.target.value}))}/></label>)}{editError&&<p role="alert" className="ticket-error">{editError}</p>}<button className="place-order" type="submit">Save changes</button></form></div>}
 
 

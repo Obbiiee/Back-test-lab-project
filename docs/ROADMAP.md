@@ -26,7 +26,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 11 | OVERLAY INDICATORS | Recorded in completed history |
 | 12 | INDICATOR PANES | Recorded in completed history |
 | 13 | REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS | Recorded in completed history |
-| 14 | TRADING UX & BACKTEST ANALYSIS | PLANNED; separate human authorization required |
+| 14 | TRADING UX & BACKTEST ANALYSIS | Recorded in completed history |
 | 14.5 | ECONOMIC NEWS BACKTESTING ENGINE | PLANNED; separate human authorization required |
 | 15 | FINAL FIGMA / UI-UX IMPLEMENTATION | PLANNED; separate human authorization required |
 | 16 | FULL QA, PERFORMANCE & HARDENING | PLANNED; separate human authorization required |
@@ -148,11 +148,9 @@ Completed authorized scope: exactly RSI, MACD, ATR and Stochastic in official Li
 
 Completed authorized scope: commit-acknowledged single-flight playback at 1×/2×/5×/10×/20×, revealed transition hints, verified native candlestick updates and safe trading suffix settlement with reference fallbacks. Seven indicator calculators, aggregation and Volume remain full reference calculations. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry grants no later-phase implementation authorization.
 
-### Phase 14 — TRADING UX & BACKTEST ANALYSIS (PLANNED)
+### Phase 14 — TRADING UX & BACKTEST ANALYSIS
 
-Planned direction:
-Improve simulated trading workflow, trade visualization, backtest
-analysis and related trading UX.
+Completed authorized MUST scope: existing terminal Analysis tab, canonical partial-exit/completed-position projection, realized metrics/balance drawdown curve, completed-position detail/canonical notes, raw/grouped CSV exports and confirmation before existing replay account resets. No simulator/replay/chart/indicator/drawing engine or storage schema changes. Evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md) and the [checkpoint report](PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md); operational authorization remains solely in the current-phase pointer. No SHOULD/DEFER or later-phase authorization is implied.
 
 ### Phase 14.5 — ECONOMIC NEWS BACKTESTING ENGINE (PLANNED)
 

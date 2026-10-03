@@ -18,6 +18,8 @@ Run in `frontend/`:
 | npm run test:phase12 | Wilder/EMA/Stochastic vectors, warmup/causality, official pane/reindex/reference lifecycle and isolation |
 | npm run test:phase13 | Exact chart/Volume/seven-indicator/account differential equality, cursor semantics, malformed hint/recovery fallback, hidden mutation causality and playback acknowledgement/cancellation |
 | npm run bench:phase13 | Non-gating CPU timing for 5000 revealed bars/seven indicators/100 steps and chart/indicator API operation counts |
+| npm run test:phase14 | Canonical partial-exit grouping/completeness, financial/drawdown vectors, legacy issues, reconciliation, CSV UTF-8 roundtrip/download lifecycle, reset guards and persistence/hidden-input independence |
+| npm run bench:phase14 | Non-gating alternating Analysis closed/open CPU comparison; same 5000 bars/seven indicators/100 steps, 500 exits, dependency-check timing and projection counts |
 | npm run test:trading-separation | Independent Risk/Reward ownership |
 | npm run test:trading | Order/position simulation |
 | npm run test:drawings | Existing geometry/math regressions |

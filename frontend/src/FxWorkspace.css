@@ -148,3 +148,23 @@ html {color-scheme:dark;}
 @media(max-width:650px){.fx-order-ticket{position:fixed;right:49px;top:48px;bottom:48px;width:min(340px,calc(100vw - 70px));z-index:22;}.main-stage.ticket-open{grid-template-columns:52px minmax(0,1fr) 49px;}.fx-journal{position:fixed;right:49px;top:48px;bottom:48px;width:275px;z-index:20;}.main-stage.journal-open{grid-template-columns:52px minmax(0,1fr) 49px;}.bottom-replay{position:absolute;left:5px;right:5px;bottom:48px;justify-content:center;background:#171717;border:1px solid #303030;border-radius:5px;}.quantity{width:65px;}.main-toolbar{gap:0;}.main-toolbar .layout-name,.main-toolbar .nav-action{display:none;}.main-stage .trade-controls{gap:5px;}}
 
 .ticket-partial{display:grid;grid-template-columns:1fr 70px 22px;gap:5px;align-items:end;margin-bottom:10px;}.ticket-partial label{font-size:9px;display:grid;gap:5px;color:#aaa;}.ticket-partial input{width:100%;height:32px;background:transparent;border:1px solid #303030;border-radius:5px;padding:5px;}.ticket-partial button,.add-partial{background:transparent;border:1px solid #333;border-radius:5px;height:30px;font-size:10px;}.add-partial{margin-bottom:12px;padding:0 10px;}
+.backtest-analysis {flex:1;min-height:0;overflow:auto;padding:12px 18px;color:#b9bdc9;font-size:12px;}
+.analysis-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.analysis-actions button,.analysis-position-list button {border:1px solid #343845;border-radius:5px;background:#222632;color:inherit;padding:7px 10px;cursor:pointer;}
+.analysis-caption,.analysis-curve small {color:#969cac;line-height:1.5;}
+.analysis-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:12px 0;}
+.analysis-stats>div {background:#20242e;border:1px solid #303440;border-radius:5px;padding:9px;}
+.analysis-stats dt {font-size:11px;color:#969cac;}
+.analysis-stats dd {margin:6px 0 0;font-size:16px;color:#e2e5ec;}
+.analysis-reconciliation {color:#39b9a4;}
+.analysis-issues {color:#eebc75;margin:10px 0;}
+.analysis-curve {margin:12px 0;padding:10px;border:1px solid #303440;border-radius:5px;}
+.analysis-curve svg {width:100%;max-height:150px;color:#969cac;}
+.analysis-curve text {fill:currentColor;font-size:10px;}
+.analysis-position-list {display:grid;gap:5px;}
+.analysis-position-list button {display:flex;justify-content:space-between;text-align:left;gap:12px;}
+.analysis-position-list button[aria-pressed=true] {border-color:#39b9a4;}
+.analysis-detail {margin-top:12px;border-top:1px solid #343845;}
+.analysis-exit {display:grid;gap:6px;padding:10px 0;border-bottom:1px solid #303440;}
+.analysis-exit label {display:grid;gap:6px;}
+.analysis-exit textarea {min-height:55px;border:1px solid #343845;background:#20242e;color:#e2e5ec;padding:8px;border-radius:5px;}

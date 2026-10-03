@@ -1,5 +1,7 @@
 # Protected boundaries
 
+- Trading analysis: preserve canonical-account ownership, partial exit vs completed-position distinction, exact realized balance/metric contracts, finite-data issues, CSV fidelity and memoization independent of cursor-only changes. Both existing workspace reset actions must be guarded before any replay/account operation; Cancel itself performs none. Do not infer initial risk, session metadata or floating-equity history. Reference contracts: [Phase 14 checkpoint](../docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md).
+
 Change these only when the authorized task explicitly requires it, with relevant regression coverage:
 
 - Market/Data: `frontend/src/market/{candles,history,useGoldMarket,useReplayMarket}.js`; historical files `frontend/public/market/`, `data/`.

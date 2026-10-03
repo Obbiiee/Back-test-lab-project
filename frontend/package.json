@@ -28,7 +28,9 @@
     "test:phase11": "node tests/phase11.test.mjs",
     "test:phase12": "node tests/phase12.test.mjs",
     "test:phase13": "node tests/phase13.test.mjs",
-    "bench:phase13": "node tests/phase13-benchmark.mjs"
+    "bench:phase13": "node tests/phase13-benchmark.mjs",
+    "test:phase14": "node tests/phase14.test.mjs",
+    "bench:phase14": "node tests/phase14-benchmark.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",

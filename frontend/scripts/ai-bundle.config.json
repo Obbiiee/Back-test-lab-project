@@ -8,7 +8,8 @@
     "AI_CONTEXT/05_PROTECTED_SYSTEMS.md",
     "AI_CONTEXT/06_WORKFLOW_RULES.md",
     "AI_CONTEXT/07_TEST_COMMANDS.md",
-    "docs/ROADMAP.md"
+    "docs/ROADMAP.md",
+    "docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",
@@ -48,7 +49,18 @@
     "frontend/src/trading/replaySettlement.js",
     "frontend/src/trading/simulator.js",
     "frontend/src/market/candles.js",
-    "frontend/src/market/history.js"
+    "frontend/src/market/history.js",
+    "frontend/src/trading/backtestAnalysis.js",
+    "frontend/src/trading/BacktestAnalysis.jsx",
+    "frontend/src/trading/backtestExport.js",
+    "frontend/src/trading/replayResetGuard.js",
+    "frontend/src/trading/ReplayResetConfirmation.jsx",
+    "frontend/src/trading/PositionsPanel.jsx",
+    "frontend/src/trading/Journal.jsx",
+    "frontend/src/trading/OrderTicket.jsx",
+    "frontend/src/trading/format.js",
+    "frontend/src/trading/riskReward.js",
+    "frontend/src/FxWorkspace.css"
   ],
   "tests": [
     "frontend/tests/phase6.test.mjs",
@@ -67,7 +79,11 @@
     "frontend/tests/phase13.test.mjs",
     "frontend/tests/phase13-benchmark.mjs",
     "frontend/tests/phase13-browser.jsx",
-    "frontend/tests/phase13.html"
+    "frontend/tests/phase13.html",
+    "frontend/tests/phase14.test.mjs",
+    "frontend/tests/phase14-benchmark.mjs",
+    "frontend/tests/phase14-browser.jsx",
+    "frontend/tests/phase14.html"
   ],
   "supporting": [
     "frontend/package.json",
