@@ -7,7 +7,9 @@
 | Why does Backtest Lab exist? What is the scientific thesis? | `BACKTEST_LAB_RESEARCH_THESIS.md` |
 | What should users see and how should the product feel/work? | `PRODUCT_DESIGN_BLUEPRINT.md` |
 | How should the software/system be structured? | `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` |
-| How do scaling, data portability and AI architecture work? | `SCALING_DATA_AI_DECISIONS.md` |
+| How do scaling, data portability, AI, billing/entitlement and provider boundaries work? | `SCALING_DATA_AI_DECISIONS.md` |
+| What security boundaries and launch-security gates apply? | `SECURITY_ARCHITECTURE.md` |
+| What engineering contract must AI-generated code obey? | `AI_ENGINEERING_GUARDRAILS.md` |
 | What capabilities are planned and in what phase? | `ROADMAP.md` |
 | What is authorized to implement now? | `../AI_CONTEXT/04_CURRENT_PHASE.md` |
 | What has actually been completed? | `../AI_CONTEXT/03_PHASE_HISTORY.md` |
@@ -27,6 +29,12 @@
     SCALING / DATA / AI DECISIONS
     HOW IT GROWS WITHOUT LOSING DATA OR BOUNDARIES
             ↓
+    SECURITY ARCHITECTURE
+    WHAT MUST REMAIN PROTECTED
+            ↓
+    AI ENGINEERING GUARDRAILS
+    HOW AI-ASSISTED CODE MUST BE BUILT & VALIDATED
+            ↓
     ROADMAP
     WHEN CAPABILITIES ARE PLANNED
             ↓
@@ -42,6 +50,7 @@ Planning documents may evolve as evidence and product decisions improve.
 
 However:
 - a blueprint does not authorize implementation;
+- security and AI-engineering contracts apply cross-cutting whenever relevant, but do not authorize a phase;
 - a thesis does not change current phase;
 - roadmap planning does not prove a feature exists;
 - completed history records facts;
