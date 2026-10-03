@@ -120,6 +120,51 @@ This means:
 
 Deployment capacity (Profile S/M/L) is independent from phase number. A later product phase may still run on simple infrastructure at low load; an earlier cloud phase may require scaling sooner if measured demand requires it.
 
+## Roadmap confidence horizon and evidence gates
+
+The roadmap is not equally committed at every distance:
+
+| Horizon | Phases | Meaning |
+| --- | --- | --- |
+| High confidence | 14.5–18 | Execution plan toward a stable local v1 |
+| Medium confidence | 19–30 | Productization plan; details may change from v1 evidence |
+| Directional | 31–60 | Capability map; ordering/implementation remains evidence-sensitive |
+| Long-term vision | 61–75 | Option space, not an engineering promise |
+
+Phase 75 is not a target that justifies premature architecture today. Preserve upgradeability, but do not build future infrastructure without present evidence.
+
+### Cross-phase quality model
+
+**Hard constraints:** Security + Correctness.  
+**Optimization priorities:** Lightweight → Efficient → Measured → Scalable.
+
+Every authorized phase must apply the relevant risk-proportional gates: authorization/input security, deterministic correctness, no-look-ahead for temporal behavior, regression tests, performance measurement when performance is affected or claimed, build/lint/static checks, diff review, and the repository workflow checkpoint.
+
+### Research-integrity foundations
+
+The architecture must converge on:
+- time-bounded market/news views so temporal consumers cannot casually read future observations;
+- truncation-invariance tests for temporal features where applicable;
+- Replay/Execution → canonical Event/Trade Log → Research Compute separation;
+- a versioned/pluggable minimum execution model before advanced research claims, including explicit candle ambiguity, spread/cost/slippage assumptions as applicable;
+- Experiment Passport content hashes for canonical dataset, strategy and protocol definitions plus engine/calculator/execution semantics and RNG provenance;
+- append-only trial/strategy lineage sufficient to disclose prior exploration and support later hypothesis-family/multiple-testing analysis;
+- explicit replay/backtest state transitions so chart/replay/trading/journal state cannot silently diverge.
+
+Trial count is provenance, not an automatic statistical correction. Bonferroni, BH-FDR, DSR or other methods may be used only when appropriate to the defined inferential question and hypothesis family.
+
+### Market-data rights gate
+
+Before Phase 23 becomes a production cloud market-data service, verify applicable acquisition, storage, display/redistribution, commercial-use, retention and derived-data rights. Technical availability does not imply redistribution rights.
+
+### Phase 30 product-evidence gate
+
+Phase 30 is not an automatic launchpad into Phase 31+. In addition to cloud QA/migration, evaluate real product evidence where available: activation, completed backtests, repeat/retained usage, research-feature usage, conversion, compute/storage cost, support burden and observed feature demand. Subsequent capability investment should respond to evidence rather than roadmap momentum.
+
+### Monetization integrity
+
+Free/paid limits must not intentionally manufacture misleading research through predictably inadequate evidence. Exact historical allowance, instruments, quotas and pricing remain product decisions; monetize depth/capacity/convenience without presenting an intentionally weak sample as scientifically sufficient.
+
 ## Human execution-order decision
 
 Human-directed sequence: Phase 14 → Phase 14.5 → Phase 16 planning/implementation under separate authorization → Phase 15 revisited later → final regression/hardening after eventual Phase 15 implementation → Phase 17 Release Candidate → Phase 18 v1.0. This changes execution order only; preserve phase numbering and historical records. Phase 15 remains planned, not completed. Phase 16 is not authorized by Phase 14.5 planning. Phase 17/18 remain blocked until news implementation/validation, deferred UI work and final release prerequisites are satisfied. Operational authorization belongs only to [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md).
@@ -316,11 +361,15 @@ No requirement for production multi-user cloud architecture at v1.0.
 Plan:
 Establish production-oriented backend/service/API boundaries as a modular-monolith-first foundation. Preserve separable Product DB, Research Compute, Billing/Entitlement, AI Gateway and Integration/CRM boundaries without prematurely extracting microservices. Define trust boundaries, runtime validation and heavy-compute separation points.
 
+Formalize persistence-facing contracts for Experiment Passport identity/content hashes, append-only trial/strategy lineage, canonical event/trade logs and research-job boundaries. This does not require advanced research features yet.
+
 ### Phase 20 — PRODUCTION DATABASE (PLANNED)
 
 Plan:
 PostgreSQL-oriented production persistence, migrations, indexing,
 backup/restore and schema lifecycle.
+
+Persist the provenance foundations introduced by Phase 19, including experiment/trial lineage and immutable/versioned research identity where applicable. Index from measured query patterns, not speculative future scale.
 
 ### Phase 21 — AUTHENTICATION & IDENTITY (PLANNED)
 
@@ -349,6 +398,8 @@ This is conceptual planning, not a locked database schema.
 
 Plan:
 Serve historical market data through cloud infrastructure.
+
+Production launch is gated by verified rights for the intended acquisition, storage, display/redistribution, commercial use, retention and derived-data behavior. Provider access alone is not evidence of redistribution rights.
 
 ### Phase 24 — MARKET DATA PIPELINE (PLANNED)
 
@@ -391,11 +442,13 @@ configuration.
 Plan:
 Implement and validate the multi-user controls defined by the Security Architecture: deny-by-default tenant isolation, server-side authorization, trust-boundary validation, rate/resource controls, protected file/object access and cross-tenant negative tests. This phase deepens security for cloud multi-tenancy; it does not imply security was deferred until Phase 29.
 
-### Phase 30 — CLOUD QA & MIGRATION (PLANNED)
+### Phase 30 — CLOUD QA & MIGRATION / PRODUCT EVIDENCE GATE (PLANNED)
 
 Plan:
 Validate migration from local-oriented architecture toward the
 multi-user cloud architecture, including concurrency and recovery.
+
+Treat this checkpoint as a product-evidence gate before automatically investing in Phase 31+: review real usage, retention/repeat behavior, research adoption, commercial signal, operating cost, support burden and observed demand where available.
 
 CHECKPOINT:
 Backtest Lab v2.0
