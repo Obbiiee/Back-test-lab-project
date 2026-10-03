@@ -389,3 +389,209 @@ The brand should communicate:
 
 Avoid language that implies guaranteed profitability, certainty about future market outcomes, or that Backtest Lab can declare a universally “good” strategy.
 
+
+
+# Flagship Instagram Campaign — Do You Actually Have an Edge?
+
+> **Status:** Script-ready content concept  
+> **Purpose:** Translate the Backtest Lab product thesis into problem-first Instagram content.  
+> **Principle:** Do not sell a feature list. Start with a trader problem, expose the evidence question, then introduce the relevant Backtest Lab solution.
+
+## Feed Carousel — 10 Slides
+
+### Slide 1 — Cover
+**STRATEGI LO PROFIT. Tapi... beneran punya EDGE?**
+
+Small text: **Profit ≠ proof.**
+
+### Slide 2 — The first doubt
+Lo backtest 100 trade. Win rate: **56%**. Equity: **naik**.
+
+Kelihatannya bagus. Tapi pertanyaan sebenarnya:
+
+**56% itu edge atau cuma noise?**
+
+### Slide 3 — Context changes everything
+Win rate sendirian **nggak cukup**.
+
+- 56% dari berapa trade?
+- RR berapa?
+- Spread dihitung?
+- Slippage?
+- Berapa parameter yang sudah dicoba?
+
+**Context changes everything.**
+
+### Slide 4 — Overfitting
+Misalnya lo mencoba **100 variasi strategi** lalu mengambil satu yang paling bagus.
+
+Hasil terbaik itu belum tentu edge. Bisa jadi lo cuma berhasil **menemukan kebetulan terbaik**.
+
+Footer: *Overfitting / data snooping.*
+
+### Slide 5 — Evidence
+Backtest seharusnya bukan mencari:
+
+**❌ equity curve paling cantik**
+
+Tetapi mencari:
+
+**seberapa kuat evidence yang kita punya?**
+
+### Slide 6 — Path risk
+Kalau edge memang ada, pertanyaan berikutnya:
+
+**SEBERAPA BURUK HASIL YANG MASIH MUNGKIN TERJADI?**
+
+Losing streak. Drawdown. Recovery time. Sequence risk.
+
+### Slide 7 — Risk sizing
+Jangan cuma bertanya:
+
+**“Risk 1% aman nggak?”**
+
+Balik pertanyaannya:
+
+**“Berapa risk maksimum kalau gue nggak mau probabilitas DD >30% melebihi 5%?”**
+
+Small text: *Risk sizing from constraints, not folklore.*
+
+### Slide 8 — Backtest vs live
+Setelah live rugi, jangan langsung bilang:
+
+**“Strateginya mati.”**
+
+Bandingkan **BACKTEST vs LIVE**:
+- risk berubah?
+- entry berubah?
+- TP ditutup cepat?
+- SL digeser?
+- setup dilanggar?
+
+### Slide 9 — The process
+Trading bukan tentang menghilangkan uncertainty, tetapi membuat keputusan lebih baik di dalam uncertainty.
+
+**TEST → MEASURE → SURVIVE → EXECUTE → AUDIT → IMPROVE**
+
+### Slide 10 — Brand
+Kami tidak sedang membangun AI signal, holy grail, atau sekadar chart replay.
+
+**Backtest Lab**
+
+*Turn trading ideas into testable evidence.*
+
+**DON'T TRUST THE CLAIM. TEST IT.**
+
+## Carousel Caption Draft
+
+Gue mulai dari pertanyaan sederhana: kalau sebuah strategi menghasilkan profit ketika di-backtest, bagaimana kita tahu itu benar-benar edge dan bukan kebetulan?
+
+Dari situ masalahnya malah makin besar.
+
+Edge perlu diuji. Uncertainty perlu diukur. Risiko perlu disesuaikan dengan karakter strategi. Hasil perlu di-stress test. Dan ketika masuk live, execution perlu dibandingkan dengan apa yang sebenarnya diuji.
+
+Itu alasan Backtest Lab dibangun.
+
+Bukan untuk menjawab *“trade berikutnya buy atau sell?”*
+
+Tapi untuk membantu menjawab: **“Seberapa kuat evidence di balik keputusan trading gue?”**
+
+🔬 **Don't Trust the Claim. Test It.**
+
+---
+
+## Reels #1 — 56% Win Rate
+
+**Target duration:** ~25–35 seconds.
+
+**Hook (0–3s)**  
+“Win rate strategi lo 56%? Gue belum tahu itu bagus atau nggak.”
+
+Visual: **WIN RATE 56%**
+
+**3–10s**  
+“Karena 56% dari 50 trade dan 56% dari 2.000 trade itu bukan evidence yang sama.”
+
+Visual: **56% / 50 trades VS 56% / 2,000 trades**
+
+**10–18s**  
+“Belum lagi RR, spread, slippage, dan berapa banyak strategi yang lo coba sebelum menemukan angka 56% itu.”
+
+**18–26s**  
+“Jadi backtest jangan berhenti di: ‘Win rate gue berapa?’”
+
+Beat.
+
+“Pertanyaan berikutnya adalah: **seberapa kuat evidence-nya?**”
+
+**Close**  
+**Backtest Lab — Don't Trust the Claim. Test It.**
+
+---
+
+## Reels #2 — Risk 1%
+
+**Hook**  
+**“Siapa yang memutuskan risk 1% itu aman?”**
+
+“Kenapa bukan 0,3%? Kenapa bukan 1,4%?”
+
+“Risk seharusnya nggak berasal dari angka sakral yang diwariskan trader ke trader.”
+
+Visual: **MAX DRAWDOWN > 30%**
+
+“Coba balik pertanyaannya.”
+
+**‘Gue nggak mau probabilitas drawdown di atas 30% lebih dari 5%.’**
+
+Lalu gunakan data strategi dan model risiko untuk mencari ukuran risk yang memenuhi constraint tersebut.
+
+**Risk management nggak menciptakan edge. Ia memberi edge kesempatan untuk bertahan.**
+
+Close: **KNOW YOUR RISK. FIND YOUR RISK. — Backtest Lab 🔬**
+
+---
+
+## Reels #3 — Backtest Profit, Live Boncos
+
+**Hook**  
+**“Backtest profit. Live malah boncos. Berarti strateginya mati?”**
+
+Beat.
+
+**“Belum tentu.”**
+
+Visual split:
+
+| BACKTEST | LIVE |
+| --- | --- |
+| Risk 0.5% | Risk 1.2% |
+| RR 1:1.25 | TP closed early |
+| Setup A | Entry after loss |
+| No intervention | SL moved |
+
+Voice-over:
+
+“Kalau yang lo lakukan ketika live berbeda dari sistem yang lo backtest, lo bahkan belum membuktikan strateginya gagal.”
+
+**“Lo sedang menjalankan eksperimen yang berbeda.”**
+
+Close:
+
+**Test the strategy. Audit the execution.**
+
+**Don't Trust the Claim. Test It.**
+
+## Instagram Editorial Pattern
+
+Default pattern for this campaign and similar posts:
+
+**One trader problem → one uncomfortable question → one evidence concept → one strong visual → Backtest Lab philosophy.**
+
+Avoid leading with feature announcements such as “New Feature: Monte Carlo.” Prefer the user problem first, e.g. **“Risk 1% itu sebenarnya datang dari mana?”** and reveal Monte Carlo/survival modeling as the solution.
+
+The product should be communicated as:
+
+**Test → Measure → Survive → Execute → Audit → Improve**
+
+rather than as a collection of unrelated features.
