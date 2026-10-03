@@ -875,6 +875,27 @@ Backtest Lab v7.0
 Target identity:
 Algorithmic-trading-ready research infrastructure.
 
+## Post-Roadmap Option — Community Space (DEFERRED)
+
+> **Status:** long-term option only. Not a numbered phase and not implementation authorization.
+
+After the core research platform, SaaS/security foundation, sharing permissions and production reliability are mature, Backtest Lab may evaluate a community layer centered on testable trading ideas.
+
+Candidate capabilities include public profiles and feed; chart analysis with drawings/text/instrument/timeframe/tags; public experiment posts; comments and threaded replies; reactions, saves, shares and follows; Private/Unlisted/Public visibility; notifications; opening shared analysis back into chart state where feasible; linking posts to strategies/protocols/experiments; and **Fork Analysis / Test This Idea / Fork Experiment / Replicate**.
+
+Evidence labels should distinguish ordinary **Analysis** from **Backtested**, **Lab Protocol**, and **Replicated** content. Popularity must not be presented as verification.
+
+Preferred loop:
+
+```text
+Community Idea → Open Analysis → Test Idea → Backtest / Lab Protocol
+→ Publish Evidence → Comment / Fork / Replicate → New Research
+```
+
+Avoid profit-based leaderboards that reward cherry-picking. Before user-generated content launches, require identity/authorization, privacy and tenant isolation, block/mute, reporting, moderation/admin tools, spam/abuse controls, rate limits, content deletion/lifecycle rules, notification controls, and security/legal review.
+
+**Priority rule:** finish the research product first. Community is an optional network-effect layer at the end, not a dependency for Backtest Lab's core value proposition.
+
 ## Hard boundary after Phase 75
 
 The approved master roadmap ENDS at Phase 75. Do NOT create Phase 76. Algorithmic-trading readiness does not authorize automatic live trading. Autonomous live broker order placement, unattended real-money execution, and automatic conversion of strategy signals into live-money positions remain OUT OF SCOPE unless separately decided and authorized by the human in the future.
