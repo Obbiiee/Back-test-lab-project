@@ -303,3 +303,142 @@ Before adopting an infrastructure component, ask:
 This does not mean pre-building distributed infrastructure. It means preserving clean boundaries, portable data and replaceable compute while deploying only the capacity currently needed.
 
 CRM systems such as Odoo should remain integration layers rather than the canonical store for Backtest Lab experiments, strategies, trades or research evidence.
+
+
+## 17. Payment, Billing & Entitlement Architecture
+
+Payment, billing, product access and CRM are separate responsibilities.
+
+> **Payment collects money. Billing records commerce. Entitlements control access. CRM manages relationships. Core engines do research.**
+
+Target boundary:
+
+    User
+      ↓
+    Backtest Lab
+      ├── Product Database
+      │    ├── User / Workspace
+      │    ├── Strategy / Experiment
+      │    └── Research Evidence
+      │
+      ├── Billing & Entitlement Layer
+      │          ↓
+      │     Payment Gateway
+      │
+      └── Integration Layer
+                 ↓
+              CRM / Odoo
+
+### Payment Flow
+
+    User chooses an upgrade
+            ↓
+    Backtest Lab creates checkout
+            ↓
+    Payment Gateway processes payment
+            ↓
+    Gateway sends signed webhook/event
+            ↓
+    Backtest Lab verifies the event
+            ↓
+    Billing record is updated
+            ↓
+    Entitlements are recalculated
+            ↓
+    Authorized product capabilities unlock
+            ↓
+    CRM/Odoo receives relevant customer lifecycle event
+
+The payment gateway confirms commerce events. It must not become the direct authorization mechanism for research features.
+
+### Billing Records
+
+Candidate billing data:
+- internal customer/user/workspace reference;
+- plan;
+- subscription status;
+- billing period;
+- provider;
+- provider customer/subscription/payment references;
+- invoice/payment state where needed;
+- timestamps;
+- cancellation/renewal state;
+- relevant webhook/event provenance.
+
+Do not store raw card credentials in Backtest Lab.
+
+### Entitlements
+
+Product features should ask the internal entitlement layer whether access is allowed.
+
+Conceptually:
+
+    can(user_or_workspace, "monte_carlo")
+    can(user_or_workspace, "rr_lab")
+    can(user_or_workspace, "robustness")
+    can(user_or_workspace, "extended_data")
+    can(user_or_workspace, "ai_research")
+
+Avoid coupling product code to questions such as:
+
+    did_user_pay_using_specific_gateway_X()
+
+This permits plans and access rules to evolve independently from a payment provider.
+
+Potential entitlement sources may later include:
+- Free;
+- Pro;
+- Research / Team;
+- trial;
+- promotion;
+- admin-granted access;
+- affiliate/coupon campaigns;
+- other explicitly supported commercial states.
+
+Exact plans, prices, quotas and commercial rules remain product decisions.
+
+### Provider Portability
+
+Payment integration should sit behind a provider adapter/billing boundary.
+
+    Billing / Entitlement Layer
+              │
+       ┌──────┴──────┐
+       ↓             ↓
+    Gateway A     Gateway B
+
+A future provider migration should not require rewriting Monte Carlo, RR Lab, Strategy Destruction, AI Research Assistant or other research engines.
+
+### CRM / Odoo Boundary
+
+Odoo/CRM may receive the business context needed for customer lifecycle, campaigns, support and relationship management.
+
+Odoo must not be the canonical source of truth for:
+- experiments;
+- trades;
+- strategies;
+- research evidence;
+- Experiment Passports;
+- product authorization decisions.
+
+If CRM is unavailable, core research and valid existing entitlements should not fail merely because CRM is down.
+
+### Reliability & Security Principles
+
+- verify payment-provider webhook signatures/authenticity;
+- design webhook processing to be idempotent because events may be retried;
+- keep an auditable event/billing history;
+- never trust a browser redirect alone as proof of successful payment;
+- use server-side authorization for paid capabilities;
+- keep secrets outside source code;
+- design reconciliation for missed/delayed provider events;
+- define safe behavior for provider outages;
+- test upgrade, renewal, failed payment, cancellation, refund and downgrade paths before production.
+
+### Upgradeability Principle
+
+Billing must obey the same infrastructure rule:
+
+> **Start small, but never design ourselves into a corner.**
+
+We may begin with one payment provider and a simple billing module. The boundary must still allow provider replacement, multiple plans, workspace/team billing and independent entitlement logic later without rewriting the research core.
