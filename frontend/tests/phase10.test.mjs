@@ -85,7 +85,7 @@ for(const file of readdirSync(new URL('../src/indicators/',import.meta.url))) {
   assert.ok(!/movingAverage|VWAP|TEST_LINE/.test(source),'No legacy, excluded or reference product indicators');
 }
 const chartSource=readFileSync(new URL('../src/components/CandleChart.jsx',import.meta.url),'utf8');
-assert.ok(/series\.setData\(candles\);\s+indicatorEngine\.setCandles\(candles\);/.test(chartSource));
+assert.ok(/syncCandleSeries\(series,[^;]+;\s+previousCandlesRef.current = candles;\s+indicatorEngine\.setCandles\(candles\);/.test(chartSource));
 assert.ok(chartSource.includes('volumeSeriesRef.current?.setData(candles.map'));
 assert.ok(chartSource.indexOf('indicatorEngine.detach();') < chartSource.indexOf('chart.remove();'));
 assert.ok(!/movingAverage|indicator:|DrawingsLayer/.test(chartSource));

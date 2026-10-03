@@ -28,6 +28,7 @@ html {color-scheme:dark;}
 .bottom-replay button {border:0;background:transparent;min-width:26px;height:32px;padding:0 4px;font-size:16px;}
 .bottom-replay button[aria-label="Replay timeframe"] {font-size:12px;}
 .bottom-replay input {width:70px;accent-color:#006aff;}
+.bottom-replay select {width:58px;height:28px;background:#171717;color:inherit;border:1px solid #303030;border-radius:4px;font-size:12px;}
 .bottom-replay button:disabled {opacity:.3;}
 .drawing-tool-slot {position:relative;min-height:40px;width:48px;display:flex;align-items:center;}
 .drawing-tool-slot .side-tool {margin-left:4px;}

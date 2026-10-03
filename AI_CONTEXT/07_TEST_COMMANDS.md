@@ -16,6 +16,8 @@ Run in `frontend/`:
 | npm run test:phase10 | Indicator registry/config, revealed-only frozen input, normalized output, warmup, error isolation, replay/prepend/timeframe, series lifecycle and protected boundaries |
 | npm run test:phase11 | SMA/EMA/Bollinger vectors, bounds, warmup, causality, multi-output isolation and lifecycle |
 | npm run test:phase12 | Wilder/EMA/Stochastic vectors, warmup/causality, official pane/reindex/reference lifecycle and isolation |
+| npm run test:phase13 | Exact chart/Volume/seven-indicator/account differential equality, cursor semantics, malformed hint/recovery fallback, hidden mutation causality and playback acknowledgement/cancellation |
+| npm run bench:phase13 | Non-gating CPU timing for 5000 revealed bars/seven indicators/100 steps and chart/indicator API operation counts |
 | npm run test:trading-separation | Independent Risk/Reward ownership |
 | npm run test:trading | Order/position simulation |
 | npm run test:drawings | Existing geometry/math regressions |
@@ -39,3 +41,5 @@ Phase 10 product/browser validation: [checkpoint report](../docs/PHASE10_INDICAT
 Phase 11 product/browser validation: [checkpoint report](../docs/PHASE11_OVERLAY_INDICATORS.md). Test-only /tests/phase11.html observes real official series on an isolated origin; production uses the same overlay registry and controls. Synthetic volume exists only in the fixture.
 
 Phase 12 browser/product evidence: [checkpoint report](../docs/PHASE12_INDICATOR_PANES.md). Test-only /tests/phase12.html observes actual official pane/series/reference ownership and revealed endpoints; all calculators remain pure.
+
+Phase 13 browser/product/performance evidence: [checkpoint report](../docs/PHASE13_REPLAY_OPTIMIZATION.md). Test-only /tests/phase13.html uses real replay/playback/trading/chart APIs and compares all series with reference output. Run tests with frontend as their working directory; legacy drawing SSR fixtures depend on that root.

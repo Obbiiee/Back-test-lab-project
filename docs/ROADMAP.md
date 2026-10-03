@@ -25,7 +25,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 10 | INDICATOR ENGINE FOUNDATION | Recorded in completed history |
 | 11 | OVERLAY INDICATORS | Recorded in completed history |
 | 12 | INDICATOR PANES | Recorded in completed history |
-| 13 | REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS | PLANNED; separate human authorization required |
+| 13 | REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS | Recorded in completed history |
 | 14 | TRADING UX & BACKTEST ANALYSIS | PLANNED; separate human authorization required |
 | 14.5 | ECONOMIC NEWS BACKTESTING ENGINE | PLANNED; separate human authorization required |
 | 15 | FINAL FIGMA / UI-UX IMPLEMENTATION | PLANNED; separate human authorization required |
@@ -144,11 +144,9 @@ Completed authorized scope: exactly SMA, EMA and Bollinger Bands through the exi
 
 Completed authorized scope: exactly RSI, MACD, ATR and Stochastic in official Lightweight Charts panes through the existing engine/adapter. One dedicated pane per instance; runtime pane ownership/reindex, native resizing, reference-line lifecycle and minimal existing controls. Overlay indicators remain on price pane. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry does not authorize persistence, extra indicators or Phase 13.
 
-### Phase 13 — REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS (PLANNED)
+### Phase 13 — REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS
 
-Planned direction:
-Improve replay architecture/performance and professional playback
-controls while preserving market/trading correctness.
+Completed authorized scope: commit-acknowledged single-flight playback at 1×/2×/5×/10×/20×, revealed transition hints, verified native candlestick updates and safe trading suffix settlement with reference fallbacks. Seven indicator calculators, aggregation and Volume remain full reference calculations. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry grants no later-phase implementation authorization.
 
 ### Phase 14 — TRADING UX & BACKTEST ANALYSIS (PLANNED)
 

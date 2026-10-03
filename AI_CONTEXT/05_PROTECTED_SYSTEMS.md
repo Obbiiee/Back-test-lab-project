@@ -19,3 +19,5 @@ This is not blanket protection of the entire repository. Narrow infrastructure/c
 - New drawing persistence/history: `DrawingPersistence.js`, `DrawingHistory.js`; `backtest-drawing-manager-v1:*`. Preserve schema, canonical fields, commit boundaries and trading isolation. History resets on reload; no cross-tab merge/backend sync.
 
 - Source-of-truth hygiene: `frontend/src/main.jsx` is the single entrypoint. Preserve intentional compatibility exports and test-dependent archives/storage fixtures. Do not reintroduce duplicate runtime trees or remove files based only on absence from the production graph. `test:repository` checks these boundaries; update its allowlist only with documented evidence.
+
+- Replay optimization: transition metadata is a hint, never a market-data source. Preserve actual revealed-prefix validation, full chart/reference trading fallbacks, completion-acknowledged single-flight scheduling and cancellation. Keep existing rewind restrictions for trading state; historical prepend must not become new trading events. Indicator calculators, native Volume and pane ownership remain independent.

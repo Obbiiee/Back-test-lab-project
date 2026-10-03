@@ -10,6 +10,8 @@ import PositionsPanel from "./trading/PositionsPanel";
 import {money} from "./trading/format";
 import useTrading from "./trading/useTrading";
 import Journal from "./trading/Journal";
+import useReplayPlayback from './market/useReplayPlayback';
+import {PLAYBACK_SPEEDS} from './market/PlaybackScheduler';
 import useReplayMarket from "./market/useReplayMarket";
 import {riskRewardOrderSeed} from "./trading/riskReward";
 import "./FigmaWorkspace.css";
@@ -77,7 +79,7 @@ function App() {
 		action,
 		id: Date.now()
 	});
-	const [speed, setSpeed] = useState(3);
+	const [speed, setSpeed] = useState(1);
 	const [notice, setNotice] = useState("");
  const [timeframe,setTimeframe]=useState(()=>{try{const saved=localStorage.getItem('backtest-workspace-interval-v1');return saved in TIMEFRAMES?saved:'30m';}catch{return '30m';}});
  useEffect(()=>{try{localStorage.setItem('backtest-workspace-interval-v1',timeframe);}catch{/* The current interval remains usable without storage. */}},[timeframe]);
@@ -86,7 +88,6 @@ function App() {
  const market = useGoldMarket(timeframe, marketMode === "live");
 	const [activeTool, setActiveTool] = useState(null);
 	const [orderTab, setOrderTab] = useState("Open Positions");
-	const [playing, setPlaying] = useState(false);
 	const [tradeSide, setTradeSide] = useState("Buy");
 	const [terminalOpen, setTerminalOpen] = useState(true);
  const [terminalHeight,setTerminalHeight] = useState(150);
@@ -94,7 +95,8 @@ function App() {
 	const [goToOpen, setGoToOpen] = useState(false);
 	const [journalOpen, setJournalOpen] = useState(false);
  const replay=useReplayMarket(timeframe);
- const trading=useTrading(replay.loading?[]:replay.active?replay.raw:market.liveBars,replay.active);
+ const {playing,setPlaying}=useReplayPlayback(replay,speed);
+ const trading=useTrading(replay.loading?[]:replay.active?replay.raw:market.liveBars,replay.active,replay.active?replay.transition:undefined);
  const [quantity,setQuantity]=useState(1),[orderSeed,setOrderSeed]=useState(null),[ticketId,setTicketId]=useState(0);
  const [dateOpen,setDateOpen]=useState(false),[replayDate,setReplayDate]=useState('2024-06-03T12:00');
  const [editPosition,setEditPosition]=useState(null),[editError,setEditError]=useState('');
@@ -108,8 +110,6 @@ function App() {
  const toggleFavorite=item=>setFavorites(current=>current.includes(item)?current.filter(name=>name!==item):[...current,item]);
  useEffect(()=>{try{localStorage.setItem('backtest-favorites-v1',JSON.stringify(favorites));}catch{/* In-memory favorites remain available. */}},[favorites]);
 	const menu = useMemo(() => activeTool ? toolGroups[activeTool] : undefined, [activeTool]);
- const {active:replayActive,atEnd:replayAtEnd,step:replayStep}=replay;
- useEffect(()=>{if(!playing||!replayActive||replayAtEnd)return;const timer=setInterval(()=>replayStep(),1000/speed);return()=>clearInterval(timer);},[playing,replayActive,replayAtEnd,replayStep,speed]);
  const data=replay.loading?[]:replay.active?replay.candles:market.candles;
  const chooseTool = (name,group=activeTool) => { const mode = resolveTool(name,group); if (mode) setDrawingMode(mode); if(group)setLastTools(current=>({...current,[group]:name}));setPlaying(false); setActiveTool(null); };
  const toolButtons = [
@@ -161,7 +161,7 @@ function App() {
         </aside>
 
         <div className={"chart-shell cursor-" + drawingMode}>
-          <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={trading.update} onClosePosition={trading.close} onCancelOrder={trading.cancel} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={indicatorInstances} /></Suspense>
+          <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} transition={replay.active?replay.transition:undefined} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={trading.update} onClosePosition={trading.close} onCancelOrder={trading.cancel} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={indicatorInstances} /></Suspense>
 
           <div className="chart-meta"><strong>XAU / USD · {timeframe} · Backtest Lab</strong><i /><span className="up-text">O {data.at(-1)?.open.toFixed(3)}&nbsp;&nbsp; H {data.at(-1)?.high.toFixed(3)}&nbsp;&nbsp; L {data.at(-1)?.low.toFixed(3)}&nbsp;&nbsp; C {data.at(-1)?.close.toFixed(3)}</span><small>Volume&nbsp; <b>{marketMode === "live" ? "—" : data.at(-1)?.volume}</b></small></div>
           {favoritesVisible&&favorites.length>0&&<div className="drawing-favorites" aria-label="Favorite drawing tools">{favorites.filter(name=>RISK_REWARD_TOOLS[resolveTool(name)] || DRAWING_SPECS[resolveTool(name)]).map(name=><button key={name} title={name} onClick={()=>chooseTool(name,Object.keys(toolGroups).find(group=>toolGroups[group].some(section=>section.items.includes(name))))}>{name==='Long Position'?'↗':name==='Short Position'?'↘':name==='Trend Line'?'╱':name==='Horizontal Line'?'―':name.slice(0,2)}</button>)}</div>}
@@ -186,13 +186,13 @@ function App() {
 
         <section className="trade-controls">
           <button className="buy-pill" onClick={()=>openTicket('Buy')}>↗ Buy</button><button className="sell-pill" onClick={()=>openTicket('Sell')}>↘ Sell</button><div className="quantity"><input aria-label="Quantity" type="number" min="0.0001" step="any" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></div>
-          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>setDateOpen(true)}>Ι◀</button><input aria-label="Speed" type="range" min="1" max="10" value={speed} onChange={event=>setSpeed(Number(event.target.value))}/><button aria-label="Go to previous candle" disabled={!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>setPlaying(value=>!value)}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!replay.active||replay.atEnd} onClick={()=>{setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>{setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);}}>×</button>}</div>
+          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>setDateOpen(true)}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>setPlaying(value=>!value)}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!replay.active||replay.atEnd} onClick={()=>{setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>{setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);}}>×</button>}</div>
           <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label="Hide positions and orders" onClick={()=>setTerminalOpen(value=>!value)}><Icon name="eye" size={17}/></button>
         </section>
         {terminalOpen&&<PositionsPanel trading={trading} onResize={resizePositions} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
         {dialog==='order'&&<OrderTicket key={ticketId} side={tradeSide} price={trading.quote?.close} balance={trading.account.balance} initialBalance={trading.account.initialBalance} initialSize={quantity} seed={orderSeed} onClose={()=>setDialog(null)} onPickPrice={(key,callback)=>{pickCallback.current=callback;setDrawingMode('order');setNotice(`Click the chart to set ${key.toUpperCase()}.`);}} onPlace={(order,journal)=>{trading.place(order);setOrderTab(order.type==='Market'?'Open Positions':'Pending Orders');setTerminalOpen(true);if(journal)setJournalOpen(true);}}/>}
         {journalOpen&&<Journal account={trading.account} onClose={()=>setJournalOpen(false)} onNotes={trading.notes}/>}
-        {goToOpen&&<div className="session-goto"><strong>Go to</strong><button onClick={()=>{setGoToOpen(false);setDateOpen(true);}}>Select date and time</button>{replay.active&&<button onClick={()=>{replay.step();setGoToOpen(false);}}>Next candle</button>}</div>}
+        {goToOpen&&<div className="session-goto"><strong>Go to</strong><button onClick={()=>{setGoToOpen(false);setDateOpen(true);}}>Select date and time</button>{replay.active&&<button onClick={()=>{setPlaying(false);replay.step();setGoToOpen(false);}}>Next candle</button>}</div>}
 
       </section>
 

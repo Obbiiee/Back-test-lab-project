@@ -1,16 +1,19 @@
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {initialAccount,placeOrder,closePosition,processCandle,pnl,validateOrder} from './simulator';
+import {settleReplay} from './replaySettlement.js';
 const KEY='backtest-paper-account-v1';
 function read(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Number.isFinite(saved.balance)&&['orders','positions','trades'].every(key=>Array.isArray(saved[key])))return saved;}catch{/* Start a fresh account if browser storage is unavailable. */}return initialAccount();}
-export default function useTrading(candles,replaying=false) {
+export default function useTrading(candles,replaying=false,transition) {
   const [account,setAccount]=useState(read);
   const quote=candles.at(-1);
+  const previous=useRef([]);
   useEffect(()=>{
     if(!quote)return;
     // Incoming market candles are an external event; settle orders when that event changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAccount(current=>{if(!replaying)return processCandle(current,quote,true);if(quote.time<current.lastTime&&!current.positions.length&&!current.orders.length&&!current.trades.length)return {...current,lastTime:quote.time};let result=current;for(const candle of candles)if(current.lastTime!=null&&candle.time>current.lastTime)result=processCandle(result,candle);return current.lastTime==null?{...current,lastTime:quote.time}:result;});
-  },[candles,quote,replaying]);
+    const before=previous.current;
+    setAccount(current=>!replaying?processCandle(current,quote,true):settleReplay(current,candles,before,transition));
+    previous.current=candles;
+  },[candles,quote,replaying,transition]);
   useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify(account));}catch{/* In-memory account remains available. */}},[account]);
   const place=useCallback(order=>{if(!quote)throw new Error('Wait for a price.');const error=validateOrder(order,quote.close);if(error)throw new Error(error);setAccount(current=>placeOrder(current,order,quote));},[quote]);
   const close=useCallback((id,fraction=1)=>{if(quote)setAccount(current=>closePosition(current,id,quote.close,quote.time,'Manual close',fraction));},[quote]);

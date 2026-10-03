@@ -13,10 +13,12 @@ import { DRAWING_SPECS } from "../drawings/DrawingTypes";
 import DrawingControls from "../drawings/DrawingControls";
 import { IndicatorEngine } from "../indicators/IndicatorEngine";
 
+import { syncCandleSeries } from "../market/replayTransitions.js";
+
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -44,6 +46,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
   const [exportPreview, setExportPreview] = useState(null);
   const [exportStatus, setExportStatus] = useState("");
   const viewportSessionRef = useRef(null);
+  const previousCandlesRef = useRef([]);
   const previousCandleCountRef = useRef(0);
   const previousFirstCandleRef = useRef(null);
   const showVolume = chartPreferences.showVolume;
@@ -148,6 +151,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      previousCandlesRef.current = [];
       volumeSeriesRef.current = null;
       markersRef.current = null;
       priceLinesRef.current = [];
@@ -401,7 +405,8 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     const visibleRange = timeScale.getVisibleLogicalRange();
     const wasFollowingLatest = visibleRange == null || visibleRange.to >= previousCount - 1.5;
 
-    series.setData(candles);
+    syncCandleSeries(series, isNewSession ? [] : previousCandlesRef.current, candles, transition);
+    previousCandlesRef.current = candles;
     indicatorEngine.setCandles(candles);
     volumeSeriesRef.current?.setData(candles.map((candle) => ({
       time: candle.time,
@@ -426,7 +431,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     viewportSessionRef.current = viewportKey;
     previousCandleCountRef.current = candles.length;
     previousFirstCandleRef.current = candles[0]?.time ?? null;
-  }, [candles, viewportKey, indicatorEngine]);
+  }, [candles, viewportKey, indicatorEngine, transition]);
 
   useEffect(() => {
     const scale=chartRef.current?.timeScale();
