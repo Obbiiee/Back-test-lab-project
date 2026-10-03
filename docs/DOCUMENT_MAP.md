@@ -1,0 +1,50 @@
+# Backtest Lab — Document Map
+
+> **Purpose:** Menentukan dokumen mana yang menjawab pertanyaan apa agar thesis, design, architecture dan roadmap tidak menjadi sumber kebenaran yang saling bersaing.
+
+| Question | Primary document |
+|---|---|
+| Why does Backtest Lab exist? What is the scientific thesis? | `BACKTEST_LAB_RESEARCH_THESIS.md` |
+| What should users see and how should the product feel/work? | `PRODUCT_DESIGN_BLUEPRINT.md` |
+| How should the software/system be structured? | `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` |
+| How do scaling, data portability and AI architecture work? | `SCALING_DATA_AI_DECISIONS.md` |
+| What capabilities are planned and in what phase? | `ROADMAP.md` |
+| What is authorized to implement now? | `../AI_CONTEXT/04_CURRENT_PHASE.md` |
+| What has actually been completed? | `../AI_CONTEXT/03_PHASE_HISTORY.md` |
+| What workflow / Definition of Done governs implementation? | `../AI_CONTEXT/06_WORKFLOW_RULES.md` |
+
+## Mental Model
+
+    RESEARCH THESIS
+    WHY / scientific foundation
+            ↓
+    PRODUCT DESIGN BLUEPRINT
+    WHAT THE USER EXPERIENCES
+            ↓
+    SYSTEM ARCHITECTURE BLUEPRINT
+    HOW THE SYSTEM IS STRUCTURED
+            ↓
+    SCALING / DATA / AI DECISIONS
+    HOW IT GROWS WITHOUT LOSING DATA OR BOUNDARIES
+            ↓
+    ROADMAP
+    WHEN CAPABILITIES ARE PLANNED
+            ↓
+    CURRENT PHASE
+    WHAT IS AUTHORIZED NOW
+            ↓
+    CODE + TESTS + COMPLETED HISTORY
+    WHAT ACTUALLY EXISTS
+
+## Governance
+
+Planning documents may evolve as evidence and product decisions improve.
+
+However:
+- a blueprint does not authorize implementation;
+- a thesis does not change current phase;
+- roadmap planning does not prove a feature exists;
+- completed history records facts;
+- current-phase authority controls implementation authorization.
+
+When documents conflict, resolve the conflict explicitly rather than silently allowing multiple truths.
