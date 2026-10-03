@@ -317,6 +317,28 @@ Replay does **not** calculate research conclusions.
 
 ---
 
+# 6A. Temporal View, Replay State & Canonical Research Log
+
+Temporal correctness should be enforced structurally where practical.
+
+```text
+Versioned Dataset
+      ↓
+TimeBoundedView(t)
+      ↓
+Replay / Indicators / News / Execution
+      ↓
+Canonical Event + Trade Log
+      ↓
+Research Compute
+```
+
+A temporal consumer should not receive unrestricted future observations merely because an index is available. Relevant features should support truncation-invariance tests: state/output at `t` remains unchanged when data after `t` is physically absent.
+
+Replay/backtest lifecycle should converge on an explicit state/revision model so chart, replay cursor, trading settlement, journal/event log and later cloud resume cannot silently represent different committed moments. Exact state names are implementation decisions; the invariant is that a committed replay revision has an unambiguous canonical trading/research state.
+
+Research analytics consume canonical logs/results rather than being embedded into the candle loop.
+
 # 7. Trading & Execution Engine
 
 ```mermaid
@@ -402,20 +424,29 @@ Changing a material locked protocol field creates a new version/experiment rathe
 
 # 9. Experiment Passport & Reproducibility
 
-Every serious Lab Protocol result should be reconstructible from:
+Every serious Lab Protocol result should be reconstructible from canonical identity/provenance such as:
 
 ```text
-Dataset Version
-+ Protocol Version
-+ Randomization Seed
-+ Engine Version
+Dataset ID + Version + Content Hash
++ Strategy ID + Version + Definition Hash
++ Protocol ID + Version + Content Hash
++ RNG Algorithm + Seed
++ Engine / Research Calculator Version
 + Execution Assumption Version
 + Regime Definition Version
++ Trial / Strategy Lineage
 = Experiment Identity
 ```
 
+Hardware identity is not required by default. Prefer defined numeric semantics and versioned calculators; record additional environment metadata only where it materially affects reproducibility.
+
 Candidate passport fields:
 - experiment ID/hash;
+- dataset content hash;
+- strategy definition hash;
+- protocol content hash;
+- RNG algorithm/seed;
+- trial/strategy lineage and experiment-family reference;
 - user/workspace;
 - strategy/version;
 - instrument/timeframe;
@@ -573,8 +604,9 @@ flowchart LR
 ```
 
 Capabilities:
+- append-only trial/strategy lineage;
 - hypothesis-family registry;
-- number of tests;
+- number of relevant tests;
 - raw p-values;
 - Bonferroni;
 - Benjamini-Hochberg FDR/q-values;
@@ -582,7 +614,7 @@ Capabilities:
 - immutable audit trail;
 - fresh OOS linkage.
 
-Multiple-testing correction is **not** automatically applied to every stress test. Sensitivity analysis and inferential hypothesis testing remain distinct concepts.
+Multiple-testing correction is **not** automatically applied to every stress test or merely because a trial counter increased. Trial history is provenance; the inferential question and hypothesis family determine whether/how Bonferroni, BH-FDR, DSR or another method is appropriate. Sensitivity analysis and inferential hypothesis testing remain distinct concepts.
 
 ---
 
@@ -926,12 +958,14 @@ Research data isolation is a product requirement, not an optional hardening task
 
 # 25. Performance Blueprint
 
-Priority order:
+Priority model:
 
-1. Correctness.
-2. Determinism.
-3. Measured performance.
-4. Optimization.
+1. Security and correctness are hard constraints.
+2. Determinism/reproducibility where promised.
+3. Lightweight by default: avoid unnecessary work.
+4. Measure relevant render/CPU/memory/query/I/O behavior.
+5. Optimize demonstrated bottlenecks.
+6. Scale through preserved boundaries when evidence requires it.
 
 Techniques:
 - incremental chart updates;
@@ -946,7 +980,7 @@ Techniques:
 - pagination;
 - load tests before infrastructure guessing.
 
-Do not move to microservices merely because the product may someday have many users.
+Do not move to microservices merely because the product may someday have many users. Do not replace official chart-library behavior with custom canvas/virtualization without measured evidence that rendering is the bottleneck.
 
 ---
 
