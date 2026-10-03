@@ -442,3 +442,72 @@ Billing must obey the same infrastructure rule:
 > **Start small, but never design ourselves into a corner.**
 
 We may begin with one payment provider and a simple billing module. The boundary must still allow provider replacement, multiple plans, workspace/team billing and independent entitlement logic later without rewriting the research core.
+
+
+## 18. Global Payment Provider Planning
+
+> **Status:** Preferred planning direction, not implementation lock. Provider availability, pricing, supported jurisdictions and legal/compliance requirements must be re-verified before implementation or launch.
+
+Backtest Lab should be designed for international SaaS distribution rather than coupling commerce to one Indonesian payment rail.
+
+### Preferred Provider Direction
+
+- **Global SaaS / subscription candidate:** Paddle, primarily because a Merchant-of-Record model can simplify international software sales, tax/VAT handling and subscription operations where supported.
+- **Indonesia-local payment candidate:** Xendit as an optional secondary adapter when local rails such as QRIS, virtual accounts or local e-wallets materially improve conversion.
+- **Future alternative:** Stripe or another international provider may be evaluated when availability, company structure, supported countries/currencies and economics make it appropriate.
+
+These are provider candidates, not permanent architectural dependencies.
+
+### Target Architecture
+
+    Global User ──────→ Global Provider Adapter ──┐
+                                                  │
+    Indonesia User ──→ Local Provider Adapter ────┤
+                                                  ↓
+                                      Verified Commerce Events
+                                                  ↓
+                                           Billing State
+                                                  ↓
+                                        Entitlement Engine
+                                                  ↓
+                                      Backtest Lab Capabilities
+
+The product must never ask a payment provider directly whether a research feature is authorized. Providers report commerce facts; Backtest Lab's internal entitlement layer decides product access.
+
+### International-Scale Requirements
+
+Before public paid launch, validate:
+- merchant/company eligibility in the operating jurisdiction;
+- supported customer countries and currencies;
+- settlement currencies and payout mechanics;
+- recurring subscription support;
+- refunds, disputes and chargebacks;
+- tax/VAT/GST responsibilities and Merchant-of-Record implications;
+- invoice/receipt requirements;
+- webhook authenticity and idempotency;
+- subscription lifecycle semantics;
+- payment failure/grace/downgrade behavior;
+- reconciliation and audit trail;
+- provider fees and FX costs;
+- data-processing/privacy terms;
+- prohibited/restricted business categories relevant to the actual Backtest Lab product and marketing claims.
+
+### Provider Migration Contract
+
+Internal billing records should preserve provider-neutral identifiers and state so that:
+
+    Paddle → another provider
+
+or
+
+    Xendit → another local provider
+
+does not require rewriting research engines, Experiment Passports, user workspaces or historical research evidence.
+
+Provider-specific customer, subscription and transaction IDs should remain integration references rather than canonical product identity.
+
+### Launch Principle
+
+Start with the smallest provider set that serves the actual launch market. Do not implement multiple gateways merely for theoretical scale.
+
+**Global-ready architecture does not mean global infrastructure on day one.**
