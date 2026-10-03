@@ -1,4 +1,5 @@
-import { projectTimestamp } from '../timeCoordinates.js';
+import { projectGeometry } from '../projectGeometry.js';
+import { RECTANGLE, HORIZONTAL_LINE, VERTICAL_LINE } from '../DrawingTypes.js';
 
 // Original application implementation of the official 5.2.1 ISeriesPrimitive
 // lifecycle/view/renderer interfaces; references are recorded in the Phase 5 report.
@@ -6,7 +7,7 @@ class TrendLinePaneRenderer {
   constructor(view) { this.view = view; }
   draw(target) {
     const { projected, source } = this.view;
-    if (!source.model.visible || projected.length !== 2 || projected.some(p => p == null)) return;
+    if (!source.model.visible || projected.length < 2 || projected.some(p => p == null)) return;
     target.useMediaCoordinateSpace(({ context }) => {
       context.save();
       try {
@@ -16,12 +17,18 @@ class TrendLinePaneRenderer {
         context.setLineDash(source.draft ? [5, 4] : []);
         context.beginPath();
         context.moveTo(projected[0].x, projected[0].y);
-        context.lineTo(projected[1].x, projected[1].y);
+        if (source.model.type === RECTANGLE) {
+          context.lineTo(projected[2].x, projected[2].y);
+          context.lineTo(projected[1].x, projected[1].y);
+          context.lineTo(projected[3].x, projected[3].y);
+          context.closePath();
+        } else context.lineTo(projected[1].x, projected[1].y);
         context.stroke();
         if (source.selected && !source.draft) {
           context.setLineDash([]); context.lineWidth = 1.5;
           context.fillStyle = '#10141b';
-          for (const point of projected) {
+          const handles = [HORIZONTAL_LINE, VERTICAL_LINE].includes(source.model.type) ? [] : projected;
+          for (const point of handles) {
             context.beginPath(); context.arc(point.x, point.y, 5, 0, Math.PI * 2);
             context.fill(); context.stroke();
           }
@@ -38,11 +45,7 @@ class TrendLinePaneView {
   renderer() { return this.paneRenderer; }
   update() {
     const { chart, series, model, bars } = this.source;
-    this.projected = !chart || !series ? [] : model.points.map(point => {
-      const x = projectTimestamp(chart.timeScale(), bars, point.time);
-      const y = series.priceToCoordinate(point.price);
-      return x == null || y == null || !Number.isFinite(x + y) ? null : { x, y };
-    });
+    this.projected = projectGeometry(model, chart, series, bars);
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DrawingManager } from './DrawingManager.js';
 import { TrendLineCreation } from './TrendLineCreation.js';
-import { TREND_LINE } from './DrawingTypes.js';
+import { CORE_DRAWINGS } from './DrawingTypes.js';
 import { DrawingInteractionController } from './interaction/DrawingInteractionController.js';
 import { DrawingHistory } from './DrawingHistory.js';
 import { DrawingPersistence } from './DrawingPersistence.js';
@@ -24,7 +24,7 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
     return manager.subscribeCommitted((before, after) => persistence.save(after));
   }, [manager, history, workspace]);
   useEffect(() => {
-    if (!['none', 'cursor-dot', 'cursor-arrow'].includes(mode)) manager.setHistoryFocus(mode === TREND_LINE ? 'drawing' : 'trading');
+    if (!['none', 'cursor-dot', 'cursor-arrow'].includes(mode)) manager.setHistoryFocus(CORE_DRAWINGS[mode] ? 'drawing' : 'trading');
     if (!chart || !series || !container.current || !['none', 'cursor-dot', 'cursor-arrow'].includes(mode)) { manager.select(null); return; }
     return new DrawingInteractionController(manager, chart, series, history).bind(container.current);
   }, [manager, history, chart, series, mode, container, timeframe]);
@@ -38,8 +38,8 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
     if (creationRef.current) creationRef.current.bars = candles;
   }, [manager, candles]);
   useEffect(() => {
-    if (!chart || !series || mode !== TREND_LINE) return;
-    const creation = new TrendLineCreation(manager, chart, series, manager.bars, timeframe, () => onModeChange('none'));
+    if (!chart || !series || !CORE_DRAWINGS[mode]) return;
+    const creation = new TrendLineCreation(manager, chart, series, manager.bars, timeframe, () => onModeChange('none'), mode);
     creationRef.current = creation;
     const keydown = event => {
       if (event.key === 'Escape') { creation.cancel(); onModeChange('none'); }

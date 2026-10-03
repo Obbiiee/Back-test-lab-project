@@ -1,3 +1,4 @@
+import { HORIZONTAL_LINE, VERTICAL_LINE } from '../DrawingTypes.js';
 import { hitDrawing, HIT } from './hitTesting.js';
 import { continuousPointFromPointer } from '../timeCoordinates.js';
 
@@ -13,7 +14,7 @@ export class DrawingInteractionController {
     this.manager.select(hit.id);
     const model = this.manager.get(hit.id), start = this.point(pointer);
     if (!model || model.locked || !start) return false;
-    this.drag = { id: model.id, type: hit.type, original: model.points, start };
+    this.drag = { id: model.id, type: hit.type, drawingType: model.type, original: model.points, start };
     return true;
   }
   move(pointer) {
@@ -21,6 +22,10 @@ export class DrawingInteractionController {
     if (!drag || !point) return;
     if (point.time === drag.start.time && point.price === drag.start.price) { this.manager.update(drag.id, drag.original, false); return; }
     const points = drag.original.map((anchor, index) => {
+      if (drag.drawingType === HORIZONTAL_LINE) return { time: anchor.time, price: anchor.price + (point.price - drag.start.price) };
+      if (drag.drawingType === VERTICAL_LINE) return { time: anchor.time + (point.time - drag.start.time), price: anchor.price };
+      if (drag.type === HIT.C) return index === 0 ? { ...anchor, price: point.price } : { ...anchor, time: point.time };
+      if (drag.type === HIT.D) return index === 0 ? { ...anchor, time: point.time } : { ...anchor, price: point.price };
       if (drag.type === HIT.BODY) return { time: anchor.time + (point.time - drag.start.time), price: anchor.price + (point.price - drag.start.price) };
       return index === (drag.type === HIT.A ? 0 : 1) ? point : anchor;
     });

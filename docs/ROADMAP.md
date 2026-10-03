@@ -20,7 +20,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 7 | Canonical persistence/history/lock/visibility | Recorded in completed history |
 | 7.5 | Repository cleanup/source-of-truth hardening | Recorded in completed history |
 | 7.6 | Extend existing project-control authorities | Operational pointer determines checkpoint status |
-| 8 | CORE DRAWING TOOLS | PLANNED; separate human authorization required |
+| 8 | CORE DRAWING TOOLS | Recorded in completed history |
 | 9 | ADVANCED DRAWING TOOLS | PLANNED; separate human authorization required |
 | 10 | INDICATOR ENGINE FOUNDATION | PLANNED; separate human authorization required |
 | 11 | OVERLAY INDICATORS | PLANNED; separate human authorization required |
@@ -108,7 +108,7 @@ These are planned release gates, not claims of released capability. Detailed acc
 
 Phases 1–7.6 retain their existing repository-supported descriptions above.
 
-### Phase 8 — CORE DRAWING TOOLS (PLANNED)
+### Phase 8 — CORE DRAWING TOOLS
 
 Planned scope:
 
@@ -118,7 +118,7 @@ Planned scope:
 
 - Rectangle
 
-These should eventually use the existing:
+These use the existing:
 DrawingManager
 DrawingRegistry
 model
@@ -126,7 +126,7 @@ primitive
 interaction
 persistence/history architecture.
 
-This planning entry does NOT authorize implementation.
+Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry does not authorize additional implementation.
 
 ### Phase 9 — ADVANCED DRAWING TOOLS (PLANNED)
 

@@ -23,11 +23,14 @@
     "frontend/src/drawings/interaction/DrawingInteractionController.js",
     "frontend/src/drawings/DrawingHistory.js",
     "frontend/src/drawings/DrawingPersistence.js",
-    "frontend/src/drawings/DrawingControls.jsx"
+    "frontend/src/drawings/DrawingControls.jsx",
+    "frontend/src/drawings/models/CoreDrawing.js",
+    "frontend/src/drawings/projectGeometry.js"
   ],
   "tests": [
     "frontend/tests/phase6.test.mjs",
-    "frontend/tests/phase7.test.mjs"
+    "frontend/tests/phase7.test.mjs",
+    "frontend/tests/phase8.test.mjs"
   ],
   "supporting": [
     "frontend/package.json",

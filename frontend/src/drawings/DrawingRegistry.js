@@ -1,4 +1,5 @@
-import { TREND_LINE } from './DrawingTypes.js';
+import { TREND_LINE, HORIZONTAL_LINE, VERTICAL_LINE, RECTANGLE } from './DrawingTypes.js';
+import { CoreDrawing } from './models/CoreDrawing.js';
 import { TrendLine } from './models/TrendLine.js';
 import { TrendLinePrimitive } from './primitives/TrendLinePrimitive.js';
 
@@ -16,5 +17,8 @@ export class DrawingRegistry {
   }
 }
 export function createDrawingRegistry() {
-  return new DrawingRegistry().register(TREND_LINE, { model: TrendLine, primitive: (model, bars, draft) => new TrendLinePrimitive(model, bars, draft) });
+  const primitive = (model, bars, draft) => new TrendLinePrimitive(model, bars, draft);
+  const registry = new DrawingRegistry().register(TREND_LINE, { model: TrendLine, primitive });
+  for (const type of [HORIZONTAL_LINE, VERTICAL_LINE, RECTANGLE]) registry.register(type, { model: input => CoreDrawing(type, input), primitive });
+  return registry;
 }
