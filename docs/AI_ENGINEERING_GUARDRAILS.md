@@ -16,6 +16,19 @@ AI-generated code is production code once accepted. It receives no reduced stand
 
 ---
 
+## Quality Priority Model
+
+Backtest Lab treats **Security and Correctness as hard constraints**, not optimizations.
+
+After those constraints are satisfied, optimize in this order:
+
+1. **Lightweight** — avoid unnecessary work, dependencies, rendering, transfer and infrastructure.
+2. **Efficient** — bound CPU, memory, queries, rendering and I/O.
+3. **Measured** — profile/benchmark before claiming optimization or scale.
+4. **Scalable** — preserve separable boundaries and upgrade paths without prematurely deploying distributed complexity.
+
+A faster implementation that weakens authorization, no-look-ahead, determinism or research accuracy is not an optimization.
+
 ## 1. Architecture Boundaries & Domain Isolation
 
 Backtest Lab follows a **Modular Monolith first** strategy unless measured evidence justifies extraction.
@@ -75,6 +88,12 @@ Implementation MUST preserve:
 
 Never silently change a formula, execution assumption, seed behavior, dataset interpretation, or research definition.
 
+Canonical research flow should preserve the boundary **Replay/Execution → canonical Event/Trade Log → Research Compute**. Heavy analytics must not be embedded into the latency-sensitive candle/replay loop merely for convenience.
+
+Experiment identity/provenance should evolve to include content hashes for canonical dataset/strategy/protocol definitions where applicable, engine/calculator/execution semantic versions, RNG algorithm/seed, and trial/strategy lineage. Platform/hardware identity is not required by default; define deterministic numeric semantics and record environment details only when they materially affect reproducibility.
+
+Prior exploratory trials should not silently disappear from research provenance. An append-only trial lineage may support later hypothesis-family and multiple-testing analysis, but trial count alone MUST NOT trigger a statistically inappropriate correction method.
+
 Changes affecting research outputs require tests and explicit version/migration consideration.
 
 ## 4. No-Look-Ahead Contract
@@ -89,6 +108,8 @@ Forbidden examples:
 - leaking future news/outcome labels into trading decisions.
 
 Every new market/replay feature that can affect temporal information MUST include anti-look-ahead tests.
+
+Prefer structural prevention over programmer discipline: temporal domain consumers should receive a time-bounded view when practical rather than unrestricted future data plus an index. Where applicable, add a **truncation-invariance** test: output/state at simulated time `t` must remain identical when observations after `t` are removed.
 
 ## 5. Database & Query Engineering
 
@@ -142,6 +163,8 @@ Heavy jobs MUST have appropriate:
 - protection against runaway loops and unbounded allocations.
 
 Do not introduce a queue before there is a workload requiring one, but do not couple heavy compute so tightly to HTTP that later separation requires rewriting the research engine.
+
+Likewise, do not introduce custom canvas virtualization, binary protocols, client caches, Redis or other performance machinery merely from intuition. First measure the relevant frame/render cost, payload/bandwidth, CPU/memory, query latency or job duration and optimize the demonstrated bottleneck.
 
 ## 7. Error Handling
 
