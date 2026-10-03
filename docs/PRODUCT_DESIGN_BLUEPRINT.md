@@ -31,12 +31,89 @@ IDEA → TEST → VALIDATE → DESTROY → SIZE → REPLICATE → FORWARD/LIVE �
 ## Main Surfaces
 
 1. **Chart Workspace** — chart, replay, drawings, indicators, trading, news, journal, Analysis.
-2. **Lab Protocol** — hypothesis, rules, RR/risk, inclusion/exclusion, planned N/stopping rule, regime and execution assumptions.
+2. **Lab Protocol** — hypothesis, Strategy Rules (the single canonical Inclusion/Exclusion rule set), RR/risk, planned N/stopping rule, optional execution checklist, blind settings, and execution assumptions.
 3. **Research Results Workspace** — post-experiment evidence dashboard.
 4. **Research Labs** — Statistical Evidence, RR Lab, Monte Carlo, Survival, Strategy Destruction, Regime, Robustness, OOS/Walk Forward, Research Integrity, Portfolio, Behavioral Audit.
 5. **Experiment Passport** — reproducibility/provenance.
 6. **AI Research Assistant** — grounded in verified experiment results.
 7. **Dashboard/Workspace** — cloud management of strategies, experiments, sessions and reports.
+
+## Lab Protocol v1 — Controlled Experiment Contract
+
+Lab Protocol is available as a research mode rather than a premium-only methodology. It should preserve chart usability while preventing silent post-result rule changes.
+
+### Protocol Setup
+
+Before the experiment is committed, define:
+- hypothesis / research question;
+- **Strategy Rules = Inclusion / Exclusion Rules** — one canonical rule set, not separate duplicated concepts;
+- entry definition;
+- exit model;
+- risk;
+- planned sample / stopping rule;
+- optional execution checklist;
+- blind/randomization settings where used;
+- execution assumptions.
+
+### Strategy Rules & Execution Checklist
+
+Strategy Rules contain the conditions that qualify or disqualify an opportunity. If **Execution Checklist = ON**, these same Strategy Rules are surfaced before execution; the user must not maintain a second duplicate checklist definition.
+
+Checklist behavior:
+- ON or OFF is chosen as part of the protocol;
+- if ON, at least one rule must be marked **Required**;
+- rules may be Required or Optional/Observation where appropriate;
+- if OFF, protocol recording, Experiment Passport and no-look-ahead remain active;
+- checklist state is recorded in the protocol.
+
+### Workspace Freedom, Temporal Strictness
+
+**Lock the hypothesis, not the workspace.**
+
+A primary/decision timeframe does not lock the chart to that timeframe. During an experiment the user may switch among available timeframes, zoom, inspect prior candles, use drawings and perform multi-timeframe analysis.
+
+All views share one canonical replay time. Switching timeframe must never expose future information. An unfinished higher-timeframe candle may expose only information actually available at replay time, never its future final OHLC.
+
+### Exit Contract
+
+For a **Fixed-RR Protocol**:
+- RR is committed before the experiment and remains constant for every qualifying trade;
+- SL distance may vary according to the committed strategy/entry logic, and TP is derived from the fixed RR;
+- after entry, the trade resolves through the committed SL/TP execution model;
+- no discretionary early close;
+- no discretionary partial close;
+- no moving SL or TP;
+- no mid-experiment RR change.
+
+If the strategy genuinely uses a variable or structural exit, it must use a **Rule-Based Exit Protocol** whose exit rule is committed before the experiment. Planned behavior such as a predefined partial exit may therefore be researched, but spontaneous intervention after observing a live trade is not part of a Fixed-RR experiment.
+
+A desired change such as RR 1:1.25 → 1:2, excluding a newly noticed condition, or introducing early-close logic creates a new Strategy/Protocol version and a new experiment rather than rewriting the committed experiment.
+
+### Experiment Lifecycle
+
+Conceptual lifecycle:
+
+```text
+DEFINE
+  ↓
+COMMIT
+  ↓
+BLIND / REPLAY
+  ↓
+EXECUTE
+  ↓
+RECORD
+  ↓
+ANALYZE
+  ↓
+REPLICATE
+```
+
+Commit creates/version-locks the Experiment Passport. The running experiment should remain relatively quiet about interim performance so that temporary results do not unnecessarily influence execution.
+
+The central principle is:
+
+> **Lab Protocol does not remove the trader's freedom to read the market. It removes the freedom to silently change the experiment after learning from its results.**
 
 ## Research Results Workspace
 
