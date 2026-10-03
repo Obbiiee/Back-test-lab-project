@@ -1416,3 +1416,83 @@ Changing an imported indicator definition after an experiment must create a new 
 **Import at the boundary; normalize into canonical contracts; keep the research core provider-neutral.**
 
 This lets Backtest Lab start cheaply while preserving the ability to add better data feeds and a larger indicator ecosystem later.
+
+
+---
+
+# 37. Open-Source Dependency Adoption Plan
+
+> Status: planning direction only; no installation or implementation is authorized here.
+
+Backtest Lab should use open source for commodity infrastructure while keeping replay/execution semantics, Lab Protocol, Experiment Passport, research integrity, and evidence methodology product-owned.
+
+## Adoption rule
+
+Adopt a dependency only when there is a demonstrated need and the project has checked commercial licensing/attribution, maintenance, security, performance cost, architectural fit, and replacement boundaries. A planned candidate is not automatically an installed dependency.
+
+## Candidate map
+
+| Capability | Candidate | Planning status |
+|---|---|---|
+| Financial market chart | TradingView Lightweight Charts | Existing foundation |
+| Browser end-to-end QA | Playwright | Evaluate, likely useful for v1 hardening |
+| Backend API | FastAPI | Planned candidate for Phase 19 |
+| Relational product state | PostgreSQL | Planned candidate for Phase 20 |
+| Research visualization | Apache ECharts | Evaluate for advanced research UI |
+| Columnar/dataframe transforms | Polars | Evaluate when measured workload justifies |
+| Embedded analytical SQL and CSV/Parquet analysis | DuckDB | Evaluate when dataset/research workload justifies |
+| Scientific/statistical primitives | SciPy | Evaluate for advanced research engines |
+| Statistical inference/models | statsmodels | Evaluate for advanced research engines |
+| Object storage | S3-compatible boundary | Defer implementation/provider choice |
+| Background jobs | Lightweight worker/job abstraction | Defer library choice until heavy jobs exist |
+| Authentication | Mature OIDC/session solution | Defer exact choice to cloud auth phase |
+| Observability | OpenTelemetry-compatible instrumentation | Evaluate for production hardening |
+| Dependency/security checks | Ecosystem-native CI tooling | Evaluate before public production |
+
+## Visualization boundary
+
+Keep Lightweight Charts for market/replay. Evaluate ECharts for research-specific views such as Monte Carlo distributions, drawdown/recovery distributions, regime heatmaps, parameter surfaces, robustness views, and portfolio/correlation visualizations.
+
+## Data and research compute boundary
+
+Potential future flow:
+
+```text
+Versioned Dataset / CSV / Parquet
+              ↓
+       DuckDB / Polars
+              ↓
+Deterministic Backtest Lab Research Logic
+              ↓
+     SciPy / statsmodels primitives
+              ↓
+ Canonical Research Result + Provenance
+              ↓
+       ECharts / Reports
+```
+
+DuckDB/Polars are analytical candidates, not replacements for PostgreSQL application state.
+
+Libraries may provide primitives and execution machinery, but Backtest Lab remains authoritative for Lab Protocol, Experiment Passport, no-look-ahead, execution assumptions, canonical Event/Trade Log, hypothesis-family definition, multiple-testing policy, Monte Carlo experiment definition, survival/risk-sizing, Strategy Destruction, and evidence interpretation.
+
+## QA priority
+
+Playwright is a strong E2E candidate for replay/navigation, drawings/indicators, order lifecycle, Fixed-RR restrictions, checklist ON/OFF, timeframe switching without temporal leakage, reset/recovery, entitlements, and Free affiliate versus paid ad-free UI.
+
+E2E tests complement deterministic unit/domain tests; they do not replace them.
+
+## Infrastructure restraint
+
+Do not introduce ClickHouse, Redis, Kafka/RabbitMQ, Kubernetes, vector databases, microservices, arbitrary user-code execution, or a custom chart renderer by default. Adopt heavier infrastructure only after a measured workload or concrete requirement proves the simpler architecture insufficient.
+
+## Dependency gate
+
+Before adoption, verify the exact package and license, attribution/NOTICE obligations, current maintenance, security posture, version-lock strategy, material transitive dependencies, and the replacement boundary for critical components.
+
+## Rollout principle
+
+**Do not install an OSS dependency because it appears on this plan. Install it at the phase where it eliminates a real problem.**
+
+Quality order remains:
+
+**Security + Correctness → Lightweight → Efficient → Measured → Scalable.**
