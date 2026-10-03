@@ -28,7 +28,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 13 | REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS | Recorded in completed history |
 | 14 | TRADING UX & BACKTEST ANALYSIS | Recorded in completed history |
 | 14.5 | ECONOMIC NEWS BACKTESTING ENGINE | PLANNED; separate human authorization required |
-| 15 | FINAL FIGMA / UI-UX IMPLEMENTATION | PLANNED; separate human authorization required |
+| 15 | FINAL FIGMA / UI-UX IMPLEMENTATION | PLANNED; intentionally deferred by human; revisit later |
 | 16 | FULL QA, PERFORMANCE & HARDENING | PLANNED; separate human authorization required |
 | 17 | v1 RELEASE CANDIDATE | PLANNED; separate human authorization required |
 | 18 | v1.0 STABLE LOCAL RELEASE | PLANNED; separate human authorization required |
@@ -89,6 +89,10 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 73 | LIVE FORWARD TESTING | PLANNED; separate human authorization required |
 | 74 | PRODUCTION RELIABILITY & RISK INFRASTRUCTURE | PLANNED; separate human authorization required |
 | 75 | ALGORITHMIC-TRADING READINESS VALIDATION | PLANNED; separate human authorization required |
+
+## Human execution-order decision
+
+Human-directed sequence: Phase 14 → Phase 14.5 → Phase 16 planning/implementation under separate authorization → Phase 15 revisited later → final regression/hardening after eventual Phase 15 implementation → Phase 17 Release Candidate → Phase 18 v1.0. This changes execution order only; preserve phase numbering and historical records. Phase 15 remains planned, not completed. Phase 16 is not authorized by Phase 14.5 planning. Phase 17/18 remain blocked until news implementation/validation, deferred UI work and final release prerequisites are satisfied. Operational authorization belongs only to [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md).
 
 ## Planned version release gates
 
