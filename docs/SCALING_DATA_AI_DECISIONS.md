@@ -511,3 +511,67 @@ Provider-specific customer, subscription and transaction IDs should remain integ
 Start with the smallest provider set that serves the actual launch market. Do not implement multiple gateways merely for theoretical scale.
 
 **Global-ready architecture does not mean global infrastructure on day one.**
+
+
+## 19. Early Affiliate Placement & Ad-Free Entitlement
+
+> **Status:** Monetization planning direction, not implementation authorization.
+
+For the initial monetization stage, Backtest Lab may use a small first-party affiliate/sponsor placement for Free users instead of depending on a generic ad network.
+
+### UX Principle
+
+The trading/replay workspace is the product. Monetization must not obstruct it.
+
+Candidate presentation:
+- a compact native affiliate card/banner with an image and optional short copy;
+- visible in a reserved, non-critical area of the Free workspace;
+- no overlay on candles, drawings, order controls, replay controls, research results, or critical navigation;
+- no pop-up/interstitial behavior during trading/replay;
+- responsive placement must preserve usable chart space;
+- clearly distinguish affiliate/sponsored content from product controls and research evidence.
+
+### Entitlement Behavior
+
+Conceptually:
+
+```text
+Free entitlement
+      ↓
+Affiliate placement may render
+
+Paid / ad-free entitlement
+      ↓
+Affiliate placement does not render
+```
+
+The decision must come from Backtest Lab's internal entitlement layer rather than being hard-coded to a payment provider.
+
+### Affiliate Link Model
+
+Affiliate destinations should be managed as configuration/content rather than embedded throughout chart code. This permits partner/link/image/campaign changes without modifying the replay or research engine.
+
+Track only the minimum analytics needed to evaluate placement performance, subject to the product's privacy/consent requirements.
+
+### Research Independence
+
+Commercial relationships must not alter:
+- research calculations;
+- backtest results;
+- provider/broker comparisons;
+- rankings or evidence presentation;
+- Experiment Passport;
+- research conclusions.
+
+Affiliate/sponsored relationships should be disclosed clearly where applicable.
+
+### Initial Commercial Strategy
+
+At early scale, prioritize relevant direct affiliate/sponsor placements over building a complex advertising system. Generic ad-network inventory can be evaluated later from measured traffic and economics.
+
+The intended exchange is simple:
+
+**Free = core product access + unobtrusive affiliate/sponsor placement.**  
+**Paid = deeper paid capabilities + ad-free workspace.**
+
+Exact partner categories, creative dimensions, placement location, frequency, pricing and affiliate agreements remain future product/business decisions.
