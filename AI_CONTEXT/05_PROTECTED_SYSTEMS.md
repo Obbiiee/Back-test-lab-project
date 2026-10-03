@@ -14,6 +14,8 @@ Change these only when the authorized task explicitly requires it, with relevant
 
 This is not blanket protection of the entire repository. Narrow infrastructure/context work is permitted within its own scope.
 
+- Indicator foundation: `frontend/src/indicators/`. Calculators receive only chart-visible candle copies, never raw future data or domain stores; preserve config validation, output timestamp validation, error isolation and owned-series cleanup. Legacy indicator runtime remains retired. Native Volume stays separate. Reference indicator is test-only; production catalog/panes require separate authorization.
+
 - New drawing persistence/history: `DrawingPersistence.js`, `DrawingHistory.js`; `backtest-drawing-manager-v1:*`. Preserve schema, canonical fields, commit boundaries and trading isolation. History resets on reload; no cross-tab merge/backend sync.
 
 - Source-of-truth hygiene: `frontend/src/main.jsx` is the single entrypoint. Preserve intentional compatibility exports and test-dependent archives/storage fixtures. Do not reintroduce duplicate runtime trees or remove files based only on absence from the production graph. `test:repository` checks these boundaries; update its allowlist only with documented evidence.

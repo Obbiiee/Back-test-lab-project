@@ -11,10 +11,17 @@ import { logicalAtTime, timeAtLogical } from "../chart/coordinates";
 import useDrawingTools from "../drawings/useDrawingTools";
 import { DRAWING_SPECS } from "../drawings/DrawingTypes";
 import DrawingControls from "../drawings/DrawingControls";
+import { IndicatorEngine } from "../indicators/IndicatorEngine";
 
 const EMPTY_TRADES = [];
+const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange }) {
+function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError }) {
+  const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
+  useEffect(() => {
+    try { indicatorEngine.replaceInstances(indicatorInstances); }
+    catch (error) { onIndicatorError?.(error); }
+  }, [indicatorEngine, indicatorInstances, onIndicatorError]);
   const chartContainer = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
@@ -121,6 +128,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     seriesRef.current = series;
     volumeSeriesRef.current = volumeSeries;
     markersRef.current = markers;
+    indicatorEngine.attach(chart);
     const overlayFrame = window.requestAnimationFrame(() => {
       setChartForOverlay(chart);
       setSeriesForOverlay(series);
@@ -136,6 +144,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     return () => {
       resizeObserver.disconnect();
       window.cancelAnimationFrame(overlayFrame);
+      indicatorEngine.detach();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -143,7 +152,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
       markersRef.current = null;
       priceLinesRef.current = [];
     };
-  }, []);
+  }, [indicatorEngine]);
 
   const commitDrawings = useCallback((nextValue) => {
     const next = typeof nextValue === "function" ? nextValue(objectBridge.objects) : nextValue;
@@ -392,6 +401,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     const wasFollowingLatest = visibleRange == null || visibleRange.to >= previousCount - 1.5;
 
     series.setData(candles);
+    indicatorEngine.setCandles(candles);
     volumeSeriesRef.current?.setData(candles.map((candle) => ({
       time: candle.time,
       value: Number(candle.volume ?? 0),
@@ -415,7 +425,7 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     viewportSessionRef.current = viewportKey;
     previousCandleCountRef.current = candles.length;
     previousFirstCandleRef.current = candles[0]?.time ?? null;
-  }, [candles, viewportKey]);
+  }, [candles, viewportKey, indicatorEngine]);
 
   useEffect(() => {
     const scale=chartRef.current?.timeScale();

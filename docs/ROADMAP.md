@@ -22,7 +22,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 7.6 | Extend existing project-control authorities | Operational pointer determines checkpoint status |
 | 8 | CORE DRAWING TOOLS | Recorded in completed history |
 | 9 | ADVANCED DRAWING TOOLS | Recorded in completed history |
-| 10 | INDICATOR ENGINE FOUNDATION | PLANNED; separate human authorization required |
+| 10 | INDICATOR ENGINE FOUNDATION | Recorded in completed history |
 | 11 | OVERLAY INDICATORS | PLANNED; separate human authorization required |
 | 12 | INDICATOR PANES | PLANNED; separate human authorization required |
 | 13 | REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS | PLANNED; separate human authorization required |
@@ -132,13 +132,9 @@ Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md)
 
 Scoped tools: Fibonacci Retracement, Arrow, Text and Measure, through the existing drawing architecture. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This entry does not authorize additional drawing tools or future implementation.
 
-### Phase 10 — INDICATOR ENGINE FOUNDATION (PLANNED)
+### Phase 10 — INDICATOR ENGINE FOUNDATION
 
-Planned scope:
-Create the reusable indicator architecture required for later overlay
-and pane indicators.
-
-Do not specify implementation details that have not yet been authorized.
+Scoped foundation: revealed candles → validated pure calculation → normalized TIME + VALUE output → official Lightweight Charts series adapter. Registry/instance/parameters, warmup/error isolation, replay-safe synchronization and minimal React/chart lifecycle are implemented. Production registry is empty; the reference close-line is test-only. Native Volume remains separate and legacy runtime retired. Completed evidence belongs to [phase history](../AI_CONTEXT/03_PHASE_HISTORY.md). This does not authorize Phase 11/12 indicators or panes.
 
 ### Phase 11 — OVERLAY INDICATORS (PLANNED)
 
