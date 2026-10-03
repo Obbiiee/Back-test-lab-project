@@ -31,7 +31,7 @@ export function projectTimestamp(scale, bars, time) {
 }
 
 export function pointFromPointer(chart, series, param, bars) {
-  if (!param.point) return null;
+  if (!param.point || (param.paneIndex !== undefined && param.paneIndex !== 0)) return null;
   const scale = chart.timeScale();
   let time = param.time ?? scale.coordinateToTime(param.point.x);
   if (time == null && bars.length > 1) {

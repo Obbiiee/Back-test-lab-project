@@ -366,7 +366,8 @@ function CandleChart({ candles, sessionId, viewportKey = sessionId, onLoadOlder,
     chart.applyOptions({ handleScroll: { pressedMouseMove: !placing, horzTouchDrag: !placing, vertTouchDrag: !placing }, handleScale: { mouseWheel: true } });
     chart.applyOptions({ crosshair: { vertLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" }, horzLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" } } });
     function pointFor(param) {
-      if (!param.point) return null;
+      if (!param.point || (param.paneIndex !== undefined && param.paneIndex !== 0)
+        || param.point.y < 0 || param.point.y > chart.paneSize(0).height) return null;
       const logical = chart.timeScale().coordinateToLogical(param.point.x);
       const time = param.time ?? timeAtLogical(candles, logical);
       let price = series.coordinateToPrice(param.point.y);

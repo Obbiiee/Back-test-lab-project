@@ -28,6 +28,7 @@ function ChartObjectOverlay({ chart, series, candles = [], drawings, selectedId,
   function coordinates(event) {
     const bounds = svgRef.current.getBoundingClientRect();
     const x = event.clientX - bounds.left, y = event.clientY - bounds.top;
+    if (!chart || y < 0 || y > chart.paneSize(0).height) return null;
     const logical = chart?.timeScale().coordinateToLogical(x);
     const time = timeAtLogical(candles, logical);
     let price = series?.coordinateToPrice(y);
@@ -99,6 +100,7 @@ function ChartObjectOverlay({ chart, series, candles = [], drawings, selectedId,
     </g>;
   }
   return <svg ref={svgRef} className={"drawings-layer " + layerClass + " " + (!neutral ? "tool-active " : "") + (placing ? "placement-active " : "")}
+    style={{ height: chart?.paneSize(0).height, overflow: 'hidden' }}
     onClick={event => { if (placing) { const point = coordinates(event); if (point) { event.stopPropagation(); onPlacePoint?.({ point: { x: point.x, y: point.y }, time: point.time }); } } }}
     onPointerMove={movePointer} onPointerUp={stopPointer} onPointerCancel={stopPointer} onLostPointerCapture={() => { if (dragging.current) { dragging.current = null; onEndDrag?.(); } }} aria-label={layerName}>
     {drawings.map(renderDrawing)}

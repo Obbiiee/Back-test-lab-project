@@ -12,6 +12,7 @@ export function instanceConfig(registry, value) {
       || !rule.validate(parameter)) throw Error('Invalid parameter: ' + key);
     parameters[key] = parameter;
   }
+  if (spec.validateParameters && !spec.validateParameters(parameters)) throw Error('Invalid parameter combination');
   return Object.freeze({ id: value.id, type: value.type, parameters: Object.freeze(parameters), visible: value.visible ?? true });
 }
 

@@ -7,6 +7,15 @@ export class IndicatorRegistry {
       || !Number.isInteger(spec.warmup) || spec.warmup < 0 || !spec.parameters
       || Object.getPrototypeOf(spec.parameters) !== Object.prototype) throw Error('Invalid indicator spec');
     if (this.#specs.has(spec.type)) throw Error('Duplicate indicator type');
+    const placement = spec.placement ?? 'price';
+    if (!['price', 'pane'].includes(placement)
+      || (spec.validateParameters !== undefined && typeof spec.validateParameters !== 'function')) throw Error('Invalid placement/parameter contract');
+    const references = spec.references ?? [];
+    if (!Array.isArray(references) || references.some(price => !Number.isFinite(price))
+      || new Set(references).size !== references.length || (references.length && placement !== 'pane')) throw Error('Invalid reference lines');
+    const range = spec.range;
+    if (range !== undefined && (placement !== 'pane' || !Array.isArray(range) || range.length !== 2
+      || !range.every(Number.isFinite) || range[0] >= range[1])) throw Error('Invalid pane range');
     if (spec.outputs !== undefined && spec.output !== undefined) throw Error('Ambiguous outputs');
     const outputs = spec.outputs ?? [{ key: 'value', outputType: spec.output, options: spec.options }];
     if (!Array.isArray(outputs) || !outputs.length || new Set(outputs.map(item => item?.key)).size !== outputs.length) throw Error('Invalid outputs');
@@ -25,7 +34,8 @@ export class IndicatorRegistry {
         || (typeof rule.default === 'number' && !Number.isFinite(rule.default))) throw Error('Invalid parameter rule');
       parameters[key] = Object.freeze({ ...rule });
     }
-    this.#specs.set(spec.type, Object.freeze({ ...spec, outputs: Object.freeze(frozenOutputs), parameters: Object.freeze(parameters) }));
+    this.#specs.set(spec.type, Object.freeze({ ...spec, placement, references: Object.freeze([...references]),
+      ...(range ? { range: Object.freeze([...range]) } : {}), outputs: Object.freeze(frozenOutputs), parameters: Object.freeze(parameters) }));
     return this;
   }
   get(type) { const spec = this.#specs.get(type); if (!spec) throw Error('Unknown indicator type'); return spec; }

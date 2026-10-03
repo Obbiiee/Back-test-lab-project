@@ -76,7 +76,9 @@ export class DrawingInteractionController {
     const move = event => {
       if (this.drag) { event.preventDefault(); event.stopPropagation(); this.move(pointer(event)); return; }
       if (trading(event) || !element.contains(event.target)) { cursor(''); return; }
-      const hit = this.hit(pointer(event));
+      const point = pointer(event);
+      if (point.y < 0 || point.y > this.chart.paneSize(0).height) { cursor(''); return; }
+      const hit = this.hit(point);
       cursor(hit.type === HIT.NONE ? '' : this.manager.get(hit.id)?.locked ? 'pointer' : hit.type === HIT.BODY ? 'move' : 'crosshair');
     };
     const up = event => { if (this.drag) { event.stopPropagation(); restore(false); } };
