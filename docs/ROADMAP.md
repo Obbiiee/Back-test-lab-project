@@ -412,6 +412,14 @@ Exact labels/order remain subject to interactive UX validation.
 - Settings
 - Subscription / Billing
 
+**Session lifecycle / result-review flow**
+- Dashboard is a lightweight session launcher: **New Backtest** plus **Previous Sessions**; do not turn each session card into a full statistics dashboard.
+- Selecting a previous session opens a dedicated **Session Overview**.
+- Session Overview presents accumulated Basic Statistics, interactive Equity and Drawdown diagrams, P&L/R views where valid, period/month filters, trade-linked inspection where practical, completed monthly-segment progression and the primary **Continue Session** action.
+- **Continue Session** returns the user to Backtest Workspace and, for Free entitlement, may consume the next available daily monthly-segment allowance.
+- A Backtest Session persists across entitlement days and may accumulate sequential monthly tradable segments without rewriting prior evidence.
+- The dashboard, Session Overview and Backtest Workspace are distinct surfaces: select work → inspect evidence → continue execution.
+
 **Core application surfaces**
 - Backtest Workspace is the primary working surface and should host the chart plus contextual trading/replay tools.
 - Dashboard manages recent sessions, resumable work and relevant account/workspace summaries.
