@@ -55,6 +55,17 @@ This continuation:
 
 The next new Free tradable-window allowance becomes available according to the next daily entitlement period.
 
+## Free account/session capacity rules
+
+- The Free daily tradable allowance does **not** accumulate. If unused for a daily entitlement period, it expires rather than banking additional monthly segments.
+- A Free user may keep a maximum of **5 active/saved Sessions**.
+- At the five-Session limit, creating another active Session requires freeing a slot or upgrading to an applicable paid entitlement.
+- Deleting an active Session moves it to **Trash for 30 days** before permanent deletion. A trashed Session does not consume one of the five active/saved Free Session slots.
+- Free does not include Session reset/restart.
+- Session duplication is not part of the intended product workflow.
+- A Free user with an available daily allowance may apply it to continuing an eligible prior Session or to starting an eligible new Session.
+- If a Pro user later returns to Free, prior research/results remain reviewable; new research actions follow current Free entitlements rather than destroying historical evidence.
+
 ## Persistent Free backtest sessions
 
 A Backtest Session is a persistent research container, not a disposable one-month backtest.
