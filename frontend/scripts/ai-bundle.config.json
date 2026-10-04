@@ -94,6 +94,7 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "frontend/tests/phase18-9.test.mjs",
     "frontend/tests/phase18-8.test.mjs",
     "frontend/tests/phase18-6.test.mjs",
     "frontend/tests/phase6.test.mjs",

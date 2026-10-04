@@ -9,16 +9,16 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "18.8",
-  "CURRENT_IMPLEMENTATION_PHASE": "18.9",
-  "NEXT_PHASE": "18.9",
-  "NEXT_PHASE_STATUS": "AUTHORIZED_SEQUENTIAL",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "18.9",
+  "LAST_COMPLETED_PHASE": "18.9",
+  "CURRENT_IMPLEMENTATION_PHASE": null,
+  "NEXT_PHASE": "19",
+  "NEXT_PHASE_STATUS": "NOT_AUTHORIZED_PLANNING_ONLY_NEXT",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": ["18.7", "18.8", "18.9"],
   "EXECUTION_MODE": "HUMAN_AUTHORIZED_POST_V1_CLOSURE",
-  "TARGET_CHECKPOINT": "Separate 18.7, 18.8, 18.9 checkpoints; STOP before Phase 19",
+  "TARGET_CHECKPOINT": "18.7–18.9 validated; final checkpoint then STOP before Phase 19",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
 
-The human explicitly authorizes sequential 18.7 → 18.8 → 18.9 with separate validated commit/push/remote-equality gates. Phase 18.7 extends the existing [Method/Session specification](../docs/TRADING_METHOD_SESSION_SPEC.md) with workflow, units, validation, confirmation and evidence contracts. Phase 18.8 prototype is validated; continue to authorized 18.9 validation/freeze after normal remote verification. No Phase 19/backend/cloud/auth/database authorization. Preserve the sole workflow/roadmap and protected boundaries.
+The authorized sequential 18.7 → 18.8 → 18.9 journey is completed subject to final normal commit/push/equality verification. Phase 18 local v1 and 18.4–18.9 are complete; no active implementation remains. The existing [Method/Session owner](../docs/TRADING_METHOD_SESSION_SPEC.md) contains frozen Trading UX handoff v1, prototype evidence and future integration prerequisites. Phase 19 is NOT AUTHORIZED; a future human prompt may authorize planning only. No backend/cloud/auth/database or v2 implementation. Verify clean 0/0 and local/origin/actual GitHub equality, report, then STOP.

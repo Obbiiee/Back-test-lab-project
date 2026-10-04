@@ -298,3 +298,43 @@ Actual isolated browser origin 5200 inspected Free Style Quick Sell cancellation
 Deterministic `test:phase18.8` checks Method creation, risk-downward rounding, geometry/precision/size/identity/stale refusals, Free Style Quick/Planned and Long/Short, ON/OFF evidence, direct request bypass for Protocol Quick/Market/risk/RR/size, idempotency duplicate/conflict and lifecycle restrictions. Full registered v1 regression, lint/build/release/bundle remain separate required gates. Prototype acceptance does not claim production Method/Session enforcement, broker compatibility, real financial outcomes, device/assistive-tech certification or complete global UI redesign.
 
 Cold production build on isolated 5201 passed Quick confirmation/manual-close representation and Protocol ON refusal/all-PASS pending confirmation; console warnings/errors zero. After these prototype actions the seeded v1 account reloaded at 100012 USD with the same legacy exit, 12 USD realized P&L, two original data issues and no invented completed position. Ignored screenshot: frontend/tests/artifacts/phase18-8-production-prototype.png. Fresh full registered regression, lint, build and release/distribution passed. Repository/bundle refresh and complete diff review close the 18.8 checkpoint; no protected engine/data/dependency changes.
+
+### Frozen Trading UX Specification v1
+
+This existing document remains the single Method/Session and trading-workflow handoff owner. The human's explicit 18.7→18.8→18.9 authorization includes this validation/freeze; no automatic Phase 19 authorization follows. Older two-dimension Mode/Method-version and Protocol Quick/Market drafts remain historical under their existing supersession notices. Design tokens/layout guidance stay with Phase 18.6, workflow/DoD with AI_CONTEXT/06_WORKFLOW_RULES, volatile phase status with 04_CURRENT_PHASE and long-term plan with ROADMAP. No second specification/roadmap/control system.
+
+```json
+{
+  "CONTRACT": "TRADING_UX_HANDOFF",
+  "VERSION": 1,
+  "STATUS": "FROZEN",
+  "VALIDATED_IMPLEMENTATION": "UX_PROTOTYPE_ONLY",
+  "PRODUCTION_INTEGRATION": "REQUIRES_EXPLICIT_AUTHORIZATION",
+  "BREAKING_CHANGE": "HUMAN_APPROVED_CONTRACT_REVISION"
+}
+```
+
+Freeze covers terminology/hierarchy, inherited Method, Session identity/feed/continuation, draft/Position Tool boundary, instrument/risk units and explicit assumptions, ticket validation/refusal, immutable reviewed request/confirmation/dedup, Protocol restrictions/ON-OFF evidence, lifecycle/state model and protected execution/Journal/Analysis handoff defined above. Future breaking changes require explicit human approval and a recorded contract revision here; preserve old evidence and prior meaning. Technical provenance revisions do not introduce a user-facing Method version editor. A downstream implementation may refine adapters without silently redefining these contracts.
+
+| Acceptance contract | Evidence / disposition |
+| --- | --- |
+| Free Style Quick and Planned | Actual browser ticket/cancel/confirm, Long/Short chart planning, valid exit amendments/partial/manual scenarios; deterministic request/lifecycle tests |
+| Protocol Planned pending only | ON/OFF examples; Quick refusal; disabled Market/TP/risk controls plus independent bypass tests for Quick/Market/risk/RR/size |
+| Risk/RR locks | SL2327 derives TP2336 and lots3.3333 under sample RR2/risk1%; invalid precision/geometry and size bounds refuse |
+| ON/OFF checklist | ON missing/FAIL blocks; all PASS permits review. OFF FAIL/NOT_ASSESSED retained through review; no fabricated compliance |
+| Confirmation | Distinct ticket and explicit confirmation, no placement submission, immutable snapshot, stale/dedup conflict tests; amendment keeps original request identity/payload |
+| Refusals/cancellation | Quick and active Protocol close/amend/partial refused; pending cancellation retained; Escape/ticket/review cancellation submits nothing |
+| Method/Session/evidence | Custom minimum-one-condition Method, inherited sample Session, immutable request/condition observations, originating Method on lifecycle events; no durable production ownership claim |
+| Journal/Analysis | Existing seeded v1 account/legacy exit/12 USD realized P&L preserved; prototype timeline is not a financial journal or performance projection |
+| Design/layout | 18.6 typography/surfaces/focus, honest available tools, chart-first desktop, 24/144/expanded terminal, local narrow scrolling at 390/320 with no document overflow |
+| Protected contracts | Zero diff in simulator/useTrading, market/replay/datasets, canonical drawing/history/persistence, indicators/news, Analysis/account schema/backend/dependency lock; full registered regression and release audit |
+
+Usability observations: Quick uses side → ticket → review → confirmation (four actions; intended friction at execution, no instant trade). Planned adds placement/geometry/risk then the same review boundary. Protocol checklist adds actual observation interaction only when ON. Chart plus persistent planner avoids a ticket obstructing chart picking; review is modal because it submits a frozen snapshot. Primary targets use defined 32px desktop / 40px narrow controls; chooser exposes actual supported tools rather than unsupported catalog placeholders. Narrow is a desktop-workflow fallback with local scroll, not mobile parity. No user study, measured execution-speed superiority or assistive-tech certification is claimed.
+
+Known prototype deviations are bounded: synthetic data/zero-cost starting-balance basis and lot/tick constraints, memory-only Methods/Sessions/events/dedup/favorites, no actual simulator fill/P&L ledger, two-decimal legacy geometry price badges with precise three-decimal fields/native scale, no permanent Method archive/feed selector/segment continuation or real Journal/Analysis integration. No executable TRACK_VIOLATION rule is invented: current authority supplies categorical restrictions, not an otherwise-allowed observational-policy fixture. Refusals are retained, and future observational policies cannot authorize forbidden actions. These limitations do not weaken the frozen product constraints; they are prerequisites for separately authorized production integration.
+
+Phase 19 planning may consume this contract, the identity/evidence/validation boundaries and integration prerequisite list. It must not implement database/auth/cloud, enable real execution, reuse demo profiles as broker metadata, migrate storage or promote prototype event representations into canonical outcomes without separate implementation authorization. Any material conflict must be surfaced for human decision; preserve historical knowledge. Final regression/browser/console/checkpoint verification evidence follows below.
+
+Final 18.9 evidence: default cold v1 at isolated 5201 retained legacy balance100012/realized12/zero completed plus two data issues, opened strict News with coverage unknown, added SMA, stepped replay from12:00 to12:15, changed15m→1h, created canonical Trend Line and exercised Undo/Redo. Default terminal collapse still uses24px. Production prototype exercised Protocol Short Sell Stop explicit confirmation and active partial-close refusal; pan/zoom/terminal collapse preserved identical TIME + PRICE anchors. Fresh cold production console errors/warnings: zero in both paths. Final test:phase18.9 passed; full registered regression/lint/build/release, refreshed repository/bundle and clean normal checkpoint gates close acceptance. Ignored final capture: frontend/tests/artifacts/phase18-9-final-prototype.png.
+
+Checkpoint inventory across the authorized journey: existing AI_CONTEXT state/architecture/history/current-phase/test-command owners; docs/ROADMAP, DOCUMENT_MAP and this specification; frontend/package.json (test scripts only), scripts/ai-bundle.config.json, src/main.jsx and workspace/usePanelResize. Created only five tradingUx implementation files plus phase18-8/phase18-9 tests. Deleted none. No new documentation authority, dependencies/lock change, datasets, engine/calculator/schema/archive deletion or backend/cloud implementation. Starting baseline adf41168d94bd2046029e2a0004af99bb3cf57fa; 18.7 checkpoint55a2743933559fcb68ba9456b8db9f956d40e760; 18.8 checkpointc8fbe9a7e8af01988899748bbf42c7898b0901b9. Final SHA/equality belongs to the report after push, avoiding self-reference.

@@ -55,3 +55,5 @@ Local release distribution: run `npm run build` then `npm run audit:release`. Th
 `npm run test:phase18.6` protects terminal collapse/compact/expanded limits, narrow viewport budget, keyboard restore/Shift/toggle and design-token normal-text contrast. Actual browser resize/modal/chooser/responsive evidence: [Phase 18.6](../docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md).
 
 `npm run test:phase18.8` protects isolated prototype Method creation, risk/instrument constraints, Quick/Planned, checklist ON/OFF evidence, bypass/stale refusal, confirmation dedup and lifecycle restrictions. Open `/?trading-ux=prototype` on an isolated origin for browser QA; all sample state is memory-only. Contracts/evidence: [existing Method/Session owner](../docs/TRADING_METHOD_SESSION_SPEC.md).
+
+`npm run test:phase18.9` protects single frozen handoff ownership, prototype isolation/default v1, immutable Method/request observations, inherited Session, stale/bypass refusal and preservation of confirmed requests through exit amendment. It complements full regression and actual browser evidence, not a production integration certification.

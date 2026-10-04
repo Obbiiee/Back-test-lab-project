@@ -37,7 +37,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 18.6 | UI/UX AUDIT & DESIGN SYSTEM | Recorded in completed history |
 | 18.7 | TRADING WORKFLOW ARCHITECTURE & UX REDESIGN | Recorded in completed history |
 | 18.8 | INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN | Recorded in completed history |
-| 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | PLANNED; separate human authorization required |
+| 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | Recorded in completed history |
 | 19 | BACKEND ARCHITECTURE | PLANNED; separate human authorization required |
 | 20 | PRODUCTION DATABASE | PLANNED; separate human authorization required |
 | 21 | AUTHENTICATION & IDENTITY | PLANNED; separate human authorization required |
@@ -508,7 +508,7 @@ Exact labels/order remain subject to interactive UX validation.
 
 Phase 18.6 deliverable must include a sitemap and a Page vs Panel vs Modal/Drawer inventory, responsive navigation behavior and clear ownership of each surface. Avoid duplicate sources of truth: a panel and a page may present different views of the same canonical data but must not create independent state.
 
-### Phase 18.7 — TRADING WORKFLOW ARCHITECTURE & UX REDESIGN (PLANNED)
+### Phase 18.7 — TRADING WORKFLOW ARCHITECTURE & UX REDESIGN
 
 **Authority correction:** any earlier Phase 18.7 language that modeled FREE/PROTOCOL as a per-workflow Trading Mode is superseded by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol is a Trading Method type inherited by Sessions. Free Style supports Quick + Planned; Protocol is Planned-only with locked protocol validation.
 
@@ -553,7 +553,7 @@ Protocol-governable actions/parameters should be designed to accommodate at leas
 
 </details>
 
-### Phase 18.8 — INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN (PLANNED)
+### Phase 18.8 — INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN
 
 Plan browser-interactive prototypes for the three permitted combinations and one refusal journey:
 - Free + Quick;
@@ -572,7 +572,7 @@ Prototype requirements:
 - prototype `ALLOW`, `BLOCK` and `TRACK_VIOLATION` states without prematurely implementing the full future Strategy Rules Engine;
 - create multiple credible layout/interaction alternatives when useful so human approval can be based on actual interaction rather than verbal/Figma description alone.
 
-### Phase 18.9 — TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE (PLANNED)
+### Phase 18.9 — TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE
 
 Validate the selected prototype with repeatable user journeys, including at minimum:
 1. Free + Quick: BUY/SELL → position → add/modify SL/TP → supported partial/manual close.
@@ -583,7 +583,7 @@ Validate the selected prototype with repeatable user journeys, including at mini
 
 Evaluate interaction count, speed, clarity, chart obstruction, accidental-action risk, error prevention, keyboard/touch implications and consistency.
 
-After explicit human approval, freeze **Trading UX Specification v1** as the implementation authority for later integration. Subsequent agents must not casually redesign the domain model. Any conflict with legacy implementation must be surfaced and resolved deliberately.
+The human explicitly authorized sequential 18.7–18.9 completion including validation/freeze. The [existing Method/Session specification](TRADING_METHOD_SESSION_SPEC.md#frozen-trading-ux-specification-v1) now owns frozen **Trading UX Specification v1** and evidence; no separate owner is created. The planning contract is retained below as scope history. After explicit human approval, freeze **Trading UX Specification v1** as the implementation authority for later integration. Subsequent agents must not casually redesign the domain model. Any conflict with legacy implementation must be surfaced and resolved deliberately.
 
 Final domain direction:
 

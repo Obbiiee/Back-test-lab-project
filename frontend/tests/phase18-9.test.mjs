@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync} from 'node:fs';
+import {SAMPLE_METHODS,createMethod,makeRequest,confirmRequest,amendExits,manage,validateRequest} from '../src/tradingUx/prototypeModel.js';
+const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
+const spec=read('../../docs/TRADING_METHOD_SESSION_SPEC.md');
+const frozen=[...spec.matchAll(/```json\s*([\s\S]*?)```/g)].map(m=>JSON.parse(m[1])).filter(b=>b.CONTRACT==='TRADING_UX_HANDOFF');
+assert.equal(frozen.length,1);assert.equal(frozen[0].VERSION,1);assert.equal(frozen[0].STATUS,'FROZEN');assert.equal(frozen[0].VALIDATED_IMPLEMENTATION,'UX_PROTOTYPE_ONLY');assert.equal(frozen[0].PRODUCTION_INTEGRATION,'REQUIRES_EXPLICIT_AUTHORIZATION');
+const docs=readdirSync(new URL('../../docs/',import.meta.url)).filter(p=>p.endsWith('.md'));
+assert.deepEqual(docs.filter(p=>read('../../docs/'+p).includes('"CONTRACT": "TRADING_UX_HANDOFF"')),['TRADING_METHOD_SESSION_SPEC.md'],'One frozen handoff owner');
+for(const file of readdirSync(new URL('../src/tradingUx/',import.meta.url)).filter(p=>/\.(js|jsx)$/.test(p))){const source=read('../src/tradingUx/'+file);assert(!/localStorage|sessionStorage|indexedDB|fetch\(|useTrading|AccountPersistence|placeOrder\(/.test(source),file+' must not write account/storage or call production execution');}
+assert(read('../src/main.jsx').includes("get('trading-ux')==='prototype'"));
+const [free,on,off]=SAMPLE_METHODS,quote={price:2332,revision:10};
+const draft={workflow:'PLANNED',side:'Buy',type:'Limit',entry:2330,sl:2328,tp:2334,risk:1,riskMode:'PERCENT',checklist:{}};
+const request=makeRequest(off,draft,quote,3,'frozen');assert(Object.isFrozen(request));assert(Object.isFrozen(request.checklist));assert.throws(()=>{request.tp=9999;});
+assert.throws(()=>createMethod({name:'duplicate',rr:2,risk:1,conditions:['Same','Same']}));
+assert.throws(()=>{on.conditions.push('Injected');});
+assert.equal(request.sessionId,'demo-session:'+off.id);assert.equal(request.checklist['Setup identified'],'NOT_ASSESSED');
+assert(validateRequest(on,{...request,methodId:on.id,sessionId:'demo-session:'+on.id},quote,3).some(r=>r.startsWith('CHECKLIST')));
+assert(validateRequest(off,{...request,workflow:'QUICK'},quote,3).some(r=>r.startsWith('PROTOCOL')));
+assert(validateRequest({...free,type:'UNKNOWN'},makeRequest(free,draft,quote,3,'unknown'),quote,3).some(r=>r.startsWith('METHOD')));
+const result=confirmRequest({},off,request,quote,3),original=JSON.stringify(request);
+const active=manage(off,result.result,'trigger').item;assert(amendExits(off,active,2327,2336).reason.startsWith('PROTOCOL'));
+const freeRequest=makeRequest(free,draft,quote,3,'free');const freeActive=manage(free,confirmRequest({},free,freeRequest,quote,3).result,'trigger').item;
+const amended=amendExits(free,freeActive,2327,2336).item;assert.equal(amended.request,freeRequest);assert.equal(amended.request.sl,2328);assert.equal(amended.currentExits.sl,2327);
+assert.equal(JSON.stringify(request),original);assert.equal(confirmRequest(result.registry,off,request,quote,3).duplicate,true);
+const stale=confirmRequest({},off,request,{...quote,revision:11},3);assert(stale.reasons.some(r=>r.startsWith('STALE')));assert.deepEqual(stale.registry,{});
+console.log('PASS Phase18.9 single frozen handoff, explicit prototype isolation/default v1, immutable requests/Method conditions, inherited Session, no invented checklist compliance, bypass/stale refusal and amendment evidence integrity.');

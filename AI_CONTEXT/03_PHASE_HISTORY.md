@@ -63,3 +63,7 @@ Extended the existing Method/Session owner with stage ownership, Free Style Quic
 ## Phase 18.8 — Interactive trading UX prototype
 
 Added explicit lazy memory-only prototype using official LWC plus existing planning overlay/resize geometry. Browser exercised Free Style Quick/Planned, Protocol ON/OFF blocked/allowed/refusal, Long/Short placement/SL drag, ticket cancel/review/confirmation, synthetic lifecycle, custom Method, focus and narrow/terminal states. Full regression/lint/build/release passed; production console clean and seeded v1 legacy evidence remained unchanged. [Method/Session owner](../docs/TRADING_METHOD_SESSION_SPEC.md) owns integration plan/evidence. Continue 18.9 only after its separate normal checkpoint/equality gate.
+
+## Phase 18.9 — Trading UX validation and specification freeze
+
+Validated the 18.7 contract against interactive 18.8 journeys and final default-v1 browser smoke. Frozen handoff v1 remains in the existing Method/Session owner; added deterministic single-owner/isolation/immutable-request/provenance/refusal tests. Full registered regression, lint/build/release and repository/bundle gates apply. No production engine/schema migration; Phase 19 remains unauthorized. Final commit/push/equality verification closes the explicitly authorized sequence, then STOP.

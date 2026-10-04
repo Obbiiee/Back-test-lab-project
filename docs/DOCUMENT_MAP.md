@@ -11,6 +11,7 @@
 | What security boundaries and launch-security gates apply? | `SECURITY_ARCHITECTURE.md` |
 | What engineering contract must AI-generated code obey? | `AI_ENGINEERING_GUARDRAILS.md` |
 | What is the canonical Trading Method / Session product contract? | [Trading Method specification](TRADING_METHOD_SESSION_SPEC.md) |
+| What frozen trading UX handoff, prototype evidence and integration gate apply? | [The same Method/Session specification — handoff v1](TRADING_METHOD_SESSION_SPEC.md#frozen-trading-ux-specification-v1) |
 | What did the post-v1 actual architecture/reference audit find? | [Phase 18.5 audit](PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md) |
 | What visual tokens, UI inventory, chooser and terminal rules apply? | [Phase 18.6 UI/design specification](PHASE18_6_UI_UX_DESIGN_SYSTEM.md) |
 | What capabilities are planned and in what phase? | `ROADMAP.md` |
