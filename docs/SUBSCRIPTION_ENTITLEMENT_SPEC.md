@@ -46,7 +46,7 @@ A subscription/window boundary must never manufacture a trade outcome.
 
 If a valid order/position is opened within the Free tradable window and remains active when the nominal calendar window ends, Backtest Lab may continue consuming the minimum subsequent market data necessary to resolve that already-open lifecycle according to the applicable strategy/protocol and execution rules.
 
-Examples include reaching SL/TP, a permitted manual close, cancellation/expiry where applicable, or another canonical terminal state.
+Examples include reaching SL/TP, cancellation/expiry where applicable, or another canonical terminal state permitted by the Trading Method. Protocol positions do not gain a manual-close exception from the entitlement boundary.
 
 This continuation:
 - does not grant a new general tradable month;
@@ -63,7 +63,7 @@ The next new Free tradable-window allowance becomes available according to the n
 - At the five-Session limit, creating another active Session requires freeing a slot or upgrading to an applicable paid entitlement.
 - Deleting an active Session moves it to **Trash for 30 days** before permanent deletion. A trashed Session does not consume one of the five active/saved Free Session slots.
 - Restoring a Session from Trash makes it active/saved again and therefore consumes a slot. If the Free account is already at 5/5 active/saved Sessions, restore is blocked until the user frees a slot or obtains an applicable higher entitlement.
-- Free does not include Session reset/restart.
+- Session reset/restart is not a product workflow for Free or Pro. A separate experiment starts as a new Session.
 - Session duplication is not part of the intended product workflow.
 - A Free user with an available daily allowance may apply it to continuing an eligible prior Session or to starting an eligible new Session.
 - If a Pro user later returns to Free, prior research/results remain reviewable; new research actions follow current Free entitlements rather than destroying historical evidence.
@@ -191,7 +191,7 @@ Upgrade prompts should appear at meaningful entitlement boundaries, not interrup
 4. Never present a deliberately inadequate Free sample as statistically conclusive.
 5. Never conflate Free subscription with the Free Style Trading Method type.
 6. Entitlement checks control access/capacity; canonical domain engines control market/execution/research truth.
-7. Pricing, exact quotas beyond the agreed daily tradable-window concept, reset mechanics and commercial packaging require separate product decisions.
+7. Pricing, exact quotas beyond the agreed daily tradable-window concept, daily-entitlement reset timing/anti-abuse mechanics and commercial packaging require separate product decisions.
 
 ## Intended product loop
 
