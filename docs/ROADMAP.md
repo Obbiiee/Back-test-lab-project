@@ -35,7 +35,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 18.4 | POST-v1 REPOSITORY HYGIENE & DOMAIN NORMALIZATION | Recorded in completed history |
 | 18.5 | POST-v1 ARCHITECTURE & REFERENCE AUDIT | Recorded in completed history |
 | 18.6 | UI/UX AUDIT & DESIGN SYSTEM | Recorded in completed history |
-| 18.7 | TRADING WORKFLOW ARCHITECTURE & UX REDESIGN | PLANNED; separate human authorization required |
+| 18.7 | TRADING WORKFLOW ARCHITECTURE & UX REDESIGN | Recorded in completed history |
 | 18.8 | INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN | PLANNED; separate human authorization required |
 | 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | PLANNED; separate human authorization required |
 | 19 | BACKEND ARCHITECTURE | PLANNED; separate human authorization required |

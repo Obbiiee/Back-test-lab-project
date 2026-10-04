@@ -188,3 +188,95 @@ Do not conflate:
 - Session with Trading Method;
 - monthly entitlement segment with Session lifetime;
 - planner geometry with executed account state.
+
+## Trading UX handoff v1 — workflow authority
+
+Phase 18.7 extends this existing owner; it does not create another Method or trading-workflow specification. This section owns conceptual workflow, units, interaction and handoff contracts. Implementation status and phase authorization remain in AI_CONTEXT, not here. Existing local v1 trading is not retroactively Protocol-compliant. Phase 18.8 will validate an explicitly labeled, memory-only prototype; a production Method/Session repository, ledger and migration remain future work. Phase 18.9 may freeze this contract under the human's explicit sequential authorization, superseding the older roadmap requirement for another approval at that point.
+
+### Stage ownership
+
+Trading Method → Session → Trading Plan → Position Tool → Order Ticket → Validation → Confirmation → Order → Position → Exit → Evidence → Journal → Analysis.
+
+| Stage | Owns | Must not own |
+| --- | --- | --- |
+| Method | Immutable identity, FREE_STYLE/PROTOCOL, rule definition, locked risk/RR and checklist setting | Account balance, chart pixels, subscription tier |
+| Session | Method reference/definition provenance, instrument/feed/dataset identity, start period/balance, execution profile, continuation | A competing method-type toggle, reinitializing balance on continuation |
+| Plan | Draft intent, direction, TIME + PRICE anchors, editable geometry, checklist observations, revision | Fills, realized returns, fabricated PASS |
+| Position Tool | View and interaction adapter over Plan; Entry/SL/TP/risk/size preview | Order submission or direct account writes |
+| Ticket | Reviewed request fields and contextual reasons, cancellation | Bypassing domain restrictions or calculating canonical execution results |
+| Validation | Instrument, session, funds/risk, geometry and method constraints against current revealed revision | Inferring unknown provenance or treating UI locks as enforcement |
+| Confirmation | Explicit user acknowledgment of an immutable validated request snapshot | Automatic execution on placement, repeated submission |
+| Order/Position/Exit | Existing execution owner when integrated; pending/trigger/partial/terminal transitions | Replacing raw replay settlement with display timeframe bars |
+| Evidence | Append-only identities, observations, decisions, execution/exit records and provenance | Calling every exit a complete trade or rewriting original records |
+| Journal/Analysis | Notes and projections of the same evidence identity | A second financial store or presumed compliance |
+
+Future production adapter: planner → validated request boundary → existing execution service → canonical account/events → existing Journal/Analysis projections. No direct planner → simulator route. Current v1 `riskRewardOrderSeed` is a legacy preview adapter; its near-price Market and /100 conversion must not be used as future Protocol enforcement.
+
+### Instrument and risk units
+
+An InstrumentProfile identifies instrumentId, displaySymbol, quoteCurrency, priceDecimals, tickSize, pipSize (nullable), quantityUnit, contractSize, sizeStep/min/max (nullable if unknown), costs model and profile provenance. Unknown broker constraints stay unknown and block any claim of broker compatibility. Tick is the smallest supported profile price increment; pip is an optional explicitly declared reporting unit, never inferred from decimals. Monetary values are in quote currency unless a separately validated FX conversion profile exists.
+
+The observed local v1 profile is XAUUSD, USD price, display precision 3, simulator size in lots and CONTRACT_SIZE=100 price units per lot. Those facts are simulator conventions, not certified broker/venue metadata. Existing tick settings are user preview settings, not authoritative feed tick size. The isolated prototype uses a disclosed DEMO profile: tick 0.001, 3 decimals, contract size 100, lots step 0.0001/min 0.0001/max 1000; these constraints are synthetic and must never be assigned to imported history as fact.
+
+Prototype risk basis is starting simulated balance 100000 USD, unchanged by synthetic lifecycle actions. This choice is a preview assumption, not the future Risk Engine equity policy. A production risk profile must declare its basis (balance/equity snapshot), revision and costs; unknown basis refuses confirmation. Protocol locks both risk mode (PERCENT or CASH) and positive value at Method creation; no implicit 1% default as a research rule. Example fixtures use 1% and RR 2 only for repeatable validation.
+
+Let d=+1 Buy, -1 Sell; stopDistance=(entry−SL)×d >0; rewardDistance=(TP−entry)×d >0; RR=rewardDistance/stopDistance. RiskBudget is CASH value or basis×percent/100. Under the explicit zero-cost demo profile, lotsRaw=RiskBudget/(stopDistance×contractSize); lots=floor(lotsRaw/sizeStep)×sizeStep. Do not round upward above budget. Reject below min/above max instead of silently enlarging/shrinking outside bounds. Planned loss=stopDistance×lots×contractSize; target preview=rewardDistance×lots×contractSize. These are intent previews, not guaranteed fills or outcomes. Missing/invalid SL means no risk-derived size. Tick-align accepted Entry/SL/TP; locked RR whose derived TP cannot satisfy tick precision is refused rather than silently distorted.
+
+Current simulator P&L formula, zero commission convention, gap/open handling, conservative same-candle stops and pending-entry-bar close-only exit evaluation remain unchanged. Real spread/slippage/fees, margin/leverage, bid/ask, currency conversion and broker rounding need later profiles; no broker claims or hidden cost assumptions. Unknown costs are displayed, not converted to zero facts; the demo explicitly declares zero costs for UX only. Production must revalidate requested risk separately from realized gap loss.
+
+### Method and Session identity
+
+Session references immutable Method identity plus definition hash/schema provenance, never a user-facing Method version switch. No re-selecting FREE_STYLE/PROTOCOL. Its identity includes instrument, immutable feed/provider, dataset/version/hash, starting month, original balance/currency and execution profile identity. Display timeframe can change without changing these identities or revealing future OHLC. Appended periods remain chronological with continuous equity; no reset/duplicate/finished-Session workflow. Existing account/date/drawing keys do not prove Session identity: never silently migrate or invent historical IDs. Archived Methods cannot create Sessions. Material rule/RR/risk/checklist changes create another Method.
+
+The prototype offers immutable sample Methods and a labeled sample Session, plus a draft Method form to demonstrate minimum one condition/risk/RR. Its feed is DEMO_SYNTHETIC, not a market provider; reload discards prototype state. Sample state is not written to account, drawing or news namespaces.
+
+### Free Style journeys
+
+Quick: choose Buy/Sell → compact ticket with Market quote/explicit quantity and optional exits → validate → review snapshot → Confirm simulation → active representation. Quick does not require a Protocol checklist or a planning object. Current price must be finite and revision-bound. Supported Free Style management may edit valid exits, cancel pending, partially exit or manually close; evidence records action even when discretionary. A Market request's entry is the current quote, not a stale draggable anchor.
+
+Planned: Long/Short → place Entry → configure SL and TP → risk mode/value and derived quantity/RR → ticket (Market/Limit/Stop as otherwise valid) → validate → explicit review/confirmation → pending or active representation. Changing geometry refreshes preview, invalidates prior review and never mutates an account. Cancel ticket/review returns to unchanged draft; dismissing review does not cancel an existing pending order.
+
+### Protocol journeys and restrictions
+
+Protocol inherits Planned only, locked risk/RR and minimum one condition. Choose Long/Short → Entry/SL → TP derived as Entry+d×stopDistance×lockedRR → size derived from locked budget → checklist observations → pending Limit/Stop ticket → domain validation → explicit confirmation → pending representation. Entry/SL may change draft; TP/risk/RR remain locked and recomputed. Turning enforcement OFF belongs to an immutable sample Method variant, not a silent mid-evidence mutation. OFF skips checklist blocking/mandatory interaction but captures NOT_ASSESSED, FAIL or PASS as actually supplied.
+
+ON requires every defined condition PASS. Missing, NOT_ASSESSED or FAIL yields PROTOCOL_BLOCKED with exact condition IDs/reasons. OFF does not override Quick/Market/locked risk/RR restrictions. Bypassed UI requests must also fail validation. Direct Market, Quick, early/manual/partial close or discretionary SL/TP intervention on an active fixed-RR Protocol position are refused. Automatic preplanned exit belongs to execution; prototype button is clearly a scenario, not a replay fill. Pending cancellation is permitted as abandonment with reason/evidence before trigger; cancellation never creates an exit/P&L. No extra Rule-Based Exit product is implemented here.
+
+Categorical restrictions cannot become TRACK_VIOLATION. No current Method supplies an otherwise-permitted warning rule, so this contract does not invent an executable TRACK_VIOLATION example. Future explicit observational policies may attach a VIOLATION observation to an otherwise allowed action, without relaxing categorical refusal; ruleId, decision/reason and action identity are required. Refused attempts are evidence of refusal, not executed violating trades or invented compliant trades.
+
+### Position Tool interaction
+
+Geometry persists conceptually as TIME + PRICE only; pixels are transient. Long/Short direction must match SL loss side/TP reward side. States: idle, planning, editing, invalid, ready, awaiting_confirmation, locked, hidden. Select/drag anchors or numeric entry edits update only draft revision. In Protocol, Entry moves preserve stop distance where translated, SL edits derive TP, TP drag/edit is blocked. Free Style supports discretionary positive geometry. Tool lock prevents edits, not validation; hidden affects visualization only. Change direction creates a new reviewed draft, not silent mutation of confirmed intent. Separate drawing history/storage remains untouched.
+
+Preview shows entry, SL, TP, risk amount/percent/basis, RR, quantity unit and rounded size, instrument assumptions, status/reason. Invalid geometry remains visible with explanation and disabled request conversion. Convert to ticket is explicit and copies a snapshot referencing planId/revision; subsequent edits invalidate pending review. Existing RiskRewardController geometry helpers may be adapted for prototype projection/interaction without replacing production drawing geometry.
+
+### Ticket, validation and confirmation
+
+Ticket includes Method/Session/plan provenance, requestId, draft revision, revealed quote revision, direction, order method/type, Entry, SL, TP, size, risk profile/budget, costs assumptions, checklist state and notes. Inherited identity is read-only. Free Style edits side/type/entry/size or risk-derived plan fields as appropriate; Market entry follows quote. Protocol locks type to Limit/Stop, risk/RR/TP-derived/size-derived; editable pending type and Entry/SL trigger revalidation. Missing instrument/quote/basis/rules, nonfinite/nonpositive input, wrong geometry, unsupported precision/size and stale revision are INVALID/REFUSED, never fallback success.
+
+Validation stages: identity/provenance → numeric/instrument constraints → supported order relation (Buy Limit below quote, Sell Limit above; Stop opposite) → risk/geometry → Method restrictions → checklist when ON → current revision. Errors carry codes/field/reason; warnings disclose assumptions without bypassing errors. UI mirrors domain decisions and displays protocol-restricted reasons. Existing simulator validateOrder remains final numeric/execution validation when a production adapter is later authorized.
+
+Ready → Review → immutable summary → explicit Confirm. Review identifies pending vs immediate entry, direction/levels/quantity/risk/method/checklist/assumptions. Quote/plan/method changes invalidate review; go back/edit must validate again. Cancel/Escape closes most local review/ticket and restores opener with no submission. Request identity is stable for a reviewed snapshot. Confirm records at most once: duplicate same request/snapshot returns prior result; reused identity with different payload is REFUSED_IDEMPOTENCY_CONFLICT; stale snapshot refuses. Future durable dedup belongs to execution/application service, not a React disable flag. Prototype keeps an in-memory dedup registry and never calls useTrading.place.
+
+### Lifecycle and evidence
+
+| State | Permitted next step / invariants |
+| --- | --- |
+| idle | choose Quick or start Planned draft |
+| planning / editing | geometry/fields/checklist updates; no account writes |
+| invalid / protocol_blocked | explain reasons; fix allowed fields or cancel; no confirm |
+| ready | open ticket/review with validated snapshot |
+| awaiting_confirmation | confirm once, cancel, or invalidate on revision change |
+| pending | cancel before trigger; synthetic trigger only in prototype, real fill only execution owner |
+| active_position | supported Free Style management; Protocol preplanned exit only |
+| partially_exited | Free Style residual remains active; exit record is not completed position |
+| closed | final execution evidence, read-only projections |
+| cancelled | draft dismissal or pending abandonment distinguished; no fill/exit claim |
+
+Event envelope: eventId, kind, request/plan/Method/Session identity, draft/quote revision, captured time, source (PROTOTYPE or canonical execution), instrument/feed/profile provenance, decision/reasons, checklist enforcement/condition observations and payload. Confirmation and refusal are separate from fill/exit. Actual fill/exit values, original/remaining size, cost evidence, entry/exit timestamps and engine policy are execution-owned. Unknown fields use null/NOT_ASSESSED; COMPLIANT requires actual sufficient assessed evidence, not a default badge. Notes reference event/position identity. Analysis consumes canonical exits and accounts; prototype displays a descriptive event timeline only and no canonical performance result.
+
+### Protected integration and acceptance boundary
+
+Prototype adapters do not import useTrading, persistence writers, replay settlement, account schemas or Analysis calculators. LWC chart uses synthetic revealed candles and existing geometric helper where safe. A separate entry selected explicitly by URL keeps local v1 default unchanged. No account/storage migration, market dataset write, indicator/news calculation or backend/cloud implementation. Terminal reuses 18.6 bounds/tokens. Future production integration needs explicit authority for Method/Session persistence, runtime validation, durable dedup/evidence, risk profile/basis, and plan-to-execution adapter; prototype success does not authorize these.
+
+18.7 acceptance: owner/stage matrix, Quick and Planned Free Style, Protocol ON/OFF/refusal, risk/instrument assumptions, request confirmation/idempotency, state/evidence model and preservation boundaries are defined here. Validate context/repository/bundle controls; browser exemption applies to this documentation-only checkpoint. Prototype behavior and freeze evidence will be recorded here in subsequent authorized phases, without a competing specification.

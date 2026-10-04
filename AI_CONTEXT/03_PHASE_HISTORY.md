@@ -55,3 +55,7 @@ Completed actual source/state/persistence/adapter/domain tracing, protected-boun
 ## Phase 18.6 — UI/UX audit and design system
 
 Completed actual browser audit and one focused [UI/design specification](../docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md) from 8e8d840. Added scoped tokens and bounded chooser/terminal polish; genuine collapse hides content while grip, chart and bottom controls remain usable. Registered UI-bound/keyboard/contrast tests, full regression, lint/build/distribution and production browser checks passed. Corrupt-storage evidence retained; console clean. No new trading workflow, engine/schema/dependency change or 18.7+ implementation. Normal checkpoint/equality gate follows.
+
+## Phase 18.7 — Trading workflow architecture
+
+Extended the existing Method/Session owner with stage ownership, Free Style Quick/Planned, Protocol ON/OFF restrictions, instrument/risk units, TIME + PRICE planning, ticket validation/explicit confirmation/dedup, lifecycle/evidence and protected integration gates. No new competing specification or runtime change. Repository/bundle gates apply; browser exempt for documentation-only checkpoint. Sequential human authorization permits 18.8 after checkpoint verification.
