@@ -1,5 +1,7 @@
 # Backtest Lab — Quantitative & Data-Driven Trading Research Thesis
 
+> **Domain precedence (Phase 18.4):** [Trading Method & Session specification](TRADING_METHOD_SESSION_SPEC.md) owns current Method/Session semantics. Older mode/version language below is historical design/research terminology where it conflicts: Session inherits its Method, Protocol is Planned-only, checklist OFF retains evidence, and cross-pair coverage is not a maturity requirement. Technical version/hash provenance remains useful; it is not a mandatory user-facing Method-version workflow. These blueprints preserve strategic knowledge and do not authorize runtime changes.
+
 > **Status:** Working research thesis / scientific foundation  
 > **Purpose:** Menjadi dokumen induk untuk tesis riset, metodologi, dan alasan ilmiah di balik Backtest Lab. Dokumen ini tidak menggantikan `docs/ROADMAP.md` sebagai authority roadmap/phase.
 

@@ -18,3 +18,5 @@ Account and favorites storage now preserve malformed/unsupported originals witho
 Existing Figma UI supports six-dot terminal resizing, keyboard height controls and popup/modal focus recovery. Narrow layouts retain News/Order/Indicators/balance access; unsupported prototype controls are disabled. [UI evidence](../docs/PHASE15_FIGMA_UI.md).
 
 Local release identity is 1.0.0 in the existing frontend package/lock. The bounded local v1 scope passed its documented regression/browser/distribution acceptance; [release evidence and limits](../docs/V1_RELEASE.md) owns the user guide. Operational status and future authorization remain solely in 04_CURRENT_PHASE.md. No v2/cloud implementation.
+
+Post-v1 documentation audit: [Phase 18.5 architecture/reference audit](../docs/PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md) maps actual source ownership, preservation decisions and future UX risks. The [Trading Method/Session contract](../docs/TRADING_METHOD_SESSION_SPEC.md) is normalized future product authority, not implemented Method/Session runtime or Protocol enforcement. Existing local v1 behavior and release acceptance remain unchanged.

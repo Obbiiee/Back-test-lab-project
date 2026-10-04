@@ -13,7 +13,9 @@
     "docs/PHASE14_5_ECONOMIC_NEWS.md",
     "docs/PHASE16_QA_HARDENING.md",
     "docs/PHASE15_FIGMA_UI.md",
-    "docs/V1_RELEASE.md"
+    "docs/V1_RELEASE.md",
+    "docs/TRADING_METHOD_SESSION_SPEC.md",
+    "docs/PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",

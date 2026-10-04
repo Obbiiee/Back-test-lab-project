@@ -32,7 +32,8 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 16 | FULL QA, PERFORMANCE & HARDENING | Checkpoint evidence recorded in phase history |
 | 17 | v1 RELEASE CANDIDATE | Recorded in completed history / local release evidence |
 | 18 | v1.0 STABLE LOCAL RELEASE | Recorded in completed history / local release evidence |
-| 18.5 | POST-v1 ARCHITECTURE & REFERENCE AUDIT | PLANNED; separate human authorization required |
+| 18.4 | POST-v1 REPOSITORY HYGIENE & DOMAIN NORMALIZATION | Recorded in completed history |
+| 18.5 | POST-v1 ARCHITECTURE & REFERENCE AUDIT | Recorded in completed history |
 | 18.6 | UI/UX AUDIT & DESIGN SYSTEM | PLANNED; separate human authorization required |
 | 18.7 | TRADING WORKFLOW ARCHITECTURE & UX REDESIGN | PLANNED; separate human authorization required |
 | 18.8 | INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN | PLANNED; separate human authorization required |
@@ -442,7 +443,7 @@ Exact labels/order remain subject to interactive UX validation.
 
 **Trading Method final protocol decisions**
 - Protocol checklist count is user-defined with a minimum of one condition.
-- Checklist enforcement is configurable ON/OFF: ON requires all defined conditions before execution; OFF removes checklist interaction from the execution flow.
+- Checklist enforcement is configurable ON/OFF: ON requires all defined conditions before execution; OFF retains checklist research evidence while removing required checklist interaction and execution blocking.
 - Protocol execution is Planned-only; discretionary Quick execution belongs to Free Style.
 - Material Protocol rule/RR/risk/checklist changes require a new Trading Method; no user-facing Protocol versioning workflow is required.
 - Session starting balance is defined once; balance/equity continues chronologically across appended monthly segments.
@@ -460,9 +461,9 @@ Exact labels/order remain subject to interactive UX validation.
 - A backtest Session must belong to a Trading Method.
 - A first-time user with zero methods is routed through Create First Trading Method before Session creation.
 - Trading Method type is selected once as Free Style or Protocol; Session inherits it rather than asking again.
-- Protocol methods carry locked RR, locked risk and at least one checklist condition; exact checklist enforcement semantics remain an explicit open decision.
+- Protocol methods carry locked RR, locked risk and at least one checklist condition; ON requires every defined condition PASS; OFF retains research evidence without blocking execution or forcing checklist interaction.
 - One Session uses one instrument/pair and one immutable feed identity, while timeframe remains switchable in the workspace.
-- The same Trading Method/version may be tested through separate Sessions across instruments/periods to support cross-pair research.
+- The same immutable Trading Method may be tested through separate Sessions across instruments/periods to support cross-pair research.
 
 **Session lifecycle / result-review flow**
 - Dashboard is a lightweight session launcher: **New Backtest** plus **Previous Sessions**; do not turn each session card into a full statistics dashboard.
@@ -508,6 +509,11 @@ Phase 18.6 deliverable must include a sitemap and a Page vs Panel vs Modal/Drawe
 
 **Authority correction:** any earlier Phase 18.7 language that modeled FREE/PROTOCOL as a per-workflow Trading Mode is superseded by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol is a Trading Method type inherited by Sessions. Free Style supports Quick + Planned; Protocol is Planned-only with locked protocol validation.
 
+Current architecture contract: Sessions inherit `FREE_STYLE | PROTOCOL`. Free Style supports Quick and Planned; Protocol supports Planned pending Limit/Stop only, locked RR/risk and checklist evidence. Domain validation rejects forbidden actions; UI disabling is not enforcement. Position Tool planning must pass explicit Order confirmation before account mutation. Use the single [Method specification](TRADING_METHOD_SESSION_SPEC.md) for semantics.
+
+<details>
+<summary>Superseded Phase 18.7 draft — historical only</summary>
+
 Historical planning below may describe the earlier two-dimension model; treat conflicting portions as superseded and do not implement them.
 
 The earlier trading UX draft described **two independent dimensions** and must not collapse them into one concept.
@@ -541,12 +547,15 @@ Architecture contract:
 
 Protocol-governable actions/parameters should be designed to accommodate at least: setup/inclusion/exclusion context, entry, SL, TP, fixed or constrained RR, risk per trade, session, maximum orders, early close, partial close, move SL, move TP, cancel order and intervention policy. Full rule-engine enforcement belongs to the later strategy/research architecture and is not implied by this UX phase.
 
+
+</details>
+
 ### Phase 18.8 — INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN (PLANNED)
 
-Plan browser-interactive prototypes for all four combinations:
+Plan browser-interactive prototypes for the three permitted combinations and one refusal journey:
 - Free + Quick;
 - Free + Planned;
-- Protocol + Quick;
+- Protocol + Quick: refusal with a clear reason;
 - Protocol + Planned.
 
 Prototype requirements:
@@ -567,7 +576,7 @@ Validate the selected prototype with repeatable user journeys, including at mini
 2. Free + Planned: Long/Short Position → Entry/SL/TP → risk per trade → calculated size/RR → Place Order → supported modification.
 3. Protocol + Planned: locked risk/RR example → Place Order → attempt a `BLOCK` action and verify clear refusal/reason.
 4. Protocol violation example: perform an action configured as `TRACK_VIOLATION` and verify the intended ledger/journal provenance contract.
-5. Protocol + Quick: verify availability only when the protocol permits the workflow.
+5. Protocol + Quick: verify refusal; also verify direct Market entry and discretionary manual close are refused.
 
 Evaluate interaction count, speed, clarity, chart obstruction, accidental-action risk, error prevention, keyboard/touch implications and consistency.
 
@@ -576,9 +585,10 @@ After explicit human approval, freeze **Trading UX Specification v1** as the imp
 Final domain direction:
 
 ```text
-Trading Mode:   FREE | PROTOCOL
+Trading Method: FREE_STYLE | PROTOCOL
+Session:        inherits Method
                          ↓
-Order Method:   QUICK | PLANNED
+Order Method:   QUICK (Free Style only) | PLANNED
                          ↓
 Canonical Order Request
                          ↓
@@ -859,7 +869,7 @@ High-fidelity market simulation platform.
 
 Plan centralized billing-state and product-entitlement boundaries for future plan tiers. Product capability checks must depend on internal entitlements rather than a specific payment provider. Preserve provider portability and server-side authorization.
 
-The [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md) is the current product contract for Free/Pro direction. In particular: Free uses the same canonical execution/correctness path, receives one tradable historical window of up to one calendar month per daily entitlement period while earlier context remains viewable/read-only, may resolve an already-authorized open lifecycle beyond the nominal window without opening unrelated new trades, and receives Basic Statistics. Pro removes the Free daily tradable-window gate subject to dataset coverage, licensing, infrastructure and fair-use constraints. Subscription Free/Pro must remain independent from trading Free/Protocol Mode.
+The [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md) is the current product contract for Free/Pro direction. In particular: Free uses the same canonical execution/correctness path, receives one tradable historical window of up to one calendar month per daily entitlement period while earlier context remains viewable/read-only, may resolve an already-authorized open lifecycle beyond the nominal window without opening unrelated new trades, and receives Basic Statistics. Pro removes the Free daily tradable-window gate subject to dataset coverage, licensing, infrastructure and fair-use constraints. Subscription Free/Pro must remain independent from Trading Method type.
 
 ### Phase 52 — BILLING & PAYMENT (PLANNED)
 

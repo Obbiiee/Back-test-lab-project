@@ -10,6 +10,8 @@
 | How do scaling, data portability, AI, billing/entitlement and provider boundaries work? | `SCALING_DATA_AI_DECISIONS.md` |
 | What security boundaries and launch-security gates apply? | `SECURITY_ARCHITECTURE.md` |
 | What engineering contract must AI-generated code obey? | `AI_ENGINEERING_GUARDRAILS.md` |
+| What is the canonical Trading Method / Session product contract? | [Trading Method specification](TRADING_METHOD_SESSION_SPEC.md) |
+| What did the post-v1 actual architecture/reference audit find? | [Phase 18.5 audit](PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md) |
 | What capabilities are planned and in what phase? | `ROADMAP.md` |
 | What is authorized to implement now? | `../AI_CONTEXT/04_CURRENT_PHASE.md` |
 | What has actually been completed? | `../AI_CONTEXT/03_PHASE_HISTORY.md` |

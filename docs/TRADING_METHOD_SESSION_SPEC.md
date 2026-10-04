@@ -27,13 +27,15 @@ Once at least one method exists, normal Dashboard/session flows replace first-me
 
 ## Trading Method types
 
+Canonical type identifiers are `FREE_STYLE | PROTOCOL`. Session inherits its parent Method type; it does not select a competing Trading Mode. This is the single owner of this product contract, distinct from the currently implemented local paper-account model.
+
 ### Free Style
 
 A Free Style method represents discretionary trading.
 
 - Method has an identity/name and may have descriptive metadata.
 - RR and risk are not protocol-locked by the method.
-- Quick Trade and Planned Trade are both available in the workspace when otherwise supported.
+- Quick Trade and Planned Trade are both available in the workspace when otherwise supported; no protocol checklist is required.
 - User actions remain recorded in the canonical ledger so discretionary behavior can still be analyzed.
 - Free Style is a trading-method type and is unrelated to Free/Pro subscription entitlement.
 
@@ -56,8 +58,8 @@ A Session inheriting a Protocol method does not ask the user to choose Free Styl
 A Protocol method must contain **at least one** user-defined checklist condition. The user may define one, five, or any supported number of conditions; the product does not impose a fixed checklist count beyond the minimum of one.
 
 Checklist execution enforcement is a method-level setting that may be ON or OFF:
-- **ON:** every checklist condition defined by the locked Protocol method must be satisfied before an order may be executed. Failure to satisfy any condition blocks execution at the protocol/domain validation boundary.
-- **OFF:** the execution flow does **not** require or display the checklist as a pre-order step. Checklist enforcement does not block execution. The Method definition may retain its checklist configuration, but execution must not force checklist interaction while enforcement is OFF.
+- **ON:** every checklist condition defined by the locked Protocol method must be recorded as PASS before an order may be executed. Failure to satisfy any condition blocks execution at the protocol/domain validation boundary.
+- **OFF:** checklist definition and available checklist state remain recorded as research evidence, including enforcement OFF and unavailable/not-assessed conditions. They do not block execution or force checklist interaction as a pre-order step. Never fabricate PASS or discard evidence because enforcement is OFF.
 
 Checklist state must be captured with the trade/protocol evidence so Research can later analyze outcomes against conditions. There is no X-of-Y threshold model in the current product contract.
 
@@ -78,7 +80,7 @@ UI locking is not the enforcement boundary. Before execution, the canonical Orde
 
 ## Locked risk behavior
 
-Protocol risk per trade is fixed by the method version.
+Protocol risk per trade is fixed by the immutable Trading Method definition. Internal schema/hash provenance does not introduce a required user-facing versioning workflow.
 
 Given account/equity basis defined by the Risk Engine and a user-defined Entry/SL distance, the planner/risk engine derives the permitted position size so the intended risk remains consistent with the locked protocol, subject to instrument/execution constraints such as tick size, contract size, lot step, minimum/maximum lot and applicable costs.
 
@@ -109,6 +111,8 @@ At creation, target inputs include:
 - starting historical month/period.
 
 Timeframe is not locked at Session creation. The user may switch supported timeframes inside the workspace while all no-look-ahead and multi-timeframe rules remain intact.
+
+Execution-profile configuration uses sensible defaults with advanced configuration when needed; it is not mandatory first-run Session complexity.
 
 One Session is bound to one instrument/pair. Testing the same Trading Method on another instrument requires another Session.
 

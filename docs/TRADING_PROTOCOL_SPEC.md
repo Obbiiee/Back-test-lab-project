@@ -1,10 +1,23 @@
-# Backtest Lab — Trading Modes, Strategy Rules & Lab Protocol Specification
+# Backtest Lab — Trading Rules & Lab Protocol Specification
 
 > **CURRENT AUTHORITY NOTICE:** Free Style / Protocol is a **Trading Method type**, not an independent per-trade Trading Mode. The canonical product model is defined in [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Any conflicting legacy wording below is superseded. Free Style may use Quick or Planned execution. Protocol is Planned-only, must submit a pending Limit or Stop order, does not permit direct Market entry, and does not permit discretionary manual close after trigger. Protocol follows "plan your trade, trade your plan." Domain/rules validation must enforce these constraints.
 
 > Trading Method ownership, Session inheritance, locked RR/risk planner behavior and cross-session research are defined in [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol trading behavior is independent from Free/Pro subscription entitlement.
 
 Status: architecture authority for future trading/rules/research work. This document does not authorize implementation.
+
+## Current rules projection
+
+The single [Trading Method authority](TRADING_METHOD_SESSION_SPEC.md) owns Method types, Session inheritance, immutable RR/risk, checklist evidence and execution constraints. Free Style supports Quick and Planned without a protocol checklist. Protocol supports Planned pending Limit/Stop only; direct Market entry and discretionary manual close are prohibited. ON requires every condition PASS; OFF preserves evidence without blocking or forcing checklist interaction.
+
+All permitted requests converge on one domain-validation/execution boundary. TRACK_VIOLATION cannot override categorically prohibited Protocol actions. Existing local v1 paper trading has not implemented this future Method/Session domain.
+
+## Historical planning — superseded, not implementation authority
+
+The following earlier draft is retained verbatim for decision provenance. Its two-dimension model, conditional Protocol Quick support and user-facing versioning do not govern current work.
+
+<details>
+<summary>Earlier trading/rules draft (historical)</summary>
 
 ## Two independent dimensions
 Trading Mode: FREE | PROTOCOL.
@@ -62,3 +75,5 @@ Journal / Analysis / Research
 
 ## UX
 Protocol restrictions must explain the reason for a blocked action. UI can guide and prevent mistakes but is not the security/correctness boundary. Do not invent additional trading modes/order methods without an explicit product decision.
+
+</details>

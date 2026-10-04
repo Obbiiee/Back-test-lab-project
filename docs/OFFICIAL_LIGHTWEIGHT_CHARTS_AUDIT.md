@@ -1,5 +1,7 @@
 # Official Lightweight Charts migration audit
 
+> Historical Phase 1 snapshot; statements about missing panes/legacy indicators describe that checkpoint. Current source ownership and reference evaluation: [Phase 18.5 audit](PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md).
+
 Date: 2026-10-02 (Asia/Jakarta). Phase 1 only; no application code or dependencies changed by this audit.
 
 ## Baseline and protected components
