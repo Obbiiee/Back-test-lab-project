@@ -24,3 +24,5 @@ The historical appendix within [ROADMAP.md](ROADMAP.md), FXREPLAY_REFERENCE.md, 
 ## Future disposable output
 
 Use `docs/_generated/` or `frontend/tests/artifacts/` for new disposable screenshots, console exports and temporary browser evidence. Both are ignored; durable reports and intentional fixtures remain tracked. Promote an artifact explicitly only when a report/test needs its checkpoint value. Do not ignore all images/JSON or move old evidence without reviewing references.
+
+[Local v1 release guide and acceptance evidence](V1_RELEASE.md) records build/run/storage/recovery/limitations and release checks. It does not replace any context authority.

@@ -12,7 +12,8 @@
     "docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md",
     "docs/PHASE14_5_ECONOMIC_NEWS.md",
     "docs/PHASE16_QA_HARDENING.md",
-    "docs/PHASE15_FIGMA_UI.md"
+    "docs/PHASE15_FIGMA_UI.md",
+    "docs/V1_RELEASE.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",

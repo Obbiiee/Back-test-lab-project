@@ -6,7 +6,7 @@ Source produksi tetap di `frontend/src/`; backend tidak diperlukan untuk workspa
 
 Arsip XAUUSD sekitar sepuluh tahun: 3.486.461 candle M1, sebelas timeframe, dimuat bertahap dari `frontend/public/market/decade/`. Sumber/batas data: [HISTORICAL_XAU](docs/HISTORICAL_XAU.md).
 
-Drawing aktif sampai Phase 7: Trend Line dengan koordinat TIME+PRICE, selection, endpoint/body drag, Delete, Undo/Redo, lock, hide/show dan localStorage. Trading/RiskReward dan replay memiliki domain terpisah. Custom indicator runtime telah retired; native Volume tetap tersedia. [Status aktual](AI_CONTEXT/01_PROJECT_STATE.md) lebih utama daripada laporan fase historis.
+Kemampuan dan batas produk aktual dimiliki oleh [status repository](AI_CONTEXT/01_PROJECT_STATE.md); laporan fase lama merekam checkpoint historis. [Panduan release lokal](docs/V1_RELEASE.md) menjelaskan cara menjalankan, penyimpanan dan bukti penerimaan.
 
 ## Menjalankan aplikasi
 

@@ -1,0 +1,5 @@
+TradingView Lightweight Charts™
+Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/
+
+Source: https://raw.githubusercontent.com/tradingview/lightweight-charts/v5.2.1/NOTICE
+React, React DOM and Scheduler: Meta Platforms, Inc. and affiliates (MIT); included license files retain their terms.

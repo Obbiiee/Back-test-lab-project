@@ -131,10 +131,10 @@ function App() {
   { icon: "cursor", key: "cursor", title: "Cursor" },
   { icon: "trend", key: "trend", title: "Trend Line" },
   { icon: "measure", key: "measure", title: "Risk / Reward" },
-  { icon: "magnet", key: "magnet", title: "Magnet" },
-  { icon: "lock", key: "lock", title: "Lock drawings" },
-  { icon: "eye", key: "eye", title: "Hide drawings" },
-  { icon: "trash", key: "trash", title: "Remove drawings" },
+  { icon: "magnet", key: "magnet", title: "Risk/Reward magnet" },
+  { icon: "lock", key: "lock", title: "Lock Risk/Reward objects" },
+  { icon: "eye", key: "eye", title: "Hide Risk/Reward objects" },
+  { icon: "trash", key: "trash", title: "Remove Risk/Reward objects" },
  ];
 	return <NewsContext.Provider value={news.context}><div className="replay-app">
       {notice && <button className="design-notice" onClick={() => setNotice("")}>{notice} ×</button>}
@@ -153,8 +153,8 @@ function App() {
 		sendChartCommand("new-layout");
 		setDrawingMode("none");
 	}}>New Layout</button>
-        <button className="tool-icon" title="Undo drawing" disabled={!drawingState.canUndo} onClick={() => sendChartCommand("undo")}><Icon name="undo" size={18} /></button>
-        <button className="tool-icon" title="Redo drawing" disabled={!drawingState.canRedo} onClick={() => sendChartCommand("redo")}><Icon name="redo" size={18} /></button>
+        <button className="tool-icon" title="Undo Risk/Reward object" disabled={!drawingState.canUndo} onClick={() => sendChartCommand("undo")}><Icon name="undo" size={18} /></button>
+        <button className="tool-icon" title="Redo Risk/Reward object" disabled={!drawingState.canRedo} onClick={() => sendChartCommand("redo")}><Icon name="redo" size={18} /></button>
         <div className="toolbar-fill" />
         <span className="workspace-name">Backtest Lab</span>
         <span className="layout-name"><i /> Design workspace⌄</span>
@@ -172,7 +172,7 @@ function App() {
             if(toolGroups[tool.key])chooseTool(lastTools[tool.key],tool.key);
             else sendChartCommand({'trash':'clear','lock':'lock-all','eye':'hide-all','magnet':'magnet'}[tool.key]);
           }}><Icon name={tool.icon}/></button>{toolGroups[tool.key]&&<button className="tool-expander" aria-label={`Expand ${tool.title}`} aria-expanded={activeTool===tool.key} onClick={()=>setActiveTool(activeTool===tool.key?null:tool.key)}>›</button>}</div>)}
-          <button className={`side-tool ${drawingState.keepDrawing?'active':''}`} title="Keep drawing mode" onClick={()=>sendChartCommand('keep-drawing')}><Icon name="brush"/></button>
+          <button className={`side-tool ${drawingState.keepDrawing?'active':''}`} title="Keep Risk/Reward placement mode" onClick={()=>sendChartCommand('keep-drawing')}><Icon name="brush"/></button>
           <button className={`side-tool ${favoritesVisible?'active':''}`} title="Toggle favorites bar" onClick={()=>setFavoritesVisible(value=>!value)}>☆</button>
         </aside>
 
@@ -190,14 +190,14 @@ function App() {
 		"5d",
 		"1d"
 	].map((r) => <button key={r} onClick={() => sendChartCommand(`range:${r}`)}>{r}</button>)}<button aria-label="Go to a date" onClick={()=>setDateOpen(true)}><Icon name="calendar" size={17} /></button></div><div><strong>{(data.length ? new Date(data.at(-1).time * 1e3).toISOString().slice(11, 19) : "—")} UTC</strong><button onClick={() => sendChartCommand("percent")}>%</button><button onClick={() => sendChartCommand("log")}>log</button><button className="auto-active" onClick={() => sendChartCommand("fit")}>auto</button></div></div>
-          {objectsOpen && <aside className="drawing-object-tree"><header><strong>Drawing objects ({drawingState.drawings.length})</strong><button onClick={() => setObjectsOpen(false)}>×</button></header>{!drawingState.drawings.length && <p>No drawings yet</p>}{drawingState.drawings.map((item, index) => <div key={item.id} className={drawingState.selectedId === item.id ? "selected" : ""}><button onClick={() => sendChartCommand("object:select:" + item.id)}>{index + 1}. {item.type.replaceAll("-", " ")}</button><button title="Edit drawing" onClick={() => sendChartCommand("object:edit:" + item.id)}>✎</button><button title={item.hidden ? "Show drawing" : "Hide drawing"} onClick={() => sendChartCommand("object:hide:" + item.id)}>{item.hidden ? "◌" : "◉"}</button><button title={item.locked ? "Unlock drawing" : "Lock drawing"} onClick={() => sendChartCommand("object:lock:" + item.id)}>{item.locked ? "🔒" : "🔓"}</button><button title="Delete drawing" onClick={() => sendChartCommand("object:delete:" + item.id)}>×</button></div>)}</aside>}
+          {objectsOpen && <aside className="drawing-object-tree"><header><strong>Risk/Reward objects ({drawingState.drawings.length})</strong><button onClick={() => setObjectsOpen(false)}>×</button></header>{!drawingState.drawings.length && <p>No Risk/Reward objects yet. Chart drawings use their separate controls.</p>}{drawingState.drawings.map((item, index) => <div key={item.id} className={drawingState.selectedId === item.id ? "selected" : ""}><button onClick={() => sendChartCommand("object:select:" + item.id)}>{index + 1}. {item.type.replaceAll("-", " ")}</button><button title="Edit drawing" onClick={() => sendChartCommand("object:edit:" + item.id)}>✎</button><button title={item.hidden ? "Show drawing" : "Hide drawing"} onClick={() => sendChartCommand("object:hide:" + item.id)}>{item.hidden ? "◌" : "◉"}</button><button title={item.locked ? "Unlock drawing" : "Lock drawing"} onClick={() => sendChartCommand("object:lock:" + item.id)}>{item.locked ? "🔒" : "🔓"}</button><button title="Delete drawing" onClick={() => sendChartCommand("object:delete:" + item.id)}>×</button></div>)}</aside>}
           {menu && <div className="tool-menu">
             {menu.map((group,gi)=><div className="menu-group" key={gi}>{group.title&&<div className="menu-title">{group.title}</div>}{group.items.map(item=><div className="drawing-menu-row" key={item}><button aria-label={item} data-tool-type={resolveTool(item,activeTool)} data-anchor-count={DRAWING_SPECS[resolveTool(item)]?.points ?? RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points} aria-pressed={resolveTool(item,activeTool)===drawingMode} onClick={()=>chooseTool(item)}><Icon name={activeTool==='measure'?'measure':activeTool} size={17}/><span>{item}</span></button><button className="about-drawing" aria-label={`About ${item}`} onClick={()=>setNotice(`${item} · ${DRAWING_SPECS[resolveTool(item)]?.points ?? RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points??1} anchor points. Select the tool, then click on the chart.`)}>ⓘ</button><button aria-label={`Favorite ${item}`} aria-pressed={favorites.includes(item)} onClick={()=>toggleFavorite(item)}>{favorites.includes(item)?'★':'☆'}</button></div>)}</div>)}
 
           </div>}
         </div>
 
-        <aside className="right-rail"><button className={dialog==='order'?'active':''} onClick={()=>openTicket()}><Icon name="order"/><span>Order</span></button><button title="Drawing objects" aria-expanded={objectsOpen} onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Object tree</span></button><button aria-expanded={journalOpen} onClick={()=>setJournalOpen(value=>!value)}><Icon name="journal"/><span>Journal</span></button><button aria-expanded={newsOpen} onClick={()=>setNewsOpen(value=>!value)}><Icon name="news"/><span>News</span></button><div className="rail-fill"/><button aria-label="Account information" onClick={()=>setNotice(`XAUUSD · 100 oz per lot · USD account · ${money(trading.account.initialBalance)} initial balance`)}><Icon name="settings"/></button>
+        <aside className="right-rail"><button className={dialog==='order'?'active':''} onClick={()=>openTicket()}><Icon name="order"/><span>Order</span></button><button title="Risk/Reward object tree" aria-expanded={objectsOpen} onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Object tree</span></button><button aria-expanded={journalOpen} onClick={()=>setJournalOpen(value=>!value)}><Icon name="journal"/><span>Journal</span></button><button aria-expanded={newsOpen} onClick={()=>setNewsOpen(value=>!value)}><Icon name="news"/><span>News</span></button><div className="rail-fill"/><button aria-label="Account information" onClick={()=>setNotice(`XAUUSD · 100 oz per lot · USD account · ${money(trading.account.initialBalance)} initial balance`)}><Icon name="settings"/></button>
         </aside>
 
         <section className="trade-controls">
