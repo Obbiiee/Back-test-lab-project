@@ -53,11 +53,13 @@ A Session inheriting a Protocol method does not ask the user to choose Free Styl
 
 ## Protocol checklist
 
-A Protocol method must contain at least one checklist condition.
+A Protocol method must contain **at least one** user-defined checklist condition. The user may define one, five, or any supported number of conditions; the product does not impose a fixed checklist count beyond the minimum of one.
 
-Checklist state must be captured with the trade/protocol evidence so Research can later analyze outcomes against conditions.
+Checklist execution enforcement is a method-level setting that may be ON or OFF:
+- **ON:** every checklist condition defined by the locked Protocol method must be satisfied before an order may be executed. Failure to satisfy any condition blocks execution at the protocol/domain validation boundary.
+- **OFF:** checklist conditions remain available for deliberate review, logging and Research evidence, but incomplete conditions do not block execution.
 
-**OPEN PRODUCT DECISION:** the exact enforcement semantics are not yet frozen. Do not invent whether every Required item must pass, whether a configurable minimum X-of-Y is sufficient, or whether both concepts coexist. This requires explicit human approval before implementation.
+Checklist state must be captured with the trade/protocol evidence so Research can later analyze outcomes against conditions. There is no X-of-Y threshold model in the current product contract.
 
 ## Locked RR behavior in Planned Position tools
 
@@ -86,9 +88,9 @@ Changing stop distance changes derived size rather than silently changing the pr
 
 Free Style methods may use both Quick and Planned order methods in the same workspace when supported.
 
-Protocol order-method behavior must follow the locked protocol definition. The product must not ask the user to re-select the method type at Session creation.
+Protocol methods use **Planned execution only**. Quick Buy/Sell is not permitted under a Protocol method. A user who wants discretionary Quick execution should use a Free Style method.
 
-Any future decision about whether a Protocol version locks one order method, permits multiple order methods, or applies per-action policy must be represented explicitly in the protocol contract rather than inferred by UI.
+The product must not ask the user to re-select the method type at Session creation. Protocol execution must preserve locked RR, locked risk and checklist enforcement at the domain-validation boundary, not only in UI controls.
 
 ## Session model
 
@@ -141,7 +143,7 @@ The product may express evidence maturity using states such as:
 - Sufficient;
 - Robust.
 
-Maturity recommendations should consider multiple dimensions such as trade count, elapsed/tested time and coverage of relevant market conditions/regimes. Exact thresholds require later research/product validation.
+Maturity recommendations should consider multiple dimensions such as trade count, elapsed/tested time, coverage of relevant market conditions/regimes, and relevant data/execution quality. **Cross-pair/pair coverage is not a Research Maturity requirement.** A method intended for one instrument must not be penalized merely because it was not tested on unrelated instruments. Exact thresholds require later research/product validation.
 
 The system must not claim a strategy is proven or valid solely because an arbitrary trade-count threshold has been reached.
 
