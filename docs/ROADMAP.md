@@ -106,6 +106,7 @@ All future implementation must remain consistent with:
 - [Professional Drawing Engine Specification](DRAWING_ENGINE_SPEC.md);
 - [Indicator Engine 2.0 Specification](INDICATOR_ENGINE_SPEC.md);
 - [Trading Modes, Strategy Rules & Lab Protocol Specification](TRADING_PROTOCOL_SPEC.md);
+- [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md);
 - [Scaling, Data & AI Decisions](SCALING_DATA_AI_DECISIONS.md);
 - [Security Architecture](SECURITY_ARCHITECTURE.md);
 - [AI Engineering Guardrails](AI_ENGINEERING_GUARDRAILS.md);
@@ -738,6 +739,8 @@ High-fidelity market simulation platform.
 ### Phase 51 — SUBSCRIPTION ARCHITECTURE (PLANNED)
 
 Plan centralized billing-state and product-entitlement boundaries for future plan tiers. Product capability checks must depend on internal entitlements rather than a specific payment provider. Preserve provider portability and server-side authorization.
+
+The [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md) is the current product contract for Free/Pro direction. In particular: Free uses the same canonical execution/correctness path, receives one tradable historical window of up to one calendar month per daily entitlement period while earlier context remains viewable/read-only, may resolve an already-authorized open lifecycle beyond the nominal window without opening unrelated new trades, and receives Basic Statistics. Pro removes the Free daily tradable-window gate subject to dataset coverage, licensing, infrastructure and fair-use constraints. Subscription Free/Pro must remain independent from trading Free/Protocol Mode.
 
 ### Phase 52 — BILLING & PAYMENT (PLANNED)
 
