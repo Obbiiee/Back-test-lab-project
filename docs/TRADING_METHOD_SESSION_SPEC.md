@@ -90,6 +90,10 @@ Free Style methods may use both Quick and Planned order methods in the same work
 
 Protocol methods use **Planned execution only**. Quick Buy/Sell is not permitted under a Protocol method. A user who wants discretionary Quick execution should use a Free Style method.
 
+Protocol follows the product principle **"plan your trade, trade your plan."** A Protocol trade must be submitted as a planned **pending order**. The user may choose a supported **Limit** or **Stop** pending order according to the setup; direct Market entry is not a Protocol execution path.
+
+Once a Protocol position is triggered/open, **manual close is not permitted**. The planned lifecycle must resolve through the canonical preplanned exit/risk rules (for example SL/TP and other explicitly supported protocol terminal rules), rather than discretionary early closure.
+
 The product must not ask the user to re-select the method type at Session creation. Protocol execution must preserve locked RR, locked risk and checklist enforcement at the domain-validation boundary, not only in UI controls.
 
 ## Session model
@@ -125,7 +129,9 @@ This supports questions such as which instruments or market conditions show stro
 
 ## Persistent Sessions and segments
 
-A Session persists beyond a single monthly entitlement segment.
+A Session persists beyond a single monthly entitlement segment and has **no product concept of "research finished."** Evidence may continue accumulating over time. The absence of a Finish state must not be interpreted as proof/validation of a strategy.
+
+Within the same Session, appended monthly segments must proceed **chronologically**. A user cannot skip from an earlier completed segment to an arbitrary later month while preserving the same continuous Session equity path. A non-contiguous research period requires a separate Session/research context.
 
 For Free entitlement, a later daily allowance may be used to continue an existing Session with another eligible monthly segment, or to create/use a different eligible Session according to the Subscription & Entitlement Specification.
 
@@ -151,7 +157,7 @@ The system must not claim a strategy is proven or valid solely because an arbitr
 
 - Session duplication is not part of the intended workflow.
 - Free entitlement does not provide Session reset/restart.
-- Reset/restart may be a paid entitlement, but must preserve research-integrity semantics and must not silently rewrite historical evidence.
+- **Session reset/restart is not a product workflow for any tier.** To rerun or start a separate experiment, create a new Session. This preserves provenance rather than rewriting accumulated evidence.
 - If rules materially change, create a **new Trading Method** rather than mutating the evidence contract. Existing evidence-bearing Methods are not edited into a different strategy.
 
 ## Trading Method lifecycle
@@ -159,6 +165,7 @@ The system must not claim a strategy is proven or valid solely because an arbitr
 - A Trading Method that already owns Session/trade/research evidence must not be hard-deleted through the normal product workflow. It may be **Archived**, preserving all linked evidence and research integrity.
 - A Trading Method with no evidence and no dependent research may be deleted.
 - Archiving a Method does not rewrite or detach its historical Sessions.
+- An Archived Trading Method cannot be used to create a new Session. The user must restore/unarchive the Method before using it for new research. Existing Sessions/evidence remain reviewable according to normal entitlement and retention rules.
 - Material rule changes are represented by creating another Trading Method, not by editing the evidence-bearing Method or requiring a user-facing versioning workflow.
 
 ## Sharing
