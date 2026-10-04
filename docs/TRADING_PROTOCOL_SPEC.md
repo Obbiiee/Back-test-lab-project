@@ -1,5 +1,7 @@
 # Backtest Lab — Trading Modes, Strategy Rules & Lab Protocol Specification
 
+> Trading Method ownership, Session inheritance, locked RR/risk planner behavior and cross-session research are defined in [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol trading behavior is independent from Free/Pro subscription entitlement.
+
 Status: architecture authority for future trading/rules/research work. This document does not authorize implementation.
 
 ## Two independent dimensions
