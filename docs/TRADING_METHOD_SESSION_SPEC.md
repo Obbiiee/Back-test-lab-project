@@ -47,7 +47,7 @@ At minimum, creation requires:
 - locked risk per trade;
 - at least one checklist condition.
 
-Once locked, the protocol definition used by existing evidence must not be silently edited. Material changes require a new method/protocol version so prior evidence remains reproducible.
+Once locked, the protocol definition used by existing evidence must not be silently edited. If the user wants materially different rules, RR, risk or checklist definition, they create a **new Trading Method**. The product does not require Protocol versioning as a user workflow; prior Method evidence remains attached to the original immutable Method.
 
 A Session inheriting a Protocol method does not ask the user to choose Free Style/Protocol again.
 
@@ -57,7 +57,7 @@ A Protocol method must contain **at least one** user-defined checklist condition
 
 Checklist execution enforcement is a method-level setting that may be ON or OFF:
 - **ON:** every checklist condition defined by the locked Protocol method must be satisfied before an order may be executed. Failure to satisfy any condition blocks execution at the protocol/domain validation boundary.
-- **OFF:** checklist conditions remain available for deliberate review, logging and Research evidence, but incomplete conditions do not block execution.
+- **OFF:** the execution flow does **not** require or display the checklist as a pre-order step. Checklist enforcement does not block execution. The Method definition may retain its checklist configuration, but execution must not force checklist interaction while enforcement is OFF.
 
 Checklist state must be captured with the trade/protocol evidence so Research can later analyze outcomes against conditions. There is no X-of-Y threshold model in the current product contract.
 
@@ -94,7 +94,7 @@ The product must not ask the user to re-select the method type at Session creati
 
 ## Session model
 
-A Session is a persistent research container belonging to exactly one Trading Method/version.
+A Session is a persistent research container belonging to exactly one Trading Method.
 
 At creation, target inputs include:
 - Trading Method;
@@ -112,14 +112,14 @@ Feed/provider identity cannot be changed mid-Session. A different feed requires 
 
 ## Cross-session and cross-instrument research
 
-Multiple Sessions may reference the same Trading Method/version.
+Multiple Sessions may reference the same Trading Method.
 
 Example:
 - Breakout S/R v1 -> XAUUSD Session;
 - Breakout S/R v1 -> EURUSD Session;
 - Breakout S/R v1 -> GBPUSD Session.
 
-Because the method/version identity is shared, Research may compare evidence across instruments, periods and Sessions while retaining each Session's feed, execution profile and dataset provenance.
+Because the Trading Method identity is shared, Research may compare evidence across instruments, periods and Sessions while retaining each Session's feed, execution profile and dataset provenance.
 
 This supports questions such as which instruments or market conditions show stronger evidence for a given method without conflating differently defined strategies.
 
@@ -129,7 +129,7 @@ A Session persists beyond a single monthly entitlement segment.
 
 For Free entitlement, a later daily allowance may be used to continue an existing Session with another eligible monthly segment, or to create/use a different eligible Session according to the Subscription & Entitlement Specification.
 
-A Session may therefore accumulate evidence over time. Prior evidence must remain immutable/reproducible when later segments are appended.
+A Session may therefore accumulate evidence over time. **Starting balance is set only when the Session is created. Thereafter balance/equity continues chronologically across appended monthly segments; continuation must not ask for or silently reset starting balance.** Prior evidence must remain immutable/reproducible when later segments are appended.
 
 Pro may expose a long date range as one continuous research experience while the engine internally uses monthly or other deterministic segments for caching, checkpoints, recovery, integrity and compute. Internal segmentation must not force repetitive monthly UX on Pro.
 
@@ -152,7 +152,14 @@ The system must not claim a strategy is proven or valid solely because an arbitr
 - Session duplication is not part of the intended workflow.
 - Free entitlement does not provide Session reset/restart.
 - Reset/restart may be a paid entitlement, but must preserve research-integrity semantics and must not silently rewrite historical evidence.
-- If rules materially change, create/version the Trading Method/Protocol rather than mutating the evidence contract.
+- If rules materially change, create a **new Trading Method** rather than mutating the evidence contract. Existing evidence-bearing Methods are not edited into a different strategy.
+
+## Trading Method lifecycle
+
+- A Trading Method that already owns Session/trade/research evidence must not be hard-deleted through the normal product workflow. It may be **Archived**, preserving all linked evidence and research integrity.
+- A Trading Method with no evidence and no dependent research may be deleted.
+- Archiving a Method does not rewrite or detach its historical Sessions.
+- Material rule changes are represented by creating another Trading Method, not by editing the evidence-bearing Method or requiring a user-facing versioning workflow.
 
 ## Sharing
 
