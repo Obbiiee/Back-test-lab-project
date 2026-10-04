@@ -372,6 +372,33 @@ No requirement for production multi-user cloud architecture at v1.0.
 
 These fractional phases refine the stable local v1 before cloud productization. They do **not** reopen completed Phase 14/15/18 history, do not authorize backend/cloud work, and do not create a second roadmap. Runtime implementation still requires explicit authorization through the current-phase authority.
 
+### Phase 18.4 — POST-v1 REPOSITORY HYGIENE & DOMAIN NORMALIZATION (PLANNED MAINTENANCE GATE)
+
+Purpose: establish a clean, unambiguous repository baseline before Phase 18.5–18.9 planning work and before any Phase 19/v2 implementation. This is maintenance/planning scope and does not authorize Phase 19.
+
+Plan:
+- freeze the current Trading Method model as the product authority: `FREE_STYLE | PROTOCOL`, inherited by Session rather than re-selected as a per-session Trading Mode;
+- Protocol requires locked RR, locked risk and at least one user-defined checklist condition;
+- Protocol checklist enforcement may be ON/OFF; when ON every defined condition must pass before execution, and when OFF checklist state remains research evidence without blocking execution;
+- Protocol permits Planned execution only; Quick + Planned are available to Free Style;
+- Research Maturity must not require cross-pair coverage;
+- keep Session creation lightweight: Trading Method, Session name, instrument/pair, immutable feed identity, starting balance and starting period; timeframe remains switchable; execution-profile complexity belongs in advanced/defaulted configuration rather than first-run friction;
+- inventory the complete repository and classify files as KEEP / ARCHIVE / DELETE CANDIDATE / REVIEW before deletion;
+- protect active runtime, tests and required fixtures, market data, useful scripts, AI_CONTEXT, roadmap/planning/concept/spec documents, licenses/notices, release evidence required for provenance, and Git/build configuration;
+- target verified disposable artifacts first: obsolete screenshots/previews, Figma/example visual artifacts, temporary browser evidence, duplicate generated proof and unreachable duplicate prototype assets;
+- do not bulk-delete `legacy/`; some legacy material remains fixture/regression/provenance evidence and must be proven unreferenced before removal;
+- audit dead code, unused imports/exports/dependencies, unreachable components, obsolete compatibility shims and duplicate implementations only after reference/import/test analysis;
+- normalize active authority language so obsolete per-workflow `Trading Mode = FREE | PROTOCOL` semantics cannot override the Trading Method model; preserve historical phase reports as history and label/supersede rather than falsifying past evidence;
+- after cleanup run the full registered regression, repository/bundle controls, lint, production build, release/distribution audit and browser smoke acceptance for chart/replay/trading/drawing/indicators/news;
+- audit the final diff and require normal Git checkpoint/push/remote equality before declaring the maintenance gate complete.
+
+Suggested checkpoint separation:
+1. documentation/domain-authority normalization;
+2. verified disposable-artifact cleanup;
+3. dead-code/dependency cleanup only if independently proven safe.
+
+Definition of done: every retained class of file has a documented reason to exist; no protected knowledge or active behavior is lost; current product authority uses one Trading Method language; validation remains green; no Phase 19 implementation has begun.
+
 ### Phase 18.5 — POST-v1 ARCHITECTURE & REFERENCE AUDIT (PLANNED)
 
 Plan:
@@ -412,6 +439,13 @@ Exact labels/order remain subject to interactive UX validation.
 - Profile
 - Settings
 - Subscription / Billing
+
+**Trading Method final protocol decisions**
+- Protocol checklist count is user-defined with a minimum of one condition.
+- Checklist enforcement is configurable ON/OFF at the method contract: ON requires all defined conditions before execution; OFF records checklist evidence without blocking.
+- Protocol execution is Planned-only; discretionary Quick execution belongs to Free Style.
+- Research Maturity excludes pair-count/cross-pair coverage as a requirement.
+- Session onboarding remains lightweight; execution profile uses a sensible default/advanced configuration rather than mandatory first-run complexity.
 
 **Trading Method onboarding / ownership**
 - A backtest Session must belong to a Trading Method.
@@ -463,7 +497,11 @@ Phase 18.6 deliverable must include a sitemap and a Page vs Panel vs Modal/Drawe
 
 ### Phase 18.7 — TRADING WORKFLOW ARCHITECTURE & UX REDESIGN (PLANNED)
 
-The trading UX has **two independent dimensions** and must not collapse them into one concept.
+**Authority correction:** any earlier Phase 18.7 language that modeled FREE/PROTOCOL as a per-workflow Trading Mode is superseded by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol is a Trading Method type inherited by Sessions. Free Style supports Quick + Planned; Protocol is Planned-only with locked protocol validation.
+
+Historical planning below may describe the earlier two-dimension model; treat conflicting portions as superseded and do not implement them.
+
+The earlier trading UX draft described **two independent dimensions** and must not collapse them into one concept.
 
 **Trading Mode**
 1. **Free Mode** — discretionary backtesting. Supported actions may be used freely and are still recorded for later analysis.
