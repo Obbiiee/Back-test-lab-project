@@ -1,5 +1,7 @@
 # Backtest Lab — Trading Modes, Strategy Rules & Lab Protocol Specification
 
+> **CURRENT AUTHORITY NOTICE:** Free Style / Protocol is a **Trading Method type**, not an independent per-trade Trading Mode. The canonical product model is defined in [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Any conflicting legacy wording below is superseded. Free Style may use Quick or Planned execution. Protocol is Planned-only, must submit a pending Limit or Stop order, does not permit direct Market entry, and does not permit discretionary manual close after trigger. Protocol follows "plan your trade, trade your plan." Domain/rules validation must enforce these constraints.
+
 > Trading Method ownership, Session inheritance, locked RR/risk planner behavior and cross-session research are defined in [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol trading behavior is independent from Free/Pro subscription entitlement.
 
 Status: architecture authority for future trading/rules/research work. This document does not authorize implementation.
