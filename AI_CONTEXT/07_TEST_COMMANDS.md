@@ -30,6 +30,8 @@ Run in `frontend/`:
 
 Run full regression in master, not the partial bundle. Browser verification is required for product interaction changes; Phase 7 evidence and limitations: `docs/PHASE7_DRAWING_PERSISTENCE.md`.
 
+Economic news: `npm run test:phase14.5` checks import/time/strict invariance/index/context/marker/navigation; `npm run bench:phase14.5` reports non-gating 10k/100k indexing/query/heap observations. Test-only `/tests/phase14-5.html` exercises real IndexedDB, file import, primitive lifecycle, replay integration and browser benchmarks on an isolated origin. [News report](../docs/PHASE14_5_ECONOMIC_NEWS.md) records evidence/limits. Retain full earlier-phase regression, lint/build and bundle gates.
+
 Phase 7.5 no-behavior-change verification is recorded in `docs/PHASE7_5_REPOSITORY_CLEANUP.md`; disposable captures are ignored under `frontend/tests/artifacts/`. Backend tests are a standalone Python workflow, not proof of active frontend features.
 
 Documentation-control changes must run test:repository and test:ai-bundle plus regenerate/verify the bundle. Product changes retain the full regression/browser requirements in [workflow](06_WORKFLOW_RULES.md). Phase 7.6 changes only context, roadmap, tests and bundle config; browser verification is exempt because no product/runtime/build path is modified.

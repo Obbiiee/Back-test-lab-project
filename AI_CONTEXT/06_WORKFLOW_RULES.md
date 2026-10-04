@@ -20,6 +20,8 @@ Do not declare completion when validation or push fails. Report the blocker and 
 
 Machine-checkable mandatory gates (these define policy, not current status):
 
+Explicit human authorization for a bounded multi-phase journey overrides the default stop between phases. Keep one phase per validated commit/push checkpoint; after remote equality and clean-tree verification, continue only to the next phase in the authorized sequence recorded in the current-phase authority. ONE_PHASE_ONLY still prohibits combining phase checkpoints; REQUIRE_STOP applies at the end of the authorized journey or a material hard-stop condition. Generated next prompts never extend authorization. Preserve all tests, browser verification, diff review and context gates for every phase. The final report includes a next prompt for human-authorized future work, without starting it.
+
 ```json
 {
   "AUTHORITY": "workflow",

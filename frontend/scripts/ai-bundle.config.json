@@ -9,7 +9,8 @@
     "AI_CONTEXT/06_WORKFLOW_RULES.md",
     "AI_CONTEXT/07_TEST_COMMANDS.md",
     "docs/ROADMAP.md",
-    "docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md"
+    "docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md",
+    "docs/PHASE14_5_ECONOMIC_NEWS.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",
@@ -60,7 +61,18 @@
     "frontend/src/trading/OrderTicket.jsx",
     "frontend/src/trading/format.js",
     "frontend/src/trading/riskReward.js",
-    "frontend/src/FxWorkspace.css"
+    "frontend/src/FxWorkspace.css",
+    "frontend/src/news/eventIndex.js",
+    "frontend/src/news/eventRepository.js",
+    "frontend/src/news/eventValidation.js",
+    "frontend/src/news/NewsContext.js",
+    "frontend/src/news/NewsMarkerAdapter.js",
+    "frontend/src/news/NewsNavigationController.js",
+    "frontend/src/news/NewsPanel.jsx",
+    "frontend/src/news/researchContext.js",
+    "frontend/src/news/timeIndex.js",
+    "frontend/src/news/TradeNewsContext.jsx",
+    "frontend/src/news/useNews.js"
   ],
   "tests": [
     "frontend/tests/phase6.test.mjs",
@@ -83,7 +95,13 @@
     "frontend/tests/phase14.test.mjs",
     "frontend/tests/phase14-benchmark.mjs",
     "frontend/tests/phase14-browser.jsx",
-    "frontend/tests/phase14.html"
+    "frontend/tests/phase14.html",
+    "frontend/tests/phase14-5-benchmark.mjs",
+    "frontend/tests/phase14-5-browser.jsx",
+    "frontend/tests/phase14-5-fixtures.mjs",
+    "frontend/tests/phase14-5-navigation.test.mjs",
+    "frontend/tests/phase14-5.html",
+    "frontend/tests/phase14-5.test.mjs"
   ],
   "supporting": [
     "frontend/package.json",

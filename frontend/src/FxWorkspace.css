@@ -168,3 +168,16 @@ html {color-scheme:dark;}
 .analysis-exit {display:grid;gap:6px;padding:10px 0;border-bottom:1px solid #303440;}
 .analysis-exit label {display:grid;gap:6px;}
 .analysis-exit textarea {min-height:55px;border:1px solid #343845;background:#20242e;color:#e2e5ec;padding:8px;border-radius:5px;}
+.news-panel {position:absolute;z-index:25;right:60px;top:60px;bottom:55px;width:min(410px,calc(100vw - 80px));overflow:auto;background:#151922;color:#e2e5ec;border:1px solid #343845;border-radius:6px;padding:14px;box-shadow:0 8px 24px #0008;font-size:12px;}
+.news-panel header {display:flex;justify-content:space-between;align-items:center;font-size:15px;margin-bottom:12px;}
+.news-panel label,.news-panel small {display:block;margin:7px 0;overflow-wrap:anywhere;}
+.news-panel input,.news-panel select,.news-panel button {color:inherit;background:#20242e;border:1px solid #343845;border-radius:4px;padding:7px;max-width:100%;}
+.news-panel button {cursor:pointer;margin:3px;}
+.news-panel button:disabled {opacity:.5;cursor:default;}
+.news-panel button:focus-visible,.news-panel input:focus-visible,.news-panel select:focus-visible {outline:2px solid #d9a94f;outline-offset:2px;}
+.news-panel [role=alert] {color:#ff9b9b;}
+.news-event-list {display:grid;gap:4px;margin-top:10px;}
+.news-event-list button {text-align:left;display:grid;gap:6px;}
+.news-event-list button[aria-pressed=true] {border-color:#d9a94f;}
+.news-panel dl div {padding:6px 0;border-bottom:1px solid #343845;}
+.news-panel dd {margin:3px 0;}

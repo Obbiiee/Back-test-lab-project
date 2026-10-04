@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import { money } from './format';
 import { utcTime } from './backtestAnalysis';
 import { downloadCsv, exportCompletedPositions, exportExitRecords } from './backtestExport';
+import TradeNewsContext from '../news/TradeNewsContext.jsx';
 const cash = value => Number.isFinite(value) ? money(value) : '—';
 const number = value => value === Infinity ? '∞' : Number.isFinite(value) ? value.toFixed(2) : '—';
 const percent = value => Number.isFinite(value) ? `${value.toFixed(2)}%` : '—';
@@ -33,6 +34,7 @@ function BacktestAnalysis({ trades, analysis, onNotes }) {
     <div className="analysis-position-list">{analysis.groups.slice().reverse().map(group=><button key={group.key} aria-pressed={selected===group.key} onClick={()=>setSelected(group.key)}><span>{group.side??'Unknown side'} · {group.status} · {group.exits.length} exit(s)</span><strong>{cash(group.totalPnl)}</strong></button>)}</div>
     {detail&&<section className="analysis-detail" aria-label="Position detail"><h3>{detail.side??'Unknown side'} · {detail.status}</h3><p>Entry {detail.entry??'Unavailable'} · {time(detail.entryTime)} · Original size {detail.initialSize??'Unavailable'}</p><p>Last recorded exit {detail.finalExit??'Unavailable'} · {time(detail.finalExitTime)} · {detail.status==='Completed'?'Duration':'Recorded elapsed time'} {detail.duration==null?'Unavailable':`${detail.duration} seconds`} · Total {cash(detail.totalPnl)}</p>
       {detail.exits.map((exit, index)=><div className="analysis-exit" key={exit.sequence}><strong>{detail.status==='Completed'&&index===detail.exits.length-1?'Final exit':'Exit'} {index+1} · {exit.record.reason??'Unknown reason'}</strong><span>{time(exit.record.exitTime)} · Price {exit.record.exit??'Unavailable'} · Size {exit.record.size??'Unavailable'} · {cash(exit.record.pnl)}</span><span>Tags: {exit.record.tags??'Unavailable'} · Strategy: {exit.record.strategy??'Unavailable'}</span><label>Journal notes for exit {index+1}<textarea aria-label={`Journal notes for exit ${index+1}`} value={exit.record.notes??''} disabled={typeof exit.record.id!=='string'||detail.errors.some(error=>error.includes('identity'))} onChange={event=>onNotes(exit.record.id,event.target.value)}/></label></div>)}
+      <TradeNewsContext detail={detail}/>
     </section>}
   </div>;
 }

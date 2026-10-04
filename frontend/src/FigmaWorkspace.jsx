@@ -16,6 +16,9 @@ import useReplayPlayback from './market/useReplayPlayback';
 import {PLAYBACK_SPEEDS} from './market/PlaybackScheduler';
 import useReplayMarket from "./market/useReplayMarket";
 import {riskRewardOrderSeed} from "./trading/riskReward";
+import useNews from './news/useNews.js';
+import NewsPanel from './news/NewsPanel.jsx';
+import { NewsContext } from './news/NewsContext.js';
 import "./FigmaWorkspace.css";
 import "./FxWorkspace.css";
 const CandleChart=lazy(()=>import('./components/CandleChart'));
@@ -99,6 +102,8 @@ function App() {
  const replay=useReplayMarket(timeframe);
  const {playing,setPlaying}=useReplayPlayback(replay,speed);
  const trading=useTrading(replay.loading?[]:replay.active?replay.raw:market.liveBars,replay.active,replay.active?replay.transition:undefined);
+ const [newsOpen,setNewsOpen]=useState(false);
+ const news=useNews({replay,trading,timeframe,setPlaying,chartCommand:setChartCommand,openPanel:setNewsOpen});
  const [quantity,setQuantity]=useState(1),[orderSeed,setOrderSeed]=useState(null),[ticketId,setTicketId]=useState(0);
  const [dateOpen,setDateOpen]=useState(false),[replayDate,setReplayDate]=useState('2024-06-03T12:00');
  const [resetRequest,setResetRequest]=useState(null);
@@ -107,16 +112,16 @@ function App() {
  const resizePositions=event=>{event.preventDefault();const start=event.clientY,height=terminalHeight;const move=point=>setTerminalHeight(Math.max(95,Math.min(window.innerHeight-280,height+start-point.clientY)));const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);};
  const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('backtest-favorites-v1'))??['Trend Line','Long Position','Short Position'];}catch{return ['Trend Line','Long Position','Short Position'];}});
  const [favoritesVisible,setFavoritesVisible]=useState(true),[lastTools,setLastTools]=useState({cursor:'Cross',trend:'Trend Line',measure:'Long Position'});
- const openTicket=(side=tradeSide,seed=null)=>{if(!trading.quote){setNotice('Loading price…');return;}setTradeSide(side);setOrderSeed(seed);setTicketId(value=>value+1);setDialog('order');};
+ const openTicket=(side=tradeSide,seed=null)=>{news.cancel();if(!trading.quote){setNotice('Loading price…');return;}setTradeSide(side);setOrderSeed(seed);setTicketId(value=>value+1);setDialog('order');};
  const fromDrawing=object=>{const seed=riskRewardOrderSeed(object,trading.quote?.close);openTicket(seed.side,seed);};
- const beginReplay=async()=>{setPlaying(false);try{const time=await replay.start(replayDate+'Z');trading.reset(time);setDateOpen(false);}catch{/* The replay form displays the loading error. */}};
- const exitReplay=()=>{setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);};
+ const beginReplay=async()=>{news.cancel();setPlaying(false);try{const time=await replay.start(replayDate+'Z');trading.reset(time);setDateOpen(false);}catch{/* The replay form displays the loading error. */}};
+ const exitReplay=()=>{news.cancel();setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);};
  const requestReset=action=>requestAccountReset(trading.account,action,confirmedAction=>setResetRequest({action:confirmedAction}));
  const toggleFavorite=item=>setFavorites(current=>current.includes(item)?current.filter(name=>name!==item):[...current,item]);
  useEffect(()=>{try{localStorage.setItem('backtest-favorites-v1',JSON.stringify(favorites));}catch{/* In-memory favorites remain available. */}},[favorites]);
 	const menu = useMemo(() => activeTool ? toolGroups[activeTool] : undefined, [activeTool]);
  const data=replay.loading?[]:replay.active?replay.candles:market.candles;
- const chooseTool = (name,group=activeTool) => { const mode = resolveTool(name,group); if (mode) setDrawingMode(mode); if(group)setLastTools(current=>({...current,[group]:name}));setPlaying(false); setActiveTool(null); };
+ const chooseTool = (name,group=activeTool) => { news.cancel(); const mode = resolveTool(name,group); if (mode) setDrawingMode(mode); if(group)setLastTools(current=>({...current,[group]:name}));setPlaying(false); setActiveTool(null); };
  const toolButtons = [
   { icon: "cursor", key: "cursor", title: "Cursor" },
   { icon: "trend", key: "trend", title: "Trend Line" },
@@ -126,7 +131,7 @@ function App() {
   { icon: "eye", key: "eye", title: "Hide drawings" },
   { icon: "trash", key: "trash", title: "Remove drawings" },
  ];
-	return <div className="replay-app">
+	return <NewsContext.Provider value={news.context}><div className="replay-app">
       {notice && <button className="design-notice" onClick={() => setNotice("")}>{notice} ×</button>}
       <header className="main-toolbar">
         <button className="tool-icon"><Icon name="back" /></button>
@@ -166,7 +171,7 @@ function App() {
         </aside>
 
         <div className={"chart-shell cursor-" + drawingMode}>
-          <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} transition={replay.active?replay.transition:undefined} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={trading.update} onClosePosition={trading.close} onCancelOrder={trading.cancel} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={indicatorInstances} /></Suspense>
+          <Suspense fallback={<div className="chart-loading">Loading chart…</div>}>          <CandleChart candles={data} transition={replay.active?replay.transition:undefined} sessionId={`XAUUSD-${marketMode}-${timeframe}`} viewportKey={`XAUUSD-${replay.active?"replay":"live"}-${timeframe}`} onLoadOlder={replay.active?replay.loadOlder:market.loadOlder} positions={trading.account.positions} orders={trading.account.orders} simulatedTrades={trading.account.trades} onCreateOrder={fromDrawing} onAmendOrder={(...args)=>{news.cancel();trading.update(...args);}} onClosePosition={(...args)=>{news.cancel();trading.close(...args);}} onCancelOrder={(...args)=>{news.cancel();trading.cancel(...args);}} onTradingError={setNotice} onPriceSelect={value=>{pickCallback.current?.(value);pickCallback.current=null;setDrawingMode("none");}} drawingMode={drawingMode} onDrawingModeChange={setDrawingMode} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={indicatorInstances} news={news.chart} /></Suspense>
 
           <div className="chart-meta"><strong>XAU / USD · {timeframe} · Backtest Lab</strong><i /><span className="up-text">O {data.at(-1)?.open.toFixed(3)}&nbsp;&nbsp; H {data.at(-1)?.high.toFixed(3)}&nbsp;&nbsp; L {data.at(-1)?.low.toFixed(3)}&nbsp;&nbsp; C {data.at(-1)?.close.toFixed(3)}</span><small>Volume&nbsp; <b>{marketMode === "live" ? "—" : data.at(-1)?.volume}</b></small></div>
           {favoritesVisible&&favorites.length>0&&<div className="drawing-favorites" aria-label="Favorite drawing tools">{favorites.filter(name=>RISK_REWARD_TOOLS[resolveTool(name)] || DRAWING_SPECS[resolveTool(name)]).map(name=><button key={name} title={name} onClick={()=>chooseTool(name,Object.keys(toolGroups).find(group=>toolGroups[group].some(section=>section.items.includes(name))))}>{name==='Long Position'?'↗':name==='Short Position'?'↘':name==='Trend Line'?'╱':name==='Horizontal Line'?'―':name.slice(0,2)}</button>)}</div>}
@@ -186,27 +191,28 @@ function App() {
           </div>}
         </div>
 
-        <aside className="right-rail"><button className={dialog==='order'?'active':''} onClick={()=>openTicket()}><Icon name="order"/><span>Order</span></button><button title="Drawing objects" aria-expanded={objectsOpen} onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Object tree</span></button><button onClick={()=>setJournalOpen(value=>!value)}><Icon name="journal"/><span>Journal</span></button><button onClick={()=>setNotice('No news events are loaded for this session.')}><Icon name="news"/><span>News</span></button><div className="rail-fill"/><button onClick={()=>setNotice(`XAUUSD · 100 oz per lot · USD account · ${money(trading.account.initialBalance)} initial balance`)}><Icon name="settings"/></button>
+        <aside className="right-rail"><button className={dialog==='order'?'active':''} onClick={()=>openTicket()}><Icon name="order"/><span>Order</span></button><button title="Drawing objects" aria-expanded={objectsOpen} onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Object tree</span></button><button onClick={()=>setJournalOpen(value=>!value)}><Icon name="journal"/><span>Journal</span></button><button aria-expanded={newsOpen} onClick={()=>setNewsOpen(value=>!value)}><Icon name="news"/><span>News</span></button><div className="rail-fill"/><button onClick={()=>setNotice(`XAUUSD · 100 oz per lot · USD account · ${money(trading.account.initialBalance)} initial balance`)}><Icon name="settings"/></button>
         </aside>
 
         <section className="trade-controls">
-          <button className="buy-pill" onClick={()=>openTicket('Buy')}>↗ Buy</button><button className="sell-pill" onClick={()=>openTicket('Sell')}>↘ Sell</button><div className="quantity"><input aria-label="Quantity" type="number" min="0.0001" step="any" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></div>
-          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>setDateOpen(true)}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>setPlaying(value=>!value)}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!replay.active||replay.atEnd} onClick={()=>{setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>requestReset(exitReplay)}>×</button>}</div>
+          <button disabled={!!news.navigation} className="buy-pill" onClick={()=>openTicket('Buy')}>↗ Buy</button><button disabled={!!news.navigation} className="sell-pill" onClick={()=>openTicket('Sell')}>↘ Sell</button><div className="quantity"><input aria-label="Quantity" type="number" min="0.0001" step="any" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></div>
+          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>{news.cancel();setDateOpen(true);}}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!!news.navigation||!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{news.cancel();setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(value=>news.navigation?false:!value);}}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!!news.navigation||!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>requestReset(exitReplay)}>×</button>}</div>
           <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label="Hide positions and orders" onClick={()=>setTerminalOpen(value=>!value)}><Icon name="eye" size={17}/></button>
         </section>
-        {terminalOpen&&<PositionsPanel trading={trading} onResize={resizePositions} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
-        {dialog==='order'&&<OrderTicket key={ticketId} side={tradeSide} price={trading.quote?.close} balance={trading.account.balance} initialBalance={trading.account.initialBalance} initialSize={quantity} seed={orderSeed} onClose={()=>setDialog(null)} onPickPrice={(key,callback)=>{pickCallback.current=callback;setDrawingMode('order');setNotice(`Click the chart to set ${key.toUpperCase()}.`);}} onPlace={(order,journal)=>{trading.place(order);setOrderTab(order.type==='Market'?'Open Positions':'Pending Orders');setTerminalOpen(true);if(journal)setJournalOpen(true);}}/>}
+        {terminalOpen&&<PositionsPanel trading={trading} interactionDisabled={!!news.navigation} onResize={resizePositions} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
+        {dialog==='order'&&<OrderTicket key={ticketId} side={tradeSide} price={trading.quote?.close} balance={trading.account.balance} initialBalance={trading.account.initialBalance} initialSize={quantity} seed={orderSeed} onClose={()=>setDialog(null)} onPickPrice={(key,callback)=>{pickCallback.current=callback;setDrawingMode('order');setNotice(`Click the chart to set ${key.toUpperCase()}.`);}} onPlace={(order,journal)=>{news.cancel();trading.place(order);setOrderTab(order.type==='Market'?'Open Positions':'Pending Orders');setTerminalOpen(true);if(journal)setJournalOpen(true);}}/>}
+        {newsOpen&&<NewsPanel news={news} onClose={()=>setNewsOpen(false)}/>}
         {journalOpen&&<Journal account={trading.account} onClose={()=>setJournalOpen(false)} onNotes={trading.notes}/>}
-        {goToOpen&&<div className="session-goto"><strong>Go to</strong><button onClick={()=>{setGoToOpen(false);setDateOpen(true);}}>Select date and time</button>{replay.active&&<button onClick={()=>{setPlaying(false);replay.step();setGoToOpen(false);}}>Next candle</button>}</div>}
+        {goToOpen&&<div className="session-goto"><strong>Go to</strong><button onClick={()=>{setGoToOpen(false);setDateOpen(true);}}>Select date and time</button>{replay.active&&<button onClick={()=>{news.cancel();setPlaying(false);replay.step();setGoToOpen(false);}}>Next candle</button>}</div>}
 
       </section>
 
       {dateOpen&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();requestReset(beginReplay);}}><header><strong>Bar replay</strong><button type="button" aria-label="Close replay date" onClick={()=>setDateOpen(false)}>×</button></header><label>Start date and time (UTC)<input type="datetime-local" min="2016-10-03T00:00" max="2026-09-25T00:58" value={replayDate} onChange={event=>setReplayDate(event.target.value)} required/></label><p>Start a new session with a $100,000 account. Candles after the selected time stay hidden until you advance replay.</p>{replay.error&&<p role="alert" className="ticket-error">{replay.error}</p>}<button type="submit" className="place-order" disabled={replay.loading}>{replay.loading?'Loading candles…':'Start replay'}</button></form></div>}
       {resetRequest&&<ReplayResetConfirmation onCancel={()=>setResetRequest(null)} onConfirm={()=>{const action=resetRequest.action;setResetRequest(null);action();}}/>}
-      {editPosition&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();try{trading.update(editPosition.id,{sl:editPosition.sl===''?null:Number(editPosition.sl),tp:editPosition.tp===''?null:Number(editPosition.tp)});setEditPosition(null);}catch(error){setEditError(error.message);}}}><header><strong>Edit {editPosition.side} · XAUUSD</strong><button type="button" aria-label="Close position edit" onClick={()=>setEditPosition(null)}>×</button></header>{['sl','tp'].map(key=><label key={key}>{key==='sl'?'Stop loss':'Take profit'}<input type="number" step="any" value={editPosition[key]??''} placeholder="None" onChange={event=>setEditPosition(current=>({...current,[key]:event.target.value}))}/></label>)}{editError&&<p role="alert" className="ticket-error">{editError}</p>}<button className="place-order" type="submit">Save changes</button></form></div>}
+      {editPosition&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();try{news.cancel();trading.update(editPosition.id,{sl:editPosition.sl===''?null:Number(editPosition.sl),tp:editPosition.tp===''?null:Number(editPosition.tp)});setEditPosition(null);}catch(error){setEditError(error.message);}}}><header><strong>Edit {editPosition.side} · XAUUSD</strong><button type="button" aria-label="Close position edit" onClick={()=>setEditPosition(null)}>×</button></header>{['sl','tp'].map(key=><label key={key}>{key==='sl'?'Stop loss':'Take profit'}<input type="number" step="any" value={editPosition[key]??''} placeholder="None" onChange={event=>setEditPosition(current=>({...current,[key]:event.target.value}))}/></label>)}{editError&&<p role="alert" className="ticket-error">{editError}</p>}<button className="place-order" type="submit">Save changes</button></form></div>}
 
 
 
-    </div>;
+    </div></NewsContext.Provider>;
 }
 export default App;

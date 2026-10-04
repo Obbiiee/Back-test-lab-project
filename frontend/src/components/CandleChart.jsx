@@ -14,11 +14,13 @@ import DrawingControls from "../drawings/DrawingControls";
 import { IndicatorEngine } from "../indicators/IndicatorEngine";
 
 import { syncCandleSeries } from "../market/replayTransitions.js";
+import { bucketTime } from '../market/candles.js';
+import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -29,6 +31,32 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   const seriesRef = useRef(null);
   const [chartForOverlay, setChartForOverlay] = useState(null);
   const [seriesForOverlay, setSeriesForOverlay] = useState(null);
+  const [newsPrimitive] = useState(() => new NewsMarkerAdapter());
+  const hasNews = Boolean(news);
+  useEffect(() => {
+    if (!hasNews || !chartForOverlay || !seriesForOverlay) return;
+    seriesForOverlay.attachPrimitive(newsPrimitive);
+    return () => seriesForOverlay.detachPrimitive(newsPrimitive);
+  }, [newsPrimitive, chartForOverlay, seriesForOverlay, hasNews]);
+  useEffect(() => {
+    if (!news || !chartForOverlay || !seriesForOverlay) return;
+    if (!candles.length || !Number.isFinite(news.cursor)) { newsPrimitive.replace([]); return; }
+    const scale = chartForOverlay.timeScale();
+    const update = () => {
+      const range = scale.getVisibleLogicalRange();
+      const first = Math.max(0, Math.floor(range?.from ?? 0)), last = Math.min(candles.length - 1, Math.ceil(range?.to ?? candles.length - 1));
+      if (last < first) { newsPrimitive.replace([]); return; }
+      const from = candles[first].time, to = last + 1 < candles.length ? candles[last + 1].time : (news.cursor ?? candles[last].time) + .001;
+      newsPrimitive.replace(markerGroups(news.getEvents(from, to), candles, news.timeframe, news.hasMinute, news.cursor));
+    };
+    const select = param => {
+      if (!['none', 'cursor-dot', 'cursor-arrow'].includes(drawingMode) || !param.point || (param.paneIndex !== undefined && param.paneIndex !== 0)) return;
+      const hit = newsPrimitive.hit(param.point.x, param.point.y);
+      if (hit) news.select(hit.events);
+    };
+    update(); scale.subscribeVisibleLogicalRangeChange(update); chartForOverlay.subscribeClick(select);
+    return () => { scale.unsubscribeVisibleLogicalRangeChange(update); chartForOverlay.unsubscribeClick(select); };
+  }, [news, newsPrimitive, chartForOverlay, seriesForOverlay, candles, drawingMode]);
   const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: "main:XAUUSD" });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
@@ -244,6 +272,11 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       }
       if (action === "fit" || action === "new-layout") { chartRef.current?.priceScale("right").applyOptions({ autoScale: true, mode: 0 }); chartRef.current?.timeScale().fitContent(); }
       if (action === "percent" || action === "log") chartRef.current?.priceScale("right").applyOptions({ mode: action === "log" ? 1 : 2 });
+      if (action === 'news-event' && Number.isFinite(command.time)) {
+        const frame = sessionId?.split('-').at(-1), time = bucketTime(command.time, frame);
+        const index = candles.findIndex(bar => bar.time === time);
+        if (index >= 0) chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, index - 35), to: Math.min(candles.length + 4, index + 35) });
+      }
       if (action.startsWith("range:")) {
         const range = action.slice(6), last = candles.at(-1);
         if (last) {

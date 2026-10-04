@@ -1,5 +1,7 @@
 # Boundaries
 
+Economic news is a separate `frontend/src/news/` domain. Frozen versioned facts feed EventIndex's availability timeline and bounded time-tree filter views. NewsRepository verifies hashes in a separate native IndexedDB namespace before atomic active/previous swaps. NewsMarkerAdapter uses an official series primitive without autoscale/trading-marker ownership. NewsNavigationController requests existing manual steps and waits for revision plus account settlement acknowledgement; it never writes replay/account state. Strict projections alone reach chart/navigation/research. A separately memoized trade-context child preserves financial calculation ownership. Contract/evidence: [news report](../docs/PHASE14_5_ECONOMIC_NEWS.md).
+
 Market data loaders → replay/live candle aggregation → CandleChart (native Lightweight Charts). Replay reveals market data; it does not own drawings.
 
 Independent domains:
