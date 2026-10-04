@@ -389,6 +389,61 @@ Plan:
 - define consistent hover, selected, focused, disabled, locked, warning, error and protocol-restricted states;
 - use Figma only where useful for visual direction; interactive trading behavior should be validated in browser prototypes rather than relying on static mockups as the behavioral authority.
 
+#### Phase 18.6 Information Architecture / Sitemap contract
+
+Phase 18.6 must also define the product information architecture before later visual prototypes are frozen. The goal is a **chart-first research application**, not a generic SaaS dashboard with every capability promoted to a separate route.
+
+**Provisional top-level navigation**
+- Dashboard
+- Backtest
+- Research
+- Strategies
+- Reports
+- Account/avatar entry for Profile, Settings and Subscription/Billing
+
+Exact labels/order remain subject to interactive UX validation.
+
+**Public/account routes**
+- Landing / Home
+- Product / Features
+- Pricing
+- Login / Register / recovery as supported
+- Profile
+- Settings
+- Subscription / Billing
+
+**Core application surfaces**
+- Backtest Workspace is the primary working surface and should host the chart plus contextual trading/replay tools.
+- Dashboard manages recent sessions, resumable work and relevant account/workspace summaries.
+- Research is the home for deeper analysis/experiments rather than duplicating every statistic into separate navigation.
+- Strategies manages strategy definitions/versioning when that capability exists.
+- Reports manages durable/exportable research outputs when that capability exists.
+
+**Prefer workspace panels/tabs instead of separate pages for**
+- Object Tree;
+- indicators/drawing management;
+- replay controls;
+- Quick Trade / Planned Trade ticket;
+- active orders and positions;
+- compact journal;
+- session Analysis/basic statistics;
+- Protocol status/rules summary;
+- market/symbol/timeframe context where practical.
+
+**Prefer modal/popover/context menu for short, contextual actions**
+- indicator/drawing settings;
+- order confirmation/review;
+- risk configuration;
+- protocol lock/confirmation;
+- destructive confirmations;
+- compact selectors and tool settings.
+
+**Prefer dedicated pages/routes when the user is managing a collection or performing deep research**, such as session history, experiment/research management, strategy library, advanced analytics, Monte Carlo/robustness/walk-forward workflows, reports, account/settings and billing.
+
+**Future/deferred surfaces** such as Team Workspace, Community and AI Research Assistant must not clutter the initial navigation before their roadmap capabilities exist.
+
+Phase 18.6 deliverable must include a sitemap and a Page vs Panel vs Modal/Drawer inventory, responsive navigation behavior and clear ownership of each surface. Avoid duplicate sources of truth: a panel and a page may present different views of the same canonical data but must not create independent state.
+
 ### Phase 18.7 — TRADING WORKFLOW ARCHITECTURE & UX REDESIGN (PLANNED)
 
 The trading UX has **two independent dimensions** and must not collapse them into one concept.
