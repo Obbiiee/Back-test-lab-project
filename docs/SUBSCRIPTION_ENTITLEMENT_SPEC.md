@@ -55,6 +55,63 @@ This continuation:
 
 The next new Free tradable-window allowance becomes available according to the next daily entitlement period.
 
+## Persistent Free backtest sessions
+
+A Backtest Session is a persistent research container, not a disposable one-month backtest.
+
+- A Free user may create a new Backtest Session or reopen a previous session.
+- The daily Free allowance may be applied to one eligible session to add/continue one tradable monthly segment.
+- A previous session remains reviewable after its tradable segment is completed.
+- On a later entitlement day, the user may continue that same session with the next eligible monthly segment, preserving its canonical trade history and cumulative results.
+- Alternatively, the user may spend that day's allowance on a new/different session.
+- The entitlement is account-level daily research capacity; creating many session records must not multiply the daily tradable allowance.
+- Continuation must preserve strategy/protocol version, dataset/feed identity, execution profile and other reproducibility metadata. Material research-contract changes must follow the applicable versioning rules rather than silently rewriting prior evidence.
+
+### Dashboard and Session Overview
+
+The Free dashboard should remain a lightweight work selector rather than exposing the full statistics of every experiment.
+
+Primary dashboard actions:
+- **New Backtest**
+- **Previous Sessions / Your Sessions**
+
+A previous-session card should primarily identify the session and its last activity/status. Detailed backtest results appear only after the user opens the session.
+
+Opening a previous session leads to a dedicated **Session Overview** before continuation. The Session Overview is the canonical review surface for that session's accumulated basic results and should include:
+- tested period / completed monthly segments;
+- total trades, wins/losses and win rate;
+- realized net P&L;
+- total R and average R;
+- profit factor;
+- maximum drawdown;
+- session/month progression;
+- access to relevant trade history/journal;
+- a primary **Continue Session** action.
+
+### Interactive basic-result diagrams
+
+Free Session Overview must include useful interactive basic-result visualization rather than intentionally degraded static charts.
+
+Initial target:
+- interactive Equity Curve;
+- interactive Drawdown Curve;
+- P&L / R view toggle where semantically valid;
+- period/month filtering;
+- tap/hover details for chart points;
+- trade markers linked to relevant trade details where practical;
+- monthly/session progression that makes completed segments and the next continuation point clear.
+
+These diagrams derive from the same canonical ledger/statistics contracts as numeric results. Subscription tier must not change the mathematical truth of the same session.
+
+Advanced research visualization and analysis may remain Pro-gated when they represent additional research depth (for example Monte Carlo, deep MAE/MFE, robustness, walk-forward, regime and cross-feed analysis), rather than a more-correct version of the Free result.
+
+### Continue Session entitlement behavior
+
+When **Continue Session** is selected:
+- if the daily Free allowance is available, the user may activate the next eligible tradable monthly segment for that session and return to the Backtest Workspace;
+- if the daily allowance has already been consumed, the Session Overview and prior results remain accessible, but a new tradable segment cannot be activated until the next allowance or an applicable upgrade;
+- the existing open-position boundary rule still applies and must not manufacture outcomes.
+
 ## Free trading capabilities
 
 Subject to normal product/data availability, Free should retain the core experience:
