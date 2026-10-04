@@ -181,3 +181,4 @@ html {color-scheme:dark;}
 .news-event-list button[aria-pressed=true] {border-color:#d9a94f;}
 .news-panel dl div {padding:6px 0;border-bottom:1px solid #343845;}
 .news-panel dd {margin:3px 0;}
+.account-storage-warning {position:fixed;z-index:100;top:52px;left:65px;right:65px;background:#3c2920;color:#ffe2b5;border:1px solid #b68744;border-radius:5px;padding:10px;font-size:12px;}

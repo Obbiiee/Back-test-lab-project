@@ -10,7 +10,8 @@
     "AI_CONTEXT/07_TEST_COMMANDS.md",
     "docs/ROADMAP.md",
     "docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md",
-    "docs/PHASE14_5_ECONOMIC_NEWS.md"
+    "docs/PHASE14_5_ECONOMIC_NEWS.md",
+    "docs/PHASE16_QA_HARDENING.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",
@@ -72,7 +73,11 @@
     "frontend/src/news/researchContext.js",
     "frontend/src/news/timeIndex.js",
     "frontend/src/news/TradeNewsContext.jsx",
-    "frontend/src/news/useNews.js"
+    "frontend/src/news/useNews.js",
+    "frontend/src/trading/AccountPersistence.js",
+    "frontend/src/workspacePreferences.js",
+    "frontend/src/WorkspaceErrorBoundary.jsx",
+    "frontend/src/main.jsx"
   ],
   "tests": [
     "frontend/tests/phase6.test.mjs",
@@ -101,11 +106,14 @@
     "frontend/tests/phase14-5-fixtures.mjs",
     "frontend/tests/phase14-5-navigation.test.mjs",
     "frontend/tests/phase14-5.html",
-    "frontend/tests/phase14-5.test.mjs"
+    "frontend/tests/phase14-5.test.mjs",
+    "frontend/tests/phase16.test.mjs",
+    "frontend/tests/phase16-built-server.mjs"
   ],
   "supporting": [
     "frontend/package.json",
-    "OPEN_SOURCE_NOTICES.md"
+    "OPEN_SOURCE_NOTICES.md",
+    "frontend/scripts/regression.mjs"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

@@ -1,12 +1,17 @@
 import { bucketTime } from '../market/candles.js';
 // Official series primitive, never the trading marker plugin or a price scale.
+export function hasCandleTime(candles, time) {
+  let lo = 0, hi = candles.length;
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (candles[mid].time < time) lo = mid + 1; else hi = mid; }
+  return candles[lo]?.time === time;
+}
 export function markerGroups(events, candles, timeframe, hasMinute, cursor) {
-  const buckets = new Set(candles.map(bar => bar.time)), groups = new Map();
+  const groups = new Map();
   for (const event of events) {
     const time = event.fields.schedule?.value;
     if (!Number.isFinite(time) || time > cursor || !hasMinute(time)) continue;
     const stamp = bucketTime(time, timeframe);
-    if (!buckets.has(stamp)) continue;
+    if (!hasCandleTime(candles, stamp)) continue;
     if (!groups.has(stamp)) groups.set(stamp, []);
     groups.get(stamp).push(event);
   }

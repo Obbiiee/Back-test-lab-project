@@ -1,10 +1,11 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {initialAccount,placeOrder,closePosition,processCandle,pnl,validateOrder} from './simulator';
 import {settleReplay} from './replaySettlement.js';
-const KEY='backtest-paper-account-v1';
-function read(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Number.isFinite(saved.balance)&&['orders','positions','trades'].every(key=>Array.isArray(saved[key])))return saved;}catch{/* Start a fresh account if browser storage is unavailable. */}return initialAccount();}
+import {AccountPersistence} from './AccountPersistence.js';
 export default function useTrading(candles,replaying=false,transition) {
-  const [account,setAccount]=useState(read);
+  const [persistence]=useState(()=>new AccountPersistence());
+  const [account,setAccount]=useState(()=>persistence.load());
+  const storageStatus=useSyncExternalStore(persistence.subscribe,persistence.snapshot,persistence.snapshot);
   const quote=candles.at(-1);
   const previous=useRef([]);
   useEffect(()=>{
@@ -14,7 +15,7 @@ export default function useTrading(candles,replaying=false,transition) {
     setAccount(current=>!replaying?processCandle(current,quote,true):settleReplay(current,candles,before,transition));
     previous.current=candles;
   },[candles,quote,replaying,transition]);
-  useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify(account));}catch{/* In-memory account remains available. */}},[account]);
+  useEffect(()=>{persistence.save(account);},[account,persistence]);
   const place=useCallback(order=>{if(!quote)throw new Error('Wait for a price.');const error=validateOrder(order,quote.close);if(error)throw new Error(error);setAccount(current=>placeOrder(current,order,quote));},[quote]);
   const close=useCallback((id,fraction=1)=>{if(quote)setAccount(current=>closePosition(current,id,quote.close,quote.time,'Manual close',fraction));},[quote]);
   const cancel=useCallback(id=>setAccount(current=>({...current,orders:current.orders.filter(item=>item.id!==id)})),[]);
@@ -22,5 +23,5 @@ export default function useTrading(candles,replaying=false,transition) {
   const notes=useCallback((id,value)=>setAccount(current=>({...current,trades:current.trades.map(item=>item.id===id?{...item,notes:value}:item)})),[]);
   const reset=useCallback(time=>setAccount({...initialAccount(),lastTime:time}),[]);
   const equity=account.balance+account.positions.reduce((sum,item)=>sum+(quote?pnl(item,quote.close):0),0);
-  return {account,equity,quote,place,close,cancel,update,notes,reset};
+  return {account,equity,quote,place,close,cancel,update,notes,reset,storageStatus};
 }

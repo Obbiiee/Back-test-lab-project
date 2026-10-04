@@ -32,7 +32,7 @@ export class EventIndex {
   constructor(dataset) {
     this.dataset = dataset;
     this.occurrences = new Map(dataset.occurrences.map(item => [item.occurrenceId, item]));
-    this.timeline = dataset.occurrences.flatMap(item => Object.values(item.facts).flatMap(facts => facts.filter(fact => fact.availableAt !== null).map(fact => ({ time: fact.availableAt, id: item.occurrenceId })))).sort((a, b) => a.time - b.time);
+    this.timeline = dataset.occurrences.flatMap(item => Object.values(item.facts).flatMap(facts => facts.filter(fact => fact.availableAt !== null).map(fact => ({ time: fact.availableAt, id: item.occurrenceId }))));
     // Actual eligibility also changes at proven release time, not only at fact availability.
     for (const item of dataset.occurrences) for (const fact of item.facts.releaseTime ?? []) if (fact.availableAt !== null && Number.isFinite(fact.value)) this.timeline.push({ time: Math.max(fact.availableAt, fact.value), id: item.occurrenceId });
     this.timeline.sort((a, b) => a.time - b.time);

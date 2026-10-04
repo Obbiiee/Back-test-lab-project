@@ -19,6 +19,7 @@ import {riskRewardOrderSeed} from "./trading/riskReward";
 import useNews from './news/useNews.js';
 import NewsPanel from './news/NewsPanel.jsx';
 import { NewsContext } from './news/NewsContext.js';
+import { readFavorites, FAVORITES_KEY } from './workspacePreferences.js';
 import "./FigmaWorkspace.css";
 import "./FxWorkspace.css";
 const CandleChart=lazy(()=>import('./components/CandleChart'));
@@ -68,7 +69,8 @@ const toolGroups = {
   cursor: [{ title: "", items: ["Cross", "Dot", "Arrow Cursor"] }],
   measure: [{ title: "RISK / REWARD", items: ["Long Position", "Short Position"] }],
 };
-const resolveTool = name => ({ Cross: 'none', Dot: 'cursor-dot', 'Arrow Cursor': 'cursor-arrow', Arrow: 'arrow', 'Trend Line': 'trend-line', 'Horizontal Line': 'horizontal-line', 'Vertical Line': 'vertical-line', Rectangle: 'rectangle', 'Fibonacci Retracement': 'fibonacci-retracement', Text: 'text', Measure: 'measure', 'Long Position': 'long-position', 'Short Position': 'short-position' })[name];
+const TOOL_MODES = Object.freeze(Object.assign(Object.create(null), { Cross: 'none', Dot: 'cursor-dot', 'Arrow Cursor': 'cursor-arrow', Arrow: 'arrow', 'Trend Line': 'trend-line', 'Horizontal Line': 'horizontal-line', 'Vertical Line': 'vertical-line', Rectangle: 'rectangle', 'Fibonacci Retracement': 'fibonacci-retracement', Text: 'text', Measure: 'measure', 'Long Position': 'long-position', 'Short Position': 'short-position' }));
+const resolveTool = name => TOOL_MODES[name];
 function App() {
   const [indicatorInstances, setIndicatorInstances] = useState([]);
 	const [drawingMode, setDrawingMode] = useState("none");
@@ -86,7 +88,7 @@ function App() {
 	});
 	const [speed, setSpeed] = useState(1);
 	const [notice, setNotice] = useState("");
- const [timeframe,setTimeframe]=useState(()=>{try{const saved=localStorage.getItem('backtest-workspace-interval-v1');return saved in TIMEFRAMES?saved:'30m';}catch{return '30m';}});
+ const [timeframe,setTimeframe]=useState(()=>{try{const saved=localStorage.getItem('backtest-workspace-interval-v1');return Object.hasOwn(TIMEFRAMES,saved)?saved:'30m';}catch{return '30m';}});
  useEffect(()=>{try{localStorage.setItem('backtest-workspace-interval-v1',timeframe);}catch{/* The current interval remains usable without storage. */}},[timeframe]);
  const [intervalOpen,setIntervalOpen]=useState(false);
  const [marketMode] = useState("live");
@@ -110,7 +112,8 @@ function App() {
  const [editPosition,setEditPosition]=useState(null),[editError,setEditError]=useState('');
  const pickCallback=useRef(null);
  const resizePositions=event=>{event.preventDefault();const start=event.clientY,height=terminalHeight;const move=point=>setTerminalHeight(Math.max(95,Math.min(window.innerHeight-280,height+start-point.clientY)));const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);};
- const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('backtest-favorites-v1'))??['Trend Line','Long Position','Short Position'];}catch{return ['Trend Line','Long Position','Short Position'];}});
+ const [favoriteStorage]=useState(()=>readFavorites());
+ const [favorites,setFavorites]=useState(favoriteStorage.value);
  const [favoritesVisible,setFavoritesVisible]=useState(true),[lastTools,setLastTools]=useState({cursor:'Cross',trend:'Trend Line',measure:'Long Position'});
  const openTicket=(side=tradeSide,seed=null)=>{news.cancel();if(!trading.quote){setNotice('Loading price…');return;}setTradeSide(side);setOrderSeed(seed);setTicketId(value=>value+1);setDialog('order');};
  const fromDrawing=object=>{const seed=riskRewardOrderSeed(object,trading.quote?.close);openTicket(seed.side,seed);};
@@ -118,7 +121,7 @@ function App() {
  const exitReplay=()=>{news.cancel();setPlaying(false);replay.stop();trading.reset(market.candles.at(-1)?.time);};
  const requestReset=action=>requestAccountReset(trading.account,action,confirmedAction=>setResetRequest({action:confirmedAction}));
  const toggleFavorite=item=>setFavorites(current=>current.includes(item)?current.filter(name=>name!==item):[...current,item]);
- useEffect(()=>{try{localStorage.setItem('backtest-favorites-v1',JSON.stringify(favorites));}catch{/* In-memory favorites remain available. */}},[favorites]);
+ useEffect(()=>{if(!favoriteStorage.writable)return;try{localStorage.setItem(FAVORITES_KEY,JSON.stringify(favorites));}catch{/* In-memory favorites remain available. */}},[favorites,favoriteStorage]);
 	const menu = useMemo(() => activeTool ? toolGroups[activeTool] : undefined, [activeTool]);
  const data=replay.loading?[]:replay.active?replay.candles:market.candles;
  const chooseTool = (name,group=activeTool) => { news.cancel(); const mode = resolveTool(name,group); if (mode) setDrawingMode(mode); if(group)setLastTools(current=>({...current,[group]:name}));setPlaying(false); setActiveTool(null); };
@@ -133,6 +136,7 @@ function App() {
  ];
 	return <NewsContext.Provider value={news.context}><div className="replay-app">
       {notice && <button className="design-notice" onClick={() => setNotice("")}>{notice} ×</button>}
+      {(trading.storageStatus || favoriteStorage.status) && <div className="account-storage-warning" role="alert">{[trading.storageStatus,favoriteStorage.status].filter(Boolean).join(' ')}</div>}
       <header className="main-toolbar">
         <button className="tool-icon"><Icon name="back" /></button>
         <div className="replay-logo"><Icon name="play" size={17} /></div>

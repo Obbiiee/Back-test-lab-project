@@ -3,6 +3,7 @@ import { NewsRepository, validatePreferences } from './eventRepository.js';
 import { NewsNavigationController } from './NewsNavigationController.js';
 import { canonicalString, contentHash } from './eventValidation.js';
 import { bucketTime } from '../market/candles.js';
+import { hasCandleTime } from './NewsMarkerAdapter.js';
 const EMPTY = Object.freeze([]);
 export default function useNews({ replay, trading, timeframe, setPlaying, chartCommand, openPanel }) {
   const [repository] = useState(() => new NewsRepository());
@@ -74,8 +75,7 @@ export default function useNews({ replay, trading, timeframe, setPlaying, chartC
     while (lo < hi) { const mid = (lo + hi) >>> 1; if (bars[mid].time < target) lo = mid + 1; else hi = mid; }
     return bars[lo]?.time === target;
   }, [replay.raw]);
-  const buckets = useMemo(() => new Set(replay.candles.map(bar => bar.time)), [replay.candles]);
-  const canMap = useCallback(time => Number.isFinite(time) && time <= cursor && hasMinute(time) && buckets.has(bucketTime(time, timeframe)), [cursor, hasMinute, buckets, timeframe]);
+  const canMap = useCallback(time => Number.isFinite(time) && time <= cursor && hasMinute(time) && hasCandleTime(replay.candles, bucketTime(time, timeframe)), [cursor, hasMinute, replay.candles, timeframe]);
   const chart = useMemo(() => ({ getEvents, hasMinute, cursor, timeframe, select: events => { setSelected(events[0]?.occurrenceId ?? null); openPanel?.(true); } }), [getEvents, hasMinute, cursor, timeframe, openPanel]);
   return { record, preferences, error, arrival, canMap, reportError: setError, busy, navigation, selected, setSelected, cursor, replace, restore, updatePreferences, navigate, cancel, context, chart };
 }
