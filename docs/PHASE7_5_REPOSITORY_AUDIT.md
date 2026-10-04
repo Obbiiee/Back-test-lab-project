@@ -1,5 +1,24 @@
 # Phase 7.5 repository audit — before cleanup
 
+## v1.0 maintenance audit — 2026-10-04
+
+Verified clean baseline `efe9553622cce95cb9bc2a6501bf9e168bbd7869`: local main, origin/main and actual GitHub main equal, ahead/behind 0/0. Recent commits are the authorized v1.0 implementation/release checkpoints. This maintenance task is explicitly authorized independently of roadmap phases; Phase 19 remains unauthorized. The original Phase 7.5 audit below remains historical evidence.
+
+Pre-deletion tracked inventory: 1,320 files, 285,653,548 bytes (working-tree file content, not compressed Git history). Reference audit covers tracked source, static/dynamic imports, tests, configurations, scripts, package metadata, bundle allowlist, archives and all documentation/planning.
+
+| Classification | Evidence / decision |
+| --- | --- |
+| DELETE | `frontend/public/icons.svg` (5,031 bytes): original imported template sprite; no reference to its path, filename, sprite IDs or SVG `<use>` consumers anywhere else in tracked files. Not a production asset, test fixture, documented extension or roadmap dependency. Delete only this file. |
+| KEEP | All AI_CONTEXT, roadmap, blueprints, Lab Protocol, release/research/planning/history documents. No competing authority or new report. |
+| KEEP | Linked Phase 4–7 screenshots/storage proofs, separation evidence, market decade chunks, test/demo CSVs and synthetic news fixtures. Data and acceptance evidence remain intact. |
+| KEEP | 81 reachable active source files and two documented compatibility exports; the latter are architectural/test compatibility, not dead code. All runtime/build/lint/download dependencies remain; `fflate` is used by both history download scripts. React types support development tooling. |
+| UNCERTAIN → KEEP | Unlinked pre-phase screenshots (`DRAWING_TOOLS_PREVIEW`, `HISTORICAL_XAU_PREVIEW`, `LIVE_XAU_PREVIEW`, `ORDER_POPUP_PREVIEW`, `RISK_REWARD_PREVIEW`, `UI_FIGMA_PREVIEW`, `chart-decade`, `fx-replay-workflow`), archived prototypes/assets and standalone backend/sample generator. Lack of filename references does not prove absence of historical/design value. |
+| KEEP / no tracked junk | No tracked dependency/build/bundle/cache/coverage/artifact directories or `.log`, `.tmp`, `.bak`, `.zip` junk. Existing ignored local dependencies/builds/bundle and browser evidence remain available for validation. |
+
+Expected reduction: one obsolete template asset, 5,031 bytes (~4.9 KiB), zero dead-code modules, zero dependencies. No runtime source, data, storage contract, UX or engine changes. Validation results are recorded here after completion; see the existing test-command authority for commands.
+
+Validation completed: full registered `test:regression` (including repository, unit/domain/integration, all decade chunks/11 timeframes, drawing history/persistence, indicators and anti-look-ahead/news/storage suites), lint, production build and release distribution audit passed. Build module count and asset hashes remain identical to the release baseline. Actual isolated production-build browser at port 5196: market/replay advanced, trend line create/undo/redo and reload restored TIME+PRICE anchors, SMA overlay/RSI pane rendered, Long Position transferred to order ticket, Buy 0.01 market order filled/advanced/closed, journal and analysis reconciled 3 exits/2 completed positions/$28.59 realized, persisted synthetic news Strict details/markers remained available. Reload retained account, Risk/Reward and drawings. Console error/warning log empty. Screenshot is ignored local evidence `frontend/tests/artifacts/v1-hygiene-smoke.jpg`; no new permanent report or tracked screenshot. News import/download behavior was not re-exercised in this smoke test; existing deterministic/full v1.0 acceptance evidence remains applicable because no related code changed. AI bundle regeneration/verification and final diff review are mandatory checkpoint gates.
+
 Baseline: `bbe2627db324a91c5cde39bcd75b1cb29358b582`, clean `main`, origin `Obbiiee/Back-test-lab-project`. All eight AI_CONTEXT files and Phase 7 report were read before editing. No unexpected baseline discrepancy.
 
 ## Classification
