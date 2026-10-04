@@ -118,7 +118,8 @@
   "supporting": [
     "frontend/package.json",
     "OPEN_SOURCE_NOTICES.md",
-    "frontend/scripts/regression.mjs"
+    "frontend/scripts/regression.mjs",
+    "frontend/scripts/release-audit.mjs"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

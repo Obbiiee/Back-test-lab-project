@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -34,7 +34,8 @@
     "test:phase14.5": "node tests/phase14-5.test.mjs",
     "bench:phase14.5": "node tests/phase14-5-benchmark.mjs",
     "test:phase16": "node tests/phase16.test.mjs",
-    "test:regression": "node scripts/regression.mjs"
+    "test:regression": "node scripts/regression.mjs",
+    "audit:release": "node scripts/release-audit.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
