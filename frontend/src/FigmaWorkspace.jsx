@@ -19,6 +19,8 @@ import {riskRewardOrderSeed} from "./trading/riskReward";
 import useNews from './news/useNews.js';
 import NewsPanel from './news/NewsPanel.jsx';
 import { NewsContext } from './news/NewsContext.js';
+import WorkspaceModal from "./workspace/WorkspaceModal.jsx";
+import usePanelResize from "./workspace/usePanelResize.js";
 import { readFavorites, FAVORITES_KEY } from './workspacePreferences.js';
 import "./FigmaWorkspace.css";
 import "./FxWorkspace.css";
@@ -97,7 +99,8 @@ function App() {
 	const [orderTab, setOrderTab] = useState("Open Positions");
 	const [tradeSide, setTradeSide] = useState("Buy");
 	const [terminalOpen, setTerminalOpen] = useState(true);
- const [terminalHeight,setTerminalHeight] = useState(150);
+ const panelResize = usePanelResize();
+ const terminalHeight = panelResize.height;
 	const [dialog, setDialog] = useState(null);
 	const [goToOpen, setGoToOpen] = useState(false);
 	const [journalOpen, setJournalOpen] = useState(false);
@@ -111,7 +114,6 @@ function App() {
  const [resetRequest,setResetRequest]=useState(null);
  const [editPosition,setEditPosition]=useState(null),[editError,setEditError]=useState('');
  const pickCallback=useRef(null);
- const resizePositions=event=>{event.preventDefault();const start=event.clientY,height=terminalHeight;const move=point=>setTerminalHeight(Math.max(95,Math.min(window.innerHeight-280,height+start-point.clientY)));const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);};
  const [favoriteStorage]=useState(()=>readFavorites());
  const [favorites,setFavorites]=useState(favoriteStorage.value);
  const [favoritesVisible,setFavoritesVisible]=useState(true),[lastTools,setLastTools]=useState({cursor:'Cross',trend:'Trend Line',measure:'Long Position'});
@@ -138,13 +140,13 @@ function App() {
       {notice && <button className="design-notice" onClick={() => setNotice("")}>{notice} ×</button>}
       {(trading.storageStatus || favoriteStorage.status) && <div className="account-storage-warning" role="alert">{[trading.storageStatus,favoriteStorage.status].filter(Boolean).join(' ')}</div>}
       <header className="main-toolbar">
-        <button className="tool-icon"><Icon name="back" /></button>
+        <button className="tool-icon" disabled aria-label="Back (unavailable in local workspace)"><Icon name="back" /></button>
         <div className="replay-logo"><Icon name="play" size={17} /></div>
-        <button className="symbol-select"><Icon name="search" size={18} /><strong>XAUUSD</strong></button>
-        <button className="round-plus"><Icon name="plus" size={16} /></button>
+        <button className="symbol-select" disabled title="XAUUSD local dataset"><Icon name="search" size={18} /><strong>XAUUSD</strong></button>
+        <button className="round-plus" disabled aria-label="Add symbol (unavailable)"><Icon name="plus" size={16} /></button>
         <div className="divider" />
-        <div className="interval-picker"><button className="time-button active" onClick={()=>setIntervalOpen(value=>!value)} aria-label="Interval">{timeframe}</button>{intervalOpen&&<div className="interval-menu">{['1m','3m','5m','15m','30m','1h','2h','4h','D','W','M'].map(t=><button key={t} className={timeframe===t?'active':''} onClick={()=>{setTimeframe(t);setIntervalOpen(false);}}>{t}</button>)}</div>}</div>
-        <button className="tool-icon"><Icon name="candles" size={19} /></button>
+        <div className="interval-picker"><button className="time-button active" onClick={()=>setIntervalOpen(value=>!value)} aria-label="Interval" aria-expanded={intervalOpen}>{timeframe}</button>{intervalOpen&&<div className="interval-menu">{['1m','3m','5m','15m','30m','1h','2h','4h','D','W','M'].map(t=><button key={t} className={timeframe===t?'active':''} onClick={()=>{setTimeframe(t);setIntervalOpen(false);}}>{t}</button>)}</div>}</div>
+        <button className="tool-icon" disabled aria-label="Candlestick chart"><Icon name="candles" size={19} /></button>
         <IndicatorControls instances={indicatorInstances} onChange={setIndicatorInstances} />
         <div className="divider" />
         <button className="nav-action" onClick={() => {
@@ -156,11 +158,11 @@ function App() {
         <div className="toolbar-fill" />
         <span className="workspace-name">Backtest Lab</span>
         <span className="layout-name"><i /> Design workspace⌄</span>
-        <button className="tool-icon"><Icon name="bolt" /></button>
-        <button className="tool-icon"><Icon name="hex" /></button>
+        <button className="tool-icon optional-control" disabled aria-label="Quick actions (unavailable)"><Icon name="bolt" /></button>
+        <button className="tool-icon optional-control" disabled aria-label="Extensions (unavailable)"><Icon name="hex" /></button>
         <button className="tool-icon" title="Download chart" onClick={() => sendChartCommand("screenshot")}><Icon name="camera" /></button>
-        <button className="editor-button"><Icon name="code" size={18} />Editor</button>
-        <button className="tool-icon"><Icon name="moon" /></button>
+        <button className="editor-button" disabled title="Editor unavailable in local v1.0"><Icon name="code" size={18} />Editor</button>
+        <button className="tool-icon optional-control" disabled aria-label="Dark theme"><Icon name="moon" /></button>
         <button className="tool-icon" title="Fullscreen" onClick={() => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()}><Icon name="expand" /></button>
       </header>
 
@@ -195,15 +197,15 @@ function App() {
           </div>}
         </div>
 
-        <aside className="right-rail"><button className={dialog==='order'?'active':''} onClick={()=>openTicket()}><Icon name="order"/><span>Order</span></button><button title="Drawing objects" aria-expanded={objectsOpen} onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Object tree</span></button><button onClick={()=>setJournalOpen(value=>!value)}><Icon name="journal"/><span>Journal</span></button><button aria-expanded={newsOpen} onClick={()=>setNewsOpen(value=>!value)}><Icon name="news"/><span>News</span></button><div className="rail-fill"/><button onClick={()=>setNotice(`XAUUSD · 100 oz per lot · USD account · ${money(trading.account.initialBalance)} initial balance`)}><Icon name="settings"/></button>
+        <aside className="right-rail"><button className={dialog==='order'?'active':''} onClick={()=>openTicket()}><Icon name="order"/><span>Order</span></button><button title="Drawing objects" aria-expanded={objectsOpen} onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Object tree</span></button><button aria-expanded={journalOpen} onClick={()=>setJournalOpen(value=>!value)}><Icon name="journal"/><span>Journal</span></button><button aria-expanded={newsOpen} onClick={()=>setNewsOpen(value=>!value)}><Icon name="news"/><span>News</span></button><div className="rail-fill"/><button aria-label="Account information" onClick={()=>setNotice(`XAUUSD · 100 oz per lot · USD account · ${money(trading.account.initialBalance)} initial balance`)}><Icon name="settings"/></button>
         </aside>
 
         <section className="trade-controls">
           <button disabled={!!news.navigation} className="buy-pill" onClick={()=>openTicket('Buy')}>↗ Buy</button><button disabled={!!news.navigation} className="sell-pill" onClick={()=>openTicket('Sell')}>↘ Sell</button><div className="quantity"><input aria-label="Quantity" type="number" min="0.0001" step="any" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></div>
-          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>{news.cancel();setDateOpen(true);}}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!!news.navigation||!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{news.cancel();setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" disabled={!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(value=>news.navigation?false:!value);}}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!!news.navigation||!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>requestReset(exitReplay)}>×</button>}</div>
-          <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label="Hide positions and orders" onClick={()=>setTerminalOpen(value=>!value)}><Icon name="eye" size={17}/></button>
+          <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>{news.cancel();setDateOpen(true);}}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!!news.navigation||!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{news.cancel();setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" aria-pressed={playing} disabled={!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(value=>news.navigation?false:!value);}}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!!news.navigation||!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>requestReset(exitReplay)}>×</button>}</div>
+          <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label={terminalOpen?"Hide positions and orders":"Show positions and orders"} aria-expanded={terminalOpen} onClick={()=>setTerminalOpen(value=>!value)}><Icon name="eye" size={17}/></button>
         </section>
-        {terminalOpen&&<PositionsPanel trading={trading} interactionDisabled={!!news.navigation} onResize={resizePositions} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
+        {terminalOpen&&<PositionsPanel trading={trading} interactionDisabled={!!news.navigation} onResize={panelResize.start} onResizeKeyDown={panelResize.keyDown} resizeHeight={panelResize.height} resizeMin={panelResize.min} resizeMax={panelResize.max} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
         {dialog==='order'&&<OrderTicket key={ticketId} side={tradeSide} price={trading.quote?.close} balance={trading.account.balance} initialBalance={trading.account.initialBalance} initialSize={quantity} seed={orderSeed} onClose={()=>setDialog(null)} onPickPrice={(key,callback)=>{pickCallback.current=callback;setDrawingMode('order');setNotice(`Click the chart to set ${key.toUpperCase()}.`);}} onPlace={(order,journal)=>{news.cancel();trading.place(order);setOrderTab(order.type==='Market'?'Open Positions':'Pending Orders');setTerminalOpen(true);if(journal)setJournalOpen(true);}}/>}
         {newsOpen&&<NewsPanel news={news} onClose={()=>setNewsOpen(false)}/>}
         {journalOpen&&<Journal account={trading.account} onClose={()=>setJournalOpen(false)} onNotes={trading.notes}/>}
@@ -211,9 +213,9 @@ function App() {
 
       </section>
 
-      {dateOpen&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();requestReset(beginReplay);}}><header><strong>Bar replay</strong><button type="button" aria-label="Close replay date" onClick={()=>setDateOpen(false)}>×</button></header><label>Start date and time (UTC)<input type="datetime-local" min="2016-10-03T00:00" max="2026-09-25T00:58" value={replayDate} onChange={event=>setReplayDate(event.target.value)} required/></label><p>Start a new session with a $100,000 account. Candles after the selected time stay hidden until you advance replay.</p>{replay.error&&<p role="alert" className="ticket-error">{replay.error}</p>}<button type="submit" className="place-order" disabled={replay.loading}>{replay.loading?'Loading candles…':'Start replay'}</button></form></div>}
+      {dateOpen&&<WorkspaceModal label="Bar replay date" onClose={()=>setDateOpen(false)}><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();requestReset(beginReplay);}}><header><strong>Bar replay</strong><button type="button" aria-label="Close replay date" onClick={()=>setDateOpen(false)}>×</button></header><label>Start date and time (UTC)<input type="datetime-local" min="2016-10-03T00:00" max="2026-09-25T00:58" value={replayDate} onChange={event=>setReplayDate(event.target.value)} required/></label><p>Start a new session with a $100,000 account. Candles after the selected time stay hidden until you advance replay.</p>{replay.error&&<p role="alert" className="ticket-error">{replay.error}</p>}<button type="submit" className="place-order" disabled={replay.loading}>{replay.loading?'Loading candles…':'Start replay'}</button></form></WorkspaceModal>}
       {resetRequest&&<ReplayResetConfirmation onCancel={()=>setResetRequest(null)} onConfirm={()=>{const action=resetRequest.action;setResetRequest(null);action();}}/>}
-      {editPosition&&<div className="dialog-backdrop"><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();try{news.cancel();trading.update(editPosition.id,{sl:editPosition.sl===''?null:Number(editPosition.sl),tp:editPosition.tp===''?null:Number(editPosition.tp)});setEditPosition(null);}catch(error){setEditError(error.message);}}}><header><strong>Edit {editPosition.side} · XAUUSD</strong><button type="button" aria-label="Close position edit" onClick={()=>setEditPosition(null)}>×</button></header>{['sl','tp'].map(key=><label key={key}>{key==='sl'?'Stop loss':'Take profit'}<input type="number" step="any" value={editPosition[key]??''} placeholder="None" onChange={event=>setEditPosition(current=>({...current,[key]:event.target.value}))}/></label>)}{editError&&<p role="alert" className="ticket-error">{editError}</p>}<button className="place-order" type="submit">Save changes</button></form></div>}
+      {editPosition&&<WorkspaceModal label="Edit position" onClose={()=>setEditPosition(null)}><form className="replay-date-dialog" onSubmit={event=>{event.preventDefault();try{news.cancel();trading.update(editPosition.id,{sl:editPosition.sl===''?null:Number(editPosition.sl),tp:editPosition.tp===''?null:Number(editPosition.tp)});setEditPosition(null);}catch(error){setEditError(error.message);}}}><header><strong>Edit {editPosition.side} · XAUUSD</strong><button type="button" aria-label="Close position edit" onClick={()=>setEditPosition(null)}>×</button></header>{['sl','tp'].map(key=><label key={key}>{key==='sl'?'Stop loss':'Take profit'}<input type="number" step="any" value={editPosition[key]??''} placeholder="None" onChange={event=>setEditPosition(current=>({...current,[key]:event.target.value}))}/></label>)}{editError&&<p role="alert" className="ticket-error">{editError}</p>}<button className="place-order" type="submit">Save changes</button></form></WorkspaceModal>}
 
 
 

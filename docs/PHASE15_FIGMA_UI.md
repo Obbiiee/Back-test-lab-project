@@ -1,0 +1,11 @@
+# Existing Figma workspace polish
+
+Reference audited: the existing local Figma Make App.tsx/index.css snapshot, particularly its dark toolbar, rails, six-dot terminal grip, centered order popup and journal surfaces. This phase extends the active React workspace; it does not copy the Figma scaffold or replace any validated engines. It makes no pixel-perfect or full accessibility certification claim.
+
+The terminal grip now shows six dots, exposes its current/min/max height and supports arrows (10px), Shift-arrows (50px), Home/End, pointer drag, cancellation/blur cleanup and resize clamping. Chart space remains bounded. News shares the existing dark popup treatment, sticky close header, readable details and constrained small-screen geometry. Order remains non-modal so chart price selection stays accessible. Both restore opener focus and handle Escape. Existing date/edit/indicator modals share focus entry, boundary Tab cycling, Escape and restoration; reset confirmation retains its existing guarded behavior.
+
+Inactive Figma placeholder controls now identify unavailable local capabilities and are disabled. Existing Indicators, balance and right-rail actions remain reachable on narrow layouts. No symbols, editor, cloud, new drawing types or blueprint features were added. Existing account, drawing, news and indicator contracts/formulas remain unchanged.
+
+Validation: lint/build and all registered regression tests passed. Actual cold production build browser checks at 1280×800, 390×844 and 320×700 confirmed rendered chart/rails, six dots, visible controls, no document horizontal overflow, opening Order/News, Escape/opener focus, SMA addition and modal Shift-Tab wrap. Terminal keyboard height changed 150→160 and Home/End reached 95/472 at desktop with chart height 232 at maximum. Replay-date Escape/Tab wrap preserved account. Cold build console had no errors/warnings. Screenshot evidence is disposable under frontend/tests/artifacts/phase15-order-desktop.jpg.
+
+Limits: narrow terminal tables/tabs scroll horizontally; this is a desktop-first local trading workspace, not a separate mobile product. Every assistive technology, touch device and OS was not tested. Full release acceptance remains a separate checkpoint. Operational phase/workflow/history/roadmap remain with their existing authorities.

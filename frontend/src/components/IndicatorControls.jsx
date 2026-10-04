@@ -1,3 +1,4 @@
+import WorkspaceModal from "../workspace/WorkspaceModal.jsx";
 import { useState } from 'react';
 import { productionRegistry } from '../indicators/productionRegistry.js';
 import { instanceConfig } from '../indicators/indicatorValidation.js';
@@ -22,8 +23,8 @@ export default function IndicatorControls({ instances, onChange }) {
   function close() { setOpen(false); setEditing(null); setError(''); }
   return <>
     <button type="button" className="nav-action" aria-label="Indicators" onClick={() => setOpen(true)}>Indicators{instances.length ? ` (${instances.length})` : ''}</button>
-    {open && <div className="dialog-backdrop" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-      <section className="overlay-indicator-dialog" role="dialog" aria-modal="true" aria-label="Overlay indicators">
+    {open && <WorkspaceModal label="Overlay indicators" onClose={close}>
+      <section className="overlay-indicator-dialog">
         <header><strong>Indicators</strong><button type="button" aria-label="Close indicators" onClick={close}>×</button></header>
         <div className="indicator-add-tools">{productionRegistry.types().map(type => <button type="button" key={type} onClick={() => add(type)}>Add {productionRegistry.get(type).name}</button>)}</div>
         <div className="indicator-instance-list">
@@ -45,6 +46,6 @@ export default function IndicatorControls({ instances, onChange }) {
           <div><button type="submit">Apply parameters</button><button type="button" onClick={() => { setEditing(null); setError(''); }}>Cancel edit</button></div>
         </form>}
       </section>
-    </div>}
+    </WorkspaceModal>}
   </>;
 }

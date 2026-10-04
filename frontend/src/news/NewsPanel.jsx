@@ -1,3 +1,4 @@
+import usePopupFocus from "../workspace/usePopupFocus.js";
 import { useState } from 'react';
 import { NEWS_FIELDS } from './eventValidation.js';
 const stamp = time => Number.isFinite(time) ? new Date(time * 1000).toISOString() : String(time ?? 'Unavailable');
@@ -10,6 +11,7 @@ function PreferenceForm({ news }) {
   </form>;
 }
 export default function NewsPanel({ news, onClose }) {
+  const popupRef = usePopupFocus(onClose);
   const [mode, setMode] = useState('Strict'), [offset, setOffset] = useState(0);
   const index = news.record?.index, cursor = news.cursor, retrospective = mode === 'Retrospective';
   const queryTime = Number.isFinite(cursor) ? cursor : retrospective ? news.record?.dataset.coverage[0]?.from : null;
@@ -22,7 +24,7 @@ export default function NewsPanel({ news, onClose }) {
     if (file.size > 64 * 1024 * 1024) { news.reportError('News JSON exceeds the 64 MiB import limit. Existing dataset preserved.'); return; }
     try { await news.replace(await file.text()); } catch (error) { news.reportError('Cannot read news file: ' + error.message); }
   };
-  return <aside className="news-panel" aria-label="Economic News"><header><strong>Economic News</strong><button aria-label="Close News" onClick={onClose}>×</button></header>
+  return <aside ref={popupRef} className="news-panel" aria-label="Economic News"><header><strong>Economic News</strong><button aria-label="Close News" onClick={onClose}>×</button></header>
     <label>Import canonical JSON<input aria-label="Import economic news JSON" type="file" accept=".json,application/json" disabled={news.busy} onChange={load}/></label><button disabled={news.busy} onClick={news.restore}>Restore previous dataset</button>
     {news.error && <p role="alert">{news.error}</p>}{news.busy && <p>Validating and saving…</p>}
     {news.arrival && <p role="status">{news.arrival}</p>}

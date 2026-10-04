@@ -11,7 +11,8 @@
     "docs/ROADMAP.md",
     "docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md",
     "docs/PHASE14_5_ECONOMIC_NEWS.md",
-    "docs/PHASE16_QA_HARDENING.md"
+    "docs/PHASE16_QA_HARDENING.md",
+    "docs/PHASE15_FIGMA_UI.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",
@@ -77,7 +78,10 @@
     "frontend/src/trading/AccountPersistence.js",
     "frontend/src/workspacePreferences.js",
     "frontend/src/WorkspaceErrorBoundary.jsx",
-    "frontend/src/main.jsx"
+    "frontend/src/main.jsx",
+    "frontend/src/workspace/usePanelResize.js",
+    "frontend/src/workspace/usePopupFocus.js",
+    "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
     "frontend/tests/phase6.test.mjs",

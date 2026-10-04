@@ -182,3 +182,51 @@ html {color-scheme:dark;}
 .news-panel dl div {padding:6px 0;border-bottom:1px solid #343845;}
 .news-panel dd {margin:3px 0;}
 .account-storage-warning {position:fixed;z-index:100;top:52px;left:65px;right:65px;background:#3c2920;color:#ffe2b5;border:1px solid #b68744;border-radius:5px;padding:10px;font-size:12px;}
+
+/* Figma workspace polish: existing engine surfaces retain their ownership. */
+.replay-app {height:100dvh;}
+.main-stage {height:calc(100dvh - 48px);}
+.replay-app :is(button,input,select,textarea,[tabindex]):focus-visible {outline:2px solid #82b5ff;outline-offset:2px;}
+.replay-app button:disabled {cursor:default;opacity:.4;}
+.positions-resize {height:12px;min-height:12px;display:grid;place-items:center;}
+.positions-resize span {width:22px;height:8px;background:radial-gradient(circle,#969ba5 1.2px,transparent 1.5px) 0 0/7px 4px;pointer-events:none;}
+.positions-resize:focus-visible,.positions-resize:hover {background:#1d3556;}
+.tool-expander:focus-visible {opacity:1;}
+.chart-meta {max-width:calc(100% - 85px);overflow:hidden;white-space:nowrap;}
+.news-panel {position:fixed;background:#101113;border-color:#3a3d42;border-radius:12px;padding:0 16px 16px;box-shadow:0 18px 55px #0009;}
+.news-panel header {position:sticky;top:0;z-index:1;margin:0 -16px 14px;padding:14px 16px;background:#151618;border-bottom:1px solid #303238;}
+.news-panel header button {width:32px;height:32px;font-size:20px;padding:0;}
+.news-panel :is(input,select,button) {background:#1c1e22;border-color:#343841;border-radius:6px;}
+.news-panel p {line-height:1.55;color:#aeb4bf;}
+.news-event-list button {padding:11px;}
+.news-event-list button:hover {background:#252931;}
+.news-event-list button[aria-pressed=true] {background:#29251d;border-color:#d9a94f;}
+.news-panel dd {overflow-wrap:anywhere;color:#aeb4bf;line-height:1.5;}
+@media(max-width:1050px){.main-toolbar .optional-control {display:none;}.main-toolbar .toolbar-fill{min-width:0;}.main-toolbar .workspace-name,.main-toolbar .layout-name{display:none;}}
+@media(max-width:720px){
+ .main-stage,.main-stage.journal-open {grid-template-columns:44px minmax(0,1fr) 44px;grid-template-rows:minmax(220px,1fr) var(--terminal-height,150px) 88px;}
+ .main-stage.terminal-closed {grid-template-rows:minmax(220px,1fr) 0 88px;}
+ .main-stage .right-rail {display:flex;grid-column:3;grid-row:1/4;}
+ .right-rail button {width:43px;min-height:48px;}
+ .main-stage .chart-shell,.main-stage .orders-panel,.main-stage .trade-controls {grid-column:2;}
+ .main-stage .trade-controls {padding:42px 5px 0;gap:4px;}
+ .bottom-replay {left:2px;right:2px;top:4px;bottom:auto;height:32px;gap:0;}
+ .bottom-replay button {min-width:23px;font-size:14px;}
+ .bottom-replay select {width:47px;}
+ .buy-pill,.sell-pill {min-width:40px;width:42px;font-size:10px;}
+ .quantity {width:35px;min-width:30px;padding-left:2px;}
+ .trade-controls>.tool-icon {width:22px;flex-shrink:0;}
+ .balance {display:block;min-width:0;font-size:9px;padding:0 4px;}
+ .main-toolbar .nav-action[aria-label="Indicators"] {display:flex;font-size:10px;padding:0 5px;}
+ .main-toolbar .nav-action,.main-toolbar .round-plus,.main-toolbar .replay-logo {display:none;}
+ .main-toolbar {padding:0 3px;gap:0;}
+ .main-toolbar .tool-icon {width:27px;flex-shrink:0;}
+ .main-toolbar .symbol-select {font-size:11px;}
+ .main-stage .fx-journal {position:fixed;right:48px;top:54px;bottom:94px;width:min(320px,calc(100vw - 96px));z-index:24;}
+ .news-panel {right:48px;top:54px;bottom:94px;width:calc(100vw - 96px);max-width:410px;}
+ .order-tabs {overflow-x:auto;flex-shrink:0;}
+ .fx-positions .order-tabs button {white-space:nowrap;padding:0 6px;font-size:10px;}
+ .range-bar {overflow-x:auto;white-space:nowrap;}
+ .range-bar>div:last-child {display:none;}
+ .drawing-favorites {left:8px;max-width:calc(100% - 16px);overflow-x:auto;}
+}
