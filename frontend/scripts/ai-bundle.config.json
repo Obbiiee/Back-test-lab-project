@@ -19,6 +19,11 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "frontend/src/tradingUx/prototypeModel.js",
+    "frontend/src/tradingUx/PrototypeEntry.jsx",
+    "frontend/src/tradingUx/PrototypeChart.jsx",
+    "frontend/src/tradingUx/TradingUxPrototype.jsx",
+    "frontend/src/tradingUx/prototype.css",
     "frontend/src/drawings/DrawingManager.js",
     "frontend/src/drawings/DrawingRegistry.js",
     "frontend/src/drawings/DrawingTypes.js",
@@ -89,6 +94,7 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "frontend/tests/phase18-8.test.mjs",
     "frontend/tests/phase18-6.test.mjs",
     "frontend/tests/phase6.test.mjs",
     "frontend/tests/phase7.test.mjs",

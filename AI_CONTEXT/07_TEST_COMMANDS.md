@@ -53,3 +53,5 @@ Phase 13 browser/product/performance evidence: [checkpoint report](../docs/PHASE
 Local release distribution: run `npm run build` then `npm run audit:release`. This separate gate checks 1.0.0 package/lock identity, installed chart version, build/catalog availability, byte-preserved shipped license files and exclusion of disposable QA seed code. It is not a substitute for full regression, browser checks or actual GitHub equality.
 
 `npm run test:phase18.6` protects terminal collapse/compact/expanded limits, narrow viewport budget, keyboard restore/Shift/toggle and design-token normal-text contrast. Actual browser resize/modal/chooser/responsive evidence: [Phase 18.6](../docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md).
+
+`npm run test:phase18.8` protects isolated prototype Method creation, risk/instrument constraints, Quick/Planned, checklist ON/OFF evidence, bypass/stale refusal, confirmation dedup and lifecycle restrictions. Open `/?trading-ux=prototype` on an isolated origin for browser QA; all sample state is memory-only. Contracts/evidence: [existing Method/Session owner](../docs/TRADING_METHOD_SESSION_SPEC.md).

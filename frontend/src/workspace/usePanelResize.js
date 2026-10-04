@@ -17,21 +17,21 @@ export const keyboardPanelHeight = (height, key, shift, viewportHeight, viewport
     : height;
   return clampPanel(next, viewportHeight, viewportWidth);
 };
-export default function usePanelResize(initialHeight = 150) {
-  const [height, setHeight] = useState(() => clampPanel(initialHeight, window.innerHeight, window.innerWidth));
+export default function usePanelResize(initialHeight = 150, extraReservedHeight = 0) {
+  const [height, setHeight] = useState(() => clampPanel(initialHeight, window.innerHeight - extraReservedHeight, window.innerWidth));
   const cleanup = useRef(() => {});
   const restoreHeight = useRef(initialHeight);
   useEffect(() => { if (height > COLLAPSED_HEIGHT) restoreHeight.current = height; }, [height]);
   useEffect(() => {
-    const resize = () => setHeight(current => clampPanel(current, window.innerHeight, window.innerWidth));
+    const resize = () => setHeight(current => clampPanel(current, window.innerHeight - extraReservedHeight, window.innerWidth));
     window.addEventListener('resize', resize);
     return () => { window.removeEventListener('resize', resize); cleanup.current(); };
-  }, []);
+  }, [extraReservedHeight]);
   const start = event => {
     if (event.button !== 0) return;
     event.preventDefault(); event.currentTarget.focus(); cleanup.current();
     const startY = event.clientY, startHeight = height;
-    const move = point => setHeight(clampPanel(startHeight + startY - point.clientY, window.innerHeight, window.innerWidth));
+    const move = point => setHeight(clampPanel(startHeight + startY - point.clientY, window.innerHeight - extraReservedHeight, window.innerWidth));
     const end = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); window.removeEventListener('blur', end); cleanup.current = () => {}; };
     cleanup.current = end;
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); window.addEventListener('blur', end);
@@ -39,8 +39,8 @@ export default function usePanelResize(initialHeight = 150) {
   const keyDown = event => {
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
     event.preventDefault();
-    setHeight(current => keyboardPanelHeight(current, event.key, event.shiftKey, window.innerHeight, window.innerWidth, restoreHeight.current));
+    setHeight(current => keyboardPanelHeight(current, event.key, event.shiftKey, window.innerHeight - extraReservedHeight, window.innerWidth, restoreHeight.current));
   };
-  const restore = () => setHeight(clampPanel(restoreHeight.current, window.innerHeight, window.innerWidth));
-  return { height, state: panelState(height), start, keyDown, restore, ...panelBounds(window.innerHeight, window.innerWidth) };
+  const restore = () => setHeight(clampPanel(restoreHeight.current, window.innerHeight - extraReservedHeight, window.innerWidth));
+  return { height, state: panelState(height), start, keyDown, restore, ...panelBounds(window.innerHeight - extraReservedHeight, window.innerWidth) };
 }

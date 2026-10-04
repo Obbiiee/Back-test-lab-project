@@ -35,6 +35,7 @@
     "bench:phase14.5": "node tests/phase14-5-benchmark.mjs",
     "test:phase16": "node tests/phase16.test.mjs",
     "test:phase18.6": "node tests/phase18-6.test.mjs",
+    "test:phase18.8": "node tests/phase18-8.test.mjs",
     "test:regression": "node scripts/regression.mjs",
     "audit:release": "node scripts/release-audit.mjs"
   },

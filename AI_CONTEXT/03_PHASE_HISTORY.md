@@ -59,3 +59,7 @@ Completed actual browser audit and one focused [UI/design specification](../docs
 ## Phase 18.7 — Trading workflow architecture
 
 Extended the existing Method/Session owner with stage ownership, Free Style Quick/Planned, Protocol ON/OFF restrictions, instrument/risk units, TIME + PRICE planning, ticket validation/explicit confirmation/dedup, lifecycle/evidence and protected integration gates. No new competing specification or runtime change. Repository/bundle gates apply; browser exempt for documentation-only checkpoint. Sequential human authorization permits 18.8 after checkpoint verification.
+
+## Phase 18.8 — Interactive trading UX prototype
+
+Added explicit lazy memory-only prototype using official LWC plus existing planning overlay/resize geometry. Browser exercised Free Style Quick/Planned, Protocol ON/OFF blocked/allowed/refusal, Long/Short placement/SL drag, ticket cancel/review/confirmation, synthetic lifecycle, custom Method, focus and narrow/terminal states. Full regression/lint/build/release passed; production console clean and seeded v1 legacy evidence remained unchanged. [Method/Session owner](../docs/TRADING_METHOD_SESSION_SPEC.md) owns integration plan/evidence. Continue 18.9 only after its separate normal checkpoint/equality gate.

@@ -9,11 +9,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "18.7",
-  "CURRENT_IMPLEMENTATION_PHASE": "18.8",
-  "NEXT_PHASE": "18.8",
+  "LAST_COMPLETED_PHASE": "18.8",
+  "CURRENT_IMPLEMENTATION_PHASE": "18.9",
+  "NEXT_PHASE": "18.9",
   "NEXT_PHASE_STATUS": "AUTHORIZED_SEQUENTIAL",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "18.8",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "18.9",
   "AUTHORIZED_PHASE_SEQUENCE": ["18.7", "18.8", "18.9"],
   "EXECUTION_MODE": "HUMAN_AUTHORIZED_POST_V1_CLOSURE",
   "TARGET_CHECKPOINT": "Separate 18.7, 18.8, 18.9 checkpoints; STOP before Phase 19",
@@ -21,4 +21,4 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 }
 ```
 
-The human explicitly authorizes sequential 18.7 → 18.8 → 18.9 with separate validated commit/push/remote-equality gates. Phase 18.7 extends the existing [Method/Session specification](../docs/TRADING_METHOD_SESSION_SPEC.md) with workflow, units, validation, confirmation and evidence contracts. Continue to the authorized 18.8 prototype after remote verification, then 18.9 validation/freeze. No Phase 19/backend/cloud/auth/database authorization. Preserve the sole workflow/roadmap and protected boundaries.
+The human explicitly authorizes sequential 18.7 → 18.8 → 18.9 with separate validated commit/push/remote-equality gates. Phase 18.7 extends the existing [Method/Session specification](../docs/TRADING_METHOD_SESSION_SPEC.md) with workflow, units, validation, confirmation and evidence contracts. Phase 18.8 prototype is validated; continue to authorized 18.9 validation/freeze after normal remote verification. No Phase 19/backend/cloud/auth/database authorization. Preserve the sole workflow/roadmap and protected boundaries.
