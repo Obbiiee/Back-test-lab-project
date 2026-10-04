@@ -442,8 +442,13 @@ Exact labels/order remain subject to interactive UX validation.
 
 **Trading Method final protocol decisions**
 - Protocol checklist count is user-defined with a minimum of one condition.
-- Checklist enforcement is configurable ON/OFF at the method contract: ON requires all defined conditions before execution; OFF records checklist evidence without blocking.
+- Checklist enforcement is configurable ON/OFF: ON requires all defined conditions before execution; OFF removes checklist interaction from the execution flow.
 - Protocol execution is Planned-only; discretionary Quick execution belongs to Free Style.
+- Material Protocol rule/RR/risk/checklist changes require a new Trading Method; no user-facing Protocol versioning workflow is required.
+- Session starting balance is defined once; balance/equity continues chronologically across appended monthly segments.
+- Free monthly-segment allowance is consumed when the segment is activated, even if only part of the month is used.
+- Trash retention is 30 days; restore consumes an active Session slot and is blocked at the Free 5/5 limit until a slot is freed or entitlement changes.
+- Evidence-bearing Trading Methods are archived rather than hard-deleted; unused Methods without dependent evidence may be deleted.
 - Research Maturity excludes pair-count/cross-pair coverage as a requirement.
 - Session onboarding remains lightweight; execution profile uses a sensible default/advanced configuration rather than mandatory first-run complexity.
 
