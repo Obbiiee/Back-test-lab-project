@@ -20,7 +20,7 @@ Feature scope is frozen to the existing local/manual backtesting product. No Pha
 
 Post-UI full registered regression passed: entire decade data, all drawing model/interaction/history/persistence tests, seven causal indicators/panes, exact replay/account/series differential checks, playback acknowledgement/cancellation, simulator/partial exits, Analysis/CSV/reset guards, strict economic-news mutation/truncation/navigation/storage/index checks and repository/bundle controls. Lint/build passed. Evidence details/measurement limits remain with individual phase reports.
 
-Actual cold build on a new isolated localhost origin started replay from 2024-06-03 12:00 with a clean $100,000 account. A Trend Line was created and canonical DOM evidence showed TIME+PRICE anchors; separate drawing Undo/Redo removed/restored it, and changing 30m→1h plus cold reload preserved the identical record. The existing legacy object tree did not list new-domain drawings; its labels were clarified rather than merging the protected domains. Desktop/mobile modal/terminal checks are recorded in PHASE15_FIGMA_UI.md. Final acceptance after Phase 18 remains required.
+Actual cold build on a new isolated localhost origin started replay from 2024-06-03 12:00 with a clean $100,000 account. A Trend Line was created and canonical DOM evidence showed TIME+PRICE anchors; separate drawing Undo/Redo removed/restored it, and changing 30m→1h plus cold reload preserved the identical record. The existing legacy object tree did not list new-domain drawings; its labels were clarified rather than merging the protected domains. Desktop/mobile modal/terminal checks are recorded in PHASE15_FIGMA_UI.md. Final acceptance is recorded below.
 
 Distribution retains the chart attribution link and public/licenses notices/license texts. Installed runtime LICENSE bytes are retained for Lightweight Charts, React, React DOM and Scheduler. Tagged chart NOTICE and inspected upstream fancy-canvas/tslib license sources are recorded in OPEN_SOURCE_NOTICES.md. This is a dependency inventory, not legal certification or permission to redistribute market/news provider data.
 
@@ -28,6 +28,27 @@ Distribution retains the chart attribution link and public/licenses notices/lice
 
 Single local XAUUSD workspace; no full proprietary TradingView library, cloud sync, authentication or real order execution. New drawing object tree/properties expansion, Ray, advanced indicator persistence, provider-specific news imports, complete historical economic news acquisition and advanced research statistics remain outside the implemented release scope. Current factual capabilities/boundaries remain in AI_CONTEXT/01_PROJECT_STATE.md. Narrow tables scroll and the product remains desktop-first. Performance measurements are non-gating observations, not a guarantee of FPS or playback throughput. Every OS/device, storage-quota condition, cross-tab race and assistive technology is not certified.
 
-Final acceptance and final GitHub checkpoint will be recorded here after the authorized Phase 18 audit; until then this document does not declare v1.0 complete.
+The final acceptance evidence below supersedes the earlier preparation notes; the final commit/push and remote equality must still be verified for the reported checkpoint.
 
 Phase 18 local release preparation: package/lock version 1.0.0, no changed dependency versions. `npm run build` and `npm run audit:release` passed; the audit verifies shipped history catalog and retained license artifacts, and excludes disposable QA seed code. Full acceptance remains pending below until the final audit/checkpoint.
+
+## Final v1.0 acceptance
+
+Acceptance was performed against the Phase 18 checkpoint 4ff98d12e2cbbebe8ebcf8c5752e2bca0cc4b6fb. All five phase checkpoints were normal pushes, verified local=origin=actual GitHub main with clean 0/0; no force push or destructive reset was used. The 25 documentation commits from adopted baseline 388f54c remain in history; no files were deleted. One current-phase/workflow/roadmap authority remains. Phase 19/v2.0 implementation was not started.
+
+| Gate | Evidence / outcome |
+| --- | --- |
+| Full regression | All registered tests passed after Phase 18, including 3,486,461 M1 candles and all domain/phase/repository/bundle suites. |
+| Lint / production build | Passed; 101 modules; main 339.25 kB (106.72 gzip), chart 241.04 kB (77.06 gzip), CSS 45.42 kB (10.32 gzip). Size observations are not performance guarantees. |
+| Distribution | audit:release passed package/lock 1.0.0, installed chart 5.2.1, shipped history catalog/licenses and exclusion of QA seed code. |
+| Protected boundaries | Baseline diff is empty for market/replay modules, simulator, replaySettlement, backtestAnalysis calculators, indicators and drawing domain. Chart/React integration changes preserve those contracts. |
+| Cold browser trading | Clean-origin replay 2024-06-03 12:00; Buy 0.1 lots, 1h manual step, 50% then final close: two exit rows, one completed position, $27.53 realized, $100,027.53 balance, reconciliation true. Unicode notes survived cold reload. |
+| Cold browser indicators/drawing | All seven production indicators added without console errors. Trend Line canonical record survived Undo/Redo, 30m→1h and reload; pointer resize 150→210, zoom and pan left identical TIME+PRICE bytes. Other tool geometry/edit/delete/lock/hide is covered by full deterministic domain tests and earlier phase browser evidence. |
+| Cold browser news | Real chooser import of synthetic canonical fixture; complete coverage and exact revealed chart mappings. Existing entry/each-exit derived context appeared without altering financial totals. Next event 14:00 at 1h settled raw endpoint 14:59 (3540-second disclosed overshoot), with correct strict eligible details and no console errors/warnings. |
+| UI / persistence | Cold desktop/narrow checks and storage-corruption/legacy safety described in Phase 15/16 reports; browser-origin data remains separate from user preview. |
+| CSV | Serialization, Unicode roundtrip and anchor/Blob download lifecycle tests passed. Real browser export click showed no error, but IAB automation did not return a download artifact; this browser-file observation is explicitly unverified, not reported as a saved-file pass. |
+| Dependency / security | Phase 16 point-in-time audit reported zero known vulnerabilities; bounded active-source sink/credential checks passed again. No claim of comprehensive security certification. |
+
+File chooser automation took an unusually long time to return despite eventual successful import; this host/tool latency is not attributed to application import performance. Every OS/device, live quota exhaustion and atomic multi-tab safety remain unverified as noted above. No additional provider news-data rights or cloud readiness are claimed.
+
+The local v1 scope passes the required product/regression/release gates with these disclosed validation limits. The final repository checkpoint records acceptance; report its actual Git SHA only after successful normal push, remote equality and clean 0/0. Future work requires separate human authorization, existing context/roadmap reading and preserved boundaries. STOP before v2.0.

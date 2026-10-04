@@ -16,3 +16,5 @@ Phase 7.5 repository cleanup removed ten unreachable copies already preserved by
 Account and favorites storage now preserve malformed/unsupported originals without overwrite and display an in-memory warning. Account writes detect changed foreign bytes and reject records exceeding the matching read bound. Valid legacy evidence remains unchanged; missing journal dates/sides display unavailable/unknown. Workspace render failures have a reload recovery screen. Scope/evidence/limits: [hardening report](../docs/PHASE16_QA_HARDENING.md).
 
 Existing Figma UI supports six-dot terminal resizing, keyboard height controls and popup/modal focus recovery. Narrow layouts retain News/Order/Indicators/balance access; unsupported prototype controls are disabled. [UI evidence](../docs/PHASE15_FIGMA_UI.md).
+
+Local release identity is 1.0.0 in the existing frontend package/lock. The bounded local v1 scope passed its documented regression/browser/distribution acceptance; [release evidence and limits](../docs/V1_RELEASE.md) owns the user guide. Operational status and future authorization remain solely in 04_CURRENT_PHASE.md. No v2/cloud implementation.

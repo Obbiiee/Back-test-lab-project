@@ -28,10 +28,10 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 13 | REPLAY ENGINE OPTIMIZATION & PLAYBACK CONTROLS | Recorded in completed history |
 | 14 | TRADING UX & BACKTEST ANALYSIS | Recorded in completed history |
 | 14.5 | ECONOMIC NEWS BACKTESTING ENGINE | Recorded in completed history |
-| 15 | FINAL FIGMA / UI-UX IMPLEMENTATION | Operational authorization belongs to current-phase authority |
+| 15 | FINAL FIGMA / UI-UX IMPLEMENTATION | Recorded in completed history / local release evidence |
 | 16 | FULL QA, PERFORMANCE & HARDENING | Checkpoint evidence recorded in phase history |
-| 17 | v1 RELEASE CANDIDATE | PLANNED; separate human authorization required |
-| 18 | v1.0 STABLE LOCAL RELEASE | PLANNED; separate human authorization required |
+| 17 | v1 RELEASE CANDIDATE | Recorded in completed history / local release evidence |
+| 18 | v1.0 STABLE LOCAL RELEASE | Recorded in completed history / local release evidence |
 | 19 | BACKEND ARCHITECTURE | PLANNED; separate human authorization required |
 | 20 | PRODUCTION DATABASE | PLANNED; separate human authorization required |
 | 21 | AUTHENTICATION & IDENTITY | PLANNED; separate human authorization required |
