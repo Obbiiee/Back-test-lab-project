@@ -101,11 +101,18 @@ The numbered roadmap describes **when product capabilities mature**. Cross-cutti
 
 All future implementation must remain consistent with:
 - [Product System Architecture Blueprint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md);
+- [Market Data Standard](MARKET_DATA_STANDARD.md);
+- [Replay & Execution Engine Specification](EXECUTION_ENGINE_SPEC.md);
+- [Professional Drawing Engine Specification](DRAWING_ENGINE_SPEC.md);
+- [Indicator Engine 2.0 Specification](INDICATOR_ENGINE_SPEC.md);
+- [Trading Modes, Strategy Rules & Lab Protocol Specification](TRADING_PROTOCOL_SPEC.md);
 - [Scaling, Data & AI Decisions](SCALING_DATA_AI_DECISIONS.md);
 - [Security Architecture](SECURITY_ARCHITECTURE.md);
 - [AI Engineering Guardrails](AI_ENGINEERING_GUARDRAILS.md);
 - [Research Thesis](BACKTEST_LAB_RESEARCH_THESIS.md);
 - the operational workflow/current-phase authorities.
+
+The specification documents above define cross-phase domain contracts; the numbered roadmap defines sequencing. If a future implementation plan conflicts with a specification, surface and resolve the conflict explicitly rather than silently inventing new semantics.
 
 This means:
 - security begins at the first trust boundary; Phase 29 deepens multi-tenant controls and Phase 60 audits the mature SaaS, but earlier phases must not knowingly create insecure foundations;
