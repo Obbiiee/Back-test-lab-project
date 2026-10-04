@@ -107,6 +107,7 @@ All future implementation must remain consistent with:
 - [Indicator Engine 2.0 Specification](INDICATOR_ENGINE_SPEC.md);
 - [Trading Modes, Strategy Rules & Lab Protocol Specification](TRADING_PROTOCOL_SPEC.md);
 - [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md);
+- [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md);
 - [Scaling, Data & AI Decisions](SCALING_DATA_AI_DECISIONS.md);
 - [Security Architecture](SECURITY_ARCHITECTURE.md);
 - [AI Engineering Guardrails](AI_ENGINEERING_GUARDRAILS.md);
@@ -411,6 +412,14 @@ Exact labels/order remain subject to interactive UX validation.
 - Profile
 - Settings
 - Subscription / Billing
+
+**Trading Method onboarding / ownership**
+- A backtest Session must belong to a Trading Method.
+- A first-time user with zero methods is routed through Create First Trading Method before Session creation.
+- Trading Method type is selected once as Free Style or Protocol; Session inherits it rather than asking again.
+- Protocol methods carry locked RR, locked risk and at least one checklist condition; exact checklist enforcement semantics remain an explicit open decision.
+- One Session uses one instrument/pair and one immutable feed identity, while timeframe remains switchable in the workspace.
+- The same Trading Method/version may be tested through separate Sessions across instruments/periods to support cross-pair research.
 
 **Session lifecycle / result-review flow**
 - Dashboard is a lightweight session launcher: **New Backtest** plus **Previous Sessions**; do not turn each session card into a full statistics dashboard.
