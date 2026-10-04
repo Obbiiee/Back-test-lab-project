@@ -32,6 +32,11 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 16 | FULL QA, PERFORMANCE & HARDENING | Checkpoint evidence recorded in phase history |
 | 17 | v1 RELEASE CANDIDATE | Recorded in completed history / local release evidence |
 | 18 | v1.0 STABLE LOCAL RELEASE | Recorded in completed history / local release evidence |
+| 18.5 | POST-v1 ARCHITECTURE & REFERENCE AUDIT | PLANNED; separate human authorization required |
+| 18.6 | UI/UX AUDIT & DESIGN SYSTEM | PLANNED; separate human authorization required |
+| 18.7 | TRADING WORKFLOW ARCHITECTURE & UX REDESIGN | PLANNED; separate human authorization required |
+| 18.8 | INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN | PLANNED; separate human authorization required |
+| 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | PLANNED; separate human authorization required |
 | 19 | BACKEND ARCHITECTURE | PLANNED; separate human authorization required |
 | 20 | PRODUCTION DATABASE | PLANNED; separate human authorization required |
 | 21 | AUTHENTICATION & IDENTITY | PLANNED; separate human authorization required |
@@ -353,6 +358,113 @@ Target identity:
 Professional local/manual trading backtesting and research platform.
 
 No requirement for production multi-user cloud architecture at v1.0.
+
+## Post-v1 Professional UX Refinement — Phases 18.5–18.9
+
+These fractional phases refine the stable local v1 before cloud productization. They do **not** reopen completed Phase 14/15/18 history, do not authorize backend/cloud work, and do not create a second roadmap. Runtime implementation still requires explicit authorization through the current-phase authority.
+
+### Phase 18.5 — POST-v1 ARCHITECTURE & REFERENCE AUDIT (PLANNED)
+
+Plan:
+- audit the current chart, drawing, indicator, replay, trading, persistence and analysis boundaries before further UI/runtime change;
+- identify unused runtime/code/assets separately from planning, scripts, concepts, roadmap and documentation, which must be preserved unless explicitly authorized otherwise;
+- compare relevant open-source/reference implementations by subsystem and record ADOPT / ADAPT / LEARN / REJECT decisions with license/provenance notes;
+- establish a regression baseline and document technical debt that could block the UX work below;
+- avoid rewrites unless evidence shows the existing architecture prevents the required interaction model.
+
+### Phase 18.6 — UI/UX AUDIT & DESIGN SYSTEM (PLANNED)
+
+Plan:
+- audit the complete v1 interface: chart, top bar, left toolbar, replay controls, trading surfaces, journal, Analysis, settings, dialogs, empty/loading/error states and responsive behavior;
+- define a Backtest Lab design system for typography, spacing, sizing, panel density, borders/radii, elevation, icons and interaction states;
+- preserve chart-first information hierarchy: permanent panels must not consume chart space without clear value;
+- define consistent hover, selected, focused, disabled, locked, warning, error and protocol-restricted states;
+- use Figma only where useful for visual direction; interactive trading behavior should be validated in browser prototypes rather than relying on static mockups as the behavioral authority.
+
+### Phase 18.7 — TRADING WORKFLOW ARCHITECTURE & UX REDESIGN (PLANNED)
+
+The trading UX has **two independent dimensions** and must not collapse them into one concept.
+
+**Trading Mode**
+1. **Free Mode** — discretionary backtesting. Supported actions may be used freely and are still recorded for later analysis.
+2. **Protocol Mode** — trading is governed by the active Strategy Rules / Lab Protocol. Each governed action eventually resolves through one of:
+   - `ALLOW`
+   - `BLOCK`
+   - `TRACK_VIOLATION`
+
+**Order Method**
+1. **Quick Trade** — BUY/SELL first, immediate/appropriate order creation, then supported SL/TP and position-management actions. Its purpose is fast execution with minimal interaction.
+2. **Planned Trade** — evolution of the existing Long/Short Position workflow: define Entry + SL + TP on chart, choose/derive risk per trade, calculate position size and RR, review, then explicitly Place Order.
+
+Required matrix:
+
+| Trading mode | Quick Trade | Planned Trade |
+| --- | --- | --- |
+| Free | Fast BUY/SELL; supported SL/TP/intervention may follow | Entry/SL/TP → risk → size/RR → Place Order; later supported intervention remains available |
+| Protocol | Available only when protocol permits the required action/risk model | Primary research workflow; locked protocol values and action policies govern the plan and subsequent position |
+
+Architecture contract:
+- Free/Protocol are **not separate execution engines**.
+- Quick/Planned are **not separate execution engines**.
+- Both order methods must converge to the same canonical Order Request → Rules validation → Execution Engine path.
+- UI hiding/disabling is never the enforcement boundary; engine/domain validation must reject forbidden actions.
+- Protocol restrictions must explain why an action is unavailable rather than silently removing capability.
+- A `TRACK_VIOLATION` action remains executable but must be recorded with enough provenance for later compliant-vs-violation analysis.
+- Do not invent a third order workflow without an explicit roadmap decision.
+
+Protocol-governable actions/parameters should be designed to accommodate at least: setup/inclusion/exclusion context, entry, SL, TP, fixed or constrained RR, risk per trade, session, maximum orders, early close, partial close, move SL, move TP, cancel order and intervention policy. Full rule-engine enforcement belongs to the later strategy/research architecture and is not implied by this UX phase.
+
+### Phase 18.8 — INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN (PLANNED)
+
+Plan browser-interactive prototypes for all four combinations:
+- Free + Quick;
+- Free + Planned;
+- Protocol + Quick;
+- Protocol + Planned.
+
+Prototype requirements:
+- chart remains the primary workspace;
+- Quick Trade uses a compact contextual surface and minimizes clicks;
+- Planned Trade treats Long/Short Position as a future **Trade Planner + Risk Calculator + Order Creator**, not merely a decorative drawing;
+- Planned Trade exposes Entry, SL, TP, live RR, risk %, monetary risk, calculated position size and P&L/R preview where applicable;
+- changing Entry/SL/TP updates planning calculations consistently;
+- `PLACE ORDER` is an explicit boundary: the planning object produces a canonical order request; a drawing must never directly mutate account state;
+- show representative pending-order, active-position, modify/cancel, SL/TP, partial-close, close and execution-feedback states;
+- prototype `ALLOW`, `BLOCK` and `TRACK_VIOLATION` states without prematurely implementing the full future Strategy Rules Engine;
+- create multiple credible layout/interaction alternatives when useful so human approval can be based on actual interaction rather than verbal/Figma description alone.
+
+### Phase 18.9 — TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE (PLANNED)
+
+Validate the selected prototype with repeatable user journeys, including at minimum:
+1. Free + Quick: BUY/SELL → position → add/modify SL/TP → supported partial/manual close.
+2. Free + Planned: Long/Short Position → Entry/SL/TP → risk per trade → calculated size/RR → Place Order → supported modification.
+3. Protocol + Planned: locked risk/RR example → Place Order → attempt a `BLOCK` action and verify clear refusal/reason.
+4. Protocol violation example: perform an action configured as `TRACK_VIOLATION` and verify the intended ledger/journal provenance contract.
+5. Protocol + Quick: verify availability only when the protocol permits the workflow.
+
+Evaluate interaction count, speed, clarity, chart obstruction, accidental-action risk, error prevention, keyboard/touch implications and consistency.
+
+After explicit human approval, freeze **Trading UX Specification v1** as the implementation authority for later integration. Subsequent agents must not casually redesign the domain model. Any conflict with legacy implementation must be surfaced and resolved deliberately.
+
+Final domain direction:
+
+```text
+Trading Mode:   FREE | PROTOCOL
+                         ↓
+Order Method:   QUICK | PLANNED
+                         ↓
+Canonical Order Request
+                         ↓
+Rules / Protocol Validation
+                         ↓
+Execution Engine
+                         ↓
+Canonical Trade/Event Ledger
+                         ↓
+Journal / Analysis / Research
+```
+
+**Quality/workflow gate for 18.5–18.9:** preserve v1 behavior outside authorized scope; apply relevant tests/regression, browser validation for interactive changes, lint/static/build checks, documentation and diff review. Every completed validated milestone receives a checkpoint commit and is pushed to GitHub before proceeding. When explicit authorization covers multiple consecutive phases and capacity remains, continue to the next dependency-safe phase rather than stopping merely because one phase number completed.
 
 ## v2.0 — CLOUD & MULTI-USER
 
