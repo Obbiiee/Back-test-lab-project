@@ -1,5 +1,20 @@
 # Phase 7.5 repository audit — before cleanup
 
+## Authorized pre-v2 cleanup execution — 2026-10-04
+
+Baseline `a613f49d09ade31fb1ea938e99b7a3f0e27bfc83`, verified actual GitHub main. Clean local main was 25 documentation commits behind; the already-audited changes remained docs-only, and fast-forward-only reconciliation produced local/origin/GitHub equality and clean 0/0. No reset, rebase or discarded commit. The human explicitly authorized only the four deletions below, superseding the earlier conservative retention decision for those exact copies/evidence. No other KEEP/REVIEW item was removed.
+
+| Removed path | Blob bytes | Pre-delete verification |
+| --- | ---: | --- |
+| docs/DRAWING_TOOLS_BROWSER_CHECKS.json | 8,512 | Old generated browser PASS matrix; no runtime/test/build/script/bundle/release or active-doc consumer. Historical validation summary and actual fixtures/tests remain. |
+| legacy/preview-before-drawing-2026-10-02/src/assets/hero.png | 13,057 | Unused copy; SHA equality with retained Phase 3 counterpart. |
+| legacy/preview-before-drawing-2026-10-02/src/assets/react.svg | 4,126 | Unused copy; SHA equality with retained Phase 3 counterpart. |
+| legacy/preview-before-drawing-2026-10-02/src/assets/vite.svg | 8,709 | Unused copy; SHA equality with retained Phase 3 counterpart. |
+
+Only generic template filenames appear in the original cleanup's historical text; those refer to removed active-tree files and preserved counterparts, not consumers of these snapshot paths. Full source/script/test/docs/spec searches found no new consumers. All four authorized candidates removed, none retained. Resolved deletion paths stayed inside the repository; no bulk archive deletion. Removed tracked content: 34,404 bytes (33.60 KiB), not compressed Git-history reduction. Source, dependencies, tests, market data, Phase 3 archive and all protected knowledge remain unchanged.
+
+Validation: full registered frontend/domain/integration/anti-look-ahead/repository regression passed, including all decade data and retained legacy geometry fixtures. Lint/build/distribution audit passed; production asset names/hashes and 101-module count unchanged. Standalone backend tests are not part of the documented local-v1 release gate; backend and requirements have no diff. Actual isolated cold-build smoke: replay/chart, SMA/RSI, Trend Line create/undo/redo, TIME+PRICE equality through 1h→30m, existing Risk/Reward rendering, market paper order advance/close, journal and Analysis reconciliation (4 exits/3 positions/$27.81), persisted Strict synthetic news/markers and console check passed. News file import/CSV download were not re-exercised; retained domain tests and prior acceptance evidence cover them. AI bundle regeneration/verification, final diff review and normal commit/push/remote equality are required before reporting completion. Phase 19/v2.0 was not started.
+
 ## v1.0 maintenance audit — 2026-10-04
 
 Verified clean baseline `efe9553622cce95cb9bc2a6501bf9e168bbd7869`: local main, origin/main and actual GitHub main equal, ahead/behind 0/0. Recent commits are the authorized v1.0 implementation/release checkpoints. This maintenance task is explicitly authorized independently of roadmap phases; Phase 19 remains unauthorized. The original Phase 7.5 audit below remains historical evidence.
