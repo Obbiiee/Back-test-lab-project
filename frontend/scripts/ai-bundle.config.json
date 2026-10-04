@@ -15,7 +15,8 @@
     "docs/PHASE15_FIGMA_UI.md",
     "docs/V1_RELEASE.md",
     "docs/TRADING_METHOD_SESSION_SPEC.md",
-    "docs/PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md"
+    "docs/PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md",
+    "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
     "frontend/src/drawings/DrawingManager.js",
@@ -47,6 +48,7 @@
     "frontend/src/components/IndicatorControls.jsx",
     "frontend/src/components/IndicatorControls.css",
     "frontend/src/FigmaWorkspace.jsx",
+    "frontend/src/workspace/designTokens.css",
     "frontend/src/market/useReplayMarket.js",
     "frontend/src/market/replayTransitions.js",
     "frontend/src/market/PlaybackScheduler.js",
@@ -87,6 +89,7 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "frontend/tests/phase18-6.test.mjs",
     "frontend/tests/phase6.test.mjs",
     "frontend/tests/phase7.test.mjs",
     "frontend/tests/phase8.test.mjs",

@@ -51,3 +51,7 @@ Completed the remaining documentation normalization from af878addf7d250083ee61db
 ## Phase 18.5 — Post-v1 architecture and reference audit
 
 Completed actual source/state/persistence/adapter/domain tracing, protected-boundary review, primary-source reference/license matrix and evidence-based debt/regression inventory in [Phase 18.5 architecture/reference audit](../docs/PHASE18_5_ARCHITECTURE_REFERENCE_AUDIT.md). One focused audit report was necessary because older chart migration and repository cleanup audits have different historical responsibilities. No engine replacement, dependency installation, UI prototype or backend/cloud work. Phase 18 local v1 acceptance remains completed. Later phases require separate human authorization.
+
+## Phase 18.6 — UI/UX audit and design system
+
+Completed actual browser audit and one focused [UI/design specification](../docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md) from 8e8d840. Added scoped tokens and bounded chooser/terminal polish; genuine collapse hides content while grip, chart and bottom controls remain usable. Registered UI-bound/keyboard/contrast tests, full regression, lint/build/distribution and production browser checks passed. Corrupt-storage evidence retained; console clean. No new trading workflow, engine/schema/dependency change or 18.7+ implementation. Normal checkpoint/equality gate follows.

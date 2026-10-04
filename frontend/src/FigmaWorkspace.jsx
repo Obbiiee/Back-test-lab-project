@@ -24,10 +24,17 @@ import usePanelResize from "./workspace/usePanelResize.js";
 import { readFavorites, FAVORITES_KEY } from './workspacePreferences.js';
 import "./FigmaWorkspace.css";
 import "./FxWorkspace.css";
+import "./workspace/designTokens.css";
 const CandleChart=lazy(()=>import('./components/CandleChart'));
 function Icon({ name, size = 20 }) {
 	const shapes = {
-		back: <path d="m15 18-6-6 6-6" />,
+		horizontal: <path d="M3 12h18" />,
+    vertical: <path d="M12 3v18" />,
+    rectangle: <rect x="4" y="5" width="16" height="14" rx="1" />,
+    arrow: <path d="M4 20 20 4M10 4h10v10" />,
+    long: <path d="m4 18 16-12M10 6h10v10M4 21h16" />,
+    short: <path d="m4 6 16 12M10 18h10V8M4 3h16" />,
+    back: <path d="m15 18-6-6 6-6" />,
 		play: <path d="m8 5 11 7-11 7V5Z" />,
 		search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></>,
 		plus: <path d="M12 5v14M5 12h14" />,
@@ -69,8 +76,9 @@ function Icon({ name, size = 20 }) {
 const toolGroups = {
   trend: [{ title: "LINES", items: ["Trend Line", "Horizontal Line", "Vertical Line"] }, { title: "SHAPES", items: ["Rectangle", "Arrow", "Text"] }, { title: "RESEARCH", items: ["Fibonacci Retracement", "Measure"] }],
   cursor: [{ title: "", items: ["Cross", "Dot", "Arrow Cursor"] }],
-  measure: [{ title: "RISK / REWARD", items: ["Long Position", "Short Position"] }],
+  measure: [{ title: "POSITION PLANNING", items: ["Long Position", "Short Position"] }],
 };
+const TOOL_ICONS = { "Trend Line": "trend", "Horizontal Line": "horizontal", "Vertical Line": "vertical", Rectangle: "rectangle", Arrow: "arrow", Text: "text", "Fibonacci Retracement": "fib", Measure: "ruler", "Long Position": "long", "Short Position": "short", Cross: "cursor", Dot: "cursor", "Arrow Cursor": "arrow" };
 const TOOL_MODES = Object.freeze(Object.assign(Object.create(null), { Cross: 'none', Dot: 'cursor-dot', 'Arrow Cursor': 'cursor-arrow', Arrow: 'arrow', 'Trend Line': 'trend-line', 'Horizontal Line': 'horizontal-line', 'Vertical Line': 'vertical-line', Rectangle: 'rectangle', 'Fibonacci Retracement': 'fibonacci-retracement', Text: 'text', Measure: 'measure', 'Long Position': 'long-position', 'Short Position': 'short-position' }));
 const resolveTool = name => TOOL_MODES[name];
 function App() {
@@ -191,8 +199,9 @@ function App() {
 		"1d"
 	].map((r) => <button key={r} onClick={() => sendChartCommand(`range:${r}`)}>{r}</button>)}<button aria-label="Go to a date" onClick={()=>setDateOpen(true)}><Icon name="calendar" size={17} /></button></div><div><strong>{(data.length ? new Date(data.at(-1).time * 1e3).toISOString().slice(11, 19) : "—")} UTC</strong><button onClick={() => sendChartCommand("percent")}>%</button><button onClick={() => sendChartCommand("log")}>log</button><button className="auto-active" onClick={() => sendChartCommand("fit")}>auto</button></div></div>
           {objectsOpen && <aside className="drawing-object-tree"><header><strong>Risk/Reward objects ({drawingState.drawings.length})</strong><button onClick={() => setObjectsOpen(false)}>×</button></header>{!drawingState.drawings.length && <p>No Risk/Reward objects yet. Chart drawings use their separate controls.</p>}{drawingState.drawings.map((item, index) => <div key={item.id} className={drawingState.selectedId === item.id ? "selected" : ""}><button onClick={() => sendChartCommand("object:select:" + item.id)}>{index + 1}. {item.type.replaceAll("-", " ")}</button><button title="Edit drawing" onClick={() => sendChartCommand("object:edit:" + item.id)}>✎</button><button title={item.hidden ? "Show drawing" : "Hide drawing"} onClick={() => sendChartCommand("object:hide:" + item.id)}>{item.hidden ? "◌" : "◉"}</button><button title={item.locked ? "Unlock drawing" : "Lock drawing"} onClick={() => sendChartCommand("object:lock:" + item.id)}>{item.locked ? "🔒" : "🔓"}</button><button title="Delete drawing" onClick={() => sendChartCommand("object:delete:" + item.id)}>×</button></div>)}</aside>}
-          {menu && <div className="tool-menu">
-            {menu.map((group,gi)=><div className="menu-group" key={gi}>{group.title&&<div className="menu-title">{group.title}</div>}{group.items.map(item=><div className="drawing-menu-row" key={item}><button aria-label={item} data-tool-type={resolveTool(item,activeTool)} data-anchor-count={DRAWING_SPECS[resolveTool(item)]?.points ?? RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points} aria-pressed={resolveTool(item,activeTool)===drawingMode} onClick={()=>chooseTool(item)}><Icon name={activeTool==='measure'?'measure':activeTool} size={17}/><span>{item}</span></button><button className="about-drawing" aria-label={`About ${item}`} onClick={()=>setNotice(`${item} · ${DRAWING_SPECS[resolveTool(item)]?.points ?? RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points??1} anchor points. Select the tool, then click on the chart.`)}>ⓘ</button><button aria-label={`Favorite ${item}`} aria-pressed={favorites.includes(item)} onClick={()=>toggleFavorite(item)}>{favorites.includes(item)?'★':'☆'}</button></div>)}</div>)}
+          {menu && <div className="tool-menu" aria-label="Chart tool chooser" onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();event.currentTarget.ownerDocument.querySelector('.tool-expander[aria-expanded="true"]')?.focus();setActiveTool(null);}}}>
+            {activeTool==='measure'&&<p className="tool-menu-hint">Planning previews · review in Order before placing.</p>}
+            {menu.map((group,gi)=><div className="menu-group" key={gi}>{group.title&&<div className="menu-title">{group.title}</div>}{group.items.map(item=><div className="drawing-menu-row" key={item}><button aria-label={item} data-tool-type={resolveTool(item,activeTool)} data-anchor-count={DRAWING_SPECS[resolveTool(item)]?.points ?? RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points} aria-pressed={resolveTool(item,activeTool)===drawingMode} onClick={()=>chooseTool(item)}><Icon name={TOOL_ICONS[item]} size={17}/><span>{item}</span></button><button className="about-drawing" aria-label={`About ${item}`} onClick={()=>setNotice(`${item} · ${DRAWING_SPECS[resolveTool(item)]?.points ?? RISK_REWARD_TOOLS[resolveTool(item,activeTool)]?.points??1} anchor points. Select the tool, then click on the chart.`)}>ⓘ</button><button aria-label={`Favorite ${item}`} aria-pressed={favorites.includes(item)} onClick={()=>toggleFavorite(item)}>{favorites.includes(item)?'★':'☆'}</button></div>)}</div>)}
 
           </div>}
         </div>
@@ -203,9 +212,9 @@ function App() {
         <section className="trade-controls">
           <button disabled={!!news.navigation} className="buy-pill" onClick={()=>openTicket('Buy')}>↗ Buy</button><button disabled={!!news.navigation} className="sell-pill" onClick={()=>openTicket('Sell')}>↘ Sell</button><div className="quantity"><input aria-label="Quantity" type="number" min="0.0001" step="any" value={quantity} onChange={event=>setQuantity(Number(event.target.value))}/></div>
           <div className="bottom-replay"><button aria-label="Bar replay" onClick={()=>{news.cancel();setDateOpen(true);}}>Ι◀</button><select aria-label="Speed" value={speed} onChange={event=>setSpeed(Number(event.target.value))}>{PLAYBACK_SPEEDS.map(value=><option key={value} value={value}>{value}×</option>)}</select><button aria-label="Go to previous candle" disabled={!!news.navigation||!replay.active||trading.account.positions.length>0||trading.account.orders.length>0||trading.account.trades.length>0} onClick={()=>{news.cancel();setPlaying(false);replay.step(-1);}}>‹</button><button aria-label="Play / Pause" aria-pressed={playing} disabled={!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(value=>news.navigation?false:!value);}}>{playing?'Ⅱ':'▷'}</button><button aria-label="Replay timeframe" onClick={()=>setIntervalOpen(value=>!value)}>{timeframe}⌄</button><button aria-label="Next candle" disabled={!!news.navigation||!replay.active||replay.atEnd} onClick={()=>{news.cancel();setPlaying(false);replay.step();}}>▷Ι</button><button aria-label="Go to" onClick={()=>setGoToOpen(value=>!value)}>↱</button>{replay.active&&<button aria-label="Exit replay" onClick={()=>requestReset(exitReplay)}>×</button>}</div>
-          <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label={terminalOpen?"Hide positions and orders":"Show positions and orders"} aria-expanded={terminalOpen} onClick={()=>setTerminalOpen(value=>!value)}><Icon name="eye" size={17}/></button>
+          <button className="balance" onClick={()=>setNotice(`Balance ${money(trading.account.balance)} · Equity ${money(trading.equity)}`)}>{money(trading.equity)}</button><button className="tool-icon" aria-label={terminalOpen&&panelResize.state!=="COLLAPSED"?"Hide positions and orders":"Show positions and orders"} aria-expanded={terminalOpen&&panelResize.state!=="COLLAPSED"} onClick={()=>{if(terminalOpen&&panelResize.state!=="COLLAPSED")setTerminalOpen(false);else{panelResize.restore();setTerminalOpen(true);}}}><Icon name="eye" size={17}/></button>
         </section>
-        {terminalOpen&&<PositionsPanel trading={trading} interactionDisabled={!!news.navigation} onResize={panelResize.start} onResizeKeyDown={panelResize.keyDown} resizeHeight={panelResize.height} resizeMin={panelResize.min} resizeMax={panelResize.max} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
+        {terminalOpen&&<PositionsPanel trading={trading} interactionDisabled={!!news.navigation} onResize={panelResize.start} onResizeKeyDown={panelResize.keyDown} resizeHeight={panelResize.height} resizeState={panelResize.state} resizeMin={panelResize.min} resizeMax={panelResize.max} onHide={()=>setTerminalOpen(false)} tab={orderTab} onTab={setOrderTab} onEdit={item=>{setEditPosition({...item});setEditError('');}}/>}
         {dialog==='order'&&<OrderTicket key={ticketId} side={tradeSide} price={trading.quote?.close} balance={trading.account.balance} initialBalance={trading.account.initialBalance} initialSize={quantity} seed={orderSeed} onClose={()=>setDialog(null)} onPickPrice={(key,callback)=>{pickCallback.current=callback;setDrawingMode('order');setNotice(`Click the chart to set ${key.toUpperCase()}.`);}} onPlace={(order,journal)=>{news.cancel();trading.place(order);setOrderTab(order.type==='Market'?'Open Positions':'Pending Orders');setTerminalOpen(true);if(journal)setJournalOpen(true);}}/>}
         {newsOpen&&<NewsPanel news={news} onClose={()=>setNewsOpen(false)}/>}
         {journalOpen&&<Journal account={trading.account} onClose={()=>setJournalOpen(false)} onNotes={trading.notes}/>}

@@ -1,0 +1,73 @@
+/* Phase 18.6 foundation: tokens own new bounded chooser/terminal corrections.
+   Existing engine/chart styles and unrelated product surfaces stay with their owners. */
+:root {
+  --lab-font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lab-font-data: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --lab-text-xs: 11px;
+  --lab-text-sm: 12px;
+  --lab-text-base: 13px;
+  --lab-text-title: 16px;
+  --lab-text-display: 22px;
+  --lab-weight-normal: 400;
+  --lab-weight-label: 500;
+  --lab-weight-heading: 600;
+  --lab-leading-ui: 1.45;
+  --lab-space-1: 4px;
+  --lab-space-2: 8px;
+  --lab-space-3: 12px;
+  --lab-space-4: 16px;
+  --lab-space-6: 24px;
+  --lab-control: 32px;
+  --lab-control-touch: 40px;
+  --lab-icon: 18px;
+  --lab-surface-chart: #08090b;
+  --lab-surface-workspace: #151b24;
+  --lab-surface-secondary: #202936;
+  --lab-surface-elevated: #293445;
+  --lab-surface-research: #f1f4f8;
+  --lab-text-primary: #e9eef5;
+  --lab-text-secondary: #bac5d5;
+  --lab-text-on-light: #243145;
+  --lab-border: #435268;
+  --lab-accent: #8ab8ff;
+  --lab-selected: #304967;
+  --lab-success: #68d6bd;
+  --lab-warning: #f0c674;
+  --lab-error: #ff9aa5;
+  --lab-radius: 4px;
+  --lab-elevation-menu: 0 8px 24px #0006;
+}
+.tool-menu {
+  width: min(304px, calc(100% - 12px));
+  font-family: var(--lab-font-ui);
+  line-height: var(--lab-leading-ui);
+  background: var(--lab-surface-secondary);
+  border-color: var(--lab-border);
+  border-radius: var(--lab-radius);
+  padding: var(--lab-space-2);
+  box-shadow: var(--lab-elevation-menu);
+}
+.tool-menu .menu-title { font-size: var(--lab-text-xs); font-weight: var(--lab-weight-heading); letter-spacing: .04em; color: var(--lab-text-secondary); padding: var(--lab-space-2); }
+.tool-menu .drawing-menu-row { min-height: 40px; gap: var(--lab-space-1); }
+.tool-menu .drawing-menu-row button { min-height: var(--lab-control); color: var(--lab-text-primary); border-radius: var(--lab-radius); }
+.tool-menu .drawing-menu-row > button:first-child { font-size: var(--lab-text-sm); padding: var(--lab-space-2); gap: var(--lab-space-2); }
+.tool-menu .drawing-menu-row > button:not(:first-child) { width: 28px; flex: 0 0 28px; }
+.tool-menu .drawing-menu-row > button:first-child[aria-pressed="true"] { background: var(--lab-selected); }
+.tool-menu .drawing-menu-row > button:not(:first-child)[aria-pressed="true"] { background: transparent; color: var(--lab-accent); }
+.tool-menu .drawing-menu-row:hover { background: var(--lab-surface-elevated); }
+.tool-menu button:focus-visible, .positions-resize:focus-visible { outline: 2px solid var(--lab-accent); outline-offset: -2px; }
+.positions-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.positions-content[hidden] { display: none; }
+.positions-resize { height: 24px; min-height: 24px; background: var(--lab-surface-workspace); }
+.positions-resize:hover, .positions-resize:focus-visible { background: var(--lab-selected); }
+.fx-positions { background: var(--lab-surface-workspace); font-family: var(--lab-font-ui); line-height: var(--lab-leading-ui); }
+.fx-positions .order-tabs button, .fx-positions table, .fx-positions td button, .fx-positions .pagination { font-size: var(--lab-text-sm); }
+.fx-positions th { color: var(--lab-text-secondary); background: var(--lab-surface-workspace); font-weight: var(--lab-weight-label); }
+.fx-positions td { font-variant-numeric: tabular-nums lining-nums; }
+.fx-positions .no-data { color: var(--lab-text-secondary); }
+@media (max-width: 650px) {
+  .tool-menu .drawing-menu-row { min-height: var(--lab-control-touch); }
+  .fx-positions .order-tabs { overflow-x: auto; }
+}
+.tool-menu-hint { margin: 0 4px 8px; color: var(--lab-text-secondary); font-size: var(--lab-text-xs); line-height: var(--lab-leading-ui); }
+@media (max-width: 720px) { .fx-positions .pagination { white-space: nowrap; overflow-x: auto; gap: 4px; padding: 0 6px; font-size: var(--lab-text-xs); } .fx-positions .pagination > * { flex-shrink: 0; } }

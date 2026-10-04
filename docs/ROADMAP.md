@@ -34,7 +34,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 18 | v1.0 STABLE LOCAL RELEASE | Recorded in completed history / local release evidence |
 | 18.4 | POST-v1 REPOSITORY HYGIENE & DOMAIN NORMALIZATION | Recorded in completed history |
 | 18.5 | POST-v1 ARCHITECTURE & REFERENCE AUDIT | Recorded in completed history |
-| 18.6 | UI/UX AUDIT & DESIGN SYSTEM | PLANNED; separate human authorization required |
+| 18.6 | UI/UX AUDIT & DESIGN SYSTEM | Recorded in completed history |
 | 18.7 | TRADING WORKFLOW ARCHITECTURE & UX REDESIGN | PLANNED; separate human authorization required |
 | 18.8 | INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN | PLANNED; separate human authorization required |
 | 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | PLANNED; separate human authorization required |
@@ -410,6 +410,9 @@ Plan:
 - avoid rewrites unless evidence shows the existing architecture prevents the required interaction model.
 
 ### Phase 18.6 — UI/UX AUDIT & DESIGN SYSTEM (PLANNED)
+
+Completed audit/specification and bounded corrections: [Phase 18.6 report](PHASE18_6_UI_UX_DESIGN_SYSTEM.md). The planning contract below remains scope history; operational authorization belongs only to the phase pointer.
+
 
 Plan:
 - audit the complete v1 interface: chart, top bar, left toolbar, replay controls, trading surfaces, journal, Analysis, settings, dialogs, empty/loading/error states and responsive behavior;
