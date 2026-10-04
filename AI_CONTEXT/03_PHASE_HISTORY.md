@@ -67,3 +67,7 @@ Added explicit lazy memory-only prototype using official LWC plus existing plann
 ## Phase 18.9 — Trading UX validation and specification freeze
 
 Validated the 18.7 contract against interactive 18.8 journeys and final default-v1 browser smoke. Frozen handoff v1 remains in the existing Method/Session owner; added deterministic single-owner/isolation/immutable-request/provenance/refusal tests. Full registered regression, lint/build/release and repository/bundle gates apply. No production engine/schema migration; Phase 19 remains unauthorized. Final commit/push/equality verification closes the explicitly authorized sequence, then STOP.
+
+## Phase 19 — Planning only (not runtime completion)
+
+Human-authorized planning from clean verified 15102e5 extends the existing system blueprint with modular-monolith ownership, observed standalone backend gaps, request/confirmation/revision/dedup contracts, immutable passport/hash/lineage/event evidence, research-job/temporal boundaries and future acceptance/cutover gates. Existing roadmap, Method/Session, security and workflow owners remain authoritative. Documentation/context and bundle allowlist only; no new documentation file, runtime/dependency/data/backend modification. Repository and AI-bundle validation with regenerated/verified bundle; browser exempt because no product path changed. Separate normal checkpoint/equality closes planning, then STOP before implementation/Phase 20.
