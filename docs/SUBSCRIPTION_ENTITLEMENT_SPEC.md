@@ -10,7 +10,7 @@ Free and paid users must use the same canonical replay/execution semantics. Subs
 
 Where Precision execution is possible from the selected dataset, entitlement must not intentionally substitute a less-correct engine for Free users.
 
-Free/Pro subscription is independent from **Free Mode / Protocol Mode** and **Quick Trade / Planned Trade**.
+Free/Pro subscription is independent from **Trading Method type (Free Style / Protocol)** and execution workflow (Quick / Planned).
 
 ## Free tier — daily tradable research window
 
@@ -20,6 +20,7 @@ The intended Free experience is a complete, credible Backtest Lab workflow with 
 
 - A Free user may activate **one tradable historical window of up to one calendar month per daily entitlement period**.
 - The exact reset timezone/time and anti-abuse mechanics are implementation decisions to be defined before launch; they must be deterministic and visible to the user.
+- **Activating the monthly segment immediately consumes that day's Free allowance**, even if the user later trades or replays only part of the activated month. The allowance is not prorated by days used.
 - Once a window is activated, trading/replay execution is allowed inside that window.
 - The user may make multiple valid trades inside the activated window; the limit is the research window, not an arbitrary trade-count penalty.
 - The daily allowance must be enforced server-side once cloud entitlements exist.
@@ -61,6 +62,7 @@ The next new Free tradable-window allowance becomes available according to the n
 - A Free user may keep a maximum of **5 active/saved Sessions**.
 - At the five-Session limit, creating another active Session requires freeing a slot or upgrading to an applicable paid entitlement.
 - Deleting an active Session moves it to **Trash for 30 days** before permanent deletion. A trashed Session does not consume one of the five active/saved Free Session slots.
+- Restoring a Session from Trash makes it active/saved again and therefore consumes a slot. If the Free account is already at 5/5 active/saved Sessions, restore is blocked until the user frees a slot or obtains an applicable higher entitlement.
 - Free does not include Session reset/restart.
 - Session duplication is not part of the intended product workflow.
 - A Free user with an available daily allowance may apply it to continuing an eligible prior Session or to starting an eligible new Session.
@@ -76,7 +78,7 @@ A Backtest Session is a persistent research container, not a disposable one-mont
 - On a later entitlement day, the user may continue that same session with the next eligible monthly segment, preserving its canonical trade history and cumulative results.
 - Alternatively, the user may spend that day's allowance on a new/different session.
 - The entitlement is account-level daily research capacity; creating many session records must not multiply the daily tradable allowance.
-- Continuation must preserve strategy/protocol version, dataset/feed identity, execution profile and other reproducibility metadata. Material research-contract changes must follow the applicable versioning rules rather than silently rewriting prior evidence.
+- Continuation must preserve Trading Method identity, dataset/feed identity, execution profile and other reproducibility metadata. Material Method-rule changes require a new Trading Method rather than silently rewriting prior evidence.
 
 ### Dashboard and Session Overview
 
@@ -131,8 +133,8 @@ Subject to normal product/data availability, Free should retain the core experie
 - no-look-ahead guarantees;
 - Quick Trade;
 - Planned Trade;
-- Free Mode;
-- Protocol Mode;
+- Free Style Trading Methods;
+- Protocol Trading Methods;
 - core drawing/trading interaction;
 - core indicator workflow;
 - journal/history needed to understand the completed session.
@@ -177,7 +179,7 @@ Pro should primarily unlock:
 
 Upgrading must not feel like switching to another trading application.
 
-Chart, drawings, Quick/Planned workflows, Free/Protocol modes, order semantics and core navigation should remain structurally consistent. Entitlements unlock capacity/research surfaces in-place.
+Chart, drawings, supported execution workflows, Trading Method semantics, order semantics and core navigation should remain structurally consistent. Entitlements unlock capacity/research surfaces in-place.
 
 Upgrade prompts should appear at meaningful entitlement boundaries, not interrupt the user's first complete core backtesting experience unnecessarily.
 
@@ -187,7 +189,7 @@ Upgrade prompts should appear at meaningful entitlement boundaries, not interrup
 2. Never truncate an already-authorized open position in a way that changes its outcome merely to enforce a subscription boundary.
 3. Never hide future candles visually while allowing the engine/indicator/rules layer to read them.
 4. Never present a deliberately inadequate Free sample as statistically conclusive.
-5. Never conflate subscription Free with trading Free Mode.
+5. Never conflate Free subscription with the Free Style Trading Method type.
 6. Entitlement checks control access/capacity; canonical domain engines control market/execution/research truth.
 7. Pricing, exact quotas beyond the agreed daily tradable-window concept, reset mechanics and commercial packaging require separate product decisions.
 
