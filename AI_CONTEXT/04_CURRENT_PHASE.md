@@ -9,16 +9,16 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "19-foundation",
+  "LAST_COMPLETED_PHASE": "19-application-api-planning",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "19",
-  "NEXT_PHASE_STATUS": "FOUNDATION_COMPLETE_FURTHER_SCOPE_NOT_AUTHORIZED",
+  "NEXT_PHASE_STATUS": "APPLICATION_API_SCOPE_PLANNED_IMPLEMENTATION_NOT_AUTHORIZED",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
-  "AUTHORIZED_PHASE_SEQUENCE": ["19-foundation"],
-  "EXECUTION_MODE": "BOUNDED_FOUNDATION_CHECKPOINT",
-  "TARGET_CHECKPOINT": "Validated foundation checkpoint; STOP before further integration or Phase 20",
+  "AUTHORIZED_PHASE_SEQUENCE": ["19-application-api-planning"],
+  "EXECUTION_MODE": "PLANNING_ONLY",
+  "TARGET_CHECKPOINT": "Validated Application/API planning checkpoint; STOP before implementation or Phase 20",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
 
-The human explicitly authorized only the first Phase 19 foundation implementation checkpoint: framework-independent immutable contracts, pure validation, canonical/hash golden fixtures and deterministic tests. This bounded checkpoint is complete subject to normal commit/push/equality verification; Phase 19 as a whole is NOT complete. Existing [system blueprint evidence](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#387-authorized-foundation-checkpoint--implementation-evidence) owns scope/limitations. No further API/application integration, persistence, auth/cloud, frontend wiring, execution-authority change or Phase 20 is authorized. Define the next narrow scope for human review, without implementing it automatically. Verify equality/clean 0/0, report and STOP.
+The human authorized Application/API Layer Preparation PLANNING ONLY from hard-gated clean 163558e. Planning is complete subject to normal commit/push/equality verification. The existing [system blueprint preparation](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#388-applicationapi-layer-preparation--planning-only) defines one proposed nonexecuting review/confirmation-intake checkpoint, exact file boundaries and acceptance gates. Its implementation is NOT authorized; Phase 19 as a whole is NOT complete. No runtime endpoint, application implementation, persistence, auth, worker, frontend wiring, execution-authority switch or Phase 20. After equality/clean 0/0, report and STOP.
