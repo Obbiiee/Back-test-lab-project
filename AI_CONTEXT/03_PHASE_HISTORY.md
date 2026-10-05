@@ -154,3 +154,7 @@ From verified clean/equal 373a734b55fa851296046f1252ce4fa2e50ab075, the human au
 ## Canonical tick/provider/timeline V1 contract freeze
 
 From verified clean/equal 0e7e0804cdd6a428743eac0cfd24a7ca1436f691, human authorized concrete contract freeze plus synthetic contract fixtures only. Existing blueprint 42.15 now defines versioned artifacts, provider boundary, atomic tie-group timeline/replay, no-lookahead and future quote/trigger/fill/settlement separation. Fifteen synthetic examples and a test-only validator reuse existing canonical/precision primitives; no production implementation or real-provider certification. Repository/bundle/contract compatibility and Git equality gates required; browser/full-release exempt because production code unchanged. STOP before separately authorized provider/timeline implementation.
+
+## Synthetic canonical provider and tick timeline checkpoint
+
+From verified clean/equal 56d8735e29d90ec3582a9233ac4942d2ea98761a, explicit human authorization implemented frozen 42.15 contracts in isolated backend/ticks plus 21 authored acceptance methods. Section 42.16 records exact/hash-bound ingestion, atomic groups, causal view, cursor/reset/seek/resume/cancellation/replacement and limits. Full backend 167 methods: 142 PASS/25 explicit DB-related skips; full frontend regression/lint/build/release and Node golden vectors PASS. Bundle/repository/Git gates required. No execution/settlement, frontend cutover, real Exness, aggregator, cloud or legacy deletion. STOP before separately authorized synthetic execution engine.

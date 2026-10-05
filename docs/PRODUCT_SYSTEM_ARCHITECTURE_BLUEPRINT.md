@@ -2415,6 +2415,8 @@ Actual audit validation: test:repository PASS; test:ai-bundle PASS; test:tick-re
 
 ## 42.15 Frozen canonical tick, provider and timeline contract — V1
 
+Subsequent separately authorized implementation evidence is recorded in [42.16](#4216-canonical-synthetic-provider-and-authoritative-tick-timeline--implemented-checkpoint); the wire/ordering definitions below remain authoritative.
+
 ### Evidence and ownership
 
 VERIFIED: baseline main/origin/actual GitHub 0e7e0804cdd6a428743eac0cfd24a7ca1436f691, clean 0/0. Existing Decimal, integer-ns Quote, BTL-CJSON-1/SHA-256 and conservative precision evidence are reusable as audited in 42.14. Existing production execution still uses candles/scalar prices. STILL UNKNOWN: Exness XAUUSD sample UNVERIFIED / NOT ACQUIRED; actual headers, timestamp resolution, order, ties, coverage, freshness and rights are not certified. No acquisition attempted here.
@@ -2523,3 +2525,51 @@ Contract decisions now freeze names, fields, hash identities, ordering/quality r
 This checkpoint changes only documentation and a test-only fixture validation harness. Existing task-specific bundle allowlist is unchanged; its architecture owner includes the complete normative fixtures, while backend tests run in master. Run new contract-fixture unittest, existing precision/golden compatibility tests, repository/bundle tests and generation/verification, diff review and Git equality gates. No runtime/browser/full-release claim: those are exempt because production paths are unchanged. STOP after push/clean 0/0, do not implement the next checkpoint automatically.
 
 Validation evidence: 28 focused unittest methods PASS (4 contract-specification/fixture checks plus 24 existing precision/policy methods); independent Node 6 golden vectors across 3 runs PASS; test:repository and test:ai-bundle PASS. Bundle generation/hash verification and normal Git equality are final gates. No provider/timeline runtime, browser, real-feed or full-release acceptance is claimed.
+
+## 42.16 Canonical synthetic provider and authoritative tick timeline — implemented checkpoint
+
+### Actual baseline and scope
+
+Starting baseline 56d8735e29d90ec3582a9233ac4942d2ea98761a = local/origin/actual GitHub main, clean 0/0. Human authorized implementation of frozen Section 42.15 canonical/provider/timeline contracts using SYNTHETIC / TEST ONLY fixtures, without settlement. Section 42.15 remains the contract owner; this section records implementation/evidence, not a second schema or roadmap. No frozen field/hash/order semantics were replaced. Section 42.14 remains the candle-path migration inventory. Existing BTL-TICK-EVIDENCE-1, precision policy, Local Tick Review and financial/account/runtime code are unchanged.
+
+### Implemented ownership
+
+| File | Implemented responsibility |
+| --- | --- |
+| backend/ticks/__init__.py | Isolated unwired namespace; no API registration |
+| backend/ticks/contracts.py | Frozen canonical tick/manifest bytes, strict exact-field/version/value validation, Decimal properties/native ns, source identity/resolution/quality/evidence, cyclic-free content hashing and local chunk validation |
+| backend/ticks/provider.py | TickDataProvider Protocol, SyntheticTickProvider, immutable canonical pages/tokens, cancellation token and offline full-ingestion acceptance; cross-page/chunk IDs/ordinals/time/sequence and hash-bound diagnostics |
+| backend/ticks/timeline.py | Controller-only TickTimeline, read-only RevealedView capability, bounded groups/deltas/cursor/hash chain, seek/reset/resume/cancellation and dataset replacement |
+| backend/tests/test_tick_timeline.py | 21 synthetic acceptance methods, including original normative matrix, hostile artifacts/cursors, bounded traversal, private future state and lifecycle races |
+
+CanonicalTick and TickManifest validate direct byte construction as well as wire factories. Wire copies cannot mutate their frozen canonical bytes. Prices use existing Decimal/canonical primitives, never floats; nanoseconds/resolution remain unsigned strings on wire. Manifest/chunk metadata rejects wrong identities, versions/hashes/ranges/provenance/source order. Exact duplicate delivery and conflicting identity reject; repeated quote values at distinct source ordinals remain separate events. Missing/crossed quotes are retained as explicit quality states; malformed price bytes are rejected from canonical quotes, and authored diagnostic records can represent quarantined invalid input with explicit missing-data intervals. No Exness/parser/provider facts are invented.
+
+Provider-specific input ends at adapter: TickTimeline uses describe/read_page only. A port-only proxy splits tied events across pages/chunks in acceptance. Chunk hashes are rechecked before exposing loaded events; previously verified cached bytes stay immutable even if backing storage later changes. Offline ingestion rejects corrupt/truncated/stalled/foreign pages, source ordinal reversals, sequence conflicts, incomplete/unlocated diagnostics and false trusted-order declarations. Unknown freshness/coverage stays UNKNOWN; source/hash/evidence references are consistency assertions, not market certification.
+
+### Replay lifecycle and causal boundary
+
+Timestamp groups are atomic. Trusted sequence requires evidenced scope and increasing unique values; otherwise the group is explicitly UNTRUSTED, not an invented chronological array. Source ordinal stays separate. A revealed-only consumer has no provider, manifest, EOF, advance, seek or checkpoint API; normal consumption cannot obtain future ticks or future numeric metadata. This is a Python capability separation for trusted application composition, not a sandbox against arbitrary code reflection.
+
+Controller advance_through returns at most 64 groups per committed step, subject to tighter canonical byte/node budgets; host pumps the same target while pending. Cursor identifies dataset/version, generation/revision, session start, through time, pending target, complete next-group index/last ID and visible prefix chain hash. Silence advances revision without fabricating ticks. Same-target/current-successor no-op is idempotent; stale/foreign/schema-boolean cursors reject. Metadata is clipped to throughNs and diagnostics counts are revealed-only; missing prices are never filled forward. Bounded-limit failures leave cursor/prefix unchanged; no silent partial serialization or EOF success.
+
+Seek resets generation then replays complete groups to target; before-first/exact/between/ties/after-final are tested. Targets before sessionStart reject, and seek does not rewind any account ledger. Reset revokes old generation views and returns an empty prefix with the same dataset. Dataset replacement creates a new timeline/generation, retires the old controller/view and invalidates old cursors. Cancellation rolls back speculative groups with bounded buffered replay; reset during provider read rejects the late callback and reconstructs the new generation rather than committing old events.
+
+Resume requires the controller-private checkpoint {cursor,advanceTargets}. This records the exact committed advance schedule already required by Section 42.15's schedule-sensitive prefix chain. Reconstruct and verify all cursor fields/hash before returning a resumed controller; cursor alone is not a trusted shortcut into hidden state. Continuous versus stopped/resumed replay produces identical subsequent groups and cursors. Generation resets intentionally change prefix identity, while immutable market groups remain reproducible.
+
+### Synthetic acceptance and limitations
+
+The normative fixture matrix remains solely in Section 42.15; tests read it rather than duplicate a competing fixture owner. Additional authored cases cover missing Bid and Ask, zero/very wide spread, bad Decimal/ordinal/sequence, chunk/hash/manifest tampering, ties across pages/chunks, oversized groups, silence/no-op/EOF, reset/seek/resume, incompatible cursors, cancellation, dataset replacement and callback races. All provider metadata says SYNTHETIC_CONTRACT_ONLY / SYNTHETIC / TEST_ONLY; fixture output is market chronology only, never fills/PnL.
+
+SYNTHETIC adapter is intentionally an in-memory test store with one authored source and <=128 authored diagnostic exemplars. Its raw authored input and each artifact must fit existing canonical budgets. Generic ingestion supports manifest-declared diagnostic blocks from provider pages; incomplete/truncated/unlocated diagnostics cannot start an authoritative timeline. A reveal exceeding diagnostic/byte/node limits fails explicitly (REVEAL_LIMIT / canonical budget / GROUP_LIMIT); host must request a smaller bounded target, not discard diagnostics. Oversized atomic groups cannot be split. No production-size performance or ten-year tick benchmark is claimed.
+
+Forward traversal buffers one page/chunk plus one group and bounded output rather than copying history every step. Offline ingestion keeps an event identity digest index; controller caches verified diagnostic exemplars and committed target acknowledgements. Memory is not claimed constant over arbitrary history. Prefix reads/seek/resume stream from provider and may scan the accepted prefix; future indexed storage/ack persistence can improve this through the existing port without changing market chronology. Synthetic provider stores its authored dataset in memory; no production disk/cloud streamer was added.
+
+Exness remains UNVERIFIED / SAMPLE NOT ACQUIRED. No real provider dataset/adapter, candle aggregator, execution/SL/TP/fill model, settlement/PnL/account migration, frontend/backend cutover, cloud delivery or legacy deletion exists here. Eleven product timeframes and all existing candle research/compatibility paths are unchanged. NO TRADE MAY BE SETTLED FROM OHLC DATA ALONE remains the future execution invariant, not a claim that current legacy production already complies.
+
+### Validation and next authorized boundary
+
+Full backend discovery: 167 methods, 142 PASS, 25 explicit PostgreSQL/identity/workspace skips because no isolated database configured; skipped gates are not release PASS. This includes 21 new synthetic acceptance methods and existing evidence/golden contracts. Final narrow type/cursor/diagnostic checks were rerun after review. Independent Node six golden vectors across three runs PASS. Entire registered frontend regression, lint, production build and local release audit PASS. No actual browser run is claimed: new pure modules are unmounted and frontend/API behavior unchanged; existing unwired-foundation exemption applies. No database/auth/schema was modified.
+
+Repository/bundle generation/verification, complete diff review, normal commit/push, actual local/origin/GitHub equality and clean 0/0 are final checkpoint gates. Bundle remains the existing partial allowlist: authoritative blueprint fixtures/context are included, backend code/tests run in master and are not silently added to the drawing-focused bundle.
+
+Next separately authorized checkpoint: IMPLEMENT TICK EXECUTION ENGINE V1 ON TOP OF THE AUTHORITATIVE TICK TIMELINE, USING SYNTHETIC FIXTURES FIRST, WITHOUT CANDLE FALLBACK. Before financial production integration, unresolved profile/activation/trigger/fill/latency/cost/lifecycle decisions require explicit bounded authority; no assumptions are silently supplied by this timeline. STOP after this checkpoint; no automatic execution, aggregation or Exness integration.
