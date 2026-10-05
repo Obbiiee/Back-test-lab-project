@@ -1,5 +1,7 @@
 # Actual product and repository state
 
+An isolated local quote-evidence foundation is implemented in backend/precision, using authored synthetic tests only. It reports observed crossings or explicit uncertainty and supports canonical hash-checked evidence roundtrip. No production consumer or licensed tick sample exists. [Existing implementation owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint) records scope and validation; older planning statements below do not imply that this module is a mounted execution engine.
+
 - React 19 / Vite 8; installed Lightweight Charts 5.2.1 (package range ^5.2.1).
 - XAUUSD approximately ten years: 3,486,461 validated M1 candles; eleven aggregated timeframes; progressive historical loading.
 - Active frontend replay: `frontend/src/market/useReplayMarket.js` loads date-selected M1 chunks, aggregates the revealed prefix, steps timeframe buckets, loads older history, extends forward chunks, restores/saves replay date. Workspace uses commit-acknowledged playback at 1×/2×/5×/10×/20×, play/pause/resume and manual stepping. Previous is allowed only without orders, positions or closed trades. Forward hints are validated against revealed arrays before native chart updates or trading suffix processing; uncertain transitions retain full reference behavior. Aggregation, seven indicator calculators and native Volume still recompute fully. Archived/backend modules are not evidence of active frontend capabilities.

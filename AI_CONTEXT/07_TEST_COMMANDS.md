@@ -1,5 +1,7 @@
 # Commands
 
+Local precision foundation: from backend run `python -m unittest tests.test_precision -v` (11 methods). Keep full backend discovery with isolated PostgreSQL, independent Node canonical vectors, frontend regression/lint/build/release and context/bundle gates. Browser exempt only while this module remains unmounted; [existing owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint) records evidence and limitations.
+
 Run in `frontend/`:
 
 | Command | Protects |
