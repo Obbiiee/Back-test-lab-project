@@ -1,0 +1,87 @@
+[
+  {
+    "name": "decimal-time-unicode",
+    "input": {
+      "schemaVersion": 1,
+      "z": null,
+      "amount": {
+        "$decimal": "-0.000"
+      },
+      "price": {
+        "$decimal": "1.2300"
+      },
+      "time": {
+        "$timestamp": "2024-01-01T07:00:00+07:00"
+      },
+      "label": "Emas 🧪",
+      "items": [
+        true,
+        false,
+        2
+      ]
+    },
+    "canonical": "{\"amount\":\"0\",\"items\":[true,false,2],\"label\":\"Emas 🧪\",\"price\":\"1.23\",\"schemaVersion\":1,\"time\":\"2024-01-01T00:00:00.000000Z\",\"z\":null}",
+    "sha256": "eeed34a9da8abe9b150c224d6523c4b4ad51311cd3056c0e487fbd126d9d4203"
+  },
+  {
+    "name": "exponents",
+    "input": {
+      "schemaVersion": 1,
+      "a": {
+        "$decimal": "1e3"
+      },
+      "b": {
+        "$decimal": "1e-7"
+      },
+      "c": {
+        "$decimal": "12345678901234567890.1234500"
+      }
+    },
+    "canonical": "{\"a\":\"1000\",\"b\":\"0.0000001\",\"c\":\"12345678901234567890.12345\",\"schemaVersion\":1}",
+    "sha256": "d99e4568f3bef33d6051be810d97537c950309d83d2d7615fc85273c0d809f81"
+  },
+  {
+    "name": "absent",
+    "input": {
+      "schemaVersion": 1,
+      "items": [
+        2,
+        1
+      ]
+    },
+    "canonical": "{\"items\":[2,1],\"schemaVersion\":1}",
+    "sha256": "89cb8790cf6da3743b5ac71b8eb19b13d827126d7d88287a60768243b2198174"
+  },
+  {
+    "name": "unicode-key-order",
+    "input": {
+      "schemaVersion": 1,
+      "😀": "astral",
+      "": "bmp",
+      "quoted": "line\n\"slash\\"
+    },
+    "canonical": "{\"quoted\":\"line\\n\\\"slash\\\\\",\"schemaVersion\":1,\"\":\"bmp\",\"😀\":\"astral\"}",
+    "sha256": "608296a405bc5d711b7aa35e9939cd4186d70a3a933867eb22529ef609a8691a"
+  },
+  {
+    "name": "integer-looking-key-sort",
+    "input": {
+      "2": "two",
+      "10": "ten",
+      "schemaVersion": 1
+    },
+    "canonical": "{\"10\":\"ten\",\"2\":\"two\",\"schemaVersion\":1}",
+    "sha256": "59fd8d269b4bdba79ea191a7eb95a1510695f07dd77f8923a7e25b1710898012"
+  },
+  {
+    "name": "utc-microseconds",
+    "input": {
+      "schemaVersion": 1,
+      "time": {
+        "$timestamp": "2024-01-01T07:00:00.123456+07:00"
+      }
+    },
+    "canonical": "{\"schemaVersion\":1,\"time\":\"2024-01-01T00:00:00.123456Z\"}",
+    "sha256": "8e2149263613a14ef651748634d75b8df2f8c45de890b36e49b4b04956e3d781"
+  }
+]

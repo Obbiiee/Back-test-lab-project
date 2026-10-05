@@ -9,16 +9,16 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "19-planning",
+  "LAST_COMPLETED_PHASE": "19-foundation",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "19",
-  "NEXT_PHASE_STATUS": "PLANNING_COMPLETE_IMPLEMENTATION_NOT_AUTHORIZED",
+  "NEXT_PHASE_STATUS": "FOUNDATION_COMPLETE_FURTHER_SCOPE_NOT_AUTHORIZED",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
-  "AUTHORIZED_PHASE_SEQUENCE": ["19-planning"],
-  "EXECUTION_MODE": "PLANNING_ONLY",
-  "TARGET_CHECKPOINT": "Phase 19 planning checkpoint; STOP before implementation or Phase 20",
+  "AUTHORIZED_PHASE_SEQUENCE": ["19-foundation"],
+  "EXECUTION_MODE": "BOUNDED_FOUNDATION_CHECKPOINT",
+  "TARGET_CHECKPOINT": "Validated foundation checkpoint; STOP before further integration or Phase 20",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
 
-The human authorized Phase 19 planning only by accepting the bounded planning proposal. Planning is complete subject to normal checkpoint/push/equality verification; runtime Phase 19 is not complete or authorized. The existing [architecture blueprint](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff) owns the backend plan and integration gates. Frozen Method/Session semantics remain unchanged. No runtime/API/database/auth/cloud implementation or Phase 20 authorization. After clean local/origin/actual GitHub equality, report and STOP.
+The human explicitly authorized only the first Phase 19 foundation implementation checkpoint: framework-independent immutable contracts, pure validation, canonical/hash golden fixtures and deterministic tests. This bounded checkpoint is complete subject to normal commit/push/equality verification; Phase 19 as a whole is NOT complete. Existing [system blueprint evidence](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#387-authorized-foundation-checkpoint--implementation-evidence) owns scope/limitations. No further API/application integration, persistence, auth/cloud, frontend wiring, execution-authority change or Phase 20 is authorized. Define the next narrow scope for human review, without implementing it automatically. Verify equality/clean 0/0, report and STOP.

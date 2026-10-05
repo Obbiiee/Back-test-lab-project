@@ -612,6 +612,8 @@ Journal / Analysis / Research
 
 Planning handoff is recorded in the [existing system architecture owner](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff). This completes the authorized planning task only; runtime implementation remains planned and requires explicit authorization through the operational authority. No Phase 20 start is implied.
 
+The separately authorized first [foundation checkpoint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#387-authorized-foundation-checkpoint--implementation-evidence) implements unwired contracts/pure validation/golden tests only. Application/API/persistence integration remains planned; this milestone does not mark the whole phase complete or authorize later work.
+
 Plan:
 Establish production-oriented backend/service/API boundaries as a modular-monolith-first foundation. Preserve separable Product DB, Research Compute, Billing/Entitlement, AI Gateway and Integration/CRM boundaries without prematurely extracting microservices. Define trust boundaries, runtime validation and heavy-compute separation points.
 
