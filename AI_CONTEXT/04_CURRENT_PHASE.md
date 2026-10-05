@@ -9,20 +9,20 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "22",
+  "LAST_COMPLETED_PHASE": "23",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "23",
-  "NEXT_PHASE_STATUS": "PLANNING_PREPARED_AWAITING_DATA_DECISIONS_AND_IMPLEMENTATION_AUTHORIZATION",
+  "NEXT_PHASE_STATUS": "RESEARCH_COMPLETE_CLOUD_SERVICE_UNIMPLEMENTED_SCOPE_DECISION_REQUIRED",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [
-    "20",
-    "21",
-    "22"
+    "23"
   ],
-  "EXECUTION_MODE": "PLANNING_ONLY",
-  "TARGET_CHECKPOINT": "Phase 23 scope preparation: documentation validation, commit/push/equality then STOP; no runtime implementation",
+  "EXECUTION_MODE": "COMPLETED_RESEARCH_CHECKPOINT",
+  "TARGET_CHECKPOINT": "Phase 23 authorized research only: validated documentation, normal push/equality and clean 0/0; STOP before service implementation or Phase 24",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
 
-The completed 20 → 21 → 22 journey reached Phase 22 checkpoint ef658338d74b501c327cb3c2baf884647436760e with clean local/origin/actual GitHub equality and 0/0. The subsequent human continuation follows the proposed **Phase 23 planning** step; the human expressly selected **both personal/internal research and public/SaaS source evaluation, with separate rights/cost records and no personal-only data in the public path**. [Existing preparation owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#42-phase-23--market-data-service-preparation-planning-only) holds audit, proposed scope and outstanding budget/provider/data-rights decisions. LAST_COMPLETED_PHASE remains 22; no implementation is authorized. Validate documentation/bundle, commit/push/verify equality, report decisions needed, then STOP. No public data service, provider purchase/contact, cloud activation, frontend cutover or Phase 24.
+The completed engineering 20 → 21 → 22 journey reached ef658338d74b501c327cb3c2baf884647436760e. The human authorized expanded **Phase 23 market-data strategy/provider research/licensing/cost planning only**, and approved first checkpointing existing drafts at clean/equal 4876c037da1970867b1a353ad4fb886f94eadaa3. The [existing system blueprint Section 42.5](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#425-phase-23-authorized-research--provider-comparison) owns provider/rights/pricing/cost decisions; [existing Market Data Standard](../docs/MARKET_DATA_STANDARD.md) owns canonical/fidelity/quality/registry requirements.
+
+Completion status above records the supplied **research scope**, not the ROADMAP cloud-market-data service capability, which remains unimplemented. The next pointer stays at 23 until a human resolves that engineering scope/dependency; it does not silently skip the service into Phase 24. No active implementation is authorized. Actual grants, provider/budget selection, samples, procurement/contact and production integration remain separate decisions. Required documentation validation, normal commit/push, actual GitHub equality and clean 0/0 precede reporting completion. STOP after this research checkpoint; no purchases, contacts, credentials, runtime changes, tick integration or Phase 24.

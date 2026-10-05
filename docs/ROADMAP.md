@@ -664,6 +664,8 @@ This is conceptual planning, not a locked database schema.
 
 [Existing system owner — preparation and proposed acceptance](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#42-phase-23--market-data-service-preparation-planning-only). Planning does not complete this milestone or grant implementation/deployment rights; finalized provider/product decisions remain required.
 
+The human separately authorized and completed the bounded [Phase 23 research/licensing/cost checkpoint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#425-phase-23-authorized-research--provider-comparison), with canonical requirements in the existing [Market Data Standard](MARKET_DATA_STANDARD.md). This closes the supplied research scope only; the cloud delivery capability below remains PLANNED. No tick acquisition/pipeline, public deployment or Phase 24 is implicitly authorized.
+
 Plan:
 Serve historical market data through cloud infrastructure.
 

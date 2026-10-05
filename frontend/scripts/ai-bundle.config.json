@@ -1,5 +1,6 @@
 {
   "context": [
+    "docs/MARKET_DATA_STANDARD.md",
     "docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md",
     "docs/SECURITY_ARCHITECTURE.md",
     "docs/AI_ENGINEERING_GUARDRAILS.md",
