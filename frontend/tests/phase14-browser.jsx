@@ -1,7 +1,7 @@
 // Isolated test fixture; production never imports counters or test controls.
 import { StrictMode, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { initialAccount } from '../src/trading/simulator.js';
+import { initialAccount, placeOrder, processCandle } from '../src/trading/simulator.js';
 import CandleChart from '../src/components/CandleChart.jsx';
 import { IndicatorSeriesAdapter } from '../src/indicators/IndicatorSeriesAdapter.js';
 import { productionRegistry } from '../src/indicators/productionRegistry.js';
@@ -45,6 +45,22 @@ export default function Harness() {
     <button onClick={()=>setIndicators(productionRegistry.types().map(type=>({id:type,type,parameters:{},visible:true})))}>Seven indicators</button>
     {['long-position','short-position'].map(tool=><button key={tool} onClick={()=>setMode(tool)}>{tool}</button>)}
     <button onClick={()=>setTicket({side:'Buy'})}>Buy ticket</button><button onClick={()=>setTicket({side:'Sell'})}>Sell ticket</button>
+    <button onClick={()=>{
+      const results=[];
+      for(const side of ['Buy','Sell'])for(const type of ['TP','SL','Limit','Stop'])for(const tick of [false,true]){
+        const buy=side==='Buy',pending=type==='Limit'||type==='Stop';
+        const level=type==='Limit'?(buy?1:3):(buy?3:1);
+        const jump=type==='SL'?(buy?.5:4):(level===1?.5:4);
+        const seed={id:'gap-fixture',side,type:pending?type:'Market',size:1,entry:pending?level:2,sl:pending?null:buy?1:3,tp:pending?null:buy?3:1};
+        const account=placeOrder(initialAccount(),seed,{time:60,close:2});
+        const result=processCandle(account,{time:120,open:jump,high:5,low:.1,close:tick?jump:2},tick);
+        const price=pending?result.positions[0]?.entry:result.trades[0]?.exit;
+        const reason=pending?type:result.trades[0]?.reason;
+        const pass=price===jump&&(pending||reason===(type==='TP'?'Take profit':'Stop loss'));
+        results.push({side,type,tick,expected:jump,price,reason,pass});
+      }
+      setReport(JSON.stringify({policy:'FIRST_SUPPLIED_PRICE / MODELLED',pass:results.every(item=>item.pass),results},null,2));
+    }}>Gap policy scenarios</button>
     <button onClick={()=>{localStorage.setItem('backtest-paper-account-v1',JSON.stringify({...initialAccount(),balance:100012,trades:[{id:'legacy-exit',side:'Buy',entry:2000,exit:2001,entryTime:60,exitTime:120,size:.1,pnl:12,notes:'Legacy محفوظ'}]}));window.location.reload();}}>Load legacy fixture</button>
     <button onClick={()=>{currentChart.timeScale().setVisibleLogicalRange({from:30,to:80});}}>Pan / zoom range</button>
   </div><div style={{height:410,position:'relative'}}><CandleChart candles={replay.candles} transition={replay.transition} sessionId={'XAUUSD-replay-'+frame} viewportKey={frame} onLoadOlder={replay.loadOlder} indicatorRegistry={productionRegistry} indicatorInstances={indicators}

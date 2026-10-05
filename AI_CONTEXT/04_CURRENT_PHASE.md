@@ -19,8 +19,8 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "AUTHORIZED_PHASE_SEQUENCE": [
     "23"
   ],
-  "EXECUTION_MODE": "COMPLETED_LOCAL_EVIDENCE_POLICY_CHECKPOINT",
-  "TARGET_CHECKPOINT": "Bounded local evidence policy: validation, normal push/equality and clean 0/0; STOP before product integration, large-history acquisition or cloud delivery",
+  "EXECUTION_MODE": "COMPLETED_SIMULATION_GAP_POLICY_CHECKPOINT",
+  "TARGET_CHECKPOINT": "Authorized frontend simulation gap policy: validation/browser, normal push/equality and clean 0/0; STOP before tick-evidence integration, acquisition or cloud delivery",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
@@ -32,3 +32,5 @@ Completion status above records the supplied **research scope**, not the ROADMAP
 The human then authorized the fixture-only foundation via the proposed prompt. Section 42.7 of the existing system blueprint supersedes planning-only restrictions for that completed bounded checkpoint only. No active implementation remains; that checkpoint was followed by the separately authorized personal sample below. This neither completes cloud delivery nor authorizes later roadmap phases.
 
 The human subsequently authorized bounded personal sample selection/acquisition/evaluation and conditional local import. Existing blueprint Section 42.8 records actual HistData sample evidence and supported narrow local-download/import purpose, with no public redistribution grant. The offline parsing seam is implemented; completeness/freshness gates remain unresolved, so production integration did not proceed. The subsequently authorized evidence policy is completed in Section 42.9. Real samples remain ambiguous. Next work requires bounded local Tick Review preparation; no automatic production cutover or fictional settlement.
+
+The human separately authorized first-supplied-price simulation for entry/TP/SL. This completed narrow exception changes frontend gap handling only; [existing trading owner](../docs/PHASE14_TRADING_UX_BACKTEST_ANALYSIS.md#first-supplied-price--authorized-simulation-gap-policy) owns scope and limits. It does not certify tick evidence or authorize further integration.

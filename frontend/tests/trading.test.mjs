@@ -40,3 +40,41 @@ targets=processCandle(targets,candle(180,2008,2025,2000,2020));assert.equal(targ
 assert.ok(validateOrder(order({partials:[{id:'bad',price:2005,percent:100}]}),2000));
 assert.ok(validateOrder(order({partials:[{id:'bad',price:2025,percent:25}]}),2000));
 console.log('PASS: buy/sell orders, market/limit/stop fills, SL/TP, gaps, conservative OHLC handling, partial closes, live ticks and duplicate-candle protection.');
+// Opening crossings precede later intrabar reversals; observed tick gaps use the supplied price.
+for(const side of ['Buy','Sell']) {
+  const buy=side==='Buy',entry=2,sl=buy?1:3,tp=buy?3:1;
+  for(const tickMode of [false,true]) {
+    for(const reason of ['Take profit','Stop loss']) {
+      const jump=reason==='Take profit'?(buy?4:.5):(buy?.5:4);
+      let state=placeOrder(initialAccount(),order({side,entry,sl,tp}),candle(60,entry));
+      state=processCandle(state,tickMode?candle(61,entry,5,.1,jump):candle(120,jump,5,.1,entry),tickMode);
+      assert.equal(state.trades[0].reason,reason);
+      assert.equal(state.trades[0].exit,jump);
+      assert.equal(state.balance,100000+(jump-entry)*(buy?1:-1)*100);
+      assert.equal(state.positions.length,0);
+    }
+    for(const type of ['Limit','Stop']) {
+      const level=type==='Limit'?(buy?1:3):(buy?3:1),jump=level===1?.5:4;
+      let state=placeOrder(initialAccount(),order({side,type,entry:level,sl:null,tp:null}),candle(60,entry));
+      state=processCandle(state,candle(120,jump),tickMode);
+      assert.equal(state.positions[0].entry,jump,`${side} ${type} gap entry`);
+      assert.equal(state.orders.length,0);
+    }
+  }
+}
+let gapPartials=placeOrder(initialAccount(),order({entry:1,sl:.5,tp:3,partials:[{id:'p',price:2,percent:25}]}),candle(60,1));
+gapPartials=processCandle(gapPartials,candle(120,4,4,.25,1));
+assert.deepEqual(gapPartials.trades.map(t=>[t.reason,t.exit]),[['Partial take profit',4],['Take profit',4]]);
+assert.equal(gapPartials.balance,100300);
+assert.strictEqual(processCandle(gapPartials,candle(120,1)),gapPartials);
+console.log('PASS symmetric first supplied price: entries, TP/SL, opening precedence, tick gaps, partials and balance.');
+for(const side of ['Buy','Sell'])for(const type of ['Limit','Stop']) {
+  const buy=side==='Buy',limit=type==='Limit',level=limit?(buy?1:3):(buy?3:1);
+  const jump=level===1?.5:4,sl=buy?.75:3.5,tp=buy?3.5:.75;
+  let state=placeOrder(initialAccount(),order({side,type,entry:level,sl,tp}),candle(60,2));
+  state=processCandle(state,candle(120,jump,4,.5,2));
+  assert.equal(state.trades[0].entry,jump);
+  assert.equal(state.trades[0].exit,jump);
+  assert.equal(state.trades[0].reason,limit?'Stop loss':'Take profit');
+  assert.equal(state.balance,100000,'Entry and immediate opening exit use the same supplied price');
+}

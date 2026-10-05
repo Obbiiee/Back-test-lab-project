@@ -123,3 +123,7 @@ From clean/equal 5ebfbfae8f83d77fe2e9f69732a53c95486b0e15, human authorized samp
 ## Local evidence-policy checkpoint
 
 From clean/equal cc203288d78002466fa99e02e48b16c5862fad88, implemented the human-authorized conservative assessment and read-only CLI with 13 new tests. Full backend 133 methods PASS with real PostgreSQL/no skips; frontend regression/lint/build/release and Node vectors PASS. Three actual sample prefixes remain ambiguous. Blueprint Section 42.9 owns evidence. Browser exempt while unmounted; repository/bundle and normal push/equality required before completion. No later phase or cloud delivery started.
+
+## Authorized simulation gap policy
+
+From verified 38276b32d1ae15b39005034a612c09ad796e1457, applied human-requested first supplied price consistently to entry/TP/SL. Opening crossings take precedence over later extrema, including immediate opening exits after pending activation. Existing tests and browser harness extended; Phase 14 owner records modelling limits and acceptance. Backend precision ambiguity remains unchanged; no later roadmap phase started.

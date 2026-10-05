@@ -1,6 +1,8 @@
 export const CONTRACT_SIZE = 100;
 export function initialAccount() { return { initialBalance:100000, balance:100000, orders:[], positions:[], trades:[], lastTime:null }; }
 export const pnl=(order,price)=>(price-order.entry)*(order.side==='Buy'?1:-1)*order.size*CONTRACT_SIZE;
+// Simulation policy: a marketable level uses the first supplied price, not an interpolated level.
+const availablePrice=(open,level,rises)=>rises?Math.max(open,level):Math.min(open,level);
 export function validateOrder(order,price) {
   if(!['Buy','Sell'].includes(order.side)||!['Market','Limit','Stop'].includes(order.type))return 'Choose a valid side and order type.';
   if(!Number.isFinite(order.size)||order.size<=0)return 'Size must be greater than zero.';
@@ -28,34 +30,43 @@ export function closePosition(account,id,price,time,reason='Manual close',fracti
   return {...account,balance:account.balance+trade.pnl,positions:amount===1?account.positions.filter(item=>item.id!==id):account.positions.map(item=>item.id===id?{...item,size:item.size-size}:item),trades:[...account.trades,trade]};
 }
 export function processCandle(account,candle,tick=false) {
-  // Process forward once. Stops win when OHLC alone cannot establish which exit hit first.
+  // Process forward once. Without an opening crossing, OHLC dual touches retain the legacy SL-first model.
   if(!tick&&account.lastTime!=null&&candle.time<=account.lastTime)return account;
   if(tick)candle={...candle,open:candle.close,high:candle.close,low:candle.close};
   let next={...account,lastTime:candle.time};
+  const openingEntries=new Set();
   for(const order of account.orders) {
     if(!tick&&candle.time<=order.placedTime)continue;
     const buy=order.side==='Buy',limit=order.type==='Limit';
     const hit=limit?(buy?candle.low<=order.entry:candle.high>=order.entry):(buy?candle.high>=order.entry:candle.low<=order.entry);
     if(!hit)continue;
-    const entry=limit?(buy?Math.min(candle.open,order.entry):Math.max(candle.open,order.entry)):(buy?Math.max(candle.open,order.entry):Math.min(candle.open,order.entry));
+    const entry=availablePrice(candle.open,order.entry,limit?!buy:buy);
+    if(limit?(buy?candle.open<=order.entry:candle.open>=order.entry):(buy?candle.open>=order.entry:candle.open<=order.entry))openingEntries.add(order.id);
     next={...next,orders:next.orders.filter(item=>item.id!==order.id),positions:[...next.positions,{...order,entry,entryTime:candle.time}]};
   }
   for(const position of next.positions) {
     if(candle.time<position.entryTime)continue;
     const buy=position.side==='Buy';
-    // On a pending entry bar, pre-entry highs/lows are unknown: evaluate exits from the close only.
+    // Pending entry-bar highs/lows may precede entry: use close except an evidenced opening entry/exit.
     const justFilled=position.entryTime===candle.time&&position.type!=='Market';
-    const stop=position.sl!=null&&(justFilled?(buy?candle.close<=position.sl:candle.close>=position.sl):(buy?candle.low<=position.sl:candle.high>=position.sl));
-    const target=position.tp!=null&&(justFilled?(buy?candle.close>=position.tp:candle.close<=position.tp):(buy?candle.high>=position.tp:candle.low<=position.tp));
-    if(stop){next=closePosition(next,position.id,justFilled?candle.close:(buy?Math.min(candle.open,position.sl):Math.max(candle.open,position.sl)),candle.time,'Stop loss');continue;}
+    const entryOpeningExit=justFilled&&openingEntries.has(position.id)&&(
+      position.sl!=null&&(buy?candle.open<=position.sl:candle.open>=position.sl)||
+      position.tp!=null&&(buy?candle.open>=position.tp:candle.open<=position.tp));
+    const suppliedExit=entryOpeningExit?candle.open:candle.close;
+    // A known opening crossing precedes unknown intrabar extremes.
+    const openingTarget=!justFilled&&position.tp!=null&&(buy?candle.open>=position.tp:candle.open<=position.tp);
+    const openingStop=!justFilled&&position.sl!=null&&(buy?candle.open<=position.sl:candle.open>=position.sl);
+    const stop=position.sl!=null&&(justFilled?(buy?suppliedExit<=position.sl:suppliedExit>=position.sl):(openingStop||!openingTarget&&(buy?candle.low<=position.sl:candle.high>=position.sl)));
+    const target=position.tp!=null&&(justFilled?(buy?suppliedExit>=position.tp:suppliedExit<=position.tp):(buy?candle.high>=position.tp:candle.low<=position.tp));
+    if(stop){next=closePosition(next,position.id,justFilled?suppliedExit:availablePrice(candle.open,position.sl,!buy),candle.time,'Stop loss');continue;}
     for(const partial of (position.partials??[]).slice().sort((a,b)=>(a.price-b.price)*(buy?1:-1))){
-      const hit=justFilled?(buy?candle.close>=partial.price:candle.close<=partial.price):(buy?candle.high>=partial.price:candle.low<=partial.price);if(!hit)continue;
+      const hit=justFilled?(buy?suppliedExit>=partial.price:suppliedExit<=partial.price):(buy?candle.high>=partial.price:candle.low<=partial.price);if(!hit)continue;
       const current=next.positions.find(item=>item.id===position.id);if(!current)break;
-      const price=justFilled?candle.close:(buy?Math.max(candle.open,partial.price):Math.min(candle.open,partial.price));
+      const price=justFilled?suppliedExit:availablePrice(candle.open,partial.price,buy);
       next=closePosition(next,position.id,price,candle.time,'Partial take profit',Math.min(1,(position.initialSize??position.size)*partial.percent/100/current.size));
       next={...next,positions:next.positions.map(item=>item.id===position.id?{...item,partials:(item.partials??[]).filter(value=>value.id!==partial.id)}:item)};
     }
-    if(target)next=closePosition(next,position.id,justFilled?candle.close:(buy?Math.max(candle.open,position.tp):Math.min(candle.open,position.tp)),candle.time,'Take profit');
+    if(target)next=closePosition(next,position.id,justFilled?suppliedExit:availablePrice(candle.open,position.tp,buy),candle.time,'Take profit');
   }
   return next;
 }
