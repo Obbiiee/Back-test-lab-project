@@ -14,13 +14,13 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "LAST_COMPLETED_PHASE": "23",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "23",
-  "NEXT_PHASE_STATUS": "LOCAL_FOUNDATION_COMPLETE_SAMPLE_SCOPE_REQUIRED",
+  "NEXT_PHASE_STATUS": "PERSONAL_SAMPLE_STRUCTURAL_PASS_PRECISION_GATES_UNRESOLVED",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [
     "23"
   ],
-  "EXECUTION_MODE": "COMPLETED_LOCAL_FOUNDATION_CHECKPOINT",
-  "TARGET_CHECKPOINT": "Fixture-only local evidence foundation: validation, normal push/equality and clean 0/0; STOP before provider acquisition, integration or cloud delivery",
+  "EXECUTION_MODE": "COMPLETED_PERSONAL_SAMPLE_CHECKPOINT",
+  "TARGET_CHECKPOINT": "Bounded personal sample/offline parser: validation, normal push/equality and clean 0/0; STOP before large-history acquisition, replay integration or cloud delivery",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
@@ -30,3 +30,5 @@ The completed engineering 20 → 21 → 22 journey reached ef658338d74b501c327cb
 Completion status above records the supplied **research scope**, not the ROADMAP cloud-market-data service capability, which remains unimplemented. The next pointer stays at 23 until a human resolves that engineering scope/dependency; it does not silently skip the service into Phase 24. No active implementation is authorized. Actual grants, provider/budget selection, samples, procurement/contact and production integration remain separate decisions. Required documentation validation, normal commit/push, actual GitHub equality and clean 0/0 precede reporting completion. STOP after this research checkpoint; no purchases, contacts, credentials, runtime changes, tick integration or Phase 24.
 
 The human then authorized the fixture-only foundation via the proposed prompt. Section 42.7 of the existing system blueprint supersedes planning-only restrictions for that completed bounded checkpoint only. No active implementation remains; next work requires defining and authorizing one rights-approved personal sample/import scope. This neither completes cloud delivery nor authorizes later roadmap phases.
+
+The human subsequently authorized bounded personal sample selection/acquisition/evaluation and conditional local import. Existing blueprint Section 42.8 records actual HistData sample evidence and supported narrow local-download/import purpose, with no public redistribution grant. The offline parsing seam is implemented; completeness/freshness gates remain unresolved, so production integration did not proceed. Next authorization must define representative follow-up windows and evidence policy without overriding unknowns or purchasing/contacting providers.

@@ -102,7 +102,7 @@ Experiments pin immutable identity/version/hash. Migration A→B creates a new d
 
 ### Quality acceptance and procurement sample plan
 
-All candidate feeds currently lack an independently downloaded tick quality benchmark. Provider claims are not measured quality scores. A future rights-approved sample must include normal sessions, market open/close, holidays/weekends, DST boundaries, volatility/spread stress, equal-time events and overlapping years. Ten-year coverage requires an interval inventory, not only first and last dates.
+The original research had no independently downloaded tick benchmark. The subsequent [personal HistData sample](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#428-personal-histdata-sample-and-offline-parser-checkpoint) supplies three limited-window structural measurements and an offline parser; it does not certify fidelity or representative coverage. Provider claims are not measured quality scores. Extended rights-approved sampling must include normal sessions, market open/close, holidays/weekends, DST boundaries, volatility/spread stress, equal-time events and overlapping years. Ten-year coverage requires an interval inventory, not only first and last dates.
 
 | Check | Required observation and treatment |
 | --- | --- |

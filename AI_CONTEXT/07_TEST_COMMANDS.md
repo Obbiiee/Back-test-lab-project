@@ -1,5 +1,7 @@
 # Commands
 
+Offline HistData tick seam: from backend run `python -m unittest tests.test_histdata_ticks tests.test_precision -v` (6 parser + 11 evaluator methods; authored fixtures only, no provider download). Full discovery with actual isolated PostgreSQL now includes 120 methods. Keep frontend/regression/lint/build/release, vectors and context/bundle gates; browser exempt while unmounted. Actual machine-local sample measurements belong to existing blueprint Section 42.8, not test fixtures or public raw data.
+
 Local precision foundation: from backend run `python -m unittest tests.test_precision -v` (11 methods). Keep full backend discovery with isolated PostgreSQL, independent Node canonical vectors, frontend regression/lint/build/release and context/bundle gates. Browser exempt only while this module remains unmounted; [existing owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint) records evidence and limitations.
 
 Run in `frontend/`:
