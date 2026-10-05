@@ -1,0 +1,28 @@
+@import '../workspace/designTokens.css';
+.tick-review { max-width: 1200px; margin: 0 auto; padding: 24px; color: var(--lab-text-primary); line-height: 1.55; }
+.tick-review header, .tick-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tick-review h1 { margin: 0; font-size: 26px; }
+.tick-review h2 { font-size: 19px; }
+.tick-review h3 { font-size: 16px; }
+.tick-review-eyebrow { color: var(--lab-text-secondary); font-size: 12px; letter-spacing: .08em; }
+.tick-review a { color: var(--lab-accent); }
+.tick-review section { background: var(--lab-surface-workspace); border: 1px solid var(--lab-border); border-radius: 8px; padding: 20px; margin: 20px 0; }
+.tick-review-import { display: flex; flex-wrap: wrap; gap: 20px; margin: 16px 0; }
+.tick-review label { display: grid; gap: 8px; flex: 1 1 220px; min-width: 0; max-width: 100%; }
+.tick-review input { width: 100%; min-width: 0; max-width: 100%; padding: 10px; border: 1px solid var(--lab-border); border-radius: 4px; background: var(--lab-surface-chart); color: var(--lab-text-primary); }
+.tick-review button { padding: 9px 14px; border: 1px solid var(--lab-border); border-radius: 4px; background: var(--lab-selected); color: var(--lab-text-primary); cursor: pointer; }
+.tick-review button:disabled { opacity: .6; cursor: default; }
+.tick-review :focus-visible { outline: 2px solid var(--lab-accent); outline-offset: 3px; }
+.tick-review-actions { justify-content: flex-start; margin-top: 14px; }
+.tick-review-status { font-weight: 700; color: var(--lab-warning); }
+.tick-review-warning, .tick-review [role=alert] { border-left: 3px solid var(--lab-warning); padding-left: 12px; }
+.tick-review-meta { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); gap: 10px 20px; }
+.tick-review dt { color: var(--lab-text-secondary); }
+.tick-review dd { margin: 0; overflow-wrap: anywhere; }
+.tick-review code { font-size: 12px; overflow-wrap: anywhere; }
+.tick-review-table { overflow-x: auto; border: 1px solid var(--lab-border); }
+.tick-review table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.tick-review caption { text-align: left; padding: 12px; color: var(--lab-text-secondary); }
+.tick-review th, .tick-review td { padding: 10px; border-bottom: 1px solid var(--lab-border); white-space: nowrap; }
+.tick-review-crossing { background: var(--lab-selected); }
+@media (max-width: 600px) { .tick-review { padding: 12px; } .tick-review section { padding: 14px; } .tick-review-meta { grid-template-columns: 1fr; gap: 5px; } .tick-review dd { margin-bottom: 9px; } }
