@@ -55,6 +55,16 @@ def grant_runtime(dsn, role):
         db.execute(sql.SQL("GRANT UPDATE ON btl.session_contexts TO {}").format(sql.Identifier(role)))
 
 
+def grant_identity_runtime(dsn, role):
+    with connect(dsn) as db:
+        db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.users TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,DELETE ON btl.auth_sessions TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE,DELETE ON btl.auth_rate_limits TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT INSERT ON btl.security_events TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT USAGE ON SEQUENCE btl.security_events_id_seq TO {}").format(sql.Identifier(role)))
+
+
 def backup(dsn, target, bin_directory=""):
     target = Path(target)
     require(not target.exists(), "backupTarget")
@@ -86,12 +96,15 @@ def main():
     parser.add_argument("--file")
     parser.add_argument("--hash")
     parser.add_argument("--runtime-role")
+    parser.add_argument("--identity-role")
     args = parser.parse_args()
     dsn = os.environ["BTL_DATABASE_URL"]
     if args.operation == "migrate":
         migrate(dsn)
         if args.runtime_role:
             grant_runtime(dsn, args.runtime_role)
+        if args.identity_role:
+            grant_identity_runtime(dsn, args.identity_role)
     elif args.operation == "backup":
         print(backup(dsn, args.file, os.getenv("BTL_PG_BIN", "")))
     else:

@@ -3,3 +3,5 @@ uvicorn[standard]>=0.29
 python-multipart>=0.0.9
 tzdata>=2024.1
 psycopg[binary]==3.3.6
+fastapi-users==15.0.5
+httpx==0.28.1

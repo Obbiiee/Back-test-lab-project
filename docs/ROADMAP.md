@@ -40,7 +40,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | Recorded in completed history |
 | 19 | BACKEND ARCHITECTURE | Recorded completed history; evidence in existing system blueprint |
 | 20 | PRODUCTION DATABASE | Recorded completed persistence checkpoint; existing system owner holds evidence |
-| 21 | AUTHENTICATION & IDENTITY | PLANNED; separate human authorization required |
+| 21 | AUTHENTICATION & IDENTITY | Recorded backend identity checkpoint; existing system owner holds evidence |
 | 22 | USER & WORKSPACE MODEL | PLANNED; separate human authorization required |
 | 23 | CLOUD MARKET DATA SERVICE | PLANNED; separate human authorization required |
 | 24 | MARKET DATA PIPELINE | PLANNED; separate human authorization required |
@@ -633,7 +633,9 @@ backup/restore and schema lifecycle.
 
 Persist the provenance foundations introduced by Phase 19, including experiment/trial lineage and immutable/versioned research identity where applicable. Index from measured query patterns, not speculative future scale.
 
-### Phase 21 — AUTHENTICATION & IDENTITY (PLANNED)
+### Phase 21 — AUTHENTICATION & IDENTITY
+
+[Implemented backend identity evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#401-implemented-identity-and-validation); email/password initial method, no login UI/public deployment implied.
 
 Plan:
 Secure user identity, authentication, session/token lifecycle,
