@@ -821,13 +821,11 @@ Professional strategy research and management platform.
 
 ## v4.0 — HIGH-FIDELITY MARKET SIMULATION
 
+Human-approved tick-native target is owned by [Market Data Standard](MARKET_DATA_STANDARD.md#tick-native-execution-decision--target-invariant); [existing Section 42.14](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4214-tick-native-decision-exness-candidate-and-migration-audit) records audit/migration gates. The target clarifies the following existing scopes without creating new phases or marking future implementation complete. Candle compatibility remains historical; future execution may not silently fall back to OHLC.
+
 ### Phase 41 — MARKET ENGINE v2 (PLANNED)
 
-Plan explicit abstraction between:
-
-- Candle Mode
-
-- Intrabar / Tick Mode
+Plan explicit abstraction between candle visualization/research and canonical tick market/execution authority. Candle Mode is a chart/compatibility mode, not a future alternative financial settlement authority. Preserve existing legacy modelled results separately until accepted migration.
 
 ### Phase 42 — TICK DATA ARCHITECTURE (PLANNED)
 
@@ -881,8 +879,7 @@ Research results should eventually record applicable assumptions such as:
 
 ### Phase 50 — CANDLE VS TICK VALIDATION (PLANNED)
 
-Plan sensitivity/comparison tooling for candle-mode versus
-higher-fidelity execution assumptions.
+Plan sensitivity/comparison of preserved legacy candle-modelled results against versioned tick-native results. Comparison is research, not permission to settle future trades from OHLC or substitute a guessed candle path when tick evidence is unresolved.
 
 CHECKPOINT:
 Backtest Lab v4.0

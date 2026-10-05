@@ -145,3 +145,8 @@ From verified clean/equal acbc4e27a49effb2adc5cfc6bb54d5ad2d01bb2b, human contin
 ## Phase 23 local-first delivery foundation
 
 From clean/equal 24c2b1d73a58e334d8049f55ad9f85728bb0e532, the human explicitly authorized local-first infrastructure for future publication, deferring paid data. Added isolated service/storage/access ports and loopback transport over existing immutable historical artifacts; nine authored tests and actual 120-chunk API scan/read. 39 focused backend tests, Node vectors and full frontend gates pass. Section 42.13 owns scope/acceptance/runbook; bundle/repository/Git gates precede completion. Local foundation complete, public cloud deferred; no frontend cutover, settlement or Phase 24.
+
+
+## Tick-native architecture and Exness candidate audit
+
+From verified clean/equal 373a734b55fa851296046f1252ce4fa2e50ab075, the human authorized the bounded migration audit and conditional small official Exness sample. Recorded target invariant in existing Market Data Standard; Section 42.14 maps active/prototype/archived candle execution, preserved chart domains, canonical limitations and staged gates. Official source documentation reviewed; browser certificate failure and ordinary HTTPS 403 prevented sample acquisition, so no actual XAUUSD measurements/hashes are claimed. Documentation-only checkpoint, no runtime/data change or full migration; sample acceptance remains blocked. Repository/bundle/Git gates required before reporting audit recorded.

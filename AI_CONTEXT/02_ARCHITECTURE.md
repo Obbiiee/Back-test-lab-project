@@ -66,3 +66,6 @@ Local Tick Review uses a loopback main-entry gate and lazy isolated component/ve
 
 
 backend/market_data separates immutable descriptor + DataService (ArtifactStore/AccessPolicy ports), validated read-only local filesystem adapter and local-only FastAPI transport. It imports canonical contracts, never trading/replay/account or cloud/identity/DB adapters. Future public adapters must supply existing identity/membership and licensed grants; PersonalLocalPolicy is not cloud authorization. Existing Section 42.13 owns boundaries.
+
+
+Target execution authority now follows [MARKET_DATA_STANDARD](../docs/MARKET_DATA_STANDARD.md#tick-native-execution-decision--target-invariant). Existing blueprint Section 42.14 owns the audit and staged migration design. Tick-native event timeline/execution/settlement and derived-candle pipeline are proposed, not implemented. Current frontend simulator and separate backend candle prototype remain unchanged compatibility systems until explicitly authorized cutover; existing M1 service remains visualization/research only.

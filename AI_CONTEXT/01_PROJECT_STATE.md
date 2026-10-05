@@ -54,3 +54,6 @@ Local Tick Review has a bounded plan in [existing system owner Section 42.10](..
 
 
 Local-first historical delivery now exists as an isolated loopback backend API over the existing 120 M1 chunks / 3,486,461 candles. Immutable raw-byte dataset versions, bounded exact-decimal pages and injected storage/access ports support future adapters. Default chart/account/tick uncertainty unchanged; no public cloud launch or frontend cutover. [Section 42.13](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4213-phase-23-local-first-historical-delivery-infrastructure) owns runbook/limits.
+
+
+The human approved the tick-native execution target in MARKET_DATA_STANDARD. Actual production still settles candle/scalar-price MODELLED results; no migration was implemented. Existing blueprint Section 42.14 audits every active/prototype/archived execution path and compatibility limits. Official Exness sample acquisition was blocked (browser certificate error / normal HTTPS 403); actual XAUUSD format/quality remains unmeasured. No Exness dataset or account settlement is integrated.

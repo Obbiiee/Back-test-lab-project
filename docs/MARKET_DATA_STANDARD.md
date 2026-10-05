@@ -5,6 +5,12 @@ Status: architecture authority for future market-data work. This document does n
 ## Principles
 Market data is evidence. Never silently repair, blend, reorder, fabricate, or upgrade its precision. Feed identity, dataset version and provenance remain visible through the research chain. All internal timestamps are UTC; source timezone/provenance is retained.
 
+## Tick-native execution decision — target invariant
+
+Human-approved target: **NO TRADE MAY BE SETTLED FROM OHLC DATA ALONE.** Canonical ordered Bid/Ask events must own future entry, triggers, exits, settlement and execution-derived statistics. Candles are derived visualization/indicator/research inputs, not execution authority. If evidence is inadequate, return UNRESOLVED/AMBIGUOUS without fill/PnL; no silent candle fallback, guessed intrabar paths or random/optimistic/pessimistic historical ordering.
+
+This is the migration target, not a claim that current runtime enforces it. Existing candle modelling and stored results remain unchanged compatibility artifacts until separately authorized migration and acceptance. They must never be relabelled as tick-native results. The authorized audit, candidate Exness evidence and migration acceptance belong to [existing system blueprint Section 42.14](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4214-tick-native-decision-exness-candidate-and-migration-audit). No settlement implementation is authorized by this decision record.
+
 ## Compatibility levels
 ### L1 — Chart Compatible
 Required: timestamp, open, high, low, close; finite numeric OHLC; high >= max(open, close); low <= min(open, close); high >= low; ascending timestamps; no duplicate canonical timestamps; known timeframe/timezone. Volume is optional. L1 is not Precision execution data.
@@ -75,7 +81,7 @@ These five fidelity labels refine the existing L1/L2/L3 compatibility levels; th
 
 ### No false intrabar certainty
 
-For entry 2645, TP 2650 and SL 2640, OHLC 2645/2651/2639/2647 alone cannot prove which threshold was reached first. Future outcomes must retain `AMBIGUOUS_INTRABAR_PATH` (or an explicitly mapped existing equivalent). Do not silently choose TP-first/SL-first or interpolate O→H→L→C as historical truth. Explicit modelling policies may produce `MODELLED / ASSUMED`, separately from `OBSERVED HISTORICAL SEQUENCE` and `UNKNOWN / AMBIGUOUS`.
+For entry 2645, TP 2650 and SL 2640, OHLC 2645/2651/2639/2647 alone cannot prove which threshold was reached first. Future outcomes must retain `AMBIGUOUS_INTRABAR_PATH` (or an explicitly mapped existing equivalent). Do not silently choose TP-first/SL-first or interpolate O→H→L→C as historical truth. Historical compatibility policies may produce `MODELLED / ASSUMED`, separately from `OBSERVED HISTORICAL SEQUENCE` and `UNKNOWN / AMBIGUOUS`. They are not permitted as a fallback for the future tick-native execution target above. Explicit future tick-based fill assumptions remain separate from proof of broker execution.
 
 An observed path is feed-specific: missing quotes, unresolved equal-time events, stale sides, unknown order activation time or a gap spanning both thresholds can still leave ambiguity. Crossing between discrete quotes is not an observed intermediate price; do not interpolate a fill. Preserve original event order, source ordinal and chronology confidence. Distinct records at the same timestamp are not automatic duplicates. Source ordinal preserves supplied order but does not manufacture a trustworthy venue sequence.
 

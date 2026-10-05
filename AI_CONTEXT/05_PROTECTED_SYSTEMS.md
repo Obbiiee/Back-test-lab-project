@@ -28,3 +28,6 @@ This is not blanket protection of the entire repository. Narrow infrastructure/c
 
 
 - Local historical delivery: backend/market_data preserves immutable raw-byte version identity, exact decimals, corruption refusal, explicit pagination, UNKNOWN/AMBIGUOUS and null financial outputs. Local transport cannot serve externally; caller research filter is not a trusted Session bound. Future cloud adapters require identity/membership and scoped data rights. Do not mount PersonalLocalPolicy publicly or connect to account settlement by implication.
+
+
+- Tick-native target: MARKET_DATA_STANDARD owns the no-OHLC-settlement migration invariant. Current candle compatibility code/results must not be relabelled as compliant, removed or silently migrated. Section 42.14 authorizes audit only; keep Quote/Request/Passport/golden wire contracts unchanged until separately authorized versioning. Raw provider data stays private; no certainty promotion or candle fallback in the future tick authority.
