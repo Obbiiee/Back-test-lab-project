@@ -662,6 +662,8 @@ This is conceptual planning, not a locked database schema.
 
 ### Phase 23 — CLOUD MARKET DATA SERVICE (PLANNED)
 
+[Existing system owner — preparation and proposed acceptance](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#42-phase-23--market-data-service-preparation-planning-only). Planning does not complete this milestone or grant implementation/deployment rights; finalized provider/product decisions remain required.
+
 Plan:
 Serve historical market data through cloud infrastructure.
 

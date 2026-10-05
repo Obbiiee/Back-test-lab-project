@@ -10,6 +10,7 @@
 | What is the planned backend contract and guarded integration path? | [Same system blueprint — Phase 19 planning handoff](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff) |
 | What Application/API intake is implemented, and what remains deferred? | [Same system blueprint — intake evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#389-applicationapi-intake--implementation-evidence) and [Phase 19 completion audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#3810-phase-19-completion-audit) |
 | What durable database, identity and ownership adapters actually exist? | Same system blueprint: [persistence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#391-implemented-persistence-and-acceptance-evidence), [identity](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#401-implemented-identity-and-validation), [ownership/final audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#411-implemented-ownership-and-final-journey-audit) |
+| What Phase 23 data/source rights, proposed delivery scope and decisions need review? | [Same system blueprint — market-data preparation](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#42-phase-23--market-data-service-preparation-planning-only) |
 | How do scaling, data portability, AI, billing/entitlement and provider boundaries work? | `SCALING_DATA_AI_DECISIONS.md` |
 | What security boundaries and launch-security gates apply? | `SECURITY_ARCHITECTURE.md` |
 | What engineering contract must AI-generated code obey? | `AI_ENGINEERING_GUARDRAILS.md` |
