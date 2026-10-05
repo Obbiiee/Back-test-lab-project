@@ -39,7 +39,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 18.8 | INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN | Recorded in completed history |
 | 18.9 | TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE | Recorded in completed history |
 | 19 | BACKEND ARCHITECTURE | Recorded completed history; evidence in existing system blueprint |
-| 20 | PRODUCTION DATABASE | PLANNED; separate human authorization required |
+| 20 | PRODUCTION DATABASE | Recorded completed persistence checkpoint; existing system owner holds evidence |
 | 21 | AUTHENTICATION & IDENTITY | PLANNED; separate human authorization required |
 | 22 | USER & WORKSPACE MODEL | PLANNED; separate human authorization required |
 | 23 | CLOUD MARKET DATA SERVICE | PLANNED; separate human authorization required |
@@ -623,7 +623,9 @@ Establish production-oriented backend/service/API boundaries as a modular-monoli
 
 Formalize persistence-facing contracts for Experiment Passport identity/content hashes, append-only trial/strategy lineage, canonical event/trade logs and research-job boundaries. This does not require advanced research features yet.
 
-### Phase 20 — PRODUCTION DATABASE (PLANNED)
+### Phase 20 — PRODUCTION DATABASE
+
+[Implemented persistence and recovery evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#391-implemented-persistence-and-acceptance-evidence). This is backend infrastructure, not deployment or browser data migration.
 
 Plan:
 PostgreSQL-oriented production persistence, migrations, indexing,

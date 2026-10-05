@@ -87,3 +87,7 @@ From verified clean dc7b4512a1f5fd2931770efd4aeeec373de7d6ac, implemented the ex
 ## Phase 19 — Completion audit
 
 After verified intake checkpoint 71c2abffc7e77060b49ebd68c66187d55ae78e47, audited every Phase 19 requirement against the existing roadmap/system blueprint and frozen handoff. [The same architecture owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#3810-phase-19-completion-audit) classifies implemented/verified boundaries and explicitly authorized deferrals; no second roadmap or audit authority. Final backend 77 tests, independent golden vectors, full frontend regression/lint/build/release and repository/bundle gates PASS; normal Git checkpoint/equality remains the reporting gate. No Phase 20, production adapters/public mounting, auth, workers or execution-authority switch. Browser exempt for unmounted code/docs only.
+
+## Phase 20 — PostgreSQL persistence
+
+From verified clean 3274342, implemented isolated durable intake/provenance adapter, canonical codec, transactional/checksummed migration, append-only constraints and explicit native backup/empty-target restore. Nine new methods and full backend 86 tests PASS on actual PostgreSQL, real server restart byte identity PASS; frontend regression/lint/build/release and Node vectors PASS. No protected runtime/frontend/data change or deletion. [Existing owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#391-implemented-persistence-and-acceptance-evidence) records scope/limits. Browser exempt for unmounted adapter. Normal Git checkpoint/equality is required before autonomous Phase 21.
