@@ -25,3 +25,6 @@ This is not blanket protection of the entire repository. Narrow infrastructure/c
 - Replay optimization: transition metadata is a hint, never a market-data source. Preserve actual revealed-prefix validation, full chart/reference trading fallbacks, completion-acknowledged single-flight scheduling and cancellation. Keep existing rewind restrictions for trading state; historical prepend must not become new trading events. Indicator calculators, native Volume and pane ownership remain independent.
 
 - Local Tick Review: preserve exact artifact/report versions, hash consistency disclosures, loopback opt-in/default-entry behavior, quote reveal/bounds and cancellation. Viewer remains read-only and memory-only; never connect its supplied reports to account settlement or treat reviewed references/hash consistency as provider certification. Existing system blueprint Section 42.11 owns the boundary.
+
+
+- Local historical delivery: backend/market_data preserves immutable raw-byte version identity, exact decimals, corruption refusal, explicit pagination, UNKNOWN/AMBIGUOUS and null financial outputs. Local transport cannot serve externally; caller research filter is not a trusted Session bound. Future cloud adapters require identity/membership and scoped data rights. Do not mount PersonalLocalPolicy publicly or connect to account settlement by implication.

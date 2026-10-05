@@ -2258,3 +2258,46 @@ Phase 23 cloud delivery remains unimplemented; Phase 24 pipeline, Phase 25 cloud
 Validation is documentation-only: repository/AI-bundle checks and regeneration/verification, plus focused existing precision and viewer tests as a conservative evidence-contract check. Browser, full product regression, lint/build and DB/auth rerun are exempt because no product/runtime/dependency/data/test files change; earlier browser or release results are not claimed rerun. Review complete diff, update existing context/status, commit/push normally, verify local/origin/actual GitHub equality and clean 0/0, report and STOP.
 
 Validation results: test:repository PASS; test:ai-bundle PASS; test:tick-review PASS (18 authored pairs plus bounds/refusal/race cases); backend precision/policy/parser 30 methods PASS. No new provider samples were measured. Bundle regeneration/verification and normal Git equality remain final checkpoint gates.
+
+
+## 42.13 Phase 23 local-first historical delivery infrastructure
+
+The human explicitly resolved the prior local/cloud mismatch: implement for personal local use now, structure infrastructure for later publication, and defer paid data. This supersedes the earlier implementation prohibition for this isolated local delivery scope only. Baseline: clean/equal main 24c2b1d73a58e334d8049f55ad9f85728bb0e532. No procurement/contact/download/deployment or implicit public grant. This completes the bounded local delivery foundation, NOT the ROADMAP cloud launch capability. Existing Phase 20–22 identity/membership remain intact for a later reviewed authenticated adapter.
+
+### Implemented product boundary
+
+`backend/market_data/service.py` owns immutable dataset/chunk descriptors and a portable DataService over ArtifactStore and AccessPolicy protocols. `local.py` implements the explicit operator-selected directory adapter for existing HistData XAUUSD bid M1 files. `serve.py` implements the local-only FastAPI transport, reusing installed libraries rather than adding dependencies. No alternate trading engine, ingestion pipeline, account migration, frontend data cutover or second roadmap.
+
+Activation scans and structurally validates every manifest M1 chunk before constructing the catalog. Version identity binds ordered normalized raw-byte hashes, byte sizes, counts, temporal boundaries, source/instrument/side and adapter normalization version. Archive hashes remain separate historical evidence. Reads recheck chunk bytes/hash and shape; corruption/change fails safely rather than silently rebuilding a version. Restart rebuilds the same identity from unchanged artifacts. New bytes require a new version and explicit request. Exact existing JSON decimal tokens are parsed as Decimal and returned as decimal strings, preserving the stored representation without inventing original provider precision. No deduplication, sorting, repricing, gap filling or fabricated volume.
+
+The descriptor discloses PERSONAL_LOCAL, M1_OHLC, BID, unavailable volume, unknown completeness/freshness and publicDisplayApproved=false. This is preservation of the user's existing local dataset use, not a new legal grant or new rights verification. Original private tick files remain outside the service/Git/public assets. AMBIGUOUS remains explicit; responses have NOT_SIMULATED/null fill/PnL. Default frontend candle MODELLED execution and read-only tick viewer are unchanged.
+
+Local routes:
+
+- GET `/api/v1/local-market/dataset`: pinned descriptor/catalog, including chunk hashes but no filesystem paths.
+- GET `/api/v1/local-market/candles?version=<catalog-version>&start=<UTC-seconds>&end=<exclusive-UTC-seconds>&limit=1000`: exact existing M1 rows, `more` and `nextAfter`. Subsequent page repeats the same version/range with `after=<nextAfter>`. No opaque cursor or server Session claim.
+- Optional `revealedBefore` is a caller-controlled research filter: include a full minute only when candle time+60 <= bound. It is NOT a server-authoritative trading replay cutoff. Future adapter MUST resolve identity/workspace/BACKTEST/revision/revealed bound on the server under existing security contracts before strict Session delivery. No higher-timeframe responses are offered here.
+
+Bounds: maximum 32-day range, requested limit 1–10,000, actual canonical page <=2,000 rows with explicit continuation (existing canonical node budget), 1 MiB response refusal, 2 MiB raw chunk, <=40,000 rows/chunk, <=240 chunks, <=2,048-byte query, two concurrent file-read workers and 30 requests/minute/process. Checksummed month reads are bounded and uncached; hashes are not provenance certification. Large pathological exact decimal responses may fail the canonical/byte limit rather than silently truncate. Missing intervals remain missing. No network provider/SSRF/file path query capability.
+
+Only loopback binding is supported, with exact localhost/127.0.0.1 Host+port and loopback client validation, no trusted forwarded address, no CORS, no Origin-bearing/cross-site requests, no body/write methods, unknown/duplicate query refusal and no-store. This adapter is for same-machine personal tools; host/origin checks are not public authentication or protection from a compromised local machine. Do not reverse-proxy it as public SaaS. Its optional filter is not a security boundary. No secrets or quote rows are logged by access logging.
+
+### Local runbook and future adapter
+
+From backend, with the existing Python environment and installed backend requirements:
+
+```powershell
+./venv/Scripts/python.exe -m market_data.serve --root ../frontend/public/market/decade --port 5199
+```
+
+The root is operator configuration, never HTTP caller input. Startup validates 120 chunks before accepting connections; allow initial scan to finish. The default workspace remains served by its existing frontend process. This service adds API infrastructure, not a new screen or automatic chart switch. Stop with Ctrl+C. Reconstruct on restart from unchanged files; a changed catalog version must be explicitly selected, never silently adopted. Back up unchanged source directory/manifest outside public hosting according to applicable rights, restore into a distinct private directory and compare descriptor/version before use; authored restore/reopen test verifies determinism. No cloud backup is authorized here.
+
+For later publication, implement a separately reviewed ArtifactStore/access/transport adapter using existing verified identity + workspace membership, immutable metadata/grants and private object storage. The current PersonalLocalPolicy must never be reused as cloud authorization. Unknown/revoked/public-ineligible rights deny serving real data. A paid provider can supply a separate version/feed without rewriting the service, but needs an explicit adapter/normalization contract and applicable license first. Authenticated SaaS is still external distribution. Preserve the two audience lanes. Phase 24 automated ingestion, Phase 25 sessions, Phase 26 sync and tick settlement are not included. Do not publish the unchanged frontend dist with its current personal dataset assets; moving real data behind a private adapter and removing publicly shipped data from a separately authorized distribution is a future launch gate, not a deletion in this task.
+
+### Acceptance evidence and limits
+
+Nine new authored tests cover exact immutable output/reopen identity, pagination/gaps/completed-prefix boundaries, mutation/version mismatch, path traversal/malformed inventory, bad prices/time/order, input/byte/page limits, public-audience refusal, origin/host/nonloopback/write/query refusal, rate limits and hidden-future quote-output independence. Existing precision/evaluator/parser 30 tests pass (39 total); six independent Node golden vectors pass. Full frontend regression/lint/build/release pass. No backend cloud/auth/DB schema or consumer changed, so full DB/auth rerun is exempt for this standalone local adapter; no skip is counted as a full release PASS. Browser adapter exemption: no frontend path changed; real localhost HTTP smoke exercises actual transport and existing data. Prior viewer browser evidence is not claimed rerun.
+
+Actual local startup validates all 120 existing M1 chunks, 3,486,461 candles. Catalog version `7610c53c7a320f711bf63e7d91a66e07a1c6797af2ed45dc86761a8b46ccadea`; one actual 100-row localhost read measured 330 ms (single observation, not SLA), status LOCAL_RESEARCH/AMBIGUOUS with null fill/PnL. Initial request before the scan finished was refused; retry after startup succeeded. No source bytes were rewritten or copied. This test does not certify provider completeness, tick fidelity, cloud load, public rights or broker fills.
+
+Required final gates: repository/bundle tests and generation/hash verification, complete diff review, current status/history updates, normal commit/push and actual local/origin/GitHub equality with clean 0/0. The bounded local scope closes; public cloud delivery stays DEFERRED pending separately scoped infrastructure/security/rights/deployment acceptance. STOP before Phase 24, frontend cutover or account/tick integration.

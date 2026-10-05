@@ -662,6 +662,8 @@ This is conceptual planning, not a locked database schema.
 
 ### Phase 23 — CLOUD MARKET DATA SERVICE (PLANNED)
 
+The human-selected local-first delivery foundation is implemented in [existing Section 42.13](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4213-phase-23-local-first-historical-delivery-infrastructure). It supplies personal loopback infrastructure with portable storage/access ports. Public cloud launch/rights acceptance remain deferred; this does not declare the cloud milestone complete or authorize Phase 24.
+
 Human-authorized local-first fixture-only evidence foundation is recorded in [existing system owner Section 42.7](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint). It supports data preparation without shipping this cloud service or completing future Phase 41–43. Operational authorization remains in the current-phase authority; provider acquisition and runtime integration need separate bounded scope.
 
 [Existing system owner — preparation and proposed acceptance](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#42-phase-23--market-data-service-preparation-planning-only). Planning does not complete this milestone or grant implementation/deployment rights; finalized provider/product decisions remain required.

@@ -51,3 +51,6 @@ Local Tick Review has a bounded plan in [existing system owner Section 42.10](..
 
 
 [Existing-evidence review Section 42.12](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4212-existing-precision-evidence-review--ambiguity-retained) records unknown completeness, side freshness and silence/session meaning without promoting flags. Local Tick Review inspects supplied scenarios; it does not associate real account trades or settle them. The user retains ambiguity for later case inspection; no provider remediation or runtime cutover occurs in this documentation checkpoint.
+
+
+Local-first historical delivery now exists as an isolated loopback backend API over the existing 120 M1 chunks / 3,486,461 candles. Immutable raw-byte dataset versions, bounded exact-decimal pages and injected storage/access ports support future adapters. Default chart/account/tick uncertainty unchanged; no public cloud launch or frontend cutover. [Section 42.13](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4213-phase-23-local-first-historical-delivery-infrastructure) owns runbook/limits.

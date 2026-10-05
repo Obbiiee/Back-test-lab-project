@@ -63,3 +63,6 @@ Local evidence policy is implemented but unmounted. Hash-bound reviewed declarat
 The existing simulator owns the human-authorized gap policy through one symmetric available-price helper and transient opening-entry IDs. No second engine, persistence schema or precision-backend settlement was added. See the existing Phase 14 trading owner for modelling limits.
 
 Local Tick Review uses a loopback main-entry gate and lazy isolated component/verifier, reading exact artifact/report files via browser APIs. Canonical verification and hash binding share the frozen wire contract; no JS crossing evaluator or financial writer. Memory-only selection/cancellation preserves accounts and datasets. [Existing system owner Section 42.11](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4211-local-tick-review--implemented-read-only-checkpoint) owns evidence and trust limits.
+
+
+backend/market_data separates immutable descriptor + DataService (ArtifactStore/AccessPolicy ports), validated read-only local filesystem adapter and local-only FastAPI transport. It imports canonical contracts, never trading/replay/account or cloud/identity/DB adapters. Future public adapters must supply existing identity/membership and licensed grants; PersonalLocalPolicy is not cloud authorization. Existing Section 42.13 owns boundaries.
