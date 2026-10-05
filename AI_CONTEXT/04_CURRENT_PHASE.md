@@ -14,13 +14,13 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "LAST_COMPLETED_PHASE": "23",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "23",
-  "NEXT_PHASE_STATUS": "SYNTHETIC_TICK_TIMELINE_IMPLEMENTED_EXECUTION_AWAITING_AUTHORIZATION",
+  "NEXT_PHASE_STATUS": "SCALABLE_TICK_STORAGE_V2_FROZEN_IMPLEMENTATION_AWAITING_AUTHORIZATION",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [
     "23"
   ],
-  "EXECUTION_MODE": "COMPLETED_UNMOUNTED_SYNTHETIC_TICK_TIMELINE",
-  "TARGET_CHECKPOINT": "Section 42.16 synthetic canonical/provider/timeline accepted; Exness unverified; Git equality clean 0/0; STOP before synthetic execution engine",
+  "EXECUTION_MODE": "COMPLETED_PLANNING_CONTRACT_FREEZE_ONLY",
+  "TARGET_CHECKPOINT": "Section 42.17 scalable V2 storage/index contract freeze; Git equality clean 0/0; STOP before V2 runtime or Exness ingestion",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
@@ -50,3 +50,5 @@ Latest human master prompt adopts the tick-native target invariant owned by MARK
 Prior completed human authorization froze the canonical tick/provider/timeline contract only, including synthetic validation fixtures. Section 42.15 records this completed bounded decision, superseding the earlier audit-only restriction for documentation/test-only validation. No active implementation remains. Next bounded checkpoint is IMPLEMENT CANONICAL TICK PROVIDER + AUTHORITATIVE TICK TIMELINE/REPLAY USING SYNTHETIC FIXTURES, WITHOUT SETTLEMENT YET; separate human authorization required. Exness remains UNVERIFIED / NOT ACQUIRED. No engine/account/candle retirement/cloud or later-phase advancement.
 
 Latest human implementation authorization completed the isolated canonical/SyntheticTickProvider/TickTimeline checkpoint under frozen Section 42.15, with evidence in 42.16. No active implementation remains after Git gates. Next supplied checkpoint is IMPLEMENT TICK EXECUTION ENGINE V1 ON TOP OF THE AUTHORITATIVE TICK TIMELINE, USING SYNTHETIC FIXTURES FIRST, WITHOUT CANDLE FALLBACK; separate human authorization required. No settlement/PnL/account cutover, candle aggregation, Exness integration, public delivery or roadmap phase advancement is implied.
+
+Latest human authorization supersedes that historical next-checkpoint suggestion: PLANNING + CONTRACT FREEZE ONLY for scalable tick storage/index V2. [Section 42.17](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4217-scalable-tick-storage-and-index-contract--v2-freeze-only) owns the separate versioned hierarchy/index/validation/publication and synthetic acceptance examples. Current V1 runtime/goldens remain unchanged. The supplied Exness disk-provider implementation was stopped before changes because of frozen-contract capacity/RAM/positioning blockers; no ingestion occurred. After validated contract commit/push/remote equality, no active implementation remains. Next separately authorized checkpoint is scalable V2 storage + disk-bounded validation + time index + indexed timeline positioning, then real local Exness ingestion/benchmark WITHOUT execution/settlement. No automatic implementation or later roadmap phase; STOP.

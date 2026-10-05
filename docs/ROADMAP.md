@@ -827,6 +827,8 @@ Human-approved tick-native target is owned by [Market Data Standard](MARKET_DATA
 
 [Implemented bounded synthetic infrastructure in Section 42.16](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4216-canonical-synthetic-provider-and-authoritative-tick-timeline--implemented-checkpoint) provides an isolated canonical provider/timeline acceptance seam. Real provider, production tick storage/execution and the following full roadmap phases remain PLANNED; no cutover or phase completion is inferred.
 
+[Scalable storage/index V2 contract freeze in Section 42.17](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4217-scalable-tick-storage-and-index-contract--v2-freeze-only) extends that preparation with a separately versioned fixed-depth hierarchy and controller-only time index. Contract/test-only, not shipped disk storage, provider ingestion, indexed runtime or completion of the following roadmap phases. Operational authorization stays in AI_CONTEXT/04_CURRENT_PHASE.md.
+
 ### Phase 41 — MARKET ENGINE v2 (PLANNED)
 
 Plan explicit abstraction between candle visualization/research and canonical tick market/execution authority. Candle Mode is a chart/compatibility mode, not a future alternative financial settlement authority. Preserve existing legacy modelled results separately until accepted migration.
