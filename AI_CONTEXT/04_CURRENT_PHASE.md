@@ -14,13 +14,13 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "LAST_COMPLETED_PHASE": "23",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "23",
-  "NEXT_PHASE_STATUS": "SCALABLE_TICK_STORAGE_V2_FROZEN_IMPLEMENTATION_AWAITING_AUTHORIZATION",
+  "NEXT_PHASE_STATUS": "SIDECAR_ACCESS_CONTRACT_FROZEN_DRAFT_PRESERVED_RUNTIME_RESUME_REQUIRES_AUTHORIZATION",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [
     "23"
   ],
-  "EXECUTION_MODE": "COMPLETED_PLANNING_CONTRACT_FREEZE_ONLY",
-  "TARGET_CHECKPOINT": "Section 42.17 scalable V2 storage/index contract freeze; Git equality clean 0/0; STOP before V2 runtime or Exness ingestion",
+  "EXECUTION_MODE": "COMPLETED_PLANNING_AND_REPOSITORY_RECONCILIATION_ONLY",
+  "TARGET_CHECKPOINT": "42.19 contract freeze on main; 42.18 byte-identical on codex/preserve-42-18-draft; normal commit/push/Git equality clean 0/0 then STOP before runtime or benchmark",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
@@ -52,3 +52,11 @@ Prior completed human authorization froze the canonical tick/provider/timeline c
 Latest human implementation authorization completed the isolated canonical/SyntheticTickProvider/TickTimeline checkpoint under frozen Section 42.15, with evidence in 42.16. No active implementation remains after Git gates. Next supplied checkpoint is IMPLEMENT TICK EXECUTION ENGINE V1 ON TOP OF THE AUTHORITATIVE TICK TIMELINE, USING SYNTHETIC FIXTURES FIRST, WITHOUT CANDLE FALLBACK; separate human authorization required. No settlement/PnL/account cutover, candle aggregation, Exness integration, public delivery or roadmap phase advancement is implied.
 
 Latest human authorization supersedes that historical next-checkpoint suggestion: PLANNING + CONTRACT FREEZE ONLY for scalable tick storage/index V2. [Section 42.17](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4217-scalable-tick-storage-and-index-contract--v2-freeze-only) owns the separate versioned hierarchy/index/validation/publication and synthetic acceptance examples. Current V1 runtime/goldens remain unchanged. The supplied Exness disk-provider implementation was stopped before changes because of frozen-contract capacity/RAM/positioning blockers; no ingestion occurred. After validated contract commit/push/remote equality, no active implementation remains. Next separately authorized checkpoint is scalable V2 storage + disk-bounded validation + time index + indexed timeline positioning, then real local Exness ingestion/benchmark WITHOUT execution/settlement. No automatic implementation or later roadmap phase; STOP.
+
+Latest explicit human authorization now supersedes the historical freeze-only scope: implement frozen Section 42.17 scalable V2 storage, disk-bounded validation, atomic publication, immutable time index and indexed timeline; ingest and benchmark the entire supplied private local Exness CSV. Baseline verified clean/equal 5184541cabfbac6bcb366f34d8cbac712d2575a1. Work remains IN PROGRESS until full measurement, applicable validation, diff/context review and normal commit/push/actual Git equality clean 0/0. No execution, settlement, PnL, aggregator, frontend cutover or later phase. Stop after this checkpoint; select the next audit from actual benchmark evidence, requiring separate human authorization.
+
+Hard-stop discovered during implementation: frozen 42.17 requires evidence sidecar coverage/gap acceptance and causal projection, but the three-method V2 provider contract does not define bounded access to those intervals. Current local draft rejects nonempty evidence catalogs rather than silently discarding evidence. Do not label V2 complete or change the frozen port without explicit contract reconciliation. Existing blueprint 42.18 records the incomplete work and partial measurement. No completion commit/push or execution authorization.
+
+Latest human authorization is RECONCILE V2 SIDECAR EVIDENCE ACCESS CONTRACT, planning/contract only. It supersedes runtime continuation for this checkpoint. Existing blueprint Section 42.19 extends 42.17 with the bounded controller-only evidence capability and conservative causal semantics. Contract preparation may be validated locally, but clean planning-only commit/push is blocked by the explicitly protected uncommitted 42.18 runtime drafts. Do not stash/reset/discard/overwrite or commit those drafts in this planning checkpoint. STOP before commit and request explicit checkpoint-separation authorization; neither runtime nor Exness benchmark may resume now. No completed checkpoint/history or new Git SHA is claimed.
+
+The subsequent explicit human authorization PRESERVE AND SEPARATE INTERRUPTED 42.18 DRAFT + FREEZE 42.19 resolves that historical checkpoint conflict only. Preserve-only snapshot 2c65d2d043530605df2b43633e64dfe8e97dc303 retains the full audited mixed input. Draft branch codex/preserve-42-18-draft at a62fbd4161a3956544d4d9611056c67a1313e998 retains seven exact runtime/test blobs and historical findings; Section 42.19 records fingerprint proof/location. Main now contains only documentation and a test-only contract oracle, with the original canonical runtime restored. Required planning gates and normal commit/push/actual remote equality clean 0/0 finalize this checkpoint; no runtime resume or benchmark is authorized. Next human checkpoint may explicitly resume the preserved draft against frozen 42.17+42.19, but must not merge the draft automatically or treat 700k progress as a completed benchmark. STOP.
