@@ -135,3 +135,8 @@ From clean/equal 6f226c6750dc5e347174e21cd1ce83f280758108, audited actual eviden
 ## Local Tick Review implementation checkpoint
 
 From clean/equal 7cc0c627c5e2fcede75aa8c0b918b650af3fc2e0, human authorized the existing bounded plan. Added opt-in loopback read-only artifact/report viewer, strict canonical/hash/financial/future refusal, 18 Python-authored vectors and cancellation/maximum-window tests. Existing normal-hour sample stays ambiguous; browser checks preserve seeded legacy account bytes and default/prototype behavior. Full frontend gates and 30 precision tests/Node vectors PASS. Existing Section 42.11 owns limits and evidence; repository/bundle/Git equality gates precede completion. No acquisition, cloud service or tick settlement.
+
+
+## Existing precision-evidence review — ambiguity retained
+
+From verified clean/equal acbc4e27a49effb2adc5cfc6bb54d5ad2d01bb2b, human continuation explicitly retains ambiguity for later per-trade inspection. Audited existing parser/evaluator/policy and recorded three-window evidence; Section 42.12 of the existing system blueprint owns findings and the bounded review handoff. Distinguishes supplied threshold scenarios from the unimplemented account-trade link; no confidence promotion, new acquisition or runtime/data/dependency change. Documentation/bundle gates and focused existing evidence tests required; browser/full release/DB rerun exempt for documentation only. Normal Git equality/clean 0/0 precedes completion; no later roadmap phase started.

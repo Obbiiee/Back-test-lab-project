@@ -2221,3 +2221,40 @@ Validation evidence:
 A reviewed narrow bundle addition includes exactly the five new frontend review modules/styles and two authored test/fixture files, so the changed main entrypoint's new dependencies and review evidence are available to future AI review. No backend/private data/vendor/dependency scope expansion; the bundle remains a nonrunnable disposable reference and golden vectors remain in their existing master location. No second documentation authority or roadmap was created.
 
 All real-sample uncertainty is unchanged; this is evidence inspection, not historical broker-fill proof or tick settlement. Phase 23 cloud delivery and Phase 41–43 remain unimplemented. Next work needs a bounded evidence-review scope (existing source semantics/coverage/sequence/calendar), without promoting unknown flags or automatically acquiring/contacting/purchasing. Required Git completion: diff review, existing context/status update, normal commit/push, actual GitHub equality and clean 0/0, then STOP.
+
+
+## 42.12 Existing precision-evidence review — ambiguity retained
+
+The human asked to continue after discussing consecutive phases, explicitly retaining ambiguity for later per-trade inspection. From verified clean/equal `acbc4e27a49effb2adc5cfc6bb54d5ad2d01bb2b`, this bounded checkpoint audits existing code and recorded sample evidence and defines the review scope. It does not authorize three unspecified roadmap phases. No new provider claims, purchases, contacts, downloads, financial integration or cloud delivery. ROADMAP remains the sole roadmap; Section 42.6 remains the prior integration proposal, not an automatic execution instruction.
+
+### Evidence inventory and disposition
+
+| Question | Existing evidence | Disposition for this checkpoint |
+| --- | --- | --- |
+| Exact prices and time conversion | histdata.parse_tick uses exact decimals and fixed UTC−5; timestamps retain supplied milliseconds | Structural representation supported, not broker accuracy or sub-millisecond ordering |
+| Recorded-feed completeness | Three limited-window measurements in Section 42.8; normal-hour tick bid OHLC matches 60 same-feed M1 bars | UNKNOWN; OHLC equivalence, quiet intervals and clean parsing do not prove all events present |
+| Side freshness | Parser deliberately creates fresh=False; original rows do not carry per-side age evidence | UNKNOWN, not proof that sides are actually stale; do not override to true |
+| Chronology and activation | Recorded sample has no measured ties/backwards rows; source ordinal is row identity, not trusted sequence | Preserve supplied order; equal-time activation remains unresolved; no claimed venue sequence |
+| Silence/session meaning | Recorded maxima 7.67 s, 3,606.684 s and 144.212 s; no scoped feed calendar in artifacts | UNKNOWN closure versus outage; duration is diagnostic, not an automatic corruption classification |
+| Decision integrity | Policy binds original/effective inputs; viewer validates canonical bytes and hashes | Integrity only, not provider authenticity or independent proof evaluator was executed |
+| Trade settlement | Policy returns NOT_SIMULATED with null fill/PnL; viewer has no account/replay consumer | No actual tick trade execution, automatic settlement or trade-account association exists |
+
+This is a source/recorded-evidence audit, not a fresh remeasurement of the monthly archive or a new provider licensing review. Private samples stay outside Git, cloud assets and AI bundles. Existing personal-local interpretation in Section 42.8 is neither expanded nor asserted current public/SaaS permission.
+
+### Per-trade review boundary
+
+The user may inspect one explicit LONG/SHORT threshold scenario with its pinned artifact/report in the current Local Tick Review. That scenario is not automatically an existing executed trade: the current contract has activation/horizon, SL/TP and side, but no canonical account trade ID, pending-entry rule, entry settlement or partial-exit lifecycle. Do not claim a trade review feature or financial reconciliation is implemented merely because scenario quotes are displayed.
+
+For later human-reviewed cases, require the dataset/version/feed/profile, exact activation and horizon, side/thresholds, original artifact and report hashes, supplied event identity/order, coverage/freshness/sequence declarations and reasons. If mapped to a real account trade in a separately authorized future scope, retain its immutable trade identity and original MODELLED result separately; a review must never overwrite it. User annotations or visual inspection do not promote uncertainty. Proposed TP/SL, entry or gap-fill alternatives remain hypotheses until independently evidenced and explicitly implemented. Historical ambiguous cases retain their original identity even if a later dataset improves evidence.
+
+No unresolved case is settled as TP or SL here. OBSERVED_QUOTE_CROSSING remains a supplied quote observation, not a broker fill; NO_OBSERVED_CROSSING does not exclude an unobserved crossing. The already-authorized frontend first-supplied-price simulation remains MODELLED under its existing Phase 14 owner; this audit does not change or relabel those results.
+
+### Bounded handoff and acceptance
+
+The next possible product task is a separately scoped, read-only per-trade/scenario review improvement: first identify whether the user wants inspecting manually supplied scenarios or linking existing MODELLED account trades. Define identity, activation semantics, privacy and preservation acceptance before implementing such a link. Provider-evidence remediation can wait until the user reviews ambiguous cases; it is not a prerequisite for inspection and is not silently pursued here. Unknown evidence remains unknown. No new paid feed, bulk download, calendar inference, confidence override, account settlement or cloud phase is included.
+
+Phase 23 cloud delivery remains unimplemented; Phase 24 pipeline, Phase 25 cloud sessions and Phase 26 synchronization depend on their existing scoped contracts and must not be represented as completed by local evidence work. This review adds no competing phase numbering or roadmap.
+
+Validation is documentation-only: repository/AI-bundle checks and regeneration/verification, plus focused existing precision and viewer tests as a conservative evidence-contract check. Browser, full product regression, lint/build and DB/auth rerun are exempt because no product/runtime/dependency/data/test files change; earlier browser or release results are not claimed rerun. Review complete diff, update existing context/status, commit/push normally, verify local/origin/actual GitHub equality and clean 0/0, report and STOP.
+
+Validation results: test:repository PASS; test:ai-bundle PASS; test:tick-review PASS (18 authored pairs plus bounds/refusal/race cases); backend precision/policy/parser 30 methods PASS. No new provider samples were measured. Bundle regeneration/verification and normal Git equality remain final checkpoint gates.
