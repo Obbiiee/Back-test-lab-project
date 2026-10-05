@@ -8,7 +8,7 @@
 | What should users see and how should the product feel/work? | `PRODUCT_DESIGN_BLUEPRINT.md` |
 | How should the software/system be structured? | `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` |
 | What is the planned backend contract and guarded integration path? | [Same system blueprint — Phase 19 planning handoff](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff) |
-| What bounded Application/API checkpoint is proposed after foundation? | [Same system blueprint — Application/API preparation](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#388-applicationapi-layer-preparation--planning-only) |
+| What Application/API intake is implemented, and what remains deferred? | [Same system blueprint — intake evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#389-applicationapi-intake--implementation-evidence) and [Phase 19 completion audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#3810-phase-19-completion-audit) |
 | How do scaling, data portability, AI, billing/entitlement and provider boundaries work? | `SCALING_DATA_AI_DECISIONS.md` |
 | What security boundaries and launch-security gates apply? | `SECURITY_ARCHITECTURE.md` |
 | What engineering contract must AI-generated code obey? | `AI_ENGINEERING_GUARDRAILS.md` |
