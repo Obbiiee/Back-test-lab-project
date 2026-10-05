@@ -1,4 +1,4 @@
-"""Opt-in versioned auth factory. No trading route or default principal."""
+"""Opt-in private identity/ownership factory; intake never executes a trade."""
 import os
 import uuid
 
@@ -74,6 +74,8 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
         return JSONResponse({"detail": "INVALID_REQUEST"}, status_code=422)
     app.state.current_user = current
     app.state.dsn = dsn
+    from .workspaces import install
+    install(app)
     return app
 
 

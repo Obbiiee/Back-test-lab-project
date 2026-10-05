@@ -52,7 +52,7 @@ class IdentityBoundary:
             await send(message)
         if scope.get("scheme") != "https":
             return await JSONResponse({"detail": "TLS_REQUIRED"}, status_code=426)(scope, receive, protected_send)
-        if scope["path"].startswith("/api/v1/auth/"):
+        if scope["path"].startswith("/api/v1/"):
             # Never trust X-Forwarded-For. Configure a trusted proxy before deployment.
             ip = (scope.get("client") or ("unknown",))[0]
             if not await self._attempt("ip:"+ip, self.limit):

@@ -41,7 +41,7 @@ The human has defined the high-level planning scopes below through Phase 75, inc
 | 19 | BACKEND ARCHITECTURE | Recorded completed history; evidence in existing system blueprint |
 | 20 | PRODUCTION DATABASE | Recorded completed persistence checkpoint; existing system owner holds evidence |
 | 21 | AUTHENTICATION & IDENTITY | Recorded backend identity checkpoint; existing system owner holds evidence |
-| 22 | USER & WORKSPACE MODEL | PLANNED; separate human authorization required |
+| 22 | USER & WORKSPACE MODEL | Recorded backend ownership checkpoint; existing system owner holds evidence |
 | 23 | CLOUD MARKET DATA SERVICE | PLANNED; separate human authorization required |
 | 24 | MARKET DATA PIPELINE | PLANNED; separate human authorization required |
 | 25 | CLOUD BACKTEST SESSIONS | PLANNED; separate human authorization required |
@@ -641,7 +641,9 @@ Plan:
 Secure user identity, authentication, session/token lifecycle,
 recovery and supported login methods.
 
-### Phase 22 — USER & WORKSPACE MODEL (PLANNED)
+### Phase 22 — USER & WORKSPACE MODEL
+
+[Implemented ownership and final journey audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#411-implemented-ownership-and-final-journey-audit). Metadata/membership model and guarded intake are implemented; cloud object payloads, local data migration and UI remain separate later scopes.
 
 Plan:
 Formal user/workspace ownership model for Backtest Lab resources.
