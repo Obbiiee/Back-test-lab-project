@@ -9,16 +9,19 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "19-application-api-planning",
-  "CURRENT_IMPLEMENTATION_PHASE": null,
-  "NEXT_PHASE": "19",
-  "NEXT_PHASE_STATUS": "APPLICATION_API_SCOPE_PLANNED_IMPLEMENTATION_NOT_AUTHORIZED",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
-  "AUTHORIZED_PHASE_SEQUENCE": ["19-application-api-planning"],
-  "EXECUTION_MODE": "PLANNING_ONLY",
-  "TARGET_CHECKPOINT": "Validated Application/API planning checkpoint; STOP before implementation or Phase 20",
+  "LAST_COMPLETED_PHASE": "19-application-intake",
+  "CURRENT_IMPLEMENTATION_PHASE": "19",
+  "NEXT_PHASE": "19-completion-audit",
+  "NEXT_PHASE_STATUS": "AUTHORIZED",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "19",
+  "AUTHORIZED_PHASE_SEQUENCE": [
+    "19-application-intake",
+    "19-completion-audit"
+  ],
+  "EXECUTION_MODE": "AUTONOMOUS_PHASE19_CLOSURE",
+  "TARGET_CHECKPOINT": "Complete remaining Phase 19 through verified checkpoints; STOP before Phase 20",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
 
-The human authorized Application/API Layer Preparation PLANNING ONLY from hard-gated clean 163558e. Planning is complete subject to normal commit/push/equality verification. The existing [system blueprint preparation](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#388-applicationapi-layer-preparation--planning-only) defines one proposed nonexecuting review/confirmation-intake checkpoint, exact file boundaries and acceptance gates. Its implementation is NOT authorized; Phase 19 as a whole is NOT complete. No runtime endpoint, application implementation, persistence, auth, worker, frontend wiring, execution-authority switch or Phase 20. After equality/clean 0/0, report and STOP.
+The latest human authorization supersedes the historical planning-only stop: complete all remaining Phase 19 from verified clean dc7b4512a1f5fd2931770efd4aeeec373de7d6ac, using separate tested commit/push/equality checkpoints and continuing automatically within Phase 19. Application intake is implemented and validated; checkpoint Git verification remains required before continuation. [Existing blueprint evidence](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#389-applicationapi-intake--implementation-evidence) owns results and limitations. Complete the dedicated Phase 19 requirements audit next; do not mount endpoints, implement persistence/auth/workers, change execution authority or start Phase 20. Older planning evidence remains historical, not a competing authorization.
