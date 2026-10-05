@@ -14,13 +14,13 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "LAST_COMPLETED_PHASE": "23",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "23",
-  "NEXT_PHASE_STATUS": "TICK_NATIVE_AUDIT_RECORDED_EXNESS_SAMPLE_BLOCKED",
+  "NEXT_PHASE_STATUS": "CANONICAL_CONTRACT_FROZEN_SYNTHETIC_IMPLEMENTATION_AWAITING_AUTHORIZATION",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [
     "23"
   ],
-  "EXECUTION_MODE": "COMPLETED_MIGRATION_DESIGN_SAMPLE_NOT_ACQUIRED",
-  "TARGET_CHECKPOINT": "Section 42.14 repository/compatibility/migration audit recorded; Exness sample acquisition blocked and quality not measured; documentation gates/Git equality clean 0/0; STOP before implementation",
+  "EXECUTION_MODE": "COMPLETED_CONTRACT_FREEZE_NO_RUNTIME_IMPLEMENTATION",
+  "TARGET_CHECKPOINT": "Section 42.15 canonical/provider/timeline V1 frozen with synthetic contract validation; Exness unverified; commit/push/equality clean 0/0; STOP before provider/timeline implementation",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
@@ -46,3 +46,5 @@ The human now authorized completion for LOCAL PERSONAL use with reusable future-
 
 
 Latest human master prompt adopts the tick-native target invariant owned by MARKET_DATA_STANDARD, while authorizing ONLY repository + conditional small official Exness sample + compatibility/migration audit. Section 42.14 records actual audit findings. Browser certificate failure and ordinary HTTPS 403 blocked the official form; no sample was acquired and personal normalization/storage rights remain unresolved. This is not full sample acceptance or tick-engine completion. No implementation remains authorized; next scope must separately resolve sample/access/rights or authorize bounded fixture-only contract engineering. No engine replacement, OHLC deletion, settlement/account migration, large download, public hosting or automatic later-phase advancement.
+
+Latest human authorization freezes the canonical tick/provider/timeline contract only, including synthetic validation fixtures. Section 42.15 records this completed bounded decision, superseding the earlier audit-only restriction for documentation/test-only validation. No active implementation remains. Next bounded checkpoint is IMPLEMENT CANONICAL TICK PROVIDER + AUTHORITATIVE TICK TIMELINE/REPLAY USING SYNTHETIC FIXTURES, WITHOUT SETTLEMENT YET; separate human authorization required. Exness remains UNVERIFIED / NOT ACQUIRED. No engine/account/candle retirement/cloud or later-phase advancement.

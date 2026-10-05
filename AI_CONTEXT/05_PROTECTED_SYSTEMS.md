@@ -31,3 +31,5 @@ This is not blanket protection of the entire repository. Narrow infrastructure/c
 
 
 - Tick-native target: MARKET_DATA_STANDARD owns the no-OHLC-settlement migration invariant. Current candle compatibility code/results must not be relabelled as compliant, removed or silently migrated. Section 42.14 authorizes audit only; keep Quote/Request/Passport/golden wire contracts unchanged until separately authorized versioning. Raw provider data stays private; no certainty promotion or candle fallback in the future tick authority.
+
+- Frozen tick boundary: existing blueprint 42.15 is the single V1 contract owner; its synthetic examples are not market evidence. Preserve legacy evidence/viewer/Passport/account wire contracts, explicit UNKNOWN states, raw-ordinal versus trusted-order distinction and revealed-only capabilities. No OHLC fallback or production migration is authorized by a contract-freeze checkpoint.

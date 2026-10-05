@@ -69,3 +69,5 @@ backend/market_data separates immutable descriptor + DataService (ArtifactStore/
 
 
 Target execution authority now follows [MARKET_DATA_STANDARD](../docs/MARKET_DATA_STANDARD.md#tick-native-execution-decision--target-invariant). Existing blueprint Section 42.14 owns the audit and staged migration design. Tick-native event timeline/execution/settlement and derived-candle pipeline are proposed, not implemented. Current frontend simulator and separate backend candle prototype remain unchanged compatibility systems until explicitly authorized cutover; existing M1 service remains visualization/research only.
+
+[Section 42.15](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4215-frozen-canonical-tick-provider-and-timeline-contract--v1) owns the frozen versioned canonical/provider/timeline contract, synthetic fixture matrix, strict identity/ordering/reveal boundaries and next implementation acceptance. Reuse existing canonical/Decimal primitives; preserve BTL-TICK-EVIDENCE-1 wire/goldens and existing production domains. Contract decisions are not shipped runtime.

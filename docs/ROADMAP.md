@@ -823,6 +823,8 @@ Professional strategy research and management platform.
 
 Human-approved tick-native target is owned by [Market Data Standard](MARKET_DATA_STANDARD.md#tick-native-execution-decision--target-invariant); [existing Section 42.14](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4214-tick-native-decision-exness-candidate-and-migration-audit) records audit/migration gates. The target clarifies the following existing scopes without creating new phases or marking future implementation complete. Candle compatibility remains historical; future execution may not silently fall back to OHLC.
 
+[Frozen V1 contract in existing Section 42.15](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4215-frozen-canonical-tick-provider-and-timeline-contract--v1) makes canonical/provider/timeline preparation concrete with synthetic contract fixtures. This is a contract-only checkpoint; the following implementation phases remain PLANNED and require separate authorization.
+
 ### Phase 41 — MARKET ENGINE v2 (PLANNED)
 
 Plan explicit abstraction between candle visualization/research and canonical tick market/execution authority. Candle Mode is a chart/compatibility mode, not a future alternative financial settlement authority. Preserve existing legacy modelled results separately until accepted migration.

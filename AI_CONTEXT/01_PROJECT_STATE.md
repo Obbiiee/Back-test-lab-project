@@ -57,3 +57,5 @@ Local-first historical delivery now exists as an isolated loopback backend API o
 
 
 The human approved the tick-native execution target in MARKET_DATA_STANDARD. Actual production still settles candle/scalar-price MODELLED results; no migration was implemented. Existing blueprint Section 42.14 audits every active/prototype/archived execution path and compatibility limits. Official Exness sample acquisition was blocked (browser certificate error / normal HTTPS 403); actual XAUUSD format/quality remains unmeasured. No Exness dataset or account settlement is integrated.
+
+Canonical/provider/timeline V1 is frozen as a contract decision in existing blueprint Section 42.15 with explicitly synthetic fixture examples and test-only validation. No TickDataProvider/timeline runtime, Exness dataset, new execution or settlement is implemented; existing candle-modelled production remains unchanged.

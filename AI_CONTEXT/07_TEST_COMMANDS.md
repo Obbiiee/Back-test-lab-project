@@ -78,3 +78,5 @@ Local Tick Review: from frontend run npm run test:tick-review (18 Python-authore
 
 
 Local historical delivery: from backend run `python -m unittest tests.test_market_data tests.test_precision tests.test_precision_policy tests.test_histdata_ticks -v` (39 methods). Node canonical vectors and frontend full regression/lint/build/release plus repository/bundle gates remain required. Actual local startup/HTTP validation and replay/cloud boundaries: existing blueprint Section 42.13. No frontend integration or DB/auth modification; browser-adapter/full DB rerun exempt here, not a cloud release certificate.
+
+Tick contract freeze: from backend run `python -m unittest tests.test_tick_contract_spec tests.test_precision tests.test_precision_policy -v`, plus independent Node golden vectors. The new harness validates the single blueprint 42.15 synthetic matrix and existing exact/canonical compatibility only; it does not test an implemented provider/timeline/settlement. Run repository/bundle tests and regenerate/verify the bundle. No browser/full-release rerun is claimed for documentation/test-only work; future implementation must add actual behavioral acceptance.

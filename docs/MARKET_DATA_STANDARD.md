@@ -22,6 +22,8 @@ L1 plus source/provider, timeframe, timezone, price precision, tick size, tradin
 Preferred minimum event: timestamp, bid, ask. Millisecond timestamps are preferred; preserve microseconds if supplied. Optional: last, bid_size, ask_size, volume, flags, sequence. L3 must preserve chronological ordering and historical spread. If equal timestamps lack a trustworthy sequence, mark ordering quality as unverifiable rather than guessing.
 
 ## Canonical tick
+
+The fields below are the policy-level vocabulary. [Existing blueprint Section 42.15](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4215-frozen-canonical-tick-provider-and-timeline-contract--v1) is the single owner of frozen V1 wire fields, identity, provider and timeline semantics; do not implement this older sketch as a competing schema. Runtime implementation remains separately authorized.
 ```text
 timestamp_utc
 instrument_id
