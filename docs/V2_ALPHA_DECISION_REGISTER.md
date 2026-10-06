@@ -40,21 +40,10 @@
 ## 2. Predefined decision trees
 
 ### DT-DRAW
-1. Run OpenAlgo isolated spike.
-2. PASS only if all drawing MUSTs, canonical anchor round-trip, replay/timeframe persistence, acceptable performance, license/provenance, bounded integration and rollback pass.
-3. If PASS and net custom-maintenance reduction is demonstrated → select OpenAlgo path.
-4. Else test OpenCharts-compatible path under same gates.
-5. If PASS → select OpenCharts/adapt path.
-6. Else → KEEP current BTL drawing engine and implement only frozen Alpha gaps.
-7. Do not search for a fourth drawing engine during execution.
+Evaluate current BTL, pinned OpenAlgo and pinned OpenCharts before selection using the exact MUST gates and lexicographic ranking in `V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md`. A disqualified candidate cannot win. Do not search for a fourth engine during the frozen journey.
 
 ### DT-IND
-1. Compare donor calculator semantics to authored vectors.
-2. If calculator parity + causality pass, donor calculators may be adopted behind adapter.
-3. If donor host integrates without breaking LC v5 pane/replay semantics, host may be adopted.
-4. Mixed outcome is allowed: best passing calculator/host combination.
-5. If no donor passes → KEEP current seven and build only Alpha-required gaps.
-6. Catalog size never overrides correctness.
+Evaluate calculator and host layers separately. Semantic parity, warmup, visible-prefix causality, replay/timeframe and pane lifecycle are MUST gates. Rank qualifying candidates by the deterministic rubric in `V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md`. Mixed calculator/host outcome is allowed. Catalog size never overrides correctness.
 
 ### DT-ANALYTICS
 1. Define metric semantics first.
@@ -108,6 +97,20 @@ At each cohort:
 - missing side/sequence/coverage can alter outcome → UNRESOLVED/AMBIGUOUS;
 - corrupt evidence → REFUSE;
 - never fallback to OHLC precision settlement.
+
+## 2A. Additional frozen decisions after PF-0 hardening
+
+- **ADR-EXEC-003 FROZEN:** exact Alpha execution/financial semantics are owned by `V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md`; X-1 cannot redesign them.
+- **ADR-SESSION-002 FROZEN:** committed financial sessions never rewind; backward exploration forks immutable lineage.
+- **ADR-UNCERTAINTY-001 FROZEN:** outcome-changing uncertainty commits no fill/P&L and propagates as UNRESOLVED.
+- **ADR-AGG-001 FROZEN:** Alpha presentation candles use revealed bid/ask mid with UTC epoch-aligned buckets per Data/Ops contract.
+- **ADR-RIGHTS-002 FROZEN:** rights are checked before provider-specific production integration and again before external cohort.
+- **ADR-SLO-001 FROZEN:** Alpha reference hardware/SLO/resource gates are owned by Data/Ops contract.
+- **ADR-RESEARCH-002 FROZEN:** advanced regime/OOS/destruction/multiple-testing work is post-Alpha for first cohort.
+- **ADR-MIGRATION-001 FROZEN:** v1 financial truth is not silently migrated; per-store matrix is owned by Data/Ops contract.
+- **ADR-TRANSACTION-001 FROZEN:** command dedup + canonical events + account/order/session revision commit atomically.
+- **ADR-SECURITY-001 FROZEN:** external Alpha requires the frozen threat-model gates.
+- **ADR-DEPENDENCY-001 FROZEN:** no opportunistic major dependency upgrades during journey.
 
 ## 3. Hard invalidation conditions
 
