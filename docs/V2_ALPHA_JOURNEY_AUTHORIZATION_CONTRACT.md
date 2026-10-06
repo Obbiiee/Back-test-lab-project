@@ -30,3 +30,11 @@ Rules:
 8. Work may not reinterpret this schema from this file; the live values in 04_CURRENT_PHASE are authoritative.
 
 This resolves governance for “plan your trade, trade your plan” without creating a second operational status owner.
+
+## Roadmap relationship
+
+`V2_ALPHA_V1` is a bounded cross-cutting engineering journey to the closed v2 Alpha/Beta-readiness review defined by its Frozen Execution Ledger. It is **not** authorization for ROADMAP Phases 23–75 as a numbered sequence and does not mark those phases complete.
+
+The ROADMAP explicitly permits an explicit bounded multi-phase human authorization to live in the sole current-phase pointer. If the human authorizes `V2_ALPHA_V1`, only capabilities/checkpoints enumerated in the frozen ledger auto-advance. Roadmap capabilities outside the Alpha ledger—including later subscription/billing, teams, social/collaboration, advanced research, AI research assistant, live broker/data, forward testing and algorithmic-trading readiness—remain separately planned/unimplemented.
+
+At journey completion L-8, factual phase/history mapping must be reconciled from what was actually implemented; no roadmap phase number is inferred merely from reaching L-8.
