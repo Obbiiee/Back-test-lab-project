@@ -6,6 +6,15 @@
 >
 > **Planning baseline:** GitHub `main` after STITCH-0, 2026-10-06.
 
+## PLAN-FREEZE overlay
+
+The detailed plan below is now constrained by three freeze documents:
+- [Frozen Product & Engineering Specification](V2_ALPHA_FROZEN_SPEC.md)
+- [Frozen Decision Register & Change Control](V2_ALPHA_DECISION_REGISTER.md)
+- [Frozen Execution Ledger](V2_ALPHA_FROZEN_EXECUTION_LEDGER.md)
+
+When this older decomposition leaves a routine choice open, the frozen specification/register/ledger resolves it. None of these planning files overrides operational authorization in `AI_CONTEXT/04_CURRENT_PHASE.md`.
+
 ## 0. Mission
 
 Deliver a trustworthy **closed v2 Alpha** of Backtest Lab with:
