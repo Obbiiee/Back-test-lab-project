@@ -331,6 +331,10 @@ Do not wholesale embed or rewrite Backtest Lab around NautilusTrader, LEAN, hftb
 
 Do not adopt proprietary TradingView Advanced Charts/Trading Platform code into the public repository without a separately verified license/product-fit decision.
 
+## 14A. Stitch-first consolidation
+
+Before extending commodity v2 subsystems, read [STITCH-0 OSS Replacement & Consolidation Audit](STITCH_0_OSS_REPLACEMENT_AUDIT.md). It owns the current cross-subsystem KEEP / REPLACE-CANDIDATE / ADAPT / REFERENCE planning map and the migration gates. It does **not** grant implementation authorization. Operational authorization remains exclusively in `AI_CONTEXT/04_CURRENT_PHASE.md`.
+
 ## 15. Dependency intake gate
 
 Before adding a dependency:
