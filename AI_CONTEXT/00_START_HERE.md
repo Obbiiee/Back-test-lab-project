@@ -35,3 +35,5 @@ Read before any future v2 Alpha work:
 - [PF-0 Adversarial Re-Audit](../docs/PF0_ADVERSARIAL_REAUDIT.md)
 
 The re-audit passes planning integrity only. Operational implementation remains governed solely by 04_CURRENT_PHASE.
+
+Final plan-freeze repository integrity: [PF-1 Final Adversarial Repository Integrity Audit](../docs/PF1_FINAL_REPOSITORY_INTEGRITY_AUDIT.md) — PASS for planning/repository integrity; it does not self-authorize implementation.
