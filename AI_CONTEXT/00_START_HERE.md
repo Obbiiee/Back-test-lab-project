@@ -42,3 +42,5 @@ The re-audit passes planning integrity only. Operational implementation remains 
 Final plan-freeze repository integrity: [PF-1 Final Adversarial Repository Integrity Audit](../docs/PF1_FINAL_REPOSITORY_INTEGRITY_AUDIT.md) — PASS for planning/repository integrity; it does not self-authorize implementation.
 
 Code-informed final planning gate: [PF-2 Gap Closure Audit](../docs/PF2_CODE_INFORMED_GAP_CLOSURE_AUDIT.md) — PASS for known-gap planning coverage only; runtime authorization remains solely in 04_CURRENT_PHASE.
+
+Measurement boundary audit: [PF-3 v2/v2.1 Measurement Readiness Audit](../docs/PF3_V2_1_MEASUREMENT_READINESS_AUDIT.md) — PASS after adding the minimum v2 sensor seam and separately authorized v2.1 product-intelligence contract; it does not authorize runtime.
