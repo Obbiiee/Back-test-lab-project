@@ -167,3 +167,11 @@ All non-invalidating discoveries are recorded for post-Alpha. They cannot alter 
 - the journey continues to the next authorized ledger checkpoint when the human has explicitly authorized the complete frozen journey.
 
 It does **not** mean bypassing security, licensing, rights, destructive-operation safeguards, failed tests or a genuine hard invalidation.
+
+
+## ADR-MEASUREMENT-001 — v2/v2.1 measurement boundary
+**Decision:** v2 ships a usable/trustworthy Alpha plus bounded operational telemetry and vendor-neutral typed product-event hooks. Full product analytics, questionnaire, funnel/retention/feature-adoption reporting and product-intelligence extraction belong to separately authorized v2.1.
+
+**Hard rules:** analytics is observational and replaceable; analytics outage cannot block or mutate execution/financial truth; no vendor SDK belongs inside deterministic execution domain logic; privacy/cardinality/storage are bounded; v2 remains usable with the analytics sink disabled.
+
+**Owner:** [v2 -> v2.1 Product Measurement Contract](V2_1_PRODUCT_MEASUREMENT_CONTRACT.md).
