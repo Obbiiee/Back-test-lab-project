@@ -68,11 +68,11 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 
 ### M-3 — Streaming Validation / Time Index
 **Do:** bounded validation and immutable index.
-**Pass:** ordering/duplicate/bid-ask/chunk/checksum/index fixtures; peak memory bounded independent of full dataset size.
+**Pass:** ordering/duplicate/bid-ask/chunk/checksum/index fixtures; peak memory bounded independent of full dataset size, including duplicate/diagnostic state; GAP-001/GAP-006 negative invariants pass.
 
 ### M-4 — Indexed Timeline
 **Do:** seek >= timestamp, range read, resume, partition crossing, cancel.
-**Pass:** deterministic equal-time semantics; random seeks avoid scan-from-start.
+**Pass:** deterministic equal-time semantics; random seek and late-history resume avoid scan-from-start/O(historical-prefix) positioning; bounded reconstruction and GAP-002/GAP-007 pass.
 
 ### M-5 — Authorized Dataset Benchmark
 **Do:** rights-safe local/private ingestion benchmark.
@@ -116,7 +116,7 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 
 ### Q-3 — Replay Worker Pool / Backpressure
 **Do:** bounded workers, queue, cancellation, fair scheduling, paused release.
-**Pass:** overload queues/throttles/rejects rather than unbounded growth.
+**Pass:** overload queues/throttles/rejects before heavy allocation rather than unbounded growth; queue is itself bounded/durable, per-user/global limits apply, worker ownership is exclusive, authority is revalidated, and recovery uses the same admission path (GAP-005/GAP-013/GAP-021/GAP-022).
 
 ### Q-4 — Cache Decision
 **Do:** execute DT-CACHE using random-cursor benchmark.
@@ -178,28 +178,29 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 
 ### I-5 — Browser Delivery Budget
 **Do:** throttle/coalesce candles/current quote/events/progress without changing engine.
-**Pass:** engine hashes identical across UI update rates.
+**Pass:** engine hashes identical across UI update rates; chart/history/cache/request state remains within an explicit browser budget and ordinary responses/history are bounded (GAP-008/GAP-009/GAP-020).
 
 ### H-1 — Observability
 **Do:** session/replay/worker/queue/resource/API/dataset/restore/version telemetry.
-**Pass:** diagnose golden injected failures without secrets.
+**Pass:** diagnose golden injected failures without secrets; bounded-cardinality telemetry covers active/queued/rejected work, queue wait, CPU/RAM/I/O, DB pool/query pressure, throughput, latency, deterministic mismatches, recovery and browser delivery without becoming an unbounded dependency (GAP-014/GAP-024).
 
 ### H-2 — Security/Tenant Hardening
 **Do:** object-level authorization, body/rate/resource limits, TLS/secrets/dependency review.
-**Pass:** A↛B read/write; hostile inputs bounded.
+**Pass:** A↛B read/write; hostile inputs bounded; production DB connections are pooled/bounded with headroom, outer protection cannot create unbounded DB pressure, and release installs pinned dependencies (GAP-010/GAP-011/GAP-018).
 
 ### H-3 — Backup/Restore / Recovery
 **Do:** DB/session/dataset/index recovery drills.
-**Pass:** documented measured recovery; no silent evidence corruption.
+**Pass:** documented measured recovery; no silent evidence corruption; backup/restore procedure is certified at representative Alpha DB size rather than relying on an unmeasured fixed timeout (GAP-017).
 
 ### H-4 — Worst-Case Load 10
 **Do:** random historical cursors, mixed speeds/orders/pause/reconnect.
 **Record:** p50/p95/p99, CPU/RAM/I/O/queue/errors/hashes.
 **Branch:** DT-PERFORMANCE/DT-CACHE.
+**Also certify:** admission limits, queue/DB/browser/telemetry budgets and applicable `V2_ALPHA_CAPACITY_FAILURE_HARDENING_CONTRACT.md` gates.
 
 ### H-5 — Failure Injection
 **Do:** worker/API/DB restart, missing/corrupt chunk/index, disk/permission pressure where safe, disconnect, stale revision, interrupted save/publication.
-**Pass:** fail closed/recover per contract.
+**Pass:** fail closed/recover per contract; execute the complete minimum failure matrix in `V2_ALPHA_CAPACITY_FAILURE_HARDENING_CONTRACT.md`, including financial all-or-none commit, duplicate retry, exclusive worker ownership, mass recovery, queue saturation and telemetry failure (GAP-012/GAP-023).
 
 ### L-1 — Final Data Rights Re-verification
 **Do:** verify exact Alpha dataset audience/storage/display/derived/retention rights.
