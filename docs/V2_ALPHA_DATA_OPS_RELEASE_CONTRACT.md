@@ -271,3 +271,19 @@ A checkpoint cannot waive an applicable family silently. Exemption requires writ
 A checkpoint may use multiple atomic commits. Every commit must leave protected baselines recoverable. Exactly one completion report/marker closes a checkpoint after all acceptance gates pass. Push and remote/local equality are required at closure.
 
 Repeated implementation failure is not counted by attempts. It becomes hard invalidation only when root-cause evidence demonstrates a mandatory acceptance criterion cannot be met under the frozen contract after the applicable predefined fallback/optimization tree is exhausted.
+
+
+## Code-informed capacity hardening
+
+The [Reality → Plan Gap Matrix](V2_ALPHA_REALITY_PLAN_GAP_MATRIX.md) and [Capacity & Failure Hardening Contract](V2_ALPHA_CAPACITY_FAILURE_HARDENING_CONTRACT.md) are normative acceptance hardening for this contract.
+
+Additional invariants:
+- production ingestion/validation/replay memory is bounded by configured working sets, not total dataset size;
+- late-history seek/resume cannot require a complete prefix scan;
+- queues, workers, DB connections, browser history/cache and telemetry cardinality are bounded;
+- overload is rejected before heavy allocation;
+- mass recovery obeys admission control;
+- active sessions pin immutable dataset/version/profile identity;
+- actual safe concurrency is benchmark-derived; a cheaper host needs its own certification and cannot inherit the reference-node result.
+
+These rules do not change the reference Alpha SLOs above. They prevent an implementation from nominally meeting a feature checkpoint while retaining an unbounded failure path.
