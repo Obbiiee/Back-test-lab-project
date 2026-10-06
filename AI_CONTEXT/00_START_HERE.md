@@ -24,3 +24,14 @@ Read these existing owners in order before work:
 Status values live only in 04_CURRENT_PHASE. History records completed work; roadmap describes planning slots, not permission. Historical reports never override these owners. Read the workflow before accepting a next task; authorization comes from the human.
 
 Production lives only in frontend/src/. Root README and docs/README.md explain the repository map; Phase 7.5 audit records cleanup evidence. Preserve useful archives and fixtures.
+
+## v2 Alpha hardened freeze set
+
+Read before any future v2 Alpha work:
+- [Execution/Financial Contract v1](../docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md)
+- [Data/Ops/Release Contract v1](../docs/V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md)
+- [Research Metrics Contract v1](../docs/V2_ALPHA_RESEARCH_METRICS_CONTRACT.md)
+- [Journey Authorization Contract](../docs/V2_ALPHA_JOURNEY_AUTHORIZATION_CONTRACT.md)
+- [PF-0 Adversarial Re-Audit](../docs/PF0_ADVERSARIAL_REAUDIT.md)
+
+The re-audit passes planning integrity only. Operational implementation remains governed solely by 04_CURRENT_PHASE.
