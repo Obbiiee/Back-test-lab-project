@@ -15,6 +15,7 @@ Read these existing owners in order before work:
 | Workflow, Definition of Done, Git policy and next prompt | [06_WORKFLOW_RULES](06_WORKFLOW_RULES.md) |
 | Validation commands | [07_TEST_COMMANDS](07_TEST_COMMANDS.md) |
 | Long-term roadmap | [Existing repository roadmap](../docs/ROADMAP.md) |
+| Cross-system engineering plan & OSS provenance | [Engineering Master Plan](../docs/ENGINEERING_MASTER_PLAN.md) |
 
 Status values live only in 04_CURRENT_PHASE. History records completed work; roadmap describes planning slots, not permission. Historical reports never override these owners. Read the workflow before accepting a next task; authorization comes from the human.
 
