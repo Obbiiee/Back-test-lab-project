@@ -16,6 +16,7 @@ Read these existing owners in order before work:
 | Validation commands | [07_TEST_COMMANDS](07_TEST_COMMANDS.md) |
 | Long-term roadmap | [Existing repository roadmap](../docs/ROADMAP.md) |
 | Cross-system engineering plan & OSS provenance | [Engineering Master Plan](../docs/ENGINEERING_MASTER_PLAN.md) |
+| v2 Alpha work decomposition, dependency DAG & checkpoint acceptance | [v2 Alpha Work Execution Plan](../docs/V2_ALPHA_WORK_EXECUTION_PLAN.md) |
 
 Status values live only in 04_CURRENT_PHASE. History records completed work; roadmap describes planning slots, not permission. Historical reports never override these owners. Read the workflow before accepting a next task; authorization comes from the human.
 
