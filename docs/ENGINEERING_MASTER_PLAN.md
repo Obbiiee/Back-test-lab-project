@@ -331,6 +331,15 @@ Do not wholesale embed or rewrite Backtest Lab around NautilusTrader, LEAN, hftb
 
 Do not adopt proprietary TradingView Advanced Charts/Trading Platform code into the public repository without a separately verified license/product-fit decision.
 
+## 13.0 v2 Alpha PLAN-FREEZE
+
+The v2 Alpha plan is constrained by:
+1. [Frozen Product & Engineering Specification](V2_ALPHA_FROZEN_SPEC.md) — final Alpha promise/scope/ownership/behavior direction;
+2. [Frozen Decision Register & Change Control](V2_ALPHA_DECISION_REGISTER.md) — frozen ADRs, deterministic fallback trees and hard-invalidation rules;
+3. [Frozen Execution Ledger](V2_ALPHA_FROZEN_EXECUTION_LEDGER.md) — checkpoint journey from plan integrity through Beta readiness.
+
+These prevent routine redesign during execution. They remain planning authorities and do not supersede `AI_CONTEXT/04_CURRENT_PHASE.md` for operational authorization.
+
 ## 13A. v2 Alpha execution decomposition
 
 For the complete workstream DAG, checkpoint scopes, dependencies, acceptance gates, rollback rules, STOP conditions and Work/Codex task-selection algorithm, read [v2 Alpha Work Execution Plan](V2_ALPHA_WORK_EXECUTION_PLAN.md). This is planning authority only; it does not override operational authorization in `AI_CONTEXT/04_CURRENT_PHASE.md`.
