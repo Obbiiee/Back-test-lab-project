@@ -4,6 +4,27 @@
 >
 > Operational implementation authorization remains governed by `AI_CONTEXT/04_CURRENT_PHASE.md`. Once the PLAN-FREEZE journey is accepted, normal execution follows the frozen ledger and decision rules; redesign is prohibited except through the hard-invalidation process in the Decision Register.
 
+## 0. Normative hardening overlay
+
+This specification is interpreted together with:
+- [Execution, Financial & Evidence Contract v1](V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md);
+- [Data, Operations & Release Contract v1](V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md);
+- [Research Metrics Contract v1](V2_ALPHA_RESEARCH_METRICS_CONTRACT.md);
+- the existing [Frozen Trading UX Specification v1](TRADING_METHOD_SESSION_SPEC.md).
+
+Precedence for overlapping subjects:
+1. operational authorization/status: `AI_CONTEXT/04_CURRENT_PHASE.md`;
+2. market-data evidence/fidelity policy: `MARKET_DATA_STANDARD.md`;
+3. Protocol/Method/Session user workflow: `TRADING_METHOD_SESSION_SPEC.md`;
+4. v2 execution/financial/evidence semantics: `V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md`;
+5. data/aggregation/operations/release gates: `V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md`;
+6. research metric formulas: `V2_ALPHA_RESEARCH_METRICS_CONTRACT.md`;
+7. this file for Alpha scope and system ownership;
+8. Decision Register for choice/change rules;
+9. Frozen Execution Ledger for order of work.
+
+A lower item cannot broaden or contradict a higher subject owner. Material conflict is a hard invalidation, not an invitation to choose.
+
 ## 1. Alpha promise
 
 A closed-alpha user can authenticate, open an authorized XAUUSD historical dataset, start or restore an independent replay session, inspect a TradingView-like chart, use core drawings and indicators, define or select a Method, optionally run under a Protocol, place manual market/limit/stop orders with explicit risk/SL/TP, replay without look-ahead, receive deterministic tick-evidence-based execution when evidence is sufficient, journal/review the resulting canonical trades, and inspect reproducible basic research tied to an Experiment Passport.
@@ -19,7 +40,7 @@ If required evidence is insufficient for an execution claim, the system refuses/
 - authoritative tick timeline where the launch mode claims precision execution;
 - candles derived for visualization;
 - chart navigation/replay;
-- core drawings;
+- the eight existing minimum drawing capabilities: Trend Line, Horizontal Line, Vertical Line, Rectangle, Fibonacci Retracement, Arrow, Text and Measure;
 - seven current indicator families at minimum;
 - market, limit and stop;
 - long and short;
@@ -147,7 +168,7 @@ Exactly one owner per truth. Presentation may be replaced; authority may not be 
 
 ## 7. Execution behavior freeze
 
-The exact C1 wire schema remains a dedicated frozen checkpoint, but its semantic direction is fixed now:
+Exact v2 Alpha execution and financial semantics are frozen by `V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md`. X-1 materializes/verifies schemas and golden vectors; it does not choose product semantics. The following summary is non-exhaustive:
 
 - Long market entry consumes/uses the buy side (ask); long liquidation tests the sell side (bid).
 - Short market entry uses the sell side (bid); short liquidation tests the buy side (ask).
@@ -177,7 +198,7 @@ Rules:
 - restore resumes from committed revision only;
 - stale client revisions are rejected;
 - committed financial events are not undone by chart navigation;
-- backward navigation cannot bypass settlement; where incompatible with committed trades, require reset/new branch/session according to the eventual UI command contract;
+- backward navigation cannot bypass settlement; where incompatible with committed trades, cannot rewind the authoritative financial session; backward exploration forks a new session with lineage under the Execution Contract;
 - timeframe/chart changes do not alter execution chronology;
 - one user's cursor/cache behavior cannot change another user's result.
 
@@ -243,7 +264,7 @@ Required before closed Alpha:
 - reconciliation status;
 - seeded Monte Carlo for outcome/DD/streak distributions.
 
-Regime, destruction/robustness and OOS/walk-forward may be built in the frozen execution ledger after core Alpha if their checkpoint is reached, but they are not allowed to delay the first trustworthy closed cohort unless the release ledger marks them MUST.
+Regime, destruction/robustness, OOS/walk-forward and multiple-testing controls are POST-ALPHA for the first closed cohort and are not Alpha release blockers.
 
 ## 12. UI freeze
 
@@ -331,7 +352,7 @@ Technical product completion and public data rights are separate gates.
 
 Closed Alpha may use only a dataset whose permitted audience/use is documented for that launch mode. If only personal/internal rights are established, external Alpha cannot use that dataset; the engineering plan continues using synthetic/private acceptance while procurement/rights resolves.
 
-Six months of XAUUSD may be sufficient for product/UX Alpha validation if rights permit. It is not sufficient evidence of broad strategy robustness merely because the product works.
+Launch history length is a configured product constraint after rights/coverage evidence. Six months is only a candidate product-validation window, never a substitute for dataset quality, rights or strategy-robustness evidence.
 
 ## 18. Alpha release ladder
 
