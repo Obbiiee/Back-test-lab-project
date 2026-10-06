@@ -331,6 +331,10 @@ Do not wholesale embed or rewrite Backtest Lab around NautilusTrader, LEAN, hftb
 
 Do not adopt proprietary TradingView Advanced Charts/Trading Platform code into the public repository without a separately verified license/product-fit decision.
 
+## 12.9 PF-0 adversarial freeze audit
+
+[PF-0 Devil's Advocate Audit](PF0_DEVILS_ADVOCATE_AUDIT.md) currently records **FAIL / not ready for autonomous journey authorization**. Its P0/P1 remediation list must be closed and PF-0 rerun before PLAN-FREEZE can be declared complete. This finding supersedes any informal statement that the current planning set is already safe for unattended end-to-end execution.
+
 ## 13.0 v2 Alpha PLAN-FREEZE
 
 The v2 Alpha plan is constrained by:
