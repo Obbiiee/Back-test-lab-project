@@ -17,6 +17,9 @@ Read these existing owners in order before work:
 | Long-term roadmap | [Existing repository roadmap](../docs/ROADMAP.md) |
 | Cross-system engineering plan & OSS provenance | [Engineering Master Plan](../docs/ENGINEERING_MASTER_PLAN.md) |
 | v2 Alpha work decomposition, dependency DAG & checkpoint acceptance | [v2 Alpha Work Execution Plan](../docs/V2_ALPHA_WORK_EXECUTION_PLAN.md) |
+| v2 Alpha frozen product/engineering contract | [Frozen v2 Alpha Specification](../docs/V2_ALPHA_FROZEN_SPEC.md) |
+| Frozen architecture/technology decision trees & change control | [v2 Alpha Decision Register](../docs/V2_ALPHA_DECISION_REGISTER.md) |
+| Deterministic checkpoint journey to closed Alpha | [v2 Alpha Frozen Execution Ledger](../docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md) |
 
 Status values live only in 04_CURRENT_PHASE. History records completed work; roadmap describes planning slots, not permission. Historical reports never override these owners. Read the workflow before accepting a next task; authorization comes from the human.
 
