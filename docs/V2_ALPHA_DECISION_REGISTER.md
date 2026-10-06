@@ -112,6 +112,10 @@ At each cohort:
 - **ADR-SECURITY-001 FROZEN:** external Alpha requires the frozen threat-model gates.
 - **ADR-DEPENDENCY-001 FROZEN:** no opportunistic major dependency upgrades during journey.
 
+- **ADR-CAPACITY-001 FROZEN:** accepted heavy work is bounded by benchmark-derived admission, queue, worker, DB and browser budgets; overload rejects before heavy allocation.
+- **ADR-RECOVERY-001 FROZEN:** indexed resume/recovery avoids complete-prefix positioning and mass recovery obeys the same bounded admission controls.
+- **ADR-OBSERVABILITY-001 FROZEN:** Alpha capacity telemetry is required but bounded-cardinality/non-authoritative; observability failure cannot corrupt or block committed financial truth.
+
 ## 3. Hard invalidation conditions
 
 A FROZEN decision may be reopened only if at least one is evidenced:
