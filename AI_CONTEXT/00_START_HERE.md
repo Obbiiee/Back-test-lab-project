@@ -33,6 +33,8 @@ Read before any future v2 Alpha work:
 - [Research Metrics Contract v1](../docs/V2_ALPHA_RESEARCH_METRICS_CONTRACT.md)
 - [Journey Authorization Contract](../docs/V2_ALPHA_JOURNEY_AUTHORIZATION_CONTRACT.md)
 - [PF-0 Adversarial Re-Audit](../docs/PF0_ADVERSARIAL_REAUDIT.md)
+- [Reality-to-Plan Gap Matrix](../docs/V2_ALPHA_REALITY_PLAN_GAP_MATRIX.md)
+- [Capacity and Failure Hardening Contract](../docs/V2_ALPHA_CAPACITY_FAILURE_HARDENING_CONTRACT.md)
 
 The re-audit passes planning integrity only. Operational implementation remains governed solely by 04_CURRENT_PHASE.
 
