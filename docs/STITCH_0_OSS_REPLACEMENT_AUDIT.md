@@ -2,6 +2,8 @@
 
 > **Status:** planning/audit only. This document does not authorize runtime replacement, dependency installation, deletion, migration, or phase advancement. Operational authority remains `AI_CONTEXT/04_CURRENT_PHASE.md`.
 >
+> **PLAN-FREEZE SUPERSESSION:** The donor facts/inventory in this audit remain useful historical evidence, but its proposed STITCH-1 selection sequence and subjective acceptance wording are superseded by `V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md`, `V2_ALPHA_DECISION_REGISTER.md`, and `V2_ALPHA_FROZEN_EXECUTION_LEDGER.md`. Current BTL, pinned OpenAlgo and pinned OpenCharts must all be evaluated under the common frozen rubric before selection. “OpenAlgo first, fallback if fail” is no longer the selection algorithm.
+>
 > **Audit baseline:** GitHub `main` reviewed 2026-10-06 after the Engineering Master Plan was linked from AI onboarding.
 
 ## 1. Objective
