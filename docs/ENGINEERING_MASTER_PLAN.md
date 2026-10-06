@@ -333,7 +333,7 @@ Do not adopt proprietary TradingView Advanced Charts/Trading Platform code into 
 
 ## 12.9 PF-0 adversarial freeze audit
 
-[PF-0 Devil's Advocate Audit](PF0_DEVILS_ADVOCATE_AUDIT.md) currently records **FAIL / not ready for autonomous journey authorization**. Its P0/P1 remediation list must be closed and PF-0 rerun before PLAN-FREEZE can be declared complete. This finding supersedes any informal statement that the current planning set is already safe for unattended end-to-end execution.
+[PF-0 Devil's Advocate Audit](PF0_DEVILS_ADVOCATE_AUDIT.md) recorded the initial **FAIL** and 38 findings. Those findings were hardened through the frozen execution/financial, data/operations/release, research and journey-authorization contracts. The subsequent [PF-0 Adversarial Re-Audit](PF0_ADVERSARIAL_REAUDIT.md) records **PASS for planning integrity**, while implementation remains unauthorized until the human explicitly authorizes the frozen journey and the sole operational owner records it.
 
 ## 13.0 v2 Alpha PLAN-FREEZE
 
