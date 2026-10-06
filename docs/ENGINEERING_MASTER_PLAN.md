@@ -331,6 +331,10 @@ Do not wholesale embed or rewrite Backtest Lab around NautilusTrader, LEAN, hftb
 
 Do not adopt proprietary TradingView Advanced Charts/Trading Platform code into the public repository without a separately verified license/product-fit decision.
 
+## 13A. v2 Alpha execution decomposition
+
+For the complete workstream DAG, checkpoint scopes, dependencies, acceptance gates, rollback rules, STOP conditions and Work/Codex task-selection algorithm, read [v2 Alpha Work Execution Plan](V2_ALPHA_WORK_EXECUTION_PLAN.md). This is planning authority only; it does not override operational authorization in `AI_CONTEXT/04_CURRENT_PHASE.md`.
+
 ## 14A. Stitch-first consolidation
 
 Before extending commodity v2 subsystems, read [STITCH-0 OSS Replacement & Consolidation Audit](STITCH_0_OSS_REPLACEMENT_AUDIT.md). It owns the current cross-subsystem KEEP / REPLACE-CANDIDATE / ADAPT / REFERENCE planning map and the migration gates. It does **not** grant implementation authorization. Operational authorization remains exclusively in `AI_CONTEXT/04_CURRENT_PHASE.md`.
