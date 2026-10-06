@@ -20,7 +20,7 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 **Runtime:** none.
 
 ### S-1 — Drawing Donor Spike
-**Do:** execute DT-DRAW against exact pinned OpenAlgo then OpenCharts fallback.
+**Do:** evaluate current BTL + exact pinned OpenAlgo + exact pinned OpenCharts under the common frozen rubric, then execute DT-DRAW ranking.
 **Output:** evidence report + selected owner.
 **No:** production migration/deletion.
 **Pass:** selected branch determined mechanically by DT-DRAW.
@@ -51,6 +51,11 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 ### S-7 — Stitch Consolidation
 **Do:** remove only proven-dead superseded code, update notices/owners, full frontend regression.
 **Pass:** one owner per capability; rollback/migration fixtures preserved.
+
+### D-0 — Early Data Mode / Rights Gate
+**Do:** apply the frozen rights matrix before provider-specific production integration.
+**Pass:** provider is classified EXTERNAL-CANDIDATE, INTERNAL-ONLY, UNVERIFIED or REJECTED with evidence.
+**Fallback:** internal/synthetic engineering continues without pretending external rights.
 
 ### M-1 — 42.18 Provenance Reconciliation
 **Do:** verify preserved branch/commit; diff exact draft; selectively reconcile to 42.17 + 42.19.
@@ -83,10 +88,10 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 **Do:** bounded internal APIs/read ports for timeline/range/replay.
 **Pass:** limits/cancel/ownership; no browser raw-tick flood.
 
-### X-1 — Execution V1 Contract Freeze
-**Do:** exact command/event schema and edge-case semantics under Frozen Spec.
-**Must settle:** market/limit/stop; pending; cancel; long/short; bid/ask; SL/TP; gap; equal-time; costs; partial exit; idempotency/revision; rejected/unresolved.
-**Pass:** golden scenario table complete before engine code.
+### X-1 — Execution V1 Contract Materialization
+**Do:** materialize wire schemas/state machine/golden vectors strictly from `V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md`.
+**No:** product-semantic design choices.
+**Pass:** every frozen golden scenario has an exact expected event/account outcome or expected UNRESOLVED/REFUSED result before engine code.
 
 ### X-2 — Pure Tick Execution Engine
 **Do:** deterministic implementation independent of UI/storage transport.
@@ -143,16 +148,16 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 **Pass:** count/WLBE/PnL/win rate/avg/expectancy/PF/DD/streak/R/duration/reconciliation vectors.
 
 ### R-7 — MAE/MFE
-**Do:** compute only where revealed event path permits.
-**Pass:** no hidden-future/path fabrication.
+**Do:** implement exactly `V2_ALPHA_RESEARCH_METRICS_CONTRACT.md`.
+**Pass:** side/partial-exit/boundary/unresolved golden vectors; no hidden-future/path fabrication.
 
 ### R-8 — Seeded Monte Carlo
-**Do:** reproducible distributions for terminal outcome/DD/streak/explicit threshold probabilities.
-**Pass:** pinned RNG algorithm/seed in Passport.
+**Do:** implement the descriptive bootstrap contract in `V2_ALPHA_RESEARCH_METRICS_CONTRACT.md`.
+**Pass:** golden PRNG vectors, seed reproducibility, N<30 refusal, reported percentiles.
 
-### R-9 — Advanced Research Gate
-**Decision:** regime/robustness/destruction/OOS are post-core-alpha by default.
-**Do now only if already marked MUST by release requirement; otherwise DEFER without blocking first closed cohort.
+### R-9 — Advanced Research
+**Status:** POST-ALPHA / NOT ON THIS ALPHA CRITICAL PATH.
+**Do:** record DEFERRED and continue. A later planning cycle is required.
 
 ### I-1 — Core Integration Gate
 **Require:** accepted S owner(s), M-4/M-5/M-6, X-2/X-3/X-4, Q-2, R-1/R-2/R-3.
@@ -196,7 +201,7 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 **Do:** worker/API/DB restart, missing/corrupt chunk/index, disk/permission pressure where safe, disconnect, stale revision, interrupted save/publication.
 **Pass:** fail closed/recover per contract.
 
-### L-1 — Data Rights Launch Gate
+### L-1 — Final Data Rights Re-verification
 **Do:** verify exact Alpha dataset audience/storage/display/derived/retention rights.
 **Pass:** external-compatible rights OR external Alpha blocked while engineering remains internal.
 **Never:** infer permission from technical access.
