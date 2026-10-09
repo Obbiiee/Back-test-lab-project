@@ -141,6 +141,8 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "frontend/tests/stitch-analytics.test.mjs",
+    "backend/tests/stitch_analytics.py",
     "frontend/tests/stitch-trading.test.mjs",
     "frontend/tests/stitch-drawing.test.mjs",
     "frontend/tests/stitch-indicators.test.mjs",

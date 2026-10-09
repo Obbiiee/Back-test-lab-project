@@ -40,3 +40,11 @@ Never label the bootstrap as probability of future profit.
 
 ## Advanced research
 Regime classification, destruction tests, walk-forward/OOS and multiple-testing correction are POST-ALPHA for the first closed cohort and are not pre-Alpha release blockers.
+
+## S-6 ResearchCalculator boundary — existing runtime mapping
+
+The pure calculator boundary is the existing `backend/execution/analysis.py:metrics(completed)` callable; this names the existing seam, not a second service, wire schema or engine. Its caller supplies ordered completed-position rows with final exact decimal-string `net`. The callable returns counts, exact numerator/denominator strings and explicit null/unavailable research values according to the definitions above. It never accepts provider/storage/index handles, candles, future quotes, uncommitted orders or account mutation capabilities.
+
+BTL `project` remains the owner of committed-event grouping, partial-close completion, causal fill validation, event-chain/account reconciliation, bounded 4096-event refusal, drawdown from exact cash postings, Session/Method/Passport provenance and orchestration. Open/unresolved positions do not enter completed-position denominators. R0 is not pinned in the current Alpha, so R/MAE/MFE/Monte Carlo remain explicitly unavailable; evaluating a library does not implement them. FinancialEngine remains unchanged.
+
+Any future numerical adapter must satisfy authored goldens at this boundary and preserve exact money/null/BE semantics before adoption. S-6 retains the current small pure calculator after the pinned QuantStats comparison; [STITCH audit Section 17](STITCH_0_OSS_REPLACEMENT_AUDIT.md#17-s-6-researchcalculator-and-quantstats-evaluation--2026-10-10) owns evidence and library limitations. No frozen metric definition is amended.

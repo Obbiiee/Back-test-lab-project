@@ -11,6 +11,7 @@
     "test:stitch-drawing": "node tests/stitch-drawing.test.mjs",
     "test:stitch-indicators": "node tests/stitch-indicators.test.mjs",
     "test:stitch-trading": "node tests/stitch-trading.test.mjs",
+    "test:stitch-analytics": "node tests/stitch-analytics.test.mjs",
     "preview": "vite preview",
     "test:market": "node tests/market.test.mjs",
     "test:trading": "node tests/trading.test.mjs",
