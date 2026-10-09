@@ -100,3 +100,17 @@ assert.throws(()=>validateControl({...documents,[owners.workflow]:documents[owne
 assert.throws(()=>validateControl({...documents,[owners.roadmap]:documents[owners.roadmap].replace(/^\| 14\.5 \|.*\r?\n/m,'')},config));
 assert.throws(()=>validateControl(documents,{...config,context:config.context.filter(p=>p!==owners.roadmap)}));
 console.log('PASS Phase 7.6 single authorities, operational fields, authorization/checkpoint/STOP/next-prompt gates, roadmap 1–75/14.5 and authoritative bundle inclusion; negative drift cases rejected.');
+
+// S-7: every planned catalog entry is classified by one existing ledger owner.
+// Derive names from authoritative specs instead of duplicating those catalogs.
+const acceptanceBlocks=[...read('docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md').matchAll(/```json\s*([\s\S]*?)```/g)].map(m=>JSON.parse(m[1]));
+const stitchAcceptance=acceptanceBlocks.filter(b=>b.CLASSIFICATION==='STITCH_S7_BOUNDED_ACCEPTANCE');assert.equal(stitchAcceptance.length,1);
+const acceptance=stitchAcceptance[0];
+const drawingCatalog=read('docs/DRAWING_ENGINE_SPEC.md').split('## Planned professional tool set')[1].split('The exact implementation order')[0].trim().split(/\r?\n/).filter(line=>line.includes(': ')).flatMap(line=>line.split(': ')[1].replace(/\.$/,'').split(', '));
+const indicatorCatalog=read('docs/INDICATOR_ENGINE_SPEC.md').split('Add: ')[1].split(', subject to')[0].replace(/ and /g,', ').split(', ');
+assert.equal(drawingCatalog.length,25);assert.equal(indicatorCatalog.length,17);
+assert.deepEqual([...acceptance.drawing.implemented,...acceptance.drawing.deferred].sort(),drawingCatalog.sort());
+assert.deepEqual([...acceptance.indicators.deferred].sort(),indicatorCatalog.sort());
+for(const owner of Object.values(acceptance.deferred_owners))assert.ok(existsSync(path.join(root,owner.split('#')[0])),'Deferred capability has no existing owner');
+assert.equal(acceptance.professional_catalog_complete,false);assert.equal(acceptance.historical_precision_accepted,false);
+console.log('PASS S-7 single ledger classifies all 25 professional drawing tools and 17 expanded indicators with existing owners; no professional/precision completion claim.');

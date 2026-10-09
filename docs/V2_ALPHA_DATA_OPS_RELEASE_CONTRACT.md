@@ -71,7 +71,7 @@ A final rights re-check remains mandatory immediately before first external coho
 | v1 closed trades | legacy view/export only unless explicit lossless import format marks LEGACY_MODELLED |
 | v1 journal notes | may import only with stable referenced legacy identity; otherwise export/read-only |
 | 8 drawing persistence | migrate only after S-1/S-2 round-trip proof; original storage preserved until cutover retention ends |
-| indicator runtime configs | current runtime-only state has no durable migration promise |
+| v1 indicator runtime configs | runtime-only state has no durable migration promise; S-7 tick-alpha preferences use a separate Session-isolated local namespace with unknown/foreign-byte preservation, no v1 migration |
 | replay date | convenience preference only; not financial/session evidence |
 | news dataset/preferences | preserved independent domain; non-blocking for v2 Alpha |
 | Method/Session prototype | no state migration; concepts only |

@@ -68,3 +68,23 @@ for(let sample=0;sample<150;sample++){
 function scan(directory){for(const item of readdirSync(directory,{withFileTypes:true})){const file=path.join(directory,item.name);if(item.isDirectory())scan(file);else if(/\.(js|jsx|css)$/.test(file)){const text=readFileSync(file,'utf8');assert.ok(!/\beval\s*\(|new\s+Function\b|dangerouslySetInnerHTML\b|document\.write\s*\(/.test(text),'Unsafe executable-input sink: '+file);assert.ok(!/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|sk-[A-Za-z0-9]{40,}/.test(text),'Potential embedded credential; review filename without printing secret: '+file);}}}
 scan(fileURLToPath(new URL('../src/',import.meta.url)));
 console.log('PASS randomized news-cache differential and active-source executable-input/embedded-credential checks (bounded heuristic, not a complete security proof).');
+
+// S-7 research preferences: actual roundtrip/edit/hide/remove, independent
+// Sessions, hostile/future bytes and concurrent foreign-tab preservation.
+const {IndicatorPreferences}=await import('../src/workspacePreferences.js');
+const {productionRegistry}=await import('../src/indicators/productionRegistry.js');
+const prefValues=new Map(),prefStorage={getItem:key=>prefValues.get(key)??null,setItem:(key,value)=>prefValues.set(key,value)};
+const newPrefs=workspace=>new IndicatorPreferences(prefStorage,workspace,productionRegistry);
+const a=newPrefs('tick-alpha:A');assert.deepEqual(a.load(),[]);
+const instances=[{id:'rsi',type:'RSI',parameters:{period:3},visible:false},{id:'sma',type:'SMA',parameters:{period:5},visible:true}];
+assert.equal(a.save(instances),true);const aReload=newPrefs('tick-alpha:A');assert.deepEqual(aReload.load(),instances);
+const b=newPrefs('tick-alpha:B');assert.deepEqual(b.load(),[]);assert.equal(b.save([]),true);assert.deepEqual(newPrefs('tick-alpha:A').load(),instances);
+const edited=[{...instances[0],visible:true,parameters:{period:7}}];assert.equal(aReload.save(edited),true);assert.deepEqual(newPrefs('tick-alpha:A').load(),edited);
+const currentBytes=prefValues.get(a.key);
+for(const bad of ['{broken',JSON.stringify({version:2,workspace:a.workspace,instances}),JSON.stringify({version:1,workspace:'foreign',instances}),JSON.stringify({version:1,workspace:a.workspace,instances:[instances[0],instances[0]]}),JSON.stringify({version:1,workspace:a.workspace,instances:[{...instances[0],type:'FUTURE'}]}),JSON.stringify({version:1,workspace:a.workspace,instances:[{...instances[0],parameters:{period:0}}]}),' '.repeat(32769)]){
+ prefValues.set(a.key,bad);const held=newPrefs(a.workspace);assert.deepEqual(held.load(),[]);assert.equal(held.save([]),false);assert.equal(prefValues.get(a.key),bad);assert.ok(held.status);
+}
+prefValues.set(a.key,currentBytes);const concurrent=newPrefs(a.workspace);concurrent.load();prefValues.set(a.key,'foreign-new-bytes');assert.equal(concurrent.save([]),false);assert.equal(prefValues.get(a.key),'foreign-new-bytes');assert.equal(concurrent.writable,false);
+const blocked=new IndicatorPreferences(()=>{throw Error('Storage denied');},'tick-alpha:C',productionRegistry);assert.deepEqual(blocked.load(),[]);assert.equal(blocked.save([]),false);
+const prefQuota=new IndicatorPreferences({getItem:()=>null,setItem:()=>{throw Error('Quota');}},'tick-alpha:D',productionRegistry);prefQuota.load();assert.equal(prefQuota.save(instances),false);assert.ok(prefQuota.status);assert.equal(prefQuota.raw,null);
+console.log('PASS S-7 per-Session indicator roundtrip/edit/hide/remove, isolation, future/corrupt/oversized/duplicate/invalid preferences, foreign-tab and unavailable/quota byte preservation.');

@@ -3,10 +3,15 @@ import CandleChart from '../components/CandleChart.jsx';
 import IndicatorControls from '../components/IndicatorControls.jsx';
 import {productionRegistry} from '../indicators/productionRegistry.js';
 import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
+import {IndicatorPreferences} from '../workspacePreferences.js';
 import {displayBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
 
 export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing}){
-  const [mode,setMode]=useState('none'),[instances,setInstances]=useState([]);
+  const [savedIndicators]=useState(()=>{
+    const store=new IndicatorPreferences(()=>globalThis.localStorage,`tick-alpha:${view.metadata.id}`,productionRegistry);
+    return {store,instances:store.load()};
+  });
+  const [mode,setMode]=useState('none'),[instances,setInstances]=useState(savedIndicators.instances);
   const [preferences,setPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const [speed,setSpeed]=useState(4),[playToken,setPlayToken]=useState(null);
   const seekInput=useRef(null);
@@ -31,6 +36,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const indicatorError=useCallback(error=>onNotice(error.message),[onNotice]);
   const changeInstances=value=>{
     if(value.length>16){onNotice('At most 16 indicators can be displayed.');return;}
+    savedIndicators.store.save(value);
     setInstances(value);
   };
   const stopAndSeek=()=>{
@@ -45,6 +51,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <label><input type="checkbox" checked={preferences.showGrid} onChange={e=>setPreferences(p=>({...p,showGrid:e.target.checked}))}/>Grid</label>
       <span>Mid-price display · volume unavailable</span>
     </div>
+    {savedIndicators.store.status&&<p className="alpha-chart-note" role="alert">{savedIndicators.store.status}</p>}
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}}>Cursor / Select</button>

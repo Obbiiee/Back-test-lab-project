@@ -11,24 +11,16 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "S-6",
-  "CURRENT_IMPLEMENTATION_PHASE": "S-7",
-  "NEXT_PHASE": "S-7",
-  "NEXT_PHASE_STATUS": "AUTHORIZED_BOUNDED_STITCH_JOURNEY",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "S-7",
-  "AUTHORIZED_PHASE_SEQUENCE": [
-    "S-1",
-    "S-2",
-    "S-3",
-    "S-4",
-    "S-5",
-    "S-6",
-    "S-7"
-  ],
-  "EXECUTION_MODE": "BOUNDED_STITCH_S1_TO_S7_BEFORE_V22",
-  "AUTO_ADVANCE_AFTER_PASS": true,
+  "LAST_COMPLETED_PHASE": "S-7",
+  "CURRENT_IMPLEMENTATION_PHASE": null,
+  "NEXT_PHASE": "V2.2",
+  "NEXT_PHASE_STATUS": "REQUIRES_HUMAN_AUTHORIZATION",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
+  "AUTHORIZED_PHASE_SEQUENCE": [],
+  "EXECUTION_MODE": "STOP_BEFORE_V22",
+  "AUTO_ADVANCE_AFTER_PASS": false,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "S-7 integrated consolidation/acceptance after S-6 Git equality gate; final validated checkpoint then stop before V2.2.",
+  "TARGET_CHECKPOINT": "STITCH S-1\u2013S-7 bounded synthetic Functional Alpha closed after final Git equality gate. STOP; define/authorize bounded V2.2 scope separately.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75"
@@ -86,3 +78,5 @@ V21-4 committed-event trading/Analysis gates passed; existing Section 43 owns ev
 V21-5 UX consolidation gates passed. Complete its normal push/equality and clean 0/0 before final V21-6 journey/release acceptance. The existing bounded grant stops before V2.2; no historical or production precision claim.
 
 V21-6 final Functional Alpha acceptance gates passed; existing Section 43 owns factual evidence and limitations. Normal final commit/push/actual remote equality and clean 0/0 close the authorized journey. No active implementation or auto-advance remains after closure; the next existing roadmap program requires separately supplied bounded human scope. STOP before V2.2. Historical authorization paragraphs above do not extend this completed journey.
+
+Latest bounded STITCH grant S-1–S-7 is exhausted by completed S-7 acceptance. Existing audit/ledger own evidence and explicit professional deferrals. Earlier authorization paragraphs are historical, not permission to start V2.2, historical ingestion/benchmark or public delivery. Final Git equality/clean0/0 closes this journey; then STOP with no automatic advancement.

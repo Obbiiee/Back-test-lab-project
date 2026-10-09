@@ -52,6 +52,109 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 **Do:** remove only proven-dead superseded code, update notices/owners, full frontend regression.
 **Pass:** one owner per capability; rollback/migration fixtures preserved.
 
+## S-7 bounded product acceptance classification
+
+This records the human-authorized S-1–S-7 result boundary; it does not rewrite the frozen future journey or authorize V2.2. Existing specs remain the future capability owners. Implementation status here is **local synthetic Functional Alpha**, not professional catalog/capacity/historical-market acceptance. Fib Retracement maps to the runtime label Fibonacci Retracement; Long/Short are research geometry whose Create order seeds only a reviewed BTL intent. Arrow/Measure are extra minimum tools outside the professional 25.
+
+```json
+{
+  "CLASSIFICATION": "STITCH_S7_BOUNDED_ACCEPTANCE",
+  "drawing": {
+    "implemented": [
+      "Trend Line",
+      "Horizontal Line",
+      "Vertical Line",
+      "Fib Retracement",
+      "Rectangle",
+      "Text",
+      "Long Position",
+      "Short Position"
+    ],
+    "deferred": [
+      "Ray",
+      "Extended Line",
+      "Horizontal Ray",
+      "Cross Line",
+      "Parallel Channel",
+      "Regression Trend",
+      "Fib Extension",
+      "Fib Channel",
+      "Rotated Rectangle",
+      "Circle/Ellipse",
+      "Polyline/Path",
+      "Brush",
+      "Highlighter",
+      "Anchored Text",
+      "Callout",
+      "Price Range",
+      "Date Range"
+    ]
+  },
+  "additional_alpha_drawings": [
+    "Arrow",
+    "Measure"
+  ],
+  "indicators": {
+    "implemented": [
+      "SMA",
+      "EMA",
+      "Bollinger Bands",
+      "RSI",
+      "MACD",
+      "ATR",
+      "Stochastic"
+    ],
+    "unavailable": [
+      "Volume"
+    ],
+    "deferred": [
+      "VWAP",
+      "Anchored VWAP",
+      "ADX",
+      "DMI",
+      "CCI",
+      "MFI",
+      "OBV",
+      "ROC",
+      "Momentum",
+      "Williams %R",
+      "Parabolic SAR",
+      "Donchian Channels",
+      "Keltner Channels",
+      "Ichimoku Cloud",
+      "Pivot Points",
+      "Aroon",
+      "Choppiness Index"
+    ]
+  },
+  "deferred_owners": {
+    "drawing": "docs/DRAWING_ENGINE_SPEC.md",
+    "indicators": "docs/INDICATOR_ENGINE_SPEC.md",
+    "workspace": "docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md",
+    "identity": "docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md#i-4--identityworkspace-ui-integration",
+    "precision": "docs/ROADMAP.md"
+  },
+  "acceptance_level": "LOCAL_SYNTHETIC_FUNCTIONAL_ALPHA_ONLY",
+  "professional_catalog_complete": false,
+  "historical_precision_accepted": false,
+  "v22_authorized": false
+}
+```
+
+| Capability | Bounded acceptance and remaining gap | Deferred owner / rationale |
+|---|---|---|
+| Eight canonical primitives + Long/Short | Current BTL manager/primitives and dedicated research geometry retained after pinned comparison; create/select/drag/handles/history/hide/lock/persistence covered by existing test owners. S-7 actual browser covers eight creations, TIME+PRICE stability, delete/undo/redo and Long planning journey. No universal full-style/grouping promise. | Drawing spec for remaining 17; minimum-tool KEEP wins frozen rubric, donor catalog alone cannot bypass acceptance. |
+| Object Tree, group/ungroup, multi-select, reorder, named templates, clipboard/style catalog | DEFERRED; selected-object controls and history exist, but no accepted hierarchical canonical Drawings+Indicators tree. Legacy geometry prototypes are not canonical professional acceptance. | Drawing + Indicator specs; new common interaction/model/history scope requires a bounded grant. |
+| Magnet OFF/WEAK/STRONG with OHLC targets | DEFERRED; existing legacy boolean magnet is not the professional three-mode/eligible-target implementation and is not exposed as that promise in tick alpha. | Drawing spec; shared anchor/interaction acceptance is future work. |
+| Seven indicator families / Volume | Accepted calculator/host KEEP; add/edit/hide/remove/multiple instances/panes/revealed-only prefix tested. Per-Session tick-alpha config now persists locally. Volume explicitly unavailable without source volume; tick counts are never invented volume. | Indicator spec for expanded 17, pane reorder/resize UI, source/style/favorites/templates/workspace undo. v1 runtime-only configs are not silently migrated. |
+| Multi-chart | DEFERRED; one chart per workspace only. | System blueprint; synchronized cursor/layout/performance is outside bounded STITCH. |
+| Default v1 → tick workspace consolidation | DEFERRED; opt-in local tick path is accepted, default v1/Figma path remains recoverable legacy/modelled. Both reuse LC5/CandleChart; they do not share settlement authority. | System blueprint / ADR-MIGRATION; changing default and legacy financial import/retirement require separate explicit acceptance. |
+| Login/dashboard/workspace account UI | DEFERRED product composition; earlier backend identity/tenant foundations are not a working local tick login UI or public SaaS. | Existing I-4 and system blueprint; no cloud/auth/public-launch grant in STITCH. |
+| Trading presentation | Accepted narrow MIT quote-direction/review adaptation, intent-only Long/Short seed, server review/confirmation, pending/Protocol, canonical fill markers/history/Analysis. Six-dot terminal drag/keyboard and focus remain shared existing owners. | Existing trading/Method/Session specs for richer redesign/order/news/dashboard requests; donor stores/LTP/PnL remain excluded. |
+| Historical feed, Exness V2 benchmark, scale/closed cohort, advanced research | DEFERRED/unaccepted; fixtures verify execution invariants, not real-feed broker fidelity. R0/MAE/MFE/MC unavailable is explicit. | Existing ROADMAP V2.2 + frozen storage/metrics owners. Preserved 42.18/42.20 bytes and partial benchmark remain untouched. |
+
+No migration donor superseded production code in S-2/S-4, so no runtime deletion is justified. Retain compatibility exports, Phase 3/golden/storage fixtures, v1 rollback and historical knowledge. [STITCH audit](STITCH_0_OSS_REPLACEMENT_AUDIT.md) owns measured evidence, licenses and limitations; operational status remains only in current-phase.
+
 ### D-0 — Early Data Mode / Rights Gate
 **Do:** apply the frozen rights matrix before provider-specific production integration.
 **Pass:** provider is classified EXTERNAL-CANDIDATE, INTERNAL-ONLY, UNVERIFIED or REJECTED with evidence.
