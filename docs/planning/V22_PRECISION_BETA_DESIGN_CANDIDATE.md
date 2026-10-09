@@ -343,3 +343,72 @@ A resting TP **limit order** must never be misrepresented as a guaranteed market
 R01 market BUY/SELL correct quote side; R02 limit price constraint; R03 stop-market adverse gap; R04 stop-limit trigger without executable limit remains pending; R05 pending expiry at session boundary; R06 stale quote blocked; R07 OCO atomicity and same-time race; R08 partial fill then partial cancel; R09 contract-size and commission P&L; R10 swap/currency conversion; R11 margin liquidation with shared positions; R12 weekend gap; R13 duplicate command and crash recovery; R14 chart timeframe invariant; R15 invalid crossed Bid/Ask quarantine; R16 license-safe anomaly bundle; R17 profile version change invalidates comparison not history; R18 adversarial fixture with both outcomes possible remains unresolved; R19 missing volume cannot be marketed as broker-confirmed fill; R20 no critical failure hidden by aggregate 99% fixture score.
 
 **Release note:** all R01–R20 are proposed fixtures, not executed tests. Main/V2.1 authority remains untouched.
+
+
+---
+
+## Review 8 — execution-ready closure plan, scope lock, acceptance and handoff (2026-10-09)
+
+**Status:** planning-only candidate. This section is a proposed *completion contract* for V2.2, not implementation authority. V21-3..V21-6 must close first, and implementation must reconcile current main/authority before any edit. No DOM/order-book, broker liquidity simulation, public SaaS, licensed resale, live order routing, guaranteed real-broker fills, or full robustness research suite is required to declare V2.2 Precision Beta complete.
+
+### Frozen product decisions (do not reopen absent failed evidence)
+1. One authoritative tick timeline, one financial engine, one account ledger; no candle-based financial settlement and no look-ahead.
+2. Pinned `NEXT_AVAILABLE_QUOTE_V1`: quote-trigger execution on first admissible Bid/Ask tick, full fill assumed at quote, favorable/adverse slippage, no fabricated intermediate quotes, no double spread. Real resting limit-order semantics and unsupported order types must be explicitly distinguished. Freeze profile per experiment.
+3. No DOM/market depth, matching engine, broker liquidity/market impact modeling or broker-specific fill guarantee. Explicit user-facing scope disclosure.
+4. `DETERMINATE` only relative to model and sufficient causal evidence; `CONDITIONAL` where pinned assumptions/scenarios vary; `UNRESOLVED` where outcome not provable; `UNSUPPORTED` where requested contract is not implemented. Never relabel an implementation bug as unresolved.
+5. Automated Unresolved Registry with grouped fingerprint, affected experiments/positions, cause and versioned evidence; user reporting is supplementary, privacy- and license-safe. Historical receipts immutable; fixes require rerun.
+6. Target >=99% **resolved eligible real-trade cases**, <=1% unresolved as a **measured aspirational product KPI**, separately from >=99% fixture classification correctness. Do not force 1% cap; report actual rate with denominator, confidence/coverage, source and period. Critical invariants and P0/P1 release gates are 100% required regardless of aggregate scores.
+7. Planned RR and realized RR are distinct; account uncertainty propagates through dependent balances, margin, sizing, trades and analytics. Unresolved outcomes never silently count as win/loss.
+8. The scientific robustness suite (statistical significance, out-of-sample, Monte Carlo, sensitivity, multiple-testing) remains a **separately gated product workstream** after tick Precision Beta unless existing approved scope explicitly includes a bounded foundational metric. Do not call it fully implemented merely because documented.
+
+### Bounded implementation sequence and exit gates
+
+| Phase | Deliverable | Exit gate / STOP condition |
+|---|---|---|
+| **V22-0** Baseline & contract reconciliation | Inspect post-V21-6 actual main, protected 42.17/42.19, 42.20 private benchmark, deployed V2.1 execution paths, tests, licenses. Write discrepancy map and profile decision record. | Clean/equal Git baseline; owner mapping; no duplicate engine; unresolved authority conflict => STOP for decision. |
+| **V22-1** Dataset manifest + rights | Immutable provider/symbol/timezone/Bid/Ask decimal semantics, timestamp precision, provenance/rights/coverage/gaps, dataset hash, verification receipts. Synthetic and legally allowed local samples. | Invalid or rights-ineligible data quarantined; raw source not committed; no unsupported redistribution claims. |
+| **V22-2** Streaming validator | 100% bounded-memory structural scan, anomaly interval index, counts/hashes/continuity, independent deterministic sample plan, provenance. | Reproducible scan results; corrupt middle-chunk, timestamp ties, gaps, crossed quote and boundary adversarial cases detected; no O(N) in-memory materialization. |
+| **V22-3** Storage & indexed timeline | Implement frozen 42.17+42.19 hierarchical V2 storage, sidecar access, atomic publication, bounded seek/scan/replay; preserve V1 history and migration fidelity labels. | Full representative legal dataset ingest and re-read reconciliation, cold seek and bounded RAM benchmarks; full Exness benchmark only if local bytes/access available, otherwise explicitly gate that acceptance and use a representative synthetic full-scale test, without falsely declaring full historical Exness acceptance. |
+| **V22-4** Execution proof & oracle | Pin quote-trigger profile; independent oracle/golden vectors for market/pending/TP/SL/gap/fees/margin; event-order proof, conditional/unresolved and downstream uncertainty propagation; exactly-once receipts. | All critical oracle and adversarial tests pass; no look-ahead, invented fills, duplicate financial effect or silent account certainty; unsupported types visibly refused. |
+| **V22-5** Unresolved Registry & reports | Durable taxonomy, fingerprint dedup, trade/account impact, deterministic reproduction, private issue report, export and support triage, permissions and safe redaction. | Every unresolved case traceable and queryable; privacy/rights tests pass; rerun does not mutate old results; dashboard aggregates actual denominator and causes. |
+| **V22-6** Stress/security/benchmark | Full replay, seek, crash/retry, concurrent sessions, malformed dataset, resource limits, disk corruption, partition boundaries, version migration, browser interactions. Record machine, data size, throughput, peak RSS, p50/p95 seek, storage overhead and repeatability. | Zero critical regressions; no unbounded memory; performance budgets set from baseline and measured evidence, not invented numeric promises. If budgets fail, optimize or declare NO-GO. |
+| **V22-7** Beta acceptance & closure | End-to-end real browser: import permitted dataset -> Method/Session -> place/activate -> replay -> TP/SL/slippage -> Analysis -> unresolved report -> restart/reopen/export. Final evidence matrix, defects, limitations, release notes and rollback. | All P0/P1 and invariants PASS; classification correctness and resolution KPI reported separately; legal/rights and browser gates PASS; commit/push/equality clean 0/0; explicit GO/NO-GO. STOP after V22-7. |
+
+**Ordering caveat:** Reconcile existing V22-0..V22-7 authority scope first; this matrix refines rather than silently supersedes frozen sections. A checkpoint that cannot meet its gate must STOP or be split by explicit authorization; never auto-advance after a failure. Every checkpoint requires tests, doc/evidence updates, one scoped commit, push, actual GitHub SHA equality, clean tree and handoff before continuing. A future bounded multi-checkpoint implementation grant may permit automatic advancement after validated closure, but this planning document does not.
+
+### Measurable acceptance scorecard
+
+| Metric | Definition | Target / release handling |
+|---|---|---|
+| Critical financial invariants | P0/P1 scenario matrix, oracle, ledger, no look-ahead, exactly once, data rights | **100% pass**, zero known critical failure |
+| Classification correctness | Correct DETERMINATE/CONDITIONAL/UNRESOLVED/UNSUPPORTED vs independent oracle for pre-registered eligible fixtures | >=99% aggregate **and 100% critical slices**, record all denominators and exclusions |
+| Observed resolution rate | Number of actual eligible evaluated trades with determinate model result / all eligible evaluated trades (explicit conditional/unresolved separate) | Aim >=99%, but publish actual and per-dataset/per-regime distribution; **not a gate that permits fabricated resolution** |
+| Unresolved impact | Count and percent plus downstream impacted account states and P&L exposure | Always visible; no unqualified WR/P&L for dependent uncertain ledger |
+| Reproducibility | Same immutable dataset/profile/engine version yields identical receipts after seek/restart/replay | 100% for pinned golden/recovery fixtures |
+| Dataset integrity | 100% structural scan + index reconciliation + anomaly and gap coverage | Mandatory; source authenticity only claimed when independently established |
+| Resource limits | Peak RSS, cold seek p95, ingestion throughput, disk overhead on stated hardware | Measure and approve numerical budgets at V22-0 or V22-3 from actual baseline; no premature numbers |
+| Rights/security | License scope, data exfiltration, raw tick report leaks, permissions | 100% critical checks pass |
+
+### Delivery tiers and cutline
+
+- **Must ship for V2.2 beta:** single tick engine, versioned quote-fill model, durable account ledger, full structural data scan, indexed bounded historical replay, per-trade uncertainty classification, registry with evidence, basic user reporting, reproducible analysis, security/rights gates, real-browser E2E and measured performance.
+- **Can remain unresolved with explicit status:** rare ambiguous ordering, uncertain source fidelity, source outages where financial outcome cannot be proven, unsupported broker-specific execution, user-reported noncritical UX inconsistencies. Report rates; do not hide from analytics.
+- **Explicitly later:** DOM, L2 liquidity, market impact, partial-fill based on depth, universal broker replication, full quant robustness/Monte Carlo platform, global SaaS, monetization, broker affiliate integration and public market-data redistribution.
+- **Hard blockers:** invented determinate P&L, broken account dependency propagation, look-ahead, corrupted or non-idempotent ledger, unbounded data memory, missing rights, unreproducible critical fills, silent history mutation, critical security exposure. Do not defer these to user reports.
+
+### Operator playbook and closure artifacts
+
+- Preflight each checkpoint: verify main/origin SHA and clean status, read `AI_CONTEXT/04_CURRENT_PHASE.md`, authority files, `AI_HANDOFF.md`, tests and protected worktree references; do not touch Codex-owned main during V2.1.
+- Build smallest scoped implementation and independent fixtures, test backend+frontend+browser where relevant, measure RAM/latency on declared environment, review diff and license safety, write acceptance evidence.
+- Before push: no secrets, no private raw ticks, no local absolute paths or proprietary excerpts in public repo. Verify after push that actual remote main equals local, and report exact commit/test counts with caveats.
+- Final artifacts: authoritative decision record, pinned execution-profile specification, dataset verification receipts, oracle fixture inventory/results, registry schema and UX, benchmark report, beta GO/NO-GO report, known limitations, rollback/recovery instructions, `AI_HANDOFF.md` closure.
+- Any discrepancy with the actual V2.1 completed implementation or protected contracts wins over this plan until reconciled; no automatic rewrite of authoritative history.
+
+### Concrete next authorized-decision boundary
+
+1. Allow V21-3 through V21-6 to complete; audit their real code and evidence.
+2. Review this candidate against authority and identify changes that must be promoted into existing owners.
+3. Obtain explicit authorization for V22-0 and, if desired, a bounded V22-0..V22-7 auto-advance grant conditional on validated Git closures.
+4. Do not start V2.2 implementation merely because this document exists.
+
+**Review-8 verdict:** planning is structured for bounded end-to-end delivery, but beta readiness, 99% KPI, Exness full ingest, browser behavior and performance are **not yet proven**.
