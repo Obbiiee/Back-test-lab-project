@@ -1,5 +1,9 @@
 {
   "context": [
+    "docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md",
+    "docs/V2_ALPHA_DECISION_REGISTER.md",
+    "docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md",
+    "docs/V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md",
     "docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md",
     "docs/MARKET_DATA_STANDARD.md",
     "docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md",
@@ -135,6 +139,9 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "frontend/tests/stitch-drawing.test.mjs",
+    "frontend/tests/stitch-drawing-server.mjs",
+    "frontend/tests/browser/stitch-drawing.html",
     "backend/tests/test_tick_analysis.py",
     "backend/tests/test_tick_workspace.py",
     "backend/tests/test_research_sessions.py",

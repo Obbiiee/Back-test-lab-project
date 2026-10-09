@@ -343,3 +343,68 @@ Recommended next human authorization:
 **STITCH-1 DRAWING COMPATIBILITY SPIKE — isolated evaluation only, no production migration or deletion.**
 
 In parallel, the interrupted 42.18 market-data work remains governed by frozen 42.17 + 42.19 and requires its own separate authorization. STITCH planning must not silently resume it.
+
+## 12. S-1 equal drawing comparison — 2026-10-10
+
+This section extends the existing evidence owner; Sections 1–11 remain the historical STITCH-0 planning audit. The newer frozen [ledger](V2_ALPHA_FROZEN_EXECUTION_LEDGER.md) owns S-1…S-7 ordering; [DT-DRAW](V2_ALPHA_DECISION_REGISTER.md) and [selection rubric](V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md#7-stitch-selection-rubric) own choice. The old OpenAlgo-first ADR summary was normalized to the existing equal-comparison rule without changing that rule. Human chat explicitly authorized adopting `9fbf762` + `4e4dbef` and S-1…S-7, with a separate validated Git checkpoint per S phase and STOP before V2.2. Adopted starting baseline: `4e4dbef51814b5e1635ad4f903d49acbc71c63ff`, clean/equal 0/0 at reconciliation.
+
+**Validated S-1 choice: KEEP.** The completion marker is conditional on the mandatory normal Git checkpoint/equality gate. Automatic approval review initially could not execute remote verification because its usage limit was reached. After its stated reset time passed, a new read-only request through the same review succeeded and actual GitHub main was still `4e4dbef`. No approval bypass occurred. S-2 advancement waits for the actual S-1 push/equality/clean 0/0 check.
+
+### Exact candidates and scope
+
+| Candidate | Inspected immutable revision / license | Inspected entry / production disposition |
+|---|---|---|
+| Current BTL | Starting baseline above; existing repository code with Lightweight Charts 5.2.1 (Apache-2.0) / existing notices | `frontend/src/drawings/useDrawingTools.js`, Manager/registry/primitives/history/persistence; retained |
+| OpenAlgo Charts 2.6.0 | `marketcalls/openalgo-charts` at `8b4cffe41a8e8fda96c286d608625dac1ec36e53`; Apache-2.0; LICENSE SHA-256 `ede6b8620b0f3598fc4982a2f238a62c1cb9283cfbadf0b0efa9d13888b344cd` | `src/draw/index.ts`; external isolated clone + ignored generated bundle, no production import/package |
+| OpenCharts 0.1.0 | `dylanpersonguy/OpenCharts` at `785d1f18cc1ca67b0246031b2b9a08cb5cb60264`; MIT, Copyright OpenCharts Contributors; LICENSE SHA-256 `c176d7d04a302024f7332a1e7c37606b09bf688bbae89683b20e0b6a16bb1a65` | `src/lib/chart-plugins/drawing-tools/manager.ts`; package declares LC ^4.2.0, isolated primitive nevertheless rendered on actual LC 5.2.1; no production import/package |
+
+The test refuses changed pins or dirty source clones. Pin/source license links: [OpenAlgo](https://github.com/marketcalls/openalgo-charts/tree/8b4cffe41a8e8fda96c286d608625dac1ec36e53), [OpenCharts](https://github.com/dylanpersonguy/OpenCharts/tree/785d1f18cc1ca67b0246031b2b9a08cb5cb60264). License acceptability for this local evaluation is established; distribution would retain exact license/copyright/NOTICE and identify adapted files. No donor source is vendored or shipped here. No chart-engine replacement, dataset acquisition, dependency install or execution/financial change occurred. Candidate source inspection found no reason to grant drawing code financial/provider authority; no critical/high finding is asserted from a security scan that was not performed. Existing production dependency/release checks remain required.
+
+### Common capability map and observed gates
+
+| BTL minimum | OpenAlgo tool ID | OpenCharts native tool / discrepancy |
+|---|---|---|
+| Trend Line | `trend-line` | `trendline` |
+| Horizontal Line | `horizontal-line` | `horizontal`; native schema retains price but drops anchor time |
+| Vertical Line | `vertical-line` | `vertical` |
+| Rectangle | `rectangle` | `rectangle` |
+| Fibonacci Retracement | `fib-retracement` | `fibonacci` |
+| Arrow | `arrow` | `arrow` |
+| Text | `text` | `text`; default placement text must be mapped/edited |
+| Measure | `measure` | `measure`; preview-only, excluded from stored DrawingType and onAdd |
+
+`frontend/tests/stitch-drawing.test.mjs` executes all eight BTL lifecycle cases with immutable fractional TIME+PRICE anchors, irregular bar spacing, create/select/body drag, lock refusal/hide, delete/undo/redo, prefix/timeframe anchor stability, cold persistence and read-only future-schema byte preservation. Existing Phase 7 and Phase 9 vectors also passed in this run. Donor mode builds the actual pinned entries and executes OpenAlgo eight-model lifecycle + JSON round-trip, and OpenCharts native commitPlacement for every minimum. It asserts the latter produces exactly seven persisted objects and no horizontal anchor time: these are reproduced gaps, not silently repaired PASS results.
+
+The new loopback-only comparison fixture (`frontend/tests/browser/stitch-drawing.html`, port 5204) uses the same 80 authored candles, with a five-minute gap, fractional drawing timestamps and the installed **LC 5.2.1** renderer. Browser observations:
+
+- **BTL:** all eight render; all canonical records persist across Zoom, Pan, chart-height resize, timeframe projection and a 40-bar revealed prefix. Cold page reload + Load restored canonical records exactly. Native Trend Line creation, body drag, endpoint resize and locked drag refusal passed; hidden selection clears and Text edit passed. Existing production creation/interactions are retained, not replaced by this test-only placement helper.
+- **OpenAlgo:** all eight render and can each be placed individually through actual pointer clicks. Native body drag, endpoint resize where applicable, delete and undo passed separately for Trend, Horizontal, Vertical, Rectangle, Fib, Arrow and Measure. Blank newly placed Text required the visible Edit Text action and targeting its label; then Text body drag/delete/undo passed as well. That first blank-label failure is not hidden or treated as a donor regression proof. Eight anchor/Text snapshots survived Zoom/Pan/resize/timeframe/replay-prefix and cold reload; lock/hide/Text update passed through donor APIs. `fromJSON` normalizes schema/key order; compare canonical anchors/Text rather than falsely requiring JSON property-order identity. Incoming model arrays must be cloned, and BTL metadata/options/storage/Text-edit ownership require an adapter. This is viable isolated rendering, not accepted production migration.
+- **OpenCharts:** seven persisted types render on LC5; Measure appears as a transient overlay. Seven native snapshots survived the same transformations and cold reload. Native Measure never emitted onAdd, and Horizontal Line omitted time. Therefore the unmodified native schema fails two shared persistence/canonical gates. A bounded adapter would need retained BTL metadata/horizontal time, a stored Measure implementation, and BTL history/save ownership; none is silently claimed complete.
+
+The first OpenAlgo irregular fixture pointer attempt exposed a missing host `dataLayer.length` and unsafe nonfinite index conversion. That fixture was corrected against the pinned host contract, then all eight pointer cases were rerun with empty error lists. Earlier failed attempts are not acceptance evidence. The regular original preparation fixture and its three untracked worktree files remain preserved. The donor evaluation does not certify HiDPI/mobile parity, large-history performance or a chart-engine cutover. These are not invented from the authored fixture.
+
+No provider/storage/index/account handle is passed to drawing modules. Production drawing code continues receiving only BTL's revealed chart prefix; stored future planning anchors are drawings, not invented future market evidence. The fixture's authored source array is a test controller input, not a consumer API. Production causal/execution boundaries were not modified. Unknown/legacy user storage remains untouched because there is no production migration.
+
+### Measured cost and deterministic choice
+
+Measured with installed Rolldown, minified ESM, Node gzip; React external for the BTL hook entry. This compares drawing entries, not full application bundles or identical upstream app surfaces.
+
+| Entry | Modules | Minified bytes | gzip bytes | Nonblank source lines in entry closure |
+|---|---:|---:|---:|---:|
+| BTL hook | 15 | 23,405 | 7,841 | 775 (811 across all retained drawing source) |
+| OpenAlgo draw | 51 | 217,397 | 67,311 | 16,210 |
+| OpenCharts manager | 8 | 35,442 | 10,279 | 2,134 |
+
+Gross incremental gzip relative to retained entry: +59,470 OpenAlgo; +2,438 OpenCharts, before any production adapter; zero selected-path delta for KEEP. Measured candidate-specific fixture glue: OpenAlgo 15 nonblank lines / 4,180 bytes, OpenCharts 7 / 1,561 bytes, plus shared coordinate/buttons/report plumbing. Compact fixture formatting makes line count a poor complexity proxy; these are prototype numbers, **not** a production adapter estimate or a claim that 811 BTL lines can be deleted. KEEP adds zero production adapter LOC and retains 811 drawing lines. Neither upstream widget replaces BTL's storage/history/projection/causality boundary for free. Entry source LOC is explicitly not BTL-maintained adapter LOC. The first ranking component decides the winner, so later ranking components need no guessed production migration implementation. Both browser-served donor bundles were SHA-256 identical to the freshly pin-checked test builds.
+
+One authored eight-case local observation (not a capacity/latency SLO): BTL lifecycle median 0.977 ms/max 5.028 ms; OpenAlgo lifecycle median 1.419 ms/max 7.768 ms. OpenCharts placement-only median 0.057 ms/max 1.508 ms is **not comparable** to those complete lifecycle timings and does not win on that number. Small sample, cold/warm process variability and 80-bar browser workload prevent historical/production-performance claims. The test records fresh observations in ignored `tests/artifacts/stitch-drawing-metrics.json`.
+
+**Mechanically supported choice: KEEP current BTL.** BTL uses zero semantic production-module rewrites and zero new runtime dependencies. Any donor production path requires at least rewriting the `useDrawingTools.js` lifecycle/factory boundary to invoke a donor adapter rather than current Manager/creation/interactions; thus its first ranking component is at least one. Extra features cannot override that first component. OpenCharts additionally has reproduced native MUST failures until an unaccepted adapter repairs them. Even granting OpenAlgo's viable bounded adapter full parity, it cannot beat 0 at the first ranking component. No subjective feature-count preference or fourth library search changes this result. This retains the official OSS LC renderer/primitives foundation; it does not claim a donor UI has been adopted or the professional 25-tool catalog is complete.
+
+Migration/rollback design: KEEP causes no storage migration and preserves current namespace/version and unknown bytes. Optional future donor adoption would retain the current implementation behind an explicit factory, map TIME+PRICE/options/text/metadata into a BTL-owned versioned snapshot, refuse unknown schemas without writing, and prove reverse round-trip/one-action history/causal prefix before cutover. No old runtime is deleted. Under the frozen ledger S-2 would be a separately recorded KEEP/N/A checkpoint **only after S-1 Git closure**, not an automatic declaration in this in-progress report.
+
+### Validation / remaining closure
+
+PASS: authored BTL vectors; donor-mode clean exact pins, size/source measurements and lifecycle/native-gap vectors; **all registered frontend regression tests** (including existing 88 legacy geometry tools, production drawing/history/persistence, seven indicator families, causal replay, trading, news, Method/Session and tick-alpha boundaries); lint; production build (120 modules); release distribution/licenses/QA-seed exclusions; repository single-authority checks; AI bundle generation/hash verification/safety (188 files); independent Node six golden vectors repeated three times; protected 42.20 15 raw/Git blobs and 42.18 seven raw fingerprints/unchanged branch refs; complete scope diff and whitespace review. Donor mode was rerun after measurement instrumentation was added. Browser checks above are separate actual observations, not inferred from unit tests. Default sandbox runs initially failed on OneDrive/root `realpath` EPERM and SSR `module is not defined`; the same unchanged tests passed through approved host filesystem access. No test/legacy/runtime weakening was used.
+
+Backend full regression is exempt for this unmounted test/documentation-only change: no backend, runtime product import, financial/data/protocol contract or dependency is changed; prior V21-6 results are historical, not rerun evidence. Normal commit/push and fresh local/origin/actual GitHub equality + clean 0/0 remain the final closure gate; do not announce completion or start S-2 before they pass. V2.2 remains outside the authorization.

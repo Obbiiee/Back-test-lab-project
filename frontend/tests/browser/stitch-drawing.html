@@ -1,0 +1,70 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>S-1 authored comparison</title>
+<style>body{margin:0;background:#10141c;color:#eee;font:14px system-ui}header{padding:12px}button{margin:3px;padding:7px}#chart{height:360px}pre{white-space:pre-wrap;padding:12px}</style>
+<header><strong id="title"></strong><div id="tools"></div><div id="actions"></div></header><div id="chart-parent"><div id="chart"></div></div><pre id="result"></pre>
+<script src="/lc.js"></script><script type="module">
+import {DrawingManager} from '/src/drawings/DrawingManager.js';
+import {DrawingHistory} from '/src/drawings/DrawingHistory.js';
+import {DrawingPersistence} from '/src/drawings/DrawingPersistence.js';
+import {DrawingInteractionController} from '/src/drawings/interaction/DrawingInteractionController.js';
+import {DRAWING_SPECS} from '/src/drawings/DrawingTypes.js';
+import {projectTimestamp,continuousPointFromPointer} from '/src/drawings/timeCoordinates.js';
+const candidate=new URLSearchParams(location.search).get('candidate')??'BTL';
+if(!['BTL','OpenAlgo','OpenCharts'].includes(candidate))throw Error('Unknown candidate');
+document.querySelector('#title').textContent=`S-1 ${candidate} · authored candles only · fixture, not production acceptance`;
+const el=document.querySelector('#chart'),out=document.querySelector('#result');
+const chart=LightweightCharts.createChart(el,{autoSize:true,layout:{background:{color:'#10141c'},textColor:'#ccd'},timeScale:{timeVisible:true,secondsVisible:true}});
+const series=chart.addSeries(LightweightCharts.CandlestickSeries);
+const full=Array.from({length:80},(_,i)=>({time:1700000000+i*60+(i>35?300:0),open:1900+i*.1,high:1901+i*.1,low:1899+i*.1,close:1900.5+i*.1}));
+let bars=full,tf='1m',tool=null,errors=[],drawings=[],selected=null,paintCalls=0,api,placement=[],suppress=false;
+const timeIndex=t=>{if(bars.length<2)return 0;let i=1;while(i<bars.length-1&&bars[i].time<t)i++;return i-1+(t-bars[i-1].time)/(bars[i].time-bars[i-1].time);};
+const indexTime=i=>{if(!Number.isFinite(i))return null;if(bars.length<2)return bars[0]?.time??null;const j=Math.min(bars.length-2,Math.max(0,Math.floor(i)));return bars[j].time+(i-j)*(bars[j+1].time-bars[j].time);};
+const indexX=i=>projectTimestamp(chart.timeScale(),bars,indexTime(i));
+const xIndex=x=>timeIndex(continuousPointFromPointer(chart,series,{x,y:0},bars)?.time);
+function report(){out.textContent=JSON.stringify({candidate,version:LightweightCharts.version(),tf,revealedBars:bars.length,through:bars.at(-1)?.time,tool,selected:api?.selected(),errors,paintCalls,drawings:api?.all().map(d=>({...d,screen:(d.points??[]).map(p=>({x:projectTimestamp(chart.timeScale(),bars,p.time),y:series.priceToCoordinate(p.price)+el.getBoundingClientRect().top}))}))},null,2);}
+function setBars(value){bars=value;series.setData(bars);api?.bars();report();}
+function button(parent,label,fn){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{try{fn();}catch(e){errors.push(String(e));}report();};document.querySelector(parent).append(b);}
+function point(e){const r=el.getBoundingClientRect();return {time:continuousPointFromPointer(chart,series,{x:e.clientX-r.left,y:e.clientY-r.top},bars)?.time,price:series.coordinateToPrice(e.clientY-r.top)};}
+const names=Object.entries(DRAWING_SPECS),algoNames={'fibonacci-retracement':'fib-retracement'};
+if(candidate==='BTL'){
+  const m=new DrawingManager(),h=new DrawingHistory(m),p=new DrawingPersistence(localStorage,'stitch-fixture:BTL');
+  h.reset(p.load(m.registry));m.subscribeCommitted((a,b)=>p.save(b));m.attach(series);m.setTimePoints(bars);
+  const c=new DrawingInteractionController(m,chart,series,h);c.bind(el);m.subscribe(report);
+  api={all:()=>m.getAll(),selected:()=>m.selectedId,bars:()=>m.setTimePoints(bars),select:id=>m.select(id),update:(id,props)=>m.setProperties(id,props),text:(id,text)=>m.setText(id,text),add:d=>m.add(d),load:d=>h.reset(d),undo:()=>h.undo(),redo:()=>h.redo(),remove:id=>m.remove(id)};
+  el.addEventListener('click',e=>{if(!tool)return;placement.push(point(e));if(placement.length===DRAWING_SPECS[tool].points){const id=crypto.randomUUID();m.add({id,type:tool,points:placement,...(tool==='text'?{text:'Authored Ω'}:{})});m.select(id);placement=[];tool=null;chart.applyOptions({handleScroll:true});report();}});
+}else if(candidate==='OpenAlgo'){
+  const {DrawingController}=await import('/openalgo.mjs');
+  const listeners=new Map(),layers=new Map();let drag=null;
+  const ctx=scope=>({dpr:scope.horizontalPixelRatio??devicePixelRatio,plotWidth:el.clientWidth-70,plotHeight:el.clientHeight-30,priceAxisWidth:0,timeScale:{indexToX:indexX,xToIndex:xIndex},priceScale:{priceToY:p=>series.priceToCoordinate(p),yToPrice:y=>series.coordinateToPrice(y),format:p=>p.toFixed(2)},dataLayer:{get length(){return bars.length;},timeToIndexFloat:timeIndex,indexToTime:indexTime,indexToTimeFloat:indexTime},theme:{lineColor:'#5faaff',axisText:'#ccd',upColor:'#26a69a',downColor:'#ef5350',background:'#10141c'},bars:()=>bars});
+  const hit=p=>[...layers.keys()].reverse().map(l=>l.hitTest?.(p.x,p.y,ctx({}))).find(Boolean);
+  const host={on(e,f){const list=listeners.get(e)??[];list.push(f);listeners.set(e,list);return()=>listeners.set(e,list.filter(x=>x!==f));},emit(e,p){for(const f of listeners.get(e)??[])f(p);queueMicrotask(report);},dataLayer:{get length(){return bars.length;},timeToIndexFloat:timeIndex,indexToTime:indexTime,indexToTimeFloat:indexTime},drawingState:()=>null,setDrawingState(){},getVisibleLogicalRange:()=>chart.timeScale().getVisibleLogicalRange(),priceToCoordinate:p=>series.priceToCoordinate(p),coordinateToPrice:y=>series.coordinateToPrice(y),timeToCoordinate:t=>projectTimestamp(chart.timeScale(),bars,t),coordinateToTime:x=>indexTime(xIndex(x)),plotRect:()=>({left:0,top:0,width:el.clientWidth-70,height:el.clientHeight-30}),setPlacementMode:active=>chart.applyOptions({handleScroll:!active,handleScale:!active}),addPrimitive(layer){const p={attached:a=>layer.attached?.(a),detached:()=>layer.detached?.(),paneViews:()=>[{zOrder:()=>layer.zOrder?.()??'normal',renderer:()=>({draw(target){target.useBitmapCoordinateSpace(s=>{try{layer.draw(s.context,ctx(s));paintCalls++;}catch(e){errors.push(String(e));}report();});}})}]};layers.set(layer,p);series.attachPrimitive(p);},removePrimitive(layer){series.detachPrimitive(layers.get(layer));layers.delete(layer);}};
+  const m=new DrawingController(host,{magnet:false,inputAnchors:false});
+  api={all:()=>m.toJSON().drawings,selected:()=>m.selected(),bars:()=>{for(const l of layers.keys())l.requestUpdate?.();chart.applyOptions({});},select:id=>m.select(id),update:(id,props)=>m.update(id,props),text:(id,text)=>m.update(id,{text:{value:text}}),add:d=>m.add(structuredClone({...d,tool:algoNames[d.type]??d.type,paneIndex:0,createdAt:1,text:d.type==='text'?{value:d.text}:undefined})),load:d=>m.fromJSON({...m.toJSON(),drawings:d,groups:[]}),undo:()=>m.undo(),redo:()=>m.redo(),remove:id=>m.remove(id),arm:type=>m.setTool(algoNames[type]??type)};
+  host.on('draw:tool',p=>{tool=p.tool??p.id??null;});
+  const facts=e=>{const r=el.getBoundingClientRect();return {point:{x:e.clientX-r.left,y:e.clientY-r.top},...point(e),paneIndex:0,modifiers:{shift:false,ctrl:false,alt:false,meta:false}};};
+  el.addEventListener('click',e=>{if(suppress){suppress=false;return;}const p=facts(e);host.emit('click',{...p,id:hit(p.point)?.externalId??null});});
+  chart.subscribeCrosshairMove(p=>{if(p.point)host.emit('crosshair:move',{point:p.point,time:indexTime(xIndex(p.point.x)),price:series.coordinateToPrice(p.point.y),paneIndex:0});});
+  el.addEventListener('pointerdown',e=>{suppress=false;if(tool||e.button!==0)return;const p=facts(e),h=hit(p.point);if(!h?.draggable)return;drag={id:h.externalId,fromPrice:p.price,fromTime:p.time,origin:p.point,moved:false};chart.applyOptions({handleScroll:false,handleScale:false});el.setPointerCapture(e.pointerId);e.preventDefault();e.stopPropagation();},true);
+  el.addEventListener('pointermove',e=>{const p=facts(e);host.emit('hover',{id:hit(p.point)?.externalId??null});if(!drag)return;if(Math.hypot(p.point.x-drag.origin.x,p.point.y-drag.origin.y)>3)drag.moved=true;if(drag.moved){host.emit('drag',{...p,...drag});e.preventDefault();e.stopPropagation();}},true);
+  el.addEventListener('pointerup',e=>{if(!drag)return;if(drag.moved)host.emit('drag:end',{});suppress=drag.moved;drag=null;chart.applyOptions({handleScroll:!tool,handleScale:!tool});el.releasePointerCapture(e.pointerId);report();},true);
+}else{
+  const {DrawingToolsManager}=await import('/opencharts.mjs');
+  const undo=[],redo=[];let m;
+  const apply=d=>{undo.push(structuredClone(drawings));redo.length=0;drawings=d;m.setDrawings(drawings);report();};
+  m=new DrawingToolsManager({chart,series,container:el,intervalSec:60,timeframe:'1m',callbacks:{onAdd:d=>apply([...drawings,d]),onUpdate:d=>apply(drawings.map(x=>x.id===d.id?d:x)),onRemove:id=>apply(drawings.filter(d=>d.id!==id)),onToolFinished:()=>{tool=null;report();},onSelectionChange:ids=>{selected=ids[0]??null;report();}}});
+  api={all:()=>drawings,selected:()=>selected,bars:()=>m.updateTimeframe(tf,tf==='1m'?60:300),select:id=>m.setSelection([id]),update:(id,p)=>apply(drawings.map(d=>d.id===id?{...d,locked:p.locked??d.locked,hidden:p.visible===undefined?d.hidden:!p.visible}:d)),text:(id,text)=>apply(drawings.map(d=>d.id===id?{...d,text}:d)),add:d=>{const type=({'trend-line':'trendline','horizontal-line':'horizontal','vertical-line':'vertical','fibonacci-retracement':'fibonacci'})[d.type]??d.type;m.setTool(type);m.commitPlacement(d.points[0],d.points[1]??d.points[0]);},load:d=>{drawings=structuredClone(d);m.setDrawings(drawings);},undo:()=>{if(undo.length){redo.push(drawings);drawings=undo.pop();m.setDrawings(drawings);}},redo:()=>{if(redo.length){undo.push(drawings);drawings=redo.pop();m.setDrawings(drawings);}},remove:id=>apply(drawings.filter(d=>d.id!==id)),arm:type=>m.setTool(({'trend-line':'trendline','horizontal-line':'horizontal','vertical-line':'vertical','fibonacci-retracement':'fibonacci'})[type]??type)};
+}
+button('#tools','Cursor',()=>{tool=null;placement=[];api.arm?.(null);chart.applyOptions({handleScroll:true});});
+for(const [type,spec]of names)button('#tools',spec.name,()=>{placement=[];tool=type;api.arm?.(type);chart.applyOptions({handleScroll:false});});
+button('#actions','Seed eight',()=>{api.load([]);for(const [i,[type,spec]]of names.entries())api.add({id:type,type,points:[{time:1700000735.25+i*120,price:1900+i*.5},{time:1700001895.75+i*120,price:1904+i*.3}].slice(0,spec.points),...(type==='text'?{text:'Authored Ω'}:{})});});
+button('#actions','Clear',()=>api.load([]));button('#actions','Save',()=>localStorage.setItem('stitch-snapshot:'+candidate,JSON.stringify(api.all())));
+button('#actions','Load',()=>{const d=localStorage.getItem('stitch-snapshot:'+candidate);if(d)api.load(JSON.parse(d));});
+button('#actions','Undo',()=>api.undo());button('#actions','Redo',()=>api.redo());button('#actions','Delete selected',()=>api.remove(api.selected()));
+button('#actions','Select first',()=>api.select(api.all()[0]?.id));button('#actions','Lock selected',()=>api.update(api.selected(),{locked:true}));button('#actions','Unlock selected',()=>api.update(api.selected(),{locked:false}));button('#actions','Hide selected',()=>api.update(api.selected(),{visible:false}));
+button('#actions','Edit Text',()=>{const d=api.all().find(d=>(d.type??d.tool)==='text');if(d)api.text(d.id,'Edited Ω');});
+button('#actions','Zoom',()=>chart.timeScale().setVisibleLogicalRange({from:5,to:65}));button('#actions','Pan',()=>chart.timeScale().setVisibleLogicalRange({from:15,to:75}));
+button('#actions','Resize',()=>el.style.height=el.clientHeight===360?'300px':'360px');
+button('#actions','Timeframe',()=>{tf=tf==='1m'?'5m':'1m';setBars(tf==='1m'?full:full.filter((_,i)=>i%5===0));chart.timeScale().fitContent();});
+button('#actions','Replay prefix',()=>{setBars(full.slice(0,40));chart.timeScale().fitContent();});
+addEventListener('error',e=>{errors.push(e.message);report();});addEventListener('unhandledrejection',e=>{errors.push(String(e.reason));report();});
+setBars(full);chart.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(report);new ResizeObserver(report).observe(el);report();
+</script></html>

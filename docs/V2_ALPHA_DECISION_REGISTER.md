@@ -11,7 +11,7 @@
 | ADR-ARCH-001 | FROZEN | One authority chain: evidence → dataset → timeline → virtual clock → execution → canonical events → account/journal/research. |
 | ADR-CHART-001 | FROZEN | Lightweight Charts remains default renderer unless STITCH's predefined donor gate proves replacement net-positive. |
 | ADR-OSS-001 | FROZEN | Commodity OSS enters through adapters; donor libraries do not own BTL financial/research truth. |
-| ADR-DRAW-001 | FROZEN | Drawing choice uses OpenAlgo → OpenCharts → KEEP decision tree, based on predefined gates; no subjective mid-build switch. |
+| ADR-DRAW-001 | FROZEN | Evaluate current BTL, pinned OpenAlgo and pinned OpenCharts equally; apply DT-DRAW MUST gates and lexicographic ranking. No subjective mid-build switch or fourth candidate. |
 | ADR-IND-001 | FROZEN | Indicator replacement may be mixed calculator/host; causality and semantic parity outrank catalog size. |
 | ADR-ANALYTICS-001 | FROZEN | Mature analytics primitives may replace calculators; BTL owns canonical grouping, provenance, Passport and orchestration. |
 | ADR-DATA-001 | FROZEN | Future precision settlement is tick-native; OHLC alone never settles v2 precision trades. |
