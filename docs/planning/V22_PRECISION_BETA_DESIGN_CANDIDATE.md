@@ -303,3 +303,43 @@ One-pass streaming scan + partition index summary + bounded anomaly queue is the
 | Q12 | Export/reopen after profile version change | Original pinned profile and receipt preserved |
 
 **Decision status:** user-approved behavioral intent, implementation pending explicit V2.2 authorization and reconciliation with existing frozen contract owners. Profile must be reviewed for fidelity and financial correctness before release.
+
+
+---
+
+## Review 7 — broker-rule completeness, 99% measurable gates, residual anomaly reporting
+
+**Status:** design/research candidate only. References inspected 2026-10-09: QuantConnect LEAN latest-price fill model (https://www.quantconnect.com/docs/v2/writing-algorithms/reality-modeling/trade-fills/supported-models/latest-price-model), LEAN equity fill model (https://www.quantconnect.com/docs/v2/writing-algorithms/reality-modeling/trade-fills/supported-models/equity-model), Backtrader order execution (https://www.backtrader.com/docu/order-creation-execution/order-creation-execution/) and order types (https://www.backtrader.com/docu/order/). These are **reference behaviors**, not proof of a particular broker's execution. Compare licensed broker terms separately before naming a broker profile.
+
+### Required rule inventory (single engine, versioned profile)
+- **Order admission:** order type, side, minimum tick/lot, decimal precision, stop distance, risk limits, market/session availability, quote freshness, pending-order expiration, idempotent placement, explicit accepted/active timestamps.
+- **Entry execution:** market BUY at eligible Ask / SELL at Bid; pending buy/sell limit vs stop vs stop-limit require separate trigger and fill state machines. Do not silently treat stop-limit as stop-market. Reject unsupported types rather than simulate incorrectly.
+- **Exit execution:** BUY close Bid / SELL close Ask, active TP/SL/OCO linkage, next-available-quote profile, favorable/adverse gap behavior, no intermediate invented quote, no double spread or slippage.
+- **Event ordering:** nanosecond precision if provided; same-timestamp atomic group, deterministic only where ordering evidence exists; no retroactive fill; TP-vs-SL ambiguity; market closed/reopen and weekend/holiday gaps; feed outage vs real market jump.
+- **Execution capacity:** quote != tradeable size; explicitly assume full fill or add versioned partial-fill/liquidity model with independent evidence. Partial close, partial TP/SL, pending remaining quantity, cancellation races, stop activation and OCO cancellation all require accounting invariants.
+- **Account ledger:** realized/unrealized P&L, spread, commission, swap/financing, contract size, pip/tick value, currency conversion, rounding, margin, margin calls, liquidation order, negative equity, deposits/withdrawals; broker-dependent parameters cannot be hardcoded as universal.
+- **Replay/durability:** same fill across chart timeframes, seek/reset/resume, cancellation, crash/retry, duplicate commands, PostgreSQL recovery, provenance, export/reopen, versioned model migrations; every economic effect exactly once.
+- **Data rights and quality:** source and license restrictions, missing quote/side, crossed market, stale timestamps, anomalous spikes, discontinuities, feed/provider disagreements, structural scan and partition hashes; structural validity != authenticity.
+- **Protocol integrity:** locked planned RR/risk, pending-only where specified, no manual close, realized RR separate from planned RR; Free Style retains its own explicit contract.
+
+### Explicit conflict-resolution and unsupported cases
+A resting TP **limit order** must never be misrepresented as a guaranteed market execution at any price. Product owner's chosen `NEXT_AVAILABLE_QUOTE_V1` is a **clearly disclosed hypothetical quote-trigger fill model**, not universal broker semantics. LEAN and Backtrader demonstrate distinct limit, stop, and stop-limit behaviors, stale quote restrictions and gap rules. Build profile adapters with immutable semantics and common ledger, not multiple competing engines. Any rule that cannot be faithfully supported must be `UNSUPPORTED_PROFILE_RULE` or `UNRESOLVED` with clear scope.
+
+### Operational 99% target — not “99% real broker fidelity”
+- **100%** of mandatory invariants, known critical event-order cases, rights gates, and P0/P1 adversarial tests must pass. No unresolved critical bug accepted for release.
+- **>=99%** of pre-registered *eligible, in-scope* scenario fixtures must have a correctly classified result (`DETERMINATE`, `CONDITIONAL`, `UNRESOLVED` or explicit `UNSUPPORTED`) verified against an independently authored oracle. Classification correctness is the metric, **not** proportion of determinate fills and **not** an assertion of market truth.
+- Record numerator, denominator, excluded cases, coverage by order type and data regime, independent oracle version, and failure severity. A high aggregate score cannot hide a 0%-tested rare critical path. Target is a **release gate**, not a current achieved result.
+- No percentage can be claimed until fixtures, tests, representative datasets and full benchmark have actually run. Use zero-tolerance for look-ahead, invented prices, corrupted financial ledger, duplicate settlement, source/license violations.
+
+### User anomaly reporting (after mandatory internal gates)
+- UI action **Report replay anomaly** on trade/event, with user-friendly categories: wrong entry/exit price, unexpected TP/SL, spread/slippage, gap, partial close, missing quote, account P&L/margin, replay inconsistency, other.
+- Automatically attach a minimal **redacted reproducibility bundle**: experiment/passport ID, dataset/hash and license-safe provenance, parser/rules/index/engine/profile versions, event/position/order IDs, tick ordinal and bounded time window, model trigger and fill trace, expected vs observed, deterministic replay seed, relevant validation receipt and screenshot reference when user consents.
+- Never automatically upload proprietary raw tick data, credentials, PII, or restricted market excerpts. Support report-only hashes and user consent; enforce access control, retention, deduplication and abuse throttling.
+- Triage: P0 incorrect authoritative financial outcome, look-ahead, unauthorized data leak => immediately block/restrict affected scope and investigate; P1 repeatable severe misfill/ledger issue => gated remediation; P2 UX/diagnostic discrepancies => queue and report; P3 feature requests => backlog. Notify reporter of received/in-review/fixed/needs-evidence states without promising SLA not staffed.
+- A report must not retroactively rewrite an immutable experiment. Fixes create versioned evidence/receipts and explicit re-run; preserve original audit lineage.
+- Residual anomalies may be user-reported, but **known uncertainty is proactively labeled**; do not silently convert unknowns to profits and wait for users to complain.
+
+### Expanded acceptance matrix
+R01 market BUY/SELL correct quote side; R02 limit price constraint; R03 stop-market adverse gap; R04 stop-limit trigger without executable limit remains pending; R05 pending expiry at session boundary; R06 stale quote blocked; R07 OCO atomicity and same-time race; R08 partial fill then partial cancel; R09 contract-size and commission P&L; R10 swap/currency conversion; R11 margin liquidation with shared positions; R12 weekend gap; R13 duplicate command and crash recovery; R14 chart timeframe invariant; R15 invalid crossed Bid/Ask quarantine; R16 license-safe anomaly bundle; R17 profile version change invalidates comparison not history; R18 adversarial fixture with both outcomes possible remains unresolved; R19 missing volume cannot be marketed as broker-confirmed fill; R20 no critical failure hidden by aggregate 99% fixture score.
+
+**Release note:** all R01–R20 are proposed fixtures, not executed tests. Main/V2.1 authority remains untouched.
