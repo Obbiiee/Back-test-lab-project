@@ -11,11 +11,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "S-1",
-  "CURRENT_IMPLEMENTATION_PHASE": "S-2",
-  "NEXT_PHASE": "S-2",
+  "LAST_COMPLETED_PHASE": "S-2",
+  "CURRENT_IMPLEMENTATION_PHASE": "S-3",
+  "NEXT_PHASE": "S-3",
   "NEXT_PHASE_STATUS": "AUTHORIZED_BOUNDED_STITCH_JOURNEY",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "S-2",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "S-3",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "S-1",
     "S-2",
@@ -28,7 +28,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "EXECUTION_MODE": "BOUNDED_STITCH_S1_TO_S7_BEFORE_V22",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "S-2 evidence-backed KEEP/N/A per completed S-1 rubric, after S-1 Git equality gate. Then S-3 to S-7 per frozen ledger, with separate validated checkpoints; stop before V2.2.",
+  "TARGET_CHECKPOINT": "S-3 equal indicator calculator/host comparison, after S-2 Git equality gate. Then S-4 to S-7 per frozen ledger, with separate validated checkpoints; stop before V2.2.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75"
