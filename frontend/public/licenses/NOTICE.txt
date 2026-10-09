@@ -1,5 +1,9 @@
 TradingView Lightweight Charts™
 Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/
 
+Backtest Lab S-5 adapts OpenCharts quote-selector and order-review presentation.
+Copyright (c) 2024 OpenCharts Contributors; MIT, see opencharts-LICENSE.txt.
+Source revision 785d1f18cc1ca67b0246031b2b9a08cb5cb60264; modified by BTL.
+
 Source: https://raw.githubusercontent.com/tradingview/lightweight-charts/v5.2.1/NOTICE
 React, React DOM and Scheduler: Meta Platforms, Inc. and affiliates (MIT); included license files retain their terms.

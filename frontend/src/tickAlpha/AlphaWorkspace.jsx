@@ -5,7 +5,7 @@ import {productionRegistry} from '../indicators/productionRegistry.js';
 import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {displayBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
 
-export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect}){
+export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing}){
   const [mode,setMode]=useState('none'),[instances,setInstances]=useState([]);
   const [preferences,setPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const [speed,setSpeed]=useState(4),[playToken,setPlayToken]=useState(null);
@@ -57,7 +57,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
           drawingWorkspace={`tick-alpha:${view.metadata.id}`} drawingStorageKey={`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
           tickEvidence={view.analysis} researchOnly
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
-          command={chartCommand} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect}/>
+          command={chartCommand} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing}/>
       </div>
     </div>
     <div className="alpha-replay-controls" aria-label="Tick replay controls">

@@ -39,6 +39,9 @@ const executionReferences=new Set([
   'backend/tests/fixtures/tick_execution_v1.json',
 ]);
 function allowedBundleSource(file){
+  // Required attribution for the only shipped donor presentation adaptation;
+  // no general public/ asset or dataset admission.
+  if(['frontend/public/licenses/opencharts-LICENSE.txt','frontend/public/licenses/NOTICE.txt'].includes(file))return true;
   return file.startsWith('backend/')?executionReferences.has(file):! /^(legacy\/|data\/|frontend\/(legacy|public|node_modules|dist)\/)/.test(file);
 }
 for(const category of ['context','implementation','tests','supporting'])for(const file of config[category]){
@@ -46,7 +49,8 @@ for(const category of ['context','implementation','tests','supporting'])for(cons
   assert.ok(allowedBundleSource(file),'Bundle must remain task-specific: '+file);
 }
 for(const file of executionReferences)assert.ok([...config.implementation,...config.tests].includes(file),'Execution seam missing from reviewed bundle: '+file);
-for(const file of ['backend/cloud/app.py','backend/ticks/exness_v2.py','backend/.env','data/raw.csv','frontend/public/market/data.json','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
+for(const file of ['backend/cloud/app.py','backend/ticks/exness_v2.py','backend/.env','data/raw.csv','frontend/public/market/data.json','frontend/public/licenses/unreviewed.js','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
+for(const file of ['frontend/public/licenses/opencharts-LICENSE.txt','frontend/public/licenses/NOTICE.txt'])assert.ok(config.supporting.includes(file),'Adapted presentation must retain attribution in its bundle');
 assert.ok(config.context.includes('docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md'));
 const pkg=JSON.parse(read('frontend/package.json')),lock=JSON.parse(read('frontend/package-lock.json'));
 for(const section of ['dependencies','devDependencies'])assert.deepEqual(pkg[section],lock.packages[''][section],'Lock manifest drift');

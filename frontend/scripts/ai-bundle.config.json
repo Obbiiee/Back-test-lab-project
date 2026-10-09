@@ -29,6 +29,8 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "frontend/src/tickAlpha/AlphaOrderPresentation.jsx",
+    "frontend/src/tickAlpha/planningIntent.js",
     "frontend/src/tickAlpha/AlphaTerminal.jsx",
     "frontend/src/tickAlpha/annotations.js",
     "backend/execution/analysis.py",
@@ -139,6 +141,7 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "frontend/tests/stitch-trading.test.mjs",
     "frontend/tests/stitch-drawing.test.mjs",
     "frontend/tests/stitch-indicators.test.mjs",
     "frontend/tests/stitch-indicators-server.mjs",
@@ -190,6 +193,8 @@
     "frontend/tests/phase16-built-server.mjs"
   ],
   "supporting": [
+    "frontend/public/licenses/opencharts-LICENSE.txt",
+    "frontend/public/licenses/NOTICE.txt",
     "frontend/package.json",
     "OPEN_SOURCE_NOTICES.md",
     "frontend/scripts/regression.mjs",
