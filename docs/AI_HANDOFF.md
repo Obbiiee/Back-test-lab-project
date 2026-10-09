@@ -45,3 +45,14 @@ Do not use this section as a substitute for updating architectural authority whe
 ## NEXT ACTION
 
 Establish the handoff workflow first. The next implementation checkpoint is expected to resume the preserved 42.18 V2 draft against frozen 42.17 + 42.19, but it requires explicit authorization before execution.
+
+
+## CHATGPT → CODEX — V2.1/V2.2 planning handoff (2026-10-09)
+
+The product owner requested that the devil's-advocate-reviewed **tick-first** V2.1 Functional Alpha / V2.2 Precision Beta plan be recorded in the **existing** repository authorities. Read `docs/ROADMAP.md` (“V2.1 Functional Alpha → V2.2 Precision Beta”) and `docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` Section 43.
+
+**Planning checkpoint only:** No V2.1 runtime implementation, browser execution, full Exness benchmark, or release acceptance has occurred by recording this plan. Do not treat this mailbox as authorization. The current-phase authority remains the operational gate until explicitly reconciled.
+
+**First implementation readiness task, requiring separately recorded authorization:** verify current local/main/origin equality and working tree, preserved 42.18 draft provenance, existing tick timeline and actual missing execution/settlement boundaries. Determine whether the existing fixture provider supports the first real tick-driven trade vertical slice without full disk V2 storage. Preserve frozen 42.17/42.19 and Phase 42 history. Report blockers; do not create a second engine, substitute candle-based fills, or claim synthetic UX status as authoritative.
+
+**Checkpoint policy:** each authorized phase must satisfy focused and required regression tests, browser verification for product changes, diff review, context update, normal commit/push, remote equality and clean tree. A multi-phase journey requires explicit bounded authorization in `AI_CONTEXT/04_CURRENT_PHASE.md`; do not infer it from this plan.
