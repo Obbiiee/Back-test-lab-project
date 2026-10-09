@@ -211,3 +211,55 @@ Track requirement coverage `verified_requirements / total_applicable_requirement
 | Real-feed rights and full Exness benchmark | UNKNOWN / INCOMPLETE | Pending | Block relevant release claims |
 
 **Review-4 verdict:** substantially hardened **planning candidate**, not “99% verified”, not production-ready, not V2.2 implementation authority. The only honest route to a numerical quality claim is to collect independent empirical evidence against pre-registered requirements. No unproven financial correctness is delegated to users.
+
+
+---
+
+## Design hardening amendment — Review 5: scalable evidence verification
+
+**Goal:** avoid expensive manual per-tick review while retaining soundness. A structurally valid quote is **not** automatically a true market quote, an ordered execution path, or a broker fill. Never convert an unchecked region into a verified assertion.
+
+### Tiered verification pipeline
+
+1. **Tier A — mandatory 100% automated streaming scan, O(N):** stream source once using bounded buffers; validate schema/types/decimal representation, nonnegative prices, Bid<=Ask policy with explicit exception handling, timestamps/precision/timezone, source identity, malformed rows, monotonicity *where source ordering contract permits*, duplicate/tie detection, range and gap summaries, count reconciliation, deterministic content hash, and stable provenance. Emit counters and anomaly intervals without retaining all rows in RAM. Preserve raw bytes where licensed. This scan is linear work, not human line-by-line review; speed depends on actual hardware and I/O.
+2. **Tier B — 100% cheap partition checks:** compare chunk count/min/max time, first/last quote, source ordinal bounds, hashes, manifest/index coverage and deterministic re-read of all chunk boundaries; enforce no lost/duplicated ticks and atomic publication. Chunk size and hierarchy follow frozen 42.17/42.19; do not silently substitute a new layout.
+3. **Tier C — stratified independent sampling:** reproducible seed, sample by month/session, spread regime, volatility, time of day, provider and anomaly class. Compare independently sourced feeds only where legally and technically available; record mismatches and source incompatibility. Statistical confidence describes the **sampled failure rate under its assumptions**, not proof of universal truth or broker fill. Define sample plan and escalation thresholds before seeing outcomes.
+4. **Tier D — risk-triggered deep checks:** inspect 100% of detected anomalies, tied timestamps near order activation/SL/TP, suspicious spreads, gap crossings, price spikes, DST/timezone boundaries, ingestion discontinuities, and affected positions. Use bounded windows and targeted independent oracle, not full expensive re-simulation of every tick.
+5. **Tier E — trade-time proof on demand:** evaluate each trade's causal revealed evidence; when all admissible orderings yield identical financial outcome, label `DETERMINATE` under the pinned model; if scenario assumptions determine a result, label `CONDITIONAL` and isolate its ledger; otherwise `UNRESOLVED`, freeze affected authoritative account state and downstream dependencies. Resource-limited proof returns `UNRESOLVED_RESOURCE_LIMIT`. Never simply skip unresolved trades from official win-rate denominator.
+6. **Tier F — continuous incremental verification:** cache immutable verification receipts keyed by source/dataset hash, parser/normalizer/schema version, rule-set version, index version, oracle version and execution profile where applicable. Revalidate only affected partitions and dependent experiment lineage after a change; any source/version mismatch invalidates old verification claims. Schedule low-priority offline deep checks; not required to block interactive chart display, but no unverified region is promoted to financial certainty.
+
+### Required classification of dataset regions
+
+- `STRUCTURALLY_VALID`: all mandatory machine checks passed; **not** independently authenticated.
+- `SUSPECT`: rule anomaly or disagreement; retain original evidence, mark bounded affected interval.
+- `UNVERIFIED_SOURCE`: structural checks passed but authenticity/market representativeness not independently established; do not describe as source-verified.
+- `UNRESOLVED_ORDERING`: sequence/availability uncertainty could alter the financial outcome.
+- `QUARANTINED`: corrupt, incomplete, unsafe or rights-ineligible artifact; exclude from authoritative financial execution until policy permits.
+- `VERIFIED_WITHIN_SCOPE`: explicitly name what was verified (structural, index, comparison, or financial model), exact scope, source and evidence; no blanket accuracy badge.
+
+**Orthogonality:** dataset-quality labels are not the same as trade-outcome labels (`DETERMINATE`, `CONDITIONAL`, `UNRESOLVED`). A structurally valid but independently unverified quote can support a deterministic *model calculation* while still not proving actual market truth. Do not auto-mark every trade unresolved solely because L1 quotes lack broker fill proof; display the simulation/model caveat instead.
+
+### Statistical sampling guardrails
+
+For random independent sampling with zero observed failures, a rough one-sided 95% upper bound on the failure probability is `~3/n` (rule of three) **only under appropriate independent representative sampling assumptions**. Example: n=3,000 with zero observed failures suggests an upper bound near 0.1% for that sampled population, not that the dataset is “99.9% correct” or free of clustered corruption. Time-series defects cluster: stratify by time and regime, inspect all detected high-risk windows, and treat dependence appropriately. Any material discrepancy triggers escalation to adjacent windows, other months, affected sessions and independent source comparison; no silent acceptance.
+
+### Performance and safety
+
+One-pass streaming scan + partition index summary + bounded anomaly queue is the baseline. Prefer batch/vectorized decimal-safe parsing and bounded-memory I/O, but never sacrifice exact Bid/Ask precision or source ordering semantics for speed. Verify deterministic parallel partition processing and boundary continuity; benchmark serial vs parallel on actual representative full dataset before claiming speedups. No hard-coded throughput promise before measurements. Keep chart rendering and quote ingestion distinct from costly per-trade ambiguity proof.
+
+### Verification receipt schema
+
+`dataset_id, raw_hash, parser_version, normalizer_version, schema_version, validation_rules_hash, index_version, partition_id, record_count, min_max_time, boundary_hashes, anomaly_counts, coverage_intervals, sampling_seed, sampling_method, sampling_size, sampling_findings, independent_source_id_if_any, trade_impact_summary, verifier_version, reviewer, measured_runtime, peak_rss, status, artifact_hashes`.
+
+### Additional negative acceptance tests
+
+- **N25:** corruption in one middle partition detected despite clean first/last samples.
+- **N26:** anomaly concentrated around rare trading entry windows; global random sample misses it but trade-time checks flag it.
+- **N27:** same dataset reprocessed with different parser/rules; old receipts invalidated and dependent results versioned.
+- **N28:** parallel validation reorders same-time events; byte-identical canonical event identity/order trust preserved.
+- **N29:** structurally valid but fabricated source prices; system does not claim independent authenticity.
+- **N30:** financial result requires unbounded tie permutations; result remains unresolved with bounded CPU/RAM.
+- **N31:** a missing or duplicate tick across partition boundary is detected by full reconciliation.
+- **N32:** source license disallows retaining raw snippets; issue report remains privacy/rights compliant.
+
+**Review-5 verdict:** architecture is efficient in asymptotic design and conservative in evidentiary claims; actual throughput, false-negative rate and cost remain unverified until benchmark and sampling experiments. All P0/P1 safety gates still apply before beta; the user-report system is only a residual-risk channel.
