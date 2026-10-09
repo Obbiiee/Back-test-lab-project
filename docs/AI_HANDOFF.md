@@ -97,3 +97,40 @@ Targeted light research UX/terminal/focus/reconnect consolidation implemented; a
 ## CODEX → CHATGPT — V21-6 final Functional Alpha acceptance
 
 Production-browser new Method/Session journey passed chart/drawing/indicator/replay and reviewed Long SL: entry Ask 2006, exit Bid 2005, net -100, balance 9900, exact event-head/account/drawing recovery after API restart. Protocol ON checklist refusal and Short Bid 2005.9 → Ask 2004.9 TP yield one completed win/net 200/balance 10200; manual exits stay locked. Full backend 233 PASS/zero skips, frontend regression/lint/build/distribution and Node/preservation gates PASS. Existing Section 43 owns final evidence; README links the local run guide. Final bundle/diff/Git equality/clean 0/0 remain closure gates. Both drafts remain byte-identical and private benchmark progress stays incomplete. The existing authorized journey ends at Functional Alpha; STOP before V2.2. Future work must first explicitly scope existing ROADMAP precision/licensing/scale/reliability acceptance and retain frozen authority.
+
+## CODEX → CHATGPT — Pemahaman langkah berikutnya dan ketidakjelasan setelah audit
+
+Permintaan manusia pada checkpoint ini hanya menulis pemahaman dan hal yang belum jelas ke handoff. Ini bukan otorisasi implementasi STITCH atau V2.2 dan bukan authority baru. Rujukan tetap [ROADMAP](ROADMAP.md), [current-phase](../AI_CONTEXT/04_CURRENT_PHASE.md), [rubric](V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md), [decision register](V2_ALPHA_DECISION_REGISTER.md), dan [ledger S-1–S-7](V2_ALPHA_FROZEN_EXECUTION_LEDGER.md).
+
+### Kondisi yang saya pahami dari repository aktual
+
+- V21-0–V21-6 selesai sebagai Functional Alpha lokal dengan fixture sintetis. Jangan mengulang atau mengganti label penerimaannya menjadi seluruh produk profesional selesai.
+- Default v1/FigmaWorkspace masih memakai alur modelled lama; route tick alpha memakai satu tick engine dan PostgreSQL dengan Method/Session, replay, order, history dan Analysis. Kedua UI belum menjadi satu pengalaman produk yang konsisten.
+- Chart memakai Lightweight Charts 5.2.1; drawing memakai API primitives resmi dengan model/manager/interaksi milik BTL. Delapan tipe drawing minimum dan Long/Short research geometry tersedia; ini bukan penerimaan seluruh katalog profesional. `lightweight-charts-drawing` tidak terpasang dan tidak ada donor drawing yang sudah diterima.
+- Worktree drawing terpisah berisi tiga file persiapan spike. Kode persiapannya secara eksplisit belum membuktikan parity pointer/browser Lightweight Charts v5 atau pemilihan donor; jangan menandai S-1 selesai dari keberadaan file tersebut.
+- Draft 42.18 dan 42.20 tetap terpisah dan byte-identik pada audit. Full Exness benchmark belum selesai; 700k dan progres privat berikutnya tetap parsial, bukan PASS.
+- Audit menemukan tiga commit dokumentasi setelah checkpoint V21-6. Baseline GitHub 64f79812ebd3fcee849d63447d28489a74a62220 hanya mengubah ROADMAP dan DOCUMENT_MAP; diadopsi fast-forward-only dari working tree bersih untuk update mailbox ini. Tidak ada perubahan runtime/dependency/data yang ikut masuk.
+
+### Urutan kerja berikutnya yang saya pahami
+
+1. Rekonsiliasi status/otorisasi bounded STITCH di owner existing, setelah baseline dan acceptance jelas. Prioritas roadmap terbaru adalah menyelesaikan STITCH sebelum implementasi V2.2; mailbox ini tidak mengaktifkan urutan tersebut.
+2. **S-1:** lanjutkan perbandingan current BTL, OpenAlgo dan OpenCharts pada exact pinned revision, dengan rubric setara. Uji lisensi/provenance, delapan minimum tools, TIME+PRICE, interaksi, history/persistence, replay/timeframe/zoom/pan/resize, no-look-ahead, browser/build dan rollback. Ukur ranking yang diwajibkan; jangan memilih hanya dari jumlah fitur atau README.
+3. **S-2:** integrasikan adapter/migrasi hanya bila donor terpilih; jika KEEP yang lolos, catat alasan/evidence dan applicability S-2 sesuai ledger. Preserve drawing tersimpan dan implementasi lama sampai parity/rollback terbukti.
+4. **S-3 → S-4:** bandingkan calculator dan host indikator secara terpisah; integrasikan hanya bagian yang lulus angka/warmup/causality/pane/replay dan UX. Catalog besar bukan bukti correctness.
+5. **S-5:** konsolidasikan visual trading/Long-Short/order/bracket melalui boundary UI → command BTL → event/account BTL → projection. Donor tidak boleh menetapkan fill atau PnL.
+6. **S-6:** evaluasi analytics primitives melalui adapter dan authored golden parity; grouping, provenance, Protocol dan orchestration tetap milik BTL.
+7. **S-7:** konsolidasi owner, persistence/rollback, license/NOTICE, regression dan penerimaan browser/UX terintegrasi. Hapus hanya kode yang terbukti obsolete dan diotorisasi; jangan bulk-delete legacy atau knowledge. Setiap checkpoint memiliki validation, diff review, context update, commit/push dan equality/clean 0/0 sendiri.
+8. V2.2 baru dipertimbangkan setelah penerimaan STITCH dengan otorisasi terpisah. Jangan menyelipkan storage historis, benchmark Exness, broker fidelity, SaaS/login atau public launch ke scope STITCH.
+
+### Yang belum jelas atau perlu direkonsiliasi sebelum implementasi
+
+- **Status operasional:** current-phase masih menunjuk V2.2 dan tidak memiliki fase implementasi aktif, sedangkan ROADMAP memprioritaskan STITCH. Prioritas produk jelas; scope dan grant implementasi S-1 saja atau seluruh S-1–S-7 belum dicatat. Permintaan menulis handoff ini tidak dianggap grant tersebut.
+- **Cakupan profesional untuk closure:** belum ada acceptance bounded yang memastikan mana dari katalog 25 tools/Object Tree/magnet/style/grouping/expanded indicators menjadi MUST untuk STITCH ini dan mana DEFER. Delapan minimum Alpha tidak otomatis memenuhi semuanya; jangan mengarang bahwa seluruh katalog wajib atau sudah selesai.
+- **Target UI terintegrasi:** arah produk adalah UI profesional yang konsisten dengan desain existing. Perlu memetakan screen/control/popup/terminal dan journey yang konkret sebagai acceptance STITCH, termasuk batas integrasi tick ke UI utama. Jangan otomatis melakukan redesign besar atau memasukkan dashboard/login/multi-chart hanya karena ada dalam blueprint.
+- **Instruksi pemilihan donor:** ADR-DRAW-001 masih menyebut OpenAlgo → OpenCharts → KEEP, sementara DT-DRAW, rubric dan roadmap terbaru mengharuskan perbandingan setara. Algoritma terbaru sudah eksplisit; baris ringkas yang tertinggal perlu dinormalisasi di owner existing ketika diotorisasi, bukan membuat decision register baru.
+- **Library tambahan:** permintaan awal menyebut `lightweight-charts-drawing`, tetapi frozen DT-DRAW membatasi tiga kandidat dan melarang mencari engine keempat dalam journey tersebut. Saya tidak akan menambah kandidat diam-diam; jika library itu harus masuk perbandingan, perlukan amendment bounded terhadap freeze existing.
+- **Hasil donor:** belum diketahui kandidat yang lulus dan ranking akhirnya. Itu pertanyaan engineering yang diselesaikan S-1, bukan alasan meminta manusia memilih library berdasarkan dugaan.
+
+### Batas checkpoint mailbox ini
+
+Hanya handoff yang diperbarui; tidak mengubah operational grant, roadmap, frozen contract, runtime, dependency, dataset atau protected draft. Browser/build/full runtime regression exempt karena perubahan mailbox dokumentasi saja; repository/authority dan bundle checks, complete diff review serta normal Git verification tetap dijalankan. Setelah update handoff tersimpan/terverifikasi, STOP sebelum implementasi.
