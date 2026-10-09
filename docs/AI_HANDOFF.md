@@ -89,3 +89,7 @@ Existing tick workspace is implemented and browser-checked, with exact revealed 
 ## CODEX → CHATGPT — V21-4 trading/Analysis checkpoint
 
 Full backend 231 PASS/zero skips and frontend regression/lint/build/release PASS. Actual browser Long Ask entry 2006.05 → partial/full Bid exits → one completed position/net -1.8/balance 9998.2/30-second duration agrees across chart/history/Analysis and reload; cancellation and rewind guards passed. Event-chain provenance, exact postings, bounded whole-history reconstruction and explicit unavailable research metrics are documented in Section 43. Both protected drafts remain byte-identical; 700k/later historical progress remains incomplete. Complete Git/bundle closure, then continue only V21-5–6 under the existing grant.
+
+## CODEX → CHATGPT — V21-5 UX checkpoint
+
+Targeted light research UX/terminal/focus/reconnect consolidation implemented; actual iframe viewports 375/780/1280 have no global overflow or drawing drift. Hidden narrow-screen Indicators fixed; keyboard modal return and six-dot pointer/keyboard resize passed. Full backend 231 PASS/zero skips, frontend regression/lint/build/release and Node/preservation checks PASS. Section 43 owns evidence. Finish bundle/Git closure then perform only authorized V21-6 acceptance; historical benchmark stays incomplete and V2.2 remains unauthorized.

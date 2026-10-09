@@ -40,17 +40,17 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   return <section className="alpha-chart-workspace" aria-label="Tick replay workspace">
     <div className="alpha-chart-header">
       <label>Timeframe<select aria-label="Chart timeframe" disabled={busy||playing} value={timeframe} onChange={e=>onTimeframe(e.target.value)}>{TIMEFRAMES.map(tf=><option key={tf}>{tf}</option>)}</select></label>
-      <IndicatorControls instances={instances} onChange={changeInstances}/>
+      <IndicatorControls instances={instances} onChange={changeInstances} onOpen={()=>setPlayToken(null)}/>
       <button onClick={()=>setChartCommand({action:'fit',id:crypto.randomUUID()})}>Fit chart</button>
       <label><input type="checkbox" checked={preferences.showGrid} onChange={e=>setPreferences(p=>({...p,showGrid:e.target.checked}))}/>Grid</label>
       <span>Mid-price display · volume unavailable</span>
     </div>
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
-        <button aria-pressed={mode==='none'} onClick={()=>setMode('none')}>Cursor / Select</button>
-        {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} aria-pressed={mode===type} onClick={()=>setMode(type)}>{spec.name}</button>)}
-        <button aria-pressed={mode==='long-position'} onClick={()=>setMode('long-position')}>Long Position</button>
-        <button aria-pressed={mode==='short-position'} onClick={()=>setMode('short-position')}>Short Position</button>
+        <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}}>Cursor / Select</button>
+        {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} aria-pressed={mode===type} onClick={()=>{setPlayToken(null);setMode(type);}}>{spec.name}</button>)}
+        <button aria-pressed={mode==='long-position'} onClick={()=>{setPlayToken(null);setMode('long-position');}}>Long Position</button>
+        <button aria-pressed={mode==='short-position'} onClick={()=>{setPlayToken(null);setMode('short-position');}}>Short Position</button>
       </nav>
       <div className="alpha-chart-host">
         <CandleChart candles={bars} transition={{kind:'forward'}} sessionId={`tick-alpha-${view.metadata.id}-${timeframe}`} viewportKey={`${view.metadata.id}:${timeframe}`}

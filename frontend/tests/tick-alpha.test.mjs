@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath} from '../src/tickAlpha/client.js';
+import {api,command,sessionPath,loadResearchContext,noticeText} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 
@@ -62,3 +62,19 @@ assert.equal(ratioLabel({numerator:'3',denominator:'7'},{percent:true}),'42.86%'
 assert.equal(ratioLabel({numerator:'-45',denominator:'7'}),'-6.43');
 assert.equal(ratioLabel(null),'Unavailable');assert.throws(()=>ratioLabel({numerator:'1',denominator:'0'}));
 console.log('PASS actual fill identity/price chart annotation, unavailable-history clearing and exact rational display rounding.');
+
+// An obsolete bootstrap must not spend a workspace worker slot or load a Session.
+const bootstrapCalls=[];
+globalThis.fetch=async(url,options)=>{bootstrapCalls.push({url,options});return {ok:true,json:async()=>({schemaVersion:1,methods:[],sessions:[]})};};
+assert.equal(await loadResearchContext('session:obsolete',{active:()=>false}),null);
+assert.equal(bootstrapCalls.length,1);
+assert.equal(bootstrapCalls[0].options.method,'GET');
+bootstrapCalls.length=0;
+const reopened=await loadResearchContext('session:saved',{timeframe:'5m'});
+assert.equal(bootstrapCalls.length,2);assert.ok(bootstrapCalls[1].url.endsWith('/sessions/session%3Asaved/view'));
+assert.deepEqual(JSON.parse(bootstrapCalls[1].options.body),{timeframe:'5m'});
+assert.ok(reopened.catalog&&reopened.view);
+assert.ok(noticeText('REFUSED_REWIND_REQUIRES_FORK').includes('Create a separate Session'));
+assert.ok(noticeText('REFUSED_REWIND_REQUIRES_FORK').includes('REFUSED_REWIND_REQUIRES_FORK'));
+assert.equal(noticeText('UNKNOWN_BOUNDARY'),'UNKNOWN_BOUNDARY');
+console.log('PASS obsolete-bootstrap cancellation, saved-session reconnect and honest refusal guidance without command mutation.');

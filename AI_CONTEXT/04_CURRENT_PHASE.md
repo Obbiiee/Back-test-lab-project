@@ -11,13 +11,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V21-4",
-  "CURRENT_IMPLEMENTATION_PHASE": "V21-5",
-  "NEXT_PHASE": "V21-5",
-  "NEXT_PHASE_STATUS": "AUTHORIZED_V21_5_THROUGH_V21_6_AFTER_V21_4_GIT_CLOSURE",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-5",
+  "LAST_COMPLETED_PHASE": "V21-5",
+  "CURRENT_IMPLEMENTATION_PHASE": "V21-6",
+  "NEXT_PHASE": "V21-6",
+  "NEXT_PHASE_STATUS": "AUTHORIZED_FINAL_ALPHA_ACCEPTANCE_AFTER_V21_5_GIT_CLOSURE",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-6",
   "AUTHORIZED_PHASE_SEQUENCE": [
-    "V21-5",
     "V21-6"
   ],
   "EXECUTION_MODE": "BOUNDED_V21_FUNCTIONAL_ALPHA_AUTO_ADVANCE_AFTER_EACH_VALIDATED_PUSH",
@@ -77,3 +76,5 @@ V21-2 local Method/Session gates passed; [Section 43 acceptance](../docs/PRODUCT
 V21-3 workspace validation passed; existing Section 43 owns evidence. Complete normal push/actual GitHub equality and clean main 0/0 before implementing the already-authorized V21-4 trading/analysis checkpoint. No V2.2 or historical benchmark acceptance is implied.
 
 V21-4 committed-event trading/Analysis gates passed; existing Section 43 owns evidence and honest unavailable metrics. Normal checkpoint push/equality and clean 0/0 precede the already-authorized V21-5 UX consolidation. Final journey acceptance and historical precision are not yet claimed.
+
+V21-5 UX consolidation gates passed. Complete its normal push/equality and clean 0/0 before final V21-6 journey/release acceptance. The existing bounded grant stops before V2.2; no historical or production precision claim.

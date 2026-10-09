@@ -20,3 +20,22 @@ export function command(view,kind,payload){
   return {schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-1',sessionId:view.metadata.id,
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
+
+// Reads only; an obsolete StrictMode mount must not start another workspace read.
+export async function loadResearchContext(selected,{active=()=>true,timeframe='1m'}={}){
+  const catalog=await api('/catalog');
+  if(!active())return null;
+  const view=selected?await api(sessionPath(selected)+'/view',{timeframe}):null;
+  return active()?{catalog,view}:null;
+}
+
+export function noticeText(message){
+  const explanations={
+    REFUSED_REWIND_REQUIRES_FORK:'This Session already has financial history. Create a separate Session to replay an earlier time.',
+    REFUSED_STALE_REVISION:'The saved Session changed. Reload it and review the action again.',
+    PROTOCOL_BLOCKED:'Protocol rules blocked this order. Check the checklist and locked entry/exit rules.',
+    LOCAL_BUSY:'The local service is busy. Wait for the current request, then retry.',
+    REFUSED_ANALYSIS_LIMIT:'Analysis exceeded its bounded event budget. No partial result is shown.',
+  };
+  return explanations[message]?`${explanations[message]} (${message})`:message;
+}

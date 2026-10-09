@@ -1,10 +1,11 @@
 import WorkspaceModal from "../workspace/WorkspaceModal.jsx";
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { productionRegistry } from '../indicators/productionRegistry.js';
 import { instanceConfig } from '../indicators/indicatorValidation.js';
 import './IndicatorControls.css';
 
-export default function IndicatorControls({ instances, onChange }) {
+export default function IndicatorControls({ instances, onChange, onOpen }) {
+  const trigger = useRef(null);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [error, setError] = useState('');
   function add(type) {
     const config = instanceConfig(productionRegistry, { id: crypto.randomUUID(), type });
@@ -22,8 +23,8 @@ export default function IndicatorControls({ instances, onChange }) {
   }
   function close() { setOpen(false); setEditing(null); setError(''); }
   return <>
-    <button type="button" className="nav-action" aria-label="Indicators" onClick={() => setOpen(true)}>Indicators{instances.length ? ` (${instances.length})` : ''}</button>
-    {open && <WorkspaceModal label="Overlay indicators" onClose={close}>
+    <button ref={trigger} type="button" className="nav-action" aria-label="Indicators" onClick={() => { onOpen?.(); setOpen(true); }}>Indicators{instances.length ? ` (${instances.length})` : ''}</button>
+    {open && <WorkspaceModal label="Overlay indicators" onClose={close} returnFocusRef={trigger}>
       <section className="overlay-indicator-dialog">
         <header><strong>Indicators</strong><button type="button" aria-label="Close indicators" onClick={close}>×</button></header>
         <div className="indicator-add-tools">{productionRegistry.types().map(type => <button type="button" key={type} onClick={() => add(type)}>Add {productionRegistry.get(type).name}</button>)}</div>
