@@ -156,3 +156,53 @@ class AnalysisPostgresTests(unittest.TestCase):
         self.assertEqual(view['analysis']['orders'][0]['id'],order_id)
         self.assertEqual(view['analysis']['metrics']['tradeCount'],0)
         self.assertEqual(view['analysis']['provenance']['eventHead'],view['state']['eventHash'])
+
+
+@unittest.skipUnless(DSN,'Actual isolated PostgreSQL required; skips are not PASS')
+class AlphaAcceptanceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):migrate(DSN)
+
+    def journey(self,protocol):
+        scope=TrustedScope('alphaaccept:'+uuid.uuid4().hex,'fixture:operator')
+        app=ResearchApplication(DSN,scope);m=method('PROTOCOL' if protocol else 'FREE_STYLE',protocol)
+        app.create_method(m);session='session:'+uuid.uuid4().hex
+        app.create_session(dict(id=session,name='Protective exit acceptance',methodId=m['id'],initialBalance='10000',startPeriod='2020-01'))
+        view=app.workspace(session,{'timeframe':'1m'})
+        request=review_request(view,True)
+        request['draft'].update(side='SHORT' if protocol else 'LONG',orderType='STOP' if protocol else 'LIMIT',
+            workflow='PLANNED',entry='2005.9' if protocol else '2006',sl='2006.4' if protocol else '2005',
+            tp=None if protocol else '2008',quantity=None,riskPercent=None if protocol else '1')
+        if protocol:
+            before=canonical_bytes(view)
+            with self.assertRaises(ContractError):app.review(request)
+            self.assertEqual(canonical_bytes(app.workspace(session,{'timeframe':'1m'})),before)
+            request['draft']['observations']=[dict(conditionId='condition',outcome='PASS')]
+        reviewed=app.review(request);order=reviewed['review']['command']['commandId']
+        receipt=app.confirm(session,dict(reviewId=order,reviewHash=reviewed['reviewHash']))
+        self.assertEqual(app.confirm(session,dict(reviewId=order,reviewHash=reviewed['reviewHash'])),receipt)
+        pending=app.workspace(session,{'timeframe':'1m'})
+        self.assertEqual(pending['analysis']['orders'][0]['status'],'PENDING')
+        target=str(int(pending['state']['throughNs'])+24*STEP_NS)
+        app.apply(session,dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',sessionId=session,
+            commandId='advance:'+uuid.uuid4().hex,expectedRevision=pending['state']['revision'],kind='ADVANCE',payload={'targetNs':target}))
+        done=app.workspace(session,{'timeframe':'1m'});five=app.workspace(session,{'timeframe':'5m'})
+        self.assertEqual(done['state'],five['state']);self.assertEqual(done['analysis'],five['analysis'])
+        self.assertEqual(done['analysis']['provenance']['eventHead'],done['state']['eventHash'])
+        self.assertEqual(done['analysis']['metrics']['tradeCount'],1)
+        self.assertEqual(len(done['analysis']['annotations']),2)
+        self.assertEqual(canonical_bytes(ResearchApplication(DSN,scope).workspace(session,{'timeframe':'1m'})),canonical_bytes(done))
+        return done
+
+    def test_freestyle_reviewed_limit_long_stops_from_bid_and_reloads_exactly(self):
+        done=self.journey(False);row=done['analysis']['completed'][0]
+        self.assertEqual((row['side'],row['entryPrice'],row['exitPrice'],row['exitReason'],row['net']),('LONG','2006','2005','SL','-100'))
+        self.assertEqual(done['analysis']['account']['balance'],'9900')
+        self.assertEqual(done['analysis']['metrics']['losses'],1)
+
+    def test_protocol_pass_short_stop_target_uses_ask_and_one_completed_position(self):
+        done=self.journey(True);row=done['analysis']['completed'][0]
+        self.assertEqual((row['side'],row['entryPrice'],row['exitPrice'],row['exitReason'],row['net']),('SHORT','2005.9','2004.9','TP','200'))
+        self.assertEqual(done['analysis']['account']['balance'],'10200')
+        self.assertEqual(done['analysis']['metrics']['wins'],1)
+        self.assertIsNone(row['rMultiple'],'Do not invent explicitly unpinned R0')
