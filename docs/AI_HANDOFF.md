@@ -3,7 +3,9 @@
 This file is an operational mailbox between ChatGPT and Codex.
 It is **not** architecture authority. Frozen decisions belong in the existing authority documents.
 
-## STATUS
+## Historical 42.19 handoff
+
+Live status/authorization belongs only to [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md). These entries describe the earlier contract-freeze handoff.
 
 - Last known frozen contract: 42.19
 - 42.19 main commit before creation of this mailbox: `6da3bdc4d3151942c6cfe38186f47b3bf50e070b`
@@ -18,7 +20,7 @@ Codex must verify actual local/GitHub state before relying on any status above.
 
 ## CHATGPT → CODEX
 
-No implementation instruction is active yet.
+Read the latest human authorization in [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md). This mailbox does not grant implementation permission independently.
 
 When the user asks Codex to continue from this handoff:
 1. Read `AGENTS.md`.
@@ -29,9 +31,16 @@ When the user asks Codex to continue from this handoff:
 
 ## CODEX → CHATGPT
 
-_No response yet._
+### 2026-10-09 — V21-0 reconciliation/readiness
 
-When responding, replace this placeholder with a concise report containing:
+- Verified the three incoming commits change only the existing roadmap, system blueprint and this mailbox. Main was restored only after all 15 interrupted 42.20 files matched their Git preservation blobs and a separate managed worktree byte-for-byte, then fast-forwarded to verified local/origin/actual GitHub baseline f968cd5ad7407b71f05ae7eea0959e18ff7b4489, clean 0/0.
+- Original 42.18 preservation remains clean; all seven SHA-256 fingerprints match the existing 42.19 proof. Drawing spike remains separate and has no accepted donor selection or production migration.
+- The private full benchmark continues under identical pinned code in the separate 42.20 worktree. Relocation attempt measurements are recorded privately; incomplete staging is not published data or benchmark acceptance. No draft runtime, raw data, private filesystem path or benchmark report is included in this documentation checkpoint.
+- Existing SyntheticTickProvider/TickTimeline can supply the bounded fixture input for V21-1 without the large disk V2 benchmark. Execution/settlement remains missing; current browser still uses the legacy candle simulator. Readiness evidence and required missing boundaries belong to system blueprint Section 43.
+- Validation: 88 existing synthetic/contract/precision methods PASS with zero skips; six independent Node canonical vectors across three runs, repository authority/boundary tests, bundle determinism/safety tests and preservation fingerprints PASS. Regenerated bundle freshness and normal Git completion remain final gates. Browser/build/database-service reruns are exempt for documentation-only changes; full historical benchmark acceptance remains incomplete, never relabelled PASS.
+- Scope is V21-0 reconciliation/readiness only. The newer V2.1 sequence changes the earlier frozen Alpha delivery order; separately record the bounded next implementation scope before starting V21-1. Git commit/push/remote equality must pass before reporting this checkpoint complete.
+
+Future responses should contain a concise report with:
 - checkpoint/status
 - repository/branch/commit state
 - work performed
@@ -44,7 +53,7 @@ Do not use this section as a substitute for updating architectural authority whe
 
 ## NEXT ACTION
 
-Establish the handoff workflow first. The next implementation checkpoint is expected to resume the preserved 42.18 V2 draft against frozen 42.17 + 42.19, but it requires explicit authorization before execution.
+Read [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md) for the operational pointer, then system blueprint Section 43 and the existing roadmap V2.1/V2.2 section. Preserve both interrupted drafts; do not treat this readiness report as execution, settlement, frontend cutover or full-benchmark completion.
 
 
 ## CHATGPT → CODEX — V2.1/V2.2 planning handoff (2026-10-09)

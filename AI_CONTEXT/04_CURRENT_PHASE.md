@@ -14,13 +14,15 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "LAST_COMPLETED_PHASE": "23",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "23",
-  "NEXT_PHASE_STATUS": "SIDECAR_ACCESS_CONTRACT_FROZEN_DRAFT_PRESERVED_RUNTIME_RESUME_REQUIRES_AUTHORIZATION",
+  "NEXT_PHASE_STATUS": "V21_0_VALIDATED_RECONCILIATION_V21_1_REQUIRES_BOUNDED_AUTHORIZATION",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [
     "23"
   ],
   "EXECUTION_MODE": "COMPLETED_PLANNING_AND_REPOSITORY_RECONCILIATION_ONLY",
-  "TARGET_CHECKPOINT": "42.19 contract freeze on main; 42.18 byte-identical on codex/preserve-42-18-draft; normal commit/push/Git equality clean 0/0 then STOP before runtime or benchmark",
+  "TARGET_CHECKPOINT": "V21-0 repository reconciliation and fixture-first readiness; preserve interrupted drafts separately; validate documentation/contracts/bundle; commit/push/equality clean 0/0; STOP before changing runtime or adopting a replacement journey",
+  "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
+  "PRESERVED_RUNTIME_STATUS": "IN_PROGRESS_PRIVATE_BENCHMARK_NOT_COMPLETE_SEPARATE_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75"
 }
 ```
@@ -60,3 +62,5 @@ Hard-stop discovered during implementation: frozen 42.17 requires evidence sidec
 Latest human authorization is RECONCILE V2 SIDECAR EVIDENCE ACCESS CONTRACT, planning/contract only. It supersedes runtime continuation for this checkpoint. Existing blueprint Section 42.19 extends 42.17 with the bounded controller-only evidence capability and conservative causal semantics. Contract preparation may be validated locally, but clean planning-only commit/push is blocked by the explicitly protected uncommitted 42.18 runtime drafts. Do not stash/reset/discard/overwrite or commit those drafts in this planning checkpoint. STOP before commit and request explicit checkpoint-separation authorization; neither runtime nor Exness benchmark may resume now. No completed checkpoint/history or new Git SHA is claimed.
 
 The subsequent explicit human authorization PRESERVE AND SEPARATE INTERRUPTED 42.18 DRAFT + FREEZE 42.19 resolves that historical checkpoint conflict only. Preserve-only snapshot 2c65d2d043530605df2b43633e64dfe8e97dc303 retains the full audited mixed input. Draft branch codex/preserve-42-18-draft at a62fbd4161a3956544d4d9611056c67a1313e998 retains seven exact runtime/test blobs and historical findings; Section 42.19 records fingerprint proof/location. Main now contains only documentation and a test-only contract oracle, with the original canonical runtime restored. Required planning gates and normal commit/push/actual remote equality clean 0/0 finalize this checkpoint; no runtime resume or benchmark is authorized. Next human checkpoint may explicitly resume the preserved draft against frozen 42.17+42.19, but must not merge the draft automatically or treat 700k progress as a completed benchmark. STOP.
+
+Latest human instruction after the actual audit authorizes V21-0 repository reconciliation and fixture-first readiness under the newly adopted ROADMAP V2.1/V2.2 direction. The earlier 42.20 and fastest-Alpha authorizations and all interrupted draft bytes remain recoverable in a separate local Git snapshot/worktree; the private 42.20 benchmark may finish under its original bounded authorization, but is not completed main runtime. Existing Section 43 records readiness and the missing execution/settlement boundaries. This documentation checkpoint does not silently transfer the older frozen Alpha sequence to the materially different V21 sequence. After validation and Git equality/clean 0/0, STOP before V21-1 pending bounded implementation authorization. No frozen contract, protected runtime, data, dependencies or roadmap numbering changes; no second roadmap or operational authority.

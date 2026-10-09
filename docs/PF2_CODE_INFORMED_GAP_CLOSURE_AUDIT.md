@@ -28,7 +28,7 @@ The hardening set now explicitly covers: bounded dataset memory; indexed seek/re
 Measured RSS/CPU/I/O per replay, safe concurrency on a selected VPS, provider data quality/rights, cache benefit and integrated failure timing remain implementation evidence. Their checkpoints and pass/fail behavior are already defined; they are not open architecture choices.
 
 ## Authorization check
-At this audit, `AI_CONTEXT/04_CURRENT_PHASE.md` still has `"AUTHORIZED_IMPLEMENTATION_PHASE": null`. This PASS therefore starts no runtime work and advances no numbered roadmap phase.
+At the time of this historical audit, the [sole operational authority](../AI_CONTEXT/04_CURRENT_PHASE.md) recorded no authorized implementation. This planning PASS started no runtime work and advanced no numbered roadmap phase; read that authority for live authorization.
 
 ## Disposition
 For currently known repository reality, there is no unmapped material planning gap from the three adversarial review rounds. A future acceptance failure is repaired inside its checkpoint; a predefined benchmark branch follows that branch; a true frozen-contract invalidation follows Decision Register change control.
