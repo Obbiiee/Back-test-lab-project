@@ -1,0 +1,22 @@
+<!doctype html><html><meta charset="utf-8"><title>S-3 indicator host comparison</title>
+<style>body{background:#131722;color:#ddd;font:14px system-ui}button{margin:5px}#chart{height:760px;width:960px;max-width:95vw}pre{white-space:pre-wrap}</style>
+<h1>S-3 pinned indicator host / LC5</h1><nav id="tools"></nav><div id="chart"></div><div id="native"></div><pre id="result"></pre>
+<script src="/lc.js"></script><script type="module">
+import {IndicatorEngine,productionRegistry,createElement,Component,createRoot,useIndicators} from '/host.mjs';
+const source=Array.from({length:80},(_,i)=>({time:1577836800+i*60,open:20+i/10,high:25+i/10,low:15+i/10,close:20+i/10+Math.sin(i)*4}));
+const chart=LightweightCharts.createChart(document.querySelector('#chart'),{autoSize:true,layout:{background:{color:'#131722'},textColor:'#ddd'}}),series=chart.addSeries(LightweightCharts.CandlestickSeries);
+const engine=new IndicatorEngine(productionRegistry);engine.attach(chart);
+let current=source, errors=[];const record=()=>document.querySelector('#result').textContent=JSON.stringify({instances:engine.snapshot(),panes:chart.panes().length,errors:engine.errors(),nativeErrors:errors,output:Object.fromEntries(engine.snapshot().map(x=>[x.id,engine.output(x.id)])),through:current.at(-1)?.time},null,2);
+const set=b=>{current=b;series.setData(b);engine.setCandles(b);chart.timeScale().fitContent();record();};
+const button=(label,fn)=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>{fn();record();};document.querySelector('#tools').append(b);};
+button('Add seven',()=>{engine.replaceInstances(productionRegistry.types().map(type=>({id:type,type})));});
+button('Add second RSI',()=>engine.create({id:'RSI-2',type:'RSI',parameters:{period:2}}));
+button('Hide RSI',()=>engine.update('RSI',{visible:false}));button('Edit RSI',()=>engine.update('RSI',{parameters:{period:2},visible:true}));
+button('Replay 35',()=>set(source.slice(0,35)));button('Timeframe 5m',()=>set(source.filter((_,i)=>i%5===0)));button('Full prefix',()=>set(source));
+button('Resize',()=>{document.querySelector('#chart').style.height='480px';});
+button('Remove RSI',()=>engine.remove('RSI'));button('Cold host remount',()=>{engine.detach();engine.attach(chart);});button('Clear',()=>engine.replaceInstances([]));
+class Boundary extends Component{constructor(p){super(p);this.state={failed:false};}static getDerivedStateFromError(){return {failed:true};}componentDidCatch(e){errors.push(String(e.message));record();}render(){return this.state.failed?createElement('p',{},'Native OpenCharts host refused LC5'):this.props.children;}}
+function Native(){useIndicators({current:chart},{current:series},current,['SMA'],true);return createElement('p',{},'Native OpenCharts hook');}
+button('Test native OpenCharts',()=>createRoot(document.querySelector('#native')).render(createElement(Boundary,{},createElement(Native))));
+set(source);window.addEventListener('error',e=>{errors.push(e.message);record();});
+</script></html>

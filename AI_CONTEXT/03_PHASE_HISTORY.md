@@ -202,3 +202,7 @@ From adopted clean/equal `4e4dbef51814b5e1635ad4f903d49acbc71c63ff`, evaluated B
 ## S-2 — Conditional drawing migration, KEEP/N/A
 
 From verified clean/equal S-1 checkpoint `b6fa6bf424d3a3b9a9ae5c69c9c885318215ed96`, recorded the frozen conditional branch: no donor selected, so migration is N/A and current drawing/storage/history owners remain intact. [Existing STITCH audit Section 13](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#13-s-2-conditional-drawing-migration--keep--na) owns rationale/rollback and validation exemption. Fresh documentation/repository/bundle/preservation/diff and normal commit/push/equality gates close this checkpoint before S-3. No runtime, dependency, schema, data or protected-draft change; browser/build/full runtime reruns exempt for documentation only.
+
+## S-3 — Independent calculator and indicator host comparison
+
+From verified S-2 `f6e638dc221ebbfff93c85f041890d20609b9bc9`, pinned goldens/prefix and actual LC5 host fixtures support DT-IND KEEP calculators + KEEP host. Flat RSI, OpenAlgo flat Stochastic and OpenCharts ATR differ from frozen BTL semantics; OpenCharts host reproduces removed LC4 API failure. [Existing STITCH audit Section 14](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#14-s-3-calculator-and-host-comparison--2026-10-10) owns evidence/cost/limits. Full frontend/repository/release/bundle/preservation and normal Git closure precede S-4 conditional KEEP/N/A. No runtime/dependency/data change; OpenAlgo own host source-inspected, not browser-certified; expanded catalog/large-history acceptance remains separate.

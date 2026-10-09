@@ -416,3 +416,34 @@ S-1 closed at `b6fa6bf424d3a3b9a9ae5c69c9c885318215ed96`: normal push succeeded,
 DrawingManager, canonical v1 drawing storage, one-action bounded DrawingHistory, registry/creation/interaction/primitives and current chart hooks remain the sole production drawing owners. No second controller, adapter, storage namespace, schema conversion or feature deletion is introduced. Existing unknown/future/legacy namespace refusal and byte preservation remain unchanged. The S-1 old-vs-donor fixtures are retained as repeatable evidence; no source/dataset/protected draft is removed. Required rollback is current BTL itself, with no migration to undo.
 
 Validation: S-1 actual browser and full regression evidence is retained, not falsely claimed as a fresh S-2 run. For this documentation-only conditional checkpoint, product browser/build/lint/full backend/frontend reruns are exempt; repository authority/bundle freshness/safety, protected fingerprints and complete documentation-only diff are required fresh. Normal commit/push/equality/clean 0/0 closes S-2 before the already-authorized S-3 comparison. Nothing here authorizes V2.2 or changes the professional 25-tool target into completed work.
+
+## 14. S-3 calculator and host comparison — 2026-10-10
+
+Starting baseline S-2 `f6e638dc221ebbfff93c85f041890d20609b9bc9`: freshly verified local/origin/actual GitHub equality, clean 0/0. Clean exact donor pins/licenses from Section 12 rechecked. `test:stitch-indicators` is isolated: default mode runs BTL goldens; optional `BTL_SPIKE_DONOR_ROOT` builds pinned source into ignored artifacts without downloads/installs. No donor source is redistributed, production dependency/runtime/contract is changed, or second authority is created.
+
+### Calculator evidence
+
+Seven hand-computed goldens cover SMA/EMA seed, population BB, Wilder RSI, SMA-seeded MACD/signal, first-bar ATR and Stochastic. Common inputs: empty/one/two bars, nonlinear five-bar vector, authored true ranges, flat zero-range prices, 60-bar nonlinear prices and decimated timeframe-shaped input. Every prefix is checked against clipped full output and a mutated unseen suffix; inputs remain immutable. Representation glue only maps settings/key names, null warmup to absent points and histogram colors. Donor numerics are never repaired. OpenAlgo descriptor EMA uses SMA seed; its separate first-value-seeded base kernel was not falsely substituted.
+
+| Family | OpenAlgo descriptor | OpenCharts function |
+|---|---|---|
+| SMA, EMA, BB, MACD | common-vector numerical/warmup parity | common-vector numerical/warmup parity |
+| RSI | flat = 100 versus BTL 50: FAIL | flat = 100 versus BTL 50: FAIL |
+| ATR | first-bar range included: parity | first range skipped; `[3.5,4.25]` from time 220 versus BTL `[3,3,4]` from 160: FAIL |
+| Stochastic | zero span yields absent K/D versus BTL 50: FAIL | parity including flat 50 |
+
+Both donors pass supplied-prefix causality/input immutability. This does not certify unrestricted donor data orchestration. Inspected OpenCharts VWAP uses `volume || 1`; fabricated volume cannot enter the tick path. VWAP remains outside this seven-family evaluation and unadopted.
+
+Installed Rolldown minified calculator entries: BTL 2,247 bytes / 922 gzip / 3 modules; OpenAlgo seven descriptors 50,427 / 15,930 / 22; OpenCharts calculator file 3,730 / 1,407 / 2. OpenAlgo includes descriptor/tail/timeframe metadata. These are scoped entries, not full-app, CPU capacity or large-history numerical acceptance.
+
+### Host evidence and independent choice
+
+Actual LC 5.2.1 browser fixture on loopback 5205 rendered seven BTL families plus independent RSI: six panes (price plus five oscillator instances), no engine errors. Hide/edit RSI, 35-bar truncation, decimated 5m-shaped projection, full-prefix restoration, height resize, removal/reindex and detach/attach passed. Removing one RSI reduced to five panes; clearing returned to one. The test TF projection is not production aggregation; production timeframe acceptance remains S-7. No provider/storage/account capability is passed.
+
+The actual pinned OpenCharts React `useIndicators` hook mounted against the same LC5 chart reproducibly failed native `addLineSeries` (`i.addLineSeries is not a function`); an error boundary displayed refusal. This expected donor failure is recorded separately, not reported as a clean console. Source uses type-keyed instances and named price scales rather than independent LC5 panes; a host rewrite is required. Working LC5 is not downgraded.
+
+OpenAlgo's own registry/context/tail chart host is source-inspected, not browser-certified here. It is not a drop-in LC5 IndicatorSeriesAdapter; an LC5 lifecycle/pane/plot adapter or unauthorized whole-engine replacement would be necessary. Calculator parity does not imply acceptance of its host.
+
+**DT-IND: KEEP BTL calculators + KEEP BTL host, independently.** BTL passes current authored semantics with zero semantic production rewrites, added dependencies or new adapter LOC. Even parity donor functions require replacing a production registry binding/adapter (at least one semantic module); native gaps require more repair. Either donor host requires replacing the factory/adapter boundary (at least one), versus BTL zero. The first lexicographic cost selects KEEP; catalog size cannot override it. Gross calculator gzip delta +15,008 OpenAlgo / +485 OpenCharts before adapters; selected path zero. No production adapter LOC estimate or deletion count is invented. Existing configurations/persistence/rollback stay with BTL.
+
+Validation PASS: fresh full registered frontend regression including Phase 10–13 panes/persistence/no-look-ahead, lint/build (120 modules), release distribution, repository/bundle (192 files) and protected-draft fingerprints. Browser observations above are actual interactions. Full backend exempt for unmounted tests/docs-only changes; no backend/financial/provider contract changed. Normal commit/push/actual equality/clean 0/0 is mandatory before conditional S-4 KEEP/N/A. No expanded catalog or V2.2 completion is claimed.

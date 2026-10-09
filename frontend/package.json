@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test:drawings": "node tests/drawings.test.mjs",
     "test:stitch-drawing": "node tests/stitch-drawing.test.mjs",
+    "test:stitch-indicators": "node tests/stitch-indicators.test.mjs",
     "preview": "vite preview",
     "test:market": "node tests/market.test.mjs",
     "test:trading": "node tests/trading.test.mjs",

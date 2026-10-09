@@ -140,6 +140,10 @@
   ],
   "tests": [
     "frontend/tests/stitch-drawing.test.mjs",
+    "frontend/tests/stitch-indicators.test.mjs",
+    "frontend/tests/stitch-indicators-server.mjs",
+    "frontend/tests/browser/stitch-indicators.html",
+    "frontend/tests/browser/stitch-lc-global.mjs",
     "frontend/tests/stitch-drawing-server.mjs",
     "frontend/tests/browser/stitch-drawing.html",
     "backend/tests/test_tick_analysis.py",
