@@ -11,13 +11,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V21-3",
-  "CURRENT_IMPLEMENTATION_PHASE": "V21-4",
-  "NEXT_PHASE": "V21-4",
-  "NEXT_PHASE_STATUS": "AUTHORIZED_V21_4_THROUGH_V21_6_AFTER_V21_3_GIT_CLOSURE",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-4",
+  "LAST_COMPLETED_PHASE": "V21-4",
+  "CURRENT_IMPLEMENTATION_PHASE": "V21-5",
+  "NEXT_PHASE": "V21-5",
+  "NEXT_PHASE_STATUS": "AUTHORIZED_V21_5_THROUGH_V21_6_AFTER_V21_4_GIT_CLOSURE",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-5",
   "AUTHORIZED_PHASE_SEQUENCE": [
-    "V21-4",
     "V21-5",
     "V21-6"
   ],
@@ -76,3 +75,5 @@ Latest human instruction explicitly authorizes continuing through completed V2.1
 V21-2 local Method/Session gates passed; [Section 43 acceptance](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v21-2-implementation-and-acceptance-evidence) owns evidence. Complete its normal commit/push/actual remote equality and clean 0/0 before implementing V21-3. The existing multi-checkpoint grant remains in force; no routine reauthorization is required.
 
 V21-3 workspace validation passed; existing Section 43 owns evidence. Complete normal push/actual GitHub equality and clean main 0/0 before implementing the already-authorized V21-4 trading/analysis checkpoint. No V2.2 or historical benchmark acceptance is implied.
+
+V21-4 committed-event trading/Analysis gates passed; existing Section 43 owns evidence and honest unavailable metrics. Normal checkpoint push/equality and clean 0/0 precede the already-authorized V21-5 UX consolidation. Final journey acceptance and historical precision are not yet claimed.

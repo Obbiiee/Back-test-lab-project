@@ -3,6 +3,7 @@ import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {api,id,sessionPath,selectSessionUrl} from './client.js';
 import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
+import AlphaTerminal from './AlphaTerminal.jsx';
 import './tickAlpha.css';
 
 const initialPlan=()=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:'2000',sl:'1998',tp:'2004',
@@ -15,6 +16,7 @@ export default function TickAlpha(){
   const flight=useRef(false);
   const creationId=useRef(null);
   const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
+  const [orderAction,setOrderAction]=useState(null);
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
   useEffect(()=>{
     let mounted=true;
@@ -67,6 +69,15 @@ export default function TickAlpha(){
       setNotice('Immutable Method saved. Create a Session to use it.');
     });
   };
+  const requestAction=(order,kind,quantity=null)=>{
+    const payload={orderId:order.id,...(kind==='CLOSE'?{quantity}:{})};
+    setPauseToken(n=>n+1);setOrderAction({order,kind,quantity,command:command(view,kind,payload)});setDialog('action');
+  };
+  const confirmAction=()=>run(async()=>{
+    await api(sessionPath(view.metadata.id)+'/commands',orderAction.command);
+    setView(await loadWorkspace(view.metadata.id));setDialog(null);setOrderAction(null);
+    setNotice(orderAction.kind==='CANCEL'?'Pending order cancellation committed.':'Exit requested. Actual closure needs the next eligible liquidation-side tick.');
+  });
   const createSession=event=>{
     event.preventDefault();const fields=new FormData(event.currentTarget);
     run(async()=>{
@@ -104,9 +115,10 @@ export default function TickAlpha(){
         {protocol&&<fieldset><legend>Checklist · enforcement {view.method.checklistOn?'ON':'OFF'}</legend>{view.method.conditions.map(c=><label key={c.id}>{c.label}<select aria-label={c.label} disabled={busy} value={plan.observations.find(o=>o.conditionId===c.id)?.outcome||'NOT_ASSESSED'} onChange={e=>edit({observations:[...plan.observations.filter(o=>o.conditionId!==c.id),{conditionId:c.id,outcome:e.target.value}]})}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</fieldset>}
         <button disabled={busy||view.state.unresolved} onClick={openReview}>Review order</button><p>Quote-based simulation; no broker fill, margin, liquidity or slippage claim. Default fixture commission is zero.</p>
       </aside></div>
-      <section className="alpha-evidence"><h2>Committed Session evidence</h2><p>{Object.keys(view.state.orders).length} accepted orders · {view.state.nextEventIndex} committed events. No chart data decides a fill.</p>{Object.entries(view.state.orders).map(([key,o])=><p key={key}>{o.side} {o.orderType} · {o.status} · {o.quantity} lots</p>)}</section>
+      <AlphaTerminal key={view.metadata.id} view={view} busy={busy} onAction={requestAction}/>
     </>}
     <footer role="status">{notice||'Synthetic / test only. Local state is durable; historical-data precision acceptance remains separate.'}</footer>
+    {dialog==='action'&&orderAction&&<WorkspaceModal label="Confirm position action" onClose={()=>{if(!busy){setDialog(null);setOrderAction(null);}}}><section className="alpha-dialog"><h2>{orderAction.kind==='CANCEL'?'Cancel pending order':orderAction.quantity===null?'Request full close':'Request partial close'}</h2><p>{orderAction.order.side} · {orderAction.order.id}</p><p>{orderAction.kind==='CLOSE'?`Quantity: ${orderAction.quantity??orderAction.order.remaining} lots. A request does not settle the trade; the next eligible observed Bid/Ask determines its exit.`:'This cancels an unfilled intent; it does not close a position.'}</p>{notice&&<p role="alert">{notice}</p>}<button disabled={busy} onClick={()=>{setDialog(null);setOrderAction(null);}}>Keep current order</button><button disabled={busy} onClick={confirmAction}>Confirm action</button></section></WorkspaceModal>}
     {dialog==='method'&&<WorkspaceModal label="Create Trading Method" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createMethod}><h2>Create Trading Method</h2><label>Name<input name="name" required maxLength={128}/></label><label>Type<select name="kind" value={kind} onChange={e=>setKind(e.target.value)}><option value="FREE_STYLE">Free Style</option><option value="PROTOCOL">Protocol</option></select></label>{kind==='PROTOCOL'&&<><label>Locked risk %<input name="risk" defaultValue="1" inputMode="decimal" required/></label><label>Locked RR<input name="rr" defaultValue="2" inputMode="decimal" required/></label><label>Conditions (one per line)<textarea name="conditions" required maxLength={4096}/></label><label>Checklist enforcement<select name="checklist"><option>ON</option><option>OFF</option></select></label></>}<p>Changing rules later requires a new Method.</p>{notice&&<p role="alert">{notice}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button disabled={busy}>Save Method</button></form></WorkspaceModal>}
     {dialog==='session'&&<WorkspaceModal label="Create Session" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createSession}><h2>Create Session</h2><label>Name<input name="name" required maxLength={128}/></label><label>Method<select name="method">{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name} · {m.kind}</option>)}</select></label><label>Starting balance (USD)<input name="balance" defaultValue="10000" inputMode="decimal" required/></label><p>XAUUSD/USD · synthetic feed · January 2020 fixture. The Session inherits its Method type and immutable rules.</p>{notice&&<p role="alert">{notice}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button disabled={busy}>Save Session</button></form></WorkspaceModal>}
     {dialog==='review'&&review&&<WorkspaceModal label="Confirm reviewed order" onClose={()=>{if(!busy){setDialog(null);setReview(null);}}}><section className="alpha-dialog"><h2>Confirm reviewed order</h2><p>{view.method.name} · {review.review.command.payload.side} {review.review.command.payload.orderType}</p><dl>{['entry','sl','tp','quantity','riskPercent'].map(k=><div key={k}><dt>{({entry:'Entry',sl:'Stop Loss',tp:'Take Profit',quantity:'Lots',riskPercent:'Risk %'})[k]}</dt><dd>{review.review.command.payload[k]??'None'}</dd></div>)}</dl><p>Risk basis ${review.review.riskBasis}. Exact values checked by the server; fill uses the next eligible observed Bid/Ask.</p>{review.review.command.payload.observations.map(o=><p key={o.conditionId}>{view.method.conditions.find(c=>c.id===o.conditionId)?.label}: {o.outcome}</p>)}{notice&&<p role="alert">{notice}</p>}<button disabled={busy} onClick={()=>{setReview(null);setDialog(null);}}>Cancel confirmation</button><button disabled={busy} onClick={confirm}>Confirm order</button></section></WorkspaceModal>}

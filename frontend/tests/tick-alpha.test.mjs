@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {api,command,sessionPath} from '../src/tickAlpha/client.js';
+import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 
 const calls=[];
@@ -46,3 +47,18 @@ assert.throws(()=>displayBars(bad),/display price/);
 const volume=structuredClone(view);volume.chart.volumeAvailable=true;
 assert.throws(()=>displayBars(volume),/Invalid revealed/);
 console.log('PASS revealed-only display projection, no fabricated volume, immutable exact wire prices and exact tick/UTC targets.');
+
+const chartLines=[],removed=[],chartMarkers=[];
+const series={createPriceLine:line=>{chartLines.push(line);return line;},removePriceLine:line=>removed.push(line)};
+const projection={status:'COMPLETE',annotations:[{eventId:'fill:exact',timeNs:'1577838540000000000',price:'2000.02',side:'LONG',kind:'ENTRY_FILL',chronologyLimited:false}],orders:[{status:'ACTIVE',side:'LONG',entryPrice:'2000.02',entry:'2000',sl:'1998',tp:'2004'}]};
+const priceLines=syncTickAnnotations({series,markerPlugin:{setMarkers:markers=>chartMarkers.push(...markers)},candles:bars,evidence:projection});
+assert.equal(chartMarkers[0].id,'fill:exact');assert.equal(chartMarkers[0].time,1577838540);
+assert.equal(chartMarkers[0].text,'Entry @ 2000.02');assert.equal(priceLines[0].price,2000.02);
+assert.notEqual(priceLines[0].price,bars[0].open,'Fill annotation retains actual Ask, not candle mid');
+assert.equal(projection.annotations[0].price,'2000.02');
+syncTickAnnotations({series,markerPlugin:{setMarkers:markers=>assert.deepEqual(markers,[])},priceLines,candles:bars,evidence:{status:'UNAVAILABLE'}});
+assert.equal(removed.length,3);
+assert.equal(ratioLabel({numerator:'3',denominator:'7'},{percent:true}),'42.86%');
+assert.equal(ratioLabel({numerator:'-45',denominator:'7'}),'-6.43');
+assert.equal(ratioLabel(null),'Unavailable');assert.throws(()=>ratioLabel({numerator:'1',denominator:'0'}));
+console.log('PASS actual fill identity/price chart annotation, unavailable-history clearing and exact rational display rounding.');

@@ -25,6 +25,9 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "frontend/src/tickAlpha/AlphaTerminal.jsx",
+    "frontend/src/tickAlpha/annotations.js",
+    "backend/execution/analysis.py",
     "backend/execution/workspace.py",
     "frontend/src/tickAlpha/AlphaWorkspace.jsx",
     "frontend/src/tickAlpha/display.js",
@@ -132,6 +135,7 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "backend/tests/test_tick_analysis.py",
     "backend/tests/test_tick_workspace.py",
     "backend/tests/test_research_sessions.py",
     "frontend/tests/tick-alpha.test.mjs",

@@ -55,6 +55,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <div className="alpha-chart-host">
         <CandleChart candles={bars} transition={{kind:'forward'}} sessionId={`tick-alpha-${view.metadata.id}-${timeframe}`} viewportKey={`${view.metadata.id}:${timeframe}`}
           drawingWorkspace={`tick-alpha:${view.metadata.id}`} drawingStorageKey={`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
+          tickEvidence={view.analysis} researchOnly
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
           command={chartCommand} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect}/>
       </div>

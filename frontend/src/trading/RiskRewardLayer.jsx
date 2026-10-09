@@ -3,6 +3,7 @@ import { isRiskReward } from "./RiskRewardController";
 import RiskRewardGeometry from "./RiskRewardGeometry";
 
 const renderGeometry = props => <RiskRewardGeometry {...props} />;
+const renderResearchGeometry = props => <RiskRewardGeometry {...props} researchOnly />;
 const isPriceOnlyAnchor = (_, index) => index === 1 || index === 2;
 const handleProjection = points => {
   const entry = points[0], end = points[3]?.x ?? entry.x + 150;
@@ -14,6 +15,6 @@ export default function RiskRewardLayer(props) {
   const mode = isRiskReward(props.drawingMode) || ["none", "cursor-dot", "cursor-arrow"].includes(props.drawingMode)
     ? props.drawingMode : "none";
   return <ChartObjectOverlay {...props} drawingMode={mode} drawings={props.objects}
-    renderGeometry={renderGeometry} isPriceOnlyAnchor={isPriceOnlyAnchor} handleProjection={handleProjection}
+    renderGeometry={props.researchOnly?renderResearchGeometry:renderGeometry} isPriceOnlyAnchor={isPriceOnlyAnchor} handleProjection={handleProjection}
     layerName="Risk/Reward objects" layerClass={'risk-reward-layer ' + (mode !== props.drawingMode ? 'tool-active' : '')} />;
 }

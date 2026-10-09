@@ -17,6 +17,7 @@ from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
+from .analysis import project, MAX_ANALYSIS_EVENTS
 
 
 def label(value):
@@ -161,6 +162,15 @@ class ResearchApplication:
                 groups = self.__timeline_cache.window(self.scope, session_id, checkpoint)
                 start = max(0,int(state['nextGroupIndex'])-len(groups))
                 view['chart'] = display_candles(groups,state['throughNs'],timeframe,start)
+                def committed_events():
+                    # Small bounded pages from this same repeatable-read snapshot.
+                    # Refusal above the projection budget occurs before this generator runs.
+                    for offset in range(0, min(state['nextEventIndex'], MAX_ANALYSIS_EVENTS), 256):
+                        page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
+                            (self.scope.workspace_id,session_id,offset)).fetchall()
+                        for row in page:
+                            yield unpack(*row)
+                view['analysis'] = project(state, committed_events(), view['quote'])
             return view
 
     def workspace(self, session_id, raw):

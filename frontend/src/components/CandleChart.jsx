@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CandlestickSeries, createChart, createSeriesMarkers, HistogramSeries } from "lightweight-charts";
 import TradingLayer from "../trading/TradingLayer";
 import { syncTradingAnnotations } from "../trading/chartAnnotations";
+import { syncTickAnnotations } from '../tickAlpha/annotations.js';
 import { positionStats } from "../trading/riskReward";
 import { isRiskReward, normalizeRiskRewardSettings, RISK_REWARD_TOOLS } from "../trading/RiskRewardController";
 import RiskRewardSettings from "../trading/RiskRewardSettings";
@@ -20,7 +21,7 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -496,9 +497,10 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     const series = seriesRef.current;
     if (!series) return;
 
-    priceLinesRef.current = syncTradingAnnotations({ series, markerPlugin: markersRef.current,
+    if (tickEvidence) priceLinesRef.current = syncTickAnnotations({series,markerPlugin:markersRef.current,priceLines:priceLinesRef.current,candles,evidence:tickEvidence});
+    else priceLinesRef.current = syncTradingAnnotations({ series, markerPlugin: markersRef.current,
       priceLines: priceLinesRef.current, candles, positions, orders, position, pendingOrder, simulatedTrades, trades });
-  }, [position,pendingOrder,positions,orders,simulatedTrades,trades,candles]);
+  }, [position,pendingOrder,positions,orders,simulatedTrades,trades,candles,tickEvidence]);
 
   const activeSpec = RISK_REWARD_TOOLS[drawingMode];
   const toolHint = DRAWING_SPECS[drawingMode] ? DRAWING_SPECS[drawingMode].name + " · " + (DRAWING_SPECS[drawingMode].points === 1 ? "Klik chart" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
@@ -521,7 +523,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       <DrawingControls tools={primitiveDrawings} />
       <div className="chart-canvas-layer">
         <div ref={chartContainer} tabIndex={-1} className="candle-chart" data-primitive-drawings={JSON.stringify(primitiveDrawings.objects)} data-primitive-selected={primitiveDrawings.selectedId ?? ''} data-primitive-draft={primitiveDrawings.draftActive} />
-        <TradingLayer positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
+        <TradingLayer researchOnly={researchOnly} positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
       </div>
       {selectedDrawingId&&drawings.find(item=>item.id===selectedDrawingId)&&<div className="selected-drawing-toolbar" aria-label="Selected drawing actions">
         <button aria-label="Drawing settings" onClick={()=>{const item=objectBridge.objects.find(item=>item.id===selectedDrawingId);setDrawingSettings({...item,points:item.points.map(point=>({...point}))});}}>⚙</button>

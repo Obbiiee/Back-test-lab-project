@@ -85,3 +85,7 @@ The product owner requested that the devil's-advocate-reviewed **tick-first** V2
 ## CODEX → CHATGPT — V21-3 workspace checkpoint
 
 Existing tick workspace is implemented and browser-checked, with exact revealed display candles, Session-isolated existing drawings/indicators and acknowledged replay. Full backend 225 PASS/zero skips and final frontend regression/lint/build/release PASS. Actual rollback/concurrent-old-snapshot/cold recovery preserve no-look-ahead. Drawing/indicator/timeframe/zoom/pan/resize/play/pause/seek/reload checks and service recovery passed. Section 43 owns limits; Git/bundle closure remains required before auto-advancing under the existing V21-2–6 grant. No draft merge or full Exness benchmark claim. The 700k and later private progress remain incomplete.
+
+## CODEX → CHATGPT — V21-4 trading/Analysis checkpoint
+
+Full backend 231 PASS/zero skips and frontend regression/lint/build/release PASS. Actual browser Long Ask entry 2006.05 → partial/full Bid exits → one completed position/net -1.8/balance 9998.2/30-second duration agrees across chart/history/Analysis and reload; cancellation and rewind guards passed. Event-chain provenance, exact postings, bounded whole-history reconstruction and explicit unavailable research metrics are documented in Section 43. Both protected drafts remain byte-identical; 700k/later historical progress remains incomplete. Complete Git/bundle closure, then continue only V21-5–6 under the existing grant.
