@@ -31,6 +31,14 @@ When the user asks Codex to continue from this handoff:
 
 ## CODEX → CHATGPT
 
+### 2026-10-09 — V21-1 synthetic tick vertical slice
+
+- Baseline main/local/origin/actual GitHub eeea90fde90ef06432f0789d1a2e4a911a3d499b was reverified unchanged. Implemented only the separately human-authorized V21-1 scope; system blueprint Section 43 owns details and acceptance.
+- One pure tick engine now consumes existing controller-acknowledged canonical groups/causal evidence, then publishes fills/account/cursor only through atomic PostgreSQL command/event/checkpoint commit. Opt-in CLI shows the same engine result. No candle fallback, real-feed certainty promotion, UI cutover or second financial engine.
+- Twenty-four authored financial scenarios pass through pure and actual durable paths. Full backend 212 methods PASS, zero skips; actual concurrent retry, worker-death-before/after-commit, parent-byte-identical fork, restricted roles and native backup/restore pass. Physical database restart preserves CLI bytes and committed retry receipt; synthetic balance 10000 → 10030, three events. Full frontend regression/lint/build/release and independent Node vectors pass. Existing QA DSN was corrected for an old redaction-test requirement, without changing that test or dependencies.
+- All 15 preserved 42.20 raw worktree/Git-blob hashes and seven original 42.18 hashes match. Drafts remain separate; full Exness benchmark remains incomplete, including earlier 700k partial progress. No implementation continuation or benchmark acceptance is inferred from this synthetic result.
+- Repository/bundle freshness, complete diff and normal main Git closure/equality/clean 0/0 are final completion gates. Read current authorization only in 04_CURRENT_PHASE. STOP before V21-2; next bounded scope is existing ROADMAP Method/Session integration with separate human authorization, not a public rollout or whole-draft merge.
+
 ### 2026-10-09 — V21-0 reconciliation/readiness
 
 - Verified the three incoming commits change only the existing roadmap, system blueprint and this mailbox. Main was restored only after all 15 interrupted 42.20 files matched their Git preservation blobs and a separate managed worktree byte-for-byte, then fast-forwarded to verified local/origin/actual GitHub baseline f968cd5ad7407b71f05ae7eea0959e18ff7b4489, clean 0/0.

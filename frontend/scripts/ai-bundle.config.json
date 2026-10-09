@@ -1,5 +1,6 @@
 {
   "context": [
+    "docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md",
     "docs/MARKET_DATA_STANDARD.md",
     "docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md",
     "docs/SECURITY_ARCHITECTURE.md",
@@ -24,6 +25,22 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "backend/execution/__init__.py",
+    "backend/execution/contracts.py",
+    "backend/execution/engine.py",
+    "backend/execution/controller.py",
+    "backend/execution/postgres.py",
+    "backend/execution/fixture_demo.py",
+    "backend/ticks/contracts.py",
+    "backend/ticks/provider.py",
+    "backend/ticks/timeline.py",
+    "backend/contracts/primitives.py",
+    "backend/contracts/canonical.py",
+    "backend/contracts/models.py",
+    "backend/application/models.py",
+    "backend/infrastructure/database.py",
+    "backend/infrastructure/codec.py",
+    "backend/infrastructure/migrations/005_tick_execution.sql",
     "frontend/src/tickReview/LocalOrigin.js",
     "frontend/src/tickReview/TickReviewEntry.jsx",
     "frontend/src/tickReview/ReviewImport.js",
@@ -104,6 +121,10 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "backend/tests/test_execution_goldens.py",
+    "backend/tests/test_tick_execution.py",
+    "backend/tests/test_tick_execution_postgres.py",
+    "backend/tests/fixtures/tick_execution_v1.json",
     "frontend/tests/tick-review.test.mjs",
     "frontend/tests/fixtures/tick-review.json",
     "frontend/tests/phase18-9.test.mjs",

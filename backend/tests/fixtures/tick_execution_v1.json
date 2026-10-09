@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "artifact": "BTL-TICK-EXECUTION-GOLDENS-1",
+  "label": "SYNTHETIC / TEST ONLY; expected outcomes authored before engine code",
+  "profile": {"instrumentId":"XAUUSD","providerId":"SYNTHETIC","feedId":"TEST_ONLY","feedInstrumentId":"SYNTHETIC_INSTRUMENT","quoteCurrency":"USD","accountCurrency":"USD","tickSize":"0.01","priceScale":"100","contractSize":"100","lotStep":"0.01","minLot":"0.01","maxLot":"100","moneyScale":2,"commissionModel":"NONE","commissionPerLotSide":"0","slippageModel":"NONE","latencyModel":"ZERO"},
+  "scenarios": [
+    {"id":"market-long","rows":[[1,"100","101"],[2,"104","105"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"fills":[["ENTRY_FILL","101"],["EXIT_FILL","104"]],"balance":"10030"},
+    {"id":"market-short","rows":[[1,"100","101"],[2,"96","97"]],"open":{"side":"SHORT","orderType":"MARKET","entry":"100","quantity":"0.1","sl":"103","tp":"97"},"fills":[["ENTRY_FILL","100"],["EXIT_FILL","97"]],"balance":"10030"},
+    {"id":"market-next-eligible","rows":[[1,"100","101"],[3,"104","105"],[4,"109","110"]],"seekBeforeOpen":"2","open":{"side":"LONG","orderType":"MARKET","entry":"105","quantity":"0.1","sl":"102","tp":"109"},"fills":[["ENTRY_FILL","105"],["EXIT_FILL","109"]],"balance":"10040"},
+    {"id":"buy-limit-improvement","rows":[[1,"97","98"],[2,"100","101"]],"open":{"side":"LONG","orderType":"LIMIT","entry":"99","quantity":"0.1","sl":"95","tp":"100"},"fills":[["ENTRY_FILL","98"],["EXIT_FILL","100"]],"balance":"10020"},
+    {"id":"sell-limit-improvement","rows":[[1,"103","104"],[2,"100","101"]],"open":{"side":"SHORT","orderType":"LIMIT","entry":"102","quantity":"0.1","sl":"106","tp":"101"},"fills":[["ENTRY_FILL","103"],["EXIT_FILL","101"]],"balance":"10020"},
+    {"id":"buy-stop-gap","rows":[[1,"104","105"],[2,"110","111"]],"open":{"side":"LONG","orderType":"STOP","entry":"102","quantity":"0.1","sl":"99","tp":"110"},"fills":[["ENTRY_FILL","105"],["EXIT_FILL","110"]],"balance":"10050"},
+    {"id":"sell-stop-gap","rows":[[1,"95","96"],[2,"89","90"]],"open":{"side":"SHORT","orderType":"STOP","entry":"98","quantity":"0.1","sl":"101","tp":"90"},"fills":[["ENTRY_FILL","95"],["EXIT_FILL","90"]],"balance":"10050"},
+    {"id":"long-sl-gap","rows":[[1,"100","101"],[2,"97","98"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"105"},"fills":[["ENTRY_FILL","101"],["EXIT_FILL","97"]],"balance":"9960"},
+    {"id":"short-sl-gap","rows":[[1,"100","101"],[2,"104","105"]],"open":{"side":"SHORT","orderType":"MARKET","entry":"100","quantity":"0.1","sl":"103","tp":"95"},"fills":[["ENTRY_FILL","100"],["EXIT_FILL","105"]],"balance":"9950"},
+    {"id":"long-tp-gap","rows":[[1,"100","101"],[2,"110","111"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"105"},"fills":[["ENTRY_FILL","101"],["EXIT_FILL","110"]],"balance":"10090"},
+    {"id":"short-tp-gap","rows":[[1,"100","101"],[2,"89","90"]],"open":{"side":"SHORT","orderType":"MARKET","entry":"100","quantity":"0.1","sl":"103","tp":"95"},"fills":[["ENTRY_FILL","100"],["EXIT_FILL","90"]],"balance":"10100"},
+    {"id":"activation-same-event-exit","rows":[[1,"99","100"]],"open":{"side":"LONG","orderType":"LIMIT","entry":"101","quantity":"0.1","sl":"100","tp":"104"},"fills":[["ENTRY_FILL","100"],["EXIT_FILL","99"]],"balance":"9990"},
+    {"id":"trusted-tie","trusted":true,"rows":[[1,"100","101",1],[2,"105","106",2],[2,"95","96",3]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"fills":[["ENTRY_FILL","101"],["EXIT_FILL","105"]],"balance":"10040"},
+    {"id":"equivalent-untrusted-tie","rows":[[1,"100","101"],[1,"100","101"],[2,"104","105"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"fills":[["ENTRY_FILL","101"],["EXIT_FILL","104"]],"balance":"10030","chronologyLimited":true},
+    {"id":"changing-untrusted-tie","rows":[[1,"100","101"],[2,"105","106"],[2,"95","96"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"fills":[["ENTRY_FILL","101"]],"balance":"10000","reason":"UNRESOLVED_EQUAL_TIME_ORDER"},
+    {"id":"cancel-before-trigger","rows":[[1,"100","101"]],"open":{"side":"LONG","orderType":"STOP","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"cancelBeforeAdvance":true,"fills":[],"balance":"10000","orderStatus":"CANCELLED"},
+    {"id":"trigger-before-cancel","rows":[[1,"100","101"]],"open":{"side":"LONG","orderType":"STOP","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"cancelAfterAdvance":true,"refusal":"REFUSED_NOT_PENDING","fills":[["ENTRY_FILL","101"]],"balance":"10000"},
+    {"id":"partial-then-full-fixed-commission","rows":[[1,"100","101"],[2,"103","104"],[3,"104","105"]],"commission":"2","open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"90","tp":"120"},"manualExits":[{"after":"1","quantity":"0.04","through":"2"},{"after":"2","quantity":null,"through":"3"}],"fills":[["ENTRY_FILL","101"],["EXIT_FILL","103"],["EXIT_FILL","104"]],"balance":"10025.6","exitNets":["7.84","17.76"],"orderStatus":"CLOSED"},
+    {"id":"fixed-commission","rows":[[1,"100","101"],[2,"104","105"]],"commission":"2","open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"fills":[["ENTRY_FILL","101"],["EXIT_FILL","104"]],"balance":"10029.6"},
+    {"id":"invalid-tick","rows":[[1,"100","101"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101.001","quantity":"0.1","sl":"99","tp":"104"},"refusal":"REFUSED_PRICE_PRECISION","fills":[],"balance":"10000"},
+    {"id":"invalid-lot","rows":[[1,"100","101"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.015","sl":"99","tp":"104"},"refusal":"REFUSED_LOT_PRECISION","fills":[],"balance":"10000"},
+    {"id":"no-eligible-quote","rows":[[1,"100","101"]],"seekBeforeOpen":"2","open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"end":true,"fills":[],"balance":"10000","reason":"UNRESOLVED_NO_QUOTE"},
+    {"id":"unknown-quality","authoredQuality":false,"rows":[[1,"100","101"]],"open":{"side":"LONG","orderType":"MARKET","entry":"101","quantity":"0.1","sl":"99","tp":"104"},"fills":[],"balance":"10000","reason":"UNRESOLVED_QUOTE_QUALITY"},
+    {"id":"money-half-even","contractSize":"1","rows":[[1,"0.99","1"],[2,"1.5","1.51"]],"open":{"side":"LONG","orderType":"MARKET","entry":"1","quantity":"0.01","sl":"0.9","tp":"1.5"},"fills":[["ENTRY_FILL","1"],["EXIT_FILL","1.5"]],"balance":"10000"}
+  ],
+  "transactionGoldens": [
+    {"id":"stale-command","expected":"REFUSED_STALE_REVISION","financialWrites":0},
+    {"id":"identical-retry","expected":"ORIGINAL_COMMITTED_RESULT","additionalFinancialWrites":0},
+    {"id":"conflicting-retry","expected":"REFUSED_IDEMPOTENCY_CONFLICT","financialWrites":0},
+    {"id":"crash-before-commit","expected":"NO_VISIBLE_WRITES","retry":"ONE_ATOMIC_COMMIT"},
+    {"id":"crash-after-commit","expected":"ALL_VISIBLE_WRITES","retry":"ORIGINAL_COMMITTED_RESULT"},
+    {"id":"protocol-manual-action","expected":"PROTOCOL_BLOCKED","financialWrites":0},
+    {"id":"financial-rewind","expected":"REFUSED_REWIND_REQUIRES_FORK","parent":"BYTE_IDENTICAL","fork":"NEW_SESSION_FROM_EXPLICIT_COMMITTED_CHECKPOINT"}
+  ]
+}

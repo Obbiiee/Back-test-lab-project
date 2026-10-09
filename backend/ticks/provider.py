@@ -46,14 +46,21 @@ class SyntheticTickProvider:
 
     def __init__(self, rows, *, dataset_id="synthetic:test", resolution_ns="1",
                  chunk_size=64, trusted=False, gaps=None, coverage=None,
-                 diagnostics=None):
+                 diagnostics=None, execution_fixture=False):
         require(type(rows) in (list, tuple) and bool(rows), "rows", "EMPTY_DATASET")
         require(type(chunk_size) is int and 1 <= chunk_size <= 1024, "chunk_size")
         require(type(trusted) is bool,"trusted")
+        require(type(execution_fixture) is bool, "execution_fixture")
+        if execution_fixture:
+            require(trusted or all(row.get("sequence") is None for row in rows),
+                    "fixtureSequence", "UNDECLARED_SEQUENCE_TRUST")
         require(diagnostics is None or (type(diagnostics) in (list,tuple) and len(diagnostics)<=128),"synthetic_diagnostics","DIAGNOSTIC_LIMIT")
         # Authored record hash owns original text/scale; it is not market evidence.
         member_hash = content_hash({"schemaVersion": 1, "artifact": "BTL-SYNTHETIC-RAW-1", "rows": list(rows), "diagnostics": diagnostics or []})
         proof = content_hash({"schemaVersion": 1, "artifact": "BTL-SYNTHETIC-SEMANTICS-1", "label": self.label})
+        quality_proof = content_hash({"schemaVersion": 1, "artifact": "BTL-SYNTHETIC-QUALITY-1",
+                                     "label": self.label, "memberHash": member_hash,
+                                     "assertion": "AUTHORED_FIXTURE_COMPLETE_FRESH_QUOTES"}) if execution_fixture else None
         events = []
         for row in rows:
             keys(row, "ordinal timeNs bid ask sequence")
@@ -71,10 +78,15 @@ class SyntheticTickProvider:
                          trustedSequence=row["sequence"],
                          provenance=dict(sourceId="synthetic:source", memberHash=member_hash,
                                          originalTimestamp="SYNTHETIC_NS:" + row["timeNs"]),
-                         quality=dict(evidenceHash=None, quote=quote, freshness="UNKNOWN",
-                                      gapBefore="UNKNOWN_SILENCE", duplicateOf=None))
+                         quality=dict(evidenceHash=quality_proof, quote=quote,
+                                      freshness="CONFIRMED" if execution_fixture else "UNKNOWN",
+                                      gapBefore="NONE" if execution_fixture else "UNKNOWN_SILENCE", duplicateOf=None))
             events.append(CanonicalTick.from_wire(event).wire)
         chunks = []
+        if execution_fixture and coverage is None:
+            require(not gaps, "fixtureCoverage", "EXPLICIT_COVERAGE_REQUIRED_WITH_GAPS")
+            coverage = [dict(startNs=events[0]["timeNs"], endNs=str(int(events[-1]["timeNs"])+1),
+                             status="DECLARED_COMPLETE", evidenceHash=quality_proof)]
         for offset in range(0, len(events), chunk_size):
             chunks.append(dict(schemaVersion=1, artifact="BTL-TICK-CHUNK-1", datasetId=dataset_id,
                                datasetVersion="0"*64, chunkIndex=str(len(chunks)), events=events[offset:offset+chunk_size]))

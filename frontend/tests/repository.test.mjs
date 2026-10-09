@@ -23,10 +23,27 @@ assert.ok(read('frontend/tests/drawings.test.mjs').includes('../legacy/phase3/sr
 assert.ok(read('frontend/tests/phase5.test.mjs').includes('PHASE4_STORAGE_BEFORE.json'));
 assert.ok(read('frontend/tests/phase6.test.mjs').includes('PHASE5_STORAGE_BEFORE.json'));
 const config=JSON.parse(read('frontend/scripts/ai-bundle.config.json'));
+// V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
+const executionReferences=new Set([
+  'backend/execution/__init__.py','backend/execution/contracts.py','backend/execution/engine.py',
+  'backend/execution/controller.py','backend/execution/postgres.py','backend/execution/fixture_demo.py',
+  'backend/ticks/contracts.py','backend/ticks/provider.py','backend/ticks/timeline.py',
+  'backend/contracts/primitives.py','backend/contracts/canonical.py','backend/contracts/models.py',
+  'backend/application/models.py','backend/infrastructure/database.py','backend/infrastructure/codec.py',
+  'backend/infrastructure/migrations/005_tick_execution.sql','backend/tests/test_execution_goldens.py',
+  'backend/tests/test_tick_execution.py','backend/tests/test_tick_execution_postgres.py',
+  'backend/tests/fixtures/tick_execution_v1.json',
+]);
+function allowedBundleSource(file){
+  return file.startsWith('backend/')?executionReferences.has(file):! /^(legacy\/|data\/|frontend\/(legacy|public|node_modules|dist)\/)/.test(file);
+}
 for(const category of ['context','implementation','tests','supporting'])for(const file of config[category]){
   assert.ok(existsSync(path.join(root,file)),'Missing bundle source: '+file);
-  assert.ok(!/^(legacy\/|backend\/|data\/|frontend\/(legacy|public|node_modules|dist)\/)/.test(file),'Bundle must remain task-specific');
+  assert.ok(allowedBundleSource(file),'Bundle must remain task-specific: '+file);
 }
+for(const file of executionReferences)assert.ok([...config.implementation,...config.tests].includes(file),'Execution seam missing from reviewed bundle: '+file);
+for(const file of ['backend/cloud/app.py','backend/ticks/exness_v2.py','backend/.env','data/raw.csv','frontend/public/market/data.json','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
+assert.ok(config.context.includes('docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md'));
 const pkg=JSON.parse(read('frontend/package.json')),lock=JSON.parse(read('frontend/package-lock.json'));
 for(const section of ['dependencies','devDependencies'])assert.deepEqual(pkg[section],lock.packages[''][section],'Lock manifest drift');
 for(const rule of ['/AI_BUNDLE/','/frontend/tests/artifacts/','/docs/_generated/','node_modules/','dist/','.env'])assert.ok(read('.gitignore').split(/\r?\n/).includes(rule),'Missing ignore boundary: '+rule);
