@@ -263,3 +263,43 @@ One-pass streaming scan + partition index summary + bounded anomaly queue is the
 - **N32:** source license disallows retaining raw snippets; issue report remains privacy/rights compliant.
 
 **Review-5 verdict:** architecture is efficient in asymptotic design and conservative in evidentiary claims; actual throughput, false-negative rate and cost remain unverified until benchmark and sampling experiments. All P0/P1 safety gates still apply before beta; the user-report system is only a residual-risk channel.
+
+
+---
+
+## Design hardening amendment — Review 6: user-selected Next Available Quote Execution profile
+
+**Decision source:** Product owner requests execution at the observed available tick quote even when price gaps across a TP/SL trigger; positive and negative slippage are reflected. This is a **simulation profile proposal**, not a claim about a specific broker's legal/exchange fill policy. Do not change V2.1 runtime or frozen contracts in this planning checkpoint.
+
+### Profile identity and semantics
+
+- ID: `NEXT_AVAILABLE_QUOTE_V1`; pinned in the immutable experiment execution profile/passport and exposed prominently in UI/export.
+- Quote side: BUY position close uses **Bid**; SELL position close uses **Ask**. Entry-side semantics remain BUY Ask, SELL Bid. Source precision and decimal-safe calculations are preserved.
+- For already-active TP/SL orders, the trigger is the **first controller-revealed, causally admissible quote** satisfying the relevant side-specific threshold. At that quote, the model fills the eligible remaining quantity at that **observed quote price**, even if better or worse than the TP/SL level. No synthetic intermediate tick, interpolation, or retroactive order activation.
+- BUY TP triggers when Bid >= TP; BUY SL when Bid <= SL. SELL TP when Ask <= TP; SELL SL when Ask >= SL. The same quote-side semantics must be explicitly specified for entry/pending orders before implementation, rather than assuming TP/SL rules apply to every order type.
+- Illustrative cases (assuming order active, trusted ordering, valid quote and full immediate simulated liquidity): BUY entry 1, TP 2, next Bid 8 => exit 8; BUY SL 0.5, next Bid 0.2 => exit 0.2; SELL TP 2, next Ask 1 => exit 1; SELL SL 3, next Ask 5 => exit 5.
+- The profile assumes immediate execution at the eligible quote and full liquidity for the modeled order size. **Level-1 Bid/Ask does not prove executable volume or actual broker price improvement.** Therefore every fill is labeled `SIMULATED_FILL`, and a user-facing warning names the assumption. This profile is not necessarily the most conservative, and may overstate positive TP slippage. If model inputs cannot justify order activation, quote side, source chronology or event outcome, return `UNRESOLVED`, not an invented fill.
+- Distinguish a **marketable TP/SL trigger modeled as quote execution** from a real resting limit order. Real limit orders have limit-price constraints; the product must not present the chosen model as faithful execution of all real-world TP limit orders. If a strict limit-order broker profile is added later, it requires a separate pinned profile with a different fill contract, not an implicit exception to this one.
+- No discretionary post-trigger extra slippage or spread applied on top of the observed Bid/Ask unless a separately versioned and disclosed broker cost/slippage model explicitly requires it. Avoid double counting spread. Commissions/swap/financing remain separate, versioned assumptions.
+- Missing feed periods and discontinuous timestamps do not automatically make a result unresolved: a valid first eligible quote may be used by this model, **provided** the selected feed, event ordering, order activation and no competing unknown outcome are sufficient. If missing evidence can change whether SL or TP was triggered first, mark `UNRESOLVED`; do not silently choose the favorable outcome.
+- A tied timestamp group is atomic. If multiple admissible orderings produce different fills or account outcomes, prove invariance or return `UNRESOLVED` / isolated `CONDITIONAL`; do not pick an arbitrary row order.
+- Protocol mode's no-manual-close, pending-only, pinned RR/risk rules remain unchanged. RR planned from levels may differ from **realized** RR due to slippage. Display both; never overwrite planned RR with realized RR.
+
+### Required acceptance cases
+
+| ID | Fixture | Expected |
+|---|---|---|
+| Q01 | BUY TP=2, first eligible Bid=8 | Exit=8, positive modeled slippage +6 |
+| Q02 | BUY SL=0.5, first eligible Bid=0.2 | Exit=0.2, adverse modeled slippage -0.3 |
+| Q03 | SELL TP=2, first eligible Ask=1 | Exit=1, favorable modeled slippage +1 (sell-position perspective) |
+| Q04 | SELL SL=3, first eligible Ask=5 | Exit=5, adverse modeled slippage -2 |
+| Q05 | Order accepted after same-timestamp quote | No retroactive fill |
+| Q06 | Equal-time group allows both TP-first and SL-first outcomes | Unresolved unless invariant proof |
+| Q07 | Quote gap with no competing ambiguous outcome | Fill at first admissible quote, not fabricated intermediate price |
+| Q08 | Bid/Ask spread already included | No double spread charge |
+| Q09 | Partial close with shared margin | Correct quantity/account ledger and uncertainty propagation |
+| Q10 | Crash/retry at gap fill | Exactly one durable economic effect |
+| Q11 | Chart timeframe change | Same tick-derived fill |
+| Q12 | Export/reopen after profile version change | Original pinned profile and receipt preserved |
+
+**Decision status:** user-approved behavioral intent, implementation pending explicit V2.2 authorization and reconciliation with existing frozen contract owners. Profile must be reviewed for fidelity and financial correctness before release.
