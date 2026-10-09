@@ -96,3 +96,118 @@ Do not invent PASS thresholds. Before optimization, register machine CPU/RAM/dis
 ## Promotion / handoff rule
 
 When Codex completes V21-6 and STOPs, rebase/reconcile this **planning-only branch** against current main after explicit review; compare with existing architecture authority, incorporate accepted decisions into their owning docs, record separately authorized V22-0 in current-phase authority, then run required documentation checks and normal commit/push/equality gates. Do not merge this proposal automatically and do not edit V2.1 master files during the ongoing journey.
+
+
+---
+
+## Design hardening amendment — Review 4 (2026-10-09)
+
+**Target:** near-complete specification with objectively measurable gates, **not** a claimed 99% software correctness probability. Every unresolved issue is assigned a class, owner, trigger, test/evidence, release disposition, and (only where safe) user-report route. This amendment is a proposal and does not override authority or authorize implementation.
+
+### H1 — Formal state-machine contract (P0)
+
+Canonical durable state is the product of these orthogonal machines, with transitions applied atomically where financial effects occur:
+
+| Machine | States | Authorized transitions | Invalid transition response |
+|---|---|---|---|
+| Session | DRAFT, READY, RUNNING, PAUSED, COMPLETED, BLOCKED | DRAFT→READY after validated method/profile/dataset; READY→RUNNING; RUNNING↔PAUSED; RUNNING/PAUSED→COMPLETED only after obligations resolved; any active→BLOCKED on evidence/integrity failure | Reject, no partial mutation |
+| Order | DRAFT, REVIEWED, ACCEPTED, ARMED, PARTIALLY_FILLED, FILLED, CANCELLED, REJECTED, EXPIRED, UNRESOLVED | DRAFT→REVIEWED→ACCEPTED→ARMED; ARMED→PARTIALLY_FILLED/FILLED/CANCELLED/EXPIRED/UNRESOLVED; PARTIALLY_FILLED→FILLED/CANCELLED/UNRESOLVED | Reject, preserve original receipt; Protocol forbids disallowed manual changes |
+| Position | OPEN, PARTIALLY_CLOSED, CLOSED, UNRESOLVED | OPEN→PARTIALLY_CLOSED/CLOSED/UNRESOLVED; PARTIALLY_CLOSED→PARTIALLY_CLOSED/CLOSED/UNRESOLVED; UNRESOLVED only resolves by proven invariant or explicitly isolated conditional replay | No negative quantity, duplicate close, or state promotion without proof |
+| Evidence | DETERMINATE, CONDITIONAL, UNRESOLVED | DETERMINATE may fork labeled CONDITIONAL cases; UNRESOLVED→DETERMINATE only with additional admissible evidence or sound proof; resource exhaustion remains UNRESOLVED | No implicit conversion to determinate |
+| Replay | INITIALIZED, SEEKING, PAUSED, PLAYING, STOPPED, ERROR | Explicit controller-acknowledged transitions; seek/reset invalidate stale in-flight command epochs; financial state restored from matching durable checkpoint | Reject stale epoch and future reveal |
+| Dataset publication | STAGING, VALIDATING, READY, PUBLISHED, QUARANTINED, RETIRED | STAGING→VALIDATING→READY→PUBLISHED only after hash/index/sidecar validation; bad artifact→QUARANTINED; retirement preserves lawful historical references | Never expose partial index |
+
+The implementation may use different internal enum names, but must provide a **mapping table** and equivalent transition semantics before code changes. No blanket promise of reversible UNRESOLVED state; reopening a proved historical result creates a new experiment version, never silent history rewrite.
+
+**Global invariants:**
+1. `filled_qty + cancelled_qty + remaining_qty = accepted_qty` in instrument units, with explicit decimal quantization and no negative component.
+2. Per-position `sum(closed_qty) <= sum(opened_qty)`; each economic fill has a unique durable ID and one ledger posting set.
+3. Double-entry or independently reconciled cash/equity/realized-PnL/fees/margin accounting, including partial exits and concurrent positions, with decimal-safe arithmetic and documented rounding.
+4. Protocol RR, risk, permitted order type, checklist and intervention rules are pinned at acceptance; rejected commands have zero economic effect.
+5. Unresolved financial effects freeze only the causally affected authoritative state/experiment; unrelated experiments remain isolated.
+6. Exactly-once economic effect requires durable unique keys and transactionally consistent command receipt, event log, cursor and account snapshot.
+7. Any state transition is replayable from the authoritative log/checkpoint with byte-identical canonical serialization under the same pinned versions.
+
+**Required model-based test generator:** enumerate allowed/forbidden transitions and interleavings for 1/2/3 simultaneous positions, multiple partial exits, cancel/fill races, same-timestamp event groups, restart/retry, session reopen and seek epochs; assert invariants on every step, not only end balances. Verify independent reconciliation after each generated trace. Explicitly test liquidation/margin-call scenarios as *model assumptions*, not historical broker truth.
+
+### H2 — Execution-model capability and epistemic labels (P0)
+
+| Claim | Tick Bid/Ask alone | Additional requirement | Display label |
+|---|---|---|---|
+| Observed quoted side at a timestamp | Supported if source/precision validated | Feed provenance and ordering trust | OBSERVED_QUOTE |
+| Quote touched entry/SL/TP under pinned algorithm | Conditional on chronology and activation evidence | Side-specific trigger semantics, tie/gap handling | MODEL_TRIGGER |
+| Simulated fill price and quantity | Not a real-world fact | Explicit execution profile, latency, spread, slippage, sizing, commissions, fill policy | SIMULATED_FILL |
+| Executable broker fill, queue position, available liquidity | Not provable from L1 Bid/Ask | Broker/order-book/trade confirmations as appropriate | NOT_PROVEN |
+| Margin, stop-out, swap, overnight financing | Not inferable from quotes | Versioned broker/account profile and calendar; otherwise unresolved | PROFILE_ASSUMPTION |
+| Generalization to another broker/feed/time | Not proven | Out-of-sample evidence and feed comparison | RESEARCH_HYPOTHESIS |
+
+Default product wording: **“Hasil simulasi berdasarkan data dan model eksekusi yang dipilih; bukan bukti fill broker aktual.”** Every export and experiment passport carries the same evidence label. No “tick-accurate broker fill” marketing claim without relevant proof.
+
+### H3 — Uncertainty for partial closes, hedging and margin (P0)
+
+Define uncertainty dependencies as a directed graph: source tick/event → order activation/trigger → fill quantity/price → position inventory/realized P&L/fees → account cash/equity/margin → risk validation of later commands → later fills and analytics. If a disputed event can alter a downstream node, mark it tainted and stop authoritative propagation; deterministic unaffected nodes may continue only after proof of independence. Multiple positions sharing an account generally share equity/margin dependencies. Branching creates **independent account ledgers and position inventories**, not just alternative exit prices. Cap branch count, depth, CPU and storage using a predeclared budget; on cap exhaustion return `UNRESOLVED_RESOURCE_LIMIT`. Never average alternative outcomes into an official ledger.
+
+### H4 — Independent oracle and metamorphic test charter (P1)
+
+Oracle must be separately authored from the production settlement functions and not import their core execution/rounding implementation. Independently compute small, auditable decimal fixtures for long/short Bid/Ask, spreads, fee rounding, partial exits, margin and simultaneous positions. Freeze hand-calculated vectors with a written derivation and an external reviewer sign-off. Add metamorphic properties: replay chunk boundaries cannot change settled result; retry/restart cannot change result; slicing revealed history at T must equal running full history and stopping at T; chart timeframe cannot change tick settlement; dataset reindex must preserve canonical event identity and outcomes; shifting all prices by a constant (when profile allows) preserves appropriately adjusted differences. Differential tests alone are insufficient if both implementations share the same assumption.
+
+### H5 — V1 → V2 migration and comparability (P1)
+
+Preserve legacy V1 candle-based experiments as **LEGACY_OHLC** with their original model/version. Never silently relabel them tick-native, recalculate old balances in place, or claim performance equivalence. A V2 re-run is a new experiment linked by `supersedes/compares_to`, pinned to a new dataset and model, with a comparison report of coverage, trigger semantics, costs, and unresolved trades. UI/API/export must show both labels and refuse apples-to-apples aggregate metrics without a clear warning. Old sessions remain readable or explicitly unsupported; migration must not mutate existing evidence.
+
+### H6 — Dataset confidence / ambiguity impact report (P1)
+
+For each feed/instrument/period: actual first/last event; expected vs observed coverage intervals; records/unique timestamps; duplicate/tie groups; source ordering trust; timestamp precision; bid<=ask violations; nonpositive/implausible quotes; spreads; stale-side windows; discontinuities; gaps; parse rejects; index consistency; normalization changes; unresolved trade count and affected-trade ratio **only where a valid denominator exists**. Report uncertainty per instrument, session, execution profile and strategy. Separate **data anomaly rate**, **simulated-trade uncertainty rate**, and **broker fill unknowns**: they are not interchangeable. No global “data 99% accurate” claim derived from row count. If a trade's causal outcome is unprovable, mark it unresolved, not silently exclude it from win-rate denominator.
+
+### H7 — Cost, performance and user-scale envelope (P1)
+
+Define single-user private-beta reference machine, realistic XAUUSD data volume, concurrent active sessions, retention days, issue-report upload budget, storage/backup multiplier, provider license limits, CPU/IO contention, bandwidth/egress, and target operating cost per active user-month. Separate one-time ingestion cost from steady-state replay and support cost. Compute marginal cost by observed resource usage, not a fixed VPS price divided by a guessed user count. Include worst-case ambiguity branching and malicious repeated seeks. Freeze explicit numeric p95/p99/RSS/IO/throughput budgets after representative measurements **before** performance tuning. If target cannot be met on chosen hardware, narrow release audience rather than relaxing correctness gates.
+
+### H8 — User-reporting system: safe residual-risk channel, not a correctness substitute
+
+**Mandatory pre-beta blockers (never delegate to user reports):** financial ledger divergence; double settlement; causal look-ahead; false determinate outcome; unbounded memory/disk or branch explosion; crash recovery corruption; authentication/authorization bypass; private-data or provider-license leakage; inability to recover/restore user session; unknown critical execution model semantics. A P0/P1 issue affecting money or evidence integrity causes fail-closed, release NO-GO, and where deployed a scoped kill switch/rollback and affected-experiment notice.
+
+**Eligible user-reported residuals after gates pass:** cosmetic/UI layout, device/browser compatibility, minor navigation, confusing labels, low-severity nonfinancial latency, documentation requests, feature suggestions, and bounded edge cases already handled safely as UNRESOLVED. Users may report a financial bug, but reporting is **detection**, not permission to leave known critical faults unresolved.
+
+**Report schema:** report_id; user-consented contact (optional); build/engine/profile/dataset identity; reproducible session/experiment IDs or redacted references; issue category/severity; expected vs actual; bounded revealed tick slice if license allows; safe screenshot optional; command/event hashes; environment; reproduction steps; consent and retention expiry. Default no raw market data, credentials, secrets, user PII, or private broker account identifiers in exported bundles. Size limits, rate limits, access control, deletion/retention policy and user-visible report status required.
+
+**Triage SLA proposal (must be staffed before public beta):** P0 immediate stop/containment on detection; P1 fix before wider rollout; P2 prioritized for next planned patch; P3 backlog. Do not promise exact response hours until operating capacity is funded. User-facing issue state: RECEIVED → TRIAGED → REPRODUCED / NEEDS_INFO / UNAVAILABLE → FIXED → VERIFIED → CLOSED. Financial fix triggers lineage impact scan and revalidation of affected experiment versions. Do not silently alter prior results.
+
+### H9 — Quantified acceptance without invented percentages
+
+Track requirement coverage `verified_requirements / total_applicable_requirements`, risk-weighted test coverage, mutation-test score where meaningful, independently reviewed critical contracts, unresolved critical count, repeatability across seeds, and measured performance against frozen budgets. **Do not translate these ratios into probability that software is 99% correct.** A release may be called “near-complete against specification” only if 100% of P0/P1 requirements have evidence, 0 open P0/P1 bugs, all critical negative tests pass, source rights are adequate for the actual audience, reproducible restore and browser E2E pass, and remaining P2/P3 issues are documented, bounded and user-reportable. Exact numerical coverage thresholds for noncritical items are to be set in V22-0 and approved before tests.
+
+**Traceability matrix columns:** requirement ID; authority owner; risk/severity; design clause; implementation owner/path; test ID; evidence artifact/hash; environment; result; reviewer; waiver rationale (P2/P3 only); issue link; affected experiment lineage; closure date. No waiver for P0/P1 or unknown license rights.
+
+### H10 — Expanded adversarial acceptance cases
+
+| ID | Scenario | Required evidence |
+|---|---|---|
+| N13 | Two open positions, one ambiguous partial close changes free margin | Shared account freezes or fully separated sound conditional branches |
+| N14 | Cancel and fill race during crash/retry | One accepted terminal outcome per causal proof, no negative remaining quantity |
+| N15 | Session reopened after engine/parser version changes | Pinned old replay or explicitly incompatible; no silent reinterpretation |
+| N16 | V1 OHLC results displayed beside V2 tick results | Visible fidelity labels, separate experiment IDs, no false aggregation |
+| N17 | Oracle and engine share rounding bug | Independent hand-derived vectors and mutation test detect error |
+| N18 | 99% of quotes valid but all strategy entries fall in gaps | Trade-impact metric exposes unacceptable uncertainty |
+| N19 | User reports sensitive screenshot or provider-restricted tick slice | Redaction, access/retention and export denial tested |
+| N20 | Malicious rapid seek, parallel sessions and report uploads | Bounded resources, isolation and backpressure |
+| N21 | Data rights revoked after previous experiment | Lawful retention/deletion, explicit reproduction-unavailable label |
+| N22 | Historical profile lacks margin/liquidity/latency evidence | Simulation assumption or unresolved; no broker-accuracy claim |
+| N23 | Recovery from backup after partial restore | Manifest/ledger/cursor hashes reconcile or fail closed |
+| N24 | Financial fix changes prior experiment outcomes | Impact list and versioned rerun; old evidence never overwritten |
+
+### H11 — Final decision register
+
+| Item | Design status | Implementation evidence | Release disposition |
+|---|---|---|---|
+| State machines and accounting invariants | SPECIFIED / REVIEW REQUIRED | Pending | Block until proven |
+| Broker execution claim boundaries | SPECIFIED / REVIEW REQUIRED | Pending | Block misleading claims |
+| Uncertainty with shared account | SPECIFIED / REVIEW REQUIRED | Pending | Block until proven |
+| Independent oracle | TEST CHARTER READY | Pending | Block until proven |
+| V1/V2 separation | SPECIFIED / REVIEW REQUIRED | Pending | Block until proven |
+| Dataset confidence and trade impact | SPECIFIED / REVIEW REQUIRED | Pending | Block until measured |
+| Cost/capacity budgets | MEASUREMENT PLAN READY | Pending | Scope audience to evidence |
+| User reporting and triage | SPECIFIED / REVIEW REQUIRED | Pending | No public beta without operational owner |
+| Real-feed rights and full Exness benchmark | UNKNOWN / INCOMPLETE | Pending | Block relevant release claims |
+
+**Review-4 verdict:** substantially hardened **planning candidate**, not “99% verified”, not production-ready, not V2.2 implementation authority. The only honest route to a numerical quality claim is to collect independent empirical evidence against pre-registered requirements. No unproven financial correctness is delegated to users.
