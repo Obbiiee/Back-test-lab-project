@@ -11,14 +11,16 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V21-1",
-  "CURRENT_IMPLEMENTATION_PHASE": null,
-  "NEXT_PHASE": "V21-2",
-  "NEXT_PHASE_STATUS": "REQUIRES_SEPARATE_HUMAN_AUTHORIZATION_FOR_BOUNDED_METHOD_SESSION_INTEGRATION",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
-  "AUTHORIZED_PHASE_SEQUENCE": [],
-  "EXECUTION_MODE": "ONE_PHASE_ONLY",
-  "TARGET_CHECKPOINT": "V21-1 synthetic tick execution/durable CLI validated; normal commit/push/actual remote equality clean 0/0 final closure gates; STOP before separately authorized V21-2 Method/Session integration under existing ROADMAP and frozen contracts",
+  "LAST_COMPLETED_PHASE": "V21-2",
+  "CURRENT_IMPLEMENTATION_PHASE": "V21-3",
+  "NEXT_PHASE": "V21-3",
+  "NEXT_PHASE_STATUS": "AUTHORIZED_V21_3_THROUGH_V21_6_AFTER_V21_2_GIT_CLOSURE",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-3",
+  "AUTHORIZED_PHASE_SEQUENCE": ["V21-3", "V21-4", "V21-5", "V21-6"],
+  "EXECUTION_MODE": "BOUNDED_V21_FUNCTIONAL_ALPHA_AUTO_ADVANCE_AFTER_EACH_VALIDATED_PUSH",
+  "AUTO_ADVANCE_AFTER_PASS": true,
+  "ALLOW_SCOPE_EXPANSION": false,
+  "TARGET_CHECKPOINT": "Complete existing ROADMAP V21-2 -> V21-3 -> V21-4 -> V21-5 -> V21-6 with separate validated commit/push/equality clean 0/0 for each; final coherent real-browser synthetic tick alpha acceptance; STOP before V2.2",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75"
@@ -64,3 +66,7 @@ The subsequent explicit human authorization PRESERVE AND SEPARATE INTERRUPTED 42
 Latest human instruction after the actual audit authorizes V21-0 repository reconciliation and fixture-first readiness under the newly adopted ROADMAP V2.1/V2.2 direction. The earlier 42.20 and fastest-Alpha authorizations and all interrupted draft bytes remain recoverable in a separate local Git snapshot/worktree; the private 42.20 benchmark may finish under its original bounded authorization, but is not completed main runtime. Existing Section 43 records readiness and the missing execution/settlement boundaries. This documentation checkpoint does not silently transfer the older frozen Alpha sequence to the materially different V21 sequence. After validation and Git equality/clean 0/0, STOP before V21-1 pending bounded implementation authorization. No frozen contract, protected runtime, data, dependencies or roadmap numbering changes; no second roadmap or operational authority.
 
 The subsequent human submission of the supplied implementation prompt authorized only V21-1 from clean/equal eeea90fde90ef06432f0789d1a2e4a911a3d499b. The isolated synthetic tick execution/durable CLI is now validated; [existing Section 43 implementation evidence](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v21-1-implementation-and-acceptance-evidence) owns scope/results/limits. Normal main commit/push/equality and clean 0/0 are final closure gates. The operational pointer now follows the explicitly adopted V21 checkpoint sequence; this does not mark the deferred ROADMAP Phase 23 public-cloud capability complete or renumber any phase. Earlier missing-execution/planning-only scopes above remain historical. No active implementation remains; separately authorize bounded ROADMAP V21-2 Method/Session integration before starting it. Both preserved drafts remain untouched, full Exness benchmark remains incomplete, and the browser has no tick execution cutover. STOP.
+
+Latest human instruction explicitly authorizes continuing through completed V2.1. Verified clean/equal baseline is 9e24d7caabe21aa4bf3fbfdb3158699cb073eb51. This supersedes the historical stop-before-V21-2 rule for only the existing ROADMAP V21-2 through V21-6 journey. Keep one validated commit/push per checkpoint; after remote equality and clean 0/0, auto-advance without another routine approval. Existing system blueprint Section 43 owns bounded scope, frozen contracts remain intact, and preserved drafts/raw data remain separate. No historical full-data acceptance, public deployment, paid data, SaaS/auth/payments or V2.2 is authorized. Final real-browser functional-alpha acceptance is required; STOP at its end or a material hard gate.
+
+V21-2 local Method/Session gates passed; [Section 43 acceptance](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v21-2-implementation-and-acceptance-evidence) owns evidence. Complete its normal commit/push/actual remote equality and clean 0/0 before implementing V21-3. The existing multi-checkpoint grant remains in force; no routine reauthorization is required.

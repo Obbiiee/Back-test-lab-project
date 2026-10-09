@@ -25,6 +25,14 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "backend/execution/research.py",
+    "backend/execution/research_fixture.py",
+    "backend/execution/local_api.py",
+    "backend/infrastructure/migrations/006_research_sessions.sql",
+    "frontend/src/tickAlpha/client.js",
+    "frontend/src/tickAlpha/TickAlpha.jsx",
+    "frontend/src/tickAlpha/TickAlphaEntry.jsx",
+    "frontend/src/tickAlpha/tickAlpha.css",
     "backend/execution/__init__.py",
     "backend/execution/contracts.py",
     "backend/execution/engine.py",
@@ -121,6 +129,8 @@
     "frontend/src/workspace/WorkspaceModal.jsx"
   ],
   "tests": [
+    "backend/tests/test_research_sessions.py",
+    "frontend/tests/tick-alpha.test.mjs",
     "backend/tests/test_execution_goldens.py",
     "backend/tests/test_tick_execution.py",
     "backend/tests/test_tick_execution_postgres.py",

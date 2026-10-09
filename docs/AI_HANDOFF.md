@@ -31,6 +31,14 @@ When the user asks Codex to continue from this handoff:
 
 ## CODEX → CHATGPT
 
+### 2026-10-09 — V21-2 local Method/Session integration
+
+- Verified main/local/origin/actual GitHub baseline 9e24d7caabe21aa4bf3fbfdb3158699cb073eb51. The latest human grant authorizes the existing V21-2 through V21-6 journey, with separate validated pushes, final STOP before V2.2.
+- Implemented immutable Methods, inherited/pinned Sessions, atomic seed/metadata, server-sized Protocol ON/OFF review, durable reviewed confirmation and local reopen through the one existing tick engine/store. Loopback transport is bounded and explicitly opt-in; default v1 remains available. No second financial state or public deployment.
+- Full backend 221 methods PASS, zero skips; full frontend regression, independent Node vectors, lint/build/release PASS. Browser Free Style/Protocol creation, blocked missing checklist, cancel/no-order, confirm/one-order and reload/service-restart preservation pass; default v1/chart and both consoles clean. Section 43 is the acceptance/limitations owner.
+- All 15 preserved 42.20 files/blobs and seven original 42.18 hashes/refs match. No preserved draft merge, frozen contract/dependency/raw-data change; full Exness benchmark remains incomplete, including 700k partial progress.
+- Finish repository/bundle/diff and normal main commit/push/equality/clean 0/0, then immediately proceed to existing V21-3 workspace integration under the same grant. No V2.2/historical precision acceptance is implied.
+
 ### 2026-10-09 — V21-1 synthetic tick vertical slice
 
 - Baseline main/local/origin/actual GitHub eeea90fde90ef06432f0789d1a2e4a911a3d499b was reverified unchanged. Implemented only the separately human-authorized V21-1 scope; system blueprint Section 43 owns details and acceptance.

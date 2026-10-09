@@ -35,23 +35,30 @@ class ExecutionController:
 
         def operation(state, checkpoint):
             require(len(checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureRecovery", "REFUSED_RECOVERY_LIMIT")
-            timeline = TickTimeline.resume(self.__provider, checkpoint)
             next_state, events = submit(state, command)
             replay = None
+            next_checkpoint = checkpoint
             if command["kind"] == "ADVANCE":
+                timeline = TickTimeline.resume(self.__provider, checkpoint)
                 require(len(checkpoint["advanceTargets"]) < MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 ack = timeline.advance_through(command["payload"]["targetNs"], timeline.cursor)
                 next_state, financial = advance(next_state, ack["groups"], ack["coverage"], ack["diagnostics"], ack["throughNs"])
                 events += financial
                 replay = {"throughNs":ack["throughNs"], "exhaustedThroughBoundary":ack["exhaustedThroughBoundary"]}
+                next_checkpoint = timeline.checkpoint()
             elif command["kind"] == "SEEK":
+                timeline = TickTimeline.resume(self.__provider, checkpoint)
                 ack = timeline.seek(command["payload"]["targetNs"])
                 require(len(timeline.checkpoint()["advanceTargets"]) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 next_state["throughNs"] = ack["throughNs"]
                 next_state["nextGroupIndex"] = ack["cursor"]["nextGroupIndex"]
                 emit(next_state, events, "SESSION_SEEK", classification="ACCEPTED_COMMAND", throughNs=ack["throughNs"])
                 replay = {"throughNs":ack["throughNs"], "exhaustedThroughBoundary":True}
-            return next_state, timeline.checkpoint(), events, replay
+                next_checkpoint = timeline.checkpoint()
+            # Order commands do not reveal ticks or change the controller checkpoint.
+            # Replay validation belongs to ADVANCE/SEEK, avoiding long row locks on
+            # concurrent confirmation retries while retaining durable CAS/dedup.
+            return next_state, next_checkpoint, events, replay
 
         return self.__store.run(scope, command, operation)
 

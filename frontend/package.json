@@ -12,6 +12,7 @@
     "test:market": "node tests/market.test.mjs",
     "test:trading": "node tests/trading.test.mjs",
     "test:tick-review": "node tests/tick-review.test.mjs",
+    "test:tick-alpha": "node tests/tick-alpha.test.mjs",
     "test:trading-separation": "node tests/trading-separation.test.mjs",
     "history:download": "node scripts/download-history.mjs",
     "history:decade": "node scripts/download-decade.mjs",
