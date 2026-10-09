@@ -1265,3 +1265,58 @@ Login, PostgreSQL, penyimpanan cloud, deployment.
 - Gap data (akhir pekan, libur) hanya peringatan; data dengan error ditolak seluruhnya.
 - Replay default mulai di candle ke-101 supaya ada riwayat 100 candle di belakang titik mulai.
 - Previous hanya menggeser tampilan; kemajuan baru dilacak oleh `high_water`.
+
+
+## V2.1 Functional Alpha → V2.2 Precision Beta — tick-first delivery plan (2026-10-09)
+
+> **Status: approved planning direction, NOT an implemented release or runtime authorization.** This section is part of the existing sole master roadmap, not a second roadmap or a re-numbering of Phases 1–75. Existing phase/history authority remains intact. Explicit scoped implementation authorization must be recorded in `AI_CONTEXT/04_CURRENT_PHASE.md` before code changes. Follow `AI_CONTEXT/06_WORKFLOW_RULES.md` for every checkpoint.
+
+### Invariants and non-goals
+
+- V2.1 uses the **real canonical tick timeline and one authoritative tick execution domain**, with deterministic small synthetic/validated fixtures. Do not replace tick execution with candle OHLC or create a disposable mock execution engine. Candle aggregation is permitted only for display/indicators, never execution decisions.
+- Reuse existing chart/drawing/indicator/replay capabilities in `frontend/src/FigmaWorkspace.jsx`, Method/Protocol UX prototype in `frontend/src/tradingUx/`, backend canonical/SyntheticTickProvider/TickTimeline, and frozen contracts. Do not silently connect prototype-only synthetic lifecycle or the legacy candle simulator as if they were authoritative tick settlement.
+- Keep Section 42.17 storage/index and Section 42.19 evidence/sidecar contracts frozen. Preserve the reported local `codex/preserve-42-18-draft` branch and verify its actual availability/provenance; do not assume it is present in a cloud environment. The full Exness benchmark is **not complete**.
+- V2.1 must be usable in a real browser end-to-end and pass core correctness tests on small fixtures. V2.2 expands data fidelity, scale, stress, precision audit, and performance; V2.2 is **not** a dumping ground for broken V2.1 UI, incorrect basic Bid/Ask, or nonfunctional order controls.
+- No public data rights, production broker fills, account/margin fidelity, cloud SaaS, payment, authentication, social community, or licensed-data redistribution are implied by this plan. Mark fixture provenance, execution model assumptions and unavailable features explicitly.
+
+### Dependency gate — before implementation
+
+Inventory actual runtime code and tests, Git HEAD/remote equality and clean-tree state, frozen authority, and preserved local draft. Decide whether the existing small-fixture tick provider can support the first vertical slice without completing large-scale V2 disk storage. If not, define the **minimum bounded V2 access** required under frozen 42.17/42.19; never bypass the contract or load the full dataset into RAM. Record unresolved blockers and stop rather than silently changing contracts.
+
+### V2.1 bounded checkpoints (each separately validated and committed/pushed)
+
+| Checkpoint | Implementation scope | Acceptance / proof |
+| --- | --- | --- |
+| V21-0 — reconciliation | Verify current main/local draft, actual engine gaps, test ownership, dependency/license/security, and align phase authority. No runtime change until authorized. | Explicit work scope, ownership, baseline, blocker log, protected files and phase mapping. |
+| V21-1 — tick vertical slice | Small fixture → canonical ordered tick replay → minimal authoritative Bid/Ask order execution → event/evidence → inspectable result. Reuse existing timeline; add only missing execution domain, not a second simulator. | Golden cases for long Ask entry/Bid exit, short Bid entry/Ask exit, pending activation, SL/TP, gaps, equal timestamps, replay seek/reset, idempotency and anti-look-ahead. Unknown ordering must be flagged or handled by documented conservative policy, never invented. |
+| V21-2 — Method/Session | Connect Method, checklist, Protocol/Free Style, planning, order review, Session identity and local persistence to domain commands/events. | Protocol cannot be bypassed; no duplicate execution; Session save/reload and corrupted/older state handling are tested. |
+| V21-3 — workspace | Integrate tick cursor with Lightweight Charts, drawing/indicator tools, display-only OHLC aggregation, timeframe and replay controls. | Browser tests for create/move/edit/delete drawings, indicators, play/pause/seek/speed, chart/engine synchronization and no future data. |
+| V21-4 — trading/analysis | Wire Order Ticket, positions, closed trades, realized P&L and Analysis to one engine event stream with dataset/engine/config provenance. | One order yields one consistent lifecycle and result across chart, positions, history and Analysis; unsupported margin/fee/broker models are explicitly limited. |
+| V21-5 — UX consolidation | Research-lab neutral/light UI with dark accents, typography, trading panel, modals, responsive navigation, accessible controls. | New-user task flow succeeds without critical blockers or obscured controls; targeted usability feedback is documented. |
+| V21-6 — alpha acceptance | End-to-end browser walkthrough; focused golden/integration tests; full mandated regression/lint/build/bundle gates; diff/authority review; clear limitations and release notes. | Method → Session → chart/drawing/indicator/replay → tick-based order → Analysis → reload works on small fixtures; normal commit/push, remote HEAD equality and clean working tree for each authorized checkpoint. |
+
+**Vertical-slice priority:** V21-1 must demonstrate a real engine-driven result before expanding UI scope. If storage V2 blocks the vertical slice, evaluate the existing fixture provider first. Do not invent a new storage format, break frozen contracts, or represent missing settlement as working.
+
+**Execution semantics:** Quote price is not a guarantee of executable broker fill. Define and test side-aware Bid/Ask pricing, gap policy, same-timestamp ordering evidence, trade/account arithmetic, zero-fee assumptions, deterministic seek/replay, and explicit uncertainty. No claim of realistic margin call or production-grade execution until that model is implemented and validated.
+
+**Functional alpha user journey:** Create Method/checklist → create/reopen Session → use chart/drawings/indicators → play/seek tick replay → plan and confirm an order → observe actual tick-driven order lifecycle → inspect event-derived Analysis → reload and verify consistent Session state. No critical UI blocker or cross-pane state mismatch is acceptable.
+
+### V2.2 bounded verification program (future, separately authorized)
+
+1. **Historical evidence and licensing:** audit Exness coverage (including partial-year gaps), timestamps, ordering, duplicates, spread, missing quotes, evidence provenance, and private/public usage rights before any redistribution.
+2. **Precision:** independent reference/golden comparisons for Bid/Ask, order types, gap behavior, SL/TP chronology, fees, P&L, deterministic replay, anti-look-ahead and uncertainty; implement/test margin or slippage only if product scope claims them.
+3. **Scale:** complete bounded V2 disk/index and sidecar access as needed; benchmark millions of ticks, memory peak, seek latency, replay throughput, cancellation, I/O and resource recovery on named hardware.
+4. **Reliability:** stress/regression/security tests, state recovery, reproducibility, browser E2E, bug fixes, performance optimizations, and measured acceptance thresholds fixed **before** declaring the beta ready.
+
+Benchmark targets are intentionally **not fabricated**: establish reproducible baseline measurements and explicit budgets before performance acceptance. Partial 700k-row progress is not a completed Exness benchmark.
+
+### OSS adoption and delivery governance
+
+Use the existing Section 37 open-source adoption plan in `docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md`: keep Lightweight Charts; evaluate Playwright/ECharts and backend/data tooling only for demonstrated gaps after license, maintenance, security, bundle and integration checks. Installing libraries is not a milestone.
+
+For each checkpoint: verify authorized scope and current Git state → implement → focused tests → mandatory regression and browser verification for product changes → diff/authority review → commit → normal push → remote HEAD equality and clean tree → report. A bounded multi-checkpoint journey requires explicit authorization recorded in the current-phase authority; this roadmap text alone never grants it. Stop on a hard gate or external change. Preserve Phase 42 historical evidence and do not renumber phases 1–75.
+
+### Release labels
+
+- **V2.1 Functional Alpha:** real tick engine and small-fixture correctness, coherent browser UX, durable single-user Session, traceable engine events and documented limits. **Not** a claim of historical/production execution accuracy.
+- **V2.2 Precision Beta:** measured and independently checked historical fidelity, large-scale performance and reliability gates, with remaining provider/broker-model limitations documented.
