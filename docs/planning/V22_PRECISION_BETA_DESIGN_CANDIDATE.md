@@ -472,3 +472,78 @@ R01 market BUY/SELL correct quote side; R02 limit price constraint; R03 stop-mar
 No DOM or order book in full-version scope. No fabricated broker liquidity, volume-guaranteed fills, intrabar candle execution, uncontrolled AI financial claims, live brokerage execution, unsupported dataset redistribution or automatic expansion into Phase 69–75. No implementation of F1–F5 until separate authorized checkpoint(s) with actual baseline audit and phase authority reconciliation.
 
 **Review-9 verdict:** a coherent full-version product map exists while preserving the tick-only engine and avoiding order-book complexity; implementation sequence and resource commitments remain conditional on V2.2 evidence.
+
+
+---
+
+## Review 10 — code-informed comparative repository audit and long-term execution plan (2026-10-09)
+
+**Evidence level:** remote read-only GitHub inspection, not a local clone, test execution, code coverage run, security scan, license counsel, or performance benchmark. All observations reflect repository files visible at audit time. Do not claim actual tests passed based on presence of test files.
+
+### Our repository inspected (main)
+- `backend/ticks/timeline.py`: `TickTimeline` and `RevealedView`; controller owns hidden provider, consumer reads revealed groups. Code explicitly says forward steps stream pages, not entire dataset. **Follow-up:** profile true disk provider and cache/memory across millions of rows and concurrent sessions; this module alone does not prove bounded full-scale ingest.
+- `backend/execution/engine.py`: pure exact reducer; transition proposals and controller durable publication of `SIMULATED_FILL`; quote observation is not broker fill. **Follow-up:** independent oracle, crash/retry idempotence, long/short quote side, gap, ties, fees, margin, partials and propagation.
+- `backend/precision/evaluator.py`: bounded evidence model, nanosecond string representation, revealed prefix and no interpolation. **Follow-up:** reconcile evaluator outcome classifications and financial engine; avoid dual authoritative outcomes.
+- `backend/tests/test_tick_execution.py`: fixture harness and tick execution cases exist. **Follow-up:** execute tests, map coverage to financial invariant matrix and find missing cases; file presence is not proof.
+- Existing top-level `backend/{execution,ticks,market_data,precision,cloud,workspace}`, `frontend/src/tickAlpha`, `docs/ROADMAP.md`, `AI_CONTEXT/04_CURRENT_PHASE.md` and research docs. **Follow-up:** identify which are runtime production paths versus prototypes/planning, with dependency graph and actual browser proof.
+- Operational phase authority inspected still records V21-2 complete / V21-3 active. This may change independently; re-fetch before acting.
+
+### External code/documentation inspected (read-only)
+| Repo | Concrete inspected evidence | Engineering lesson | Decision and caution |
+|---|---|---|---|
+| `nautechsystems/nautilus_trader` | `BENCHMARKING.md`, root structure including `crates`, `python`, `test_data`, `schema`; LGPL-3.0 metadata | Benchmark workloads, profiling and performance claims with measured evidence; event-driven modularity | Adopt benchmark methodology and test design; do not transplant engine or LGPL code without legal review |
+| `QuantConnect/Lean` | root `Engine`, `Data`, `Common`, `Brokerages`, `Report`, `Research`, `Tests`; Apache-2.0 metadata | Explicit responsibility boundaries across data/execution/research/reporting | Map modular boundaries; not a reason to create parallel engine or copy brokerage complexity |
+| `polakowo/vectorbt` | `vectorbt/portfolio/base.py` (portfolio/order/trade/drawdown records, Numba reference); source header Apache 2.0 with Commons Clause | High-throughput research and portfolio analytics can be downstream of immutable fills | Reference API/data shapes; commercial code reuse requires Commons Clause/legal assessment; not tick execution replacement |
+| `mementum/backtrader` | `backtrader/feed.py`, data feed lifecycle; GPL-3.0 metadata | Separate replay/feed adapter and chart aggregation from settlement | Learn abstraction only; GPL code reuse has strong obligations; maintenance activity comparatively older |
+| `quantopian/empyrical` | `empyrical/stats.py` including `max_drawdown`, annualization and cumulative-return helpers; Apache-2.0 | Independent numerical cross-checks and risk metric semantics | Compare against independent fixtures; confirm return frequency/annualization assumptions |
+| `nkaz001/hftbacktest` | `README.rst` explicitly requires L2/L3 book/queue/latency models; MIT metadata | Clarifies where quote-only full-fill assumptions stop being realistic | **Exclude** DOM/L2/L3/queue/market impact; use only to articulate limitations |
+
+Reference links:
+- https://github.com/Obbiiee/Back-test-lab-project
+- https://github.com/nautechsystems/nautilus_trader/blob/develop/BENCHMARKING.md
+- https://github.com/QuantConnect/Lean
+- https://github.com/polakowo/vectorbt/blob/master/vectorbt/portfolio/base.py
+- https://github.com/mementum/backtrader/blob/master/backtrader/feed.py
+- https://github.com/quantopian/empyrical/blob/master/empyrical/stats.py
+- https://github.com/nkaz001/hftbacktest/blob/master/README.rst
+
+### Gap register and prioritization
+
+| ID | Gap / verification question | Current evidence | Priority / checkpoint |
+|---|---|---|---|
+| G01 | Are tick event order, revealed boundary and execution truly consistent after seek/restart? | Modules exist; no fresh execution proof in this review | P0; V21-6 / V22-4 |
+| G02 | Is scalable V2 storage/index and full historical ingest bounded and complete? | Historical 42.18 hard stop; plan only | P0; V22-2/3 |
+| G03 | Is independent execution oracle separate from production engine? | Existing test file inspected, no full coverage run | P0; V22-4 |
+| G04 | Are fees, P&L, partials, margin and unresolved downstream balances coherent? | Need current full ledger audit | P0; V22-4 |
+| G05 | What is actual incremental RAM/CPU/IO per active user? | No verified per-user benchmark | P1; V22-6, SaaS F1 |
+| G06 | Is real historical source permitted for intended private/public use? | Exness provenance/licensing unresolved | P0 for affected release; V22-1 |
+| G07 | Can users reproduce and report ambiguous results safely? | Planned registry/report | P1; V22-5 |
+| G08 | Are statistical edge/robustness claims calibrated against fair-coin/null fixtures? | Research roadmap, not audited as implemented | P1 after F0; F2 |
+| G09 | Are multi-tenant auth, quotas, restore and operations production-grade? | Modules exist, no current production proof | P0 before public SaaS; F1 |
+| G10 | Are open-source integrations legally/operationally suitable? | Repo metadata and representative files checked only | P1 before copying/dependency installation |
+
+### Detailed future implementation order (respect existing authority)
+
+**A. Finish V2.1 (current Codex owner).** Re-fetch authority; complete V21-3 workspace, V21-4 trading/analysis, V21-5 UX and V21-6 browser acceptance. Each checkpoint requires tests, commit/push, actual remote equality, clean tree. Do not interrupt owner or write main concurrently.
+
+**B. Execute V2.2 (after separate explicit grant).** V22-0 baseline/reconcile; V22-1 data provenance/rights; V22-2 streaming validator; V22-3 bounded storage/index/ingest; V22-4 oracle and ledger; V22-5 unresolved registry/report; V22-6 performance/security/concurrency; V22-7 browser beta GO/NO-GO. No broker DOM, no candle-based financial execution.
+
+**C. Private real-user alpha-to-beta evidence.** Controlled testers with license-permitted data, Method -> Session -> Replay -> Trade -> Analysis; instrument funnel, replay failure, issue reports, measured costs, statistical false-confidence messaging. No public dataset distribution before license.
+
+**D. Public SaaS prerequisites (existing Phases 24–30 + relevant 51–60).** Auth, tenant isolation, server-side quotas, durable sync, backup/restore, security, billing only after economic evidence. Performance sizing by measured 1/10/50/100/1000 simultaneous sessions, browser vs server memory separated. Public launch GO only after rights, privacy, reliability and customer support readiness.
+
+**E. Research full product (31–40 + 61–68).** Build Experiment Passport and statistical evidence first: win-rate interval, break-even WR after costs, minimum detectable effect/sample size, false confidence for N=10, null controls, exact binomial or appropriate dependence-aware tests; then OOS/walk-forward, multiple testing, Monte Carlo, risk of ruin, sensitivity, regime, portfolio and batch research. Keep statistics separate from execution ledger and versioned.
+
+**F. Monetization/community/advanced.** Free/Pro metering and entitlements based on observed cost; optional broker affiliate with disclosure; social/community only when user demand and moderation rights established; forward/live paper research separately gated. No live broker trading implied.
+
+### Operational requirements for the next agent
+1. Before any implementation, collect current SHA, branch, authority and worktree; inventory actual code paths and protected frozen contracts.
+2. Construct dependency graph `raw quotes -> normalized immutable ticks -> indexed timeline -> authoritative execution/ledger -> immutable events -> analysis/research -> UI/export`. Mark every node IMPLEMENTED / TESTED / BENCHMARKED / PLANNED / BLOCKED with file/test evidence.
+3. Execute the project test commands on actual environment, then independent golden/oracle suite; record counts, failures, skip reasons and machine specs.
+4. Benchmark dataset size, tick/s, seek p50/p95, peak RSS, disk IO and session concurrency; do not turn planning estimates into product facts.
+5. Review external code and license before adding any dependency; prefer concepts/fixtures over copying GPL/LGPL/Commons-Clause source.
+6. Prioritize P0 critical correctness/rights/security, P1 performance/user task completion, P2 research differentiation, P3 optional community. Track measurable acceptance and stop on failures.
+7. Maintain immutable experiment lineage and never silently change previously published P&L after engine updates.
+8. Use dedicated planning branch until V2.1 completion and explicit authorization. **This review is an audit/planning artifact only.**
+
+**Audit verdict:** the existing Backtest Lab modular foundation is promising, but this read-only inspection is insufficient to certify readiness. The best cross-project transfer is benchmark discipline (NautilusTrader), component separation (LEAN), feed lifecycle (Backtrader), independent metrics (Empyrical), and research throughput ideas (vectorbt), while explicitly rejecting order-book modeling (hftbacktest).
