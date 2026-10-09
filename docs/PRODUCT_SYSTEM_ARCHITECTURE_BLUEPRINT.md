@@ -2878,3 +2878,26 @@ Prior planning-attempt validation (before separation): 88 focused contract/V1/ti
 Repository reconciliation validation is run again on main without the seven runtime/test draft files and with the original canonical runtime. Only the six planning documentation owners, phase-history bookkeeping and backend/tests/test_tick_evidence_access_contract_spec.py may enter the main checkpoint. No preservation .gitattributes, draft source, raw CSV/ZIP, private staging store or benchmark artifact enters main. The contract content and fixture in 42.19 remain unchanged during separation. The existing 42.18 report remains historical partial evidence; preservation commits do not turn it into an accepted runtime release or complete benchmark. Separate human authorization is required to resume implementation. STOP after normal main commit/push/equality/clean 0/0 and final preservation fingerprint checks.
 
 Actual reconciliation gates: all 88 focused contract/V1/timeline/precision/HistData/canonical methods PASS on main using the unchanged baseline canonical runtime, with zero SKIP/FAIL in the final run. Independent Node six golden vectors across three runs PASS; repository and AI-bundle deterministic/safety tests PASS. Seven pre/post worktree and preservation-commit blob hashes match; baseline 42.17, normative 42.19 content and its oracle bytes are unchanged. Complete main diff contains documentation and the test-only oracle, no runtime/data/dependency/frontend change. Bundle regeneration/verification and normal main Git checkpoint/equality are final completion gates. Browser, product build/full regression, database-service exercise and real Exness ingestion/benchmark NOT RUN for this repository/planning-only checkpoint, not labelled PASS. The earlier 700,000-row progress remains partial and interrupted. Preservation refs remain local and recoverable; only planning main is pushed in this checkpoint.
+
+
+## 43. V2.1 tick-first functional integration / V2.2 precision validation — design decision
+
+> **Planning only (2026-10-09).** Delivery checkpoints, acceptance criteria, non-goals and Git governance live in the existing `docs/ROADMAP.md` section “V2.1 Functional Alpha → V2.2 Precision Beta”. This section is architecture guidance, **not** a Phase 43 implementation authorization, an amendment to frozen Sections 42.17/42.19, or a claim that V2.1/V2.2 has shipped.
+
+### Ownership and seams
+
+- **Canonical tick data / time:** existing tick provider, authoritative ordered timeline, bounded cursor/seek and frozen evidence contract. Preserve unknown same-timestamp ordering as uncertainty unless evidence supplies a stable sequence.
+- **Execution domain:** a **single** tick-driven command/event implementation, used with small fixture providers in V2.1 and disk-indexed historical providers in V2.2. Long entry Ask/exit Bid; short entry Bid/exit Ask. Pending activation, SL/TP, gaps, position/account arithmetic and idempotency must be explicitly specified and golden-tested. A quote-based model is not proof of broker fill.
+- **Application:** Method/Session rules, Protocol checklist, review/confirmation, identity, state persistence, replay lifecycle and evidence provenance. Enforce rules at the domain boundary, not only by disabling UI controls.
+- **Presentation:** reuse existing Lightweight Charts workspace, drawing, indicators, prototype UX and Analysis. Display candles may aggregate already-revealed ticks; OHLC must never decide execution. No independent synthetic trade status presented as authoritative.
+- **Research/evidence:** all trading/Analysis views consume the same engine events with dataset/version/parameter/cost provenance. Unsupported settlement/margin models must be labeled unavailable; fixtures are explicitly marked as fixtures.
+
+### Implementation dependency order
+
+First reconcile actual repository and preserved 42.18 local draft; inspect whether the existing SyntheticTickProvider/Timeline can support a complete small-fixture tick vertical slice without completing V2 storage. Then establish engine-driven trade lifecycle and golden tests, followed by Method/Session persistence, chart integration, Analysis and UX acceptance. Large historical ingestion, full sidecar/storage benchmark, independent historical precision audit and stress belong to V2.2 unless a smaller prerequisite is proven necessary. No new alternative storage contract or second execution engine.
+
+### Non-negotiable acceptance
+
+V2.1: one new user can complete Method → Session → chart/drawings/indicators → tick replay → validated order → event-derived result/Analysis → save/reopen, in a real browser, without critical interaction blockers or cross-pane state divergence. Core correctness includes side-aware Bid/Ask, same-time ordering policy, gap, idempotency, seek/reset determinism and no look-ahead. V2.2: independently verified historical fidelity and reproducible resource/performance budgets on specified data/hardware, not unmeasured claims.
+
+No runtime authorization arises from this section. `AI_CONTEXT/04_CURRENT_PHASE.md` must be updated through a separately scoped authorization; every checkpoint follows `AI_CONTEXT/06_WORKFLOW_RULES.md`.
