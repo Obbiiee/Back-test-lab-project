@@ -25,6 +25,21 @@
 | What has actually been completed? | `../AI_CONTEXT/03_PHASE_HISTORY.md` |
 | What workflow / Definition of Done governs implementation? | `../AI_CONTEXT/06_WORKFLOW_RULES.md` |
 
+## Continuity entry points — V2.1 / STITCH / V2.2
+
+Use the **existing** [master roadmap](ROADMAP.md#stitch-continuity--existing-oss-adoption-program-not-a-new-phase-or-release) to understand how completed V21-0…V21-6, uncompleted STITCH work, and separately authorized V2.2 connect. This is one product journey, **not** three competing roadmaps or a claim that STITCH is complete.
+
+| Question | Existing owner |
+| --- | --- |
+| Which OSS projects were researched and what can they replace? | [STITCH-0 OSS audit](STITCH_0_OSS_REPLACEMENT_AUDIT.md) (historical inventory, not final donor selection) |
+| How are current BTL, OpenAlgo and OpenCharts compared fairly? | [Data/Ops/Release Contract](V2_ALPHA_DATA_OPS_RELEASE_CONTRACT.md) and [Decision Register](V2_ALPHA_DECISION_REGISTER.md) |
+| What is the order of S-1…S-7 work and acceptance? | [Frozen Execution Ledger](V2_ALPHA_FROZEN_EXECUTION_LEDGER.md) and [Work Execution Plan](V2_ALPHA_WORK_EXECUTION_PLAN.md) |
+| What are the full professional drawing and indicator targets? | [Drawing Engine Spec](DRAWING_ENGINE_SPEC.md) and [Indicator Engine Spec](INDICATOR_ENGINE_SPEC.md) |
+| What was actually completed in V2.1 and what is currently authorized? | [Phase History](../AI_CONTEXT/03_PHASE_HISTORY.md) and [Current Phase](../AI_CONTEXT/04_CURRENT_PHASE.md) |
+| What is the bounded V2.2 precision/data/reliability plan? | [Master Roadmap](ROADMAP.md#v22-bounded-verification-program-future-separately-authorized) |
+
+**Do not** promote old STITCH-0 donor preferences to final selection, mark professional targets complete based on Alpha minima, re-run V21-6, silently activate the frozen Alpha journey, or create a second planning/status owner. Historical reports and small notes remain preserved; deletion requires reference, history, bundle and test evidence per [workflow rules](../AI_CONTEXT/06_WORKFLOW_RULES.md).
+
 ## Mental Model
 
     RESEARCH THESIS
