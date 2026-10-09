@@ -412,3 +412,63 @@ R01 market BUY/SELL correct quote side; R02 limit price constraint; R03 stop-mar
 4. Do not start V2.2 implementation merely because this document exists.
 
 **Review-8 verdict:** planning is structured for bounded end-to-end delivery, but beta readiness, 99% KPI, Exness full ingest, browser behavior and performance are **not yet proven**.
+
+
+---
+
+## Review 9 — Full Product roadmap after V2.2: tick-only, no order book (2026-10-09)
+
+**Planning status:** product direction only; does not authorize implementation, change existing Phase 24–75 numbering, or alter main/ROADMAP authority. Read alongside ROADMAP v2.0 cloud (24–30), v3.0 research (31–40), tick-market phases (41–50), SaaS (51–60), quantitative research (61–68), live/paper research (69–75), and deferred community. Existing older phase descriptions are mapped, **not** automatically granted or presumed finished. Actual post-V2.2 code and product-evidence gates decide work order.
+
+### Nonnegotiable architectural scope
+- **All simulated financial decisions are driven by immutable ordered Bid/Ask quote ticks.** OHLC candles may be aggregated from revealed ticks for charting/indicators only, never to infer intrabar SL/TP sequence or settlement.
+- **One authoritative tick engine, one event stream, one account ledger, one execution-profile contract** reused by Replay, Session, Journal, Analysis, Research and Paper/Forward Testing where applicable. No parallel candle settlement or second broker engine.
+- **No order book, DOM, Level 2, queue-position, matching-engine, market-impact or liquidity-depth simulation** in the full-version target. A quote is not proof of executable volume; any full-fill assumption is versioned and disclosed. Do not claim broker-exact fills.
+- Broker quote feeds and exchange data are distinguished. Versioned fees, spreads, financing, margin and contract metadata are applied where evidence permits; missing broker specifics are conditional/unsupported, not invented.
+- Dataset provider, feed identity, rights, precision, ordering, coverage and validation receipt are immutable experiment dependencies; no public redistribution without contractual permission.
+- Cloud scale uses bounded indexed tick reads, shared immutable dataset storage, cache isolation and per-session state, not one dataset copy in RAM per user. Measure incremental memory and CPU/I/O cost at 1/10/50/100/1000 active sessions before capacity claims.
+- Statistical evidence is not a promise of future profits. Expose sample size, uncertainty, costs, selection bias and robustness failure. A 7/10 WR 70% RR 1:1 example must not be marketed as proven edge; under iid fair coin P(X>=7)=17.1875%.
+
+### Delivery program — full-version capability tracks, not a replacement phase numbering
+
+| Release track | Existing ROADMAP mapping | Product deliverable | Exit criterion |
+|---|---|---|---|
+| **F0 — Precision foundation** | V2.1 + V2.2, overlap 41–50 | Fully checked tick replay, bounded storage, quote-fill profile, one ledger, data quality, reproducibility, unresolved registry | V22-7 GO with real browser, independent oracle, security/rights and performance evidence |
+| **F1 — Multi-user SaaS foundation** | 24–30, 51/53/55/59/60 essentials | Identity/login, tenant isolation, cloud sessions, sync, backup/restore, rate/usage quotas, audit, operational dashboard, incident handling | Independent tenant isolation/security tests; restore drill; actual concurrent replay memory/CPU/I/O budget; license-compatible private/public data serving |
+| **F2 — Scientific research core** | 31–40, 61–66 essentials | Strategy library/versioning, journal, advanced metrics, MAE/MFE, time/regime analysis, strategy comparisons, statistical inference and sample-size/power, walk-forward/OOS, Monte Carlo and risk-of-ruin, parameter sensitivity, multiple-testing correction, reproducible Experiment Passport | Pre-registered synthetic null tests and known-edge controls; independent statistics oracle; no leakage; reproducible runs; uncertainty and costs visible; 10-trade false-confidence warnings |
+| **F3 — Commercial operations** | 51–60, subset 40 | Free/Pro entitlements, usage metering, payments, billing events, CRM/finance integration, support and abuse response, exports and user feedback analytics | Accurate entitlements and invoices, idempotent webhooks, data rights and privacy, cost-to-serve vs price monitored; no paid tier promises before measured economics |
+| **F4 — Advanced research & portfolio** | 37–40, 63–68, later 69–75 where safe | Portfolio/multi-pair replay, strategy batch research, research automation, versioned comparisons, optional explainable AI assistant, live quotes/paper/forward testing as separately approved scope | Shared engine correctness and isolation, no look-ahead or research leakage, concurrency benchmark, model disclosure and live-feed rights; no broker-live order routing implied |
+| **F5 — Community / growth (deferred)** | Post-roadmap community | Public/unlisted/private experiment posts, peer comments, shareable reports, creator education and referrals | Moderation/privacy/license review, share permissions, real user demand and engagement evidence |
+
+**Ordering:** F1 and a minimal F2 statistical evidence slice can be sequenced by user feedback and dependency after F0. F3 is conditional on actual product use and legal data rights. F4/F5 should not delay a working public beta. Do not equate full-version scope with simultaneous implementation of every phase.
+
+### Research validity requirements for full product
+- Always distinguish descriptive statistics (observed WR/P&L) from statistical evidence (uncertainty, tests, confidence/power) and future predictive claims.
+- Baseline zero-edge depends on reward/loss asymmetry and transaction costs, not always p=0.5; disclose iid assumptions and serial dependence.
+- Guard train/validation/test splits by chronological availability and embargo/purge where applicable; freeze selected strategies before OOS.
+- Report multiple comparisons and strategy search count, walk-forward results, parameter neighborhood stability, sensitivity to fees/spread/slippage, Monte Carlo path distribution, risk of ruin and selection bias. Never issue an unqualified "proven edge" badge.
+- Research compute uses the same immutable fills/ledger; deterministic independent reference implementations validate statistical calculators. Data uncertainty propagates into dependent analytics.
+
+### Free/Pro product principles (reconcile frozen 18.x before activation)
+- Free: accessible tick-based core replay and basic evidence; session/data/usage quotas enforced server-side, with clear limits and fair disclosure. Previously discussed one month active/day and five sessions are **candidate inherited product constraints**, not automatic implementation truth; verify current authority and cost.
+- Pro: extended dataset windows where licensed, more sessions, advanced analytics/research, exports and workflow modes; avoid promising unlimited compute/storage if metering shows unsustainable cost. Protocol and Free Style restrictions remain as previously frozen unless separately changed.
+- No public pricing/affiliate/broker claim before rights, compliance, user support and measured unit economics. Broker affiliate relationships must not bias statistical reporting.
+
+### RAM/cost capacity gate (full-version prerequisite)
+- Record **server shared baseline** (OS/API/DB/index/cache), **incremental RSS per active replay session**, **browser/client RAM**, CPU utilization, disk IOPS, bandwidth, storage retention and concurrency contention independently.
+- Benchmark 1, 10, 50, 100, 1000 concurrent sessions across paused, 1x, 20x, random seek and mixed import workloads; cold/warm cache, multiple dataset sizes and multi-tenant isolation. Do not assume 30–150MB/session or 2GB baseline are measured facts; these are illustrative planning estimates only.
+- Fit empirical capacity curve `RAM_total(N) = RAM_shared + incremental_RAM(N)`; test nonlinearity and cache sharing; provision headroom for spikes, failures and DB. Separate user-count from concurrently active tick-replay sessions.
+- Capacity and VPS procurement remain evidence-driven, with cost/user/session, cost per 1M replayed ticks and cost per stored GB-month tracked.
+
+### Full-version definition of done
+1. F0 proven; all critical financial, causality, provenance and replay gates pass, with explicit model limits and anomalies.
+2. Secure multi-user onboarding, login, Session continuity, data access control, backups and restore verified.
+3. One research workflow end to end: define Method -> run tick backtest -> inspect Analysis -> assess statistical evidence and robustness -> save reproducible Passport -> compare OOS -> export/share with permission.
+4. Monetization/support works only if activated; accurate usage/billing, cancellation, data deletion/retention and issue handling.
+5. Benchmarked concurrency, stable costs, observability, incidents/rollback and tested recovery; realistic dataset/provider licensing.
+6. Real users complete critical tasks and provide measurable retention, bug rates, resolution and support demand. No fixed marketing claims based only on fixtures.
+
+### Deferred / prohibited without new authorization
+No DOM or order book in full-version scope. No fabricated broker liquidity, volume-guaranteed fills, intrabar candle execution, uncontrolled AI financial claims, live brokerage execution, unsupported dataset redistribution or automatic expansion into Phase 69–75. No implementation of F1–F5 until separate authorized checkpoint(s) with actual baseline audit and phase authority reconciliation.
+
+**Review-9 verdict:** a coherent full-version product map exists while preserving the tick-only engine and avoiding order-book complexity; implementation sequence and resource commitments remain conditional on V2.2 evidence.
