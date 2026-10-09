@@ -547,3 +547,72 @@ Reference links:
 8. Use dedicated planning branch until V2.1 completion and explicit authorization. **This review is an audit/planning artifact only.**
 
 **Audit verdict:** the existing Backtest Lab modular foundation is promising, but this read-only inspection is insufficient to certify readiness. The best cross-project transfer is benchmark discipline (NautilusTrader), component separation (LEAN), feed lifecycle (Backtrader), independent metrics (Empyrical), and research throughput ideas (vectorbt), while explicitly rejecting order-book modeling (hftbacktest).
+
+
+---
+
+## Review 11 — Integrated go-to-market roadmap: product, media, operations, first paid customer (2026-10-09)
+
+**Status:** PLANNING CANDIDATE ONLY. Does not authorize implementation, pricing claims, external promotion, purchases, or modifying `main`. Continue authorized V2.1 implementation independently. This review adds a business workstream, not a new technical phase numbering.
+
+### Non-negotiable strategy
+- Backtest Lab is tick-by-tick Bid/Ask research/replay, without order book/DOM. Candle display is not execution evidence. Quote-only fills remain explicitly hypothetical; unresolved execution cases propagate to downstream metrics.
+- Launch to **controlled cohorts** and market organically. No misleading claims of broker-realistic fills, guaranteed edge, completed benchmarks, unlimited compute, or validated data rights.
+- **Do not confuse waitlist demand with capacity:** public landing page can accept interest while replay access is invite-only and capped by measured simultaneous active sessions.
+- Measure technical truth, user success, unit economics, and support quality before scaling.
+
+### Parallel tracks and stage gates
+
+| Gate | Product/engineering | Content/growth | Commercial/operations | Measurable exit |
+|---|---|---|---|---|
+| G0: foundation | Reconcile current authority; continue V21-3..6; instrument performance and errors | Reserve consistent brand handles (availability unverified); draft voice, visual kit, editorial ethics, 12 evidence-based topics | Define target user, hypotheses, consent-based waitlist, privacy/support contact | No unauthorized code; brand checklist; event definitions and benchmark protocol documented |
+| G1: technical alpha | Complete V2.1 deterministic browser workflow; fixtures, persistence, correctness; V22-0..4 data provenance/index/oracle | Publish educational research and development transparency without promising access | Landing page + interest signup (after privacy/legal review); recruit 5–10 traders by consent | End-to-end workflow passes; no P0 correctness defects; dataset rights verified for proposed use |
+| G2: measured capacity | V22-5..7 anomaly registry, end-to-end benchmark; compare server-only vs hybrid on same workload, hardware and fixtures | Demonstrate experiments with disclosed assumptions; collect structured questions | Private alpha support, bug triage, usage telemetry, safety cap/queue/kill switch | Real RAM/CPU/IO/network, tick/s, seek p50/p95, replay 1x/20x, error rate, per-active-session cost recorded; browser mobile included |
+| G3: closed beta | Fix top task blockers; secure isolation, durable session and restore, monitoring/backup | Soft promotion from YouTube/Instagram/TikTok to waitlist; invite batches | 5–10 then 20/50/100 invites **only as measured capacity permits** | Users independently complete method→session→trade→analysis→return; measurable completion, repeat use, support response, and critical incident rate |
+| G4: first sales | Metered plan limits, payment entitlements, billing/refund flows, operational rollback | Publish transparent product demos and results, no investment promises | Test willingness to pay, localized price, payment gateway, terms, taxes, invoices, support; affiliate disclosures if applicable | First genuine paid customer successfully activated and supported; positive contribution margin **or explicit time-boxed subsidy**; no selling unavailable functionality |
+| G5: sustainable scale | Capacity/load-test gates, autoscaling only if economical, security reviews, independent science metrics | Grow repeatable content funnel, customer education and referrals | Cohort retention, churn, conversion, CAC, revenue, refunds, complaints, support burden | Sustained unit economics and reliability at measured traffic; expand only with evidence |
+
+### Technical cost benchmark — mandatory before broad promotion
+1. Benchmark on named hardware, dataset slice and full representative historical data, versioned storage format and indexed seek. Record sample count, methodology, variance, cold/warm cache, p50/p95/p99 where feasible.
+2. Compare **server-authoritative replay** and **hybrid browser replay + server verification** with identical deterministic scenarios; do not assume hybrid is cheaper once validation, downloads, retries and mobile limits are included.
+3. Concurrency: 1/5/10/25/50/100 **active replay sessions** (not website visitors), only proceed while safe. Include seek storms, simultaneous start, paused sessions, mobile memory, 20x playback and failure/recovery.
+4. Track server peak RSS and incremental RAM/session; CPU-seconds/session; storage read/write IOPS and bytes; transfer GB/session; cache hit rate; latency; verification cost; total infrastructure bill; monthly fixed overhead.
+5. Cost model per completed research session = compute + storage operations + network + verification + attributable fixed infrastructure + support/payment cost. Model free tier and Pro usage tails, not only average. Do not promise 'unlimited' until bounded cost is proven.
+6. Add admission control, queue with clear ETA only if measured, rate limits, graceful overload and feature flags. No hidden silent loss or fabricated backtest output.
+7. No numeric capacity or price is declared by this plan. Actual acceptance thresholds must be justified by benchmark, hardware budget, user experience and measured margin.
+
+### Owned media system
+- **YouTube:** primary research/education, long-form reproducible experiments and devlogs; one main research episode can be repurposed into shorts.
+- **TikTok:** short questions, visual probability examples, research caveats and a link to the longer methodology.
+- **Instagram:** Reels, research carousels, progress and community questions.
+- Suggested sustainable *production hypothesis*: one researched long video + three short cuts + one carousel every 1–2 weeks; adjust to measured production time and audience response.
+- Editorial pillars: (a) zero-edge and sample-size illusions; (b) risk of ruin and path dependence; (c) spreads/slippage and realistic assumptions; (d) methodology/protocol and anti-overfitting; (e) building Backtest Lab openly.
+- Each published quantitative claim must disclose model assumptions, fees, data source/rights, sample size, uncertainty, reproducibility, and what it **does not** prove. No guaranteed-profit or cherry-picked strategy claims.
+- Track impressions→qualified engagement→waitlist opt-in→invite activation→completed experiment→return→paid conversion; do not optimize views alone.
+
+### 30/60/90-day *planning windows*, not guaranteed calendar deadlines
+- Days 1–30: brand architecture, content backlog, draft scripts, ethical claims checklist, waitlist specification; continue V2.1 and instrument performance. Publish education independent of product readiness.
+- Days 31–60: V2.2 precision and cost benchmarks as feasible, private alpha invitations only after safety gates, collect completion/incident data, improve onboarding.
+- Days 61–90: if gates pass, invite-only closed beta, price interviews and operational payment preparation; **first sale only after rights, stability, billing and support are ready**. Slip milestones rather than fabricate readiness.
+
+### Business assumptions to falsify
+- Audience segment: Indonesian discretionary traders seeking disciplined, evidence-based replay and research; verify through interviews.
+- Value: repeatable evidence and Protocol Mode improve decisions versus existing replay/journal tools; test with comparative tasks.
+- Willingness to pay: measure, don't infer from competitor prices or comments.
+- Growth: organic educational content can yield qualified signups; measure conversion by channel.
+- Retention: users return for repeated experiments; monitor cohorts, not only first session.
+- Cost: tick-by-tick can be served at sustainable marginal cost; benchmark real concurrent workloads before scaling.
+
+### Owners, dependencies, and explicit blockers
+- Founder: final positioning, public voice, customer interviews, commercial/legal decisions.
+- AI assistance: research, scripts, editorial QA, benchmarking protocols, issue triage, analytics specifications; no pretending autonomous customer support exists.
+- Codex/engineering: implementation only under existing authorized phase sequence and repository gates.
+- Critical blockers: actual data redistribution license, independent execution oracle, V2 full dataset seek benchmark, per-session cost, tenant isolation, privacy/consent, payments/tax/refund readiness.
+- STOP if critical P0 integrity, security, or data-rights issues are unresolved; allow waitlist/educational content to continue without access promises.
+
+### Next executable batch while coding credits cool down
+1. Prepare 12-video editorial backlog with scientific sources and scripts for first 3 episodes.
+2. Define brand naming/handles and landing page messaging, waitlist consent, FAQ and limited-beta disclaimer.
+3. Draft benchmark runbook and CSV result template: hardware, dataset, workload, RAM, CPU, IOPS, network, p95, incidents, cost/session.
+4. Define private-alpha interview script, success tasks, telemetry events and support triage rubric.
+5. Audit what is already in repo before duplicating any planned assets. Do not alter production code or current `main` as part of this planning review.
