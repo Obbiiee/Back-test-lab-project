@@ -122,6 +122,10 @@ def create_local_app(dsn, *, port=5188):
     async def review(request: Request):
         return await execute(application.review,await body(request))
 
+    @app.post("/api/v1/tick-alpha/sessions/{session_id}/view")
+    async def workspace(session_id: str,request: Request):
+        return await execute(application.workspace,session_id,await body(request))
+
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/confirm")
     async def confirm(session_id: str,request: Request):
         return await execute(application.confirm,session_id,await body(request))

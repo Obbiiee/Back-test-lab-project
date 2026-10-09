@@ -1,6 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {api,id,sessionPath,selectSessionUrl} from './client.js';
+import {command} from './client.js';
+import AlphaWorkspace from './AlphaWorkspace.jsx';
 import './tickAlpha.css';
 
 const initialPlan=()=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:'2000',sl:'1998',tp:'2004',
@@ -12,12 +14,14 @@ export default function TickAlpha(){
   const [kind,setKind]=useState('FREE_STYLE'),[plan,setPlan]=useState(initialPlan),[planRevision,setPlanRevision]=useState(0);
   const flight=useRef(false);
   const creationId=useRef(null);
+  const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
+  const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
   useEffect(()=>{
     let mounted=true;
     (async()=>{try{
       const list=await api('/catalog');
       const selected=new URL(window.location.href).searchParams.get('session');
-      const saved=selected?await api(sessionPath(selected)):null;
+      const saved=selected?await api(sessionPath(selected)+'/view',{timeframe:'1m'}):null;
       if(mounted){setCatalog(list);setView(saved);}
     }catch(error){if(mounted)setNotice(error.message);}})();
     return ()=>{mounted=false;};
@@ -25,10 +29,11 @@ export default function TickAlpha(){
   const run=async action=>{
     if(flight.current)return;
     flight.current=true;setBusy(true);setNotice('');
-    try{await action();}catch(error){setNotice(error.message);}finally{flight.current=false;setBusy(false);}
+    try{return await action()??true;}catch(error){setNotice(error.message);return false;}finally{flight.current=false;setBusy(false);}
   };
   const reopen=async session=>{
-    const saved=await api(sessionPath(session));setView(saved);selectSessionUrl(session);setReview(null);setDialog(null);
+    setPauseToken(n=>n+1);
+    const saved=await loadWorkspace(session);setView(saved);selectSessionUrl(session);setReview(null);setDialog(null);
     setPlan(initialPlan());setPlanRevision(0);
     setNotice('Session reopened from its committed local state.');
   };
@@ -36,6 +41,7 @@ export default function TickAlpha(){
   const protocol=view?.method.kind==='PROTOCOL';
   const planned=protocol||plan.workflow==='PLANNED';
   const openReview=()=>run(async()=>{
+    setPauseToken(n=>n+1);
     const draft={...plan,workflow:planned?'PLANNED':'QUICK',orderType:protocol&&plan.orderType==='MARKET'?'LIMIT':plan.orderType,
       ...(protocol?{tp:null,riskPercent:null,quantity:null}:{}),
       ...(!protocol&&planned?{quantity:null}:{}),
@@ -47,7 +53,7 @@ export default function TickAlpha(){
   });
   const confirm=()=>run(async()=>{
     await api(sessionPath(view.metadata.id)+'/confirm',{reviewId:review.review.command.commandId,reviewHash:review.reviewHash});
-    setView(await api(sessionPath(view.metadata.id)));setDialog(null);setReview(null);
+    setView(await loadWorkspace(view.metadata.id));setDialog(null);setReview(null);
     setNotice('Order accepted and saved locally. A fill requires the next eligible tick.');
   });
   const createMethod=event=>{
@@ -66,22 +72,30 @@ export default function TickAlpha(){
     run(async()=>{
       const saved=await api('/sessions',{id:creationId.current,name:fields.get('name'),methodId:fields.get('method'),
         initialBalance:fields.get('balance'),startPeriod:'2020-01'});
-      setCatalog(await api('/catalog'));setView(saved);selectSessionUrl(saved.metadata.id);setDialog(null);setPlan(initialPlan());setPlanRevision(0);
+      const workspace=await loadWorkspace(saved.metadata.id);
+      setCatalog(await api('/catalog'));setView(workspace);selectSessionUrl(saved.metadata.id);setDialog(null);setPlan(initialPlan());setPlanRevision(0);
       setNotice('Session created. The initial chart prefix is warmup; orders use subsequent ticks.');
     });
   };
   return <main className="tick-alpha">
     <header><div><strong>Backtest Lab</strong><span className="alpha-badge">Local tick alpha · Synthetic fixture</span></div><a href="/">Open local v1</a></header>
     <section className="alpha-context" aria-label="Method and Session">
-      <button disabled={busy||!catalog} onClick={()=>{creationId.current=id('method');setKind('FREE_STYLE');setDialog('method');}}>Create Method</button>
-      <button disabled={busy||!catalog?.methods.length} onClick={()=>{creationId.current=id('session');setDialog('session');}}>Create Session</button>
+      <button disabled={busy||!catalog} onClick={()=>{setPauseToken(n=>n+1);creationId.current=id('method');setKind('FREE_STYLE');setDialog('method');}}>Create Method</button>
+      <button disabled={busy||!catalog?.methods.length} onClick={()=>{setPauseToken(n=>n+1);creationId.current=id('session');setDialog('session');}}>Create Session</button>
       <label>Reopen Session<select aria-label="Reopen Session" disabled={busy||!catalog} value={view?.metadata.id||''} onChange={e=>{if(e.target.value)run(()=>reopen(e.target.value));}}>
         <option value="">Choose saved Session</option>{catalog?.sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       {view&&<><span>{view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}</span><button disabled={busy} onClick={()=>run(()=>reopen(view.metadata.id))}>Reload saved Session</button></>}
     </section>
     {!catalog?<section className="alpha-empty"><h1>Local tick service</h1><p>Start the local alpha service and database to create or reopen a Session.</p><p>Your local service is unavailable. Start it, then retry the connection.</p><button disabled={busy} onClick={()=>run(async()=>setCatalog(await api('/catalog')))}>Retry connection</button></section>:!view?<section className="alpha-empty"><h1>Start a research Session</h1><p>Create a Method, then a Session. Your Method rules and balance are saved locally.</p><p>This alpha uses an authored XAUUSD/USD fixture, not historical market prices.</p></section>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p>XAUUSD · USD · authored January 2020 fixture · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'} · revision {view.state.revision}</p></section>
-      <div className="alpha-workspace"><section className="alpha-stage"><h2>Tick execution Session</h2><p>Method and Session are connected to the authoritative tick engine.</p><p>Bid <strong>{view.quote?.bid??'Unavailable'}</strong> · Ask <strong>{view.quote?.ask??'Unavailable'}</strong></p><p>Chart/replay integration follows in the workspace checkpoint.</p><p>All accepted commands are committed locally. Reopening this Session preserves its original balance, Method and evidence.</p></section>
+      <div className="alpha-workspace"><AlphaWorkspace key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
+        onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
+        onReplay={(kind,targetNs)=>run(async()=>{
+          await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
+          const saved=await loadWorkspace(view.metadata.id);setView(saved);
+          if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
+          return true;
+        })} onPriceSelect={price=>edit({entry:String(price)})}/>
       <aside className="alpha-ticket"><h2>Plan an order</h2>
         <label>Workflow<select aria-label="Workflow" disabled={busy||protocol} value={planned?'PLANNED':'QUICK'} onChange={e=>edit({workflow:e.target.value,orderType:e.target.value==='QUICK'?'MARKET':'LIMIT'})}><option value="QUICK">Quick</option><option value="PLANNED">Planned</option></select></label>
         <label>Direction<select disabled={busy} value={plan.side} onChange={e=>edit({side:e.target.value})}><option value="LONG">Buy / Long</option><option value="SHORT">Sell / Short</option></select></label>

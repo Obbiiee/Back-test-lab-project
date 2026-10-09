@@ -16,6 +16,7 @@ from .contracts import seed_state, policy_wire, open_payload, exact, text, price
 from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
+from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
 
 
 def label(value):
@@ -43,7 +44,8 @@ class ResearchApplication:
         self.scope = scope or TrustedScope("fixture:local-alpha", "fixture:local-operator")
         self.__provider = research_provider()
         self.store = PostgresExecutionStore(dsn)
-        self.controller = ExecutionController(self.store, self.__provider)
+        self.__timeline_cache = FixtureTimelineCache(self.__provider)
+        self.controller = ExecutionController(self.store, self.__provider, self.__timeline_cache)
 
     def _catalog_lock(self, db):
         db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (self.scope.workspace_id,))
@@ -138,23 +140,33 @@ class ResearchApplication:
                 require(count < 128, "sessions", "REFUSED_CATALOG_LIMIT")
                 self.store._insert(db,self.scope,state,timeline.checkpoint())
                 db.execute("INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))
+        if not prior:
+            self.__timeline_cache.seed(self.scope, raw['id'], timeline)
         return self.inspect(raw["id"])
 
     def _quote(self, state, checkpoint):
-        timeline = TickTimeline.resume(self.__provider, checkpoint)
-        count = int(state["nextGroupIndex"])
-        groups = timeline.consumer().read_revealed(str(max(0,count-1)),1)
+        groups = self.__timeline_cache.window(self.scope, state['sessionId'], checkpoint, last_only=True)
         return deepcopy(groups[-1]["events"][-1]) if groups else None
 
-    def inspect(self, session_id):
+    def inspect(self, session_id, timeframe=None):
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             meta, method, state, checkpoint = self._session(db,session_id)
             rows = db.execute("SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 256",
                               (self.scope.workspace_id,session_id)).fetchall()
-            return dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=meta, method=method, state=state,
+            view = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=meta, method=method, state=state,
                         events=[unpack(*row) for row in reversed(rows)], eventWindowStart=max(0,state["nextEventIndex"]-256),
                         quote=self._quote(state,checkpoint), label="SYNTHETIC / TEST ONLY")
+            if timeframe is not None:
+                groups = self.__timeline_cache.window(self.scope, session_id, checkpoint)
+                start = max(0,int(state['nextGroupIndex'])-len(groups))
+                view['chart'] = display_candles(groups,state['throughNs'],timeframe,start)
+            return view
+
+    def workspace(self, session_id, raw):
+        keys(raw, 'timeframe')
+        require(type(raw['timeframe']) is str and raw['timeframe'] in TIMEFRAMES, 'timeframe', 'REFUSED_TIMEFRAME')
+        return self.inspect(session_id, raw['timeframe'])
 
     def review(self, raw):
         keys(raw,"sessionId requestId expectedRevision planId planRevision draft")

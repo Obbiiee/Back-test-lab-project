@@ -20,7 +20,7 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -57,7 +57,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     update(); scale.subscribeVisibleLogicalRangeChange(update); chartForOverlay.subscribeClick(select);
     return () => { scale.unsubscribeVisibleLogicalRangeChange(update); chartForOverlay.unsubscribeClick(select); };
   }, [news, newsPrimitive, chartForOverlay, seriesForOverlay, candles, drawingMode]);
-  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: "main:XAUUSD" });
+  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: drawingWorkspace });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
@@ -77,12 +77,12 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   const previousCandlesRef = useRef([]);
   const previousCandleCountRef = useRef(0);
   const previousFirstCandleRef = useRef(null);
-  const showVolume = chartPreferences.showVolume;
+  const showVolume = volumeAvailable && chartPreferences.showVolume;
   const magnetRef = useRef(false);
   const [magnetEnabled, setMagnetEnabled] = useState(false);
   const [keepDrawing, setKeepDrawing] = useState(false);
   const restoredSessionRef = useRef(null);
-  const storageKey = sessionId && (sessionId.startsWith("design-") || sessionId.startsWith("XAUUSD-")) ? "backtest-drawings-v2:" + sessionId : null;
+  const storageKey = drawingStorageKey ?? (sessionId && (sessionId.startsWith("design-") || sessionId.startsWith("XAUUSD-")) ? "backtest-drawings-v2:" + sessionId : null);
 
   useEffect(() => {
     onDrawingStateChange?.({ drawings, selectedId: selectedDrawingId, ...historyState, magnet: magnetEnabled, keepDrawing });
@@ -441,11 +441,12 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     syncCandleSeries(series, isNewSession ? [] : previousCandlesRef.current, candles, transition);
     previousCandlesRef.current = candles;
     indicatorEngine.setCandles(candles);
-    volumeSeriesRef.current?.setData(candles.map((candle) => ({
+    if (volumeAvailable) volumeSeriesRef.current?.setData(candles.map((candle) => ({
       time: candle.time,
       value: Number(candle.volume ?? 0),
       color: candle.close >= candle.open ? "#22c99a66" : "#f0647466",
     })));
+    else volumeSeriesRef.current?.setData([]);
 
     const previousFirst = previousFirstCandleRef.current;
     const prepended = previousFirst != null && candles[0]?.time < previousFirst ? candles.findIndex(bar => bar.time === previousFirst) : 0;
@@ -464,7 +465,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     viewportSessionRef.current = viewportKey;
     previousCandleCountRef.current = candles.length;
     previousFirstCandleRef.current = candles[0]?.time ?? null;
-  }, [candles, viewportKey, indicatorEngine, transition]);
+  }, [candles, viewportKey, indicatorEngine, transition, volumeAvailable]);
 
   useEffect(() => {
     const scale=chartRef.current?.timeScale();
@@ -505,7 +506,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   return (
     <div className="chart-wrap" onContextMenu={handleChartContextMenu} onClick={() => setContextMenu(null)}>
       <div className="chart-tools" aria-label="Chart trading controls">
-        <button type="button" className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>
+        <button type="button" disabled={!volumeAvailable} title={volumeAvailable ? 'Volume' : 'Source volume is unavailable; tick count is not exchange volume'} className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>
         <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pilih harga order</button>
         <span className="tool-divider" />
         <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>

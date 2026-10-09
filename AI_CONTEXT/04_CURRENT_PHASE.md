@@ -11,12 +11,16 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V21-2",
-  "CURRENT_IMPLEMENTATION_PHASE": "V21-3",
-  "NEXT_PHASE": "V21-3",
-  "NEXT_PHASE_STATUS": "AUTHORIZED_V21_3_THROUGH_V21_6_AFTER_V21_2_GIT_CLOSURE",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-3",
-  "AUTHORIZED_PHASE_SEQUENCE": ["V21-3", "V21-4", "V21-5", "V21-6"],
+  "LAST_COMPLETED_PHASE": "V21-3",
+  "CURRENT_IMPLEMENTATION_PHASE": "V21-4",
+  "NEXT_PHASE": "V21-4",
+  "NEXT_PHASE_STATUS": "AUTHORIZED_V21_4_THROUGH_V21_6_AFTER_V21_3_GIT_CLOSURE",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V21-4",
+  "AUTHORIZED_PHASE_SEQUENCE": [
+    "V21-4",
+    "V21-5",
+    "V21-6"
+  ],
   "EXECUTION_MODE": "BOUNDED_V21_FUNCTIONAL_ALPHA_AUTO_ADVANCE_AFTER_EACH_VALIDATED_PUSH",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
@@ -70,3 +74,5 @@ The subsequent human submission of the supplied implementation prompt authorized
 Latest human instruction explicitly authorizes continuing through completed V2.1. Verified clean/equal baseline is 9e24d7caabe21aa4bf3fbfdb3158699cb073eb51. This supersedes the historical stop-before-V21-2 rule for only the existing ROADMAP V21-2 through V21-6 journey. Keep one validated commit/push per checkpoint; after remote equality and clean 0/0, auto-advance without another routine approval. Existing system blueprint Section 43 owns bounded scope, frozen contracts remain intact, and preserved drafts/raw data remain separate. No historical full-data acceptance, public deployment, paid data, SaaS/auth/payments or V2.2 is authorized. Final real-browser functional-alpha acceptance is required; STOP at its end or a material hard gate.
 
 V21-2 local Method/Session gates passed; [Section 43 acceptance](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v21-2-implementation-and-acceptance-evidence) owns evidence. Complete its normal commit/push/actual remote equality and clean 0/0 before implementing V21-3. The existing multi-checkpoint grant remains in force; no routine reauthorization is required.
+
+V21-3 workspace validation passed; existing Section 43 owns evidence. Complete normal push/actual GitHub equality and clean main 0/0 before implementing the already-authorized V21-4 trading/analysis checkpoint. No V2.2 or historical benchmark acceptance is implied.

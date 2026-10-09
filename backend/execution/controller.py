@@ -7,10 +7,11 @@ from .engine import submit, advance, emit
 
 
 class ExecutionController:
-    __slots__ = ("__store", "__provider")
+    __slots__ = ("__store", "__provider", "__fixture_cache")
 
-    def __init__(self, store, provider):
+    def __init__(self, store, provider, fixture_cache=None):
         self.__store, self.__provider = store, provider
+        self.__fixture_cache = fixture_cache
 
     def create(self, scope, session_id, profile, policy=None, balance="10000"):
         profile = profile_wire(profile)
@@ -39,22 +40,28 @@ class ExecutionController:
             replay = None
             next_checkpoint = checkpoint
             if command["kind"] == "ADVANCE":
-                timeline = TickTimeline.resume(self.__provider, checkpoint)
                 require(len(checkpoint["advanceTargets"]) < MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
-                ack = timeline.advance_through(command["payload"]["targetNs"], timeline.cursor)
+                if self.__fixture_cache is None:
+                    timeline = TickTimeline.resume(self.__provider, checkpoint)
+                    ack = timeline.advance_through(command["payload"]["targetNs"], timeline.cursor)
+                    next_checkpoint = timeline.checkpoint()
+                else:
+                    ack, next_checkpoint = self.__fixture_cache.reveal(scope, command['sessionId'], checkpoint, command['payload']['targetNs'])
                 next_state, financial = advance(next_state, ack["groups"], ack["coverage"], ack["diagnostics"], ack["throughNs"])
                 events += financial
                 replay = {"throughNs":ack["throughNs"], "exhaustedThroughBoundary":ack["exhaustedThroughBoundary"]}
-                next_checkpoint = timeline.checkpoint()
             elif command["kind"] == "SEEK":
-                timeline = TickTimeline.resume(self.__provider, checkpoint)
-                ack = timeline.seek(command["payload"]["targetNs"])
-                require(len(timeline.checkpoint()["advanceTargets"]) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
+                if self.__fixture_cache is None:
+                    timeline = TickTimeline.resume(self.__provider, checkpoint)
+                    ack = timeline.seek(command["payload"]["targetNs"])
+                    next_checkpoint = timeline.checkpoint()
+                else:
+                    ack, next_checkpoint = self.__fixture_cache.reveal(scope, command['sessionId'], checkpoint, command['payload']['targetNs'], seek=True)
+                require(len(next_checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 next_state["throughNs"] = ack["throughNs"]
                 next_state["nextGroupIndex"] = ack["cursor"]["nextGroupIndex"]
                 emit(next_state, events, "SESSION_SEEK", classification="ACCEPTED_COMMAND", throughNs=ack["throughNs"])
                 replay = {"throughNs":ack["throughNs"], "exhaustedThroughBoundary":True}
-                next_checkpoint = timeline.checkpoint()
             # Order commands do not reveal ticks or change the controller checkpoint.
             # Replay validation belongs to ADVANCE/SEEK, avoiding long row locks on
             # concurrent confirmation retries while retaining durable CAS/dedup.
