@@ -206,3 +206,7 @@ From verified clean/equal S-1 checkpoint `b6fa6bf424d3a3b9a9ae5c69c9c885318215ed
 ## S-3 — Independent calculator and indicator host comparison
 
 From verified S-2 `f6e638dc221ebbfff93c85f041890d20609b9bc9`, pinned goldens/prefix and actual LC5 host fixtures support DT-IND KEEP calculators + KEEP host. Flat RSI, OpenAlgo flat Stochastic and OpenCharts ATR differ from frozen BTL semantics; OpenCharts host reproduces removed LC4 API failure. [Existing STITCH audit Section 14](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#14-s-3-calculator-and-host-comparison--2026-10-10) owns evidence/cost/limits. Full frontend/repository/release/bundle/preservation and normal Git closure precede S-4 conditional KEEP/N/A. No runtime/dependency/data change; OpenAlgo own host source-inspected, not browser-certified; expanded catalog/large-history acceptance remains separate.
+
+## S-4 — Conditional indicator migration KEEP/N/A
+
+From clean/equal S-3 `166571672733a79eb94c600f6d43d776ebd57366`, calculator and host migration are independently N/A because DT-IND selected both current BTL owners. Existing registry/engine/adapter/config/persistence remain intact; no second owner or speculative adoption. Fresh repository/bundle/preservation/diff and normal Git closure precede S-5. Runtime reruns exempt for documentation only; S-3 actual frontend/browser evidence remains historical. [STITCH audit Section 15](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#15-s-4-conditional-indicator-migration--keep--na) owns the conditional result.
