@@ -1,5 +1,9 @@
 # Short history
 
+### R-4A Alpha strategy/source presentation slice (2026-10-11)
+
+From clean/equal `92ddcaa`, changed only product wording/default strategy selection and added an action-opened source details panel using existing modal/timestamp owners. The existing [design owner](../docs/PRODUCT_DESIGN_BLUEPRINT.md#alpha-strategysource-composition-evidence-2026-10-11) records functional validation and design-context dependency. No stored Method/Session renaming, financial command/schema/data/trust/dependency change. This completes a bounded presentation slice, not R-4/I-3 or Alpha; operational owner records remaining design input and scope. Normal full frontend/browser/repository/bundle/protection/diff/Git closure applies.
+
 ### S-2 Alpha Ray extension (2026-10-11)
 
 From clean/equal `1e9d590`, added Ray to existing drawing registry/toolbar/primitive/history/persistence, adapting only attributed MIT donor endpoint normalization with an offscreen-anchor correction. Existing [STITCH audit Section20](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#20-alpha-ray-integration--2026-10-11) owns lifecycle/browser/validation evidence. Strict version1 JSON and all legacy bytes retain their owners; no full donor runtime or dependency/financial/data change. Full frontend regression, lint/build/distribution and nine-type browser coordinate persistence gates PASS. Normal repository/bundle/protection/diff/Git closure precedes already-authorized R-4/I-3 workspace UX; full Alpha acceptance remains pending.

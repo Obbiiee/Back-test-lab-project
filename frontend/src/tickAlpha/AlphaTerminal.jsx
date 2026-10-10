@@ -1,8 +1,8 @@
 import {useRef,useState} from 'react';
 import {ratioLabel} from './annotations.js';
 import usePanelResize from '../workspace/usePanelResize.js';
+import {stamp} from './display.js';
 
-const stamp=value=>value===null?'—':new Date(Number(BigInt(value)/1000000n)).toISOString();
 const shown=value=>value??'Unavailable';
 
 export default function AlphaTerminal({view,busy,onAction}){

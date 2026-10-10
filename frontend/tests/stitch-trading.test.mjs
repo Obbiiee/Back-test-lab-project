@@ -31,5 +31,15 @@ try{
   const reviewed=renderToStaticMarkup(ReviewedIntent({payload:{side:'SHORT',orderType:'LIMIT',entry:exact,sl:'2002',tp:'1996',quantity:'0.01',riskPercent:'1'},methodName:'<img src=x onerror=alert(1)>',riskBasis:'10000.0001'}));
   assert.ok(reviewed.includes(exact)&&reviewed.includes('10000.0001')&&reviewed.includes('&lt;img'));
   assert.ok(!reviewed.includes('<img'));
+  const {default:SourceDetails}=await server.ssrLoadModule('/src/tickAlpha/AlphaSourceDetails.jsx');
+  const sourceView={metadata:{startPeriod:'2015-12'},state:{throughNs:'1448929802000000000'},label:'<img src=x onerror=alert(1)>',futureTicks:'SECRET_FUTURE_DATA',eof:'SECRET_EOF'};
+  const sourceBefore=JSON.stringify(sourceView);
+  const sourceHtml=renderToStaticMarkup(SourceDetails({historical:true,view:sourceView,onClose(){}}));
+  assert.ok(sourceHtml.includes('2015-12')&&sourceHtml.includes('unverified')&&sourceHtml.includes('unresolved'));
+  assert.ok(sourceHtml.includes('&lt;img')&&!sourceHtml.includes('<img'));
+  assert.ok(!sourceHtml.includes('SECRET_FUTURE_DATA')&&!sourceHtml.includes('SECRET_EOF'));
+  assert.equal(JSON.stringify(sourceView),sourceBefore);
+  const syntheticHtml=renderToStaticMarkup(SourceDetails({historical:false,catalog:{startPeriod:'2020-01'},onClose(){}}));
+  assert.ok(syntheticHtml.includes('Synthetic fixture')&&!syntheticHtml.includes('Thanks to Exness'));
 }finally{await server.close();}
 console.log('PASS S-5 drawing-to-draft only, Long/Short orientation/refusal, Protocol target/risk ownership, exact quote/review display, intent callbacks and escaped user text.');

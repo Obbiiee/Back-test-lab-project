@@ -1,6 +1,7 @@
 // Number conversion is confined to chart/indicator presentation, never settlement.
 export const TIMEFRAMES=['1m','3m','5m','15m','30m','1h','2h','4h','D'];
 export const TICK_STEP_NS=15000000000n;
+export const stamp=value=>value===null?'—':new Date(Number(BigInt(value)/1000000n)).toISOString();
 export function displayBars(view){
   const chart=view.chart;
   if(!chart||chart.priceBasis!=='EXACT_REVEALED_MID_DISPLAY_ONLY'||chart.volumeAvailable!==false
