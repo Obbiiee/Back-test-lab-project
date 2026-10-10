@@ -27,11 +27,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "EXECUTION_MODE": "AUTHORIZED_LOCAL_V22_CHECKPOINTS",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "V22-C full original Exness 2015 publication, independent source reconciliation and measured benchmark; local V2.2 grant continues after each verified checkpoint.",
+  "TARGET_CHECKPOINT": "V22-E bounded indexed start-month adapter while private V22-C full2015 qualification continues; C/D/F source, precision, performance and cutover gates remain pending. Local V2.2 grant continues after each verified checkpoint.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "V22-B bounded canonical replay and benchmark tooling"
+  "LAST_COMPLETED_CHECKPOINT": "V22-C independent source verification tooling only; full qualification pending"
 }
 ```
 

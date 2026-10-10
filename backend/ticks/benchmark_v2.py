@@ -1,6 +1,8 @@
 """Explicit private local real CSV ingestion/access/replay benchmark CLI."""
 import argparse
 import ctypes
+import hashlib
+from decimal import Decimal
 import json
 import os
 from pathlib import Path
@@ -31,7 +33,7 @@ def disk_size(folder):
     return sum(p.stat().st_size for p in Path(folder).rglob("*") if p.is_file())
 
 
-def _benchmark(source, folder, report_path, *, resume=False, existing_version=None, dataset_folder=None):
+def _benchmark(source, folder, report_path, *, resume=False, existing_version=None, dataset_folder=None, expected_year=None):
     source, folder, report_path=Path(source),Path(folder),Path(report_path)
     folder.mkdir(parents=True,exist_ok=True)
     dataset = Path(dataset_folder) if dataset_folder is not None else folder/"dataset"
@@ -40,6 +42,8 @@ def _benchmark(source, folder, report_path, *, resume=False, existing_version=No
         report_path.parent.mkdir(parents=True,exist_ok=True)
         report_path.write_text(json.dumps(report,indent=2),encoding="utf-8")
     save()  # A prior COMPLETE report must never survive a new failed attempt.
+    if expected_year is not None and (type(expected_year) is not int or not 1970 <= expected_year <= 9999):
+        raise ValueError("SOURCE_YEAR_CONFLICT")
     start=time.perf_counter()
     if existing_version is None:
         ingestion=ExnessIngestion(source,dataset,resume=resume)
@@ -104,7 +108,7 @@ def _benchmark(source, folder, report_path, *, resume=False, existing_version=No
                ("late",low+9*(high-low)//10),("near-end",max(low,high-1)),("exact-last",high),("after-last",high+1))
     # Independent streaming raw-source lower bound, not storage/index metadata.
     from datetime import datetime
-    expected = {}
+    expected, samples, periods = {}, {}, {}
     ordered = sorted(targets, key=lambda pair:pair[1])
     next_target, ordinal, cached_stamp, cached_time = 0, 0, None, None
     scan_started = time.perf_counter()
@@ -113,14 +117,22 @@ def _benchmark(source, folder, report_path, *, resume=False, existing_version=No
         for raw in stream:
             row = parse_record(raw)
             if row["Timestamp"] != cached_stamp:
-                dt = datetime.fromisoformat(row["Timestamp"].replace("Z", "+00:00"))-EPOCH
+                observed = datetime.fromisoformat(row["Timestamp"].replace("Z", "+00:00"))
+                if expected_year is not None and observed.year != expected_year:
+                    p.close();raise ValueError("SOURCE_YEAR_CONFLICT")
+                dt = observed-EPOCH
                 cached_stamp, cached_time = row["Timestamp"], (dt.days*86400+dt.seconds)*1000000000
+            period = row["Timestamp"][:7]
+            if period not in periods and len(periods) >= 1200:
+                p.close();raise ValueError("REFERENCE_PERIOD_LIMIT")
+            periods[period] = periods.get(period, 0)+1
             while next_target < len(ordered) and ordered[next_target][1] <= cached_time:
                 expected[ordered[next_target][0]] = (str(cached_time), str(ordinal))
+                samples[ordered[next_target][0]] = (row["Bid"], row["Ask"], row["Timestamp"])
                 next_target += 1
             ordinal += 1
     for name,_ in ordered[next_target:]:expected[name]=(None,None)
-    report["referenceScan"] = dict(sourceRows=ordinal,elapsedSeconds=time.perf_counter()-scan_started,
+    report["referenceScan"] = dict(sourceRows=ordinal,periodRows=periods,expectedYear=expected_year,elapsedSeconds=time.perf_counter()-scan_started,
                                    method="independent full source-order CSV scan; first ordinal >= each target")
     if ordinal != int(root["eventCount"]):
         p.close();raise ValueError("SOURCE_COUNT_CONFLICT")
@@ -132,6 +144,17 @@ def _benchmark(source, folder, report_path, *, resume=False, existing_version=No
             raise ValueError("REFERENCE_SCAN_MISMATCH")
         if located != reader.locate_v2(reader.dataset_id,version,str(target)):raise ValueError("NONDETERMINISTIC_POSITION")
         opened=time.perf_counter();page=reader.read_page_v2(reader.dataset_id,version,located["position"],256);read=time.perf_counter()-opened
+        if name in samples:
+            event = page["events"][0]
+            bid, ask, stamp = samples[name]
+            identity = dict(schemaVersion=1, artifact="BTL-TICK-ID-1", providerId=root["providerId"],
+                            feedId=root["feedId"], memberHash=pin["sha256"], rawOrdinal=expected[name][1])
+            independently_hashed = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+            if not (Decimal(event["bid"]) == Decimal(bid) and Decimal(event["ask"]) == Decimal(ask)
+                    and event["eventId"] == independently_hashed and event["rawOrdinal"] == expected[name][1]
+                    and event["provenance"]["memberHash"] == pin["sha256"]
+                    and event["provenance"]["originalTimestamp"] == stamp and event["trustedSequence"] is None):
+                reader.close();p.close();raise ValueError("REFERENCE_QUOTE_CONFLICT")
         opened=time.perf_counter()
         for _ in range(10):reader.locate_v2(reader.dataset_id,version,str(target))
         warm=(time.perf_counter()-opened)/10
@@ -147,7 +170,7 @@ def _benchmark(source, folder, report_path, *, resume=False, existing_version=No
                          boundedPageSeconds=read,pageEvents=len(page["events"]),firstAtomicGroupSeconds=group_latency,
                          firstAtomicGroupEvents=sum(len(g["events"]) for g in first["groups"]),sequentialEvents=events,
                          sequentialSeconds=sequential,sequentialEventsPerSecond=events/sequential,memory=memory(),
-                         referenceScanMatches=True,repeatPositionMatches=True,
+                         referenceScanMatches=True,referenceQuoteMatches=name in samples,repeatPositionMatches=True,
                          cacheNote="fresh provider cache; OS cache not flushed, not a claimed cold-disk test")
         report["access"].append(observation);print(json.dumps(dict(stage="ACCESS",**observation)),flush=True);save()
     report["replay"]=[]
@@ -175,10 +198,10 @@ def _benchmark(source, folder, report_path, *, resume=False, existing_version=No
     return report
 
 
-def benchmark(source, folder, report_path, *, resume=False, existing_version=None, dataset_folder=None):
+def benchmark(source, folder, report_path, *, resume=False, existing_version=None, dataset_folder=None, expected_year=None):
     try:
         return _benchmark(source, folder, report_path, resume=resume, existing_version=existing_version,
-                          dataset_folder=dataset_folder)
+                          dataset_folder=dataset_folder, expected_year=expected_year)
     except BaseException as exc:
         path = Path(report_path)
         report = json.loads(path.read_text(encoding="utf-8")) if path.exists() and path.stat().st_size <= 4194304 else {}
@@ -193,4 +216,5 @@ if __name__=="__main__":
     parser.add_argument("--source",required=True);parser.add_argument("--store",required=True);parser.add_argument("--report",required=True)
     parser.add_argument("--resume",action="store_true");parser.add_argument("--existing-version")
     parser.add_argument("--dataset-folder",help="Existing private accepted store; no copy or re-ingestion")
-    args=parser.parse_args();benchmark(args.source,args.store,args.report,resume=args.resume,existing_version=args.existing_version,dataset_folder=args.dataset_folder)
+    parser.add_argument("--expected-year",type=int,help="Explicit source-year restriction; any other year refuses the benchmark")
+    args=parser.parse_args();benchmark(args.source,args.store,args.report,resume=args.resume,existing_version=args.existing_version,dataset_folder=args.dataset_folder,expected_year=args.expected_year)

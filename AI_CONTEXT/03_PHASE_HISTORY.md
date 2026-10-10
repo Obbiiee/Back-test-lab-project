@@ -237,3 +237,7 @@ From clean/equal4404484, recorded the new human V2.2/2015-only completion grant 
 ### V22-B — bounded replay optimization / honest benchmark lifecycle
 
 V22-A baseline `b0ac858` was normally pushed and verified clean/equal0/0. Exact canonical group limits/hash parity and private external-store benchmarking implemented without wire/financial/dependency changes. Full287backend tests/zero skips, frontend/lint/build/distribution, independent Node goldens, bundle determinism and restarted-API browser smoke PASS. Existing Section43 owns measurements and limits; full original-source/day qualification is still pending. Separate commit/push/equality precede continuing the authorized V22-C.
+
+### V22-C source verification tooling — qualification remains pending
+
+From verified/equal `cff7180`, independent original CSV year/month/count/quote/provenance/event-identity checks extend the existing private benchmark; wrong-year/source failures invalidate completion. Existing Section43 owns validation and limitations. This is a tooling checkpoint, not completed full-source ingestion/benchmark or V2.2 acceptance. The ongoing private2015 import and the independent existing-workspace adapter may progress under the existing local journey grant; full C/D/F gates remain mandatory before cutover/acceptance.

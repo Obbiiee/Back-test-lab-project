@@ -502,9 +502,15 @@ class BenchmarkEvidenceTests(unittest.TestCase):
             finally: importer.builder.store.close()
             with redirect_stdout(StringIO()):
                 measured = benchmark(source, path/'measurements', path/'report.json',
-                                     existing_version=result['datasetVersion'], dataset_folder=store)
+                                     existing_version=result['datasetVersion'], dataset_folder=store, expected_year=2015)
             self.assertEqual(measured['status'], 'COMPLETE')
             self.assertEqual(measured['referenceScan']['sourceRows'], 3)
+            self.assertEqual(measured['referenceScan']['periodRows'], {'2015-01': 3})
+            self.assertTrue(all(probe['referenceQuoteMatches'] for probe in measured['access'] if probe['pageEvents']))
+            with self.assertRaisesRegex(ValueError, 'SOURCE_YEAR_CONFLICT'):
+                benchmark(source, path/'wrong-year', path/'report.json', existing_version=result['datasetVersion'],
+                          dataset_folder=store, expected_year=2016)
+            self.assertEqual(json.loads((path/'report.json').read_text(encoding='utf-8'))['status'], 'FAILED')
             self.assertFalse((path/'measurements'/'dataset').exists())
             self.assertGreaterEqual(measured['totalOutputFootprintBytes'], measured['datasetFootprintBytes'])
             source.write_bytes(source.read_bytes()+b'exness,XAUUSDm,2015-01-01 00:00:03.000Z,1200.123,1200.234\n')
