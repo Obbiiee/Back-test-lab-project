@@ -1,5 +1,9 @@
 # Short history
 
+### S-1 supplemental drawing evaluation (2026-10-10)
+
+From clean/equal `3dee7f2`, built inspected MIT donor0.5.1 at exact `72290d3` in ignored isolated artifacts with existing tooling. Authored vectors and actual LC5.2.1 browser reproduce native inverse-time snapping/irregular-time mismatch and native parser incompatibility. Existing [STITCH evidence owner](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#19-supplemental-alpha-drawing-evaluation--2026-10-10) owns measured results, bounded alternatives and selection. No production drawing/storage/chart/dependency change. KEEP canonical manager/history/storage/coordinate bridge; S-2 may ADAPT only attributed donor Ray extension geometry into the existing primitive, with extended-ray selection and existing lifecycle. Native full runtime is not accepted. Normal repository/bundle/protection/diff/Git gates precede S-2.
+
 ### PF-0 Alpha product closure amendment (2026-10-10)
 
 From freshly fetched clean/equal `d2f82bf`, the human accepted the complete Alpha proposal and explicitly directed continuing to the target. Extended the existing Alpha scope, design screen checklist, Decision Register, measurement contract, OSS intake and ledger mapping; no new roadmap/document owner. Added Ray and the minimum optional feedback/usefulness/cost slice to planned scope, with one separately pinned drawing evaluation, unchanged frozen financial/data/Protocol semantics and a separate external rollout gate. Existing S/V21/V22 acceptance and uncertainty limits remain historical evidence, not full hosted Alpha completion.

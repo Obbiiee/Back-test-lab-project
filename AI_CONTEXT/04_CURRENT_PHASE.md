@@ -13,11 +13,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "PF-0 Alpha product closure",
-  "CURRENT_IMPLEMENTATION_PHASE": "S-1 supplemental drawing spike",
-  "NEXT_PHASE": "S-2 conditional drawing and Ray",
+  "LAST_COMPLETED_PHASE": "S-1 supplemental drawing spike",
+  "CURRENT_IMPLEMENTATION_PHASE": "S-2 conditional drawing and Ray",
+  "NEXT_PHASE": "R-4/I-3 Alpha workspace UX",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_PREVIOUS_CHECKPOINT_GIT_GATES",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "S-1 supplemental drawing spike",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "S-2 conditional drawing and Ray",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
   "AUTO_ADVANCE_AFTER_PASS": true,
@@ -26,7 +26,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "PF-0 Alpha scope/screens/OSS/measurement reconciliation; normal Git checkpoint gates precede S-1 execution"
+  "LAST_COMPLETED_CHECKPOINT": "S-1 supplemental pinned0.5.1 drawing observations and selection; normal Git closure precedes S-2"
 }
 ```
 

@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Alpha drawing donor fixture</title>
+<style>body{background:#10141c;color:#ddd;font:14px system-ui;margin:0}header,pre{padding:12px}button{padding:8px;margin:4px}#chart{height:400px}pre{white-space:pre-wrap}</style>
+<header>Supplemental 0.5.1 — authored candles, isolated fixture
+<button id="probe">Probe coordinates</button><button id="zoom">Zoom</button><button id="pan">Pan</button><button id="tf">Timeframe</button><button id="resize">Resize</button></header>
+<div id="chart"></div><pre id="report"></pre><script src="/lc.js"></script><script type="module">
+import {DrawingManager,makeCoords} from '/donor.js';
+import {projectTimestamp,continuousPointFromPointer} from '/coords.js';
+const el=document.querySelector('#chart'),out=document.querySelector('#report'),errors=[];
+addEventListener('error',e=>{errors.push(e.message);});addEventListener('unhandledrejection',e=>{errors.push(String(e.reason));});
+const chart=LightweightCharts.createChart(el,{autoSize:true,layout:{background:{color:'#10141c'},textColor:'#ddd'},timeScale:{timeVisible:true}});
+const series=chart.addSeries(LightweightCharts.CandlestickSeries);
+const full=Array.from({length:80},(_,i)=>({time:1700000000+i*60+(i>35?300:0),open:1900+i*.1,high:1901+i*.1,low:1899+i*.1,close:1900.5+i*.1}));
+let bars=full;series.setData(bars);chart.timeScale().fitContent();
+const donor=new DrawingManager(chart,series,{bars:()=>bars});
+const anchors=[{time:1700000735.25,price:1902},{time:1700002195.75,price:1905}];
+donor.add({id:'native-ray',kind:'ray',points:structuredClone(anchors)});
+const original=donor.exportJSON();
+function probe(){const coords=makeCoords(chart,series,()=>bars);const x=projectTimestamp(chart.timeScale(),bars,anchors[0].time);
+out.textContent=JSON.stringify({LC:LightweightCharts.version(),donor:'0.5.1',bars:bars.length,x,nativeInverse:coords.xToTime(x),
+canonical:anchors[0].time,hostInverse:continuousPointFromPointer(chart,series,{x,y:100},bars)?.time,
+serializedUnchanged:donor.exportJSON()===original,drawings:JSON.parse(donor.exportJSON()),errors},null,2);}
+document.querySelector('#probe').onclick=probe;
+document.querySelector('#zoom').onclick=()=>{chart.timeScale().setVisibleLogicalRange({from:5,to:65});requestAnimationFrame(probe);};
+document.querySelector('#pan').onclick=()=>{chart.timeScale().setVisibleLogicalRange({from:15,to:75});requestAnimationFrame(probe);};
+document.querySelector('#tf').onclick=()=>{bars=bars===full?full.filter((_,i)=>i%5===0):full;series.setData(bars);chart.timeScale().fitContent();requestAnimationFrame(probe);};
+document.querySelector('#resize').onclick=()=>{el.style.height=el.clientHeight===400?'300px':'400px';requestAnimationFrame(probe);};
+chart.timeScale().subscribeVisibleLogicalRangeChange(probe);new ResizeObserver(probe).observe(el);requestAnimationFrame(probe);
+</script></html>
