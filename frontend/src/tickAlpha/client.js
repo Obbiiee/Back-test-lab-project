@@ -2,8 +2,9 @@
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
 export async function api(path,body){
+  const source=typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('tick-alpha')==='local'?'synthetic':'historical';
   const response=await fetch(ROOT+path,{method:body===undefined?'GET':'POST',cache:'no-store',
-    credentials:'omit',headers:{'X-BTL-Local':'1',...(body===undefined?{}:{'Content-Type':'application/json'})},
+    credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
     ...(body===undefined?{}:{body:JSON.stringify(body)})});
   const value=await response.json();
   if(!response.ok)throw new Error(value.detail||'Local service unavailable');

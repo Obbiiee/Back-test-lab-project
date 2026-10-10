@@ -1,8 +1,8 @@
 # Backtest Lab
 
 Aplikasi utama: React 19, Vite 8, TradingView Lightweight Charts 5.2.1.
-Default v1: `frontend/index.html` → `frontend/src/main.jsx` → `FigmaWorkspace.jsx`; local tick alpha is an explicit opt-in route.
-Source produksi tetap di `frontend/src/`; backend tidak diperlukan untuk workspace default v1.
+Default lokal: workspace tick Exness melalui `frontend/src/main.jsx` → `TickAlphaEntry.jsx`. UI v1 tetap tersedia secara eksplisit pada `/?legacy=local`; fixture sintetis pada `/?tick-alpha=local` memakai UI tick yang sama.
+Source produksi tetap di `frontend/src/`. Workspace utama memerlukan layanan loopback, PostgreSQL yang sudah dimigrasikan, dan dataset privat yang sudah dipublikasikan; tidak ada fallback diam-diam ke candle atau fixture.
 
 Arsip XAUUSD sekitar sepuluh tahun: 3.486.461 candle M1, sebelas timeframe, dimuat bertahap dari `frontend/public/market/decade/`. Sumber/batas data: [HISTORICAL_XAU](docs/HISTORICAL_XAU.md).
 
@@ -16,7 +16,7 @@ npm ci
 npm run dev
 ```
 
-Buka alamat yang ditampilkan Vite. Harga live memerlukan internet; simulasi historis berjalan di browser.
+Buka alamat yang ditampilkan Vite setelah menyalakan layanan lokal sesuai [runbook](AI_CONTEXT/07_TEST_COMMANDS.md#local-exness-workspace). Legacy rollback tetap dapat berjalan di browser secara terpisah.
 
 ## Struktur dan validasi
 
@@ -24,7 +24,7 @@ Buka alamat yang ditampilkan Vite. Harga live memerlukan internet; simulasi hist
 - `frontend/tests/`: regresi dan fixture browser; [daftar command](AI_CONTEXT/07_TEST_COMMANDS.md).
 - `frontend/scripts/`: download data dan generator AI bundle.
 - `frontend/legacy/phase3/`, `legacy/`: arsip, bukan aplikasi aktif.
-- `backend/`, `data/`: backend/domain dan sample terpisah; local tick alpha memakai layanan loopback + PostgreSQL, sementara default v1 tetap independen.
+- `backend/`, `data/`: backend/domain dan sample terpisah; local tick alpha memakai layanan loopback + PostgreSQL, sementara legacy v1 tetap independen.
 - `AI_CONTEXT/`: konteks aktual; [mulai di sini](AI_CONTEXT/00_START_HERE.md).
 - `docs/`: laporan historis dan keputusan; [indeks](docs/README.md).
 - `AI_BUNDLE/`, dependencies, build/cache: output lokal yang diabaikan Git.
@@ -45,10 +45,10 @@ python -m unittest discover -s tests -t . -v
 
 API lama: buat virtual environment, install `requirements.txt`, lalu `uvicorn api.main:app --reload --port 8000`. Konsumen UI lamanya tersimpan di arsip Phase 3; menyalakan API tidak mengaktifkan UI tersebut pada workspace utama.
 
-## Local tick Functional Alpha (V2.1)
+## Local tick workspace (bounded Exness connection)
 
-Open `/?tick-alpha=local` on the configured loopback frontend (5173, or isolated QA 5196), with the separately configured local PostgreSQL and loopback service running. See [authoritative run/test commands](AI_CONTEXT/07_TEST_COMMANDS.md) and [existing Section 43 scope/evidence](docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md). Service startup does not migrate/reset a database; choose an accepted isolated target and apply the existing checksum migrations explicitly. Credentials stay in the local environment.
+Open `/` on the configured loopback frontend (5173, or isolated QA 5196), with the separately configured local PostgreSQL and loopback service running. See [authoritative run/test commands](AI_CONTEXT/07_TEST_COMMANDS.md) and [existing Section 43 scope/evidence](docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md). Service startup does not migrate/reset a database; choose an accepted isolated target and apply the existing checksum migrations explicitly. Credentials stay in the local environment.
 
-Create a Method, create/reopen its Session, use chart/drawings/indicators and tick replay, review/confirm an intent, then reveal ticks to observe its actual simulated lifecycle. Trading/Analysis read the same committed event chain; reload reopens the database Session. Drawing geometry persists separately per Session; indicator settings currently reset on reload. The default v1 route retains its historical candle-modelled workspace.
+Create a Method, create/reopen its Session, use chart/drawings/indicators and tick replay, review/confirm an intent, then reveal ticks to observe its actual simulated lifecycle. Trading/Analysis read the same committed event chain; reload reopens the database Session. Drawing geometry persists separately per Session; indicator settings persist per Session. The explicit `/?legacy=local` route retains its historical candle-modelled workspace and saved state.
 
-This alpha uses authored synthetic XAUUSD/USD Bid/Ask evidence and exact simulated postings. It does not certify Exness ingestion, historical/broker precision, large-data SLO, margin/liquidity/slippage/latency or public data rights. Ambiguity stays explicit. R0 was not explicitly pinned in the reviewed schema, so R is unavailable; MAE/MFE and Monte Carlo are not computed/accepted. V2.2 requires separate scope/authorization; the single roadmap remains [ROADMAP](docs/ROADMAP.md).
+The admitted private Exness subset contains 100,000 original rows (complete timestamp groups), 2015-08-10 through 2015-08-11 UTC. It is not the full year. Coverage/freshness and ordering trust remain unresolved; intent execution may be UNRESOLVED without changing money. `/?tick-alpha=local` remains an explicitly synthetic test source. Neither mode certifies full-source benchmarking, broker precision, large-data SLO, margin/liquidity/slippage/latency or public data rights. Ambiguity stays explicit. R0 was not explicitly pinned in the reviewed schema, so R is unavailable; MAE/MFE and Monte Carlo are not computed/accepted. V2.2 requires separate scope/authorization; the single roadmap remains [ROADMAP](docs/ROADMAP.md).

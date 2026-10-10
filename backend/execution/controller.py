@@ -35,12 +35,17 @@ class ExecutionController:
             return self.__store.fork(scope, command)
 
         def operation(state, checkpoint):
-            require(len(checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureRecovery", "REFUSED_RECOVERY_LIMIT")
+            indexed = getattr(self.__fixture_cache, 'indexed', False)
+            if indexed:
+                self.__fixture_cache.validate_checkpoint(checkpoint)
+            else:
+                require(len(checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureRecovery", "REFUSED_RECOVERY_LIMIT")
             next_state, events = submit(state, command)
             replay = None
             next_checkpoint = checkpoint
             if command["kind"] == "ADVANCE":
-                require(len(checkpoint["advanceTargets"]) < MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
+                if not indexed:
+                    require(len(checkpoint["advanceTargets"]) < MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 if self.__fixture_cache is None:
                     timeline = TickTimeline.resume(self.__provider, checkpoint)
                     ack = timeline.advance_through(command["payload"]["targetNs"], timeline.cursor)
@@ -57,7 +62,8 @@ class ExecutionController:
                     next_checkpoint = timeline.checkpoint()
                 else:
                     ack, next_checkpoint = self.__fixture_cache.reveal(scope, command['sessionId'], checkpoint, command['payload']['targetNs'], seek=True)
-                require(len(next_checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
+                if not indexed:
+                    require(len(next_checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 next_state["throughNs"] = ack["throughNs"]
                 next_state["nextGroupIndex"] = ack["cursor"]["nextGroupIndex"]
                 emit(next_state, events, "SESSION_SEEK", classification="ACCEPTED_COMMAND", throughNs=ack["throughNs"])

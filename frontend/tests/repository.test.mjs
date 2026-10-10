@@ -28,6 +28,8 @@ const executionReferences=new Set([
   'backend/execution/analysis.py','backend/tests/test_tick_analysis.py','backend/tests/stitch_analytics.py',
   'backend/execution/workspace.py','backend/tests/test_tick_workspace.py',
   'backend/execution/research.py','backend/execution/research_fixture.py','backend/execution/local_api.py',
+  'backend/execution/historical.py','backend/ticks/contracts_v2.py','backend/ticks/storage_v2.py','backend/ticks/exness_v2.py','backend/ticks/timeline_v2.py','backend/ticks/evidence_v2.py','backend/ticks/benchmark_v2.py',
+  'backend/tests/test_historical_workspace.py','backend/tests/test_tick_storage_v2.py','backend/tests/test_tick_evidence_v2.py','backend/tests/test_identity.py',
   'backend/infrastructure/migrations/006_research_sessions.sql','backend/tests/test_research_sessions.py',
   'backend/execution/__init__.py','backend/execution/contracts.py','backend/execution/engine.py',
   'backend/execution/controller.py','backend/execution/postgres.py','backend/execution/fixture_demo.py',
@@ -49,7 +51,7 @@ for(const category of ['context','implementation','tests','supporting'])for(cons
   assert.ok(allowedBundleSource(file),'Bundle must remain task-specific: '+file);
 }
 for(const file of executionReferences)assert.ok([...config.implementation,...config.tests].includes(file),'Execution seam missing from reviewed bundle: '+file);
-for(const file of ['backend/cloud/app.py','backend/ticks/exness_v2.py','backend/.env','data/raw.csv','frontend/public/market/data.json','frontend/public/licenses/unreviewed.js','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
+for(const file of ['backend/cloud/app.py','backend/ticks/unreviewed.py','backend/.env','data/raw.csv','frontend/public/market/data.json','frontend/public/licenses/unreviewed.js','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
 for(const file of ['frontend/public/licenses/opencharts-LICENSE.txt','frontend/public/licenses/NOTICE.txt'])assert.ok(config.supporting.includes(file),'Adapted presentation must retain attribution in its bundle');
 assert.ok(config.context.includes('docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md'));
 const pkg=JSON.parse(read('frontend/package.json')),lock=JSON.parse(read('frontend/package-lock.json'));

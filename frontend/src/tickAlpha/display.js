@@ -20,7 +20,9 @@ export function displayBars(view){
 }
 export function replayTarget(view,steps){
   if(![1,4,16].includes(steps))throw Error('Unsupported replay batch');
-  return String(BigInt(view.state.throughNs)+BigInt(steps)*TICK_STEP_NS);
+  const step=view.replayStepNs===undefined?TICK_STEP_NS:BigInt(view.replayStepNs);
+  if(typeof view.replayStepNs!=="undefined"&&(typeof view.replayStepNs!=="string"||!/^[1-9][0-9]{0,10}$/.test(view.replayStepNs)||step>60000000000n))throw Error('Invalid replay interval');
+  return String(BigInt(view.state.throughNs)+BigInt(steps)*step);
 }
 export function seekTarget(value){
   if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?$/.test(value))throw Error('Enter a UTC date and time');

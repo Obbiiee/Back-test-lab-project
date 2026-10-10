@@ -1,6 +1,6 @@
 # Frontend Backtest Lab
 
-Source aktif: `src/main.jsx` → `src/FigmaWorkspace.jsx`, chart `src/components/CandleChart.jsx`.
+Source aktif lokal: `src/main.jsx` → `src/tickAlpha/TickAlphaEntry.jsx`, chart bersama `src/components/CandleChart.jsx`. `/?legacy=local` mempertahankan FigmaWorkspace; lihat [panduan root](../README.md) untuk sumber Exness privat, layanan/database, dan fixture sintetis yang terpisah.
 Market/replay, trading/RiskReward, dan drawing memiliki domain terpisah. `src/` adalah source produksi; jangan membuat source tree pengganti.
 
 Jalankan `npm ci`, `npm run dev`. Validasi lengkap dan batas arsitektur dijelaskan di [AI_CONTEXT](../AI_CONTEXT/07_TEST_COMMANDS.md).

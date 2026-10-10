@@ -1,5 +1,7 @@
 # Local v1 release and acceptance evidence
 
+This remains the historical v1 guide for the explicit `/?legacy=local` rollback route. The current local tick/Exness default and required services are described in the [root run guide](../README.md) and [authoritative commands](../AI_CONTEXT/07_TEST_COMMANDS.md#local-exness-workspace); this v1 record does not certify that later dataset or change its acceptance scope.
+
 This is the release evidence/user guide, not a second roadmap, workflow or Definition of Done. Current phase/authorization belongs to AI_CONTEXT/04_CURRENT_PHASE.md; the sole roadmap remains ROADMAP.md. Strategic Lab Protocol/product/website blueprints remain preserved post-v1 direction unless required by existing phase MUST scope.
 
 ## Run the existing application

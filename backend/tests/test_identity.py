@@ -143,10 +143,25 @@ class IdentityTests(unittest.TestCase):
             self.assertEqual(response.status_code, 400); self.assertNotIn(invalid, response.text)
 
     def test_account_rate_shared_across_client_addresses(self):
-        for index in range(11):
-            with client(self.app) as caller:
-                response = caller.post("/api/v1/auth/login", data={"username": self.email, "password": "bad"})
-                self.assertEqual(response.status_code, 429 if index == 10 else 400)
+        # Production uses fixed PostgreSQL minute buckets. A test crossing a
+        # minute must not mistake the intended counter reset for a bypass.
+        # Retry a fresh fixture account only when the real DB bucket changed;
+        # no mocked rate store/clock or weakened status assertions.
+        for _ in range(3):
+            email = "u"+uuid.uuid4().hex+"@example.com"
+            with connect(DSN) as db:
+                before = db.execute("SELECT floor(extract(epoch FROM clock_timestamp())/60)").fetchone()[0]
+            statuses = []
+            for _index in range(11):
+                with client(self.app) as caller:
+                    response = caller.post("/api/v1/auth/login", data={"username": email, "password": "bad"})
+                    statuses.append(response.status_code)
+            with connect(DSN) as db:
+                after = db.execute("SELECT floor(extract(epoch FROM clock_timestamp())/60)").fetchone()[0]
+            if before == after:
+                self.assertEqual(statuses, [400]*10+[429])
+                return
+        self.fail("No single-minute sample obtained; rate acceptance remains unverified")
 
     def test_reset_prevents_stale_login_session_publication(self):
         self.register()

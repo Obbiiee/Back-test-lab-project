@@ -1,6 +1,7 @@
 """Opt-in loopback-only local-alpha transport. No public identity composition."""
 import asyncio
 from collections import deque
+from contextlib import asynccontextmanager
 from ipaddress import ip_address
 import json
 import os
@@ -40,9 +41,26 @@ async def body(request):
     return value
 
 
-def create_local_app(dsn, *, port=5188):
-    app = FastAPI(title="Backtest Lab local tick alpha",docs_url=None,redoc_url=None,openapi_url=None)
-    application = ResearchApplication(dsn)
+def create_local_app(dsn, *, port=5188, historical_source=None):
+    fixture = ResearchApplication(dsn)
+    historical = ResearchApplication(dsn, historical_source=historical_source) if historical_source else None
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        try:
+            yield
+        finally:
+            fixture.close()
+            if historical:
+                historical.close()
+
+    app = FastAPI(title="Backtest Lab local tick alpha",docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
+
+    def application(request):
+        source = request.headers.get("x-btl-source", "historical" if historical else "synthetic")
+        require(source in ("historical", "synthetic"), "source", "REFUSED_SOURCE")
+        require(source != "historical" or historical is not None, "source", "HISTORICAL_SOURCE_UNAVAILABLE")
+        return historical if source == "historical" else fixture
     recent = deque()
     limiter = anyio.CapacityLimiter(2)
     admission = anyio.Semaphore(2)
@@ -65,7 +83,7 @@ def create_local_app(dsn, *, port=5188):
                 return response({"detail":"METHOD_NOT_ALLOWED"},405)
             result = Response(status_code=204)
             result.headers["Access-Control-Allow-Methods"] = "GET, POST"
-            result.headers["Access-Control-Allow-Headers"] = "Content-Type, X-BTL-Local"
+            result.headers["Access-Control-Allow-Headers"] = "Content-Type, X-BTL-Local, X-BTL-Source"
         else:
             if request.method not in {"GET","POST"} or request.headers.get("x-btl-local") != "1" or request.headers.get("transfer-encoding") or request.url.query:
                 return response({"detail":"LOCAL_REQUEST_REQUIRED"},403)
@@ -103,43 +121,48 @@ def create_local_app(dsn, *, port=5188):
         return response(await anyio.to_thread.run_sync(function,*args,limiter=limiter))
 
     @app.get("/api/v1/tick-alpha/catalog")
-    async def catalog():
-        return await execute(application.catalog)
+    async def catalog(request: Request):
+        return await execute(application(request).catalog)
 
     @app.post("/api/v1/tick-alpha/methods")
     async def create_method(request: Request):
-        return await execute(application.create_method,await body(request))
+        return await execute(application(request).create_method,await body(request))
 
     @app.post("/api/v1/tick-alpha/sessions")
     async def create_session(request: Request):
-        return await execute(application.create_session,await body(request))
+        return await execute(application(request).create_session,await body(request))
 
     @app.get("/api/v1/tick-alpha/sessions/{session_id}")
-    async def session(session_id: str):
-        return await execute(application.inspect,session_id)
+    async def session(session_id: str, request: Request):
+        return await execute(application(request).inspect,session_id)
 
     @app.post("/api/v1/tick-alpha/reviews")
     async def review(request: Request):
-        return await execute(application.review,await body(request))
+        return await execute(application(request).review,await body(request))
 
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/view")
     async def workspace(session_id: str,request: Request):
-        return await execute(application.workspace,session_id,await body(request))
+        return await execute(application(request).workspace,session_id,await body(request))
 
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/confirm")
     async def confirm(session_id: str,request: Request):
-        return await execute(application.confirm,session_id,await body(request))
+        return await execute(application(request).confirm,session_id,await body(request))
 
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/commands")
     async def command(session_id: str,request: Request):
-        return await execute(application.apply,session_id,await body(request))
+        return await execute(application(request).apply,session_id,await body(request))
 
     return app
 
 
 def main():
     import uvicorn
-    config = uvicorn.Config(create_local_app(os.environ["BTL_DATABASE_URL"]),host="127.0.0.1",port=5188,
+    historical = None
+    if os.environ.get("BTL_EXNESS_STORE"):
+        from .historical import HistoricalSource, published_version
+        folder = os.environ["BTL_EXNESS_STORE"]
+        historical = HistoricalSource(folder, published_version(folder), log_root=os.environ["BTL_TICK_LOG_ROOT"])
+    config = uvicorn.Config(create_local_app(os.environ["BTL_DATABASE_URL"], historical_source=historical),host="127.0.0.1",port=5188,
                             proxy_headers=False,access_log=False)
     factory = asyncio.SelectorEventLoop if os.name=="nt" else asyncio.new_event_loop
     asyncio.run(uvicorn.Server(config).serve(),loop_factory=factory)

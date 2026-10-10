@@ -1,3 +1,4 @@
+import Icon from './workspace/WorkspaceIcon.jsx';
 import { DRAWING_SPECS } from './drawings/DrawingTypes.js';
 import IndicatorControls from './components/IndicatorControls.jsx';
 import { productionRegistry } from './indicators/productionRegistry.js';
@@ -26,53 +27,7 @@ import "./FigmaWorkspace.css";
 import "./FxWorkspace.css";
 import "./workspace/designTokens.css";
 const CandleChart=lazy(()=>import('./components/CandleChart'));
-function Icon({ name, size = 20 }) {
-	const shapes = {
-		horizontal: <path d="M3 12h18" />,
-    vertical: <path d="M12 3v18" />,
-    rectangle: <rect x="4" y="5" width="16" height="14" rx="1" />,
-    arrow: <path d="M4 20 20 4M10 4h10v10" />,
-    long: <path d="m4 18 16-12M10 6h10v10M4 21h16" />,
-    short: <path d="m4 6 16 12M10 18h10V8M4 3h16" />,
-    back: <path d="m15 18-6-6 6-6" />,
-		play: <path d="m8 5 11 7-11 7V5Z" />,
-		search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></>,
-		plus: <path d="M12 5v14M5 12h14" />,
-		candles: <><path d="M7 3v4M7 13v8M17 3v8M17 17v4" /><rect x="4" y="7" width="6" height="6" /><rect x="14" y="11" width="6" height="6" /></>,
-		indicator: <><path d="M3 18 8 8l4 7 4-11 5 14" /><path d="M3 18h18" /></>,
-		undo: <path d="M9 7 4 12l5 5M5 12h8a6 6 0 0 1 6 6" />,
-		redo: <path d="m15 7 5 5-5 5M19 12h-8a6 6 0 0 0-6 6" />,
-		bolt: <path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" />,
-		hex: <path d="m8 3-5 9 5 9h8l5-9-5-9H8Z" />,
-		camera: <><path d="M5 7h3l2-2h4l2 2h3a2 2 0 0 1 2 2v10H3V9a2 2 0 0 1 2-2Z" /><circle cx="12" cy="13" r="3.5" /></>,
-		code: <><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14" /></>,
-		moon: <path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" />,
-		expand: <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />,
-		cursor: <><path d="M12 2v20M2 12h20" /><circle cx="12" cy="12" r="2" /></>,
-		trend: <><path d="m4 18 6-7 4 3 6-9" /><circle cx="4" cy="18" r="1.5" /><circle cx="20" cy="5" r="1.5" /></>,
-		fib: <><path d="M4 5h16M4 9h12M4 13h16M4 17h10M4 21h16" /></>,
-		pattern: <><path d="m3 18 5-12 5 12 5-12 3 12" /><circle cx="8" cy="6" r="1.5" /><circle cx="13" cy="18" r="1.5" /><circle cx="18" cy="6" r="1.5" /></>,
-		measure: <><path d="m4 18 14-14 3 3L7 21H4v-3Z" /><path d="m13 9 3 3M9 13l3 3" /></>,
-		brush: <><path d="m4 18 11-11 3 3L7 21H4v-3ZM17 5l2-2 3 3-2 2" /></>,
-		text: <><path d="M5 5h14M12 5v14M8 19h8" /></>,
-		smile: <><circle cx="12" cy="12" r="9" /><path d="M8 10h.01M16 10h.01M8 15s1.5 2 4 2 4-2 4-2" /></>,
-		ruler: <><path d="M4 20 20 4M7 17l2 2M10 14l2 2M13 11l2 2" /></>,
-		zoom: <><circle cx="10" cy="10" r="6" /><path d="m15 15 6 6M10 7v6M7 10h6" /></>,
-		magnet: <path d="M5 4v9a7 7 0 0 0 14 0V4h-5v9a2 2 0 0 1-4 0V4H5ZM5 8h5M14 8h5" />,
-		lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
-		eye: <><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></>,
-		trash: <><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14" /></>,
-		layers: <><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></>,
-		order: <><circle cx="12" cy="12" r="8" /><path d="M12 8v8M8 12h8" /></>,
-		news: <><rect x="4" y="4" width="16" height="16" rx="1" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
-		journal: <><rect x="5" y="3" width="14" height="18" rx="1" /><path d="M9 7h6M9 11h6M9 15h4" /></>,
-		settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></>,
-		calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4M17 3v4M3 10h18" /></>,
-		analytics: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
-		bell: <><path d="M18 9a6 6 0 0 0-12 0c0 6-3 7-3 9h18c0-2-3-3-3-9M10 21h4" /></>
-	};
-	return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shapes[name]}</svg>;
-}
+
 const toolGroups = {
   trend: [{ title: "LINES", items: ["Trend Line", "Horizontal Line", "Vertical Line"] }, { title: "SHAPES", items: ["Rectangle", "Arrow", "Text"] }, { title: "RESEARCH", items: ["Fibonacci Retracement", "Measure"] }],
   cursor: [{ title: "", items: ["Cross", "Dot", "Arrow Cursor"] }],

@@ -40,13 +40,27 @@ def method_policy(record):
 
 class ResearchApplication:
     """Single-user local operator; no public identity/tenant composition."""
-    def __init__(self, dsn, scope=None):
+    def __init__(self, dsn, scope=None, *, historical_source=None):
         self.dsn = dsn
-        self.scope = scope or TrustedScope("fixture:local-alpha", "fixture:local-operator")
-        self.__provider = research_provider()
+        self.scope = scope or TrustedScope("local:exness:"+historical_source.version if historical_source else "fixture:local-alpha", "fixture:local-operator")
+        self.__historical = historical_source
+        self.__provider = historical_source or research_provider()
+        self.__profile = historical_source.profile if historical_source else research_profile()
+        self.__label = historical_source.label if historical_source else "SYNTHETIC / TEST ONLY"
+        self.__start = historical_source.start_ns if historical_source else START_NS
+        self.__warmup = self.__start + 1800*1000000000 if historical_source else WARMUP_NS
+        self.__period = historical_source.start_period if historical_source else "2020-01"
         self.store = PostgresExecutionStore(dsn)
-        self.__timeline_cache = FixtureTimelineCache(self.__provider)
+        if historical_source:
+            from .historical import IndexedTimelineCache
+            self.__timeline_cache = IndexedTimelineCache(historical_source)
+        else:
+            self.__timeline_cache = FixtureTimelineCache(self.__provider)
         self.controller = ExecutionController(self.store, self.__provider, self.__timeline_cache)
+
+    def close(self):
+        if self.__historical:
+            self.__timeline_cache.close()
 
     def _catalog_lock(self, db):
         db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (self.scope.workspace_id,))
@@ -96,7 +110,7 @@ class ResearchApplication:
             for meta in metas:
                 self._session(db, meta["id"])
             return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=metas,
-                        label="SYNTHETIC / TEST ONLY", profile=research_profile(), startPeriod="2020-01")
+                        label=self.__label, profile=self.__profile, startPeriod=self.__period)
 
     def create_method(self, raw):
         raw = deepcopy(raw)
@@ -118,31 +132,40 @@ class ResearchApplication:
     def create_session(self, raw):
         keys(raw, "id name methodId initialBalance startPeriod")
         identifier(raw["id"], "sessionId"); label(raw["name"])
-        require(raw["startPeriod"] == "2020-01", "period", "REFUSED_FIXTURE_PERIOD")
-        with connect(self.dsn) as db:
-            self._catalog_lock(db)
-            method = self._method(db, raw["methodId"]); policy = method_policy(method)
-            timeline = TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(START_NS))
-            timeline.seek(str(WARMUP_NS))
-            state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
-                               str(START_NS), research_profile(), policy, raw["initialBalance"])
-            require(exact(raw["initialBalance"],"initialBalance",True) == Fraction(state["initialBalance"]), "moneyPrecision")
-            state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])
-            meta = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-1", id=raw["id"], name=label(raw["name"]), methodId=raw["methodId"],
-                        methodHash=policy.definition_hash, datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
-                        profileHash=state["profileHash"], startPeriod=raw["startPeriod"], initialBalance=state["initialBalance"])
-            blob, sha = pack(meta)
-            prior = db.execute("SELECT content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s", (self.scope.workspace_id,raw["id"])).fetchone()
-            if prior:
-                require(prior[0] == sha, "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
-                self._session(db,raw["id"])
-            else:
-                count = db.execute("SELECT count(*) FROM btl.tick_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
-                require(count < 128, "sessions", "REFUSED_CATALOG_LIMIT")
-                self.store._insert(db,self.scope,state,timeline.checkpoint())
-                db.execute("INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))
-        if not prior:
-            self.__timeline_cache.seed(self.scope, raw['id'], timeline)
+        require(raw["startPeriod"] == self.__period, "period", "REFUSED_FIXTURE_PERIOD")
+        timeline = None
+        seeded = False
+        try:
+            with connect(self.dsn) as db:
+                self._catalog_lock(db)
+                method = self._method(db, raw["methodId"]); policy = method_policy(method)
+                state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
+                                   str(self.__start), self.__profile, policy, raw["initialBalance"])
+                require(exact(raw["initialBalance"],"initialBalance",True) == Fraction(state["initialBalance"]), "moneyPrecision")
+                meta = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-1", id=raw["id"], name=label(raw["name"]), methodId=raw["methodId"],
+                            methodHash=policy.definition_hash, datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
+                            profileHash=state["profileHash"], startPeriod=raw["startPeriod"], initialBalance=state["initialBalance"])
+                blob, sha = pack(meta)
+                prior = db.execute("SELECT content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s", (self.scope.workspace_id,raw["id"])).fetchone()
+                if prior:
+                    # Dedup before constructing a disk timeline: never reset a
+                    # previously committed Session's private position lookup.
+                    require(prior[0] == sha, "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
+                    self._session(db,raw["id"])
+                else:
+                    count = db.execute("SELECT count(*) FROM btl.tick_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
+                    require(count < 128, "sessions", "REFUSED_CATALOG_LIMIT")
+                    timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], self.__start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(self.__start))
+                    timeline.seek(str(self.__warmup))
+                    state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])
+                    self.store._insert(db,self.scope,state,timeline.checkpoint())
+                    db.execute("INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))
+            if timeline is not None:
+                self.__timeline_cache.seed(self.scope, raw['id'], timeline)
+                seeded = True
+        finally:
+            if self.__historical and timeline is not None and not seeded:
+                self.__timeline_cache.discard(timeline)
         return self.inspect(raw["id"])
 
     def _quote(self, state, checkpoint):
@@ -157,7 +180,9 @@ class ResearchApplication:
                               (self.scope.workspace_id,session_id)).fetchall()
             view = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=meta, method=method, state=state,
                         events=[unpack(*row) for row in reversed(rows)], eventWindowStart=max(0,state["nextEventIndex"]-256),
-                        quote=self._quote(state,checkpoint), label="SYNTHETIC / TEST ONLY")
+                        quote=self._quote(state,checkpoint), label=self.__label)
+            if self.__historical:
+                view['replayStepNs'] = '1000000000'
             if timeframe is not None:
                 groups = self.__timeline_cache.window(self.scope, session_id, checkpoint)
                 start = max(0,int(state['nextGroupIndex'])-len(groups))

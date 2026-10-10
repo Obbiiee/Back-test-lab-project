@@ -25,7 +25,7 @@ def tag(obj, artifact, fields):
     keys(obj, "schemaVersion artifact " + fields)
     require(type(obj["schemaVersion"]) is int and obj["schemaVersion"] == 1
             and obj["artifact"] == artifact, "version", "SCHEMA_MISMATCH")
-    canonical_bytes(obj)
+    return canonical_bytes(obj)
 
 
 def text(value, field, limit=1024):
@@ -69,7 +69,7 @@ class CanonicalTick:
 
     @staticmethod
     def _validate(row):
-        tag(row, "BTL-CANONICAL-TICK-1", "datasetId datasetVersion providerId feedId instrumentId eventId timeNs resolutionNs bid ask rawOrdinal trustedSequence provenance quality")
+        raw = tag(row, "BTL-CANONICAL-TICK-1", "datasetId datasetVersion providerId feedId instrumentId eventId timeNs resolutionNs bid ask rawOrdinal trustedSequence provenance quality")
         for field in ("datasetId", "providerId", "feedId", "instrumentId"):
             identifier(row[field], field)
         digest(row["datasetVersion"], "version")
@@ -95,7 +95,7 @@ class CanonicalTick:
         require(q["gapBefore"] in ("NONE", "KNOWN_SESSION_CLOSED", "MISSING_DATA", "UNKNOWN_SILENCE"), "gap")
         require((q["freshness"] == "UNKNOWN" and q["gapBefore"] == "UNKNOWN_SILENCE")
                 or q["evidenceHash"] is not None, "evidence", "MISSING_EVIDENCE_REFERENCE")
-        return canonical_bytes(row)
+        return raw
 
     @property
     def wire(self):

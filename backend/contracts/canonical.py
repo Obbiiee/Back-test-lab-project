@@ -27,7 +27,7 @@ def utc_text(value):
 
 
 def _text(value):
-    require(len(value) <= 65536 and not any(0xD800 <= ord(c) <= 0xDFFF for c in value), "unicode")
+    require(len(value) <= 65536 and (value.isascii() or not any(0xD800 <= ord(c) <= 0xDFFF for c in value)), "unicode")
     return value
 
 

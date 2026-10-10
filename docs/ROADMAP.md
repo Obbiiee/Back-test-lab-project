@@ -1370,3 +1370,6 @@ For each checkpoint: verify authorized scope and current Git state → implement
 
 - **V2.1 Functional Alpha:** real tick engine and small-fixture correctness, coherent browser UX, durable single-user Session, traceable engine events and documented limits. **Not** a claim of historical/production execution accuracy.
 - **V2.2 Precision Beta:** measured and independently checked historical fidelity, large-scale performance and reliability gates, with remaining provider/broker-model limitations documented.
+
+
+Bounded local integration evidence (2026-10-10): the human's steps 1-3 connect one structurally published original-source 100k-row Exness subset to the existing tick/UI stack and local default route, with explicit legacy rollback. This is an incremental V22-B/C/D/E/F connection, **not** completion of those full program gates or Precision Beta. Existing [Section 43](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v22-bounded-local-exness-connection----human-steps-1-3-2026-10-10) owns actual measurements/validation/limits; operational status remains only in current-phase. Full 2015 qualification/benchmark and public rights remain deferred. No second roadmap.

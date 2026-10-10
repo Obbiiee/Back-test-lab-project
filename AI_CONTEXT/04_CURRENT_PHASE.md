@@ -14,16 +14,17 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "LAST_COMPLETED_PHASE": "S-7",
   "CURRENT_IMPLEMENTATION_PHASE": null,
   "NEXT_PHASE": "V2.2",
-  "NEXT_PHASE_STATUS": "REQUIRES_HUMAN_AUTHORIZATION",
+  "NEXT_PHASE_STATUS": "REQUIRES_HUMAN_SCOPE_AND_AUTHORIZATION",
   "AUTHORIZED_IMPLEMENTATION_PHASE": null,
   "AUTHORIZED_PHASE_SEQUENCE": [],
-  "EXECUTION_MODE": "STOP_BEFORE_V22",
+  "EXECUTION_MODE": "STOP_AFTER_HUMAN_STEPS_1_2_3",
   "AUTO_ADVANCE_AFTER_PASS": false,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "STITCH S-1\u2013S-7 bounded synthetic Functional Alpha closed after final Git equality gate. STOP; define/authorize bounded V2.2 scope separately.",
+  "TARGET_CHECKPOINT": "Bounded local Exness subset connection / existing UI reuse / explicit default and legacy rollback accepted; final normal Git checkpoint/equality closes human steps 1-3. STOP. Full 2015 qualification/benchmark, full V22-C/D/Precision Beta and other-year/public work remain incomplete and need new bounded scope.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
-  "FINAL_ROADMAP_PHASE": "75"
+  "FINAL_ROADMAP_PHASE": "75",
+  "LAST_COMPLETED_CHECKPOINT": "Human steps 1-3: bounded local Exness 100k subset workspace"
 }
 ```
 
@@ -80,3 +81,11 @@ V21-5 UX consolidation gates passed. Complete its normal push/equality and clean
 V21-6 final Functional Alpha acceptance gates passed; existing Section 43 owns factual evidence and limitations. Normal final commit/push/actual remote equality and clean 0/0 close the authorized journey. No active implementation or auto-advance remains after closure; the next existing roadmap program requires separately supplied bounded human scope. STOP before V2.2. Historical authorization paragraphs above do not extend this completed journey.
 
 Latest bounded STITCH grant S-1–S-7 is exhausted by completed S-7 acceptance. Existing audit/ledger own evidence and explicit professional deferrals. Earlier authorization paragraphs are historical, not permission to start V2.2, historical ingestion/benchmark or public delivery. Final Git equality/clean0/0 closes this journey; then STOP with no automatic advancement.
+
+
+## Latest human grant — local Exness / existing UI / default route (2026-10-10)
+
+The human explicitly said "lajutkan no 1,2,3 sampai situ stop" against the immediately preceding three-step proposal. This supersedes the prior no-implementation pointer only for the bounded local integration described above. Existing ROADMAP V22-B through F define dependency gates, not a new roadmap. The existing main baseline was safely fast-forwarded from 346f20a to 2e2e1df after reviewing the two documentation-only commits. Preserve original 42.18 and 42.20 refs/worktrees byte-for-byte; selectively copy reviewed runtime into main, never modify or merge those snapshots wholesale. Use a new private working copy of the interrupted store, not its original staging bytes. Preserve frozen 42.17/42.19 and financial/uncertainty semantics. Progressive original-source subset publication and bounded integration evidence precede the local connection/cutover, following existing ROADMAP V22-C. Full 2015 qualification is not claimed; incomplete progress is never COMPLETE. Scope permits minimum engineering validation and one real source, not an audit/ingestion of all years. Default cutover must pass real-data/replay/refusal and browser gates; uncertain source quality yields unresolved financial results, never certified provider/broker fills. STOP on a material frozen-contract conflict, protected drift, rights/capacity/safety failure, or externally changed baseline.
+
+
+Latest bounded closure: human steps 1-3 are accepted on one structurally published 100k original-row atomic-group subset, with existing UI and explicit legacy rollback. Full backend 284 PASS/zero skips, frontend/regression/build/distribution, actual browser/cold recovery, canonical goldens and preserved drafts passed; existing Section 43 owns evidence/limits. No full V22 phase/Precision Beta completion is claimed. Finish the single bounded checkpoint normal commit/push/actual equality clean0/0, then STOP. The human did not request broader V22 phases or another roadmap. Future planning/implementation is not authorized.

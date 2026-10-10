@@ -78,3 +78,21 @@ assert.ok(noticeText('REFUSED_REWIND_REQUIRES_FORK').includes('Create a separate
 assert.ok(noticeText('REFUSED_REWIND_REQUIRES_FORK').includes('REFUSED_REWIND_REQUIRES_FORK'));
 assert.equal(noticeText('UNKNOWN_BOUNDARY'),'UNKNOWN_BOUNDARY');
 console.log('PASS obsolete-bootstrap cancellation, saved-session reconnect and honest refusal guidance without command mutation.');
+
+const routed=[];
+globalThis.fetch=async(url,options)=>{routed.push({url,options});return {ok:true,json:async()=>({schemaVersion:1})};};
+globalThis.window={location:{href:'http://127.0.0.1:5173/'}};
+await api('/catalog');
+assert.equal(routed.at(-1).options.headers['X-BTL-Source'],'historical');
+assert.ok(!routed.at(-1).url.includes('?'),'Local API query guard remains intact');
+globalThis.window.location.href='http://127.0.0.1:5173/?tick-alpha=local';
+await api('/catalog');
+assert.equal(routed.at(-1).options.headers['X-BTL-Source'],'synthetic');
+delete globalThis.window;
+const observed={state:{throughNs:'1439166600000000000'},replayStepNs:'1000000000'};
+assert.equal(replayTarget(observed,4),'1439166604000000000');
+for(const invalid of ['0','-1','1000000000000',1,true,'1e9'])assert.throws(()=>replayTarget({...observed,replayStepNs:invalid},1));
+assert.ok(ui.includes('startPeriod:catalog.startPeriod'));
+assert.ok(ui.includes("dialog==='ticket'"));
+assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
+console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');

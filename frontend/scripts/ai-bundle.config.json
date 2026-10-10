@@ -138,7 +138,15 @@
     "frontend/src/main.jsx",
     "frontend/src/workspace/usePanelResize.js",
     "frontend/src/workspace/usePopupFocus.js",
-    "frontend/src/workspace/WorkspaceModal.jsx"
+    "frontend/src/workspace/WorkspaceModal.jsx",
+    "backend/execution/historical.py",
+    "backend/ticks/contracts_v2.py",
+    "backend/ticks/storage_v2.py",
+    "backend/ticks/exness_v2.py",
+    "backend/ticks/timeline_v2.py",
+    "backend/ticks/evidence_v2.py",
+    "backend/ticks/benchmark_v2.py",
+    "frontend/src/workspace/WorkspaceIcon.jsx"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -192,7 +200,11 @@
     "frontend/tests/phase14-5.html",
     "frontend/tests/phase14-5.test.mjs",
     "frontend/tests/phase16.test.mjs",
-    "frontend/tests/phase16-built-server.mjs"
+    "frontend/tests/phase16-built-server.mjs",
+    "backend/tests/test_historical_workspace.py",
+    "backend/tests/test_tick_storage_v2.py",
+    "backend/tests/test_tick_evidence_v2.py",
+    "backend/tests/test_identity.py"
   ],
   "supporting": [
     "frontend/public/licenses/opencharts-LICENSE.txt",
