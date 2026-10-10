@@ -227,3 +227,8 @@ From clean/equal S-6 `1aa849081cb0579c3ca7360294f37eb3841867ab`, fixed actual lo
 ## Bounded local Exness connection — human steps 1-3 (2026-10-10)
 
 Baseline 2e2e1df was adopted fast-forward-only after two documentation-only remote commits. One original-source 100k-row atomic-group private Exness subset is structurally published and connected via the reviewed V2 provider/controller/timeline to the existing financial reducer and UI. Root localhost now selects this workspace; old candle UI/state remains explicit legacy rollback, synthetic Sessions remain in their unchanged scope. Existing Section 43 owns exact measurements, validation and limits. Full backend 284 PASS/zero skips, frontend/regression/lint/build/distribution, bundle/hash/determinism, actual browser/cold recovery and protected fingerprints passed. Final normal Git checkpoint/equality closes this bounded task, not a full V22 phase or Precision Beta. Historical 700k and newer 7,213,056-row staging remain partial/unpublished; protected draft snapshots stay byte-identical. STOP after human step 3; no other-year/public work or automatic next phase.
+
+
+### V22-A — authorized local V2.2 baseline / acceptance preparation
+
+From clean/equal4404484, recorded the new human V2.2/2015-only completion grant in the existing operational pointer and baseline/quantitative pre-acceptance budgets in existing blueprint Section43. Existing ROADMAP V22 sequence retained; preserved draft fingerprints PASS. This is preparation/measurement, not full-source qualification or beta completion. Separate documentation/repository/bundle/diff/Git gates apply; the already-authorized local journey may continue after equality.

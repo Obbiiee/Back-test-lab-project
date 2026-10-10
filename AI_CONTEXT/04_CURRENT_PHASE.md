@@ -12,15 +12,22 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 {
   "AUTHORITY": "current-phase",
   "LAST_COMPLETED_PHASE": "S-7",
-  "CURRENT_IMPLEMENTATION_PHASE": null,
+  "CURRENT_IMPLEMENTATION_PHASE": "V2.2",
   "NEXT_PHASE": "V2.2",
-  "NEXT_PHASE_STATUS": "REQUIRES_HUMAN_SCOPE_AND_AUTHORIZATION",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
-  "AUTHORIZED_PHASE_SEQUENCE": [],
-  "EXECUTION_MODE": "STOP_AFTER_HUMAN_STEPS_1_2_3",
-  "AUTO_ADVANCE_AFTER_PASS": false,
+  "NEXT_PHASE_STATUS": "AUTHORIZED_BOUNDED_LOCAL_JOURNEY",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2.2",
+  "AUTHORIZED_PHASE_SEQUENCE": [
+    "V22-A",
+    "V22-B",
+    "V22-C",
+    "V22-D",
+    "V22-E",
+    "V22-F"
+  ],
+  "EXECUTION_MODE": "AUTHORIZED_LOCAL_V22_CHECKPOINTS",
+  "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "Bounded local Exness subset connection / existing UI reuse / explicit default and legacy rollback accepted; implementation Git checkpoint/equality verified, human steps 1-3 closed. STOP. Full 2015 qualification/benchmark, full V22-C/D/Precision Beta and other-year/public work remain incomplete and need new bounded scope.",
+  "TARGET_CHECKPOINT": "Complete existing V2.2 local Precision Beta verification with only Exness XAUUSDm 2015; separate validated commit/push checkpoints; STOP at acceptance or a material frozen-contract/evidence gate.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
@@ -91,3 +98,8 @@ The human explicitly said "lajutkan no 1,2,3 sampai situ stop" against the immed
 Latest bounded closure: human steps 1-3 are accepted on one structurally published 100k original-row atomic-group subset, with existing UI and explicit legacy rollback. Full backend 284 PASS/zero skips, frontend/regression/build/distribution, actual browser/cold recovery, canonical goldens and preserved drafts passed; existing Section 43 owns evidence/limits. No full V22 phase/Precision Beta completion is claimed. Finish the single bounded checkpoint normal commit/push/actual equality clean0/0, then STOP. The human did not request broader V22 phases or another roadmap. Future planning/implementation is not authorized.
 
 Implementation checkpoint 375a776d3ceac6bed8377606d11f5fa32f39cb80 passed normal push and actual local/origin/GitHub equality clean0/0; remaining closure bookkeeping is documentation-only. The pointer remains idle/auto-advance OFF; STOP after this report.
+
+
+## Latest human grant — complete existing V2.2 locally (2026-10-10)
+
+The human explicitly authorized completion through V2.2 after restricting source use to the supplied Exness XAUUSDm 2015 CSV. This supersedes the exhausted steps-1-3 STOP only for the existing ROADMAP V22-A through F local verification journey. Starting clean/equal baseline: `4404484a2b056daf8f4b975a8af087f00cdd483e`. Preserve protected drafts and original staging, frozen 42.17/42.19, unknown quality, old Session identity/state, one workspace and explicit rollback. No other-year import, public redistribution/deployment, paid procurement, broker fill certification, new UI or roadmap. Each successful checkpoint requires applicable validation, existing-owner update, normal commit/push, actual GitHub equality and clean0/0 before auto-advancing. No routine reauthorization between checkpoints; material contract/rights/provenance/capacity conflicts require STOP. Existing Section43 owns implementation scope/evidence; the roadmap remains the sole journey owner.
