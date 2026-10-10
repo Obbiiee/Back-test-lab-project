@@ -356,3 +356,7 @@ Same gate; cost/user and support burden included.
 ## Journey completion
 
 The frozen journey is complete at L-8. Post-Alpha parking-lot work requires a new planning/freeze cycle; it is not silently appended to this ledger.
+
+### R-5 canonical journal evidence
+
+The existing [system architecture evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#alpha-canonical-journal-implementation-evidence--2026-10-11) owns durable scoped notes, independent note CAS, canonical complete JSON export and actual validation/limits. No financial authority or roadmap changes. The operational pointer and authorization remain solely in AI_CONTEXT/04_CURRENT_PHASE.md; Git closure precedes already-authorized R-6.

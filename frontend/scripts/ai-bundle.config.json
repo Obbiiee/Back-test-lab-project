@@ -33,6 +33,9 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "frontend/src/tickAlpha/AlphaJournal.jsx",
+    "backend/execution/journal.py",
+    "backend/infrastructure/migrations/007_tick_journal.sql",
     "frontend/src/tickAlpha/AlphaHome.jsx",
     "frontend/src/tickAlpha/AlphaSourceDetails.jsx",
     "frontend/src/tickAlpha/AlphaOrderPresentation.jsx",
@@ -169,6 +172,7 @@
     "frontend/tests/browser/stitch-lc-global.mjs",
     "frontend/tests/stitch-drawing-server.mjs",
     "frontend/tests/browser/stitch-drawing.html",
+    "backend/tests/test_tick_journal.py",
     "backend/tests/test_tick_analysis.py",
     "backend/tests/test_tick_workspace.py",
     "backend/tests/test_research_sessions.py",

@@ -25,6 +25,7 @@ assert.ok(read('frontend/tests/phase6.test.mjs').includes('PHASE5_STORAGE_BEFORE
 const config=JSON.parse(read('frontend/scripts/ai-bundle.config.json'));
 // V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
 const executionReferences=new Set([
+  'backend/execution/journal.py','backend/tests/test_tick_journal.py','backend/infrastructure/migrations/007_tick_journal.sql',
   'backend/execution/analysis.py','backend/tests/test_tick_analysis.py','backend/tests/stitch_analytics.py',
   'backend/execution/workspace.py','backend/tests/test_tick_workspace.py',
   'backend/execution/research.py','backend/execution/research_fixture.py','backend/execution/local_api.py',

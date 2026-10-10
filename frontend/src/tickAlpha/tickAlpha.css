@@ -72,3 +72,4 @@
 @media(max-width:760px){.alpha-workspace{flex:1 0 auto;min-height:560px}.alpha-chart-workspace{min-height:560px}}
 @media(max-width:600px){.alpha-home-nav .alpha-wordmark{white-space:nowrap;font-size:18px}.alpha-home-nav .alpha-wordmark span{font-size:8px;letter-spacing:1.3px}.alpha-home-nav nav a{white-space:nowrap}}
 @media(min-width:761px) and (max-height:600px){.tick-alpha{overflow:auto}.alpha-workspace{flex:1 0 auto;min-height:400px}.alpha-chart-workspace{min-height:400px}}
+.alpha-journal article{border-top:1px solid var(--alpha-line,#dce4df);padding:16px 0}.alpha-journal label{display:block;margin:8px 0}.alpha-journal textarea{display:block;width:100%;min-height:96px;resize:vertical}.alpha-journal code{overflow-wrap:anywhere}.alpha-journal small{margin-left:12px}

@@ -140,6 +140,14 @@ def create_local_app(dsn, *, port=5188, historical_source=None):
     async def review(request: Request):
         return await execute(application(request).review,await body(request))
 
+    @app.get('/api/v1/tick-alpha/sessions/{session_id}/journal')
+    async def journal(session_id: str,request: Request):
+        return await execute(application(request).journal,session_id)
+
+    @app.post('/api/v1/tick-alpha/sessions/{session_id}/journal')
+    async def note(session_id: str,request: Request):
+        return await execute(application(request).save_note,session_id,await body(request))
+
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/view")
     async def workspace(session_id: str,request: Request):
         return await execute(application(request).workspace,session_id,await body(request))

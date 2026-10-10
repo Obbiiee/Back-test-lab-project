@@ -18,6 +18,7 @@ from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
 from .analysis import project, MAX_ANALYSIS_EVENTS
+from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
 
 
 def label(value):
@@ -207,6 +208,60 @@ class ResearchApplication:
         keys(raw, 'timeframe')
         require(type(raw['timeframe']) is str and raw['timeframe'] in TIMEFRAMES, 'timeframe', 'REFUSED_TIMEFRAME')
         return self.inspect(session_id, raw['timeframe'])
+
+    def _journal_projection(self, db, state, checkpoint):
+        require(state['nextEventIndex'] <= MAX_ANALYSIS_EVENTS, 'journal', 'REFUSED_ANALYSIS_LIMIT')
+        def events():
+            for offset in range(0,state['nextEventIndex'],256):
+                page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
+                                  (self.scope.workspace_id,state['sessionId'],offset)).fetchall()
+                for row in page:
+                    yield unpack(*row)
+        analysis = project(state, events(), self._quote(state,checkpoint))
+        require(len(analysis['orders']) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+        return analysis
+
+    def journal(self, session_id):
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            _, _, state, checkpoint = self._session(db,session_id)
+            analysis = self._journal_projection(db,state,checkpoint)
+            orders = {row['id']:row for row in analysis['orders']}
+            saved = db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id LIMIT %s',
+                               (self.scope.workspace_id,session_id,MAX_JOURNAL_ORDERS+1)).fetchall()
+            require(len(saved) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+            notes = []
+            for blob,sha,note_revision,order_id in saved:
+                value = validate_note(unpack(blob,sha),state,orders)
+                require((value['orderId'],value['noteRevision']) == (order_id,note_revision),'journal','CORRUPT_RECORD')
+                notes.append(value)
+            return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',provenance=analysis['provenance'],orders=analysis['orders'],notes=notes,
+                        financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
+    def save_note(self, session_id, raw):
+        journal_request(raw)
+        with connect(self.dsn) as db:
+            _, _, state, checkpoint = self._session(db,session_id,lock=True)
+            analysis = self._journal_projection(db,state,checkpoint)
+            orders = {row['id']:row for row in analysis['orders']}
+            require(raw['orderId'] in orders,'order','RESOURCE_UNAVAILABLE')
+            prior = db.execute('SELECT payload,content_hash,note_revision FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s AND order_id=%s FOR UPDATE',
+                               (self.scope.workspace_id,session_id,raw['orderId'])).fetchone()
+            previous = validate_note(unpack(*prior[:2]),state,orders) if prior else None
+            require(previous is None or previous['noteRevision'] == prior[2],'journal','CORRUPT_RECORD')
+            current = prior[2] if prior else 0
+            # A lost response may be retried exactly, but a competing edit cannot overwrite.
+            if previous and current == raw['expectedNoteRevision']+1 and previous['text'] == raw['text'] and previous['tags'] == raw['tags']:
+                return previous
+            require(raw['expectedNoteRevision'] == current,'noteRevision','REFUSED_STALE_NOTE')
+            value = dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-NOTE-1',sessionId=session_id,
+                         datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],orderId=raw['orderId'],
+                         noteRevision=current+1,text=raw['text'],tags=raw['tags'])
+            validate_note(value,state,orders)
+            blob,sha = pack(value)
+            db.execute('INSERT INTO btl.tick_journal_notes VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (workspace_id,session_id,order_id) DO UPDATE SET note_revision=EXCLUDED.note_revision,payload=EXCLUDED.payload,content_hash=EXCLUDED.content_hash',
+                       (self.scope.workspace_id,session_id,raw['orderId'],value['noteRevision'],blob,sha))
+            return value
 
     def review(self, raw):
         keys(raw,"sessionId requestId expectedRevision planId planRevision draft")

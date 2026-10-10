@@ -45,6 +45,8 @@ export function noticeText(message){
     REFUSED_HISTORICAL_PERIOD:'Choose a month with observations in the configured source year. Unavailable months have no fallback feed.',
     REFUSED_REWIND_REQUIRES_FORK:'This Session already has financial history. Create a separate Session to replay an earlier time.',
     REFUSED_STALE_REVISION:'The saved Session changed. Reload it and review the action again.',
+    REFUSED_STALE_NOTE:'Another edit changed this note. Reload the journal, compare with your retained draft, then explicitly save again.',
+    REFUSED_JOURNAL_LIMIT:'This Session exceeds the complete journal snapshot budget (32 canonical orders). No partial export or reset was made.',
     PROTOCOL_BLOCKED:'Protocol rules blocked this order. Check the checklist and locked entry/exit rules.',
     LOCAL_BUSY:'The local service is busy. Wait for the current request, then retry.',
     REFUSED_ANALYSIS_LIMIT:'Analysis exceeded its bounded event budget. No partial result is shown.',
