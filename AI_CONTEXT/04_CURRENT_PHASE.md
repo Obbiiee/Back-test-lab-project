@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest effective status is the JSON below and this closure: the human-authorized V22-A–F local supplied2015 journey has passed its scoped acceptance; existing [Section43](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v22-f-full-source-operator-cutover-and-scoped-local-precision-beta-acceptance) owns evidence and limits. Complete normal F checkpoint push/actual equality/clean0/0, then STOP. Historical authorization paragraphs below are retained provenance, not permission to continue beyond V2.2. No next implementation scope has been supplied. Actual Exness orders remain unresolved under UNKNOWN quality; no broker-fill/public-data certification.
+
 This is the sole operational phase pointer. String phase IDs preserve fractional checkpoints; null means no active/authorized implementation. Roadmap slots do not grant authorization.
 
 The human authorized local precision planning and subsequently the fixture-only foundation. [Existing blueprint Section 42.6](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#426-local-precision-scope--planning-only) owns scope; [Section 42.7](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint) owns implementation evidence. Market Data Standard remains canonical. The completed policy is recorded in Section 42.9; the Local Tick Review viewer in Section 42.11 is implemented; the subsequent evidence review in Section 42.12 and explicitly authorized local delivery foundation in Section 42.13 are complete. Latest scope is local-first infrastructure; public delivery, frontend cutover, financial settlement and later-phase implementation remain deferred/unimplemented.
@@ -11,27 +13,20 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "S-7",
-  "CURRENT_IMPLEMENTATION_PHASE": "V2.2",
-  "NEXT_PHASE": "V2.2",
-  "NEXT_PHASE_STATUS": "AUTHORIZED_BOUNDED_LOCAL_JOURNEY",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2.2",
-  "AUTHORIZED_PHASE_SEQUENCE": [
-    "V22-A",
-    "V22-B",
-    "V22-C",
-    "V22-D",
-    "V22-E",
-    "V22-F"
-  ],
-  "EXECUTION_MODE": "AUTHORIZED_LOCAL_V22_CHECKPOINTS",
-  "AUTO_ADVANCE_AFTER_PASS": true,
+  "LAST_COMPLETED_PHASE": "V2.2",
+  "CURRENT_IMPLEMENTATION_PHASE": null,
+  "NEXT_PHASE": null,
+  "NEXT_PHASE_STATUS": "SCOPE_UNDEFINED_REQUIRES_HUMAN_AUTHORIZATION",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
+  "AUTHORIZED_PHASE_SEQUENCE": [],
+  "EXECUTION_MODE": "STOP_AFTER_LOCAL_V22_ACCEPTANCE",
+  "AUTO_ADVANCE_AFTER_PASS": false,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "V22-F full-source operator cutover, browser journey and final scoped local Precision Beta acceptance. Preserve unknown quality and explicit100k rollback; stop before later scope.",
+  "TARGET_CHECKPOINT": "STOP after final V22-F normal push, actual GitHub equality and clean0/0. Local supplied2015 Precision Beta only; preserve unknown quality,100k rollback and draft worktrees. Define future bounded scope with the human before implementation.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "V22-D precision and full-source exact cold recovery; F beta acceptance pending"
+  "LAST_COMPLETED_CHECKPOINT": "V22-F scoped local supplied2015 Precision Beta acceptance"
 }
 ```
 
