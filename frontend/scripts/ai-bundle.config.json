@@ -1,5 +1,9 @@
 {
   "context": [
+    "docs/V2_ALPHA_FROZEN_SPEC.md",
+    "docs/PRODUCT_DESIGN_BLUEPRINT.md",
+    "docs/ENGINEERING_MASTER_PLAN.md",
+    "docs/V2_1_PRODUCT_MEASUREMENT_CONTRACT.md",
     "docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md",
     "docs/V2_ALPHA_DECISION_REGISTER.md",
     "docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md",

@@ -4,6 +4,47 @@
 >
 > Operational implementation authorization remains governed by `AI_CONTEXT/04_CURRENT_PHASE.md`. Once the PLAN-FREEZE journey is accepted, normal execution follows the frozen ledger and decision rules; redesign is prohibited except through the hard-invalidation process in the Decision Register.
 
+## 0A. Human-approved Alpha product closure amendment (2026-10-10)
+
+The human requested a complete Alpha and open-source adoption plan, accepted the proposal with "kerjakan chat", and then explicitly directed "ingat kembali pekerjaan dan kerjakan target alpha". This amendment extends this existing scope owner; it does not create another release, roadmap, operational pointer or execution contract. The accepted local V2.2 checkpoint is the starting product asset, not evidence that the complete hosted Alpha promise is fulfilled.
+
+The primary delivery is one usable **internal/local Alpha**, followed by hosted composition/readiness and an external rights/security/capacity gate. Engineering may proceed internally while public data rights remain unresolved. No external deployment, purchase, provider contact or cohort admission is implied. Actual authorization/sequence belongs only to `AI_CONTEXT/04_CURRENT_PHASE.md`.
+
+```json
+{
+  "CONTRACT": "ALPHA_PRODUCT_CLOSURE_20261010",
+  "screen_ids": ["workspace", "method_session", "order_review", "journal_analysis", "source_details", "feedback", "identity_workspace"],
+  "additional_drawing": "Ray",
+  "measurement_owner": "docs/V2_1_PRODUCT_MEASUREMENT_CONTRACT.md",
+  "design_owner": "docs/PRODUCT_DESIGN_BLUEPRINT.md",
+  "oss_owner": "docs/ENGINEERING_MASTER_PLAN.md",
+  "decision_owner": "docs/V2_ALPHA_DECISION_REGISTER.md",
+  "sequence_owner": "docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md",
+  "external_rollout_requires_separate_gate": true,
+  "financial_contract_unchanged": true,
+  "historical_uncertainty_preserved": true
+}
+```
+
+### Product acceptance
+
+| Capability | Alpha acceptance | Existing detail owner |
+| --- | --- | --- |
+| Coherent workspace | One default workspace; chart first, familiar left toolbar, grouped replay, six-dot bottom terminal, action-triggered Order and News surfaces; no QA-named Method/Session | Product Design Blueprint, Alpha screen acceptance section |
+| Method/Session | Select/create descriptive strategy, create/restore persistent Session, inherit Method type and immutable feed; no reset, forced finish or duplicate Method-type prompt | TRADING_METHOD_SESSION_SPEC.md |
+| Drawings | Existing eight primitives plus Ray; Cursor/Select utility and separate Long/Short planning; create/select/drag/edit/delete/lock/hide/history/serialization and TIME+PRICE stability | DRAWING_ENGINE_SPEC.md; supplemental donor gate in Decision Register |
+| Indicators | Existing seven families; add/edit/hide/remove, Session preference persistence and causal input; unavailable source volume stays unavailable | INDICATOR_ENGINE_SPEC.md |
+| Orders | Free Style Quick/Planned; Protocol Planned pending Limit/Stop with locked risk/RR and genuine checklist evidence; explicit review/confirmation | Trading Method/Session and execution contracts |
+| Evidence | Bid/Ask tick-only execution, exact money, causal bounded access, honest unresolved/refused reason; no broker-fill or quality promotion | Market Data Standard, frozen 42.17/42.19, Execution/Financial Contract |
+| Journal/research | Canonical trade-linked notes/exports, basic metrics and the existing R/MAE/MFE/seeded Monte Carlo requirements; unavailable inputs produce explicit null/refusal | Research Metrics Contract; ledger R-5 through R-8 |
+| Feedback/measurement | Optional short questionnaire after meaningful use; bounded vendor-neutral usage events, internal/test exclusion, export and measured cost worksheet/report | Product Measurement Contract, minimum Alpha extension |
+| Identity | Local private mode remains clearly local; hosted readiness composes real existing identity, verification/recovery and workspace authorization | Ledger I-4; existing identity/system blueprint |
+| Recovery/release | No lost/duplicate committed evidence; refresh/restart/rollback preservation; resource, tenant, backup, rights and cohort gates remain mandatory | Existing Data/Ops/Release and Capacity contracts |
+
+UI product completion, precision eligibility and external release eligibility are separate acceptance results. A structurally valid dataset with UNKNOWN quality remains unresolved where execution evidence is insufficient. A synthetic journey can certify functional behavior, not real-feed eligibility. Research denominators never include unresolved positions.
+
+The detailed screen checklist is linked, not copied here. Measurement adds only the minimum Alpha feedback/usefulness/cost capability; a visual survey builder, session recording, marketing suite, billing system, broad analytics dashboard and advanced research remain outside this amendment. OSS decisions remain conditional on compatible pinned code and the existing selection gates. No drawing/indicator engine replacement is preselected.
+
 ## 0. Normative hardening overlay
 
 This specification is interpreted together with:

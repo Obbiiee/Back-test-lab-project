@@ -13,6 +13,25 @@ A failed test is repaired in the same checkpoint. It does not trigger architectu
 
 ## Journey
 
+### Alpha product closure mapping after local V2.2 (2026-10-10)
+
+This is a reconciliation of the existing checkpoints against [the scope amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10), not another roadmap or a claim that the old complete frozen journey already passed. Current-phase alone owns authorization/progress. Accepted V21/STITCH/V22 capabilities are reused with their actual limits; rerun validation when changed, not whole implementation from scratch. Preserve original ledger entries/history below.
+
+| Existing checkpoint | Remaining product closure work / gate |
+| --- | --- |
+| PF-0 | Normalize scope, screens, minimum measurement and supplemental drawing decision; deterministic authority/bundle tests; no runtime change |
+| S-1 / conditional S-2 | Pin and test the one supplemental drawing candidate against BTL/LC5 and Ray; migrate accepted portions only, otherwise minimal existing-owner Ray; preserve JSON/history/rollback |
+| R-4 / I-3 | Apply the design-owner screen checklist to the one current workspace; fix Method/Session wording, source credit, order/News presentation and terminal/replay usability; keep all domain restrictions |
+| R-5 | Connect genuine journal notes/export to canonical trade identities without account mutation |
+| R-6 / R-7 / R-8 | Close pinned initial-risk/basic metric, causal MAE/MFE and frozen seeded-bootstrap gaps; missing evidence remains unavailable; no QuantStats wholesale adoption |
+| H-1 | Implement the minimum bounded event/optional-survey/cost measurement slice through vendor-neutral adapters; disabled/outage operation cannot affect finance |
+| I-4 / I-2 | Compose existing identity/workspace into hosted-ready product paths; real verification/recovery/logout/tenant tests, not a fake login or exposing the loopback personal service |
+| Q-3 / I-5 / H-2 through H-5 | Close only actual admission/browser/security/recovery/capacity gaps against the existing quantitative contracts; preserve successful applicable evidence |
+| L-1 / L-2 | Separate internal product acceptance from external rights; full end-to-end browser/release regression and honest limitations; no external claim while rights/source eligibility are unresolved |
+| L-3 onward | Cohort admission/deployment requires its actual rights/security/capacity/operator gate; no procurement or public deployment by implication |
+
+Each row is decomposed into narrow checkpoint commits using the same owners. Stop on material data/contract/provenance/security/remote conflicts; do not stop just because an intermediate authorized checkpoint succeeds. External-rights blockers do not forbid safe internal engineering. No source certainty promotion, additional-year ingestion, draft merge, live broker, AI/community, billing, chart rewrite or professional full-catalog expansion.
+
 ### PF-0 — Plan Freeze Integrity
 **Input:** Frozen Spec + Decision Register + STITCH-0 + Work Execution Plan.
 **Do:** cross-check links, authority, contradictions and repository baseline.

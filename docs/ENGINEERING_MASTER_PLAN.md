@@ -354,6 +354,33 @@ Before extending commodity v2 subsystems, read [STITCH-0 OSS Replacement & Conso
 
 ## 15. Dependency intake gate
 
+### Alpha product closure OSS intake (2026-10-10)
+
+Scope and screen requirements belong to the [existing Alpha spec](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10) and design owner. This section owns donor decisions/provenance; it is not a second phase sequence. The completed STITCH selection stays historical; [Decision Register CR-ALPHA-20261010](V2_ALPHA_DECISION_REGISTER.md#cr-alpha-20261010--bounded-product-closure-amendment) permits one bounded supplemental drawing evaluation only.
+
+| Area | Upstream / observed license | Intake decision |
+| --- | --- | --- |
+| Chart | tradingview/lightweight-charts; Apache-2.0 with NOTICE/attribution | KEEP installed LC5; official primitives/plugins first; no engine replacement |
+| Drawings | deepentropy/lightweight-charts-drawing; MIT | EVALUATE one exact pin/distribution against existing BTL and the supplemental rubric; README advertises v5/86 tools but compatibility/runtime are unproven; no moving version or assumption that an older installed/reference package is the same code |
+| Dialog/menu/tabs | radix-ui/primitives; MIT | EVALUATE only useful accessibility primitives; current WorkspaceModal/design tokens remain default until a concrete improvement passes focus/browser gates |
+| Terminal resize | bvaughn/react-resizable-panels; MIT | EVALUATE only if existing six-dot/keyboard resize cannot meet screen gate; do not replace a passing small interaction merely to add a dependency |
+| Terminal table | TanStack/table; MIT | EVALUATE when sorting/filtering/row handling requires it; no mandatory dependency for existing small tables |
+| API/identity/database | fastapi/fastapi, fastapi-users/fastapi-users (MIT), postgres/postgres (PostgreSQL License) | KEEP existing foundations; compose real auth rather than duplicate it. FastAPI Users README currently states maintenance mode/security and dependency maintenance; review exact supported pin before hosted composition |
+| Survey | surveyjs/survey-library; MIT Form Library | EVALUATE fixed JSON questionnaire against handwritten bounded-form alternative; paid Creator/Dashboard/PDF are excluded; response API/storage remain BTL-owned |
+| Usage analytics | umami-software/umami; MIT | EVALUATE optional adapter/dashboard after typed internal sink and resource/privacy budget; PostgreSQL aggregate/export path can satisfy early internal slice without another service |
+| Operational measurement | open-telemetry/opentelemetry-python; Apache-2.0 | EVALUATE minimal traces/metrics/no-op export; no large mandatory observability stack or unbounded labels |
+| Browser verification | microsoft/playwright; Apache-2.0 | EVALUATE reusable actual-workflow checks/screenshots; existing browser verification stays required regardless of runner |
+| Hosted HTTPS | caddyserver/caddy; Apache-2.0 | EVALUATE simple reverse proxy when host/operator gate exists; no deployment or purchase now |
+| Research primitives | numpy/numpy, scipy/scipy; BSD licenses | REFERENCE/EVALUATE only a measured need; preserve frozen exact-money/seed/PRNG/calculator semantics; no dependency required merely for small basic metrics |
+| Larger platforms | Formbricks, PostHog, OpenMeter | DEFER for minimum internal Alpha; license/service footprint and actual need must precede adoption |
+| Trading engines | nautechsystems/nautilus_trader, QuantConnect/Lean | REFERENCE only; BTL keeps tick execution, uncertainty, canonical grouping and Passport truth |
+
+Official source URLs are the corresponding `https://github.com/<owner>/<repo>` entries above; inspected public README/package/license facts are dated 2026-10-10, not an incorporation record. Adopting code requires exact upstream revision, inspected file/distribution hash, LICENSE/NOTICE, marked modifications, purpose/adapter owner, transitive security check, measured bundle/resource effect and rollback. No source copy, new installed dependency or donor runtime acceptance is claimed by this planning checkpoint. Open-source code licenses never grant market-data redistribution rights.
+
+The fastest acceptable path is to keep passing foundations, compare one candidate for a concrete gap, import only the part that reduces maintenance, and test that boundary immediately. UI, survey and telemetry libraries never become financial execution authority.
+
+Supplemental drawing candidate inspected via actual GitHub main on 2026-10-10: revision `72290d3165682ec7bd28f96af7f9354184982dda` (upstream commit date2026-10-08), package0.5.1, LC peer `^5.0.0`, MIT Copyright2026deepentropy. Exact package/LICENSE/README blobs are `4c5a2e076198a0a8a726f0755912dc276b72b083`, `4ae18072ead8b4441f91741dd9704b5faf3fb928`, `f7019d6254f1fac67d13763996f65a3b2d123ad4`. Earlier browser-cached package0.2.x descriptions are not the spike pin. This is source/provenance inspection only; no downloaded/executed donor or compatibility acceptance is claimed here. Use this exact revision for S-1, or explicitly report a provenance failure rather than tracking a moving branch.
+
 Before adding a dependency:
 1. prove the capability is needed;
 2. search existing code and mature OSS first;

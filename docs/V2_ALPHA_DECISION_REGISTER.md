@@ -4,6 +4,18 @@
 
 ## 1. Frozen decisions
 
+### CR-ALPHA-20261010 — bounded product closure amendment
+
+**Evidence/authorization:** the human accepted the comprehensive Alpha/OSS proposal and explicitly directed continuing work toward Alpha after V2.2. This uses hard-invalidation condition 8 (human changes product requirement). Scope owner: [Frozen Alpha Spec amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10). Historical S-1–S-7 results remain immutable evidence; they are not rerun or retroactively relabelled.
+
+**Narrow changes:** add Ray to the minimum closure drawing scope; allow a supplemental compatibility spike of `deepentropy/lightweight-charts-drawing` against retained BTL/LC5; add minimum optional questionnaire and bounded usefulness/cost measurement before internal product acceptance. Original three-candidate DT-DRAW remains the historical STITCH journey policy. The supplemental gate below is the sole exception for the new scope, not permission to search endlessly for engines. Financial, market-data, storage/sidecar, Protocol, tenant and rollout contracts are unchanged.
+
+**Supplemental DT-DRAW:** inspect and pin exact donor commit/package/distribution and license before execution of donor code; compare retained BTL and that single donor on the existing Data/Ops MUST rubric plus Ray. README counts/claimed v5 support are not acceptance. In addition test legacy drawing import/refusal/byte preservation, selected-object controls, one-action undo grouping, Text editor focus, lock/delete semantics, TIME+PRICE roundtrip, replay/timeframe/resize and canonical separation. Host storage/history/toolbar remain behind the BTL boundary. Rank qualifying branches by the existing lexicographic rubric; if the donor fails, KEEP and add the minimal Ray extension to the existing owner. No replacement of chart engine, deleted legacy storage, new parallel drawing authority, wholesale donor application or automatic dependency upgrade.
+
+**Measurement exception:** minimum Alpha feedback/usage/cost scope lives in the existing measurement owner. Observational events never block/mutate finance and support disabled/no-op operation. Broad measurement-suite capabilities retain their separately scoped status. Vendor adoption requires real operational/privacy/license evidence.
+
+**Validation/rollback:** supplemental authored parity and actual-browser tests, relevant existing drawing/financial regressions, notices, bundle, full diff and separate commit/push/equality; retain original storage/drafts/legacy entry. Stop on a material frozen-contract contradiction or unsafe migration. The accepted amendment authorizes planning of these boundaries; active checkpoint/journey authorization remains solely in current-phase.
+
 | ID | Status | Decision |
 |---|---|---|
 | ADR-PROD-001 | FROZEN | v2 Alpha is a trustworthy manual historical replay/research product, not automated/live trading. |

@@ -4,6 +4,21 @@ Status: **PLAN-FREEZE / planning only — runtime remains unauthorized by this d
 
 ## 1. Version boundary
 
+### Minimum Alpha extension (human-approved 2026-10-10)
+
+The [Alpha scope amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10) now includes a minimum optional feedback/usage/cost slice for internal Alpha. This narrowly supersedes the earlier statements that *all* questionnaires must wait for the separate measurement release. Full funnel/cohort dashboards, recording, experimentation, visual survey building and marketing attribution remain separately scoped. Existing observational/privacy/no-op rules and acceptance gates still apply. Runtime authorization is supplied only by current-phase, not this document.
+
+Minimum slice:
+- fixed versioned short survey after meaningful use, dismissible and rate-limited; usefulness, useful/confusing feature, unmet need, willingness-to-consider-paying/optional price band and disappointment question; willingness to pay is stated interest, not paid conversion;
+- SurveyJS Form Library is the first evaluation candidate; no paid Creator/Dashboard/PDF requirement; answers have a separate bounded storage/access/export/retention boundary;
+- typed idempotent usage hooks for workspace/replay/order/Analysis/recovery and allowlisted feature categories; failures cannot block financial commits; internal/QA/bot cohorts excluded explicitly;
+- reproducible definitions for meaningful-use activation and return use, with missing telemetry distinguished from abandonment; do not implement a product Finish action to satisfy an old `session_completed` event;
+- workload/cost aggregates plus a dated tariff/config worksheet: compute, storage, DB/backup, bandwidth, data licensing and operational service costs; separate shared fixed costs, variable/marginal costs, active-user average and light/heavy workload classes;
+- measurements include observation window, cohort size, assumptions and exclusions; local laptop usage alone is not a hosted cost invoice; unknown provider costs remain unknown;
+- pseudonymous linkage where policy permits; no tokens, credentials, raw ticks, complete private strategies/orders or journal text in telemetry; no unbounded per-user metric labels.
+
+Before collecting external tester feedback define retention, response access, deletion and notice/consent policy. Internal acceptance first uses authored data and project-owner voluntary feedback. Analytics-disabled/outage/duplicate/retry/storage-budget vectors must prove financial state unchanged. Detailed question delivery belongs here, screen behavior to the design owner, donor intake to the Engineering Master Plan. No competing questionnaire/measurement contract.
+
 ### v2 — usable, trustworthy Alpha product
 v2 must be usable by the owner and closed-alpha testers without depending on the v2.1 analytics stack. It owns:
 - tick-evidence replay/execution and existing frozen financial semantics;

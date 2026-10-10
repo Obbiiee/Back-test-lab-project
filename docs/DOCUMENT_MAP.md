@@ -22,6 +22,7 @@
 | What visual tokens, UI inventory, chooser and terminal rules apply? | [Phase 18.6 UI/design specification](PHASE18_6_UI_UX_DESIGN_SYSTEM.md) |
 | What capabilities are planned and in what phase? | `ROADMAP.md` |
 | What is authorized to implement now? | `../AI_CONTEXT/04_CURRENT_PHASE.md` |
+| What complete Alpha target was accepted after local V2.2? | [Existing Alpha scope amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10); screen acceptance in Product Design Blueprint, supplemental decisions in Decision Register, OSS intake in Engineering Master Plan and checkpoint mapping in the existing ledger |
 | What has actually been completed? | `../AI_CONTEXT/03_PHASE_HISTORY.md` |
 | What workflow / Definition of Done governs implementation? | `../AI_CONTEXT/06_WORKFLOW_RULES.md` |
 

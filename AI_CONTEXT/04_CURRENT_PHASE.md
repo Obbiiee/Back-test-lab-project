@@ -1,6 +1,6 @@
 # Operational phase authority
 
-Latest effective status is the JSON below and this closure: the human-authorized V22-A–F local supplied2015 journey has passed its scoped acceptance; existing [Section43](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v22-f-full-source-operator-cutover-and-scoped-local-precision-beta-acceptance) owns evidence and limits. Complete normal F checkpoint push/actual equality/clean0/0, then STOP. Historical authorization paragraphs below are retained provenance, not permission to continue beyond V2.2. No next implementation scope has been supplied. Actual Exness orders remain unresolved under UNKNOWN quality; no broker-fill/public-data certification.
+Latest effective grant: after requesting and accepting the comprehensive Alpha plan, the human explicitly said "ingat kembali pekerjaan dan kerjakan target alpha". Continue the bounded Alpha product closure mapped onto the existing ledger, starting with PF-0 scope normalization and then the single supplemental drawing spike. The [existing scope amendment](../docs/V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10) owns requirements; [ledger mapping](../docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md#alpha-product-closure-mapping-after-local-v22-2026-10-10) owns decomposition. No competing roadmap or authority. Keep one validated commit/push/equality checkpoint per step and continue after passing intermediate steps. Local/internal product acceptance is the primary target; hosted-ready composition is permitted, but external rollout/deployment, purchases/provider contact and real-data eligibility promotion are not implied. STOP on material frozen-contract/provenance/rights/security/capacity/remote conflicts; external rights uncertainty does not block safe internal work. Preserve drafts, full supplied2015 store, old Sessions and100k rollback. Actual Exness UNKNOWN remains unresolved; no broker-fill certification.
 
 This is the sole operational phase pointer. String phase IDs preserve fractional checkpoints; null means no active/authorized implementation. Roadmap slots do not grant authorization.
 
@@ -13,22 +13,24 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V2.2",
-  "CURRENT_IMPLEMENTATION_PHASE": null,
-  "NEXT_PHASE": null,
-  "NEXT_PHASE_STATUS": "SCOPE_UNDEFINED_REQUIRES_HUMAN_AUTHORIZATION",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": null,
-  "AUTHORIZED_PHASE_SEQUENCE": [],
-  "EXECUTION_MODE": "STOP_AFTER_LOCAL_V22_ACCEPTANCE",
-  "AUTO_ADVANCE_AFTER_PASS": false,
+  "LAST_COMPLETED_PHASE": "PF-0 Alpha product closure",
+  "CURRENT_IMPLEMENTATION_PHASE": "S-1 supplemental drawing spike",
+  "NEXT_PHASE": "S-2 conditional drawing and Ray",
+  "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_PREVIOUS_CHECKPOINT_GIT_GATES",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "S-1 supplemental drawing spike",
+  "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
+  "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
+  "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "STOP after final V22-F normal push, actual GitHub equality and clean0/0. Local supplied2015 Precision Beta only; preserve unknown quality,100k rollback and draft worktrees. Define future bounded scope with the human before implementation.",
+  "TARGET_CHECKPOINT": "Complete the accepted Alpha product closure through internal acceptance using existing ledger owners, with separate validated normal commit/push/equality/clean0/0 checkpoints. Preserve financial/evidence contracts, private2015 and draft/rollback state. No external deployment/cohort, procurement, certainty promotion or post-Alpha scope.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "V22-F scoped local supplied2015 Precision Beta acceptance"
+  "LAST_COMPLETED_CHECKPOINT": "PF-0 Alpha scope/screens/OSS/measurement reconciliation; normal Git checkpoint gates precede S-1 execution"
 }
 ```
+
+Starting baseline for this grant: clean local main = origin/main = actual GitHub main at `d2f82bf1eb2f9f3d0f6871d4b0bb21470216ee11`, freshly fetched and independently checked. The previous V22 grant below is completed historical provenance. PF-0 changes planning/control/test documentation only; S-1 may execute only after its normal push/equality/clean0/0 closure. Subsequent runtime is checkpoint-scoped and must pass its own tests/browser gates. README observations authorize evaluation, never automatic donor adoption.
 
 The completed engineering 20 → 21 → 22 journey reached ef658338d74b501c327cb3c2baf884647436760e. The human authorized expanded **Phase 23 market-data strategy/provider research/licensing/cost planning only**, and approved first checkpointing existing drafts at clean/equal 4876c037da1970867b1a353ad4fb886f94eadaa3. The [existing system blueprint Section 42.5](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#425-phase-23-authorized-research--provider-comparison) owns provider/rights/pricing/cost decisions; [existing Market Data Standard](../docs/MARKET_DATA_STANDARD.md) owns canonical/fidelity/quality/registry requirements.
 

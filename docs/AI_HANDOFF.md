@@ -1,5 +1,11 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — Alpha product closure grant and PF-0
+
+Latest human instruction accepts the complete Alpha proposal and explicitly directs execution toward the target; it supersedes the exhausted V22 STOP only for the bounded existing-owner Alpha closure. Starting main/origin/actual GitHub baseline `d2f82bf` clean0/0. Scope/screens/minimum feedback-cost/Ray/OSS intake and supplemental donor decision are now normalized in existing owners, not a new roadmap. Repository/negative drift and bundle safety/determinism tests plus6Node vectors x3 PASS; protected42.18 seven and42.20 fifteen raw files/refs unchanged. Sandbox realpath failures were retried with the unchanged test outside sandbox and passed. This checkpoint has no runtime/dependency/schema/provider-data change; browser/build/full-backend exemption is documentation-only.
+
+Regenerated verified bundle, full diff and normal PF-0 commit/push/actual equality/clean0/0 precede the already-authorized S-1 supplemental drawing spike. Its inspected candidate is deepentropy/lightweight-charts-drawing0.5.1 at exact `72290d3165682ec7bd28f96af7f9354184982dda`, MIT, LC5 peer; compatibility is not yet accepted. Continue narrow checkpoint commits toward one usable local/internal Alpha, journal/research/feedback/identity/readiness gaps. UNKNOWN data stays unresolved. No public deployment/cohort, procurement, extra-year ingestion, protected draft merge, new chart engine or broad professional catalog. Current-phase remains sole authorization/progress owner; external rights/security/capacity gates remain separate.
+
 This file is an operational mailbox between ChatGPT and Codex.
 It is **not** architecture authority. Frozen decisions belong in the existing authority documents.
 

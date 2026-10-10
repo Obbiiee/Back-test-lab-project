@@ -116,3 +116,34 @@ assert.deepEqual([...acceptance.indicators.deferred].sort(),indicatorCatalog.sor
 for(const owner of Object.values(acceptance.deferred_owners))assert.ok(existsSync(path.join(root,owner.split('#')[0])),'Deferred capability has no existing owner');
 assert.equal(acceptance.professional_catalog_complete,false);assert.equal(acceptance.historical_precision_accepted,false);
 console.log('PASS S-7 single ledger classifies all 25 professional drawing tools and 17 expanded indicators with existing owners; no professional/precision completion claim.');
+
+// Alpha closure: protect scope/owner/screen coherence without copying runtime status.
+function validateAlphaClosure(docs,bundleConfig){
+  const spec='docs/V2_ALPHA_FROZEN_SPEC.md';
+  const contracts=Object.entries(docs).flatMap(([file,doc])=>[...doc.matchAll(/```json\s*([\s\S]*?)```/g)].map(m=>({file,value:JSON.parse(m[1])})))
+    .filter(block=>block.value.CONTRACT==='ALPHA_PRODUCT_CLOSURE_20261010');
+  assert.equal(contracts.length,1,'One Alpha closure scope owner');
+  assert.equal(contracts[0].file,spec);
+  const closure=contracts[0].value;
+  assert.equal(closure.financial_contract_unchanged,true);
+  assert.equal(closure.historical_uncertainty_preserved,true);
+  assert.equal(closure.external_rollout_requires_separate_gate,true);
+  assert.equal(closure.additional_drawing,'Ray');
+  assert.equal(new Set(closure.screen_ids).size,closure.screen_ids.length,'Screen identities must be unique');
+  assert.ok(closure.screen_ids.length>0);
+  for(const key of ['measurement_owner','design_owner','oss_owner','decision_owner','sequence_owner']){
+    const owner=closure[key];assert.ok(docs[owner],'Missing Alpha owner '+key);
+    assert.ok(bundleConfig.context.includes(owner),'Alpha owner excluded from handoff bundle: '+owner);
+    assert.ok(docs[owner].includes('V2_ALPHA_FROZEN_SPEC.md'),'Owner must link to Alpha scope: '+owner);
+  }
+  assert.ok(bundleConfig.context.includes(spec),'Scope excluded from bundle');
+  for(const screen of closure.screen_ids)assert.ok(docs[closure.design_owner].includes('| '+screen+' |'),'Missing screen acceptance: '+screen);
+  const changes=Object.entries(docs).filter(([,doc])=>/^### CR-ALPHA-20261010 —/m.test(doc));
+  assert.deepEqual(changes.map(([file])=>file),[closure.decision_owner],'One supplemental drawing/measurement decision');
+}
+validateAlphaClosure(documents,config);
+assert.throws(()=>validateAlphaClosure({...documents,'docs/duplicate-alpha.md':documents['docs/V2_ALPHA_FROZEN_SPEC.md']},config));
+assert.throws(()=>validateAlphaClosure({...documents,'docs/PRODUCT_DESIGN_BLUEPRINT.md':documents['docs/PRODUCT_DESIGN_BLUEPRINT.md'].replace('| order_review |','| removed_screen |')},config));
+assert.throws(()=>validateAlphaClosure({...documents,'docs/V2_ALPHA_FROZEN_SPEC.md':documents['docs/V2_ALPHA_FROZEN_SPEC.md'].replace('"financial_contract_unchanged": true','"financial_contract_unchanged": false')},config));
+assert.throws(()=>validateAlphaClosure(documents,{...config,context:config.context.filter(p=>p!=='docs/V2_1_PRODUCT_MEASUREMENT_CONTRACT.md')}));
+console.log('PASS Alpha closure single scope/decision, screen acceptance, existing owners/bundle, separate external gate and preserved financial/uncertainty contracts; negative drift rejected.');

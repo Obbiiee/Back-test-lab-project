@@ -6,6 +6,8 @@
 
 This existing roadmap is the sole long-term plan. It was normalized in Phase 7.6 rather than creating a competing AI_CONTEXT roadmap. [Current phase/authorization](../AI_CONTEXT/04_CURRENT_PHASE.md) controls work; [completed history](../AI_CONTEXT/03_PHASE_HISTORY.md) controls historical facts; [workflow/Definition of Done](../AI_CONTEXT/06_WORKFLOW_RULES.md) controls execution. Do not maintain a second current-phase tracker here.
 
+The human-approved [Alpha product closure scope amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10) maps remaining product work onto the existing [Alpha checkpoint ledger](V2_ALPHA_FROZEN_EXECUTION_LEDGER.md#alpha-product-closure-mapping-after-local-v22-2026-10-10). It adds no roadmap number and does not relabel scoped local V2.2 as completed hosted Alpha. Design, measurement, OSS and active progress remain with their existing owners.
+
 The human has defined the high-level planning scopes below through Phase 75, including 14.5. Scope text does not grant implementation permission. Explicit bounded multi-phase human authorization, when supplied, belongs solely to the current-phase pointer; otherwise the default separate-authorization workflow applies. Known Phase 1–3 records remain grouped historically. Completed facts belong to history. Preserve fractional IDs as strings.
 
 | Phase | Milestone / planning scope | Status source / planning state |

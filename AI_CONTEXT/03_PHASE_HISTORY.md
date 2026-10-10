@@ -1,5 +1,11 @@
 # Short history
 
+### PF-0 Alpha product closure amendment (2026-10-10)
+
+From freshly fetched clean/equal `d2f82bf`, the human accepted the complete Alpha proposal and explicitly directed continuing to the target. Extended the existing Alpha scope, design screen checklist, Decision Register, measurement contract, OSS intake and ledger mapping; no new roadmap/document owner. Added Ray and the minimum optional feedback/usefulness/cost slice to planned scope, with one separately pinned drawing evaluation, unchanged frozen financial/data/Protocol semantics and a separate external rollout gate. Existing S/V21/V22 acceptance and uncertainty limits remain historical evidence, not full hosted Alpha completion.
+
+Existing repository tests now protect unique scope/decision, all screen IDs, linked owners/bundle and negative drift cases. Repository and bundle determinism/safety tests PASS; independent6Node goldens x3 PASS; seven42.18 and fifteen42.20 raw file hashes/refs unchanged. Bundle test first hit sandbox realpath EPERM (both OS-temp and workspace-temp attempts); unchanged test passed outside that sandbox. Documentation/test/config-only scope justifies browser/build/full backend exemptions. Regenerated/hash-verified bundle and complete diff/normal commit/push/actual equality/clean0/0 are checkpoint closure gates before the already-authorized supplemental S-1. No runtime/dependency/schema/provider data change or external deployment.
+
 Phase 1–3: trading/drawing separation and protection.
 Phase 4: legacy non-trading drawing and custom indicator runtimes retired; legacy data preserved.
 Phase 5: official series-primitive drawing foundation and Trend Line creation.

@@ -6,6 +6,24 @@
 > **Purpose:** Menyimpan keputusan UX, product language, information architecture, monetization experience, dan AI Research Assistant agar ide tidak hilang.  
 > **Authority:** Dokumen ini bukan implementation authorization dan tidak menggantikan ROADMAP atau AI_CONTEXT/04_CURRENT_PHASE.md.
 
+## Alpha screen acceptance (2026-10-10)
+
+This extends the existing design owner under [the Alpha scope amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10). The existing `UI_FIGMA_PREVIEW.jpg`, Phase 15 Figma UI and Phase 18.6 design tokens are the visual baseline. Do not substitute a donor demo/dashboard as the product design. The Method/Session contract continues to own product semantics.
+
+| Screen ID | Required interaction and visible outcome |
+| --- | --- |
+| workspace | Chart dominates; left tool icons have labels/tooltips; strategy and saved Session are visible; instrument is XAUUSD with unobtrusive Exness source credit; timeframe/indicators/replay are grouped; Order opens on action; News opens from its control; bottom terminal has six-dot drag, keyboard resize/collapse/restore and persisted safe bounds |
+| method_session | First use explains strategy and Session in familiar language; choose/create Method once, inherit its type; user names Session, chooses available start period and initial balance only at creation; restore retains balance/evidence; do not seed product-facing names such as Method Exness 2015 or Session Exness |
+| order_review | Quick or Long/Short plan opens ticket; exact Entry/SL/TP/risk/size/RR and costs assumptions are readable; Protocol restrictions visible; immutable review before explicit Confirm; cancel/Escape returns focus without submitting; repeated confirmation does not duplicate orders |
+| journal_analysis | Pending/positions/history/journal/analysis use the same canonical identities; notes do not change account; unresolved and unavailable measures have readable explanations; export retains provenance |
+| source_details | Opening source credit shows provider feed identity, actual available period and quality/ordering limits; credits express thanks, not broker endorsement or redistribution permission; no technical dataset hash/path in routine creation flow |
+| feedback | Optional short survey after meaningful replay/order/Analysis use; can dismiss; no modal on every load or trade; response save/error/retry explicit; failure never interrupts trading |
+| identity_workspace | Hosted path has real login/verification/recovery/logout and private workspace; local path identified as private/local; no fake login; access denial and expired identity preserve work safely |
+
+Browser acceptance must exercise the actual product at desktop and 780/375px widths, with no overflow hiding essential actions. Dialog Tab/Escape/focus recovery, empty/loading/error/reconnect states and six-dot interaction are required. Verify screenshot composition against the existing design reference; automated financial tests alone do not certify UI quality. Use a new QA Method/Session and isolated annotation namespace, not the user's saved evidence. Source uncertainty remains accessible without overwhelming the chart.
+
+Product wording: **strategi → sesi → replay → rencanakan order → konfirmasi → jurnal → analisis**. Session is a continuing research context; leaving/reopening a workspace is a usage milestone, not a product Finish state. Exness identifies data, never the user's strategy. Keep one workspace with an explicit legacy rollback; fixture routes are engineering tools rather than separate products.
+
 ## Product Identity
 
 Backtest Lab adalah **laboratorium penelitian trading**, bukan sekadar chart replay dengan statistik tambahan.
