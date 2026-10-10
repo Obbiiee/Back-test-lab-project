@@ -13,7 +13,7 @@ The primary delivery is one usable **internal/local Alpha**, followed by hosted 
 ```json
 {
   "CONTRACT": "ALPHA_PRODUCT_CLOSURE_20261010",
-  "screen_ids": ["workspace", "method_session", "order_review", "journal_analysis", "source_details", "feedback", "identity_workspace"],
+  "screen_ids": ["research_home", "workspace", "method_session", "order_review", "journal_analysis", "source_details", "feedback", "identity_workspace"],
   "additional_drawing": "Ray",
   "measurement_owner": "docs/V2_1_PRODUCT_MEASUREMENT_CONTRACT.md",
   "design_owner": "docs/PRODUCT_DESIGN_BLUEPRINT.md",
@@ -27,6 +27,8 @@ The primary delivery is one usable **internal/local Alpha**, followed by hosted 
 ```
 
 ### Product acceptance
+
+Human design clarification (2026-10-11): use the already-present local Figma chart UI/source as the workspace reference; design the remaining surfaces, including a restrained research landing page, originally. Direction: research, mathematics, data science, clean/professional, no trading hard sell or return promises. This explicitly supplies the local-reference alternative to direct Figma context. It adds an informational local research home to the same application; no public deployment, marketing suite, pricing/billing or external data rights are authorized. The requested post-implementation devil's-advocate audit must report actual reproduction/evidence and remaining blockers, not certify Alpha from existing regression alone.
 
 | Capability | Alpha acceptance | Existing detail owner |
 | --- | --- | --- |

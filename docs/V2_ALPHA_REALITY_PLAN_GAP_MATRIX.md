@@ -55,3 +55,16 @@ The v2 Alpha implementation MUST satisfy all of these:
 ## Planning disposition
 
 All known gaps above map to existing frozen journey checkpoints. They harden acceptance; they do not add product scope or authorize runtime. A new finding that cannot map to the frozen architecture must follow the Decision Register hard-invalidation/change-request protocol.
+
+## Alpha implementation adversarial observations (2026-10-11)
+
+These are concrete checkpoint findings, not the requested final post-implementation Alpha audit. Historical planning rows remain unchanged; no final release PASS is inferred.
+
+| Finding | Severity | Reproduction / consequence | Existing owner | Disposition / evidence |
+| --- | --- | --- | --- | --- |
+| ALPHA-A01 | P2 | seekTarget(2025-02-30T12:00) returned March2; April31 and24:00 could normalize rather than reject the requested replay time | R-4/I-3 display boundary | Fixed exact UTC roundtrip; authored leap/century/invalid calendar/time vectors pass, empty browser seek refuses before command |
+| ALPHA-A02 | P2 | Fixed420px mobile workspace height let chart/replay/limitations overlap the following order bar | R-4/I-3 responsive composition | Corrected intrinsic/min height; actual375px DOM bounds confirm detailsBottom≤orderTop and no horizontal overflow |
+| ALPHA-A03 | P2 | A bare home link discarded Session/source query selection, making navigation return to an unselected workspace | R-4/I-3 navigation | Same-origin bounded pagePath preserves Session and synthetic/historical context; actual home return and authored route vectors pass |
+| ALPHA-A04 | P2 | Introducing persisted24px terminal state revealed an unreopenable restoreHeight24 default | R-4 shared panel policy | Fixed minimum restored height144; golden keyboard test plus actual reload/Restore pass. Persistence preserves unsupported/foreign bytes and handles denied/quota failures |
+
+Financial/tick contracts and actual Exness UNKNOWN/UNTRUSTED are unchanged. R-5 through release gates remain pending under the sole operational pointer. After implementation, re-audit tenant/session ownership, no-look-ahead, financial retries/recovery, journal/metrics/measurement, resource bounds, dependency security and complete browser journeys; unresolved severity1/2 issues block internal Alpha acceptance.

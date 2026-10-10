@@ -15,6 +15,13 @@ export async function api(path,body){
   return value;
 }
 export function sessionPath(session){return `/sessions/${encodeURIComponent(session)}`;}
+export function pagePath(page=null){
+  if(page!==null&&page!=='home')throw Error('Unsupported workspace page');
+  const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);
+  url.searchParams.delete('page');
+  if(page)url.searchParams.set('page',page);
+  return url.pathname+url.search;
+}
 export function selectSessionUrl(session){
   const url=new URL(window.location.href);
   url.searchParams.set('session',session);

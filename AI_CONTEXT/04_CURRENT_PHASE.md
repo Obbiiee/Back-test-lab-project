@@ -13,12 +13,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "S-2 conditional drawing and Ray",
-  "CURRENT_IMPLEMENTATION_PHASE": "R-4/I-3 Alpha workspace UX",
-  "NEXT_PHASE": "R-5 canonical journal",
+  "LAST_COMPLETED_PHASE": "R-4/I-3 Alpha workspace UX",
+  "CURRENT_IMPLEMENTATION_PHASE": "R-5 canonical journal",
+  "NEXT_PHASE": "R-6 pinned risk and basic metrics",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "PARTIAL_AWAITING_FIGMA_DESIGN_CONTEXT_LINK",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "R-4/I-3 Alpha workspace UX",
+  "CURRENT_PHASE_STATUS": "AUTHORIZED_AFTER_PREVIOUS_CHECKPOINT_GIT_GATES",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "R-5 canonical journal",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
   "AUTO_ADVANCE_AFTER_PASS": true,
@@ -27,7 +27,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "R-4A strategy/session wording and source details; R-4/I-3 visual composition remains incomplete awaiting Figma file/node URL"
+  "LAST_COMPLETED_CHECKPOINT": "R-4 local chart composition, original research home, action-triggered order/news, guarded terminal persistence and invalid-date refusal; normal Git closure precedes R-5"
 }
 ```
 

@@ -88,3 +88,17 @@ prefValues.set(a.key,currentBytes);const concurrent=newPrefs(a.workspace);concur
 const blocked=new IndicatorPreferences(()=>{throw Error('Storage denied');},'tick-alpha:C',productionRegistry);assert.deepEqual(blocked.load(),[]);assert.equal(blocked.save([]),false);
 const prefQuota=new IndicatorPreferences({getItem:()=>null,setItem:()=>{throw Error('Quota');}},'tick-alpha:D',productionRegistry);prefQuota.load();assert.equal(prefQuota.save(instances),false);assert.ok(prefQuota.status);assert.equal(prefQuota.raw,null);
 console.log('PASS S-7 per-Session indicator roundtrip/edit/hide/remove, isolation, future/corrupt/oversized/duplicate/invalid preferences, foreign-tab and unavailable/quota byte preservation.');
+
+const {TerminalPreferences}=await import('../src/workspacePreferences.js');
+const terminalStore=workspace=>new TerminalPreferences(prefStorage,workspace);
+const terminalA=terminalStore('dataset:A:session:A');assert.equal(terminalA.load(),144);
+assert.equal(terminalA.save(24),true);assert.equal(terminalStore(terminalA.workspace).load(),24);
+const terminalB=terminalStore('dataset:B:session:A');assert.equal(terminalB.load(),144);
+assert.equal(terminalA.save(420),true);assert.equal(terminalStore(terminalA.workspace).load(),420);
+for(const bad of ['{broken',' '.repeat(513),JSON.stringify({version:2,workspace:terminalA.workspace,height:144}),JSON.stringify({version:1,workspace:'foreign',height:144}),JSON.stringify({version:1,workspace:terminalA.workspace,height:143}),JSON.stringify({version:1,workspace:terminalA.workspace,height:Infinity}),JSON.stringify({version:1,workspace:terminalA.workspace,height:144,extra:1})]){
+  prefValues.set(terminalA.key,bad);const held=terminalStore(terminalA.workspace);assert.equal(held.load(),144);assert.equal(held.save(24),false);assert.equal(prefValues.get(held.key),bad);
+}
+const foreignTerminal=terminalStore('dataset:C:session:A');foreignTerminal.load();prefValues.set(foreignTerminal.key,'foreign terminal bytes');assert.equal(foreignTerminal.save(144),false);assert.equal(prefValues.get(foreignTerminal.key),'foreign terminal bytes');
+const deniedTerminal=new TerminalPreferences(()=>{throw Error('Denied');},'blocked');assert.equal(deniedTerminal.load(),144);assert.equal(deniedTerminal.save(24),false);
+const quotaTerminal=new TerminalPreferences({getItem:()=>null,setItem:()=>{throw Error('Quota');}},'quota');quotaTerminal.load();assert.equal(quotaTerminal.save(144),false);assert.equal(quotaTerminal.raw,null);assert.ok(quotaTerminal.status);
+console.log('PASS R-4 terminal preference restore, dataset/Session isolation and hostile/future/foreign/denied/quota preservation.');

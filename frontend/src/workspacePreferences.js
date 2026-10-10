@@ -68,3 +68,35 @@ export class IndicatorPreferences {
     }
   }
 }
+
+// Independent UI preference; never reads or writes Session/account evidence.
+export class TerminalPreferences {
+  writable=false;
+  status='';
+  constructor(storage,workspace){this.storage=storage;this.workspace=workspace;this.key='backtest-terminal-v1:'+encodeURIComponent(workspace);}
+  access(){return typeof this.storage==='function'?this.storage():this.storage;}
+  valid(height){return Number.isInteger(height)&&(height===24||height>=144&&height<=3072);}
+  load(){
+    this.writable=false;
+    try{
+      this.raw=this.access().getItem(this.key);
+      let height=144;
+      if(this.raw!==null){
+        if(typeof this.raw!=='string'||this.raw.length>512)throw Error('Preference size');
+        const doc=JSON.parse(this.raw);
+        if(!doc||doc.version!==1||doc.workspace!==this.workspace||Object.keys(doc).length!==3||!this.valid(doc.height))throw Error('Unsupported terminal preferences');
+        height=doc.height;
+      }
+      this.writable=true;this.status='';return height;
+    }catch{this.status='Terminal preferences unavailable; original data preserved. Changes stay in memory.';return 144;}
+  }
+  save(height){
+    if(!this.writable)return false;
+    try{
+      if(!this.valid(height))throw Error('Invalid height');
+      if(this.access().getItem(this.key)!==this.raw){this.writable=false;throw Error('Foreign edit');}
+      const next=JSON.stringify({version:1,workspace:this.workspace,height});
+      this.access().setItem(this.key,next);this.raw=next;this.status='';return true;
+    }catch{this.status='Terminal preference save failed; original data preserved. Changes stay in memory.';return false;}
+  }
+}

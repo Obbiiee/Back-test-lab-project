@@ -14,6 +14,8 @@
 
 **Measurement exception:** minimum Alpha feedback/usage/cost scope lives in the existing measurement owner. Observational events never block/mutate finance and support disabled/no-op operation. Broad measurement-suite capabilities retain their separately scoped status. Vendor adoption requires real operational/privacy/license evidence.
 
+**Human design clarification (2026-10-11):** the human instructed using the existing local chart UI and originally designing the remaining pages/landing in a clean professional research/math/data-science direction without hard selling. Extend the same scope/design owners with research_home; preserve default private workspace and rollback. This is the explicit local-reference instruction; it removes the missing Figma-link dependency, not data/financial/identity/release gates. The human also requests an adversarial acceptance audit after implementation; findings must be reproducible and unresolved material defects prevent completion claims.
+
 **Validation/rollback:** supplemental authored parity and actual-browser tests, relevant existing drawing/financial regressions, notices, bundle, full diff and separate commit/push/equality; retain original storage/drafts/legacy entry. Stop on a material frozen-contract contradiction or unsafe migration. The accepted amendment authorizes planning of these boundaries; active checkpoint/journey authorization remains solely in current-phase.
 
 | ID | Status | Decision |

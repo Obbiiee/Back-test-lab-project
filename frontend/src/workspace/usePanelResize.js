@@ -11,7 +11,7 @@ export const panelState = height => height === COLLAPSED_HEIGHT ? 'COLLAPSED' : 
 export const keyboardPanelHeight = (height, key, shift, viewportHeight, viewportWidth = 1280, restoreHeight = 150) => {
   const bounds = panelBounds(viewportHeight, viewportWidth), step = shift ? 50 : 10;
   const next = key === 'Home' ? bounds.min : key === 'End' ? bounds.max
-    : key === 'Enter' || key === ' ' ? height === bounds.min ? restoreHeight : bounds.min
+    : key === 'Enter' || key === ' ' ? height === bounds.min ? Math.max(COMPACT_HEIGHT, restoreHeight) : bounds.min
     : key === 'ArrowUp' ? height === bounds.min ? COMPACT_HEIGHT : height + step
     : key === 'ArrowDown' ? height <= COMPACT_HEIGHT ? bounds.min : Math.max(COMPACT_HEIGHT, height - step)
     : height;
@@ -20,7 +20,7 @@ export const keyboardPanelHeight = (height, key, shift, viewportHeight, viewport
 export default function usePanelResize(initialHeight = 150, extraReservedHeight = 0) {
   const [height, setHeight] = useState(() => clampPanel(initialHeight, window.innerHeight - extraReservedHeight, window.innerWidth));
   const cleanup = useRef(() => {});
-  const restoreHeight = useRef(initialHeight);
+  const restoreHeight = useRef(Math.max(COMPACT_HEIGHT, initialHeight));
   useEffect(() => { if (height > COLLAPSED_HEIGHT) restoreHeight.current = height; }, [height]);
   useEffect(() => {
     const resize = () => setHeight(current => clampPanel(current, window.innerHeight - extraReservedHeight, window.innerWidth));

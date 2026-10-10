@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext} from '../src/tickAlpha/client.js';
+import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 
@@ -39,6 +39,11 @@ assert.deepEqual(Object.keys(bars[0]),['time','open','high','low','close']);
 assert.equal(view.chart.candles[0].open,'2000.015');
 assert.equal(replayTarget(view,4),'1577838660000000000');
 assert.equal(seekTarget('2020-01-01T00:30'),'1577838600000000000');
+assert.equal(seekTarget('2020-02-29T12:34:56'),'1582979696000000000');
+assert.equal(seekTarget('2000-02-29T00:00'),'951782400000000000');
+for(const invalid of ['2025-02-30T12:00','2015-04-31T00:00','1900-02-29T00:00','2015-12-01T24:00','2015-13-01T00:00','2015-12-01T00:60','2015-12-01T00:00:60']){
+  assert.throws(()=>seekTarget(invalid),/valid UTC/,'Invalid calendar/time must never silently normalize: '+invalid);
+}
 assert.throws(()=>replayTarget(view,1000));assert.throws(()=>seekTarget('2020-01-01T00:30Z'));
 const future=structuredClone(view);future.chart.candles[0].time=1577838660;
 assert.throws(()=>displayBars(future),/Unrevealed/);
@@ -82,6 +87,12 @@ console.log('PASS obsolete-bootstrap cancellation, saved-session reconnect and h
 const routed=[];
 globalThis.fetch=async(url,options)=>{routed.push({url,options});return {ok:true,json:async()=>({schemaVersion:1})};};
 globalThis.window={location:{href:'http://127.0.0.1:5173/'}};
+assert.equal(pagePath('home'),'/?page=home');
+window.location.href='http://127.0.0.1:5173/?session=session%3Asaved&tick-alpha=local&page=home';
+assert.equal(pagePath(),'/?session=session%3Asaved&tick-alpha=local');
+assert.equal(pagePath('home'),'/?session=session%3Asaved&tick-alpha=local&page=home');
+assert.throws(()=>pagePath('https://evil.example/'));
+window.location.href='http://127.0.0.1:5173/';
 await api('/catalog');
 assert.equal(routed.at(-1).options.headers['X-BTL-Source'],'historical');
 assert.equal(sourceContext(),'historical');

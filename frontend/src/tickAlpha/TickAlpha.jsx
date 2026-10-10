@@ -1,11 +1,12 @@
 import '../workspace/designTokens.css';
 import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
-import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext} from './client.js';
+import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath} from './client.js';
 import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaTerminal from './AlphaTerminal.jsx';
 import AlphaSourceDetails from './AlphaSourceDetails.jsx';
+import Icon from '../workspace/WorkspaceIcon.jsx';
 import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
 import './tickAlpha.css';
@@ -96,7 +97,7 @@ export default function TickAlpha(){
     });
   };
   return <main className="tick-alpha">
-    <header><div><strong>Backtest Lab</strong><span className="alpha-badge">Private local workspace</span></div><a href="/?legacy=local">Legacy rollback</a></header>
+    <header><div><a className="alpha-wordmark" href={pagePath('home')}>Backtest Lab</a><span className="alpha-badge">Private local workspace</span></div><nav aria-label="Workspace navigation"><a href={pagePath('home')}>Research home</a><a href="/?legacy=local">Legacy rollback</a></nav></header>
     <section className="alpha-context" aria-label="Method and Session">
       <button disabled={busy||!catalog} onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);creationId.current=id('method');setKind('FREE_STYLE');setDialog('method');}}>New strategy</button>
       <button disabled={busy||!catalog?.methods.length} onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);creationId.current=id('session');setDialog('session');}}>Create Session</button>
@@ -119,13 +120,14 @@ export default function TickAlpha(){
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
           catch(error){setNotice(error.message);}
-        }}/>
+        }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button disabled={busy||view.state.unresolved} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/></button></aside>
       </div>
       <div className="alpha-order-bar"><span>Bid <strong>{view.quote?.bid??'Unavailable'}</strong> / Ask <strong>{view.quote?.ask??'Unavailable'}</strong></span><button disabled={busy||view.state.unresolved} onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('ticket');}}>New order</button><span>{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span></div>
       <AlphaTerminal key={view.metadata.id} view={view} busy={busy} onAction={requestAction}/>
     </>}
     <footer role="status" aria-live="polite">{noticeText(notice)||(catalog?'Private local research · source limitations available in Data source':'Local service required. No fallback market feed.')}</footer>
     {dialog==='source'&&<WorkspaceModal returnFocusRef={returnFocus} label="Data source" onClose={()=>setDialog(null)}><AlphaSourceDetails historical={sourceContext()==='historical'} catalog={catalog} view={view} onClose={()=>setDialog(null)}/></WorkspaceModal>}
+    {dialog==='news'&&<WorkspaceModal returnFocusRef={returnFocus} label="News context" onClose={()=>setDialog(null)}><section className="alpha-dialog"><div className="alpha-terminal-heading"><h2>News context</h2><button onClick={()=>setDialog(null)}>Close</button></div><p>No point-in-time news dataset is connected to this Session.</p><p>News is not inferred from prices or fetched from today's calendar. Historical availability and revisions must be verified before events can be shown alongside replay.</p><p>Your trading evidence and saved balance are unchanged.</p></section></WorkspaceModal>}
     {dialog==='ticket'&&view&&<WorkspaceModal returnFocusRef={returnFocus} label="Plan an order" onClose={()=>{if(!busy)setDialog(null);}}>      <section className="alpha-ticket alpha-dialog"><div className="alpha-terminal-heading"><h2>Plan an order</h2><button aria-label="Close order panel" disabled={busy} onClick={()=>setDialog(null)}>Close</button></div><p className="alpha-ticket-guide">1. Set the intent · 2. Review exact values · 3. Confirm · 4. Reveal the next tick</p>
         <label>Workflow<select aria-label="Workflow" disabled={busy||protocol} value={planned?'PLANNED':'QUICK'} onChange={e=>edit({workflow:e.target.value,orderType:e.target.value==='QUICK'?'MARKET':'LIMIT'})}><option value="QUICK">Quick</option><option value="PLANNED">Planned</option></select></label>
         <DirectionQuotes side={plan.side} quote={view.quote} disabled={busy} onChange={side=>edit({side})}/>

@@ -33,6 +33,7 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "frontend/src/tickAlpha/AlphaHome.jsx",
     "frontend/src/tickAlpha/AlphaSourceDetails.jsx",
     "frontend/src/tickAlpha/AlphaOrderPresentation.jsx",
     "frontend/src/tickAlpha/planningIntent.js",

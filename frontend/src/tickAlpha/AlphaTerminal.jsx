@@ -1,13 +1,17 @@
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {ratioLabel} from './annotations.js';
 import usePanelResize from '../workspace/usePanelResize.js';
 import {stamp} from './display.js';
+import {TerminalPreferences} from '../workspacePreferences.js';
 
 const shown=value=>value??'Unavailable';
 
 export default function AlphaTerminal({view,busy,onAction}){
   const [tab,setTab]=useState('Open positions'),[quantities,setQuantities]=useState({});
-  const panel=usePanelResize(300);
+  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,`${view.state.datasetVersion}:${view.metadata.id}`);return {store,height:store.load()};});
+  const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
+  const panel=usePanelResize(preference.height);
+  useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   const evidence=view.analysis;
   if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
@@ -18,6 +22,7 @@ export default function AlphaTerminal({view,busy,onAction}){
     <div ref={grip} className="alpha-terminal-resize" role="separator" aria-label="Resize trading terminal" aria-orientation="horizontal" aria-valuemin={panel.min} aria-valuemax={panel.max} aria-valuenow={panel.height} aria-valuetext={`${panel.state.toLowerCase()}, ${panel.height} pixels`} tabIndex={0} onPointerDown={panel.start} onKeyDown={panel.keyDown} onDoubleClick={panel.restore} title="Drag six dots; arrows resize, Home collapses, Enter restores"><span aria-hidden="true">⠿</span><span>Trading terminal · {panel.state==='COLLAPSED'?'Enter to restore':'drag or use arrow keys'}</span></div>
     {panel.state==='COLLAPSED'&&<button className="alpha-terminal-restore" aria-label="Restore trading terminal" onClick={panel.restore}>Restore</button>}
     <div className="alpha-terminal-content" hidden={panel.state==='COLLAPSED'}>
+    {preferenceStatus&&<p className="alpha-chart-note" role="status">{preferenceStatus}</p>}
     <div className="alpha-terminal-heading"><h2>Trading and Analysis</h2><button aria-label="Collapse trading terminal" onClick={()=>{panel.keyDown({key:'Home',preventDefault(){}});grip.current?.focus();}}>Collapse</button></div>
     <div className="alpha-account" aria-label="Committed account"><span>Balance <strong>${account.balance}</strong></span><span>Net cash change <strong>${account.netCashChange}</strong></span><span>Commission <strong>${account.commission}</strong></span><span>Indicative unrealized <strong>{account.unrealizedIndicative===null?'Unavailable':'$'+account.unrealizedIndicative}</strong></span><span>Indicative equity <strong>{account.equityIndicative===null?'Unavailable':'$'+account.equityIndicative}</strong></span></div>
     <p className="alpha-chart-note">Marks use the last revealed liquidation side: Bid for Long, Ask for Short. Marks are estimates; committed cash and completed-position metrics remain separate.</p>

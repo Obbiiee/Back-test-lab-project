@@ -29,5 +29,7 @@ export function seekTarget(value){
   if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?$/.test(value))throw Error('Enter a UTC date and time');
   const milliseconds=Date.parse(value+'Z');
   if(!Number.isSafeInteger(milliseconds)||milliseconds<0)throw Error('Enter a valid UTC date and time');
+  const canonical=new Date(milliseconds).toISOString().slice(0,19);
+  if(canonical!==(value.length===16?value+':00':value))throw Error('Enter a valid UTC date and time');
   return String(BigInt(milliseconds)*1000000n);
 }

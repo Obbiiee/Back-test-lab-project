@@ -10,6 +10,7 @@ for (const [width,height] of [[1280,800],[1024,720],[390,844],[320,700]]) {
   assert.equal(keyboardPanelHeight(COLLAPSED_HEIGHT,'ArrowUp',false,height,width),COMPACT_HEIGHT);
   assert.equal(keyboardPanelHeight(COMPACT_HEIGHT,'ArrowDown',false,height,width),COLLAPSED_HEIGHT);
   assert.equal(keyboardPanelHeight(COLLAPSED_HEIGHT,'Enter',false,height,width,200),Math.min(200,bounds.max));
+  assert.equal(keyboardPanelHeight(COLLAPSED_HEIGHT,'Enter',false,height,width,COLLAPSED_HEIGHT),COMPACT_HEIGHT,'A restored collapsed preference must still reopen');
   assert.equal(keyboardPanelHeight(200,' ',false,height,width),COLLAPSED_HEIGHT);
   assert.equal(keyboardPanelHeight(150,'ArrowUp',true,height,width),Math.min(200,bounds.max));
   assert.equal(keyboardPanelHeight(150,'End',false,height,width),bounds.max);

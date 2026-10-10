@@ -21,7 +21,7 @@ This is a reconciliation of the existing checkpoints against [the scope amendmen
 | --- | --- |
 | PF-0 | Normalize scope, screens, minimum measurement and supplemental drawing decision; deterministic authority/bundle tests; no runtime change |
 | S-1 / conditional S-2 | Pin and test the one supplemental drawing candidate against BTL/LC5 and Ray; migrate accepted portions only, otherwise minimal existing-owner Ray; preserve JSON/history/rollback |
-| R-4 / I-3 | Apply the design-owner screen checklist to the one current workspace; fix Method/Session wording, source credit, order/News presentation and terminal/replay usability; keep all domain restrictions |
+| R-4 / I-3 | Apply the design-owner screen checklist to the one current workspace; fix Method/Session wording, source credit, order/News presentation and terminal/replay usability; human-approved local chart reference and original research_home; keep all domain restrictions |
 | R-5 | Connect genuine journal notes/export to canonical trade identities without account mutation |
 | R-6 / R-7 / R-8 | Close pinned initial-risk/basic metric, causal MAE/MFE and frozen seeded-bootstrap gaps; missing evidence remains unavailable; no QuantStats wholesale adoption |
 | H-1 | Implement the minimum bounded event/optional-survey/cost measurement slice through vendor-neutral adapters; disabled/outage operation cannot affect finance |

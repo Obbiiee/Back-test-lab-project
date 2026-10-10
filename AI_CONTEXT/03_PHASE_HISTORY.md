@@ -1,5 +1,9 @@
 # Short history
 
+### R-4/I-3 Alpha workspace composition (2026-10-11)
+
+From clean/equal21e8665, the human explicitly supplied the existing local chart reference and original research/math/data-science design for remaining pages. One local research home preserves Session/source URL context; workspace retains chart/tools and adds Order/News/source action rail, grouped seek/replay and guarded per-dataset/Session terminal preferences. Existing [design owner](../docs/PRODUCT_DESIGN_BLUEPRINT.md#alpha-workspacehome-composition-evidence-2026-10-11) owns actual browser/build evidence; [gap matrix](../docs/V2_ALPHA_REALITY_PLAN_GAP_MATRIX.md#alpha-implementation-adversarial-observations-2026-10-11) records reproduced UI/date defects and fixes. No backend/financial/feed/dependency change. Full frontend regression/lint/build/release, production browser, Node goldens and protected draft fingerprints PASS. Normal repository/bundle/diff/commit/push/equality precedes already-authorized R-5; Alpha and the final adversarial release audit remain incomplete.
+
 ### R-4A Alpha strategy/source presentation slice (2026-10-11)
 
 From clean/equal `92ddcaa`, changed only product wording/default strategy selection and added an action-opened source details panel using existing modal/timestamp owners. The existing [design owner](../docs/PRODUCT_DESIGN_BLUEPRINT.md#alpha-strategysource-composition-evidence-2026-10-11) records functional validation and design-context dependency. No stored Method/Session renaming, financial command/schema/data/trust/dependency change. This completes a bounded presentation slice, not R-4/I-3 or Alpha; operational owner records remaining design input and scope. Normal full frontend/browser/repository/bundle/protection/diff/Git closure applies.
