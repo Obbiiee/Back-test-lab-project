@@ -41,9 +41,9 @@ const executionReferences=new Set([
   'backend/tests/fixtures/tick_execution_v1.json',
 ]);
 function allowedBundleSource(file){
-  // Required attribution for the only shipped donor presentation adaptation;
+  // Required attribution for the reviewed presentation and Ray adaptations;
   // no general public/ asset or dataset admission.
-  if(['frontend/public/licenses/opencharts-LICENSE.txt','frontend/public/licenses/NOTICE.txt'].includes(file))return true;
+  if(['frontend/public/licenses/opencharts-LICENSE.txt','frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt','frontend/public/licenses/NOTICE.txt'].includes(file))return true;
   return file.startsWith('backend/')?executionReferences.has(file):! /^(legacy\/|data\/|frontend\/(legacy|public|node_modules|dist)\/)/.test(file);
 }
 for(const category of ['context','implementation','tests','supporting'])for(const file of config[category]){

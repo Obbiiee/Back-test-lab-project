@@ -24,7 +24,7 @@ function report(){out.textContent=JSON.stringify({candidate,version:LightweightC
 function setBars(value){bars=value;series.setData(bars);api?.bars();report();}
 function button(parent,label,fn){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{try{fn();}catch(e){errors.push(String(e));}report();};document.querySelector(parent).append(b);}
 function point(e){const r=el.getBoundingClientRect();return {time:continuousPointFromPointer(chart,series,{x:e.clientX-r.left,y:e.clientY-r.top},bars)?.time,price:series.coordinateToPrice(e.clientY-r.top)};}
-const names=Object.entries(DRAWING_SPECS),algoNames={'fibonacci-retracement':'fib-retracement'};
+const names=Object.entries(DRAWING_SPECS).filter(([type])=>candidate==='BTL'||type!=='ray'),algoNames={'fibonacci-retracement':'fib-retracement'};
 if(candidate==='BTL'){
   const m=new DrawingManager(),h=new DrawingHistory(m),p=new DrawingPersistence(localStorage,'stitch-fixture:BTL');
   h.reset(p.load(m.registry));m.subscribeCommitted((a,b)=>p.save(b));m.attach(series);m.setTimePoints(bars);
@@ -55,7 +55,7 @@ if(candidate==='BTL'){
 }
 button('#tools','Cursor',()=>{tool=null;placement=[];api.arm?.(null);chart.applyOptions({handleScroll:true});});
 for(const [type,spec]of names)button('#tools',spec.name,()=>{placement=[];tool=type;api.arm?.(type);chart.applyOptions({handleScroll:false});});
-button('#actions','Seed eight',()=>{api.load([]);for(const [i,[type,spec]]of names.entries())api.add({id:type,type,points:[{time:1700000735.25+i*120,price:1900+i*.5},{time:1700001895.75+i*120,price:1904+i*.3}].slice(0,spec.points),...(type==='text'?{text:'Authored Ω'}:{})});});
+button('#actions',`Seed ${names.length}`,()=>{api.load([]);for(const [i,[type,spec]]of names.entries())api.add({id:type,type,points:[{time:1700000735.25+i*120,price:1900+i*.5},{time:1700001895.75+i*120,price:1904+i*.3}].slice(0,spec.points),...(type==='text'?{text:'Authored Ω'}:{})});});
 button('#actions','Clear',()=>api.load([]));button('#actions','Save',()=>localStorage.setItem('stitch-snapshot:'+candidate,JSON.stringify(api.all())));
 button('#actions','Load',()=>{const d=localStorage.getItem('stitch-snapshot:'+candidate);if(d)api.load(JSON.parse(d));});
 button('#actions','Undo',()=>api.undo());button('#actions','Redo',()=>api.redo());button('#actions','Delete selected',()=>api.remove(api.selected()));

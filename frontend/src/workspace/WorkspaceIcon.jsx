@@ -4,6 +4,7 @@ export default function Icon({ name, size = 20 }) {
     vertical: <path d="M12 3v18" />,
     rectangle: <rect x="4" y="5" width="16" height="14" rx="1" />,
     arrow: <path d="M4 20 20 4M10 4h10v10" />,
+    ray: <><circle cx="5" cy="18" r="2" /><path d="m7 16 14-13" /></>,
     long: <path d="m4 18 16-12M10 6h10v10M4 21h16" />,
     short: <path d="m4 6 16 12M10 18h10V8M4 3h16" />,
     back: <path d="m15 18-6-6 6-6" />,

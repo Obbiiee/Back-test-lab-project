@@ -1,5 +1,6 @@
 import { projectGeometry } from '../projectGeometry.js';
-import { RECTANGLE, FIBONACCI, ARROW, TEXT, MEASURE } from '../DrawingTypes.js';
+import { RECTANGLE, FIBONACCI, ARROW, TEXT, MEASURE, RAY } from '../DrawingTypes.js';
+import {rayEnd} from '../rayGeometry.js';
 
 import { fibonacciLevels, arrowHead, measurementLines, labelBounds, insideLabel } from '../advancedGeometry.js';
 
@@ -37,6 +38,11 @@ export function hitDrawing(manager, chart, series, pointer) {
         pointer.y >= Math.min(a.y,b.y)-BODY_TOLERANCE && pointer.y <= Math.max(a.y,b.y)+BODY_TOLERANCE ? HIT.BODY : HIT.NONE;
       // Additional projected corners are transient, never canonical anchors.
     } else type = hitSegment(pointer, points[0], points[1], model.points.length === 2 && model.id === manager.selectedId);
+    if (type === HIT.NONE && model.type === RAY) {
+      // Handles remain the two canonical anchors, never the far rendered end.
+      const end=rayEnd(points[0],points[1],chart.timeScale().width(),chart.paneSize().height);
+      type=hitSegment(pointer,points[0],end);
+    }
     if (type === HIT.NONE && model.type === FIBONACCI) {
       for(const level of fibonacciLevels(model.points)) {
         const y=series.priceToCoordinate(level.price);

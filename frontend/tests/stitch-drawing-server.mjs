@@ -5,12 +5,13 @@ import {resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const donorRoot=process.env.BTL_SPIKE_DONOR_ROOT;
-if(!donorRoot)throw Error('Explicit inspected/pinned donor root required');
 const routes=new Map([
   ['/',resolve(root,'tests/browser/stitch-drawing.html')],
   ['/lc.js',resolve(root,'node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.js')],
-  ['/openalgo.mjs',resolve(donorRoot,'openalgo-charts-prepared.mjs')],
-  ['/opencharts.mjs',resolve(donorRoot,'OpenCharts-prepared.mjs')],
+  ...(donorRoot?[
+    ['/openalgo.mjs',resolve(donorRoot,'openalgo-charts-prepared.mjs')],
+    ['/opencharts.mjs',resolve(donorRoot,'OpenCharts-prepared.mjs')],
+  ]:[]),
 ]);
 createServer((req,res)=>{
   const url=new URL(req.url,'http://127.0.0.1'); let file=routes.get(url.pathname);

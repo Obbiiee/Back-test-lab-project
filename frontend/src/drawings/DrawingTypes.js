@@ -13,7 +13,9 @@ export const FIBONACCI = 'fibonacci-retracement';
 export const ARROW = 'arrow';
 export const TEXT = 'text';
 export const MEASURE = 'measure';
+export const RAY = 'ray';
 export const ADVANCED_DRAWINGS = Object.freeze({
+  [RAY]: { name: 'Ray', points: 2 },
   [FIBONACCI]: { name: 'Fibonacci Retracement', points: 2 },
   [ARROW]: { name: 'Arrow', points: 2 },
   [TEXT]: { name: 'Text', points: 1 },

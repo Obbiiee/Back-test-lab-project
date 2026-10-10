@@ -29,12 +29,12 @@ import "./workspace/designTokens.css";
 const CandleChart=lazy(()=>import('./components/CandleChart'));
 
 const toolGroups = {
-  trend: [{ title: "LINES", items: ["Trend Line", "Horizontal Line", "Vertical Line"] }, { title: "SHAPES", items: ["Rectangle", "Arrow", "Text"] }, { title: "RESEARCH", items: ["Fibonacci Retracement", "Measure"] }],
+  trend: [{ title: "LINES", items: ["Trend Line", "Ray", "Horizontal Line", "Vertical Line"] }, { title: "SHAPES", items: ["Rectangle", "Arrow", "Text"] }, { title: "RESEARCH", items: ["Fibonacci Retracement", "Measure"] }],
   cursor: [{ title: "", items: ["Cross", "Dot", "Arrow Cursor"] }],
   measure: [{ title: "POSITION PLANNING", items: ["Long Position", "Short Position"] }],
 };
 const TOOL_ICONS = { "Trend Line": "trend", "Horizontal Line": "horizontal", "Vertical Line": "vertical", Rectangle: "rectangle", Arrow: "arrow", Text: "text", "Fibonacci Retracement": "fib", Measure: "ruler", "Long Position": "long", "Short Position": "short", Cross: "cursor", Dot: "cursor", "Arrow Cursor": "arrow" };
-const TOOL_MODES = Object.freeze(Object.assign(Object.create(null), { Cross: 'none', Dot: 'cursor-dot', 'Arrow Cursor': 'cursor-arrow', Arrow: 'arrow', 'Trend Line': 'trend-line', 'Horizontal Line': 'horizontal-line', 'Vertical Line': 'vertical-line', Rectangle: 'rectangle', 'Fibonacci Retracement': 'fibonacci-retracement', Text: 'text', Measure: 'measure', 'Long Position': 'long-position', 'Short Position': 'short-position' }));
+const TOOL_MODES = Object.freeze(Object.assign(Object.create(null), { Cross: 'none', Dot: 'cursor-dot', 'Arrow Cursor': 'cursor-arrow', Arrow: 'arrow', 'Trend Line': 'trend-line', Ray: 'ray', 'Horizontal Line': 'horizontal-line', 'Vertical Line': 'vertical-line', Rectangle: 'rectangle', 'Fibonacci Retracement': 'fibonacci-retracement', Text: 'text', Measure: 'measure', 'Long Position': 'long-position', 'Short Position': 'short-position' }));
 const resolveTool = name => TOOL_MODES[name];
 function App() {
   const [indicatorInstances, setIndicatorInstances] = useState([]);

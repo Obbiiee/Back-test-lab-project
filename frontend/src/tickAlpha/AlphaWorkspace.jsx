@@ -57,7 +57,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>
-        {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} aria-pressed={mode===type} onClick={()=>{setPlayToken(null);setMode(type);}} aria-label={spec.name} title={spec.name}><Icon name={({"trend-line":"trend","horizontal-line":"horizontal","vertical-line":"vertical",rectangle:"rectangle",arrow:"arrow",text:"text","fibonacci-retracement":"fib",measure:"ruler",ray:"trend"})[type]||"trend"}/></button>)}
+        {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} aria-pressed={mode===type} onClick={()=>{setPlayToken(null);setMode(type);}} aria-label={spec.name} title={spec.name}><Icon name={({"trend-line":"trend","horizontal-line":"horizontal","vertical-line":"vertical",rectangle:"rectangle",arrow:"arrow",text:"text","fibonacci-retracement":"fib",measure:"ruler",ray:"ray"})[type]||"trend"}/></button>)}
         <button aria-pressed={mode==='long-position'} onClick={()=>{setPlayToken(null);setMode('long-position');}} aria-label="Long Position" title="Long Position"><Icon name="long"/></button>
         <button aria-pressed={mode==='short-position'} onClick={()=>{setPlayToken(null);setMode('short-position');}} aria-label="Short Position" title="Short Position"><Icon name="short"/></button>
       </nav>

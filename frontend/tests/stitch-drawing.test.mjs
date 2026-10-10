@@ -25,7 +25,10 @@ const chart={timeScale:()=>({timeToCoordinate:t=>({100:10,200:30,500:50})[t]??nu
 const series={coordinateToPrice:y=>100-y,priceToCoordinate:p=>100-p};
 const interactions=new DrawingInteractionController(manager,chart,series,history);
 const samples=[];
-for(const [type,spec] of Object.entries(DRAWING_SPECS)){
+// Preserve the original eight-candidate comparison; supplemental Ray gates
+// live in phase9 and the separate pinned Alpha fixture.
+const originalSpecs=Object.fromEntries(Object.entries(DRAWING_SPECS).filter(([type])=>type!=='ray'));
+for(const [type,spec] of Object.entries(originalSpecs)){
   const points=[{time:150.25,price:80.125},{time:350.75,price:60.875}].slice(0,spec.points);
   const input={id:type,type,points,...(type==='text'?{text:'Authored Ω'}:{})};
   const start=performance.now(); manager.add(input);
@@ -59,7 +62,7 @@ const future=JSON.stringify({version:42,workspace:'stitch-authored',drawings:[]}
 assert.deepEqual(persistence.load(manager.registry),[]);assert.equal(persistence.save(manager.getAll()),false);
 assert.equal(records.get(persistence.key),future);
 samples.sort((a,b)=>a-b);
-console.log(JSON.stringify({candidate:'BTL',eightTypes:Object.keys(DRAWING_SPECS),lifecycle:true,canonicalReload:true,irregularTime:true,replayTimeframeAnchorStability:true,unsupportedSchemaPreserved:true,fixtureLifecycleMedianMs:samples[4],fixtureLifecycleMaxMs:samples.at(-1),productionSemanticRewrites:0,newRuntimeDependencies:0}));
+console.log(JSON.stringify({candidate:'BTL',eightTypes:Object.keys(originalSpecs),lifecycle:true,canonicalReload:true,irregularTime:true,replayTimeframeAnchorStability:true,unsupportedSchemaPreserved:true,fixtureLifecycleMedianMs:samples[4],fixtureLifecycleMaxMs:samples.at(-1),productionSemanticRewrites:0,newRuntimeDependencies:0}));
 console.log('PASS S-1 BTL authored lifecycle, canonical preservation and rollback vectors; browser evidence is a separate gate.');
 
 // Optional repeatable donor evaluation. Exact source is supplied locally; no
@@ -89,7 +92,7 @@ if(process.env.BTL_SPIKE_DONOR_ROOT){
   const a=new algo.DrawingController(host(),{magnet:false,inputAnchors:false});
   const mapping={'fibonacci-retracement':'fib-retracement'};
   const times=[];
-  for(const [type,spec] of Object.entries(DRAWING_SPECS)){
+  for(const [type,spec] of Object.entries(originalSpecs)){
     const points=[{time:150.25,price:80.125},{time:350.75,price:60.875}].slice(0,spec.points);
     const start=performance.now();
     a.add({id:type,tool:mapping[type]??type,points:structuredClone(points),paneIndex:0,createdAt:1,...(type==='text'?{text:{value:'Authored Ω'}}:{})});
@@ -98,7 +101,7 @@ if(process.env.BTL_SPIKE_DONOR_ROOT){
     times.push(performance.now()-start);
   }
   const restoredAlgo=new algo.DrawingController(host(),{magnet:false,inputAnchors:false});restoredAlgo.fromJSON(JSON.parse(JSON.stringify(a.toJSON())));
-  for(const [type] of Object.entries(DRAWING_SPECS))assert.deepEqual(restoredAlgo.get(type).points,a.get(type).points);
+  for(const [type] of Object.entries(originalSpecs))assert.deepEqual(restoredAlgo.get(type).points,a.get(type).points);
   assert.equal(restoredAlgo.get('text').text.value,'Authored Ω');
   times.sort((a,b)=>a-b);metrics['openalgo-charts'].fixtureLifecycleMedianMs=times[4];metrics['openalgo-charts'].fixtureLifecycleMaxMs=times.at(-1);
   a.destroy();restoredAlgo.destroy();

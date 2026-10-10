@@ -7,3 +7,10 @@ Source revision 785d1f18cc1ca67b0246031b2b9a08cb5cb60264; modified by BTL.
 
 Source: https://raw.githubusercontent.com/tradingview/lightweight-charts/v5.2.1/NOTICE
 React, React DOM and Scheduler: Meta Platforms, Inc. and affiliates (MIT); included license files retain their terms.
+
+Backtest Lab Alpha adapts only Ray endpoint normalization from
+deepentropy/lightweight-charts-drawing, src/core/scene/lines.ts:sceneExtendedSegment.
+Copyright (c) 2026 deepentropy; MIT, see lightweight-charts-drawing-ray-LICENSE.txt.
+Source https://github.com/deepentropy/lightweight-charts-drawing at
+72290d3165682ec7bd28f96af7f9354184982dda (package0.5.1).
+Modified by BTL for offscreen anchors; native runtime/parser are not integrated.

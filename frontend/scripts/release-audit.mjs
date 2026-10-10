@@ -14,6 +14,8 @@ assert.ok(notices.includes('NOTICE.txt') && notices.length >= 7);
 for (const name of notices) assert.equal(read('dist/licenses/' + name), read('public/licenses/' + name), 'Distribution must retain notice: ' + name);
 for (const name of ['lightweight-charts', 'react', 'react-dom', 'scheduler']) assert.equal(read('public/licenses/' + name + '-LICENSE.txt').replace(/\r\n/g,'\n'), read('node_modules/' + name + '/LICENSE').replace(/\r\n/g,'\n'), 'Installed license must remain unchanged.');
 assert.ok(read('dist/licenses/NOTICE.txt').includes('TradingView'));
+assert.ok(read('dist/licenses/NOTICE.txt').includes('72290d3165682ec7bd28f96af7f9354184982dda'));
+assert.ok(read('dist/licenses/lightweight-charts-drawing-ray-LICENSE.txt').includes('Copyright (c) 2026 deepentropy'));
 for (const name of readdirSync(path.join(root, 'dist/assets'))) {
   if (!/\.js$/.test(name)) continue;
   const content = read('dist/assets/' + name);

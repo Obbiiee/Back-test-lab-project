@@ -90,6 +90,7 @@
     "frontend/src/drawings/DrawingControls.jsx",
     "frontend/src/drawings/models/CoreDrawing.js",
     "frontend/src/drawings/projectGeometry.js",
+    "frontend/src/drawings/rayGeometry.js",
     "frontend/src/drawings/advancedGeometry.js",
     "frontend/src/drawings/DrawingTextEditor.jsx",
     "frontend/src/indicators/IndicatorRegistry.js",
@@ -214,6 +215,7 @@
     "backend/tests/test_identity.py"
   ],
   "supporting": [
+    "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
     "frontend/public/licenses/opencharts-LICENSE.txt",
     "frontend/public/licenses/NOTICE.txt",
     "frontend/package.json",

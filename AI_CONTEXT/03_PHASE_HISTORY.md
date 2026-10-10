@@ -1,5 +1,9 @@
 # Short history
 
+### S-2 Alpha Ray extension (2026-10-11)
+
+From clean/equal `1e9d590`, added Ray to existing drawing registry/toolbar/primitive/history/persistence, adapting only attributed MIT donor endpoint normalization with an offscreen-anchor correction. Existing [STITCH audit Section20](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#20-alpha-ray-integration--2026-10-11) owns lifecycle/browser/validation evidence. Strict version1 JSON and all legacy bytes retain their owners; no full donor runtime or dependency/financial/data change. Full frontend regression, lint/build/distribution and nine-type browser coordinate persistence gates PASS. Normal repository/bundle/protection/diff/Git closure precedes already-authorized R-4/I-3 workspace UX; full Alpha acceptance remains pending.
+
 ### S-1 supplemental drawing evaluation (2026-10-10)
 
 From clean/equal `3dee7f2`, built inspected MIT donor0.5.1 at exact `72290d3` in ignored isolated artifacts with existing tooling. Authored vectors and actual LC5.2.1 browser reproduce native inverse-time snapping/irregular-time mismatch and native parser incompatibility. Existing [STITCH evidence owner](../docs/STITCH_0_OSS_REPLACEMENT_AUDIT.md#19-supplemental-alpha-drawing-evaluation--2026-10-10) owns measured results, bounded alternatives and selection. No production drawing/storage/chart/dependency change. KEEP canonical manager/history/storage/coordinate bridge; S-2 may ADAPT only attributed donor Ray extension geometry into the existing primitive, with extended-ray selection and existing lifecycle. Native full runtime is not accepted. Normal repository/bundle/protection/diff/Git gates precede S-2.

@@ -7,7 +7,8 @@ import { TrendLineCreation } from '../src/drawings/TrendLineCreation.js';
 import { DrawingInteractionController } from '../src/drawings/interaction/DrawingInteractionController.js';
 import { HIT } from '../src/drawings/interaction/hitTesting.js';
 import { projectGeometry } from '../src/drawings/projectGeometry.js';
-import { FIBONACCI as F, ARROW as A, TEXT as T, MEASURE as M } from '../src/drawings/DrawingTypes.js';
+import { FIBONACCI as F, ARROW as A, TEXT as T, MEASURE as M, RAY } from '../src/drawings/DrawingTypes.js';
+import {rayEnd} from '../src/drawings/rayGeometry.js';
 import { FIB_LEVELS, fibonacciLevels, arrowHead, measurement, measurementLines, labelBounds } from '../src/drawings/advancedGeometry.js';
 const bars=[{time:100},{time:200},{time:500}];let zoom=1,pan=0;
 const scale={width:()=>100,timeToCoordinate:t=>({100:10,200:30,500:70})[t]==null?null:({100:10,200:30,500:70})[t]*zoom+pan,coordinateToTime:x=>100+(x-10)*5};
@@ -18,7 +19,7 @@ const manager=new DrawingManager(),history=new DrawingHistory(manager);manager.s
 const legacy=new Map([['backtest-drawings-v2:old','  opaque legacy bytes  ']]),records=new Map(legacy);let writes=0;
 const storage={getItem:k=>records.get(k)??null,setItem:(k,v)=>{writes++;records.set(k,v);}};
 const persistence=new DrawingPersistence(storage,'main:XAUUSD');persistence.load(manager.registry);manager.subscribeCommitted((before,after)=>persistence.save(after));
-for(const type of [F,A,T,M]){
+for(const type of [F,A,T,M,RAY]){
  const count=type===T?1:2,input={id:type,type,points:anchors.slice(0,count),...(type===T?{text:'Research\nSession A'}:{})};
  for(const points of [[],[...input.points,{time:1,price:2}],input.points.map(p=>({...p,time:NaN})),input.points.map(p=>({...p,price:Infinity}))])assert.throws(()=>manager.add({...input,points}));
  if(type===T)for(const text of [undefined,42,'','  ','a'.repeat(2001)])assert.throws(()=>manager.add({...input,text}));
@@ -68,5 +69,22 @@ for(const source of ['advancedGeometry.js','models/CoreDrawing.js']){const text=
 const mixedBefore = JSON.stringify(manager.getAll());
 manager.setProperties('old-trend',{visible:false});manager.setText(manager.getAll().find(model=>model.type===T).id,'Mixed text edit');manager.remove('old-rectangle');
 const mixedAfter=JSON.stringify(manager.getAll());for(let i=0;i<3;i++)history.undo();assert.equal(JSON.stringify(manager.getAll()),mixedBefore);for(let i=0;i<3;i++)history.redo();assert.equal(JSON.stringify(manager.getAll()),mixedAfter);
-for(const type of ['ray','fibonacci-extension','brush','ellipse','indicator'])assert.throws(()=>manager.registry.get(type),/Unknown drawing type/);
+for(const type of ['fibonacci-extension','brush','ellipse','indicator'])assert.throws(()=>manager.registry.get(type),/Unknown drawing type/);
+// Ray extension is selectable in both screen directions, but never behind
+// the origin. Handles always refer to the real two anchors, not the far end.
+for(const [points,inside,outside] of [
+ [[{time:100,price:80},{time:200,price:80}],{x:90,y:20},{x:0,y:20}],
+ [[{time:200,price:80},{time:100,price:80}],{x:0,y:20},{x:90,y:20}],
+ [[{time:100,price:80},{time:100,price:60}],{x:10,y:90},{x:10,y:0}],
+]){
+ const m=new DrawingManager();m.setTimePoints(bars);m.add({id:'r',type:RAY,points});
+ const c=new DrawingInteractionController(m,chart,series);
+ assert.equal(c.hit(inside).id,'r');assert.equal(c.hit(outside).type,HIT.NONE);
+ m.select('r');assert.equal(c.hit(projectGeometry(m.get('r'),chart,series,bars)[1]).type,HIT.B);
+ m.setProperties('r',{locked:true});assert.equal(c.begin(c.hit(inside),inside),false);
+ m.setProperties('r',{visible:false});assert.equal(c.hit(inside).type,HIT.NONE);
+}
+const offscreen=rayEnd({x:-10000,y:20},{x:-9990,y:20},100,100);
+assert.ok(offscreen.x>100);assert.equal(offscreen.y,20);
+assert.deepEqual(rayEnd({x:1,y:1},{x:1,y:1},100,100),{x:1,y:1});
 console.log('PASS Phase 9: exact Fib levels/reversal, arrow shaft/head, text validation/content/edit/cancel, deterministic measurement, creation/draft, handles/body/commit history, lock/hide/delete, mixed v1 restore, corruption safety and domain isolation.');

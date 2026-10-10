@@ -1,6 +1,7 @@
 import { projectGeometry } from '../projectGeometry.js';
-import { RECTANGLE, HORIZONTAL_LINE, VERTICAL_LINE, FIBONACCI, ARROW, TEXT, MEASURE } from '../DrawingTypes.js';
+import { RECTANGLE, HORIZONTAL_LINE, VERTICAL_LINE, FIBONACCI, ARROW, TEXT, MEASURE, RAY } from '../DrawingTypes.js';
 import { fibonacciLevels, arrowHead, measurementLines, labelBounds } from '../advancedGeometry.js';
+import {rayEnd} from '../rayGeometry.js';
 
 // One official Series Primitive lifecycle, retained under its compatible Phase 5 name.
 class TrendLinePaneRenderer {
@@ -33,7 +34,7 @@ class TrendLinePaneRenderer {
             context.moveTo(a.x,a.y); context.lineTo(projected[2].x,projected[2].y);
             context.lineTo(b.x,b.y); context.lineTo(projected[3].x,projected[3].y); context.closePath();
           } else {
-            segment(a,b);
+            segment(a,model.type===RAY?rayEnd(a,b,source.chart.timeScale().width(),source.chart.paneSize().height):b);
             if(model.type===ARROW) for(const wing of arrowHead(a,b)) segment(b,wing);
             if(model.type===MEASURE) { segment(a,{x:b.x,y:a.y}); segment({x:b.x,y:a.y},b); }
           }
