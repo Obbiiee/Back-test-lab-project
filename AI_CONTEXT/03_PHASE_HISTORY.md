@@ -253,3 +253,7 @@ From verified/equal `ed45752`, removed repeated provider-page reads through one 
 ### V22-E historical display uncertainty disclosure
 
 From clean/equal `1b56f29`, added one historical-only sentence to the existing chart note: research candles retain recorded row order, while order within a timestamp remains unverified. Existing Section43 owns frontend/build/distribution and actual dev/production/375px browser evidence. Saved historical and synthetic financial state remain unchanged; no backend, wire, dependency, frozen-contract or source-trust change. This separate presentation checkpoint requires repository/bundle/preservation/diff/normal Git closure. Full2015 C/D/F and Precision Beta acceptance remain pending.
+
+### V22-C full supplied-source qualification / completed benchmark
+
+From clean/equal `84bcef5`, the private full supplied2015 file completed structural publication and independent full-source benchmark:8,698,581rows, exact hash/count/month and9indexed source quote/provenance/event-ID probes. Existing Section43 owns raw receipt hashes, actual Aug10–Dec31 span, measured RAM/access/day-replay fixed budgets and unknown-quality/private-use limitations. Earlier700k/42.20 incomplete histories are unchanged. No runtime or default-source change; documentation-only repository/bundle/protected/diff/Git gates apply. D precision/cold closure and F cutover/final beta acceptance remain required.
