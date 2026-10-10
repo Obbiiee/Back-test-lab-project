@@ -256,6 +256,49 @@ class TickStorageV2Tests(unittest.TestCase):
         with self.assertRaises(ValueError):view.read_revealed()
         self.assertEqual(replacement.next_group(replacement.cursor)["groups"][0]["timeNs"],"300")
 
+    def test_revealed_batch_streams_verified_positions_without_page_amplification(self):
+        from unittest.mock import patch
+        times = tuple(i*100 for i in range(1,522) for _ in range(2))
+        _, p = self.build(times, packing=(256,8,2), folder="streamed-view")
+        t = self.timeline(p, folder="streamed-view-logs")
+        pump(t,50000)
+        # Source-authored times/ordinals are independent of the replay reader.
+        with patch.object(p,"read_page_v2",wraps=p.read_page_v2) as pages:
+            rows = t.consumer().read_revealed("430",64)
+        self.assertEqual([g["timeNs"] for g in rows],[str(i*100) for i in range(431,495)])
+        self.assertEqual([e["rawOrdinal"] for g in rows for e in g["events"]],
+                         [str(i) for i in range(860,988)])
+        self.assertTrue(all(g["order"] == "UNTRUSTED" and len(g["events"]) == 2 for g in rows))
+        self.assertLessEqual(pages.call_count,2,"A bounded 128-quote view must not read 64 provider pages")
+        self.assertEqual(t.consumer().read_revealed("499",64)[0]["timeNs"],"50000")
+        self.assertEqual(t.consumer().read_revealed("500",64),[])
+        with self.assertRaisesRegex(ValueError,"UNREVEALED_INDEX"):
+            t.consumer().read_revealed("501",64)
+
+    def test_streamed_view_keeps_atomic_budget_and_rechecks_acknowledged_membership(self):
+        times = tuple(i*100 for i in range(1,13) for _ in range(81))
+        _, p = self.build(times, packing=(256,8,2), folder="heavy-view")
+        t = self.timeline(p, folder="heavy-view-logs")
+        pump(t,1200)
+        rows = t.consumer().read_revealed("0",64)
+        self.assertGreater(len(rows),0)
+        self.assertLess(len(rows),12)
+        canonical_v2_bytes(dict(schemaVersion=2,artifact="BTL-TICK-VIEW-CHECK-2",groups=rows))
+        gathered = list(rows)
+        while len(gathered)<12:
+            gathered.extend(t.consumer().read_revealed(str(len(gathered)),64))
+        self.assertEqual([g["timeNs"] for g in gathered],[str(i*100) for i in range(1,13)])
+        self.assertEqual([len(g["events"]) for g in gathered],[81]*12)
+        self.assertEqual([e["rawOrdinal"] for g in gathered for e in g["events"]],
+                         [str(i) for i in range(972)])
+        tip=t.checkpoint()["positionLogHash"]
+        with closing(sqlite3.connect(self.path/"heavy-view-logs"/"timeline.sqlite")) as db, db:
+            db.execute("DELETE FROM blocks WHERE hash=?",(tip,))
+        # Successful earlier reads cannot turn a missing acknowledged block
+        # into a stale trusted read, including a batch beyond the first page.
+        with self.assertRaisesRegex(ValueError,"INCOMPLETE_INGESTION"):
+            t.consumer().read_revealed("11",64)
+
     def csv(self, name="sample.csv", rows=None):
         path=self.path/name
         path.write_text('"Exness","Symbol","Timestamp","Bid","Ask"\n'+''.join(rows or [

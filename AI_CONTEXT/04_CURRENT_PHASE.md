@@ -31,7 +31,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "V22-E indexed start-month adapter; full C/D/F qualification and beta acceptance pending"
+  "LAST_COMPLETED_CHECKPOINT": "V22-B/E bounded revealed-window follow-up; full C/D/F qualification and beta acceptance pending"
 }
 ```
 

@@ -172,7 +172,7 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             result = []
             total_bytes = 0
             while start < end:
-                rows = consumer.read_revealed(str(start), 1)
+                rows = consumer.read_revealed(str(start), min(64, end-start))
                 require(bool(rows), 'revealed', 'CORRUPT_RECORD')
                 total_bytes += sum(len(json.dumps(group,ensure_ascii=False,separators=(",", ":"),allow_nan=False).encode("utf-8")) for group in rows)
                 require(total_bytes <= 8*1048576, 'revealedWindow', 'REFUSED_CHART_WINDOW_LIMIT')

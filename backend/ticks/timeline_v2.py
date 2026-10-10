@@ -340,9 +340,13 @@ class IndexedTickTimeline:
         records.sort(key=lambda r: int(r["groupIndex"]))
         packed = CanonicalGroupBudget("BTL-TICK-VIEW-CHECK-2")
         groups = packed.groups
+        # Membership records form one contiguous acknowledged prefix. Stream
+        # it once instead of rereading a whole provider page for every group.
+        observed = self.__groups(records[0]["position"]) if records else iter(())
         for record in records:
-            _, group = next(self.__groups(record["position"]))
-            require(group["groupId"] == record["groupId"] and int(group["timeNs"]) <= int(self.__cursor["throughNs"]), "prefix", "IDENTITY_CONFLICT")
+            position, group = next(observed)
+            require(position == record["position"] and group["groupId"] == record["groupId"]
+                    and int(group["timeNs"]) <= int(self.__cursor["throughNs"]), "prefix", "IDENTITY_CONFLICT")
             try:
                 packed.append(group)
             except ValueError:

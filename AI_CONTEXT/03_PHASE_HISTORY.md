@@ -245,3 +245,7 @@ From verified/equal `cff7180`, independent original CSV year/month/count/quote/p
 ### V22-E indexed start-month adapter — final cutover remains pending
 
 From verified/equal `31fb727`, extended the existing historical Session startPeriod/dialog with controller-private indexed month selection and explicit unavailable-month refusal. Existing Section43 owns tests, real browser/state-preservation evidence and limits. Synthetic period, immutable source/Method/profile pins, canonical tick/execution/sidecar contracts and old saved Sessions remain intact. This independent adapter does not claim full C qualification, D historical acceptance or F cutover/Precision Beta completion.
+
+### V22-B/E bounded revealed-window follow-up
+
+From verified/equal `ed45752`, removed repeated provider-page reads through one contiguous verified group stream and bounded64-group composition. Exact positions/membership/hash/time fences/atomic canonical limits and old window/memo bounds remain intact. Existing Section43 owns the matching original-source window/cursor hashes, ~4.1x bounded window measurement, final292backend PASS/zero skips, focused financial/database/evidence goldens, frontend/build/browser/restart/rewind and preservation proof. Failed preliminary undersized-fixture run is disclosed separately; final discovery uses the corrected fixture. No dependency/schema/financial/frozen-contract/raw-data change. Normal repository/bundle/diff/Git closure precedes continuation; full2015 C/D/F and Precision Beta acceptance remain pending.
