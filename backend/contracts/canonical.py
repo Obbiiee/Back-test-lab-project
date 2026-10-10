@@ -12,6 +12,8 @@ from decimal import Decimal
 
 from .primitives import decimal, require, timestamp
 
+NORMALIZATION_NODE_LIMIT = 16384
+
 
 def decimal_text(value):
     value = decimal(value)
@@ -33,7 +35,7 @@ def _text(value):
 
 def _normalize(value, depth=0, budget=None):
     if budget is None:
-        budget = [16384]
+        budget = [NORMALIZATION_NODE_LIMIT]
     budget[0] -= 1
     require(budget[0] >= 0, "nodeBudget")
     require(depth <= 32, "depth")

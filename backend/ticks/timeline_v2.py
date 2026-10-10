@@ -9,7 +9,7 @@ import json
 
 from contracts.primitives import require, digest
 from .contracts import keys, uint, CanonicalTick
-from .contracts_v2 import canonical_v2_bytes, decode_v2, hash_v2, shape
+from .contracts_v2 import canonical_v2_bytes, decode_v2, hash_v2, shape, CanonicalGroupBudget
 from .provider import Cancellation, empty_diagnostics
 from .timeline import CURSOR_FIELDS, RevealedView, make_group
 from .storage_v2 import connect
@@ -250,18 +250,19 @@ class IndexedTickTimeline:
         require(self.__cursor["pendingTargetNs"] in (None, target_ns), "target", "ADVANCE_IN_PROGRESS")
         cancel = cancellation or Cancellation(); cancel.check()
         epoch, old = self.__epoch, int(self.__cursor["throughNs"])
-        groups, positions = [], []
+        packed = CanonicalGroupBudget("BTL-TICK-STEP-CHECK-2")
+        groups, positions = packed.groups, []
         try:
             while (pending := self.__peek()) is not None and int(pending[1]["timeNs"]) <= target:
                 cancel.check(); require(epoch == self.__epoch, "cancel", "CANCELLED")
                 if len(groups) == 64:
                     break
                 try:
-                    canonical_v2_bytes(dict(schemaVersion=2, artifact="BTL-TICK-STEP-CHECK-2", groups=groups+[pending[1]]))
+                    packed.append(pending[1])
                 except ValueError:
                     require(bool(groups), "group", "GROUP_LIMIT")
                     break
-                positions.append(pending[0]); groups.append(pending[1])
+                positions.append(pending[0])
                 self.__has_pending = False
             pending = self.__peek()
             done = pending is None or int(pending[1]["timeNs"]) > target
@@ -337,16 +338,16 @@ class IndexedTickTimeline:
             records.append(record)
         require(len(records) == wanted-start, "prefix", "INCOMPLETE_ATOMIC_BOUNDARY")
         records.sort(key=lambda r: int(r["groupIndex"]))
-        groups = []
+        packed = CanonicalGroupBudget("BTL-TICK-VIEW-CHECK-2")
+        groups = packed.groups
         for record in records:
             _, group = next(self.__groups(record["position"]))
             require(group["groupId"] == record["groupId"] and int(group["timeNs"]) <= int(self.__cursor["throughNs"]), "prefix", "IDENTITY_CONFLICT")
             try:
-                canonical_v2_bytes(dict(schemaVersion=2, artifact="BTL-TICK-VIEW-CHECK-2", groups=groups+[group]))
+                packed.append(group)
             except ValueError:
                 require(bool(groups), "group", "GROUP_LIMIT")
                 break
-            groups.append(group)
         return deepcopy(groups)
 
     def reset(self, session_start_ns=None):

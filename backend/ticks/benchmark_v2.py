@@ -31,20 +31,22 @@ def disk_size(folder):
     return sum(p.stat().st_size for p in Path(folder).rglob("*") if p.is_file())
 
 
-def benchmark(source, folder, report_path, *, resume=False, existing_version=None):
+def _benchmark(source, folder, report_path, *, resume=False, existing_version=None, dataset_folder=None):
     source, folder, report_path=Path(source),Path(folder),Path(report_path)
     folder.mkdir(parents=True,exist_ok=True)
-    report={"sourceFilename":source.name,"rawUpload":False,"execution":False,"memoryMethod":memory()["method"]}
+    dataset = Path(dataset_folder) if dataset_folder is not None else folder/"dataset"
+    report={"status":"RUNNING","sourceFilename":source.name,"rawUpload":False,"execution":False,"memoryMethod":memory()["method"]}
     def save():
         report_path.parent.mkdir(parents=True,exist_ok=True)
         report_path.write_text(json.dumps(report,indent=2),encoding="utf-8")
+    save()  # A prior COMPLETE report must never survive a new failed attempt.
     start=time.perf_counter()
     if existing_version is None:
-        ingestion=ExnessIngestion(source,folder/"dataset",resume=resume)
+        ingestion=ExnessIngestion(source,dataset,resume=resume)
         starting_rows=ingestion.builder.s["count"]
         measurements=[]
         def progress(value):
-            observation=dict(value,memory=memory(),diskBytes=disk_size(folder/"dataset"))
+            observation=dict(value,memory=memory(),diskBytes=disk_size(dataset))
             # At most 128 sampled observations. Never keep one record per tick.
             if len(measurements)<128:measurements.append(observation)
             print(json.dumps(dict(stage="INGESTING",**observation)),flush=True)
@@ -62,7 +64,7 @@ def benchmark(source, folder, report_path, *, resume=False, existing_version=Non
             report["ingestion"]["scalingSamples"]=measurements
             report["ingestion"]["temporaryPeakDiskSampledBytes"]=max((s["diskBytes"] for s in measurements),default=0)
             version=result["datasetVersion"]
-            report["storage"]=dict(finalBytes=disk_size(folder/"dataset"),ratioToRaw=disk_size(folder/"dataset")/result["source"]["bytes"],
+            report["storage"]=dict(finalBytes=disk_size(dataset),ratioToRaw=disk_size(dataset)/result["source"]["bytes"],
                                    physical="SQLite content-addressed zlib level-1 canonical payloads + disk UNIQUE indexes/journal; version materialized on read")
             db=ingestion.builder.store.db
             report["storage"]["artifacts"]={kind:count for kind,count in db.execute("SELECT kind,COUNT(*) FROM objects GROUP BY kind")}
@@ -80,13 +82,13 @@ def benchmark(source, folder, report_path, *, resume=False, existing_version=Non
     else:
         version=existing_version
         report["ingestion"]={"status":"NOT_RERUN","datasetVersion":version}
-    p=DiskTickProvider(folder/"dataset",version)
+    p=DiskTickProvider(dataset,version)
     root=p.describe_v2(p.dataset_id,p.dataset_version)["root"]
     # An existing publication does not authorize comparing against a different
     # CSV, or claiming full counts from only representative seek matches.
     pin=source_pin(source)
     try:
-        store=ArtifactStore(folder/"dataset")
+        store=ArtifactStore(dataset)
         try:
             sources=store.get(root["sourceCatalogHash"],version)["sources"]
             if len(sources) != 1 or sources[0]["memberHash"] != pin["sha256"]:
@@ -123,7 +125,7 @@ def benchmark(source, folder, report_path, *, resume=False, existing_version=Non
     if ordinal != int(root["eventCount"]):
         p.close();raise ValueError("SOURCE_COUNT_CONFLICT")
     for name,target in targets:
-        reader=DiskTickProvider(folder/"dataset",version)
+        reader=DiskTickProvider(dataset,version)
         opened=time.perf_counter()
         located=reader.locate_v2(reader.dataset_id,version,str(target));seek=time.perf_counter()-opened
         if (located["groupTimeNs"],None if located["position"] is None else located["position"]["globalOrdinal"]) != expected[name]:
@@ -167,13 +169,28 @@ def benchmark(source, folder, report_path, *, resume=False, existing_version=Non
     if source_pin(source) != pin:raise ValueError("SOURCE_CHANGED")
     report["status"]="COMPLETE";report["memory"]=memory()
     report["totalBenchmarkSeconds"]=time.perf_counter()-start
-    report["totalOutputFootprintBytes"]=disk_size(folder)
+    report["datasetFootprintBytes"]=disk_size(dataset)
+    report["totalOutputFootprintBytes"]=disk_size(folder)+(disk_size(dataset) if not dataset.resolve().is_relative_to(folder.resolve()) else 0)
     save()
     return report
+
+
+def benchmark(source, folder, report_path, *, resume=False, existing_version=None, dataset_folder=None):
+    try:
+        return _benchmark(source, folder, report_path, resume=resume, existing_version=existing_version,
+                          dataset_folder=dataset_folder)
+    except BaseException as exc:
+        path = Path(report_path)
+        report = json.loads(path.read_text(encoding="utf-8")) if path.exists() and path.stat().st_size <= 4194304 else {}
+        report.update(status="INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else "FAILED", error=repr(exc))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        raise
 
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("--source",required=True);parser.add_argument("--store",required=True);parser.add_argument("--report",required=True)
     parser.add_argument("--resume",action="store_true");parser.add_argument("--existing-version")
-    args=parser.parse_args();benchmark(args.source,args.store,args.report,resume=args.resume,existing_version=args.existing_version)
+    parser.add_argument("--dataset-folder",help="Existing private accepted store; no copy or re-ingestion")
+    args=parser.parse_args();benchmark(args.source,args.store,args.report,resume=args.resume,existing_version=args.existing_version,dataset_folder=args.dataset_folder)

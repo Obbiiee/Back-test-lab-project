@@ -27,11 +27,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "EXECUTION_MODE": "AUTHORIZED_LOCAL_V22_CHECKPOINTS",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "Complete existing V2.2 local Precision Beta verification with only Exness XAUUSDm 2015; separate validated commit/push checkpoints; STOP at acceptance or a material frozen-contract/evidence gate.",
+  "TARGET_CHECKPOINT": "V22-C full original Exness 2015 publication, independent source reconciliation and measured benchmark; local V2.2 grant continues after each verified checkpoint.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Human steps 1-3: bounded local Exness 100k subset workspace"
+  "LAST_COMPLETED_CHECKPOINT": "V22-B bounded canonical replay and benchmark tooling"
 }
 ```
 

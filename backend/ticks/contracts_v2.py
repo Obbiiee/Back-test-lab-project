@@ -3,7 +3,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 
-from contracts.canonical import _normalize
+from contracts.canonical import _normalize, NORMALIZATION_NODE_LIMIT
 from contracts.primitives import digest, identifier, require
 from .contracts import keys, uint
 
@@ -40,6 +40,35 @@ def canonical_v2_bytes(value):
 
 def hash_v2(value):
     return hashlib.sha256(canonical_v2_bytes(value)).hexdigest()
+
+
+class CanonicalGroupBudget:
+    """Incremental equivalent of canonicalizing each growing group envelope.
+
+    Each group retains the envelope's original depth and shared node budget.
+    Final reveal/view serialization still independently validates everything.
+    This is controller working state, never a new wire artifact.
+    """
+    def __init__(self, artifact):
+        envelope = dict(schemaVersion=2, artifact=artifact, groups=[])
+        self._nodes = [NORMALIZATION_NODE_LIMIT]
+        _normalize(envelope, budget=self._nodes)
+        self._bytes = len(canonical_v2_bytes(envelope))
+        self.groups = []
+
+    def append(self, group):
+        previous = self._nodes[0]
+        try:
+            normalized = _normalize(group, depth=2, budget=self._nodes)
+            encoded = json.dumps(normalized, sort_keys=True, ensure_ascii=False,
+                                 separators=(",", ":"), allow_nan=False).encode("utf-8")
+            size = self._bytes + len(encoded) + bool(self.groups)
+            require(size <= 1048576, "serializedSize", "ARTIFACT_LIMIT")
+        except ValueError:
+            self._nodes[0] = previous
+            raise
+        self._bytes = size
+        self.groups.append(group)
 
 
 def payload(value):
@@ -166,17 +195,24 @@ def summary(index, child, *, verified_hash=None):
 
 
 def validate_container(obj, root, *, expected_hash=None, expected_descriptor=None):
-    shape(obj)
+    encoded = shape(obj, return_bytes=True)
     for field in ("datasetId", "providerId", "feedId", "instrumentId"):
         require(obj[field] == root[field], field, "IDENTITY_CONFLICT")
+    actual_hash = None
+    if expected_hash is not None or expected_descriptor is not None:
+        # Reuse the exact normalized envelope already checked by shape. Removing
+        # cyclical version fields can only reduce its byte/node/depth budgets.
+        raw = json.dumps(payload(json.loads(encoded)), sort_keys=True,
+                         ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        actual_hash = hashlib.sha256(raw).hexdigest()
     if expected_hash is not None:
-        require(content_hash_v2(obj) == expected_hash, "hash", "CHILD_HASH_MISMATCH")
+        require(actual_hash == expected_hash, "hash", "CHILD_HASH_MISMATCH")
     if obj["artifact"] in ("BTL-TICK-DIRECTORY-2", "BTL-TICK-PARTITION-2"):
         descriptors(obj["children"], 1024 if obj["artifact"] == "BTL-TICK-DIRECTORY-2" else 256)
         require(obj["range"] == interval_for(obj["children"]), "range", "RANGE_CONFLICT")
         require(int(obj["eventCount"]) == sum(int(d["eventCount"]) for d in obj["children"]), "count", "COUNT_CONFLICT")
     if expected_descriptor is not None:
-        require(summary(int(expected_descriptor["index"]), obj) == expected_descriptor, "descriptor", "RANGE_CONFLICT")
+        require(summary(int(expected_descriptor["index"]), obj, verified_hash=actual_hash) == expected_descriptor, "descriptor", "RANGE_CONFLICT")
 
 
 def validate_root(root):

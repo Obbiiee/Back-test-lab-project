@@ -232,3 +232,8 @@ Baseline 2e2e1df was adopted fast-forward-only after two documentation-only remo
 ### V22-A — authorized local V2.2 baseline / acceptance preparation
 
 From clean/equal4404484, recorded the new human V2.2/2015-only completion grant in the existing operational pointer and baseline/quantitative pre-acceptance budgets in existing blueprint Section43. Existing ROADMAP V22 sequence retained; preserved draft fingerprints PASS. This is preparation/measurement, not full-source qualification or beta completion. Separate documentation/repository/bundle/diff/Git gates apply; the already-authorized local journey may continue after equality.
+
+
+### V22-B — bounded replay optimization / honest benchmark lifecycle
+
+V22-A baseline `b0ac858` was normally pushed and verified clean/equal0/0. Exact canonical group limits/hash parity and private external-store benchmarking implemented without wire/financial/dependency changes. Full287backend tests/zero skips, frontend/lint/build/distribution, independent Node goldens, bundle determinism and restarted-API browser smoke PASS. Existing Section43 owns measurements and limits; full original-source/day qualification is still pending. Separate commit/push/equality precede continuing the authorized V22-C.

@@ -204,3 +204,8 @@ Verified Git closure: implementation checkpoint `375a776d3ceac6bed8377606d11f5fa
 ## CODEX → CHATGPT — V22-A local completion grant / baseline
 
 Latest human instruction explicitly authorizes completion through existing V2.2, using only supplied Exness2015. Baseline4404484 is clean/equal; old steps1-3 STOP is superseded only for this bounded journey. Existing04 pointer owns authorization, ROADMAP owns sequence, Section43 owns measurements/budgets. Protected42.18/42.20 fingerprints/refs PASS. Full import resumes only the separate private working copy; original staging/subset/Session state retained. No full publication/benchmark/precision claim yet. Frozen42.17 still requires recorded-prefix reconstruction; no trusted snapshot shortcut, certainty promotion, public delivery or other-year import. Auto-advance only after each checkpoint validation/normal push/equality.
+
+
+## CODEX → CHATGPT — V22-B verification and continuation
+
+Exact canonical-limit/hash-preserving bounded replay optimization and private accepted-store benchmark option implemented; failed new attempts invalidate old COMPLETE receipts. Full287backend PASS/zero skips/500.163s, frontend regression/lint/build/distribution, independent6Node goldens x3, bundle determinism and real restarted-API cold reload/timeframe/popup/Escape/clean-console smoke PASS. Measured same-window replay improves207.69→377.44events/s; full-file/day acceptance is not claimed. Preserve100k source/Session/log scope for rollback; separate full2015 working-copy import remains in progress, no other-year access. Normal B checkpoint/equality precede C source/scale qualification; the human local V2.2 grant remains active. Frozen42.17/42.19 and protected drafts unchanged.

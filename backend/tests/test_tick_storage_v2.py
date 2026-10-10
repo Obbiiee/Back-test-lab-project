@@ -2,6 +2,7 @@
 from copy import deepcopy
 from contextlib import closing
 from pathlib import Path
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -439,6 +440,78 @@ class TickStorageV2Tests(unittest.TestCase):
         resumed=DatasetBuilder(self.path/"cancel-final",meta,m["sources"],{},resume=True);self.resources.append(resumed.store)
         version=resumed.finish();reader=DiskTickProvider(self.path/"cancel-final",version);self.resources.append(reader)
         self.assertEqual(reader.describe_v2(reader.dataset_id,version)["root"]["eventCount"],"1")
+
+
+
+class IncrementalCanonicalBudgetTests(unittest.TestCase):
+    def test_exact_original_envelope_limits_and_failed_append_recovery(self):
+        from ticks.contracts_v2 import CanonicalGroupBudget, canonical_v2_bytes
+        cases = [
+            [{'timeNs': str(i), 'events': [{'bid': '1100.001', 'quality': {'freshness': 'UNKNOWN'}}]*3} for i in range(100)],
+            [{'text': 'a'*65000} for _ in range(18)],
+            [{'nodes': [None]*1024} for _ in range(20)],
+            [{'text': chr(0x1f600)*30000} for _ in range(12)],
+            [{'text': chr(0xd800)}],
+            [{'nested': [[[[[None]]]]]}],
+            [{'bad': 1.25}],
+        ]
+        for artifact in ('BTL-TICK-STEP-CHECK-2', 'BTL-TICK-VIEW-CHECK-2'):
+            for candidates in cases:
+                packed = CanonicalGroupBudget(artifact)
+                reference = []
+                for candidate in candidates:
+                    try:
+                        expected = canonical_v2_bytes(dict(schemaVersion=2, artifact=artifact, groups=reference+[candidate]))
+                    except ValueError:
+                        with self.assertRaises(ValueError): packed.append(candidate)
+                        self.assertEqual(packed.groups, reference)
+                        # A refusal must not consume the remaining node budget.
+                        small = {'timeNs': '0'}
+                        try: canonical_v2_bytes(dict(schemaVersion=2, artifact=artifact, groups=reference+[small]))
+                        except ValueError:
+                            with self.assertRaises(ValueError): packed.append(small)
+                        else:
+                            packed.append(small);reference.append(small)
+                    else:
+                        packed.append(candidate);reference.append(candidate)
+                        self.assertEqual(canonical_v2_bytes(dict(schemaVersion=2, artifact=artifact, groups=packed.groups)), expected)
+
+    def test_envelope_depth_remains_part_of_the_limit(self):
+        from ticks.contracts_v2 import CanonicalGroupBudget, canonical_v2_bytes
+        value = None
+        for _ in range(32): value = [value]
+        envelope = dict(schemaVersion=2, artifact='BTL-TICK-STEP-CHECK-2', groups=[value])
+        with self.assertRaises(ValueError): canonical_v2_bytes(envelope)
+        packed = CanonicalGroupBudget(envelope['artifact'])
+        with self.assertRaises(ValueError): packed.append(value)
+
+
+class BenchmarkEvidenceTests(unittest.TestCase):
+    def test_external_accepted_store_is_not_copied_and_failure_revokes_old_complete_report(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from ticks.benchmark_v2 import benchmark
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            source = path/'source.csv'
+            source.write_text('Exness,Symbol,Timestamp,Bid,Ask\n'+''.join(
+                f'exness,XAUUSDm,2015-01-01 00:00:{i:02}.000Z,1200.123,1200.234\n' for i in range(3)), encoding='utf-8')
+            store = path/'accepted'
+            importer = ExnessIngestion(source, store)
+            try: result = importer.run()
+            finally: importer.builder.store.close()
+            with redirect_stdout(StringIO()):
+                measured = benchmark(source, path/'measurements', path/'report.json',
+                                     existing_version=result['datasetVersion'], dataset_folder=store)
+            self.assertEqual(measured['status'], 'COMPLETE')
+            self.assertEqual(measured['referenceScan']['sourceRows'], 3)
+            self.assertFalse((path/'measurements'/'dataset').exists())
+            self.assertGreaterEqual(measured['totalOutputFootprintBytes'], measured['datasetFootprintBytes'])
+            source.write_bytes(source.read_bytes()+b'exness,XAUUSDm,2015-01-01 00:00:03.000Z,1200.123,1200.234\n')
+            with self.assertRaisesRegex(ValueError, 'SOURCE_CHANGED'):
+                benchmark(source, path/'measurements', path/'report.json',
+                          existing_version=result['datasetVersion'], dataset_folder=store)
+            self.assertEqual(json.loads((path/'report.json').read_text(encoding='utf-8'))['status'], 'FAILED')
 
 
 if __name__ == "__main__":unittest.main()
