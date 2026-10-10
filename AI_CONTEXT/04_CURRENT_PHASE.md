@@ -27,11 +27,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "EXECUTION_MODE": "AUTHORIZED_LOCAL_V22_CHECKPOINTS",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "V22-D precision and fixed-budget recovery closure, then V22-F full-source browser/cutover/final acceptance. Local V2.2 grant continues after each verified checkpoint.",
+  "TARGET_CHECKPOINT": "V22-F full-source operator cutover, browser journey and final scoped local Precision Beta acceptance. Preserve unknown quality and explicit100k rollback; stop before later scope.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "V22-C full supplied-source structural qualification and completed measured benchmark; D/F beta acceptance pending"
+  "LAST_COMPLETED_CHECKPOINT": "V22-D precision and full-source exact cold recovery; F beta acceptance pending"
 }
 ```
 

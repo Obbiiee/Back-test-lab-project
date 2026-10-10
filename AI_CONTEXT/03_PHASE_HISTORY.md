@@ -257,3 +257,7 @@ From clean/equal `1b56f29`, added one historical-only sentence to the existing c
 ### V22-C full supplied-source qualification / completed benchmark
 
 From clean/equal `84bcef5`, the private full supplied2015 file completed structural publication and independent full-source benchmark:8,698,581rows, exact hash/count/month and9indexed source quote/provenance/event-ID probes. Existing Section43 owns raw receipt hashes, actual Aug10–Dec31 span, measured RAM/access/day-replay fixed budgets and unknown-quality/private-use limitations. Earlier700k/42.20 incomplete histories are unchanged. No runtime or default-source change; documentation-only repository/bundle/protected/diff/Git gates apply. D precision/cold closure and F cutover/final beta acceptance remain required.
+
+### V22-D precision and full-source cold recovery
+
+From clean/equal `a31c888`, closed fixed precision/causal/recovery gates without changing runtime/contracts. Existing Section43 owns43focused actual-PG/authored-vector tests, independent Node goldens/final292zero-skip discovery, full-source early/middle/late exact checkpoint/prefix recovery under60s and RAM budgets, six honest real-source refusals/no invented money, and future-evidence refusal. Invalid private planned-order helper inputs failed first; corrected input-only retry and failed logs are documented/preserved. Real Exness fills remain uncertified. Documentation-only repository/bundle/protected/diff/Git gates close D; F operator cutover/browser/final local-beta acceptance remains.
