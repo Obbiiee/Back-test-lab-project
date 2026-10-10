@@ -132,7 +132,12 @@ class ResearchApplication:
     def create_session(self, raw):
         keys(raw, "id name methodId initialBalance startPeriod")
         identifier(raw["id"], "sessionId"); label(raw["name"])
-        require(raw["startPeriod"] == self.__period, "period", "REFUSED_FIXTURE_PERIOD")
+        if self.__historical:
+            start = self.__historical.start_for_period(raw["startPeriod"])
+            warmup = start + 1800*1000000000
+        else:
+            require(raw["startPeriod"] == self.__period, "period", "REFUSED_FIXTURE_PERIOD")
+            start, warmup = self.__start, self.__warmup
         timeline = None
         seeded = False
         try:
@@ -140,7 +145,7 @@ class ResearchApplication:
                 self._catalog_lock(db)
                 method = self._method(db, raw["methodId"]); policy = method_policy(method)
                 state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
-                                   str(self.__start), self.__profile, policy, raw["initialBalance"])
+                                   str(start), self.__profile, policy, raw["initialBalance"])
                 require(exact(raw["initialBalance"],"initialBalance",True) == Fraction(state["initialBalance"]), "moneyPrecision")
                 meta = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-1", id=raw["id"], name=label(raw["name"]), methodId=raw["methodId"],
                             methodHash=policy.definition_hash, datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
@@ -155,8 +160,8 @@ class ResearchApplication:
                 else:
                     count = db.execute("SELECT count(*) FROM btl.tick_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
                     require(count < 128, "sessions", "REFUSED_CATALOG_LIMIT")
-                    timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], self.__start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(self.__start))
-                    timeline.seek(str(self.__warmup))
+                    timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(start))
+                    timeline.seek(str(warmup))
                     state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])
                     self.store._insert(db,self.scope,state,timeline.checkpoint())
                     db.execute("INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))

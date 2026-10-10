@@ -241,3 +241,7 @@ V22-A baseline `b0ac858` was normally pushed and verified clean/equal0/0. Exact 
 ### V22-C source verification tooling — qualification remains pending
 
 From verified/equal `cff7180`, independent original CSV year/month/count/quote/provenance/event-identity checks extend the existing private benchmark; wrong-year/source failures invalidate completion. Existing Section43 owns validation and limitations. This is a tooling checkpoint, not completed full-source ingestion/benchmark or V2.2 acceptance. The ongoing private2015 import and the independent existing-workspace adapter may progress under the existing local journey grant; full C/D/F gates remain mandatory before cutover/acceptance.
+
+### V22-E indexed start-month adapter — final cutover remains pending
+
+From verified/equal `31fb727`, extended the existing historical Session startPeriod/dialog with controller-private indexed month selection and explicit unavailable-month refusal. Existing Section43 owns tests, real browser/state-preservation evidence and limits. Synthetic period, immutable source/Method/profile pins, canonical tick/execution/sidecar contracts and old saved Sessions remain intact. This independent adapter does not claim full C qualification, D historical acceptance or F cutover/Precision Beta completion.

@@ -1,8 +1,11 @@
 // Local transport only. Financial values stay exact strings; no browser settlement.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
+export function sourceContext(){
+  return typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('tick-alpha')==='local'?'synthetic':'historical';
+}
 export async function api(path,body){
-  const source=typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('tick-alpha')==='local'?'synthetic':'historical';
+  const source=sourceContext();
   const response=await fetch(ROOT+path,{method:body===undefined?'GET':'POST',cache:'no-store',
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
     ...(body===undefined?{}:{body:JSON.stringify(body)})});
@@ -32,6 +35,7 @@ export async function loadResearchContext(selected,{active=()=>true,timeframe='1
 
 export function noticeText(message){
   const explanations={
+    REFUSED_HISTORICAL_PERIOD:'Choose a month with observations in the configured source year. Unavailable months have no fallback feed.',
     REFUSED_REWIND_REQUIRES_FORK:'This Session already has financial history. Create a separate Session to replay an earlier time.',
     REFUSED_STALE_REVISION:'The saved Session changed. Reload it and review the action again.',
     PROTOCOL_BLOCKED:'Protocol rules blocked this order. Check the checklist and locked entry/exit rules.',

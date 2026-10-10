@@ -17,6 +17,20 @@ from execution.engine import submit, advance
 from ticks.exness_v2 import ExnessIngestion
 
 
+def monthly_source(path):
+    """Authored sparse quotes, never a provider-completeness declaration."""
+    csv = path/'months.csv'
+    csv.write_text('Exness,Symbol,Timestamp,Bid,Ask\n'
+        'exness,XAUUSDm,2015-08-10 00:00:00.000Z,1100.001,1100.003\n'
+        'exness,XAUUSDm,2015-11-15 00:00:00.000Z,2200.001,2200.003\n'
+        'exness,XAUUSDm,2015-11-15 00:00:00.000Z,2200.002,2200.004\n'
+        'exness,XAUUSDm,2015-12-21 00:00:00.000Z,3300.001,3300.003\n', encoding='utf-8')
+    importer = ExnessIngestion(csv,path/'month-dataset')
+    try: version=importer.run()['datasetVersion']
+    finally: importer.builder.store.close()
+    return HistoricalSource(path/'month-dataset',version,log_root=path/'month-logs')
+
+
 class HistoricalWorkspaceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -97,6 +111,32 @@ class HistoricalWorkspaceTests(unittest.TestCase):
     def test_wrong_dataset_checkpoint_is_refused(self):
         bad=deepcopy(self.checkpoint);bad['cursor']['datasetVersion']='f'*64
         with self.assertRaises(ValueError):self.cache.window(self.scope,self.session,bad)
+
+    def test_start_month_refuses_malformed_missing_and_foreign_year_without_fallback(self):
+        self.assertEqual(self.source.start_for_period('2015-08'),self.source.start_ns)
+        for period in (None,201508,'2015-8','2015-13','2015-08-01','２０１５-08','2016-08','2015-01','2015-09'):
+            with self.subTest(period=period), self.assertRaisesRegex(ValueError,'REFUSED_HISTORICAL_PERIOD'):
+                self.source.start_for_period(period)
+
+    def test_late_month_reveals_only_its_actual_atomic_quote_group_and_recovers(self):
+        source=monthly_source(self.path)
+        start=source.start_for_period('2015-11')
+        self.assertEqual(datetime.fromtimestamp(start//10**9,timezone.utc),datetime(2015,11,15,tzinfo=timezone.utc))
+        cache=IndexedTimelineCache(source)
+        try:
+            timeline=cache.new_timeline(self.scope,'session:late',start)
+            checkpoint=timeline.checkpoint();cache.seed(self.scope,'session:late',timeline)
+            result,saved=cache.reveal(self.scope,'session:late',checkpoint,str(start+1800*10**9))
+            self.assertEqual(len(result['groups']),1)
+            self.assertEqual(result['groups'][0]['order'],'UNTRUSTED')
+            self.assertEqual([e['bid'] for e in result['groups'][0]['events']],['2200.001','2200.002'])
+            self.assertEqual(result['coverage'],[dict(startNs=str(start),endNs=result['throughNs'],status='UNKNOWN',evidenceHash=None)])
+            original=cache.window(self.scope,'session:late',saved)
+            cache.close();cache=IndexedTimelineCache(source)
+            self.assertEqual(cache.window(self.scope,'session:late',saved),original)
+            for absent in ('1100.001','3300.001','endOfDataset','indexContentHash'):
+                self.assertNotIn(absent,json.dumps(original))
+        finally:cache.close()
 
     def test_window_memo_is_exact_checkpoint_bound_and_returns_defensive_copies(self):
         _, first = self.cache.reveal(self.scope,self.session,self.checkpoint,str(self.source.start_ns+2*10**9))
@@ -195,3 +235,32 @@ class HistoricalApplicationTests(unittest.TestCase):
                 self.assertEqual(synthetic.status_code,200)
                 self.assertEqual(synthetic.json()['label'],'SYNTHETIC / TEST ONLY')
                 self.assertEqual(client.get('/api/v1/tick-alpha/catalog',headers={'X-BTL-Source':'unknown'}).status_code,409)
+
+    def test_month_selection_preserves_old_session_pins_and_survives_durable_reload(self):
+        from execution.research import ResearchApplication
+        source=monthly_source(self.path)
+        scope=TrustedScope('historicalmonthsqa:'+uuid.uuid4().hex,'local:operator')
+        app=ResearchApplication(self.dsn,scope,historical_source=source)
+        try:
+            app.create_method(self.method)
+            first=dict(self.body,id='session:'+uuid.uuid4().hex)
+            original=app.create_session(first)
+            later=dict(first,id='session:'+uuid.uuid4().hex,startPeriod='2015-11')
+            created=app.create_session(later)
+            view=app.workspace(later['id'],{'timeframe':'1m'})
+            self.assertEqual(created['metadata']['startPeriod'],'2015-11')
+            self.assertEqual(view['quote']['bid'],'2200.002')
+            self.assertEqual(view['quote']['ask'],'2200.004')
+            self.assertEqual(view['state']['balance'],'10000')
+            self.assertFalse(view['state']['unresolved'])
+            self.assertEqual(app.create_session(first),original)
+            for period in ('2015-09','2016-11','2015-13'):
+                with self.assertRaisesRegex(ValueError,'REFUSED_HISTORICAL_PERIOD'):
+                    app.create_session(dict(later,id='session:'+uuid.uuid4().hex,startPeriod=period))
+            self.assertEqual(len(app.catalog()['sessions']),2)
+            app.close();app=ResearchApplication(self.dsn,scope,historical_source=source)
+            self.assertEqual(app.create_session(later),created)
+            self.assertEqual(app.workspace(later['id'],{'timeframe':'1m'}),view)
+            self.assertEqual(app.inspect(first['id']),original)
+            self.assertEqual(app.catalog()['startPeriod'],'2015-08')
+        finally:app.close()

@@ -8,6 +8,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import re
 from threading import RLock
 
 from contracts.canonical import canonical_bytes, content_hash
@@ -43,6 +44,24 @@ class HistoricalSource:
 
     def provider(self):
         return DiskTickProvider(self.folder, self.version, allow_threads=True)
+
+    def start_for_period(self, period):
+        """Operator-selected new Session start; index/EOF stay controller-private."""
+        require(type(period) is str and re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', period) is not None
+                and period[:4] == self.start_period[:4], 'period', 'REFUSED_HISTORICAL_PERIOD')
+        date = datetime(int(period[:4]), int(period[5:]), 1, tzinfo=timezone.utc)
+        days = (date-datetime(1970,1,1,tzinfo=timezone.utc)).days
+        target = max(self.start_ns, days*86400*1000000000)
+        provider = self.provider()
+        try:
+            located = provider.locate_v2(self.dataset_id, self.version, str(target))
+            require(located['position'] is not None, 'period', 'REFUSED_HISTORICAL_PERIOD')
+            start = int(located['groupTimeNs'])
+            observed_period = datetime.fromtimestamp(start//1000000000, timezone.utc).strftime('%Y-%m')
+            require(observed_period == period, 'period', 'REFUSED_HISTORICAL_PERIOD')
+            return start
+        finally:
+            provider.close()
 
 
 class IndexedTimelineCache:

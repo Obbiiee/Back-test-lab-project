@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText} from '../src/tickAlpha/client.js';
+import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 
@@ -84,15 +84,21 @@ globalThis.fetch=async(url,options)=>{routed.push({url,options});return {ok:true
 globalThis.window={location:{href:'http://127.0.0.1:5173/'}};
 await api('/catalog');
 assert.equal(routed.at(-1).options.headers['X-BTL-Source'],'historical');
+assert.equal(sourceContext(),'historical');
+await api('/sessions',{id:'session:month',name:'Late month',methodId:'method:test',initialBalance:'10000',startPeriod:'2015-11'});
+assert.equal(JSON.parse(routed.at(-1).options.body).startPeriod,'2015-11');
 assert.ok(!routed.at(-1).url.includes('?'),'Local API query guard remains intact');
 globalThis.window.location.href='http://127.0.0.1:5173/?tick-alpha=local';
 await api('/catalog');
 assert.equal(routed.at(-1).options.headers['X-BTL-Source'],'synthetic');
+assert.equal(sourceContext(),'synthetic');
 delete globalThis.window;
+assert.equal(sourceContext(),null);
+assert.ok(noticeText('REFUSED_HISTORICAL_PERIOD').includes('no fallback feed'));
 const observed={state:{throughNs:'1439166600000000000'},replayStepNs:'1000000000'};
 assert.equal(replayTarget(observed,4),'1439166604000000000');
 for(const invalid of ['0','-1','1000000000000',1,true,'1e9'])assert.throws(()=>replayTarget({...observed,replayStepNs:invalid},1));
-assert.ok(ui.includes('startPeriod:catalog.startPeriod'));
+assert.ok(ui.includes('name="startPeriod"')&&ui.includes('Start month (UTC)'));
 assert.ok(ui.includes("dialog==='ticket'"));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
 console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');
