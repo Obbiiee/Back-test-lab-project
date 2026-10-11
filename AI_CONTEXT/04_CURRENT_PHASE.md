@@ -19,7 +19,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "CURRENT_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "NEXT_PHASE": "L-1/L-2 internal Alpha acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "CAPACITY_SUBCHECKPOINT_CODE_VALIDATED_ACCEPTANCE_OPEN",
+  "CURRENT_PHASE_STATUS": "CAPACITY_SUBCHECKPOINT_PUBLISHED_ACCEPTANCE_OPEN",
   "AUTHORIZED_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
@@ -29,7 +29,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Q-3 scoped ADVANCE/SEEK replay scheduling validated with native post-commit crash recovery after scoped read queue. Capacity/failure and final internal acceptance remain authorized and incomplete. Normal subcheckpoint Git closure precedes continued readiness"
+  "LAST_COMPLETED_CHECKPOINT": "Capacity-remediation code checkpoint 39d4c0c88c296d3a1ac89d854062664287c2beaf: 343 zero-skip backend tests and frontend/repository/bundle/goldens/protected checks pass; normal push, actual GitHub equality and clean0/0 verified. Human deferred HTTPS for this checkpoint. Target20x, worst-case30second queue, peak/reference-host capacity and final internal Alpha acceptance remain incomplete"
 }
 ```
 
