@@ -34,6 +34,7 @@
 .alpha-research-equation{font:12px ui-monospace,monospace;line-height:1.5;padding-top:20px;color:#c8d1de}
 .alpha-home-method{padding:64px clamp(22px,6vw,96px);border-block:1px solid var(--home-line);display:grid;grid-template-columns:1fr 2fr;gap:50px;background:#fff}
 .alpha-home h2{font-size:34px;line-height:1.2;font-weight:650;letter-spacing:-1px;margin:0 0 24px}
+.alpha-home h2,.alpha-home h3{text-wrap:balance}.alpha-home section[id]{scroll-margin-top:24px}
 .alpha-home-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
 .alpha-home-cards article>span{font:12px ui-monospace,monospace;letter-spacing:.5px;color:#0965ff}
 .alpha-home h3{font-size:17px;font-weight:600;line-height:1.4;margin:20px 0 12px}

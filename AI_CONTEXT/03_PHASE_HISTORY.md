@@ -349,3 +349,7 @@ Fromab57c8d, original logo and approved research identity implemented on the exp
 ## Riksora workspace/header presentation slice — 2026-10-12
 
 From7c0bc06, shared supplied-brand workspace/account header, Alpha-scoped navy palette and official chart appearance options. Registered frontend regression/lint/build/distribution/repository/bundle/Node vectors and saved-session/timeframe/grid/fit/navigation/production-responsive-console checks PASS; detailed evidence belongs to the existing design blueprint. No financial/backend/data/draft change or V2.2 completion claim.
+
+## Riksora order/terminal visual slice and bounded review — 2026-10-12
+
+Fromfd55a79, CSS-only right order drawer and terminal presentation completed with existing semantics/confirmation preserved. Registered frontend regression/lint/build/distribution/repository/bundle/Node vectors PASS; actual production order click, keyboard focus/Escape, review cancellation, mobile width, terminal keyboard resize and explicit unavailable News verified. Existing design owner records bounded adversarial findings and the oversized original-artwork follow-up. V2.2 final acceptance remains OPEN; no capacity/reference/HTTPS waiver or new backend correctness claim.

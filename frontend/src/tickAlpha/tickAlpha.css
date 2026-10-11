@@ -74,6 +74,18 @@
 .tick-alpha .alpha-empty{padding:clamp(24px,5vw,64px);max-width:760px}.tick-alpha .alpha-empty h1{font-size:28px;letter-spacing:-.5px;margin-bottom:16px}.tick-alpha .alpha-empty p{font-size:14px;line-height:1.7;color:#c8d1de}.tick-alpha .alpha-empty button{margin-top:16px}
 .alpha-identity-nav{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px clamp(22px,6vw,96px);border-bottom:1px solid #d9e2ee;background:#f5f8fc;color:#06162e}
 .alpha-identity-nav>span{font-size:12px;color:#52627a}
+/* Order remains action-triggered and modal; only its visual placement changes. */
+.tick-alpha .dialog-backdrop:has(>.alpha-ticket){justify-content:flex-end;align-items:stretch;background:#020b1bb3}
+.tick-alpha .alpha-ticket.alpha-dialog{width:min(420px,100vw);max-height:100dvh;margin:0;border-radius:0;border-block:0;border-right:0;padding:24px;padding-right:max(24px,env(safe-area-inset-right));padding-bottom:max(24px,env(safe-area-inset-bottom));box-shadow:-12px 0 36px #0005;overflow:auto;overscroll-behavior:contain}
+.alpha-ticket .alpha-terminal-heading{margin-bottom:18px}.alpha-ticket .alpha-terminal-heading h2{font-size:20px;font-weight:650}
+.alpha-ticket .alpha-ticket-guide{line-height:1.7;font-size:12px;padding:12px;border:1px solid var(--lab-border);border-radius:8px;background:var(--lab-surface-chart);margin-bottom:18px}
+.tick-alpha .alpha-ticket label{gap:6px;margin:14px 0;font-size:13px}.tick-alpha .alpha-ticket input,.tick-alpha .alpha-ticket select{min-height:40px;font-size:14px;font-variant-numeric:tabular-nums}
+.alpha-direction-quotes strong{font-family:var(--lab-font-data);font-size:22px}.alpha-direction-quotes small{font-size:12px}.alpha-ticket>p:last-child{font-size:12px;line-height:1.7;color:var(--lab-text-secondary)}
+.tick-alpha .alpha-terminal-tabs{gap:4px;border-bottom:1px solid var(--lab-border);padding-bottom:0}
+.tick-alpha .alpha-terminal-tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:9px 12px;color:var(--lab-text-secondary);min-height:40px}
+.tick-alpha .alpha-terminal-tabs [aria-pressed=true]{border-bottom-color:#71aeff;color:#f5f8fc;background:#17365c}
+.alpha-terminal thead{position:sticky;top:0;background:var(--lab-surface-workspace);z-index:1}.alpha-terminal tbody tr:hover{background:var(--lab-surface-secondary)}
+.alpha-terminal th{font-weight:500;color:var(--lab-text-secondary)}.alpha-terminal td{font-variant-numeric:tabular-nums}.alpha-terminal-resize{font-size:12px}.alpha-terminal-resize>span:first-child{color:#71aeff}
 @media(max-width:760px){.tick-alpha>header{gap:12px;padding:10px 12px}.alpha-workspace-brand{gap:8px}.alpha-identity-nav{padding:20px 22px;flex-wrap:wrap}}
 @media(min-width:761px) and (max-height:600px){.tick-alpha{overflow:auto}.alpha-workspace{flex:1 0 auto;min-height:400px}.alpha-chart-workspace{min-height:400px}}
 .alpha-journal article{border-top:1px solid var(--alpha-line,#dce4df);padding:16px 0}.alpha-journal label{display:block;margin:8px 0}.alpha-journal textarea{display:block;width:100%;min-height:96px;resize:vertical}.alpha-journal code{overflow-wrap:anywhere}.alpha-journal small{margin-left:12px}
