@@ -484,10 +484,10 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   // data/projection mutation, series replacement or drawing lifecycle change.
   useEffect(() => {
     chartForOverlay?.applyOptions({
-      layout: {background:{color:researchOnly?'#06162e':'#08090b'},textColor:researchOnly?'#c8d1de':'#a5a8ad'},
-      grid: {vertLines:{color:researchOnly?'#182d48':'#1b1c1f'},horzLines:{color:researchOnly?'#182d48':'#1b1c1f'}},
-      rightPriceScale:{borderColor:researchOnly?'#29405b':'#2a2c30'},
-      timeScale:{borderColor:researchOnly?'#29405b':'#2a2c30'},
+      layout: {background:{color:researchOnly?'#101216':'#08090b'},textColor:researchOnly?'#adb5c2':'#a5a8ad'},
+      grid: {vertLines:{color:researchOnly?'#20242c':'#1b1c1f'},horzLines:{color:researchOnly?'#20242c':'#1b1c1f'}},
+      rightPriceScale:{borderColor:researchOnly?'#2c313a':'#2a2c30'},
+      timeScale:{borderColor:researchOnly?'#2c313a':'#2a2c30'},
     });
   }, [chartForOverlay,researchOnly]);
 

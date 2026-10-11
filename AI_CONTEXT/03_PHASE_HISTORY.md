@@ -1,5 +1,7 @@
 # Short history
 
+Bounded chart-presentation correction (2026-10-12): preserved current functions/engine/data while returning to neutral local Figma/FX Replay-inspired styling. Existing design owner records reproduced/fixed mobile replay-over-order overlap, actual production click/responsive checks, unchanged cursor/cash and passing frontend/build/golden gates. This is not V2.2 readiness completion; operational status remains solely04_CURRENT_PHASE.
+
 ### R-4/I-3 Alpha workspace composition (2026-10-11)
 
 From clean/equal21e8665, the human explicitly supplied the existing local chart reference and original research/math/data-science design for remaining pages. One local research home preserves Session/source URL context; workspace retains chart/tools and adds Order/News/source action rail, grouped seek/replay and guarded per-dataset/Session terminal preferences. Existing [design owner](../docs/PRODUCT_DESIGN_BLUEPRINT.md#alpha-workspacehome-composition-evidence-2026-10-11) owns actual browser/build evidence; [gap matrix](../docs/V2_ALPHA_REALITY_PLAN_GAP_MATRIX.md#alpha-implementation-adversarial-observations-2026-10-11) records reproduced UI/date defects and fixes. No backend/financial/feed/dependency change. Full frontend regression/lint/build/release, production browser, Node goldens and protected draft fingerprints PASS. Normal repository/bundle/diff/commit/push/equality precedes already-authorized R-5; Alpha and the final adversarial release audit remain incomplete.

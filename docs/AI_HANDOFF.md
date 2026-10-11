@@ -1,5 +1,11 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — neutral chart correction / mobile overlap fixed
+
+From fresh clean/equal2222b6603737d3f5106cc373f347173a0d25f399, implemented human-approved neutral local Figma/FX Replay-inspired presentation while retaining workspace/functions/latest engine/data and approved home. Only Alpha CSS/official research chart colors changed. Mobile reproduced replay controls intercepting New order; intrinsic workspace height fixes it, rebuilt375px actual click PASS. Frontend regression/final lint/build136/distribution/Node6×3 PASS; responsive/timeframe/Fit/modal/Escape/terminal arrows/unchanged cursor-cash/empty production console verified. Existing design owner records evidence; backend exemption is presentation-only. No financial intent confirmed, raw data/dependency/draft change or gate relaxation.
+
+NEXT-PROMPT REQUIREMENT: continue already-authorized readiness from freshly verified main after normal checkpoint push/equality/clean0/0; run existing bounded capacity probe after other workloads finish, preserve prior evidence and frozen20x/85%-RAM/reference requirements/private data/drafts. Record exact results in existing owners; do not claim V2.2 complete without final acceptance. HTTPS remains human-deferred until separately authorized VPS. No purchase/deployment/post-Alpha scope; STOP on material contract/capacity/provenance conflict.
+
 ## CODEX → CHATGPT — Alpha product closure grant and PF-0
 
 Latest human instruction accepts the complete Alpha proposal and explicitly directs execution toward the target; it supersedes the exhausted V22 STOP only for the bounded existing-owner Alpha closure. Starting main/origin/actual GitHub baseline `d2f82bf` clean0/0. Scope/screens/minimum feedback-cost/Ray/OSS intake and supplemental donor decision are now normalized in existing owners, not a new roadmap. Repository/negative drift and bundle safety/determinism tests plus6Node vectors x3 PASS; protected42.18 seven and42.20 fifteen raw files/refs unchanged. Sandbox realpath failures were retried with the unchanged test outside sandbox and passed. This checkpoint has no runtime/dependency/schema/provider-data change; browser/build/full-backend exemption is documentation-only.
