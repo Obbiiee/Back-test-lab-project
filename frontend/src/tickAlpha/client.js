@@ -1,10 +1,19 @@
 // Local transport only. Financial values stay exact strings; no browser settlement.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
+import {accountTransport,isAccountPage} from './accountClient.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
 export function sourceContext(){
+  if(accountTransport()||isAccountPage())return 'synthetic';
   return typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('tick-alpha')==='local'?'synthetic':'historical';
 }
 export async function api(path,body,{signal}={}){
+  const account=accountTransport();
+  if(account){
+    const value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal});
+    if(value?.schemaVersion!==1)throw Error('Unsupported workspace response; no state was imported.');
+    return value;
+  }
+  if(isAccountPage())throw Error('Sign in to continue. No private local fallback was requested.');
   const source=sourceContext();
   const response=await fetch(ROOT+path,{method:body===undefined?'GET':'POST',cache:'no-store',
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
@@ -18,6 +27,7 @@ export function sessionPath(session){return `/sessions/${encodeURIComponent(sess
 export function pagePath(page=null){
   if(page!==null&&page!=='home')throw Error('Unsupported workspace page');
   const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);
+  if(isAccountPage()){url.searchParams.delete('session');return url.pathname+'?page=account';}
   url.searchParams.delete('page');
   if(page)url.searchParams.set('page',page);
   return url.pathname+url.search;

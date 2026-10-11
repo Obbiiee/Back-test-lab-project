@@ -7,9 +7,10 @@ import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {IndicatorPreferences} from '../workspacePreferences.js';
 import {displayBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
 import {emitLocal} from './measurement.js';
+import {accountStorageKey,accountTransport} from './accountClient.js';
 
 export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing}){
-  const workspaceKey=view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`;
+  const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
   const [savedIndicators]=useState(()=>{
     const store=new IndicatorPreferences(()=>globalThis.localStorage,workspaceKey,productionRegistry);
     return {store,instances:store.load()};
@@ -63,8 +64,8 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
         <button aria-pressed={mode==='short-position'} onClick={()=>{setPlayToken(null);setMode('short-position');}} aria-label="Short Position" title="Short Position"><Icon name="short"/></button>
       </nav>
       <div className="alpha-chart-host">
-        <CandleChart candles={bars} transition={{kind:'forward'}} sessionId={`tick-alpha-${view.metadata.id}-${timeframe}`} viewportKey={`${view.metadata.id}:${timeframe}`}
-          drawingWorkspace={workspaceKey} drawingStorageKey={view.replayStepNs?`backtest-${workspaceKey}`:`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
+        <CandleChart candles={bars} transition={{kind:'forward'}} sessionId={accountStorageKey(`tick-alpha-${view.metadata.id}-${timeframe}`)} viewportKey={accountStorageKey(`${view.metadata.id}:${timeframe}`)}
+          drawingWorkspace={workspaceKey} drawingStorageKey={accountTransport()?`backtest-${workspaceKey}`:view.replayStepNs?`backtest-${workspaceKey}`:`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
           tickEvidence={view.analysis} researchOnly
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
           command={chartCommand} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing}/>

@@ -4,6 +4,49 @@ import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pag
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
+import {createAccountClient,setAccountTransport,clearAccountTransport,accountStorageKey} from '../src/tickAlpha/accountClient.js';
+
+// HTTPS-only account transport never persists tokens or falls back to local data.
+const accountCalls=[];
+const accountFetch=async(path,options)=>{
+  accountCalls.push([path,options]);
+  return {ok:true,status:200,json:async()=>path.endsWith('/login')?{access_token:'QA-MEMORY-TOKEN',token_type:'bearer'}:path.endsWith('/me')?{id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true}: {schemaVersion:1,label:'SYNTHETIC / TEST ONLY'}};
+};
+const account=createAccountClient({fetcher:accountFetch,secure:()=>true});
+await account.login('qa@example.com','Test fixture passphrase only');
+assert.equal(accountCalls[0][1].credentials,'omit');
+assert.equal(accountCalls[0][1].headers.Authorization,undefined);
+assert.equal(accountCalls[1][1].headers.Authorization,'Bearer QA-MEMORY-TOKEN');
+assert.equal(JSON.stringify(account).includes('QA-MEMORY-TOKEN'),false);
+setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
+const tenantKey=accountStorageKey('same-session-id');
+setAccountTransport(account,'33333333-3333-4333-8333-333333333333');
+assert.notEqual(accountStorageKey('same-session-id'),tenantKey);
+setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
+assert.equal(sourceContext(),'synthetic');
+await api('/catalog');
+assert.equal(accountCalls.at(-1)[0],'/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog');
+assert.equal(accountCalls.at(-1)[1].headers['X-BTL-Source'],undefined);
+await account.logout(true);
+await assert.rejects(()=>api('/catalog'),/Sign in/);
+clearAccountTransport();
+assert.equal(accountStorageKey('same-session-id'),'same-session-id');
+const beforeAccountWindow=globalThis.window;
+globalThis.window={location:{href:'https://localhost:5197/?page=account'}};
+await assert.rejects(()=>api('/catalog'),/No private local fallback/);
+assert.equal(pagePath('home'),'/?page=account');
+if(beforeAccountWindow===undefined)delete globalThis.window;else globalThis.window=beforeAccountWindow;
+const insecure=createAccountClient({fetcher:()=>{throw Error('Must not fetch');},secure:()=>false});
+await assert.rejects(()=>insecure.login('qa@example.com','password'),/HTTPS/);
+const refused=createAccountClient({fetcher:async()=>({ok:false,status:400,json:()=>{throw Error('SECRET');}}),secure:()=>true});
+await assert.rejects(()=>refused.login('qa@example.com','SECRET'),error=>!error.message.includes('SECRET'));
+let resolveLogin;
+const obsolete=createAccountClient({fetcher:()=>new Promise(resolve=>{resolveLogin=resolve;}),secure:()=>true});
+const obsoleteLogin=obsolete.login('qa@example.com','password');
+obsolete.clear();resolveLogin({ok:true,status:200,json:async()=>({access_token:'STALE',token_type:'bearer'})});
+await assert.rejects(()=>obsoleteLogin,/discarded/);
+assert.equal(obsolete.hasSession(),false);
+console.log('PASS account transport: HTTPS-only, memory-only token, strict verified identity, scoped preferences, logout/no local fallback, safe refusals and obsolete-login cancellation.');
 
 const localData=new Map(),localStore={getItem:key=>localData.get(key)??null,setItem:(key,value)=>localData.set(key,value)};
 const observedNow=Date.UTC(2026,9,11),disabledMeasurement=readMeasurement(localStore,observedNow);

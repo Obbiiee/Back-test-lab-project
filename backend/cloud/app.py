@@ -76,6 +76,8 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
     app.state.dsn = dsn
     from .workspaces import install
     install(app)
+    from .research import install as install_research
+    install_research(app)
     return app
 
 

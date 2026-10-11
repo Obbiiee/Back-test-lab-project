@@ -13,12 +13,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "H-1 minimum internal feedback and measurement",
-  "CURRENT_IMPLEMENTATION_PHASE": "I-4/I-2 identity composition",
-  "NEXT_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
+  "LAST_COMPLETED_PHASE": "I-4/I-2 identity composition",
+  "CURRENT_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
+  "NEXT_PHASE": "L-1/L-2 internal Alpha acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
   "CURRENT_PHASE_STATUS": "AUTHORIZED_AFTER_PREVIOUS_CHECKPOINT_GIT_GATES",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "I-4/I-2 identity composition",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
   "AUTO_ADVANCE_AFTER_PASS": true,
@@ -27,7 +27,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "H-1 optional internal feedback/local event sink/process counters validated; no hosted cost/capacity certificate. Normal Git closure precedes identity composition"
+  "LAST_COMPLETED_CHECKPOINT": "I-4/I-2 verified identity/workspace composition validated; synthetic account feed, private loopback data separation. Normal Git closure precedes readiness"
 }
 ```
 

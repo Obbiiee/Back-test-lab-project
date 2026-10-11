@@ -6,12 +6,13 @@ import {TerminalPreferences} from '../workspacePreferences.js';
 import AlphaJournal from './AlphaJournal.jsx';
 import AlphaBootstrap from './AlphaBootstrap.jsx';
 import {emitLocal} from './measurement.js';
+import {accountStorageKey} from './accountClient.js';
 
 const shown=value=>value??'Unavailable';
 
 export default function AlphaTerminal({view,busy,onAction,onFeedback}){
   const [tab,setTab]=useState('Open positions'),[quantities,setQuantities]=useState({});
-  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,`${view.state.datasetVersion}:${view.metadata.id}`);return {store,height:store.load()};});
+  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);

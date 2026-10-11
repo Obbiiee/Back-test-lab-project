@@ -2,7 +2,7 @@
 // No provider handles, unrestricted source metadata, EOF or future coverage.
 import {stamp} from './display.js';
 
-export default function AlphaSourceDetails({historical,catalog,view,onClose}) {
+export default function AlphaSourceDetails({historical,account=false,catalog,view,onClose}) {
   return <section className="alpha-dialog">
     <div className="alpha-terminal-heading"><h2>Data source</h2><button onClick={onClose} aria-label="Close data source">Close</button></div>
     <p>{historical?'Thanks to Exness for the historical quote source used in this local research workspace.':'This workspace uses an authored synthetic fixture for engineering checks.'}</p>
@@ -14,7 +14,7 @@ export default function AlphaSourceDetails({historical,catalog,view,onClose}) {
     </dl>
     <p>{historical?'Quote quality and ordering within equal timestamps are unverified. Missing or insufficient evidence remains unresolved; no intrabar path or fill is invented.':'Synthetic results test the application workflow and do not represent broker fills.'}</p>
     <p>Candles and indicators are research displays. Order execution uses observed Bid/Ask ticks. Unavailable months are refused without substituting a feed.</p>
-    <p>This is a private local workspace. Source credit does not imply broker endorsement or permission to redistribute data on a public website.</p>
+    <p>{account?'This verified workspace uses the synthetic test feed; private local market files are not mounted.':'This is a private local workspace. Source credit does not imply broker endorsement or permission to redistribute data on a public website.'}</p>
     <details><summary tabIndex={0}>Source disclosure</summary><p>{view?.label??catalog?.label??'Source unavailable'}</p></details>
   </section>;
 }
