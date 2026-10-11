@@ -431,6 +431,12 @@ Remaining blockers:20x capacity, peak/reference-host certification and trusted H
 
 ### CODEX → CHATGPT — HTTPS deferred to VPS / local memory measurement
 
+### CODEX → CHATGPT — approved Riksora design preparation
+
+Human approved the supplied-brand concept and requested planning before V2.2 completion. Fresh clean main/origin/actual GitHub baselineb8fd16a9a824b76ad97de7b5197f329b51e849aa,0/0. Existing PRODUCT_DESIGN_BLUEPRINT owns the new approved visual-refinement plan and file/acceptance mapping;04_CURRENT_PHASE records authorization. No new roadmap, runtime/asset/dependency/dataset/draft changes in this planning checkpoint. Current home/workspace/order/terminal owners already exist; six-dot terminal resize already works. Retain action-triggered Order, existing News behavior and default Session route, despite illustrative mockup differences. Original logo hash pinned; concept metrics/data are not evidence.
+
+NEXT-PROMPT REQUIREMENT: continue the already-authorized R-4 visual refinement from verified clean main, starting brand/home, then workspace and order/terminal in separate validated checkpoints; use the existing design plan, real logo and components, preserve financial/causal/Session behavior and private/draft state, browser-test applicable product flows, run regression/build/repository/bundle gates, update existing owners, normal commit/push and actual equality/clean0/0. HTTPS deferred until separately authorized VPS; capacity/final Alpha acceptance remains open. STOP on material contract/scope/security conflict; no external/post-Alpha work.
+
 Human explicitly deferred HTTPS until VPS and authorized continuing local work. Current-phase owns that instruction; no certificate changes, VPS procurement/deployment or final-acceptance waiver. Fresh main/origin/actual GitHub673ca8412b3ab88d3dc40adf230c49d2386dd6b3 was clean0/0. Only the authored capacity probe and existing operational/test-command owners changed; no production runtime, execution, dependency, dataset or preserved-draft modification.
 
 Added bounded aggregate whole-host sampling (0.1seconds, maximum2048 observations, errors isolated, explicit thread stop) to replace reliance on endpoints alone. Deterministic diagnostic checks PASS for max observation/error isolation, unsupported host, exact sample cap and native thread shutdown. An initial sleep-dependent assertion expected3samples but observed2; it remains failed diagnostic evidence, replaced by controlled Event responses rather than weakened expectations. This is not a new production regression claim.

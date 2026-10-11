@@ -718,6 +718,36 @@ Full registered frontend regression PASS, including source escaping/immutability
 
 Visual implementation requires a real Figma Make URL or node-specific Design URL under the loaded figma-design-to-code skill (high-fidelity get_design_context plus screenshot). Repository and read-only local Figma Make snapshot contain source and preview but no file/node URL; none was guessed and no replacement Figma file created. Requested the missing link asynchronously and completed the independent product-language/source slice. Operational status and remaining work remain solely in04_CURRENT_PHASE. The existing accepted multi-checkpoint grant persists; no new product authorization is requested merely for receiving the design reference.
 
+## Approved Riksora visual refinement plan (2026-10-12)
+
+Human approved the Riksora Labs concept board ("ya acc design") and requested planning before closing V2.2. This section owns the visual requirements; operational permission/status remains in04_CURRENT_PHASE and sequencing in the existing Alpha ledger. It is a refinement of existing R-4 surfaces, not another roadmap or execution contract. Earlier composition evidence below remains historical.
+
+### Brand and tokens
+
+Use the supplied original metallic R, never an AI-redrawn substitute. Source: `Logo R Metalik Minimalis.png`, SHA256 `08f9dae81b9ee6bb7c798e1b67aeb2991b5b1e6aedef095fa9ca99de4f20bd1a`. The approved generated board is a layout/style reference only; numbers, dates, data ranges and controls are illustrative, not product evidence.
+
+Palette: midnight navy `#06162E`, electric blue `#0965FF`, ice white `#F5F8FC`, silver `#C8D1DE`, amber `#FFC83D`, muted text `#64748B`. Amber is reserved for important evidence/warning states. Positive/negative financial colors retain semantic contrast. Use existing local/system sans typography, tabular numbers,14px readable body and12px minimum secondary text where practical; avoid new remote font requests. White research home, dark navy analytical workspace, restrained8px corners, subtle coordinate geometry only on informational surfaces. Logo header is compact; no heavy metallic textures behind data.
+
+### Implementation mapping and order
+
+| Existing surface | Planned refinement | Existing files / boundary |
+| --- | --- | --- |
+| Research home | Riksora identity, approved "Don't trust the claim. Test it." message, hypothesis/test/evidence diagram, clear workspace link and getting-started sequence | `AlphaHome.jsx`, `tickAlpha.css`; preserve pagePath query/source/Session context; no invented results or new catalog fetch on informational home |
+| Workspace shell and empty/loading/error states | Compact brand/header, descriptive strategy/Session controls, XAUUSD and existing source credit, clear next action | `TickAlpha.jsx`, `AlphaAccount.jsx`, shared scoped CSS; no default-route change, account mutation or fake login functionality |
+| Chart/replay | Navy chrome, readable toolbar hierarchy, grouped existing timeframe/replay controls | `AlphaWorkspace.jsx`; keep CandleChart/Lightweight Charts, drawings TIME+PRICE, indicator inputs, callbacks and replay scheduling |
+| Order and source/news surfaces | Order appears on user action with compact right-side layout; preserve price picking, review/confirm, Protocol restrictions and explicit uncertainty | `AlphaOrderPresentation.jsx`, existing TickAlpha order form/modal and `AlphaSourceDetails.jsx`; no new news ingestion or fictitious News terminal tab |
+| Terminal/journal/analysis | Restyle existing six-dot resize grip, tabs, tables and empty states; retain existing functional tab inventory | `AlphaTerminal.jsx`, `AlphaJournal.jsx`, `AlphaBootstrap.jsx`; no changes to calculations, trade grouping, exports, resize persistence or evidence scope |
+
+First implement brand/home, then shell/chart presentation, then order/terminal presentation. Use separate validated Git checkpoints within existing R-4 refinement; keep changes small, no large-file rewrite, dependency upgrade or new UI framework. A small shared brand component/asset is justified only if multiple current headers use it; update the existing bundle allowlist when needed. Copy only the original approved logo asset for runtime; social feed posters and full concept board remain references, not large app backgrounds. Image editing/cropping requires the image tool unless explicitly authorized otherwise; prefer original-file display with CSS sizing.
+
+The chart-first workspace remains the default. Informational home remains the existing explicit home route; do not silently redirect existing Sessions to a new dashboard. A live saved-research table belongs to the existing catalog-backed workspace until an independently reviewed reuse is implemented; never populate it with mock sessions.
+
+### Acceptance before local product closure
+
+Verify1280px desktop and375px narrow layout, keyboard focus/Escape/return, terminal pointer and keyboard resizing/collapse/restore, actual source credit, drawing create/select/edit/history/timeframe, order review/confirmation and unchanged canonical state, saved Session reload, unsupported/unavailable states, and clean console. Run registered frontend regression, lint/build/distribution, repository/bundle and independent contract vectors; backend regression only if backend/runtime contract code changes. No existing test expectations may be weakened for visual PASS. Audit as an adversarial reviewer after implementation, with reproducible findings.
+
+HTTPS/account-browser acceptance remains human-deferred to VPS. UI completion does not close20x, RAM/reference-host, rights or final Alpha gates. No subscription/pricing/payment, external deployment, new source data, future evidence, fabricated fill or v2.3 feature is part of this plan.
+
 ## Alpha workspace/home composition evidence (2026-10-11)
 
 The human explicitly resolved the missing design input: retain the existing local Figma chart UI/source and originally design other surfaces in a clean professional research/math/data-science direction without hard selling. This supersedes the earlier link dependency for this scope; no direct Figma matching claim. Informational research_home shares the same private entry/router and preserves Session/source query context, without fetching market data or inventing performance/customer claims. Existing default workspace and legacy rollback remain.
