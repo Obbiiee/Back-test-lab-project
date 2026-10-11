@@ -34,6 +34,9 @@
     "docs/PHASE18_6_UI_UX_DESIGN_SYSTEM.md"
   ],
   "implementation": [
+    "frontend/src/tickAlpha/measurement.js",
+    "frontend/src/tickAlpha/AlphaFeedback.jsx",
+    "frontend/src/tickAlpha/AlphaBootstrap.jsx",
     "frontend/src/tickAlpha/AlphaJournal.jsx",
     "backend/execution/journal.py",
     "backend/infrastructure/migrations/007_tick_journal.sql",
@@ -45,6 +48,7 @@
     "frontend/src/tickAlpha/annotations.js",
     "backend/execution/analysis.py",
     "backend/execution/bootstrap.py",
+    "backend/execution/observability.py",
     "backend/execution/workspace.py",
     "frontend/src/tickAlpha/AlphaWorkspace.jsx",
     "frontend/src/tickAlpha/display.js",

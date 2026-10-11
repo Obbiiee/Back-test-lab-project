@@ -4,11 +4,11 @@ export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
 export function sourceContext(){
   return typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('tick-alpha')==='local'?'synthetic':'historical';
 }
-export async function api(path,body){
+export async function api(path,body,{signal}={}){
   const source=sourceContext();
   const response=await fetch(ROOT+path,{method:body===undefined?'GET':'POST',cache:'no-store',
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
-    ...(body===undefined?{}:{body:JSON.stringify(body)})});
+    ...(body===undefined?{}:{body:JSON.stringify(body)}),...(signal?{signal}:{})});
   const value=await response.json();
   if(!response.ok)throw new Error(value.detail||'Local service unavailable');
   if(value.schemaVersion!==1)throw new Error('Unsupported local response; no state was imported.');

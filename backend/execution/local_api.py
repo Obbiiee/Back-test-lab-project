@@ -13,6 +13,7 @@ from fastapi.responses import Response
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError, require
 from .research import ResearchApplication
+from .observability import OperationalMetrics
 
 ORIGINS = frozenset({"http://127.0.0.1:5173","http://localhost:5173",
                      "http://127.0.0.1:5196","http://localhost:5196"})
@@ -41,9 +42,10 @@ async def body(request):
     return value
 
 
-def create_local_app(dsn, *, port=5188, historical_source=None):
+def create_local_app(dsn, *, port=5188, historical_source=None, observability=True):
     fixture = ResearchApplication(dsn)
     historical = ResearchApplication(dsn, historical_source=historical_source) if historical_source else None
+    operational = OperationalMetrics(enabled=observability)
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -98,8 +100,11 @@ def create_local_app(dsn, *, port=5188, historical_source=None):
             try:
                 admission.acquire_nowait()
             except anyio.WouldBlock:
+                operational.observe('rejected')
                 result = response({"detail":"LOCAL_BUSY"},429)
             else:
+                started=time.monotonic()
+                operational.observe('admitted')
                 try:
                     result = await call_next(request)
                 except ContractError as error:
@@ -111,6 +116,9 @@ def create_local_app(dsn, *, port=5188, historical_source=None):
                     result = response({"detail":"LOCAL_SERVICE_UNAVAILABLE"},503)
                 finally:
                     admission.release()
+                operation=request.url.path.rstrip('/').split('/')[-1]
+                operational.observe('completed',operation,time.monotonic()-started,result.status_code,
+                                    int(result.headers.get('content-length','0')))
         result.headers["Access-Control-Allow-Origin"] = origin
         result.headers["Vary"] = "Origin"
         result.headers["Cache-Control"] = "no-store"
@@ -119,6 +127,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None):
 
     async def execute(function,*args):
         return response(await anyio.to_thread.run_sync(function,*args,limiter=limiter))
+
+    @app.get('/api/v1/tick-alpha/measurement/operational')
+    async def operational_snapshot():
+        return response(operational.snapshot())
 
     @app.get("/api/v1/tick-alpha/catalog")
     async def catalog(request: Request):

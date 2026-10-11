@@ -6,6 +6,7 @@ import {productionRegistry} from '../indicators/productionRegistry.js';
 import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {IndicatorPreferences} from '../workspacePreferences.js';
 import {displayBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
+import {emitLocal} from './measurement.js';
 
 export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing}){
   const workspaceKey=view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`;
@@ -70,7 +71,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       </div>
     </div>
     <div className="alpha-replay-controls" aria-label="Tick replay controls">
-      <button disabled={busy&&!playing||view.state.ended} aria-pressed={playing} onClick={()=>setPlayToken(playing?null:pauseToken)}>{playing?'Pause replay':'Play replay'}</button>
+      <button disabled={busy&&!playing||view.state.ended} aria-pressed={playing} onClick={()=>{setPlayToken(playing?null:pauseToken);emitLocal(playing?'replay_paused':'replay_started');}}>{playing?'Pause replay':'Play replay'}</button>
       <button disabled={busy||playing||view.state.ended} onClick={()=>onReplay('ADVANCE',replayTarget(view,speed))}>Step ticks</button>
       <label>Replay speed<select aria-label="Replay speed" disabled={busy||playing} value={speed} onChange={e=>setSpeed(Number(e.target.value))}><option value={1}>1 interval / step</option><option value={4}>4 intervals / step</option><option value={16}>16 intervals / step</option></select></label>
       <details className="alpha-seek"><summary>Go to time</summary><div><label>Seek (UTC)<input ref={seekInput} aria-label="Seek UTC" type="datetime-local" step="1" disabled={busy||playing} defaultValue={new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19)}/></label><button disabled={busy||playing} onClick={stopAndSeek}>Seek replay</button></div></details>

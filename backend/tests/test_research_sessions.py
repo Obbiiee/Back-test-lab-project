@@ -19,6 +19,27 @@ from fastapi.testclient import TestClient
 DSN=os.getenv('BTL_TEST_DATABASE_URL')
 
 
+class OperationalObservationTests(unittest.TestCase):
+    def test_fixed_cardinality_bounded_window_disabled_and_nonblocking_contention(self):
+        from execution.observability import OperationalMetrics,OPERATIONS
+        metrics=OperationalMetrics()
+        for i in range(300):
+            metrics.observe('admitted')
+            metrics.observe('completed','secret-user:'+str(i),duration=i/1000,status=409,response_bytes=100)
+        result=metrics.snapshot()
+        self.assertEqual(result['latencyWindow'],256)
+        self.assertEqual(set(result['routeCounts']),set(OPERATIONS))
+        self.assertEqual((result['active'],result['admitted'],result['statusCounts']['refused']),(0,300,300))
+        self.assertNotIn('secret-user',json.dumps(result))
+        self.assertIsNone(OperationalMetrics(enabled=False).snapshot()['latencySeconds']['p50'])
+        metrics.lock.acquire()
+        try:
+            self.assertFalse(metrics.observe('admitted'))
+            self.assertEqual(metrics.snapshot()['status'],'INCOMPLETE')
+        finally:metrics.lock.release()
+        self.assertEqual(metrics.snapshot()['status'],'DISABLED_OR_INCOMPLETE')
+
+
 def method(kind='FREE_STYLE',on=False):
     return dict(schemaVersion=1,artifact='BTL-LOCAL-METHOD-1',id='method:'+uuid.uuid4().hex,name='QA Method',kind=kind,
                 checklistOn=on,conditions=[] if kind=='FREE_STYLE' else [dict(id='condition',label='Setup valid')],
@@ -191,6 +212,22 @@ class LocalAlphaBoundaryTests(unittest.TestCase):
 
     def tearDown(self):
         self.client.close()
+
+    def test_operational_disabled_does_not_change_canonical_workspace(self):
+        app=ResearchApplication(DSN);m=method();app.create_method(m)
+        session='session:'+uuid.uuid4().hex
+        app.create_session(dict(id=session,name='Operational no-op QA',methodId=m['id'],initialBalance='10000',startPeriod='2020-01'))
+        before=canonical_bytes(app.inspect(session))
+        disabled=TestClient(create_local_app(DSN,observability=False),base_url='http://127.0.0.1:5188',client=('127.0.0.1',60000),headers={'Origin':'http://127.0.0.1:5196','X-BTL-Local':'1'})
+        try:
+            self.assertEqual(disabled.post('/api/v1/tick-alpha/sessions/'+session+'/view',json={'timeframe':'1m'}).status_code,200)
+            report=disabled.get('/api/v1/tick-alpha/measurement/operational')
+            self.assertEqual(report.status_code,200)
+            self.assertEqual(report.json()['status'],'DISABLED_OR_INCOMPLETE')
+            self.assertNotIn(session,report.text)
+            self.assertNotIn(DSN,report.text)
+        finally:disabled.close();app.close()
+        self.assertEqual(canonical_bytes(ResearchApplication(DSN).inspect(session)),before)
 
     def test_bootstrap_transport_has_strict_seed_and_no_caller_evidence(self):
         app=ResearchApplication(DSN);m=method();app.create_method(m)

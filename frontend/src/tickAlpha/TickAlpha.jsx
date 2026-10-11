@@ -6,6 +6,8 @@ import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaTerminal from './AlphaTerminal.jsx';
 import AlphaSourceDetails from './AlphaSourceDetails.jsx';
+import AlphaFeedback from './AlphaFeedback.jsx';
+import {emitLocal} from './measurement.js';
 import Icon from '../workspace/WorkspaceIcon.jsx';
 import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
@@ -30,7 +32,7 @@ export default function TickAlpha(){
     (async()=>{try{
       const selected=new URL(window.location.href).searchParams.get('session');
       const result=await loadResearchContext(selected,{active:()=>mounted});
-      if(result){setCatalog(result.catalog);setView(result.view);}
+      if(result){setCatalog(result.catalog);setView(result.view);emitLocal('workspace_opened');}
     }catch(error){if(mounted)setNotice(error.message);}finally{if(mounted)setConnecting(false);}})();
     return ()=>{mounted=false;};
   },[]);
@@ -44,11 +46,12 @@ export default function TickAlpha(){
     const saved=await loadWorkspace(session);setView(saved);setSelectedMethod(saved.method.id);selectSessionUrl(session);setReview(null);setDialog(null);setOrderAction(null);
     setPlan(initialPlan(saved));setPlanRevision(0);
     setNotice('Session reopened from its committed local state.');
+    emitLocal('session_restored');
   };
   const edit=patch=>{setPlan(p=>({...p,...patch}));setPlanRevision(r=>r+1);setReview(null);};
   const protocol=view?.method.kind==='PROTOCOL';
   const planned=protocol||plan.workflow==='PLANNED';
-  const openSource=event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('source');};
+  const openSource=event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('source');emitLocal('feature_source');};
   const openReview=()=>{return run(async()=>{
     setPauseToken(n=>n+1);
     const draft={...plan,workflow:planned?'PLANNED':'QUICK',orderType:protocol&&plan.orderType==='MARKET'?'LIMIT':plan.orderType,
@@ -63,6 +66,7 @@ export default function TickAlpha(){
   const confirm=()=>run(async()=>{
     await api(sessionPath(view.metadata.id)+'/confirm',{reviewId:review.review.command.commandId,reviewHash:review.reviewHash});
     setView(await loadWorkspace(view.metadata.id));setDialog(null);setReview(null);
+    emitLocal('order_command_submitted');
     setNotice('Order accepted and saved locally. A fill requires the next eligible tick.');
   });
   const createMethod=event=>{
@@ -96,7 +100,10 @@ export default function TickAlpha(){
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
     });
   };
-  return <main className="tick-alpha">
+  return <main className="tick-alpha" onClickCapture={event=>{
+    if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
+    if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
+  }}>
     <header><div><a className="alpha-wordmark" href={pagePath('home')}>Backtest Lab</a><span className="alpha-badge">Private local workspace</span></div><nav aria-label="Workspace navigation"><a href={pagePath('home')}>Research home</a><a href="/?legacy=local">Legacy rollback</a></nav></header>
     <section className="alpha-context" aria-label="Method and Session">
       <button disabled={busy||!catalog} onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);creationId.current=id('method');setKind('FREE_STYLE');setDialog('method');}}>New strategy</button>
@@ -114,6 +121,9 @@ export default function TickAlpha(){
         onReplay={(kind,targetNs)=>run(async()=>{
           await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
           const saved=await loadWorkspace(view.metadata.id);setView(saved);
+          if(saved.state.nextGroupIndex!==view.state.nextGroupIndex)emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
+          if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
+          if(saved.analysis.metrics.tradeCount>view.analysis.metrics.tradeCount)emitLocal('order_outcome_committed');
           if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
           return true;
         })} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
@@ -123,9 +133,10 @@ export default function TickAlpha(){
         }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button disabled={busy||view.state.unresolved} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/></button></aside>
       </div>
       <div className="alpha-order-bar"><span>Bid <strong>{view.quote?.bid??'Unavailable'}</strong> / Ask <strong>{view.quote?.ask??'Unavailable'}</strong></span><button disabled={busy||view.state.unresolved} onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('ticket');}}>New order</button><span>{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span></div>
-      <AlphaTerminal key={view.metadata.id} view={view} busy={busy} onAction={requestAction}/>
+      <AlphaTerminal key={view.metadata.id} view={view} busy={busy} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
     </>}
     <footer role="status" aria-live="polite">{noticeText(notice)||(catalog?'Private local research · source limitations available in Data source':'Local service required. No fallback market feed.')}</footer>
+    {dialog==='feedback'&&<WorkspaceModal returnFocusRef={returnFocus} label="Optional research feedback" onClose={()=>setDialog(null)}><AlphaFeedback onClose={()=>setDialog(null)}/></WorkspaceModal>}
     {dialog==='source'&&<WorkspaceModal returnFocusRef={returnFocus} label="Data source" onClose={()=>setDialog(null)}><AlphaSourceDetails historical={sourceContext()==='historical'} catalog={catalog} view={view} onClose={()=>setDialog(null)}/></WorkspaceModal>}
     {dialog==='news'&&<WorkspaceModal returnFocusRef={returnFocus} label="News context" onClose={()=>setDialog(null)}><section className="alpha-dialog"><div className="alpha-terminal-heading"><h2>News context</h2><button onClick={()=>setDialog(null)}>Close</button></div><p>No point-in-time news dataset is connected to this Session.</p><p>News is not inferred from prices or fetched from today's calendar. Historical availability and revisions must be verified before events can be shown alongside replay.</p><p>Your trading evidence and saved balance are unchanged.</p></section></WorkspaceModal>}
     {dialog==='ticket'&&view&&<WorkspaceModal returnFocusRef={returnFocus} label="Plan an order" onClose={()=>{if(!busy)setDialog(null);}}>      <section className="alpha-ticket alpha-dialog"><div className="alpha-terminal-heading"><h2>Plan an order</h2><button aria-label="Close order panel" disabled={busy} onClick={()=>setDialog(null)}>Close</button></div><p className="alpha-ticket-guide">1. Set the intent · 2. Review exact values · 3. Confirm · 4. Reveal the next tick</p>

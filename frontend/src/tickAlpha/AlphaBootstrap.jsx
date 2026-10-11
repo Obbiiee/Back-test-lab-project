@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,sessionPath,noticeText} from './client.js';
 import {ratioLabel} from './annotations.js';
+import {emitLocal} from './measurement.js';
 
 export default function AlphaBootstrap({view,busy=false}){
   const [seed,setSeed]=useState('42'),[result,setResult]=useState(null),[error,setError]=useState(''),[running,setRunning]=useState(false);
@@ -25,6 +26,7 @@ export default function AlphaBootstrap({view,busy=false}){
         throw Error('The saved Session changed. Reload it before running research again.');
       }
       setResult(response);
+      emitLocal('research_metric_requested');
     }catch(failure){if(current===generation.current)setError(noticeText(failure.message));}
     finally{if(current===generation.current)setRunning(false);}
   }
