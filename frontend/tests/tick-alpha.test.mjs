@@ -43,6 +43,27 @@ assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identi
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
+let replayJob;
+const replayCalls=[];
+const reconciliation={subject:queuedAccount.subject,request:async(path,options={})=>{
+  replayCalls.push([path,options]);
+  if(path.endsWith('/commands')){replayJob=options.jobId;return {schemaVersion:1,jobId:replayJob,state:'QUEUED',result:null};}
+  return {schemaVersion:1,jobId:replayJob,state:'RECONCILE_REQUIRED',result:null};
+}};
+setAccountTransport(reconciliation,'11111111-1111-4111-8111-111111111111');
+const replayBody={kind:'ADVANCE',commandId:'command:retained'};
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>
+  error.message.includes('Reload committed Session evidence')&&!error.message.includes('unchanged'));
+assert.equal(replayCalls.length,2,'Uncertain replay polls its existing job; never silently resubmits a financial command');
+assert.equal(replayCalls[0][1].body,replayBody,'Preserve canonical financial command identity');
+const lostReplayCalls=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  lostReplayCalls.push([path,options]);
+  throw new DOMException('Response lost after possible commit','TimeoutError');
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),/Reload committed Session evidence/);
+assert.equal(lostReplayCalls.filter(([path])=>path.endsWith('/commands')).length,1);
+assert.ok(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),'Best-effort stop never asserts that an earlier attempt did not commit');
 setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);

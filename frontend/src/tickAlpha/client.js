@@ -9,19 +9,24 @@ export function sourceContext(){
 export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
-    const queued=/\/sessions\/[^/]+\/(view|bootstrap)$/.test(path);
+    const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
+    const queued=replay||/\/sessions\/[^/]+\/(view|bootstrap)$/.test(path);
     const jobId=queued?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
+    const uncertainReplay=()=>Error('Replay outcome requires reconciliation. Reload committed Session evidence before retrying.');
     let value;
     try{value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal:bounded,jobId});}
     catch(error){
       if(jobId)void account.client.request(account.root+'/jobs/'+jobId+'/cancel',{method:'POST'}).catch(()=>{});
+      if(replay)throw uncertainReplay();
       throw error;
     }
     while(value?.jobId){
       if(value.jobId!==jobId)throw Error('Unexpected research job; no state was imported.');
       if(value.state==='SUCCEEDED'){value=value.result;break;}
-      if(!['QUEUED','RUNNING'].includes(value.state))throw Error('Research calculation did not complete. Financial state is unchanged.');
+      if(!['QUEUED','RUNNING'].includes(value.state))throw Error(replay
+        ?'Replay outcome requires reconciliation. Reload committed Session evidence before retrying.'
+        :'Research calculation did not complete. Financial state is unchanged.');
       try{
         await new Promise((resolve,reject)=>{
           if(bounded.aborted)return reject(bounded.reason);
@@ -31,8 +36,10 @@ export async function api(path,body,{signal}={}){
         });
         value=await account.client.request(account.root+'/jobs/'+jobId,{signal:bounded});
       }catch(error){
-        // Best-effort queued READ cancellation; never retries a financial command.
+        // Best-effort stop: replay cancellation requires committed-state
+        // reconciliation and never claims an earlier attempt did not commit.
         void account.client.request(account.root+'/jobs/'+jobId+'/cancel',{method:'POST'}).catch(()=>{});
+        if(replay)throw uncertainReplay();
         throw error;
       }
     }

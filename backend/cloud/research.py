@@ -46,6 +46,8 @@ def install(app):
         return await body(request)
 
     async def execute(user, workspace_id, operation, *args, write=False, job_id=None):
+        if operation == 'apply' and args[-1].get('kind') in ('ADVANCE','SEEK'):
+            operation = 'replay'
         if operation in queue.OPERATIONS:
             try:
                 job = await anyio.to_thread.run_sync(partial(queue.submit, app.state.dsn, user.id, workspace_id,
@@ -127,7 +129,12 @@ def install(app):
                       'journal': ('save_note', True), 'confirm': ('confirm', True), 'commands': ('apply', True)}
         require(operation in operations, 'operation', 'RESOURCE_UNAVAILABLE')
         name, write = operations[operation]
-        job_id = request.headers.get('x-btl-job') if name in queue.OPERATIONS else None
+        raw = await json_body(request)
+        queued = name in queue.OPERATIONS or (name == 'apply' and raw.get('kind') in ('ADVANCE','SEEK'))
+        job_id = request.headers.get('x-btl-job') if queued else None
         if job_id is not None:
-            job_id = uuid.UUID(job_id)
-        return await execute(user, workspace_id, name, session_id, await json_body(request), write=write, job_id=job_id)
+            try:
+                job_id = uuid.UUID(job_id)
+            except ValueError:
+                require(False,'jobId')
+        return await execute(user, workspace_id, name, session_id, raw, write=write, job_id=job_id)

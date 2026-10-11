@@ -27,7 +27,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Q-3 scoped read queue validated after H-2/I-5 bounds/internal H-3 recovery. Financial replay queue, capacity/failure and final acceptance remain authorized and incomplete. Normal subcheckpoint Git closure precedes continued readiness"
+  "LAST_COMPLETED_CHECKPOINT": "Q-3 scoped ADVANCE/SEEK replay scheduling validated with native post-commit crash recovery after scoped read queue. Capacity/failure and final internal acceptance remain authorized and incomplete. Normal subcheckpoint Git closure precedes continued readiness"
 }
 ```
 

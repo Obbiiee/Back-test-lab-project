@@ -15,7 +15,9 @@ from cloud.research import run
 from contracts.primitives import ContractError
 from infrastructure.database import connect, migrate
 from tests import test_cloud_research as cloud_fixture
-from tests.test_research_sessions import method
+from tests.test_research_sessions import method, review_request
+from execution.research import ResearchApplication
+from application.models import TrustedScope
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
@@ -119,6 +121,85 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(status.json()['state'],'SUCCEEDED')
         self.assertEqual(status.json()['result'],response.json())
         self.assertEqual(self.fixture.client.get(path,headers=self.fixture.headers).content,before)
+
+    def replay_fixture(self):
+        app=ResearchApplication(self.dsn,TrustedScope(str(self.workspace),str(self.actor)))
+        m=method();app.create_method(m)
+        session='session:'+uuid.uuid4().hex
+        created=app.create_session({'id':session,'name':'Queued replay QA','methodId':m['id'],
+                                    'initialBalance':'10000','startPeriod':'2020-01'})
+        request=review_request(created);reviewed=app.review(request)
+        app.confirm(session,{'reviewId':request['requestId'],'reviewHash':reviewed['reviewHash']})
+        view=app.inspect(session)
+        command={'schemaVersion':1,'artifact':'BTL-TICK-EXECUTION-COMMAND-1','sessionId':session,
+                 'commandId':'command:'+uuid.uuid4().hex,'expectedRevision':view['state']['revision'],
+                 'kind':'ADVANCE','payload':{'targetNs':str(int(view['state']['throughNs'])+60_000_000_000)}}
+        return app,session,command
+
+    def test_replay_process_death_after_inner_commit_recovers_without_duplicate_fill(self):
+        app,session,command=self.replay_fixture()
+        try:
+            job=self.submit(operation='replay',args=(session,command))
+            script="""from cloud.queue import work_one
+from cloud.research import run
+import os
+def crash_after(*args,**kwargs):
+    run(*args,**kwargs)
+    os._exit(17)
+work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
+"""
+            process=subprocess.run([sys.executable,'-B','-c',script],timeout=20,capture_output=True,
+                                   env={**os.environ,'BTL_TEST_DATABASE_URL':self.dsn})
+            self.assertEqual(process.returncode,17,process.stderr.decode(errors='replace'))
+            before=app.inspect(session)
+            self.assertEqual(before['state']['revision'],command['expectedRevision']+1)
+            self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in before['events']))
+            self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])['state'],'QUEUED')
+            self.assertTrue(queue.work_one(self.dsn,run))
+            result=queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])
+            self.assertEqual(result['state'],'SUCCEEDED')
+            self.assertTrue(result['result']['durable'])
+            self.assertEqual(app.inspect(session),before)
+            duplicate=self.submit(operation='replay',args=(session,command))
+            self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,duplicate['jobId'],cancel=True)['state'],'RECONCILE_REQUIRED')
+            self.assertEqual(app.inspect(session),before,'Cancelled operational retry must not claim the previous fill was absent')
+        finally:
+            app.close()
+
+    def test_replay_expiry_and_conflict_never_claim_unchanged_financial_state(self):
+        app,session,command=self.replay_fixture()
+        try:
+            original=app.apply(session,command)
+            before=app.inspect(session)
+            expired=self.submit(operation='replay',args=(session,command))
+            with connect(self.dsn) as db:
+                db.execute("UPDATE btl.research_jobs SET expires_at=clock_timestamp()-interval '1 second' WHERE id=%s",(expired['jobId'],))
+            self.assertTrue(queue.work_one(self.dsn,run))
+            self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,expired['jobId'])['state'],'RECONCILE_REQUIRED')
+            conflict={**command,'payload':{'targetNs':str(int(command['payload']['targetNs'])+60_000_000_000)}}
+            changed=self.submit(operation='replay',args=(session,conflict))
+            self.assertTrue(queue.work_one(self.dsn,run))
+            self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,changed['jobId'])['state'],'RECONCILE_REQUIRED')
+            self.assertEqual(app.inspect(session),before)
+            self.assertTrue(original['durable'])
+        finally:
+            app.close()
+
+    def test_replay_admission_requires_owner_and_refuses_other_mutations(self):
+        app,session,command=self.replay_fixture()
+        try:
+            member,headers=self.fixture.account()
+            self.assertEqual(self.fixture.client.post('/api/v1/workspaces/'+str(self.workspace)+'/members',
+                            headers=self.fixture.headers,json={'userId':member}).status_code,204)
+            with self.assertRaises(ContractError):
+                queue.submit(self.dsn,uuid.UUID(member),self.workspace,uuid.uuid4(),'replay',(session,command))
+            cancel={**command,'kind':'CANCEL','payload':{'orderId':'order:authored'}}
+            with self.assertRaises(ContractError):
+                self.submit(operation='replay',args=(session,cancel))
+            with connect(self.dsn) as db:
+                self.assertEqual(db.execute('SELECT count(*) FROM btl.research_jobs WHERE actor_id=%s',(self.actor,)).fetchone()[0],0)
+        finally:
+            app.close()
 
     def test_two_workers_cannot_run_same_actor_and_cancel_running_is_honest(self):
         first, second = self.submit(), self.submit()

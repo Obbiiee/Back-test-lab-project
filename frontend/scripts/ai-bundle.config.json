@@ -177,7 +177,8 @@
     "frontend/src/workspace/WorkspaceIcon.jsx",
     "backend/infrastructure/resources.py",
     "backend/cloud/queue.py",
-    "backend/infrastructure/migrations/008_research_queue.sql"
+    "backend/infrastructure/migrations/008_research_queue.sql",
+    "backend/infrastructure/migrations/009_replay_queue.sql"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
