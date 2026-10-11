@@ -213,6 +213,30 @@ class LocalAlphaBoundaryTests(unittest.TestCase):
     def tearDown(self):
         self.client.close()
 
+    def test_telemetry_sink_failure_cannot_block_or_duplicate_financial_commit(self):
+        from unittest.mock import patch
+        app=ResearchApplication(DSN);m=method();app.create_method(m)
+        session='session:'+uuid.uuid4().hex
+        view=app.create_session(dict(id=session,name='Telemetry failure QA',methodId=m['id'],initialBalance='10000',startPeriod='2020-01'))
+        request=review_request(view);reviewed=app.review(request)
+        app.confirm(session,dict(reviewId=request['requestId'],reviewHash=reviewed['reviewHash']))
+        before=app.inspect(session)
+        raw=dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',sessionId=session,
+                 commandId='command:'+uuid.uuid4().hex,expectedRevision=before['state']['revision'],
+                 kind='ADVANCE',payload={'targetNs':str(int(before['state']['throughNs'])+STEP_NS)})
+        path='/api/v1/tick-alpha/sessions/'+session+'/commands'
+        with patch('execution.observability.OperationalMetrics.observe',side_effect=RuntimeError('Authored sink unavailable')):
+            reply=self.client.post(path,json=raw)
+            self.assertEqual(reply.status_code,200,reply.text)
+            retry=self.client.post(path,json=raw)
+            self.assertEqual(retry.content,reply.content)
+        saved=app.inspect(session)
+        self.assertEqual(saved['state']['revision'],raw['expectedRevision']+1)
+        self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in saved['events']))
+        with patch('execution.observability.OperationalMetrics.snapshot',side_effect=RuntimeError('Authored sink unavailable')):
+            self.assertEqual(self.client.get('/api/v1/tick-alpha/measurement/operational').status_code,503)
+        self.assertEqual(app.inspect(session),saved)
+
     def test_operational_disabled_does_not_change_canonical_workspace(self):
         app=ResearchApplication(DSN);m=method();app.create_method(m)
         session='session:'+uuid.uuid4().hex

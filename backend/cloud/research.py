@@ -57,13 +57,18 @@ def install(app):
                     raise
                 return Response(canonical_bytes({'schemaVersion': 1, 'detail': 'QUEUE_CAPACITY'}), status_code=429,
                                 media_type='application/json', headers={'Retry-After': '1'})
+            # Modern clients acknowledge durable admission and poll. Heavy work
+            # belongs to the bounded lifespan workers, never this HTTP request.
+            if job_id is not None:
+                return queue_response(job)
             # Persist acceptance before attempting work; busy workers leave a durable job.
             try:
                 admission.acquire_nowait()
             except anyio.WouldBlock:
                 return Response(canonical_bytes(job), status_code=202, media_type='application/json')
             try:
-                await anyio.to_thread.run_sync(queue.work_one, app.state.dsn, run, limiter=limiter)
+                from .worker import run as bounded_run
+                await anyio.to_thread.run_sync(queue.work_one, app.state.dsn, bounded_run, limiter=limiter)
                 job = await anyio.to_thread.run_sync(partial(queue.inspect, app.state.dsn, user.id, workspace_id, job['jobId']), limiter=limiter)
                 return queue_response(job)
             finally:

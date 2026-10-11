@@ -132,7 +132,7 @@ def work_one(dsn, runner):
 
 @asynccontextmanager
 async def lifespan(app):
-    from .research import run
+    from .worker import run, close
     limiter = anyio.CapacityLimiter(WORKERS)
     async def worker():
         while True:
@@ -142,10 +142,15 @@ async def lifespan(app):
                 # DB outage never runs a task outside admission or exposes errors.
                 await anyio.sleep(1)
             await anyio.sleep(.25)
-    async with anyio.create_task_group() as group:
-        for _ in range(WORKERS):
-            group.start_soon(worker)
-        try:
-            yield
-        finally:
-            group.cancel_scope.cancel()
+    try:
+        async with anyio.create_task_group() as group:
+            for _ in range(WORKERS):
+                group.start_soon(worker)
+            try:
+                yield
+            finally:
+                group.cancel_scope.cancel()
+    finally:
+        # Reap after admitted threads finish, including failed/cancelled exit.
+        with anyio.CancelScope(shield=True):
+            await anyio.to_thread.run_sync(close)

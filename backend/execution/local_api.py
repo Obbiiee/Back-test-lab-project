@@ -47,6 +47,13 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
     historical = ResearchApplication(dsn, historical_source=historical_source) if historical_source else None
     operational = OperationalMetrics(enabled=observability)
 
+    def observe(*args):
+        try:
+            return operational.observe(*args)
+        except Exception:
+            # An optional measurement sink is never financial authority.
+            return False
+
     @asynccontextmanager
     async def lifespan(_app):
         try:
@@ -100,11 +107,11 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
             try:
                 admission.acquire_nowait()
             except anyio.WouldBlock:
-                operational.observe('rejected')
+                observe('rejected')
                 result = response({"detail":"LOCAL_BUSY"},429)
             else:
                 started=time.monotonic()
-                operational.observe('admitted')
+                observe('admitted')
                 try:
                     result = await call_next(request)
                 except ContractError as error:
@@ -117,7 +124,7 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
                 finally:
                     admission.release()
                 operation=request.url.path.rstrip('/').split('/')[-1]
-                operational.observe('completed',operation,time.monotonic()-started,result.status_code,
+                observe('completed',operation,time.monotonic()-started,result.status_code,
                                     int(result.headers.get('content-length','0')))
         result.headers["Access-Control-Allow-Origin"] = origin
         result.headers["Vary"] = "Origin"
@@ -130,7 +137,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
 
     @app.get('/api/v1/tick-alpha/measurement/operational')
     async def operational_snapshot():
-        return response(operational.snapshot())
+        try:
+            return response(operational.snapshot())
+        except Exception:
+            return response({'detail':'MEASUREMENT_UNAVAILABLE'},503)
 
     @app.get("/api/v1/tick-alpha/catalog")
     async def catalog(request: Request):

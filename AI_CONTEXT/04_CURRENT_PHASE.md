@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest narrow instruction (2026-10-12): the human explicitly deferred the localhost certificate/browser-trust task, authorized capacity optimization first, and requested a normal GitHub checkpoint plus results/blockers in the existing handoff. This authorizes publishing the validated owned capacity-remediation draft as an incomplete-readiness subcheckpoint; deferred browser verification is not a PASS or final Alpha acceptance. Keep the 20x/resource/reference-host requirements unchanged. Continue to record unresolved gates under this operational pointer, not a second roadmap. No certificate/security-setting change is part of this capacity checkpoint.
+
 Latest effective grant: after requesting and accepting the comprehensive Alpha plan, the human explicitly said "ingat kembali pekerjaan dan kerjakan target alpha". Continue the bounded Alpha product closure mapped onto the existing ledger, starting with PF-0 scope normalization and then the single supplemental drawing spike. The [existing scope amendment](../docs/V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10) owns requirements; [ledger mapping](../docs/V2_ALPHA_FROZEN_EXECUTION_LEDGER.md#alpha-product-closure-mapping-after-local-v22-2026-10-10) owns decomposition. No competing roadmap or authority. Keep one validated commit/push/equality checkpoint per step and continue after passing intermediate steps. Local/internal product acceptance is the primary target; hosted-ready composition is permitted, but external rollout/deployment, purchases/provider contact and real-data eligibility promotion are not implied. STOP on material frozen-contract/provenance/rights/security/capacity/remote conflicts; external rights uncertainty does not block safe internal work. Preserve drafts, full supplied2015 store, old Sessions and100k rollback. Actual Exness UNKNOWN remains unresolved; no broker-fill certification.
 
 This is the sole operational phase pointer. String phase IDs preserve fractional checkpoints; null means no active/authorized implementation. Roadmap slots do not grant authorization.
@@ -17,7 +19,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "CURRENT_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "NEXT_PHASE": "L-1/L-2 internal Alpha acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "AUTHORIZED_AFTER_PREVIOUS_CHECKPOINT_GIT_GATES",
+  "CURRENT_PHASE_STATUS": "CAPACITY_SUBCHECKPOINT_CODE_VALIDATED_ACCEPTANCE_OPEN",
   "AUTHORIZED_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",

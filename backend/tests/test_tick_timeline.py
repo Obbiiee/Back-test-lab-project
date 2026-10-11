@@ -3,7 +3,8 @@ from copy import deepcopy
 from decimal import Decimal
 import unittest
 
-from contracts.canonical import content_hash
+from contracts.canonical import content_hash, canonical_bytes
+from unittest.mock import patch
 from ticks.contracts import CanonicalTick, TickManifest, validate_chunk
 from ticks.provider import SyntheticTickProvider, Cancellation, validate_provider
 from ticks.timeline import TickTimeline
@@ -44,6 +45,73 @@ class Proxy:
 
 
 class TickTimelineTests(unittest.TestCase):
+    def test_wire_factory_keeps_full_validation_and_matches_constructor_oracle(self):
+        from copy import deepcopy
+        p=SyntheticTickProvider([row(0,100)])
+        wire=p.read_page(p.dataset_id,p.dataset_version,None,1)['events'][0]
+        expected=CanonicalTick(CanonicalTick._validate(wire))
+        with patch.object(CanonicalTick,'_validate',wraps=CanonicalTick._validate) as validator:
+            actual=CanonicalTick.from_wire(wire)
+            self.assertEqual(validator.call_count,1,'Every wire record must receive one complete validation')
+        self.assertEqual(actual,expected)
+        wire['bid']='0'
+        self.assertEqual(actual,expected,'Caller mutation must not alter accepted immutable bytes')
+        for field,value in (('bid','0'),('bid',Decimal('1')),('timeNs','01'),('eventId','0'*64),('schemaVersion',True)):
+            corrupt=deepcopy(expected.wire);corrupt[field]=value
+            with self.assertRaises(ValueError) as original:
+                CanonicalTick(CanonicalTick._validate(corrupt))
+            with self.assertRaises(ValueError) as optimized:
+                CanonicalTick.from_wire(corrupt)
+            self.assertEqual(str(optimized.exception),str(original.exception))
+        class DerivedTick(CanonicalTick):
+            pass
+        self.assertIsInstance(DerivedTick.from_wire(expected.wire),DerivedTick)
+        class HostileEquality(dict):
+            def __eq__(self,other):return True
+        corrupt=expected.wire;corrupt['quality']['quote']=HostileEquality()
+        with self.assertRaises(ValueError) as original:
+            CanonicalTick(CanonicalTick._validate(corrupt))
+        with self.assertRaises(ValueError) as optimized:
+            CanonicalTick.from_wire(corrupt)
+        self.assertEqual(str(optimized.exception),str(original.exception))
+        original_validator=CanonicalTick._validate
+        source=expected.wire
+        def mutate_caller(snapshot):
+            self.assertIsNot(snapshot,source)
+            self.assertIsNot(snapshot['quality'],source['quality'])
+            source['bid']='0';source['quality']['quote']='CROSSED'
+            return original_validator(snapshot)
+        with patch.object(CanonicalTick,'_validate',side_effect=mutate_caller):
+            self.assertEqual(CanonicalTick.from_wire(source),expected)
+
+    def test_page_prefix_matches_incremental_reference_at_canonical_limit(self):
+        p=SyntheticTickProvider([row(i,100+i) for i in range(768)])
+        # One-event delivery independently supplies rows for the historical
+        # append/check reference; compare exact bytes, token and EOF semantics.
+        events=[];token=None
+        while True:
+            page=p.read_page(p.dataset_id,p.dataset_version,token,1)
+            events.extend(page['events']);token=page['nextToken']
+            if page['endOfDataset']:break
+        for start,maximum in ((0,1),(0,64),(0,512),(0,1024),(766,64),(768,64)):
+            token=None if start==0 else dict(schemaVersion=1,artifact='BTL-TICK-PAGE-TOKEN-1',datasetVersion=p.dataset_version,sourceIndex='0',afterRawOrdinal=str(start-1))
+            expected=dict(schemaVersion=1,artifact='BTL-TICK-PAGE-1',datasetId=p.dataset_id,datasetVersion=p.dataset_version,events=[],diagnostics={'records':[],'counts':{},'truncated':False},nextToken=None,endOfDataset=False)
+            for event in events[start:start+maximum]:
+                expected['events'].append(event)
+                expected['nextToken']=dict(schemaVersion=1,artifact='BTL-TICK-PAGE-TOKEN-1',datasetVersion=p.dataset_version,sourceIndex='0',afterRawOrdinal=event['rawOrdinal'])
+                try:canonical_bytes(expected)
+                except ValueError:
+                    expected['events'].pop()
+                    expected['nextToken']['afterRawOrdinal']=expected['events'][-1]['rawOrdinal']
+                    break
+            expected['endOfDataset']=start+len(expected['events'])==len(events)
+            if expected['endOfDataset']:expected['nextToken']=None
+            with patch('ticks.provider.canonical_bytes',wraps=canonical_bytes) as encoder:
+                actual=p.read_page(p.dataset_id,p.dataset_version,token,maximum)
+                self.assertLessEqual(encoder.call_count,14,'Page encoding must remain logarithmic in bounded page size')
+            self.assertEqual(canonical_bytes(actual),canonical_bytes(expected))
+            if start==0 and maximum==1024:self.assertLess(len(actual['events']),768)
+
     def test_exact_decimal_ns_resolution_immutability_and_identity(self):
         rows = [row(0, 1700000000000000123, "1.123456789123456789", "1.12345678912345679")]
         p,t = timeline(rows)

@@ -1,6 +1,7 @@
 """Offline provider port and SYNTHETIC / TEST ONLY implementation."""
 from dataclasses import dataclass
 import json
+import hashlib
 from typing import Protocol
 from copy import deepcopy
 
@@ -159,19 +160,32 @@ class SyntheticTickProvider:
         result = dict(schemaVersion=1, artifact="BTL-TICK-PAGE-1", datasetId=dataset_id,
                       datasetVersion=dataset_version, events=[], diagnostics=empty_diagnostics(),
                       nextToken=None, endOfDataset=False)
-        while position < len(self.__events) and len(result["events"]) < max_events:
-            event = json.loads(self.__events[position])
-            result["events"].append(event)
+        remaining = self.__events[position:position+max_events]
+        result["events"] = [json.loads(raw) for raw in remaining]
+        if result["events"]:
             result["nextToken"] = dict(schemaVersion=1, artifact="BTL-TICK-PAGE-TOKEN-1",
-                                       datasetVersion=dataset_version, sourceIndex="0", afterRawOrdinal=event["rawOrdinal"])
+                                       datasetVersion=dataset_version, sourceIndex="0", afterRawOrdinal=result["events"][-1]["rawOrdinal"])
             try:
                 canonical_bytes(result)
             except ValueError:
-                result["events"].pop()
-                require(bool(result["events"]), "page", "RECORD_LIMIT")
+                # Immutable validated rows: encoded size/node count grows with
+                # each appended event. Find the same maximal valid prefix as
+                # the old per-event encoder without encoding every prefix.
+                events = result["events"]
+                low, high = 0, len(events)
+                while low+1 < high:
+                    middle = (low+high)//2
+                    result["events"] = events[:middle]
+                    result["nextToken"]["afterRawOrdinal"] = result["events"][-1]["rawOrdinal"]
+                    try:
+                        canonical_bytes(result)
+                        low = middle
+                    except ValueError:
+                        high = middle
+                require(low > 0, "page", "RECORD_LIMIT")
+                result["events"] = events[:low]
                 result["nextToken"]["afterRawOrdinal"] = result["events"][-1]["rawOrdinal"]
-                break
-            position += 1
+        position += len(result["events"])
         result["endOfDataset"] = position == len(self.__events)
         if result["endOfDataset"]:
             result["nextToken"] = None
@@ -232,20 +246,24 @@ def validate_provider(provider, dataset_id, dataset_version, cancellation=None, 
             cancel.check()
             tick = CanonicalTick.from_wire(raw)
             row = tick.wire
+            moment = int(row["timeNs"])
+            # Fully validated immutable canonical bytes already own this row.
+            # Hash those exact bytes rather than normalize/encode it again.
+            row_hash = hashlib.sha256(tick._bytes).hexdigest()
             source = sources.get(row["provenance"]["sourceId"], -1)
             ordinal = int(row["rawOrdinal"])
             if row["eventId"] in seen_ids:
-                require(False, "event", "DUPLICATE_DELIVERY" if content_hash(row) == seen_ids[row["eventId"]] else "IDENTITY_CONFLICT")
-            seen_ids[row["eventId"]] = content_hash(row)
+                require(False, "event", "DUPLICATE_DELIVERY" if row_hash == seen_ids[row["eventId"]] else "IDENTITY_CONFLICT")
+            seen_ids[row["eventId"]] = row_hash
             require(source >= last_source and (source != last_source or ordinal > last_ordinal), "ordinal", "INVALID_SOURCE_ORDINAL")
-            require(tick.time_ns >= previous, "time", "ORDER_REVERSAL")
-            if tick.time_ns != tie_time:
+            require(moment >= previous, "time", "ORDER_REVERSAL")
+            if moment != tie_time:
                 if tie_rows:
                     try:
                         canonical_bytes(dict(schemaVersion=1, artifact="BTL-TICK-GROUP-CHECK-1", events=tie_rows))
                     except ValueError:
                         require(False, "tie", "GROUP_LIMIT")
-                tie_time, tie_sequence, tie_count = tick.time_ns, None, 0
+                tie_time, tie_sequence, tie_count = moment, None, 0
                 tie_sequences, tie_rows, tie_bytes = set(), [], 0
             tie_count += 1
             require(tie_count <= 1024, "tie", "GROUP_LIMIT")
@@ -261,7 +279,7 @@ def validate_provider(provider, dataset_id, dataset_version, cancellation=None, 
             require(tie_bytes <= 1048576, "tie", "GROUP_LIMIT")
             duplicate = row["quality"]["duplicateOf"]
             require(duplicate is None or (duplicate in seen_ids and duplicate != row["eventId"]), "duplicate_reference", "UNVERIFIED_DUPLICATE_REFERENCE")
-            last_source, last_ordinal, previous = source, ordinal, tick.time_ns
+            last_source, last_ordinal, previous = source, ordinal, moment
             buffer.append(row)
             require(chunk_index < len(m["chunks"]), "chunks", "EXTRA_EVENT")
             if len(buffer) == m["chunks"][chunk_index]["eventCount"]:

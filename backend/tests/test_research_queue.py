@@ -113,13 +113,18 @@ class QueueTests(unittest.TestCase):
         before=self.fixture.client.get(path,headers=self.fixture.headers).content
         job=str(uuid.uuid4())
         headers={**self.fixture.headers,'X-BTL-Job':job}
-        response=self.fixture.client.post(path+'/view',headers=headers,json={'timeframe':'1m'})
-        self.assertEqual(response.status_code,200,response.text)
+        with patch('cloud.queue.work_one',side_effect=AssertionError('API may not enter heavy work')):
+            response=self.fixture.client.post(path+'/view',headers=headers,json={'timeframe':'1m'})
+        self.assertEqual(response.status_code,202,response.text)
+        self.assertEqual(response.json()['state'],'QUEUED')
         repeated=self.fixture.client.post(path+'/view',headers=headers,json={'timeframe':'1m'})
         self.assertEqual(repeated.content,response.content)
+        self.assertTrue(queue.work_one(self.dsn,run))
         status=self.fixture.client.get(self.fixture.root+'/jobs/'+job,headers=self.fixture.headers)
         self.assertEqual(status.json()['state'],'SUCCEEDED')
-        self.assertEqual(status.json()['result'],response.json())
+        completed=self.fixture.client.post(path+'/view',headers=headers,json={'timeframe':'1m'})
+        self.assertEqual(completed.status_code,200)
+        self.assertEqual(status.json()['result'],completed.json())
         self.assertEqual(self.fixture.client.get(path,headers=self.fixture.headers).content,before)
 
     def replay_fixture(self):
@@ -135,6 +140,29 @@ class QueueTests(unittest.TestCase):
                  'commandId':'command:'+uuid.uuid4().hex,'expectedRevision':view['state']['revision'],
                  'kind':'ADVANCE','payload':{'targetNs':str(int(view['state']['throughNs'])+60_000_000_000)}}
         return app,session,command
+
+    def test_native_bounded_worker_revalidates_and_retains_canonical_receipt(self):
+        from cloud.worker import run as bounded_run
+        app,session,command=self.replay_fixture()
+        try:
+            job=self.submit(operation='replay',args=(session,command))
+            self.assertTrue(queue.work_one(self.dsn,bounded_run))
+            result=queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])
+            self.assertEqual(result['state'],'SUCCEEDED')
+            before=app.inspect(session)
+            self.assertEqual(bounded_run(self.dsn,self.actor,self.workspace,'apply',(session,command),write=True),result['result'])
+            self.assertEqual(app.inspect(session),before)
+            other,_=self.fixture.account()
+            with self.assertRaises(ContractError):
+                bounded_run(self.dsn,uuid.UUID(other),self.workspace,'workspace',(session,{'timeframe':'1m'}))
+            # A warm controller cache never substitutes for fresh authority.
+            bounded_run(self.dsn,self.actor,self.workspace,'workspace',(session,{'timeframe':'1m'}))
+            with connect(self.dsn) as db:
+                db.execute('UPDATE btl.users SET is_active=false WHERE id=%s',(self.actor,))
+            with self.assertRaises(ContractError):
+                bounded_run(self.dsn,self.actor,self.workspace,'workspace',(session,{'timeframe':'1m'}))
+        finally:
+            app.close()
 
     def test_replay_process_death_after_inner_commit_recovers_without_duplicate_fill(self):
         app,session,command=self.replay_fixture()

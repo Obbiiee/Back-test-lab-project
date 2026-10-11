@@ -178,7 +178,8 @@
     "backend/infrastructure/resources.py",
     "backend/cloud/queue.py",
     "backend/infrastructure/migrations/008_research_queue.sql",
-    "backend/infrastructure/migrations/009_replay_queue.sql"
+    "backend/infrastructure/migrations/009_replay_queue.sql",
+    "backend/cloud/worker.py"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -202,6 +203,7 @@
     "frontend/tests/tick-alpha.test.mjs",
     "backend/tests/test_execution_goldens.py",
     "backend/tests/test_tick_execution.py",
+    "backend/tests/test_tick_timeline.py",
     "backend/tests/test_tick_execution_postgres.py",
     "backend/tests/fixtures/tick_execution_v1.json",
     "frontend/tests/tick-review.test.mjs",
@@ -243,7 +245,9 @@
     "backend/tests/test_tick_evidence_v2.py",
     "backend/tests/test_identity.py",
     "backend/tests/test_resource_bounds.py",
-    "backend/tests/test_research_queue.py"
+    "backend/tests/test_research_queue.py",
+    "backend/tests/test_worker_deadline.py",
+    "backend/tests/alpha_capacity_probe.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

@@ -65,7 +65,24 @@ class CanonicalTick:
 
     @classmethod
     def from_wire(cls,row):
-        return cls(cls._validate(row))
+        if type(row) is dict:
+            # Own the mutable containers before encoding and validating them.
+            # All accepted leaves are immutable; unexpected types still follow
+            # the original validation/constructor path rather than being coerced.
+            row = row.copy()
+            for field in ('provenance', 'quality'):
+                if type(row.get(field)) is dict:
+                    row[field] = row[field].copy()
+        raw = cls._validate(row)
+        if cls is not CanonicalTick or any(type(value) not in (str, type(None))
+                                          for value in row['quality'].values()):
+            return cls(raw)
+        # _validate checks the entire original wire record and returns its
+        # canonical immutable bytes. Revalidating those same bytes in
+        # __post_init__ adds no check; direct byte construction still uses it.
+        tick = object.__new__(cls)
+        object.__setattr__(tick, '_bytes', raw)
+        return tick
 
     @staticmethod
     def _validate(row):
@@ -232,8 +249,9 @@ def chunk_content(chunk):
 
 def validate_chunk(chunk, manifest):
     m = manifest.wire
+    version = manifest.version
     tag(chunk, "BTL-TICK-CHUNK-1", "datasetId datasetVersion chunkIndex events")
-    require(chunk["datasetId"] == m["datasetId"] and chunk["datasetVersion"] == manifest.version, "chunk_dataset", "VERSION_MISMATCH")
+    require(chunk["datasetId"] == m["datasetId"] and chunk["datasetVersion"] == version, "chunk_dataset", "VERSION_MISMATCH")
     index = uint(chunk["chunkIndex"])
     require(index < len(m["chunks"]), "chunk_index")
     meta = m["chunks"][index]
@@ -246,22 +264,23 @@ def validate_chunk(chunk, manifest):
     source_indices={s["sourceId"]:index for index,s in enumerate(m["sources"])}
     for tick in ticks:
         row = tick.wire
+        moment = int(row["timeNs"])
         if row["eventId"] in seen:
             require(False,"event","DUPLICATE_DELIVERY" if seen[row["eventId"]]==tick._bytes else "IDENTITY_CONFLICT")
         seen[row["eventId"]]=tick._bytes
         for field in ("datasetId", "providerId", "feedId", "instrumentId"):
             require(row[field] == m[field], field, "IDENTITY_CONFLICT")
-        require(row["datasetVersion"] == manifest.version, "tick_version", "VERSION_MISMATCH")
+        require(row["datasetVersion"] == version, "tick_version", "VERSION_MISMATCH")
         source = next((s for s in m["sources"] if s["sourceId"] == row["provenance"]["sourceId"]), None)
         require(source is not None and source["memberHash"] == row["provenance"]["memberHash"] and source["resolutionNs"] == row["resolutionNs"], "provenance")
         source_index=source_indices[source["sourceId"]]
         ordinal=int(row["rawOrdinal"])
         require(source_index>=last_source and (source_index!=last_source or ordinal>last_ordinal),"ordinal","INVALID_SOURCE_ORDINAL")
         last_source,last_ordinal=source_index,ordinal
-        require(previous <= tick.time_ns < int(m["range"]["endNs"]) and tick.time_ns >= int(m["range"]["startNs"]), "time", "ORDER_REVERSAL")
-        if previous!=tick.time_ns:
+        require(previous <= moment < int(m["range"]["endNs"]) and moment >= int(m["range"]["startNs"]), "time", "ORDER_REVERSAL")
+        if previous!=moment:
             sequences,last_sequence=set(),None
-        previous = tick.time_ns
+        previous = moment
         if m["ordering"]["ties"]=="TRUSTED_SEQUENCE":
             require(row["trustedSequence"] is not None,"sequence","INVALID_TRUSTED_SEQUENCE")
         if row["trustedSequence"] is not None:

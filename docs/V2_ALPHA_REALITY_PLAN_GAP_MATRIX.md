@@ -72,3 +72,14 @@ Financial/tick contracts and actual Exness UNKNOWN/UNTRUSTED are unchanged. R-5 
 
 
 I-4 browser finding ALPHA-A06 (P2, fixed): identity root reused `.alpha-account`, which already styles the committed-account ledger. At531px the document reached911px and chart controls inherited account form styles. Renamed root and scoped direct identity controls; actual final375px/1280px document widths equal viewport, with clean production console. No financial or chart engine change. Remaining GAP-010/GAP-011/capacity/queue requirements are not closed by this UI fix.
+
+Readiness adversarial follow-up (validated capacity-remediation subcheckpoint, not final acceptance):
+
+| Finding | Severity | Actual evidence | Disposition |
+| --- | --- | --- | --- |
+| ALPHA-A07 | P2, code remediated | Heavy HTTP queue admission previously attempted work inside the request; a thread timeout could not terminate its executing native computation | Explicit-job202 admission and bounded native process deadline; actual kill/reap, duplicate financial receipt and worker-loss tests pass in343-test zero-skip final regression. Browser verification is deferred by human for this subcheckpoint and remains required for Alpha acceptance |
+| ALPHA-A08 | P2 / acceptance blocker | Earlier last completion59.106525→33.715893→25.554017seconds; latest same authored ten-session probe39.933708seconds wall /35.426059seconds last completion /9.014941x reproduces the30second queue miss. All ten jobs succeeded with exact cold receipts. Host RAM endpoint snapshots87%→88% are not peak/reference certification; prior12.790244x is historical evidence, not the current result | Preserve all reports. No deadline/target relaxation or silent retry; committed-state reconciliation remains required. Target20x, browser/worst-case capacity and final Alpha acceptance remain OPEN |
+| ALPHA-A09 | QA blocker, not a runtime correctness finding | Local HTTPS reload refused ERR_CERT_AUTHORITY_INVALID; native trust inventory found no reviewed QA certificate, and browser tool policy rejected access to its security interstitial | Human explicitly deferred this task for the capacity Git checkpoint on2026-10-12. No warning bypass or alternate browser surface. Browser gate is NOT PASSED |
+| ALPHA-A10 | P2, code remediated | Interrupted pooled calls did not reap their retained child; failed API-lifespan exit could skip cleanup after the task group | Added cleanup for BaseException and a shielded outer lifespan finally. Seven actual native lifecycle tests and final343-test zero-skip regression PASS; deferred browser and final Alpha acceptance remain OPEN |
+
+These observations do not promote fixtures to historical execution quality, relabel700k as a completed benchmark, or replace the existing acceptance contracts. The human explicitly authorized a Git checkpoint of validated capacity work with browser trust deferred; that checkpoint does not close capacity or Alpha acceptance.

@@ -27,7 +27,7 @@ for(const file of reachable)if(file.startsWith('frontend/src/tickAlpha/'))
   assert.ok(config.implementation.includes(file),'Reachable Alpha module missing from AI bundle: '+file);
 // V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
 const executionReferences=new Set([
-  'backend/cloud/queue.py','backend/infrastructure/migrations/009_replay_queue.sql','backend/infrastructure/migrations/008_research_queue.sql','backend/tests/test_research_queue.py',
+  'backend/cloud/worker.py','backend/tests/test_worker_deadline.py','backend/tests/alpha_capacity_probe.py','backend/cloud/queue.py','backend/infrastructure/migrations/009_replay_queue.sql','backend/infrastructure/migrations/008_research_queue.sql','backend/tests/test_research_queue.py',
   'backend/infrastructure/resources.py','backend/tests/test_resource_bounds.py',
   'backend/cloud/app.py','backend/cloud/research.py','backend/cloud/workspaces.py','backend/tests/test_cloud_research.py',
   'backend/identity/store.py','backend/identity/manager.py','backend/identity/boundary.py','backend/identity/delivery.py',
@@ -45,7 +45,7 @@ const executionReferences=new Set([
   'backend/contracts/primitives.py','backend/contracts/canonical.py','backend/contracts/models.py',
   'backend/application/models.py','backend/infrastructure/database.py','backend/infrastructure/codec.py',
   'backend/infrastructure/migrations/005_tick_execution.sql','backend/tests/test_execution_goldens.py',
-  'backend/tests/test_tick_execution.py','backend/tests/test_tick_execution_postgres.py',
+  'backend/tests/test_tick_execution.py','backend/tests/test_tick_timeline.py','backend/tests/test_tick_execution_postgres.py',
   'backend/tests/fixtures/tick_execution_v1.json',
 ]);
 function allowedBundleSource(file){
