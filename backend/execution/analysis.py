@@ -41,6 +41,65 @@ def ratio(value):
     return dict(numerator=str(value.numerator), denominator=str(value.denominator))
 
 
+def excursions(completed, groups, state):
+    """Observed liquidation excursions from an already revealed bounded prefix.
+
+    Canonical closed positions prove accepted coverage while exposed. This does
+    not infer missing ticks; absent boundaries or uncertain exposure return null.
+    """
+    require(len(groups)<=1024, 'excursionGroups','REFUSED_RESEARCH_LIMIT')
+    require(all(int(g['timeNs'])<=int(state['throughNs']) for g in groups),
+            'excursionFuture','REFUSED_FUTURE_EVIDENCE')
+    results = {}
+    for row in completed:
+        unavailable = dict(mae=None,mfe=None,excursionReason='REVEALED_HISTORY_LIMIT')
+        results[row['id']] = unavailable
+        lo,hi = int(row['entryTimeNs']),int(row['exitTimeNs'])
+        span = [g for g in groups if lo<=int(g['timeNs'])<=hi]
+        entry = row['entryEvidence']; exits = row['exitSlices']
+        if not span or not entry or not exits:
+            continue
+        ids = {g['groupId'] for g in span}
+        if entry['groupId'] not in ids or any(e['groupId'] not in ids for e in exits):
+            continue
+        if sum(len(g['events']) for g in span)>16384:
+            unavailable['excursionReason']='REVEALED_RESEARCH_LIMIT';continue
+        remaining=Fraction(row['quantity']); favorable=adverse=Fraction(); started=False; consumed=0; reason=None
+        for group in span:
+            boundaries = group['groupId']==entry['groupId'] or any(e['groupId']==group['groupId'] for e in exits)
+            if group['order']=='UNTRUSTED' and boundaries and len({(t['bid'],t['ask']) for t in group['events']})>1:
+                reason='UNRESOLVED_EXCURSION_CHRONOLOGY';break
+            for tick in group['events']:
+                if not started:
+                    if group['groupId']!=entry['groupId'] or tick['eventId'] not in entry['eventIds']:
+                        continue
+                    started=True
+                quality=tick['quality']
+                require(tick['datasetId']==state['datasetId'] and tick['datasetVersion']==state['datasetVersion'] and
+                        tick['timeNs']==group['timeNs'],'excursionIdentity','CORRUPT_RECORD')
+                if (quality['quote']!='VALID' or quality['freshness']!='CONFIRMED' or
+                    quality['gapBefore'] not in ('NONE','KNOWN_SESSION_CLOSED') or
+                    quality['evidenceHash'] is None or quality['duplicateOf'] is not None):
+                    reason='UNRESOLVED_EXCURSION_EVIDENCE';break
+                liquidation=Fraction(tick['bid'] if row['side']=='LONG' else tick['ask'])
+                value=(1 if row['side']=='LONG' else -1)*(liquidation-Fraction(row['entryPrice']))*Fraction(state['profile']['contractSize'])*remaining
+                favorable=max(favorable,value);adverse=max(adverse,-value)
+                while consumed<len(exits) and exits[consumed]['groupId']==group['groupId'] and tick['eventId'] in exits[consumed]['eventIds']:
+                    next_remaining=Fraction(exits[consumed]['remaining'])
+                    require(0<=next_remaining<remaining,'excursionExposure','CORRUPT_RECORD')
+                    remaining=next_remaining;consumed+=1
+                if remaining==0:
+                    break
+            if reason or remaining==0:
+                break
+        if reason:
+            unavailable['excursionReason']=reason
+        elif started and remaining==0 and consumed==len(exits):
+            results[row['id']]=dict(mae=text(adverse),mfe=text(favorable),excursionReason=None,
+                excursionBasis='OBSERVED_LIQUIDATION_GROSS_REMAINING_EXPOSURE',excursionVersion='BTL-CAUSAL-EXCURSIONS-1')
+    return results
+
+
 def metrics(completed):
     nets = [Fraction(row['net']) for row in completed]
     wins = [n for n in nets if n > 0]
@@ -97,6 +156,7 @@ def project(state, events, quote):
         if kind == 'ORDER_ACCEPTED':
             require(order_id in state['orders'] and order_id not in rows, 'acceptedOrder', 'CORRUPT_RECORD')
             row = dict(id=order_id, **deepcopy(detail['plan']), entryPrice=None, entryTimeNs=None, entryFillRef=None,
+                entryEvidence=None, exitSlices=[],
                 exitTimeNs=None, exitPrice=None, exitFillRef=None, exitReason=None, gross='0', commission='0', netCashChange='0',
                 status='PENDING', remaining=detail['plan']['quantity'], rMultiple=None, rReason='PREENTRY_R0_NOT_PINNED',
                 mae=None, mfe=None, excursionReason='NOT_COMPUTED_IN_FUNCTIONAL_ALPHA')
@@ -121,7 +181,8 @@ def project(state, events, quote):
         row['netCashChange'] = text(Fraction(row['netCashChange']) + delta)
         if kind == 'ENTRY_FILL':
             require(row['entryFillRef'] is None and detail['quantity'] == row['quantity'] and delta == -cost, 'entry', 'CORRUPT_RECORD')
-            row.update(status='ACTIVE', entryPrice=detail['price'], entryTimeNs=evidence['timeNs'], entryFillRef=event['eventId'])
+            row.update(status='ACTIVE', entryPrice=detail['price'], entryTimeNs=evidence['timeNs'], entryFillRef=event['eventId'],
+                       entryEvidence=dict(groupId=evidence['groupId'],eventIds=deepcopy(evidence['eventIds'])))
         else:
             require(row['entryFillRef'] == detail['entryFillRef'] and
                 Fraction(row['remaining']) - Fraction(detail['quantity']) == Fraction(detail['remaining']) and
@@ -129,6 +190,8 @@ def project(state, events, quote):
             gross += Fraction(detail['gross'])
             row.update(gross=text(Fraction(row['gross'])+Fraction(detail['gross'])), remaining=detail['remaining'],
                 exitTimeNs=evidence['timeNs'], exitPrice=detail['price'], exitFillRef=event['eventId'], exitReason=detail['reason'])
+            row['exitSlices'].append(dict(groupId=evidence['groupId'],eventIds=deepcopy(evidence['eventIds']),
+                                         timeNs=evidence['timeNs'],remaining=detail['remaining']))
             if Fraction(row['remaining']) == 0:
                 row.update(status='CLOSED', net=row['netCashChange'], durationNs=str(stamp-int(row['entryTimeNs'])))
                 completed.append(row)

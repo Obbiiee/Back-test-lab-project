@@ -8,7 +8,7 @@ import uuid
 from application.models import TrustedScope
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import ContractError
-from execution.analysis import project, metrics, planned_risk, MAX_ANALYSIS_EVENTS
+from execution.analysis import project, metrics, planned_risk, excursions, MAX_ANALYSIS_EVENTS
 from execution.research import ResearchApplication
 from execution.research_fixture import STEP_NS
 from infrastructure.database import connect, migrate
@@ -20,6 +20,39 @@ DSN=os.getenv('BTL_TEST_DATABASE_URL')
 
 
 class AnalysisGoldenTests(unittest.TestCase):
+    def test_causal_excursions_include_boundaries_and_partial_remaining_exposure(self):
+        from ticks.timeline import TickTimeline
+        case=deepcopy(next(c for c in goldens()['scenarios'] if c['id']=='partial-then-full-fixed-commission'))
+        case['rows'].append([4,'9999','10000'])
+        h=exercise(case);h.through(4)
+        timeline=TickTimeline.resume(provider_for(case),h.store.sessions[(h.scope.workspace_id,h.session)][1])
+        groups=timeline.consumer().read_revealed('0',64)
+        result=project(h.state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
+        before=canonical_bytes(h.state)
+        value=excursions(result['completed'],groups,h.state)['order:1']
+        self.assertEqual((value['mae'],value['mfe'],value['excursionReason']),('10','20',None))
+        changed=deepcopy(groups);changed[-1]['events'][0]['bid']='1';changed[-1]['events'][0]['ask']='2'
+        self.assertEqual(excursions(result['completed'],changed,h.state)['order:1'],value)
+        self.assertEqual(canonical_bytes(h.state),before)
+        self.assertEqual(excursions(result['completed'],groups[1:],h.state)['order:1']['excursionReason'],'REVEALED_HISTORY_LIMIT')
+        changed[0]['events'][0]['quality']['freshness']='UNKNOWN'
+        self.assertEqual(excursions(result['completed'],changed,h.state)['order:1']['excursionReason'],'UNRESOLVED_EXCURSION_EVIDENCE')
+
+    def test_short_excursions_use_ask_and_future_groups_are_refused(self):
+        from ticks.timeline import TickTimeline
+        case=dict(rows=[[1,'100','101'],[2,'97','98']],open=dict(side='SHORT',orderType='MARKET',
+            entry='100',quantity='0.1',sl='110',tp='90'),manualExits=[dict(after='1',quantity=None,through='2')])
+        h=exercise(case)
+        timeline=TickTimeline.resume(provider_for(case),h.store.sessions[(h.scope.workspace_id,h.session)][1])
+        groups=timeline.consumer().read_revealed('0',64)
+        result=project(h.state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
+        value=excursions(result['completed'],groups,h.state)['order:1']
+        self.assertEqual((value['mae'],value['mfe']),('10','20'))
+        future=deepcopy(groups);future[-1]['timeNs']='3'
+        with self.assertRaises(ContractError):excursions(result['completed'],future,h.state)
+        uncertain=deepcopy(groups);uncertain[0]['order']='UNTRUSTED';extra=deepcopy(uncertain[0]['events'][0]);extra['bid']='99';uncertain[0]['events'].append(extra)
+        self.assertEqual(excursions(result['completed'],uncertain,h.state)['order:1']['excursionReason'],'UNRESOLVED_EXCURSION_CHRONOLOGY')
+
     def test_projection_rejects_forged_pin_and_keeps_pinless_history_null(self):
         case=next(c for c in goldens()['scenarios'] if c['id']=='partial-then-full-fixed-commission')
         h=exercise(case);state=h.state
@@ -164,6 +197,7 @@ class AnalysisPostgresTests(unittest.TestCase):
         closed=done['analysis']['completed'][0]
         self.assertEqual((closed['gross'],closed['net']),('-1.8','-1.8'))
         self.assertEqual(closed['durationNs'],str(2*STEP_NS))
+        self.assertEqual((closed['mae'],closed['mfe'],closed['excursionReason']),('1.5','0',None))
         self.assertEqual(done['analysis']['account']['balance'],'9998.2')
         self.assertEqual(done['analysis']['metrics']['maxDrawdown'],'1.8')
         self.assertEqual(done['analysis']['provenance']['eventHead'],done['state']['eventHash'])
@@ -248,6 +282,7 @@ class AlphaAcceptanceTests(unittest.TestCase):
         self.assertEqual(done['analysis']['account']['balance'],'9900')
         self.assertEqual(done['analysis']['metrics']['losses'],1)
         self.assertEqual(row['rMultiple'],dict(numerator='-1',denominator='1'))
+        self.assertEqual((row['mae'],row['mfe']),('100','0'))
 
     def test_protocol_pass_short_stop_target_uses_ask_and_one_completed_position(self):
         done=self.journey(True);row=done['analysis']['completed'][0]
@@ -255,4 +290,5 @@ class AlphaAcceptanceTests(unittest.TestCase):
         self.assertEqual(done['analysis']['account']['balance'],'10200')
         self.assertEqual(done['analysis']['metrics']['wins'],1)
         self.assertEqual(row['rMultiple'],dict(numerator='2',denominator='1'))
+        self.assertEqual((row['mae'],row['mfe']),('20','200'))
         self.assertEqual(done['analysis']['metrics']['rEligible'],1)

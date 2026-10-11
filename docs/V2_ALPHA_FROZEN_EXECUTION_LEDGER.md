@@ -362,3 +362,5 @@ The frozen journey is complete at L-8. Post-Alpha parking-lot work requires a ne
 The existing [system architecture evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#alpha-canonical-journal-implementation-evidence--2026-10-11) owns durable scoped notes, independent note CAS, canonical complete JSON export and actual validation/limits. No financial authority or roadmap changes. The operational pointer and authorization remain solely in AI_CONTEXT/04_CURRENT_PHASE.md; Git closure precedes already-authorized R-6.
 
 R-6 implementation evidence: [existing system blueprint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#alpha-pinned-risk-and-basic-research-implementation-evidence--2026-10-11). This link records implementation evidence, not another operational pointer or amended metric definition.
+
+R-7 implementation evidence: [existing system blueprint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#alpha-causal-excursion-implementation-evidence--2026-10-11); bounded unavailable values preserve the frozen metric contract. Operational status remains solely in04_CURRENT_PHASE.

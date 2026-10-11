@@ -17,7 +17,7 @@ from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
-from .analysis import project, metrics, planned_risk, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
+from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
 from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
 
 
@@ -203,6 +203,7 @@ class ResearchApplication:
                             yield unpack(*row)
                 view['analysis'] = project(state, committed_events(), view['quote'])
                 self._research_risk(db, state, view['analysis'])
+                self._research_excursions(state,view['analysis'],groups)
             return view
 
     def _research_risk(self, db, state, analysis):
@@ -244,6 +245,17 @@ class ResearchApplication:
         analysis['metrics'].update(metrics(analysis['completed']))
         analysis['provenance']['researchVersion'] = RESEARCH_VERSION
 
+    def _research_excursions(self, state, analysis, groups):
+        if analysis['status']!='COMPLETE':
+            return
+        for row in analysis['orders']:
+            if row['status']!='CLOSED':
+                row['excursionReason']='POSITION_NOT_COMPLETED'
+        values=excursions(analysis['completed'],groups,state)
+        for row in analysis['completed']:
+            row.update(values[row['id']])
+        analysis['provenance']['excursionVersion']='BTL-CAUSAL-EXCURSIONS-1'
+
     def workspace(self, session_id, raw):
         keys(raw, 'timeframe')
         require(type(raw['timeframe']) is str and raw['timeframe'] in TIMEFRAMES, 'timeframe', 'REFUSED_TIMEFRAME')
@@ -259,6 +271,7 @@ class ResearchApplication:
                     yield unpack(*row)
         analysis = project(state, events(), self._quote(state,checkpoint))
         self._research_risk(db,state,analysis)
+        self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
         require(len(analysis['orders']) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         return analysis
 
