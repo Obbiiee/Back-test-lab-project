@@ -11,6 +11,7 @@ from pathlib import Path
 import platform
 import time
 import uuid
+from threading import Event, Thread
 from unittest.mock import patch
 
 import psycopg
@@ -35,6 +36,38 @@ def host_memory():
     status=Status();status.length=ctypes.sizeof(status)
     if not ctypes.WinDLL('kernel32').GlobalMemoryStatusEx(ctypes.byref(status)):return None
     return dict(totalBytes=status.total,availableBytes=status.available,usedPercent=status.load)
+
+
+class MemorySampler:
+    """Bounded aggregate workload sampling; never an exact continuous peak."""
+    def __init__(self):
+        self.stop = Event()
+        self.samples = 0
+        self.errors = 0
+        self.maximum = None
+        self.thread = Thread(target=self._sample, daemon=True)
+
+    def _sample(self):
+        for _ in range(2048):
+            try:
+                value = host_memory()
+                if value is not None:
+                    self.samples += 1
+                    if self.maximum is None or value['usedPercent'] > self.maximum['usedPercent']:
+                        self.maximum = value
+            except Exception:
+                self.errors += 1
+            if self.stop.wait(.1):
+                return
+
+    def close(self):
+        self.stop.set()
+        self.thread.join(timeout=2)
+
+    def report(self):
+        return dict(samples=self.samples, errors=self.errors, maximumObserved=self.maximum,
+                    stopped=not self.thread.is_alive(), intervalSeconds='.1', sampleLimit=2048,
+                    interpretation='Sampled whole-host memory during workload only; may miss inter-sample peaks, includes other apps, excludes setup/cold receipt checks; not process RSS or reference certification.')
 
 
 def main():
@@ -62,8 +95,10 @@ def main():
                          commandId='command:'+uuid.uuid4().hex,expectedRevision=before['state']['revision'],kind='ADVANCE',
                          payload={'targetNs':str(int(before['state']['throughNs'])+24*STEP_NS)})
             sessions.append((f,app,session,command,str(uuid.uuid4())))
+    sampler = MemorySampler()
     try:
         memory_before=host_memory()
+        sampler.thread.start()
         start=time.monotonic()
         for f,app,session,command,job in sessions:
             now=time.monotonic()
@@ -88,6 +123,7 @@ def main():
             list(workers.map(lambda _:drain(),range(2)))
         elapsed=time.monotonic()-start
         memory_after=host_memory()
+        sampler.close()
         mismatches=0;successful=0;states={}
         for f,app,session,command,job in sessions:
             result=queue.inspect(dsn,uuid.UUID(f.actor),uuid.UUID(f.workspace),job)
@@ -109,6 +145,7 @@ def main():
                     states=states,
                     workerObservations=worker_observations,
                     hostMemorySnapshots=dict(before=memory_before,after=memory_after,interpretation='Endpoint host snapshots only; not sampled peak RSS or resource certification.'),
+                    hostMemorySampling=sampler.report(),
                     workload='Ten distinct verified OWNER workspaces; one reviewed Limit Long with canonical SL exit and 24 fifteen-second intervals (six minutes) per Session; exact cold duplicate receipt for successful jobs.',
                     workloadWallSeconds=str(elapsed),minimumPerSessionVirtualSpeed=str(24*STEP_NS/1000000000/elapsed),
                     apiAcknowledgementSeconds=dict(p95=str(values[9]),p99=str(values[9])),
@@ -119,6 +156,8 @@ def main():
         print(json.dumps(report,indent=2))
         assert pending==0 and successful==10 and mismatches==0, 'Internal capacity probe failed; aggregate evidence retained'
     finally:
+        if sampler.thread.ident is not None:
+            sampler.close()
         for client in clients:client.close()
         for _,app,*_ in sessions:app.close()
 
