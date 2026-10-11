@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest readiness measurement (2026-10-12), after visual checkpoint62b820bd02bd74e58b8ebda1572885ae63543573: separate existing ten-Session QA probe returned10SUCCEEDED/queue0/mismatch0,24.613797600148246seconds/14.625942971020114x,225host-memory observations/max87%/errors0. Frozen20x/85%-RAM/reference requirements remain unmet. This is a material capacity hard-stop under the existing grant; do not mark V2.2 complete or begin final acceptance as passed. HTTPS stays deferred; no external deployment/purchase, contract weakening or additional runtime implementation in this diagnostic checkpoint. Existing system blueprint owns evidence and limitations.
+
 Latest human correction (2026-10-12): retain current workspace functions and latest engine/data, but refine chart presentation toward the original local Figma/FX Replay-inspired neutral dark workspace; approved Riksora home stays unchanged. Human requested continuing through V2.2. This bounded correction does not authorize changing financial/evidence contracts, weakening readiness gates or external deployment. Existing readiness pointer below remains active; HTTPS stays human-deferred.
 
 Latest human design grant (2026-10-12): approved the Riksora visual concept and requested planning before V2.2 closure, then continuing work. The [existing design owner](../docs/PRODUCT_DESIGN_BLUEPRINT.md#approved-riksora-visual-refinement-plan-2026-10-12) maps bounded R-4 presentation refinements onto existing components. Plan checkpoint completed; brand/home, workspace/header and order/terminal slices implemented and validated, with bounded adversarial evidence in the design owner. Resume existing capacity/reference/final Alpha acceptance under the existing grant; these UI checkpoints do not close those gates. No engine/financial/data change, new roadmap, public deployment or weakened readiness gates. Current readiness pointer remains authoritative and incomplete.
@@ -25,7 +27,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "CURRENT_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "NEXT_PHASE": "L-1/L-2 internal Alpha acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "CAPACITY_SUBCHECKPOINT_PUBLISHED_ACCEPTANCE_OPEN",
+  "CURRENT_PHASE_STATUS": "CAPACITY_GATE_FAILED_FINAL_ACCEPTANCE_BLOCKED",
   "AUTHORIZED_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
