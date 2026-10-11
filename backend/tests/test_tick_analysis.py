@@ -2,6 +2,9 @@
 from copy import deepcopy
 from fractions import Fraction
 import os
+import json
+import re
+from pathlib import Path
 import unittest
 import uuid
 
@@ -17,6 +20,27 @@ from tests.test_tick_execution import exercise, Harness, provider_for, open_plan
 from tests.test_research_sessions import method, review_request
 
 DSN=os.getenv('BTL_TEST_DATABASE_URL')
+
+
+class BootstrapFreezeTests(unittest.TestCase):
+    def test_single_normative_primitive_and_materialized_vectors(self):
+        source=(Path(__file__).resolve().parents[2]/'docs/V2_ALPHA_RESEARCH_METRICS_CONTRACT.md').read_text(encoding='utf-8')
+        marker='<!-- BTL-BOOTSTRAP-FROZEN-VECTORS-1 -->'
+        self.assertEqual(source.count(marker),1)
+        vectors=json.loads(re.search(r'```json\s*(.*?)\s*```',source.split(marker)[1],re.S).group(1))
+        self.assertEqual(vectors['artifact'],'BTL-BOOTSTRAP-FROZEN-VECTORS-1')
+        self.assertEqual(vectors['prngVersion'],'BTL-XORSHIFT32-13-17-5-1')
+        x=vectors['seed'];words=[]
+        for _ in range(5):
+            x=(x^(x<<13))&0xffffffff;x=(x^(x>>17))&0xffffffff;x=(x^(x<<5))&0xffffffff
+            words.append(str(x))
+        self.assertEqual(words,vectors['firstWords'])
+        self.assertEqual([(int(w)-1)%3 for w in words],vectors['firstSampleIndicesN3'])
+        mixed=vectors['mixed30']
+        self.assertEqual(len(mixed['repeatedValues'])*mixed['repeat'],30)
+        self.assertEqual(mixed['paths'],10000)
+        for key in ('terminalP5P50P95','drawdownP50P95P99','negativeStreakP50P95P99'):
+            self.assertEqual(len(mixed[key]),3)
 
 
 class AnalysisGoldenTests(unittest.TestCase):

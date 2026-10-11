@@ -27,7 +27,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "R-7 bounded revealed liquidation excursions with exact partial exposure and honest unavailable limits; normal Git closure precedes R-8"
+  "LAST_COMPLETED_CHECKPOINT": "R-8 primitive and materialized vectors frozen before calculator implementation; runtime remains unimplemented and current R-8 remains authorized"
 }
 ```
 

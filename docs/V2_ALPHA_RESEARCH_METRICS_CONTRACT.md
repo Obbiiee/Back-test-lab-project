@@ -48,3 +48,35 @@ The pure calculator boundary is the existing `backend/execution/analysis.py:metr
 BTL `project` remains the owner of committed-event grouping, partial-close completion, causal fill validation, event-chain/account reconciliation, bounded 4096-event refusal, drawdown from exact cash postings, Session/Method/Passport provenance and orchestration. Open/unresolved positions do not enter completed-position denominators. At the original S-6 checkpoint, R0 was not pinned and research values were explicitly unavailable; evaluating a library did not implement them. Subsequent implementation evidence belongs to the [existing system blueprint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#alpha-pinned-risk-and-basic-research-implementation-evidence--2026-10-11), with operational progress solely in [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md). FinancialEngine remains unchanged.
 
 Any future numerical adapter must satisfy authored goldens at this boundary and preserve exact money/null/BE semantics before adoption. S-6 retains the current small pure calculator after the pinned QuantStats comparison; [STITCH audit Section 17](STITCH_0_OSS_REPLACEMENT_AUDIT.md#17-s-6-researchcalculator-and-quantstats-evaluation--2026-10-10) owns evidence and library limitations. No frozen metric definition is amended.
+
+## R-8 deterministic bootstrap primitive freeze — 2026-10-11
+
+This is the existing contract's pre-calculator PRNG freeze, not another roadmap or execution contract. Scope is descriptive resampling of already-completed canonical net R values; it grants no forecast, execution certainty, provider rights or external delivery. Algorithm/version: `BTL-XORSHIFT32-13-17-5-1`. The explicit integer seed is in1..4294967295; zero/boolean/string/fractional/out-of-range seeds are refused. It is a reproducible noncryptographic research primitive, never a security token generator.
+
+State is an unsigned32-bit integer. Each word performs, in order, `x ^= (x << 13)`, `x ^= (x >> 17)`, `x ^= (x << 5)`, with modulo2^32 after each operation and a logical unsigned right shift. Nonzero seeds cycle through nonzero words. To sample N positions, let M=4294967295 and L=floor(M/N)*N; set u=next_word-1, reject u>=L, otherwise return u mod N. This avoids naive modulo bias over the primitive's nonzero output domain. Replacement draws continue one deterministic state across all10000 paths; input order is canonical completion order, never shuffled or sorted by profit.
+
+Each path starts at0R and has exactly N replacement draws. Cash-style drawdown magnitude is running peak (initial0) minus current cumulative R. Negative streak counts consecutive draws with R<0; zero/positive reset it. Report sorted-sample nearest-rank quantiles: index ceil(p*10000)-1 for p in0.05/0.50/0.95/0.99. All input, path, drawdown and percentile arithmetic stays exact rational; display alone may round. N<30 returns INSUFFICIENT_SAMPLE before path computation. Existing128-position/4096-event accepted input budgets apply; larger input is refused, never truncated. Missing-R exclusions, seed, PRNG/version and10000-path count are always disclosed.
+
+The following materialized vectors were independently computed in JavaScript before Python calculator implementation. All-one and all-negative30-position inputs must give terminal30/-30 respectively; their drawdown0/30 and longest negative streak0/30 are constant across every percentile. The mixed input below contains30 values, repeating[-1,0,2] ten times, seed1,10000 paths.
+
+<!-- BTL-BOOTSTRAP-FROZEN-VECTORS-1 -->
+```json
+{
+  "schemaVersion": 1,
+  "artifact": "BTL-BOOTSTRAP-FROZEN-VECTORS-1",
+  "prngVersion": "BTL-XORSHIFT32-13-17-5-1",
+  "seed": 1,
+  "firstWords": ["270369", "67634689", "2647435461", "307599695", "2398689233"],
+  "firstSampleIndicesN3": [2, 0, 2, 1, 1],
+  "mixed30": {
+    "repeatedValues": ["-1", "0", "2"],
+    "repeat": 10,
+    "paths": 10000,
+    "terminalP5P50P95": ["-1", "10", "21"],
+    "drawdownP50P95P99": ["4", "7", "10"],
+    "negativeStreakP50P95P99": [3, 5, 6]
+  }
+}
+```
+
+The freeze precedes calculator implementation. Its validation cannot be reported as a completed Monte Carlo runtime or Alpha acceptance.
