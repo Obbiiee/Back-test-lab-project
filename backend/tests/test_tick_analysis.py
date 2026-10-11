@@ -12,6 +12,7 @@ from application.models import TrustedScope
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import ContractError
 from execution.analysis import project, metrics, planned_risk, excursions, MAX_ANALYSIS_EVENTS
+from execution.bootstrap import bootstrap, ResearchRandom
 from execution.research import ResearchApplication
 from execution.research_fixture import STEP_NS
 from infrastructure.database import connect, migrate
@@ -41,6 +42,51 @@ class BootstrapFreezeTests(unittest.TestCase):
         self.assertEqual(mixed['paths'],10000)
         for key in ('terminalP5P50P95','drawdownP50P95P99','negativeStreakP50P95P99'):
             self.assertEqual(len(mixed[key]),3)
+
+
+class BootstrapCalculatorTests(unittest.TestCase):
+    @staticmethod
+    def rows(values):
+        return [dict(id=f'order:{i}',net=str(v),rMultiple=dict(numerator=str(v),denominator='1')) for i,v in enumerate(values)]
+
+    def test_implementation_matches_frozen_words_sampling_and_mixed_paths(self):
+        source=(Path(__file__).resolve().parents[2]/'docs/V2_ALPHA_RESEARCH_METRICS_CONTRACT.md').read_text(encoding='utf-8')
+        vectors=json.loads(re.search(r'```json\s*(.*?)\s*```',source.split('<!-- BTL-BOOTSTRAP-FROZEN-VECTORS-1 -->')[1],re.S).group(1))
+        random=ResearchRandom(vectors['seed'])
+        self.assertEqual([str(random.word()) for _ in range(5)],vectors['firstWords'])
+        random=ResearchRandom(vectors['seed'])
+        self.assertEqual([random.index(3) for _ in range(5)],vectors['firstSampleIndicesN3'])
+        mixed=vectors['mixed30'];rows=self.rows([int(v) for v in mixed['repeatedValues']]*mixed['repeat'])
+        result=bootstrap(rows,vectors['seed'])
+        for field,expected in [('terminalR','terminalP5P50P95'),('maxDrawdownR','drawdownP50P95P99')]:
+            self.assertEqual([Fraction(int(v['numerator']),int(v['denominator'])) for v in result[field].values()],
+                             [Fraction(v) for v in mixed[expected]])
+        self.assertEqual(list(result['longestNegativeStreak'].values()),mixed['negativeStreakP50P95P99'])
+        self.assertEqual(result,bootstrap(rows,vectors['seed']))
+
+    def test_constants_rational_units_minimum_exclusions_seed_bounds_and_rejection(self):
+        for value in (1,-1):
+            result=bootstrap(self.rows([value]*30),42)
+            self.assertEqual(result['terminalR']['p50'],dict(numerator=str(value*30),denominator='1'))
+            self.assertEqual(result['maxDrawdownR']['p99'],dict(numerator='0' if value>0 else '30',denominator='1'))
+            self.assertEqual(result['longestNegativeStreak']['p99'],0 if value>0 else 30)
+        rows=self.rows([1]*30)
+        for row in rows:row['rMultiple']['denominator']='3'
+        before=deepcopy(rows);result=bootstrap(rows,42)
+        self.assertEqual(result['terminalR']['p50'],dict(numerator='10',denominator='1'))
+        self.assertEqual(rows,before)
+        rows[-1]['rMultiple']=None
+        missing=bootstrap(rows,42)
+        self.assertEqual((missing['status'],missing['eligible'],missing['exclusions'],missing['pathsComputed']),('INSUFFICIENT_SAMPLE',29,1,0))
+        self.assertIsNone(missing['terminalR'])
+        for seed in (0,True,False,-1,'42',1.5,4294967296):
+            with self.assertRaises(ContractError):bootstrap([],seed)
+        with self.assertRaises(ContractError):bootstrap(self.rows([1]*129),42)
+        with self.assertRaises(ContractError):bootstrap([self.rows([1])[0]]*30,42)
+        class RejectFirst(ResearchRandom):
+            def __init__(self):self.words=iter([4294967295,1])
+            def word(self):return next(self.words)
+        self.assertEqual(RejectFirst().index(30),0)
 
 
 class AnalysisGoldenTests(unittest.TestCase):
@@ -259,6 +305,50 @@ class AnalysisPostgresTests(unittest.TestCase):
         self.assertEqual(view['analysis']['orders'][0]['id'],order_id)
         self.assertEqual(view['analysis']['metrics']['tradeCount'],0)
         self.assertEqual(view['analysis']['provenance']['eventHead'],view['state']['eventHash'])
+
+    def test_bootstrap_is_scoped_read_only_and_insufficient_without_invented_r(self):
+        before=canonical_bytes(self.view())
+        empty=self.app.bootstrap(self.session,{'seed':42})
+        self.assertEqual((empty['status'],empty['eligible'],empty['pathsComputed']),('INSUFFICIENT_SAMPLE',0,0))
+        self.assertIsNone(empty['terminalR'])
+        for raw in ({'seed':0},{'seed':True},{'seed':42,'completed':[]}):
+            with self.assertRaises(ContractError):self.app.bootstrap(self.session,raw)
+        foreign=ResearchApplication(DSN,TrustedScope('foreign:'+uuid.uuid4().hex,'fixture:operator'))
+        with self.assertRaises(ContractError):foreign.bootstrap(self.session,{'seed':42})
+        self.assertEqual(canonical_bytes(self.view()),before)
+
+        reviewed=self.app.review(review_request(self.view()))
+        order=reviewed['review']['command']['commandId']
+        self.app.confirm(self.session,dict(reviewId=order,reviewHash=reviewed['reviewHash']))
+        self.advance();self.apply('CLOSE',{'orderId':order,'quantity':None});self.advance()
+        before=canonical_bytes(self.view())
+        result=self.app.bootstrap(self.session,{'seed':42})
+        self.assertEqual((result['eligible'],result['exclusions'],result['pathsComputed']),(0,1,0))
+        self.assertEqual(result['provenance']['eventHead'],self.view()['state']['eventHash'])
+        self.assertEqual(result,ResearchApplication(DSN,self.scope).bootstrap(self.session,{'seed':42}))
+        self.assertEqual(canonical_bytes(self.view()),before)
+
+    def test_bootstrap_thirty_actual_reviewed_tick_trades_reproduce_exactly(self):
+        for _ in range(30):
+            view=self.view();raw=review_request(view)
+            raw.update(planId='plan:bootstrap-qa',planRevision=0)
+            entry=Fraction(view['quote']['ask'])
+            from execution.contracts import text
+            raw['draft'].update(workflow='PLANNED',quantity='0.01',sl=text(entry-1),tp=text(entry+1))
+            review=self.app.review(raw);order=review['review']['command']['commandId']
+            self.assertEqual(review['review']['researchRisk']['amount'],'1')
+            self.app.confirm(self.session,dict(reviewId=order,reviewHash=review['reviewHash']))
+            self.advance();self.apply('CLOSE',{'orderId':order,'quantity':None});self.advance()
+        view=self.view();before=canonical_bytes(view)
+        self.assertEqual(len(view['analysis']['completed']),30)
+        result=self.app.bootstrap(self.session,{'seed':42})
+        self.assertEqual((result['status'],result['eligible'],result['pathsComputed']),('COMPLETE',30,10000))
+        expected=bootstrap(view['analysis']['completed'],42)
+        for key in ('inputHash','terminalR','maxDrawdownR','longestNegativeStreak'):
+            self.assertEqual(result[key],expected[key])
+        self.assertEqual(result,ResearchApplication(DSN,self.scope).bootstrap(self.session,{'seed':42}))
+        self.assertEqual(canonical_bytes(self.view()),before)
+
 
 
 @unittest.skipUnless(DSN,'Actual isolated PostgreSQL required; skips are not PASS')

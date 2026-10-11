@@ -152,6 +152,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None):
     async def workspace(session_id: str,request: Request):
         return await execute(application(request).workspace,session_id,await body(request))
 
+    @app.post('/api/v1/tick-alpha/sessions/{session_id}/bootstrap')
+    async def bootstrap(session_id: str,request: Request):
+        return await execute(application(request).bootstrap,session_id,await body(request))
+
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/confirm")
     async def confirm(session_id: str,request: Request):
         return await execute(application(request).confirm,session_id,await body(request))

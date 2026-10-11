@@ -44,6 +44,7 @@
     "frontend/src/tickAlpha/AlphaTerminal.jsx",
     "frontend/src/tickAlpha/annotations.js",
     "backend/execution/analysis.py",
+    "backend/execution/bootstrap.py",
     "backend/execution/workspace.py",
     "frontend/src/tickAlpha/AlphaWorkspace.jsx",
     "frontend/src/tickAlpha/display.js",

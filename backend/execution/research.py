@@ -19,6 +19,7 @@ from .research_fixture import research_provider, research_profile, START_NS, STE
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
 from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
 from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
+from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 
 
 def label(value):
@@ -261,16 +262,32 @@ class ResearchApplication:
         require(type(raw['timeframe']) is str and raw['timeframe'] in TIMEFRAMES, 'timeframe', 'REFUSED_TIMEFRAME')
         return self.inspect(session_id, raw['timeframe'])
 
-    def _journal_projection(self, db, state, checkpoint):
-        require(state['nextEventIndex'] <= MAX_ANALYSIS_EVENTS, 'journal', 'REFUSED_ANALYSIS_LIMIT')
+    def _committed_analysis(self, db, state, quote=None):
         def events():
-            for offset in range(0,state['nextEventIndex'],256):
+            for offset in range(0,min(state['nextEventIndex'],MAX_ANALYSIS_EVENTS),256):
                 page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
                                   (self.scope.workspace_id,state['sessionId'],offset)).fetchall()
                 for row in page:
                     yield unpack(*row)
-        analysis = project(state, events(), self._quote(state,checkpoint))
+        analysis = project(state, events(), quote)
         self._research_risk(db,state,analysis)
+        return analysis
+
+    def bootstrap(self, session_id, raw):
+        keys(raw,'seed')
+        validate_seed(raw['seed'])
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            _, _, state, _ = self._session(db,session_id)
+            analysis=self._committed_analysis(db,state)
+            require(analysis['status']=='COMPLETE','bootstrap','REFUSED_ANALYSIS_LIMIT')
+        result=descriptive_bootstrap(analysis['completed'],raw['seed'])
+        result['provenance']=analysis['provenance']
+        return result
+
+    def _journal_projection(self, db, state, checkpoint):
+        require(state['nextEventIndex'] <= MAX_ANALYSIS_EVENTS, 'journal', 'REFUSED_ANALYSIS_LIMIT')
+        analysis = self._committed_analysis(db,state,self._quote(state,checkpoint))
         self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
         require(len(analysis['orders']) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         return analysis

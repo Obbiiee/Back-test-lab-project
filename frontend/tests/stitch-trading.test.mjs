@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {planningIntent} from '../src/tickAlpha/planningIntent.js';
 import {createServer} from 'vite';
 import {renderToStaticMarkup} from 'react-dom/server';
+import {createElement} from 'react';
 import {RiskRewardController} from '../src/trading/RiskRewardController.js';
 const long={type:'long-position',points:[{time:1,price:2000.125},{time:2,price:1998.25},{time:3,price:2004.75}],quantity:999,accountSize:999999,riskValue:80};
 const before=JSON.stringify(long);
@@ -21,6 +22,15 @@ for(const bad of [null,{...long,type:'trend-line'},{...long,points:[]},{...long,
 // clicking a side is a draft callback, not a provider/financial command.
 const server=await createServer({server:{middlewareMode:true},appType:'custom'});
 try{
+  const {default:AlphaBootstrap}=await server.ssrLoadModule('/src/tickAlpha/AlphaBootstrap.jsx');
+  const bootstrapView={analysis:{metrics:{rEligible:1,rExcluded:2}},futureTicks:'SECRET_FUTURE_DATA',provider:'SECRET_PROVIDER'};
+  const bootstrapBefore=JSON.stringify(bootstrapView);
+  const bootstrapHtml=renderToStaticMarkup(createElement(AlphaBootstrap,{view:bootstrapView,busy:true}));
+  assert.ok(bootstrapHtml.includes('1 eligible positions')&&bootstrapHtml.includes('2 excluded'));
+  assert.ok(bootstrapHtml.includes('Minimum 30')&&bootstrapHtml.includes('does not predict future profit'));
+  assert.ok(bootstrapHtml.includes('value="42"')&&bootstrapHtml.includes('disabled=""'));
+  assert.ok(!bootstrapHtml.includes('SECRET_'));
+  assert.equal(JSON.stringify(bootstrapView),bootstrapBefore);
   const {DirectionQuotes,ReviewedIntent}=await server.ssrLoadModule('/src/tickAlpha/AlphaOrderPresentation.jsx');
   const callbacks=[],exact='2000.123456789012345678';
   const quote=DirectionQuotes({side:'LONG',quote:{ask:exact,bid:'1999.99'},disabled:false,onChange:s=>callbacks.push(s)});

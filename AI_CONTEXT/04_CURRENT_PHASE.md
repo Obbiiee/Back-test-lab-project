@@ -13,12 +13,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "R-7 causal MAE/MFE",
-  "CURRENT_IMPLEMENTATION_PHASE": "R-8 frozen seeded Monte Carlo",
-  "NEXT_PHASE": "H-1 minimum feedback and measurement",
+  "LAST_COMPLETED_PHASE": "R-8 seeded descriptive bootstrap",
+  "CURRENT_IMPLEMENTATION_PHASE": "H-1 minimum feedback and measurement",
+  "NEXT_PHASE": "I-4/I-2 identity composition",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
   "CURRENT_PHASE_STATUS": "AUTHORIZED_AFTER_PREVIOUS_CHECKPOINT_GIT_GATES",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "R-8 frozen seeded Monte Carlo",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "H-1 minimum feedback and measurement",
   "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
   "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
   "AUTO_ADVANCE_AFTER_PASS": true,
@@ -27,7 +27,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "R-8 primitive and materialized vectors frozen before calculator implementation; runtime remains unimplemented and current R-8 remains authorized"
+  "LAST_COMPLETED_CHECKPOINT": "R-8 exact seeded descriptive bootstrap, actual-PG thirty tick trades, production insufficient/complete/export and revision invalidation validated; normal Git closure precedes H-1"
 }
 ```
 

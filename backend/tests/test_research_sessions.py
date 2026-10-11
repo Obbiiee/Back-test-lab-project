@@ -192,6 +192,22 @@ class LocalAlphaBoundaryTests(unittest.TestCase):
     def tearDown(self):
         self.client.close()
 
+    def test_bootstrap_transport_has_strict_seed_and_no_caller_evidence(self):
+        app=ResearchApplication(DSN);m=method();app.create_method(m)
+        session='session:'+uuid.uuid4().hex
+        app.create_session(dict(id=session,name='Bootstrap transport QA',methodId=m['id'],initialBalance='10000',startPeriod='2020-01'))
+        path='/api/v1/tick-alpha/sessions/'+session+'/bootstrap'
+        before=canonical_bytes(app.inspect(session))
+        response=self.client.post(path,json={'seed':42})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.headers['cache-control'],'no-store')
+        self.assertEqual(response.json()['status'],'INSUFFICIENT_SAMPLE')
+        for raw in ({'seed':0},{'seed':True},{'seed':42,'completed':[]},{'seed':42,'provider':'arbitrary'}):
+            self.assertEqual(self.client.post(path,json=raw).status_code,409)
+        self.assertEqual(self.client.post(path,json={'seed':42},headers={'Origin':'https://evil.example'}).status_code,403)
+        self.assertEqual(canonical_bytes(app.inspect(session)),before)
+        app.close()
+
     def test_host_peer_origin_custom_header_preflight_and_no_secret_errors(self):
         self.assertEqual(self.client.get('/api/v1/tick-alpha/catalog').status_code,200)
         for headers in ({'Origin':'https://evil.example'},{'Host':'evil.example'},{'X-BTL-Local':'0'}):
