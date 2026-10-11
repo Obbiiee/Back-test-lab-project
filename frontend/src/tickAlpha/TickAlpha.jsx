@@ -4,6 +4,7 @@ import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath} from './client.js';
 import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
+import AlphaBrand from './AlphaBrand.jsx';
 import AlphaTerminal from './AlphaTerminal.jsx';
 import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
@@ -105,7 +106,7 @@ export default function TickAlpha(){
     if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
     if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
   }}>
-    <header><div><a className="alpha-wordmark" href={pagePath('home')}>Backtest Lab</a><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation"><a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav></header>
+    <header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation"><a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav></header>
     <section className="alpha-context" aria-label="Method and Session">
       <button disabled={busy||!catalog} onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);creationId.current=id('method');setKind('FREE_STYLE');setDialog('method');}}>New strategy</button>
       <button disabled={busy||!catalog?.methods.length} onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);creationId.current=id('session');setDialog('session');}}>Create Session</button>

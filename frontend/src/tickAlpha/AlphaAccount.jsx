@@ -1,6 +1,7 @@
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {createAccountClient,setAccountTransport,clearAccountTransport} from './accountClient.js';
 import './tickAlpha.css';
+import AlphaBrand from './AlphaBrand.jsx';
 const Workspace=lazy(()=>import('./TickAlpha.jsx'));
 const modes={login:'Sign in',register:'Create account',verify:'Verify email',resend:'Request verification',forgot:'Request recovery',reset:'Reset password'};
 
@@ -41,7 +42,7 @@ export default function AlphaAccount(){
   }
   const secure=window.location.protocol==='https:';
   return <main className="alpha-identity">
-    <header className="alpha-home-nav"><a className="alpha-wordmark" href="?page=account">Backtest Lab<span>RESEARCH WORKSPACE</span></a><span>{user?'Verified account':'Account access'}</span></header>
+    <header className="alpha-identity-nav"><AlphaBrand href="?page=account"/><span>{user?'Verified account':'Account access'}</span></header>
     <section className={`alpha-identity-content${selected?' alpha-identity-workspace':''}`}><p className="alpha-eyebrow">RESEARCH / PRIVATE WORKSPACES</p>
       {!secure?<><h1>Account access requires HTTPS.</h1><p>Open the configured secure application address to sign in. The private local data service is separate.</p><a href="/">Open local workspace</a></>:!user?<>
         <h1>{modes[mode]}</h1><p>Use your verified account to access authorized workspaces. Tokens stay in memory; refreshing requires signing in again.</p>

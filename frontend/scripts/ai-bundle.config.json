@@ -43,6 +43,8 @@
     "backend/execution/journal.py",
     "backend/infrastructure/migrations/007_tick_journal.sql",
     "frontend/src/tickAlpha/AlphaHome.jsx",
+    "frontend/src/tickAlpha/AlphaBrand.jsx",
+    "frontend/src/tickAlpha/alphaBrand.css",
     "frontend/src/tickAlpha/alphaHome.css",
     "frontend/src/assets/riksora-mark.png",
     "frontend/src/tickAlpha/AlphaSourceDetails.jsx",

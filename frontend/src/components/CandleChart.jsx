@@ -480,6 +480,17 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     volumeSeriesRef.current?.applyOptions({ visible: showVolume });
   }, [showVolume]);
 
+  // Alpha research presentation uses official chart options; no chart remount,
+  // data/projection mutation, series replacement or drawing lifecycle change.
+  useEffect(() => {
+    chartForOverlay?.applyOptions({
+      layout: {background:{color:researchOnly?'#06162e':'#08090b'},textColor:researchOnly?'#c8d1de':'#a5a8ad'},
+      grid: {vertLines:{color:researchOnly?'#182d48':'#1b1c1f'},horzLines:{color:researchOnly?'#182d48':'#1b1c1f'}},
+      rightPriceScale:{borderColor:researchOnly?'#29405b':'#2a2c30'},
+      timeScale:{borderColor:researchOnly?'#29405b':'#2a2c30'},
+    });
+  }, [chartForOverlay,researchOnly]);
+
   useEffect(() => {
     chartRef.current?.applyOptions({
       grid: {
