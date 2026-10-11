@@ -14,6 +14,24 @@ from .contracts import text, validate_state
 
 MAX_ANALYSIS_EVENTS = 4096
 ANALYSIS_VERSION = 'BTL-COMMITTED-ANALYSIS-1'
+RESEARCH_VERSION = 'BTL-PINNED-RESEARCH-1'
+
+
+def planned_risk(state, command):
+    """Explicit nominal risk reviewed before confirmation; never a fill prediction."""
+    plan = command['payload']
+    amount = None
+    if plan['sl'] is not None:
+        amount = (abs(Fraction(plan['entry'])-Fraction(plan['sl'])) *
+                  Fraction(plan['quantity']) * Fraction(state['profile']['contractSize']) +
+                  2 * Fraction(state['profile']['commissionPerLotSide']) * Fraction(plan['quantity']))
+        require(amount > 0, 'plannedRisk', 'CORRUPT_RECORD')
+    return dict(schemaVersion=1, artifact='BTL-PREENTRY-RISK-1',
+        sessionId=state['sessionId'], datasetId=state['datasetId'], datasetVersion=state['datasetVersion'],
+        profileHash=state['profileHash'], throughNs=state['throughNs'], commandHash=content_hash(command),
+        amount=text(amount) if amount is not None else None,
+        reason=None if amount is not None else 'NO_PLANNED_STOP',
+        basis='INTENT_ENTRY_TO_INITIAL_STOP_PLUS_FIXED_ROUND_TRIP_COMMISSION')
 
 
 def ratio(value):
@@ -28,6 +46,9 @@ def metrics(completed):
     wins = [n for n in nets if n > 0]
     losses = [n for n in nets if n < 0]
     positive, negative = sum(wins, Fraction()), -sum(losses, Fraction())
+    r_values = [Fraction(int(row['rMultiple']['numerator']), int(row['rMultiple']['denominator']))
+                for row in completed if row.get('rMultiple') is not None]
+    durations = [int(row['durationNs']) for row in completed if row.get('durationNs') is not None]
     streak_win = streak_loss = maximum_win = maximum_loss = 0
     for net in nets:
         streak_win = streak_win + 1 if net > 0 else 0
@@ -40,8 +61,12 @@ def metrics(completed):
         expectancy=ratio(sum(nets, Fraction()) / len(nets)) if nets else None,
         profitFactor=ratio(positive / negative) if negative else None,
         maxWinStreak=maximum_win, maxLossStreak=maximum_loss,
-        rEligible=0, rExcluded=len(nets), rReason='PREENTRY_R0_NOT_PINNED',
-        monteCarlo=dict(status='INSUFFICIENT_SAMPLE', eligible=0, exclusions=len(nets), minimum=30))
+        rEligible=len(r_values), rExcluded=len(nets)-len(r_values),
+        rReason=None if r_values else 'PREENTRY_R0_NOT_PINNED',
+        averageR=ratio(sum(r_values, Fraction()) / len(r_values)) if r_values else None,
+        averageDurationNs=ratio(Fraction(sum(durations), len(durations))) if durations else None,
+        monteCarlo=dict(status='INSUFFICIENT_SAMPLE' if len(r_values)<30 else 'NOT_COMPUTED',
+                        eligible=len(r_values), exclusions=len(nets)-len(r_values), minimum=30))
 
 
 def project(state, events, quote):

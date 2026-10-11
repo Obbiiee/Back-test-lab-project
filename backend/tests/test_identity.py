@@ -198,12 +198,24 @@ class IdentityTests(unittest.TestCase):
 
     def test_bounded_rate_tls_body_safe_errors_and_fail_closed_config(self):
         app = create_app(DSN, self.secret, self.delivery, rate_limit=3)
-        with client(app) as caller:
-            for _ in range(3): self.assertEqual(caller.get("/api/v1/auth/me").status_code, 401)
-            refused = caller.get("/api/v1/auth/me", headers={"X-Forwarded-For": "different-ip"})
-            self.assertEqual(refused.status_code, 429)
-            self.assertEqual(refused.headers["cache-control"], "no-store")
-            self.assertEqual(len(refused.headers["x-request-id"]), 32)
+        # Match the real fixed-minute reset, as in the account-rate vector above.
+        # Fresh client identity per attempt; never accept 401 as a rate refusal.
+        for _ in range(3):
+            with connect(DSN) as db:
+                before = db.execute("SELECT floor(extract(epoch FROM clock_timestamp())/60)").fetchone()[0]
+            with client(app) as caller:
+                statuses = [caller.get("/api/v1/auth/me").status_code for _index in range(3)]
+                refused = caller.get("/api/v1/auth/me", headers={"X-Forwarded-For": "different-ip"})
+            with connect(DSN) as db:
+                after = db.execute("SELECT floor(extract(epoch FROM clock_timestamp())/60)").fetchone()[0]
+            if before == after:
+                self.assertEqual(statuses, [401]*3)
+                self.assertEqual(refused.status_code, 429)
+                self.assertEqual(refused.headers["cache-control"], "no-store")
+                self.assertEqual(len(refused.headers["x-request-id"]), 32)
+                break
+        else:
+            self.fail("No single-minute sample obtained; rate acceptance remains unverified")
         with client(self.app) as caller:
             oversized = caller.post("/api/v1/auth/register", content=b"x"*16385)
             self.assertEqual(oversized.status_code, 413)

@@ -14,7 +14,7 @@ export function DirectionQuotes({side,quote,disabled,onChange}){
   </div>;
 }
 
-export function ReviewedIntent({payload,methodName,riskBasis}){
+export function ReviewedIntent({payload,methodName,riskBasis,researchRisk}){
   return <>
     <div className={`alpha-review-heading ${payload.side==='LONG'?'alpha-buy':'alpha-sell'}`}>
       <span>{methodName}</span><strong>{payload.side==='LONG'?'Buy / Long':'Sell / Short'} · {payload.orderType}</strong>
@@ -23,5 +23,7 @@ export function ReviewedIntent({payload,methodName,riskBasis}){
     <dl className="alpha-reviewed-values">{['entry','sl','tp','quantity','riskPercent'].map(k=><div key={k}>
       <dt>{({entry:'Entry intent',sl:'Stop Loss',tp:'Take Profit',quantity:'Lots',riskPercent:'Risk %'})[k]}</dt><dd>{payload[k]??'None'}</dd>
     </div>)}</dl><p>Reviewed risk basis <strong>${riskBasis}</strong>. Values come from the server review.</p>
+    {researchRisk&&<p>Planned initial risk R0: <strong>{researchRisk.amount===null?'Unavailable (no planned stop)':`$${researchRisk.amount}`}</strong>.
+      Based on entry intent, initial stop and fixed round-trip commission. Confirming pins this value for research; gaps can produce a different realized loss.</p>}
   </>;
 }

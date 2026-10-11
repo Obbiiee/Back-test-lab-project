@@ -6,9 +6,9 @@ import unittest
 import uuid
 
 from application.models import TrustedScope
-from contracts.canonical import canonical_bytes
+from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import ContractError
-from execution.analysis import project, metrics, MAX_ANALYSIS_EVENTS
+from execution.analysis import project, metrics, planned_risk, MAX_ANALYSIS_EVENTS
 from execution.research import ResearchApplication
 from execution.research_fixture import STEP_NS
 from infrastructure.database import connect, migrate
@@ -20,6 +20,51 @@ DSN=os.getenv('BTL_TEST_DATABASE_URL')
 
 
 class AnalysisGoldenTests(unittest.TestCase):
+    def test_projection_rejects_forged_pin_and_keeps_pinless_history_null(self):
+        case=next(c for c in goldens()['scenarios'] if c['id']=='partial-then-full-fixed-commission')
+        h=exercise(case);state=h.state
+        result=project(state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
+        row=result['orders'][0]
+        command=dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',sessionId=state['sessionId'],
+            commandId=row['id'],expectedRevision=0,kind='OPEN',
+            payload={k:row[k] for k in ('side','orderType','workflow','entry','quantity','sl','tp','riskPercent','observations')})
+        review=dict(schemaVersion=1,command=command,profileHash=state['profileHash'],
+            methodHash=state['policy']['definitionHash'],throughNs=state['throughNs'])
+        app=ResearchApplication.__new__(ResearchApplication);app.scope=h.scope
+        from execution.postgres import pack
+        class Result:
+            def fetchall(self):return [(row['id'],*pack(review),content_hash(command),1)]
+        class Database:
+            def execute(self,*args):return Result()
+        app._research_risk(Database(),state,result)
+        self.assertIsNone(result['completed'][0]['rMultiple'])
+        review['researchRisk']=dict(planned_risk(state,command),amount='999')
+        with self.assertRaises(ContractError):app._research_risk(Database(),state,result)
+
+    def test_preentry_risk_exact_commission_and_missing_stop(self):
+        state = dict(schemaVersion=1,sessionId='session:test',datasetId='fixture:test',datasetVersion='v1',
+            profileHash='hash',throughNs='10',profile=dict(contractSize='100',commissionPerLotSide='2'))
+        command = dict(schemaVersion=1,payload=dict(entry='2000.1',sl='1999.8',quantity='0.2'))
+        before = canonical_bytes(state)
+        pin = planned_risk(state,command)
+        self.assertEqual(pin['amount'],'6.8')
+        command['payload']['sl']=None
+        missing=planned_risk(state,command)
+        self.assertIsNone(missing['amount'])
+        self.assertEqual(missing['reason'],'NO_PLANNED_STOP')
+        self.assertEqual(canonical_bytes(state),before)
+
+    def test_exact_r_and_duration_exclusions(self):
+        rows=[dict(net='10',rMultiple=dict(numerator='5',denominator='2'),durationNs='10'),
+              dict(net='-3',rMultiple=dict(numerator='-1',denominator='2'),durationNs='11'),
+              dict(net='0',rMultiple=None,durationNs='12')]
+        result=metrics(rows)
+        self.assertEqual((result['rEligible'],result['rExcluded']),(2,1))
+        self.assertEqual(result['averageR'],dict(numerator='1',denominator='1'))
+        self.assertEqual(result['averageDurationNs'],dict(numerator='11',denominator='1'))
+        self.assertEqual(result['monteCarlo']['status'],'INSUFFICIENT_SAMPLE')
+        self.assertEqual(metrics([rows[0]]*30)['monteCarlo']['status'],'NOT_COMPUTED')
+
     def test_every_frozen_vector_reconciles_without_rounding_partial_net_twice(self):
         for case in goldens()['scenarios']:
             with self.subTest(case=case['id']):
@@ -179,6 +224,9 @@ class AlphaAcceptanceTests(unittest.TestCase):
             self.assertEqual(canonical_bytes(app.workspace(session,{'timeframe':'1m'})),before)
             request['draft']['observations']=[dict(conditionId='condition',outcome='PASS')]
         reviewed=app.review(request);order=reviewed['review']['command']['commandId']
+        self.assertEqual(reviewed['review']['researchRisk']['amount'],'100')
+        self.assertEqual(app.workspace(session,{'timeframe':'1m'})['analysis']['orders'],[])
+        self.assertEqual(app.review(request),reviewed)
         receipt=app.confirm(session,dict(reviewId=order,reviewHash=reviewed['reviewHash']))
         self.assertEqual(app.confirm(session,dict(reviewId=order,reviewHash=reviewed['reviewHash'])),receipt)
         pending=app.workspace(session,{'timeframe':'1m'})
@@ -199,10 +247,12 @@ class AlphaAcceptanceTests(unittest.TestCase):
         self.assertEqual((row['side'],row['entryPrice'],row['exitPrice'],row['exitReason'],row['net']),('LONG','2006','2005','SL','-100'))
         self.assertEqual(done['analysis']['account']['balance'],'9900')
         self.assertEqual(done['analysis']['metrics']['losses'],1)
+        self.assertEqual(row['rMultiple'],dict(numerator='-1',denominator='1'))
 
     def test_protocol_pass_short_stop_target_uses_ask_and_one_completed_position(self):
         done=self.journey(True);row=done['analysis']['completed'][0]
         self.assertEqual((row['side'],row['entryPrice'],row['exitPrice'],row['exitReason'],row['net']),('SHORT','2005.9','2004.9','TP','200'))
         self.assertEqual(done['analysis']['account']['balance'],'10200')
         self.assertEqual(done['analysis']['metrics']['wins'],1)
-        self.assertIsNone(row['rMultiple'],'Do not invent explicitly unpinned R0')
+        self.assertEqual(row['rMultiple'],dict(numerator='2',denominator='1'))
+        self.assertEqual(done['analysis']['metrics']['rEligible'],1)

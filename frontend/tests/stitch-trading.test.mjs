@@ -31,6 +31,12 @@ try{
   const reviewed=renderToStaticMarkup(ReviewedIntent({payload:{side:'SHORT',orderType:'LIMIT',entry:exact,sl:'2002',tp:'1996',quantity:'0.01',riskPercent:'1'},methodName:'<img src=x onerror=alert(1)>',riskBasis:'10000.0001'}));
   assert.ok(reviewed.includes(exact)&&reviewed.includes('10000.0001')&&reviewed.includes('&lt;img'));
   assert.ok(!reviewed.includes('<img'));
+  const riskProps={payload:{side:'LONG',orderType:'LIMIT',entry:'2006',sl:'2005',tp:'2008',quantity:'1',riskPercent:'1'},methodName:'QA',riskBasis:'10000',researchRisk:{amount:'100.000000000000000001'}};
+  const riskBefore=JSON.stringify(riskProps);
+  const riskHtml=renderToStaticMarkup(ReviewedIntent(riskProps));
+  assert.ok(riskHtml.includes('$100.000000000000000001')&&riskHtml.includes('gaps can produce a different realized loss'));
+  assert.equal(JSON.stringify(riskProps),riskBefore);
+  assert.ok(renderToStaticMarkup(ReviewedIntent({...riskProps,researchRisk:{amount:null}})).includes('Unavailable (no planned stop)'));
   const {default:SourceDetails}=await server.ssrLoadModule('/src/tickAlpha/AlphaSourceDetails.jsx');
   const sourceView={metadata:{startPeriod:'2015-12'},state:{throughNs:'1448929802000000000'},label:'<img src=x onerror=alert(1)>',futureTicks:'SECRET_FUTURE_DATA',eof:'SECRET_EOF'};
   const sourceBefore=JSON.stringify(sourceView);

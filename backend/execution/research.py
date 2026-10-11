@@ -17,7 +17,7 @@ from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
-from .analysis import project, MAX_ANALYSIS_EVENTS
+from .analysis import project, metrics, planned_risk, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
 from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
 
 
@@ -202,7 +202,47 @@ class ResearchApplication:
                         for row in page:
                             yield unpack(*row)
                 view['analysis'] = project(state, committed_events(), view['quote'])
+                self._research_risk(db, state, view['analysis'])
             return view
+
+    def _research_risk(self, db, state, analysis):
+        """Join only accepted orders to their immutable confirmed review, never future drafts."""
+        if analysis['status'] != 'COMPLETE':
+            return
+        orders = {row['id']: row for row in analysis['orders']}
+        if orders:
+            pins = db.execute('SELECT r.review_id,r.payload,r.content_hash,c.command_hash,c.revision '
+                'FROM btl.tick_order_reviews r JOIN btl.tick_commands c '
+                'ON r.workspace_id=c.workspace_id AND r.session_id=c.session_id AND r.review_id=c.command_id '
+                'WHERE r.workspace_id=%s AND r.session_id=%s AND r.review_id=ANY(%s) LIMIT 129',
+                (self.scope.workspace_id,state['sessionId'],list(orders))).fetchall()
+            require(len(pins)<=128,'riskPins','CORRUPT_RECORD')
+            for order_id, payload, sha, command_hash, committed_revision in pins:
+                reviewed = unpack(payload,sha)
+                command = reviewed['command']; order = orders[order_id]
+                require(command['kind']=='OPEN' and command['commandId']==order_id and
+                    command['sessionId']==state['sessionId'] and content_hash(command)==command_hash and
+                    committed_revision==command['expectedRevision']+1 and committed_revision<=state['revision'] and
+                    all(order[k]==v for k,v in command['payload'].items()) and
+                    reviewed['profileHash']==state['profileHash'] and
+                    reviewed['methodHash']==state['policy']['definitionHash'] and
+                    int(reviewed['throughNs'])<=int(state['throughNs']), 'riskReview','CORRUPT_RECORD')
+                # Existing pinless reviews remain excluded. No historical retrofit.
+                if 'researchRisk' not in reviewed:
+                    continue
+                basis = dict(state,throughNs=reviewed['throughNs'])
+                pin = reviewed['researchRisk']
+                require(pin==planned_risk(basis,command),'riskPin','CORRUPT_RECORD')
+                require(order['entryTimeNs'] is None or int(reviewed['throughNs'])<=int(order['entryTimeNs']),
+                        'preentryRisk','CORRUPT_RECORD')
+                order['plannedInitialRisk'] = pin['amount']
+                if pin['amount'] is not None and order['status']=='CLOSED':
+                    order['rMultiple'] = ratio(Fraction(order['net'])/Fraction(pin['amount']))
+                    order['rReason'] = None
+                elif pin['amount'] is None:
+                    order['rReason'] = pin['reason']
+        analysis['metrics'].update(metrics(analysis['completed']))
+        analysis['provenance']['researchVersion'] = RESEARCH_VERSION
 
     def workspace(self, session_id, raw):
         keys(raw, 'timeframe')
@@ -218,6 +258,7 @@ class ResearchApplication:
                 for row in page:
                     yield unpack(*row)
         analysis = project(state, events(), self._quote(state,checkpoint))
+        self._research_risk(db,state,analysis)
         require(len(analysis['orders']) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         return analysis
 
@@ -314,6 +355,7 @@ class ResearchApplication:
             reviewed = dict(schemaVersion=1,artifact="BTL-LOCAL-ORDER-REVIEW-1",requestHash=request_hash,command=command,
                             contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=meta["methodHash"],profileHash=state["profileHash"],
                             throughNs=state["throughNs"],riskBasis=state["balance"],model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
+            reviewed['researchRisk'] = planned_risk(state,command)
             blob, sha = pack(reviewed)
             count = db.execute("SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s",(self.scope.workspace_id,raw["sessionId"])).fetchone()[0]
             require(count < 256,"reviews","REFUSED_REVIEW_LIMIT")
