@@ -55,7 +55,8 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
         return GuardedDatabaseStrategy(token_store, lifetime_seconds=session_seconds)
     backend = AuthenticationBackend(name="database", transport=BearerTransport(tokenUrl="api/v1/auth/login"), get_strategy=strategy)
     users = FastAPIUsers[User, uuid.UUID](manager, [backend])
-    app = FastAPI(title="Backtest Lab identity API", version="1", docs_url=None, redoc_url=None, debug=False)
+    from .queue import lifespan
+    app = FastAPI(title="Backtest Lab identity API", version="1", docs_url=None, redoc_url=None, debug=False, lifespan=lifespan)
     app.add_middleware(IdentityBoundary, dsn=dsn, limit=rate_limit)
     app.include_router(users.get_register_router(UserRead, UserCreate), prefix="/api/v1/auth")
     app.include_router(users.get_auth_router(backend, requires_verification=True), prefix="/api/v1/auth")

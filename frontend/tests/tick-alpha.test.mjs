@@ -27,6 +27,23 @@ assert.equal(sourceContext(),'synthetic');
 await api('/catalog');
 assert.equal(accountCalls.at(-1)[0],'/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog');
 assert.equal(accountCalls.at(-1)[1].headers['X-BTL-Source'],undefined);
+const queuedCalls=[];
+let queuedId;
+const queuedAccount={subject:()=> '22222222-2222-4222-8222-222222222222',request:async(path,options={})=>{
+  queuedCalls.push([path,options]);
+  if(path.endsWith('/view')){queuedId=options.jobId;return {schemaVersion:1,jobId:queuedId,state:'QUEUED',result:null};}
+  return {schemaVersion:1,jobId:queuedId,state:'SUCCEEDED',result:{schemaVersion:1,label:'Bounded queued read'}};
+}};
+setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
+const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
+assert.equal(queuedResult.label,'Bounded queued read');
+assert.equal(queuedCalls.length,2);
+assert.match(queuedId,/^[0-9a-f-]{36}$/);
+assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
+const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
+setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
+setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);
 clearAccountTransport();

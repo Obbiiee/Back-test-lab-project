@@ -9,13 +9,14 @@ from psycopg.rows import dict_row
 
 from application.models import TrustedScope
 from contracts.canonical import canonical_bytes
-from contracts.primitives import require
+from contracts.primitives import require, ContractError
 from execution.local_api import body
 from execution.research import ResearchApplication
 from identity.store import User
 from infrastructure.database import connect
 from workspace.policy import owner
 from workspace.store import WorkspaceUnit
+from . import queue
 
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
@@ -44,7 +45,27 @@ def install(app):
         require(not request.url.query and not request.headers.get('x-btl-source'), 'source')
         return await body(request)
 
-    async def execute(user, workspace_id, operation, *args, write=False):
+    async def execute(user, workspace_id, operation, *args, write=False, job_id=None):
+        if operation in queue.OPERATIONS:
+            try:
+                job = await anyio.to_thread.run_sync(partial(queue.submit, app.state.dsn, user.id, workspace_id,
+                                                            job_id or uuid.uuid4(), operation, args), limiter=limiter)
+            except ContractError as error:
+                if error.code != 'QUEUE_CAPACITY':
+                    raise
+                return Response(canonical_bytes({'schemaVersion': 1, 'detail': 'QUEUE_CAPACITY'}), status_code=429,
+                                media_type='application/json', headers={'Retry-After': '1'})
+            # Persist acceptance before attempting work; busy workers leave a durable job.
+            try:
+                admission.acquire_nowait()
+            except anyio.WouldBlock:
+                return Response(canonical_bytes(job), status_code=202, media_type='application/json')
+            try:
+                await anyio.to_thread.run_sync(queue.work_one, app.state.dsn, run, limiter=limiter)
+                job = await anyio.to_thread.run_sync(partial(queue.inspect, app.state.dsn, user.id, workspace_id, job['jobId']), limiter=limiter)
+                return queue_response(job)
+            finally:
+                admission.release()
         try:
             admission.acquire_nowait()
         except anyio.WouldBlock:
@@ -59,6 +80,21 @@ def install(app):
             return Response(raw, media_type='application/json', headers={'X-Content-Type-Options': 'nosniff'})
         finally:
             admission.release()
+
+    def queue_response(job):
+        if job['state'] == 'SUCCEEDED':
+            return Response(canonical_bytes(job['result']), media_type='application/json')
+        return Response(canonical_bytes(job), status_code=202, media_type='application/json')
+
+    @app.get(prefix + '/jobs/{job_id}')
+    async def job_status(workspace_id: uuid.UUID, job_id: uuid.UUID, user: User = Depends(current)):
+        job = await anyio.to_thread.run_sync(partial(queue.inspect, app.state.dsn, user.id, workspace_id, job_id), limiter=limiter)
+        return Response(canonical_bytes(job), media_type='application/json')
+
+    @app.post(prefix + '/jobs/{job_id}/cancel')
+    async def cancel_job(workspace_id: uuid.UUID, job_id: uuid.UUID, user: User = Depends(current)):
+        job = await anyio.to_thread.run_sync(partial(queue.inspect, app.state.dsn, user.id, workspace_id, job_id, cancel=True), limiter=limiter)
+        return Response(canonical_bytes(job), media_type='application/json')
 
     @app.get(prefix + '/catalog')
     async def catalog(workspace_id: uuid.UUID, user: User = Depends(current)):
@@ -91,4 +127,7 @@ def install(app):
                       'journal': ('save_note', True), 'confirm': ('confirm', True), 'commands': ('apply', True)}
         require(operation in operations, 'operation', 'RESOURCE_UNAVAILABLE')
         name, write = operations[operation]
-        return await execute(user, workspace_id, name, session_id, await json_body(request), write=write)
+        job_id = request.headers.get('x-btl-job') if name in queue.OPERATIONS else None
+        if job_id is not None:
+            job_id = uuid.UUID(job_id)
+        return await execute(user, workspace_id, name, session_id, await json_body(request), write=write, job_id=job_id)

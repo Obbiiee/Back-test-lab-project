@@ -79,6 +79,7 @@ def grant_workspace_runtime(dsn, role):
         db.execute(sql.SQL("GRANT UPDATE(id) ON btl.workspaces TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(user_id) ON btl.memberships TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.resources TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE,DELETE ON btl.research_jobs TO {}").format(sql.Identifier(role)))
 
 
 def backup(dsn, target, bin_directory=""):

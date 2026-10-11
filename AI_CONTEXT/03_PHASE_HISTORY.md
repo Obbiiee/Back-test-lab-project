@@ -320,11 +320,13 @@ From43a8421, existing FastAPI Users/workspace policies compose with the single r
 
 ## H-2/I-5 bounds and internal H-3 recovery subcheckpoint — 2026-10-11
 
-From clean/equal3402057, shared twelve-slot sync/async DB admission, eight-request outer admission and bounded body/network waits preserve existing financial/evidence authority. Existing system blueprint owns measured native75MB restore and dated dependency advisory evidence. Full backend320 zero-skip/native recovery PASS612.293s, focused9 PASS, frontend regression/lint/build132/distribution and restarted HTTPS canonical position/reopen/console PASS. This is a readiness subcheckpoint, not Q-3 durable queue, reference-host capacity, public RPO operations or final Alpha acceptance. Normal repository/bundle/protected/diff/Git gates precede continued authorized readiness.
-
-
-## H-2/I-5 bounds and internal H-3 recovery subcheckpoint — 2026-10-11
-
 From clean/equal3402057, shared twelve-slot sync/async DB admission, eight-request outer admission and five-second body/30-second client deadlines preserve financial/evidence authority. Existing system blueprint owns native75MB backup9.091s/restore8.175s canonical equality and dated zero-listed dependency advisories. Full backend320 zero-skip/native recovery PASS612.293s, focused9 PASS, frontend regression/lint/build132/distribution and restarted trusted HTTPS position/cash/console PASS. Q-3 durable queue, workload/failure readiness and final internal acceptance/adversarial audit remain incomplete. Reference-host/public capacity and ongoing WAL/RPO are not certified. No financial/schema/dependency/source/preserved-draft changes. Normal repository/bundle/protection/diff/Git gates close this subcheckpoint only.
 
 NEXT-PROMPT REQUIREMENT: continue the already-authorized bounded Alpha readiness sequence from actual clean main without routine reauthorization; preserve contracts/drafts/private data and stop before post-Alpha or external deployment. Historical700k remains partial.
+
+
+## Q-3 scoped read-job subcheckpoint — 2026-10-11
+
+From clean/equalb22e159, additive008 and existing PostgreSQL ownership/admission compose a scoped read-job queue for workspace/bootstrap only. Existing system blueprint owns exact limits, finite operational receipt retention and financial-path exclusions. Full backend329 zero-skip/native migration/recovery PASS878.326s; isolated9 queue tests PASS110.024s, frontend regression/lint/build132/distribution, HTTPS5m/N0 seeded read/console and personal full2015 unchanged unresolved Session PASS. A shared-QA-worker interference risk was fixed with a new isolated queue-test database; initial interrupted full run is not accepted. Financial commands remain immediate; queued financial replay, capacity/failure closure and final Alpha acceptance remain incomplete. No financial/evidence/schema-contract change, dependency/source/draft change or public release. Normal repository/bundle/protected/diff/Git gates close this subcheckpoint only.
+
+NEXT-PROMPT REQUIREMENT: continue the already-authorized Alpha readiness/internal acceptance and reproducible adversarial audit from actual clean main; no routine reauthorization, no scope expansion, preserve frozen contracts/private2015/drafts and historical700k partial status. STOP before post-Alpha or external deployment.

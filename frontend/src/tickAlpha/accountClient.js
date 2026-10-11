@@ -1,7 +1,7 @@
 // Existing same-origin HTTPS identity. Bearer tokens live only in this closure.
 export function createAccountClient({fetcher=fetch,secure=()=>window.location.protocol==='https:'}={}){
   let token=null,subject=null,generation=0;
-  async function request(path,{method='GET',body,form=false,authenticated=true,signal}={}){
+  async function request(path,{method='GET',body,form=false,authenticated=true,signal,jobId}={}){
     if(!secure())throw Error('Account access requires HTTPS. The private local workspace remains separate.');
     if(!/^\/api\/v1\/(auth|workspaces)(\/|$)/.test(path))throw Error('Unsupported account route');
     if(authenticated&&!token)throw Error('Sign in to continue.');
@@ -9,7 +9,7 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
     const deadline=AbortSignal.timeout(30000);
     const boundedSignal=signal?AbortSignal.any([signal,deadline]):deadline;
     const response=await fetcher(path,{method,cache:'no-store',credentials:'omit',signal:boundedSignal,
-      headers:{...(authenticated?{Authorization:`Bearer ${token}`} : {}),...(body===undefined?{}:{'Content-Type':form?'application/x-www-form-urlencoded':'application/json'})},
+      headers:{...(authenticated?{Authorization:`Bearer ${token}`} : {}),...(jobId?{'X-BTL-Job':jobId}:{}),...(body===undefined?{}:{'Content-Type':form?'application/x-www-form-urlencoded':'application/json'})},
       ...(body===undefined?{}:{body:form?new URLSearchParams(body).toString():JSON.stringify(body)})});
     if(current!==generation)throw Error('Account changed; this response was discarded.');
     if(!response.ok){
