@@ -46,6 +46,17 @@ const obsoleteLogin=obsolete.login('qa@example.com','password');
 obsolete.clear();resolveLogin({ok:true,status:200,json:async()=>({access_token:'STALE',token_type:'bearer'})});
 await assert.rejects(()=>obsoleteLogin,/discarded/);
 assert.equal(obsolete.hasSession(),false);
+let resolveDecoded;
+const decoding=createAccountClient({secure:()=>true,fetcher:async()=>({ok:true,status:200,json:()=>new Promise(resolve=>{resolveDecoded=resolve;})})});
+const decodingLogin=decoding.login('qa@example.com','password');
+await Promise.resolve();await Promise.resolve();
+decoding.clear();resolveDecoded({access_token:'STALE-DECODED',token_type:'bearer'});
+await assert.rejects(()=>decodingLogin,/discarded/);
+assert.equal(decoding.hasSession(),false,'Logout during response decoding may not restore a token');
+const callerAbort=new AbortController();
+const canceled=createAccountClient({secure:()=>true,fetcher:async(_path,options)=>{assert.equal(options.signal.aborted,true);throw Error('canceled');}});
+callerAbort.abort();
+await assert.rejects(()=>canceled.request('/api/v1/auth/verify',{authenticated:false,signal:callerAbort.signal}),/canceled/);
 console.log('PASS account transport: HTTPS-only, memory-only token, strict verified identity, scoped preferences, logout/no local fallback, safe refusals and obsolete-login cancellation.');
 
 const localData=new Map(),localStore={getItem:key=>localData.get(key)??null,setItem:(key,value)=>localData.set(key,value)};

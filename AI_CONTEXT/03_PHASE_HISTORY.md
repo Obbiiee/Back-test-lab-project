@@ -316,3 +316,15 @@ From clean/equal624430f, optional bounded local events/fixed questionnaire/expor
 ## I-4/I-2 verified identity/workspace composition — 2026-10-11
 
 From43a8421, existing FastAPI Users/workspace policies compose with the single research/execution owner. [Existing system blueprint](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#alpha-verified-identityworkspace-composition-evidence--2026-10-11) owns API/browser/test evidence and limits. Full backend315 zero-skip/native recovery, final full frontend regression/lint/build/distribution, hostile tenant/revocation locks, HTTPS account/strategy/Session/tick/logout/reopen and375px/1280px console PASS. Tokens are memory-only; account preferences scoped; private Exness remains unmounted. CSS identity/ledger collision fixed. No financial/schema/dependency/data/draft change. Normal Git closure precedes authorized readiness; Alpha and external delivery are not yet complete.
+
+
+## H-2/I-5 bounds and internal H-3 recovery subcheckpoint — 2026-10-11
+
+From clean/equal3402057, shared twelve-slot sync/async DB admission, eight-request outer admission and bounded body/network waits preserve existing financial/evidence authority. Existing system blueprint owns measured native75MB restore and dated dependency advisory evidence. Full backend320 zero-skip/native recovery PASS612.293s, focused9 PASS, frontend regression/lint/build132/distribution and restarted HTTPS canonical position/reopen/console PASS. This is a readiness subcheckpoint, not Q-3 durable queue, reference-host capacity, public RPO operations or final Alpha acceptance. Normal repository/bundle/protected/diff/Git gates precede continued authorized readiness.
+
+
+## H-2/I-5 bounds and internal H-3 recovery subcheckpoint — 2026-10-11
+
+From clean/equal3402057, shared twelve-slot sync/async DB admission, eight-request outer admission and five-second body/30-second client deadlines preserve financial/evidence authority. Existing system blueprint owns native75MB backup9.091s/restore8.175s canonical equality and dated zero-listed dependency advisories. Full backend320 zero-skip/native recovery PASS612.293s, focused9 PASS, frontend regression/lint/build132/distribution and restarted trusted HTTPS position/cash/console PASS. Q-3 durable queue, workload/failure readiness and final internal acceptance/adversarial audit remain incomplete. Reference-host/public capacity and ongoing WAL/RPO are not certified. No financial/schema/dependency/source/preserved-draft changes. Normal repository/bundle/protection/diff/Git gates close this subcheckpoint only.
+
+NEXT-PROMPT REQUIREMENT: continue the already-authorized bounded Alpha readiness sequence from actual clean main without routine reauthorization; preserve contracts/drafts/private data and stop before post-Alpha or external deployment. Historical700k remains partial.

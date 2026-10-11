@@ -78,6 +78,8 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
     install(app)
     from .research import install as install_research
     install_research(app)
+    from infrastructure.resources import ApiAdmission
+    app.add_middleware(ApiAdmission)
     return app
 
 

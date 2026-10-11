@@ -174,7 +174,8 @@
     "backend/ticks/timeline_v2.py",
     "backend/ticks/evidence_v2.py",
     "backend/ticks/benchmark_v2.py",
-    "frontend/src/workspace/WorkspaceIcon.jsx"
+    "frontend/src/workspace/WorkspaceIcon.jsx",
+    "backend/infrastructure/resources.py"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -237,7 +238,8 @@
     "backend/tests/test_historical_workspace.py",
     "backend/tests/test_tick_storage_v2.py",
     "backend/tests/test_tick_evidence_v2.py",
-    "backend/tests/test_identity.py"
+    "backend/tests/test_identity.py",
+    "backend/tests/test_resource_bounds.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

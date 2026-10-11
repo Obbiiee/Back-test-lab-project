@@ -1,5 +1,6 @@
 """Explicit PostgreSQL lifecycle operations; never automatic on API startup."""
 import argparse
+from contextlib import contextmanager
 import os
 import subprocess
 from pathlib import Path
@@ -8,6 +9,7 @@ import psycopg
 from psycopg import sql
 from contracts.primitives import require
 from .codec import fingerprint
+from .resources import DATABASE
 
 MIGRATIONS = Path(__file__).with_name("migrations")
 
@@ -24,9 +26,12 @@ def _libpq_env(dsn):
             **{names[key]: value for key, value in info.items()}}
 
 
+@contextmanager
 def connect(dsn):
     # Caller config owns TLS and credentials. Bound connect/lock/query waits.
-    return psycopg.connect(dsn, connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000")
+    with DATABASE.claim():
+        with psycopg.connect(dsn, connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000") as db:
+            yield db
 
 
 def migrate(dsn, directory=MIGRATIONS):

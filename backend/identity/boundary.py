@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import uuid
+import anyio
 from urllib.parse import parse_qs
 from starlette.responses import JSONResponse
 from .store import connection, audit
@@ -58,16 +59,17 @@ class IdentityBoundary:
             if not await self._attempt("ip:"+ip, self.limit):
                 return await JSONResponse({"detail": "RATE_LIMITED"}, status_code=429, headers={"Retry-After": "60"})(scope, receive, protected_send)
         total, messages = 0, []
-        while True:
-            message = await receive()
-            if message["type"] != "http.request":
-                return
-            total += len(message.get("body", b""))
-            if total > self.max_bytes:
-                return await JSONResponse({"detail": "BODY_TOO_LARGE"}, status_code=413)(scope, receive, protected_send)
-            messages.append(message)
-            if not message.get("more_body"):
-                break
+        with anyio.fail_after(5):
+            while True:
+                message = await receive()
+                if message["type"] != "http.request":
+                    return
+                total += len(message.get("body", b""))
+                if total > self.max_bytes:
+                    return await JSONResponse({"detail": "BODY_TOO_LARGE"}, status_code=413)(scope, receive, protected_send)
+                messages.append(message)
+                if not message.get("more_body"):
+                    break
         account = None
         raw = b"".join(message.get("body", b"") for message in messages)
         if scope["method"] == "POST" and scope["path"] == "/api/v1/auth/login":

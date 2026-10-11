@@ -10,6 +10,7 @@ from psycopg import sql
 from pydantic import BaseModel
 from fastapi_users import exceptions
 from fastapi_users.db import BaseUserDatabase
+from infrastructure.resources import DATABASE
 
 
 class User(BaseModel):
@@ -33,10 +34,11 @@ class CredentialChanged(ValueError):
 
 @asynccontextmanager
 async def connection(dsn):
-    db = await psycopg.AsyncConnection.connect(dsn, row_factory=dict_row, connect_timeout=5,
-                                              options="-c statement_timeout=15000 -c lock_timeout=10000")
-    async with db:
-        yield db
+    with DATABASE.claim():
+        db = await psycopg.AsyncConnection.connect(dsn, row_factory=dict_row, connect_timeout=5,
+                                                  options="-c statement_timeout=15000 -c lock_timeout=10000")
+        async with db:
+            yield db
 
 
 async def audit(db, code, user_id=None):
