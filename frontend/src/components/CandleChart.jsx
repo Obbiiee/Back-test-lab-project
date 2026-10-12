@@ -86,8 +86,8 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   const storageKey = drawingStorageKey ?? (sessionId && (sessionId.startsWith("design-") || sessionId.startsWith("XAUUSD-")) ? "backtest-drawings-v2:" + sessionId : null);
 
   useEffect(() => {
-    onDrawingStateChange?.({ drawings, selectedId: selectedDrawingId, ...historyState, magnet: magnetEnabled, keepDrawing });
-  }, [drawings, selectedDrawingId, historyState, magnetEnabled, keepDrawing, onDrawingStateChange]);
+    onDrawingStateChange?.({ drawings: researchOnly?[...drawings,...primitiveDrawings.objects.map(item=>({...item,native:true,hidden:!item.visible}))]:drawings, selectedId: researchOnly?(primitiveDrawings.selectedId??selectedDrawingId):selectedDrawingId, ...historyState, magnet: magnetEnabled, keepDrawing });
+  }, [drawings, selectedDrawingId, historyState, magnetEnabled, keepDrawing, onDrawingStateChange,researchOnly,primitiveDrawings.objects,primitiveDrawings.selectedId]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -266,6 +266,17 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       if (action === "keep-drawing") setKeepDrawing(value => !value);
       if (action.startsWith("object:")) {
         const [, operation, id] = action.split(":");
+        const native=primitiveDrawings.objects.find(item=>item.id===id);
+        if(researchOnly&&native){
+          if(operation==='select'||operation==='edit')setSelectedDrawingId(null);
+          if(operation==='select')primitiveDrawings.select(id);
+          if(operation==='delete')primitiveDrawings.remove(id);
+          if(operation==='hide')primitiveDrawings.setProperties(id,{visible:!native.visible});
+          if(operation==='lock')primitiveDrawings.setProperties(id,{locked:!native.locked});
+          if(operation==='edit'){primitiveDrawings.select(id);if(native.type==='text')primitiveDrawings.editText(id);}
+          return;
+        }
+        if(researchOnly&&(operation==='select'||operation==='edit'))primitiveDrawings.clearSelection();
         if (operation === "select") setSelectedDrawingId(id);
         if (operation === "delete") { commitDrawings(current => current.filter(item => item.id !== id)); setSelectedDrawingId(null); }
         if (["hide", "lock"].includes(operation)) { const key = operation === "hide" ? "hidden" : "locked"; commitDrawings(current => current.map(item => item.id === id ? { ...item, [key]: !item[key] } : item)); }

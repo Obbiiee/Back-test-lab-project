@@ -10,6 +10,7 @@ from pathlib import Path
 import json
 import re
 from threading import RLock
+from time import monotonic
 
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require
@@ -19,6 +20,7 @@ from ticks.storage_v2 import ArtifactStore, DiskTickProvider
 from ticks.timeline_v2 import IndexedTickTimeline
 from .fixture_demo import fixture_profile
 from .workspace import WINDOW_GROUPS
+from .contracts import exact, text
 
 
 class HistoricalSource:
@@ -38,12 +40,89 @@ class HistoricalSource:
         finally:
             with_provider.close()
         self.dataset_version = version
+        self._chart_contexts = OrderedDict()
+        self._chart_context_lock = RLock()
         self.label = 'EXNESS LOCAL / COVERAGE AND FRESHNESS UNKNOWN'
         if ':first:' in self.dataset_id:
             self.label = 'EXNESS LOCAL / FIRST '+self.dataset_id.rsplit(':first:',1)[1]+' ROWS (ATOMIC GROUPS) / COVERAGE AND FRESHNESS UNKNOWN'
 
     def provider(self):
         return DiskTickProvider(self.folder, self.version, allow_threads=True)
+
+    def chart_history(self, period, timeframe, offset):
+        """Controller-private bounded work. Only past OHLC leaves this method."""
+        from .workspace import TIMEFRAMES
+        require(type(timeframe) is str and timeframe in TIMEFRAMES and type(offset) is int and 0 <= offset <= 50000,
+                'historyRequest', 'INVALID_INPUT')
+        require(type(period) is str and re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', period), 'period')
+        year, month = map(int, period.split('-'))
+        end = int(datetime(year, month, 1, tzinfo=timezone.utc).timestamp())
+        prior_year, prior_month = (year-1,12) if month == 1 else (year,month-1)
+        start = int(datetime(prior_year, prior_month, 1, tzinfo=timezone.utc).timestamp())
+        with self._chart_context_lock:
+            started = monotonic()
+            if period not in self._chart_contexts:
+                while len(self._chart_contexts) >= 2:
+                    _, old = self._chart_contexts.popitem(last=False)
+                    if old['provider'] is not None: old['provider'].close()
+                provider = self.provider()
+                try:
+                    position = provider.locate_v2(self.dataset_id,self.version,str(start*10**9))['position']
+                except BaseException:
+                    provider.close(); raise
+                self._chart_contexts[period] = dict(provider=provider,position=position,bars=[],done=False)
+            entry = self._chart_contexts[period]
+            self._chart_contexts.move_to_end(period)
+            # At most 192 bounded pages per request, never an unbounded scan.
+            for page_index in range(192):
+                if page_index and monotonic()-started >= 2: break
+                if entry['done']: break
+                if entry['position'] is None:
+                    entry['done'] = True; break
+                page = entry['provider'].read_page_v2(self.dataset_id,self.version,entry['position'],256)
+                for event in page['events']:
+                    stamp = int(event['timeNs'])
+                    if stamp >= end*10**9:
+                        entry['done'] = True; break
+                    require(stamp >= start*10**9,'historyBound')
+                    bucket = stamp//10**9//60*60
+                    mid = (exact(event['bid'],'bid',True)+exact(event['ask'],'ask',True))/2
+                    bars = entry['bars']
+                    if not bars or bars[-1]['time'] != bucket:
+                        require(len(bars) < 50000,'historyBars','REFUSED_CHART_WINDOW_LIMIT')
+                        bars.append(dict(time=bucket,open=mid,high=mid,low=mid,close=mid))
+                    else:
+                        bar = bars[-1]
+                        bar.update(high=max(bar['high'],mid),low=min(bar['low'],mid),close=mid)
+                entry['position'] = page['nextPosition']
+            if entry['done'] and entry['provider'] is not None:
+                entry['provider'].close(); entry['provider'] = None
+            result = dict(schemaVersion=1,artifact='BTL-PAST-CHART-CONTEXT-1',datasetId=self.dataset_id,
+                          datasetVersion=self.version,startTime=start,endTime=end,timeframe=timeframe,
+                          priceBasis='EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable=False,
+                          coverage='UNKNOWN',executionAuthority=False,status='READY' if entry['done'] else 'BUILDING',
+                          candles=[],nextOffset=None)
+            if not entry['done']: return result
+            bars = []
+            duration = TIMEFRAMES[timeframe]
+            for source in entry['bars']:
+                bucket = source['time']//duration*duration
+                if bucket < start or bucket+duration > end: continue
+                if not bars or bars[-1]['time'] != bucket:
+                    bars.append(dict(source,time=bucket))
+                else:
+                    bar = bars[-1]
+                    bar.update(high=max(bar['high'],source['high']),low=min(bar['low'],source['low']),close=source['close'])
+            require(offset <= len(bars),'historyOffset','INVALID_INPUT')
+            result['candles'] = [dict(time=bar['time'],**{field:text(bar[field]) for field in ('open','high','low','close')}) for bar in bars[offset:offset+512]]
+            if offset+512 < len(bars): result['nextOffset'] = offset+512
+            return result
+
+    def close_chart_history(self):
+        with self._chart_context_lock:
+            for entry in self._chart_contexts.values():
+                if entry['provider'] is not None: entry['provider'].close()
+            self._chart_contexts.clear()
 
     def start_for_period(self, period):
         """Operator-selected new Session start; index/EOF stay controller-private."""

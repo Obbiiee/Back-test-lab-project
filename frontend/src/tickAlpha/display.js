@@ -2,6 +2,24 @@
 export const TIMEFRAMES=['1m','3m','5m','15m','30m','1h','2h','4h','D'];
 export const TICK_STEP_NS=15000000000n;
 export const stamp=value=>value===null?'—':new Date(Number(BigInt(value)/1000000n)).toISOString();
+export function historyPage(view,page,timeframe,offset){
+  const fields='schemaVersion artifact datasetId datasetVersion startTime endTime timeframe priceBasis volumeAvailable coverage executionAuthority status candles nextOffset'.split(' ');
+  if(!page||Object.keys(page).length!==fields.length||fields.some(key=>!Object.hasOwn(page,key))||page.schemaVersion!==1)throw Error('Invalid past candle context');
+  const end=Date.parse(`${view.metadata.startPeriod}-01T00:00:00Z`)/1000;
+  const date=new Date(end*1000);date.setUTCMonth(date.getUTCMonth()-1);
+  const start=date.getTime()/1000;
+  if(page?.artifact!=='BTL-PAST-CHART-CONTEXT-1'||page.datasetId!==view.state.datasetId
+    ||page.datasetVersion!==view.state.datasetVersion||page.timeframe!==timeframe
+    ||page.startTime!==start||page.endTime!==end||page.executionAuthority!==false
+    ||page.coverage!=='UNKNOWN'||page.priceBasis!=='EXACT_REVEALED_MID_DISPLAY_ONLY'||page.volumeAvailable!==false
+    ||!['BUILDING','READY'].includes(page.status)||!Array.isArray(page.candles)||page.candles.length>512
+    ||(page.status==='BUILDING'&&(page.candles.length||page.nextOffset!==null))
+    ||(page.nextOffset!==null&&(page.nextOffset!==offset+512||page.candles.length!==512||page.nextOffset>50000)))throw Error('Invalid past candle context');
+  const bars=displayBars({...view,chart:{...page,candles:page.candles}});
+  const duration=timeframe==='D'?86400:parseInt(timeframe,10)*(timeframe.endsWith('h')?3600:60);
+  if(bars.some(bar=>bar.time<start||bar.time%duration!==0||bar.time+duration>end))throw Error('Past candle context crosses the Session boundary');
+  return bars;
+}
 export function displayBars(view){
   const chart=view.chart;
   if(!chart||chart.priceBasis!=='EXACT_REVEALED_MID_DISPLAY_ONLY'||chart.volumeAvailable!==false

@@ -179,6 +179,13 @@ class ResearchApplication:
         groups = self.__timeline_cache.window(self.scope, state['sessionId'], checkpoint, last_only=True)
         return deepcopy(groups[-1]["events"][-1]) if groups else None
 
+    def chart_history(self, session_id, raw):
+        keys(raw, 'timeframe offset')
+        require(self.__historical is not None,'history','HISTORY_UNAVAILABLE')
+        with connect(self.dsn) as db:
+            meta, _, _, _ = self._session(db, session_id)
+        return self.__historical.chart_history(meta['startPeriod'],raw['timeframe'],raw['offset'])
+
     def inspect(self, session_id, timeframe=None):
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")

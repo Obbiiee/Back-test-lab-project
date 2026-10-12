@@ -61,7 +61,7 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
     else manager.add({ id: crypto.randomUUID(), type: TEXT, points: [textEditor.point], text: text.trim(), metadata: { createdOnTimeframe: textEditor.timeframe } });
     cancelText();
   };
-  return { ...snapshot, textEditor, cancelText, saveText, editText: id => {
+  return { ...snapshot, textEditor, cancelText, saveText, clearSelection: () => { manager.select(null); manager.setHistoryFocus('trading'); }, select: id => { focusDrawing(); manager.select(id); }, remove: id => { focusDrawing(); manager.remove(id); }, editText: id => {
     const model = manager.get(id);
     if (!model || model.type !== TEXT || model.locked) return;
     focusDrawing(); setTextEditor({ id, text: model.text });

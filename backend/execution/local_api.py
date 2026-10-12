@@ -62,6 +62,7 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
             fixture.close()
             if historical:
                 historical.close()
+                historical_source.close_chart_history()
 
     app = FastAPI(title="Backtest Lab local tick alpha",docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 
@@ -173,6 +174,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/view")
     async def workspace(session_id: str,request: Request):
         return await execute(application(request).workspace,session_id,await body(request))
+
+    @app.post('/api/v1/tick-alpha/sessions/{session_id}/chart-history')
+    async def chart_history(session_id: str, request: Request):
+        return await execute(application(request).chart_history,session_id,await body(request))
 
     @app.post('/api/v1/tick-alpha/sessions/{session_id}/bootstrap')
     async def bootstrap(session_id: str,request: Request):

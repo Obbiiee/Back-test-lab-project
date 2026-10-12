@@ -31,6 +31,64 @@ def monthly_source(path):
     return HistoricalSource(path/'month-dataset',version,log_root=path/'month-logs')
 
 
+class PastCandleContextTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.source = monthly_source(Path(self.temp.name))
+
+    def tearDown(self):
+        self.source.close_chart_history()
+        self.temp.cleanup()
+
+    def test_previous_month_only_exact_mid_and_no_provider_evidence(self):
+        result = self.source.chart_history('2015-12','1m',0)
+        self.assertEqual(result['status'],'READY')
+        self.assertEqual(result['coverage'],'UNKNOWN')
+        self.assertFalse(result['executionAuthority'])
+        self.assertEqual(len(result['candles']),1)
+        bar = result['candles'][0]
+        self.assertEqual((bar['open'],bar['high'],bar['low'],bar['close']),('2200.002','2200.003','2200.002','2200.003'))
+        self.assertLess(bar['time'],result['endTime'])
+        self.assertFalse({'provider','position','nextPosition','endOfDataset','events','root'} & result.keys())
+        self.assertEqual(self.source.chart_history('2015-12','D',0)['candles'][0]['open'],'2200.002')
+
+    def test_source_start_and_absent_history_do_not_fabricate_bars(self):
+        self.assertEqual(self.source.chart_history('2015-08','1m',0)['candles'],[])
+        self.assertEqual(self.source.chart_history('2015-09','1m',0)['candles'][0]['open'],'1100.002')
+        self.assertEqual(self.source.chart_history('2015-11','1m',0)['candles'],[])
+
+    def test_invalid_requests_refuse_and_cache_is_bounded(self):
+        from contracts.primitives import ContractError
+        for tf,offset in [('bad',0),({},0),('1m',True),('1m',-1),('1m',50001),('1m',99)]:
+            with self.assertRaises(ContractError):self.source.chart_history('2015-12',tf,offset)
+        for period in ['2015-08','2015-09','2015-10']:self.source.chart_history(period,'1m',0)
+        self.assertLessEqual(len(self.source._chart_contexts),2)
+
+    def test_request_budget_and_ready_pagination_never_export_raw_progress(self):
+        from unittest.mock import patch
+        start = int(datetime(2015,11,1,tzinfo=timezone.utc).timestamp())
+        class Pages:
+            def __init__(self): self.calls=0;self.closed=False
+            def locate_v2(self,*args): return {'position':0}
+            def read_page_v2(self,dataset,version,position,limit):
+                self.calls+=1
+                return {'events':[dict(timeNs=str((start+position*60)*10**9),bid='1.001',ask='1.003')],
+                        'nextPosition':position+1 if position<599 else None}
+            def close(self): self.closed=True
+        provider=Pages()
+        with patch.object(self.source,'provider',return_value=provider):
+            first=self.source.chart_history('2015-12','1m',0)
+            self.assertEqual(provider.calls,192)
+            self.assertEqual((first['status'],first['candles'],first['nextOffset']),('BUILDING',[],None))
+            self.assertFalse({'events','position','endOfDataset','totalRows'} & first.keys())
+            for _ in range(3): ready=self.source.chart_history('2015-12','1m',0)
+            self.assertEqual((ready['status'],len(ready['candles']),ready['nextOffset']),('READY',512,512))
+            tail=self.source.chart_history('2015-12','1m',512)
+            self.assertEqual((len(tail['candles']),tail['nextOffset']),(88,None))
+            self.assertLess(ready['candles'][-1]['time'],tail['candles'][0]['time'])
+            self.assertTrue(provider.closed)
+
+
 class HistoricalWorkspaceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -235,6 +293,46 @@ class HistoricalApplicationTests(unittest.TestCase):
                 self.assertEqual(synthetic.status_code,200)
                 self.assertEqual(synthetic.json()['label'],'SYNTHETIC / TEST ONLY')
                 self.assertEqual(client.get('/api/v1/tick-alpha/catalog',headers={'X-BTL-Source':'unknown'}).status_code,409)
+
+    def test_past_candle_access_is_scoped_and_does_not_modify_session(self):
+        from execution.research import ResearchApplication
+        from contracts.primitives import ContractError
+        source=monthly_source(self.path)
+        app=ResearchApplication(self.dsn,self.scope,historical_source=source)
+        foreign=ResearchApplication(self.dsn,TrustedScope('foreign:'+uuid.uuid4().hex,'local:operator'),historical_source=source)
+        try:
+            app.create_method(self.method)
+            body=dict(self.body,startPeriod='2015-12')
+            app.create_session(body)
+            before=app.inspect(body['id'])
+            history=app.chart_history(body['id'],{'timeframe':'1m','offset':0})
+            self.assertEqual(history['candles'][0]['open'],'2200.002')
+            self.assertEqual(app.inspect(body['id']),before)
+            with self.assertRaises(ContractError):foreign.chart_history(body['id'],{'timeframe':'1m','offset':0})
+            with self.assertRaises(ContractError):app.chart_history(body['id'],{'timeframe':'1m','offset':0,'provider':True})
+            with self.assertRaises(ContractError):self.app.chart_history(body['id'],{'timeframe':'1m','offset':0})
+        finally:
+            foreign.close();app.close();source.close_chart_history()
+
+    def test_history_endpoint_requires_local_transport_and_preserves_financial_tip(self):
+        from fastapi.testclient import TestClient
+        from execution.local_api import create_local_app
+        source=monthly_source(self.path)
+        headers={'Origin':'http://127.0.0.1:5173','X-BTL-Local':'1','X-BTL-Source':'historical'}
+        with TestClient(create_local_app(self.dsn,historical_source=source),base_url='http://127.0.0.1:5188',
+                        client=('127.0.0.1',60000),headers=headers) as client:
+            self.assertEqual(client.post('/api/v1/tick-alpha/methods',json=self.method).status_code,200)
+            body=dict(self.body,startPeriod='2015-12')
+            self.assertEqual(client.post('/api/v1/tick-alpha/sessions',json=body).status_code,200)
+            path='/api/v1/tick-alpha/sessions/'+body['id']
+            before=client.get(path).json()
+            result=client.post(path+'/chart-history',json={'timeframe':'1m','offset':0})
+            self.assertEqual(result.status_code,200)
+            self.assertFalse(result.json()['executionAuthority'])
+            self.assertEqual(client.get(path).json(),before)
+            self.assertEqual(client.post(path+'/chart-history',json={'timeframe':{},'offset':0}).status_code,409)
+            self.assertEqual(client.post(path+'/chart-history',json={'timeframe':'1m','offset':0},headers={'Origin':'https://foreign.invalid'}).status_code,403)
+            self.assertEqual(client.post(path+'/chart-history',json={'timeframe':'1m','offset':0},headers={'X-BTL-Source':'synthetic'}).status_code,409)
 
     def test_month_selection_preserves_old_session_pins_and_survives_durable_reload(self):
         from execution.research import ResearchApplication

@@ -5,7 +5,8 @@ import IndicatorControls from '../components/IndicatorControls.jsx';
 import {productionRegistry} from '../indicators/productionRegistry.js';
 import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {IndicatorPreferences} from '../workspacePreferences.js';
-import {displayBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
+import {displayBars,historyPage,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
+import {api,sessionPath} from './client.js';
 import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
 
@@ -23,6 +24,44 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const playing=playToken===pauseToken;
   const [chartCommand,setChartCommand]=useState(null);
   const [drawingState,setDrawingState]=useState({drawings:[],selectedId:null});
+  const [past,setPast]=useState({key:'',bars:[],status:''}),[historyRetry,setHistoryRetry]=useState(0);
+  const historyKey=`${view.metadata.id}:${timeframe}`;
+  useEffect(()=>{
+    const controller=new AbortController();
+    const key=`${view.metadata.id}:${timeframe}`;
+    if(!view.replayStepNs||accountTransport())return;
+    const load=async()=>{
+      const loaded=[];let offset=0;
+      setPast({key,bars:[],status:'Loading the previous month of candle context…'});
+      try{
+        for(let requests=0;requests<2000;requests++){
+          let page;
+          try{page=await api(sessionPath(view.metadata.id)+'/chart-history',{timeframe,offset},{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(30000)])});}
+          catch(error){
+            if(!controller.signal.aborted&&['LOCAL_BUSY','RATE_LIMITED'].includes(error.message)){
+              await new Promise(resolve=>setTimeout(resolve,error.message==='RATE_LIMITED'?10000:2000));
+              if(controller.signal.aborted)return;continue;
+            }
+            throw error;
+          }
+          const bars=historyPage(view,page,timeframe,offset);
+          if(page.status==='BUILDING'){await new Promise(resolve=>setTimeout(resolve,500));if(controller.signal.aborted)return;continue;}
+          if(bars.length&&loaded.length&&bars[0].time<=loaded.at(-1).time)throw Error('Overlapping past candle context');
+          loaded.push(...bars);
+          if(loaded.length>50000)throw Error('Past candle context exceeds the display limit');
+          if(page.nextOffset===null){
+            if(!controller.signal.aborted)setPast({key,bars:loaded,status:loaded.length?'Previous calendar month: recorded candles only; coverage remains unknown.':'No candles are available before this Session in the selected dataset.'});
+            return;
+          }
+          offset=page.nextOffset;
+        }
+        throw Error('Past candle context did not finish within the work budget');
+      }catch(error){if(!controller.signal.aborted)setPast({key,bars:[],status:`Earlier candles unavailable: ${error.message}. Retry earlier candles when the service is ready.`});}
+    };
+    void load();return()=>controller.abort();
+  // Session/timeframe own this request; cursor changes must not restart it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[view.metadata.id,timeframe,historyRetry]);
   const latest=useRef({view,onReplay});
   useEffect(()=>{latest.current={view,onReplay};},[view,onReplay]);
   useEffect(()=>{
@@ -38,7 +77,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     timer=setTimeout(next,500);
     return()=>{active=false;clearTimeout(timer);};
   },[playing,speed]);
-  const bars=useMemo(()=>displayBars(view),[view]);
+  const bars=useMemo(()=>[...(past.key===historyKey?past.bars:[]),...displayBars(view)],[view,past,historyKey]);
   const indicatorError=useCallback(error=>onNotice(error.message),[onNotice]);
   const changeInstances=value=>{
     if(value.length>16){onNotice('At most 16 indicators can be displayed.');return;}
@@ -58,6 +97,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <span>Mid-price display · volume unavailable</span>
     </div>
     {savedIndicators.store.status&&<p className="alpha-chart-note" role="alert">{savedIndicators.store.status}</p>}
+    {past.key===historyKey&&past.status&&<details className="alpha-display-details alpha-history-context"><summary>Earlier candle context</summary><div><p role="status">{past.status}</p><button onClick={()=>setHistoryRetry(value=>value+1)}>Retry earlier candles</button></div></details>}
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>
@@ -76,7 +116,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
           command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing}/>
       </div>
-      {objectsOpen&&<aside className="alpha-object-panel" aria-label="Position drawing objects"><h2>Position drawings</h2><p>Other chart drawings keep their on-chart editing controls.</p>{!drawingState.drawings.length&&<p>No position drawings yet.</p>}{drawingState.drawings.map((item,index)=><div key={item.id}><button onClick={()=>setChartCommand({action:`object:select:${item.id}`,id:crypto.randomUUID()})}>{index+1}. {item.type.replaceAll('-',' ')}</button>{['edit','hide','lock','delete'].map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} onClick={()=>setChartCommand({action:`object:${action}:${item.id}`,id:crypto.randomUUID()})}>{action==='hide'&&item.hidden?'Show':action==='lock'&&item.locked?'Unlock':action}</button>)}</div>)}</aside>}
+      {objectsOpen&&<aside className="alpha-object-panel" aria-label="Drawing objects"><h2>Drawing objects</h2><p>Select a drawing to edit its handles on the chart.</p>{!drawingState.drawings.length&&<p>No drawings yet.</p>}{drawingState.drawings.map((item,index)=><div key={item.id}><button onClick={()=>setChartCommand({action:`object:select:${item.id}`,id:crypto.randomUUID()})}>{index+1}. {item.type.replaceAll('-',' ')}</button>{['edit','hide','lock','delete'].map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} onClick={()=>setChartCommand({action:`object:${action}:${item.id}`,id:crypto.randomUUID()})}>{action==='hide'&&item.hidden?'Show':action==='lock'&&item.locked?'Unlock':action}</button>)}</div>)}</aside>}
     </div>
     <div className={`alpha-replay-controls ${floating?'is-floating':'is-docked'}`} style={floating?{translate:`${replayOffset.x}px ${replayOffset.y}px`}:undefined} aria-label="Tick replay controls">
       <button className="alpha-replay-grip" aria-label="Move replay controls" disabled={!floating} title="Drag or use arrow keys" onKeyDown={event=>{const delta={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,-10],ArrowDown:[0,10]}[event.key];if(delta){event.preventDefault();const rect=event.currentTarget.parentElement.getBoundingClientRect();setReplayOffset(current=>({x:current.x+Math.max(8-rect.left,Math.min(innerWidth-8-rect.right,delta[0])),y:current.y+Math.max(8-rect.top,Math.min(innerHeight-8-rect.bottom,delta[1]))}));}}} onPointerDown={event=>{if(event.button!==0)return;const target=event.currentTarget;let x=event.clientX,y=event.clientY;target.setPointerCapture(event.pointerId);target.onpointermove=next=>{const rect=target.parentElement.getBoundingClientRect();const dx=Math.max(8-rect.left,Math.min(innerWidth-rect.right-8,next.clientX-x));const dy=Math.max(8-rect.top,Math.min(innerHeight-rect.bottom-8,next.clientY-y));x=next.clientX;y=next.clientY;setReplayOffset(current=>({x:current.x+dx,y:current.y+dy}));};target.onpointerup=target.onpointercancel=()=>{target.onpointermove=null;target.onpointerup=null;target.onpointercancel=null;};}}>⠿</button>

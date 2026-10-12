@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
-import {displayBars,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
+import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
 import {createAccountClient,setAccountTransport,clearAccountTransport,accountStorageKey} from '../src/tickAlpha/accountClient.js';
 
@@ -241,3 +241,9 @@ assert.ok(ui.includes('name="startPeriod"')&&ui.includes('Start month (UTC)'));
 assert.ok(ui.includes("dialog==='ticket'"));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
 console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');
+const historyView={metadata:{startPeriod:'2015-09'},state:{datasetId:'test:history',datasetVersion:'test:v1',throughNs:'1441067400000000000'}};
+const pastPage={schemaVersion:1,artifact:'BTL-PAST-CHART-CONTEXT-1',datasetId:'test:history',datasetVersion:'test:v1',startTime:1438387200,endTime:1441065600,timeframe:'1m',priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable:false,coverage:'UNKNOWN',executionAuthority:false,status:'READY',candles:[{time:1439164800,open:'1.001',high:'1.003',low:'1.001',close:'1.002'}],nextOffset:null};
+assert.equal(historyPage(historyView,pastPage,'1m',0)[0].open,1.001);
+for(const change of [{datasetId:'foreign'},{datasetVersion:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{endTime:1441065660},{nextOffset:256},{endOfDataset:true},{status:'BUILDING'},{candles:[{...pastPage.candles[0],time:1441065600}]},{candles:[{...pastPage.candles[0],time:1439164801}]}])assert.throws(()=>historyPage(historyView,{...pastPage,...change},'1m',0));
+assert.deepEqual(historyPage(historyView,{...pastPage,candles:[],status:'BUILDING'},'1m',0),[]);
+console.log('PASS past OHLC context identity, exact price display, Session boundary, timeframe alignment, bounded pagination and future metadata refusal.');

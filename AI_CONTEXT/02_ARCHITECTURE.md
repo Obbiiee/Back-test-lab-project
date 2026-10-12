@@ -1,5 +1,7 @@
 # Boundaries
 
+The separately authorized local past-candle display channel is owned by the [existing system blueprint](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#local-past-candle-context-and-unified-objects--2026-10-12). Controller-private provider access produces only pinned OHLC strictly before the Session month; it does not extend execution RevealedView or financial authority.
+
 Latest local route composition: `main.jsx` selects TickAlphaEntry by default on loopback, with FigmaWorkspace retained only as explicit legacy rollback. `execution/historical.py` composes the reviewed V2 disk provider, bounded controller evidence/cache, indexed causal timeline and the unchanged sole financial reducer/PostgreSQL commit. Shared CandleChart/drawing/indicator/modal/terminal/icon owners remain independent of financial execution. Existing [system blueprint Section 43](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#v22-bounded-local-exness-connection----human-steps-1-3-2026-10-10) owns the detailed frozen contracts, accepted subset and limits; older default-v1/unmounted descriptions below are historical.
 
 backend/precision is an unmounted pure quote-evidence module depending only on standard library and existing contracts primitives/canonical encoding. It does not import legacy engines, cloud/application adapters or frontend. No account, database or provider side effects. Existing [system owner](../docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint) defines its evidence assertions and limitations.
