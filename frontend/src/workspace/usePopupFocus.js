@@ -5,7 +5,7 @@ export default function usePopupFocus(onClose, modal = false, returnFocusRef) {
   useEffect(() => { close.current = onClose; }, [onClose]);
   useEffect(() => {
     const previous = returnFocusRef?.current ?? document.activeElement, node = ref.current;
-    node?.querySelector('button:not(:disabled),input:not(:disabled)')?.focus();
+    [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled)')??[])].find(item=>item.getClientRects().length)?.focus();
     const key = event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close.current(); }
       if (modal && event.key === 'Tab') {

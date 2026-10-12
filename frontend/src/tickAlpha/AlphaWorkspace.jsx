@@ -9,7 +9,7 @@ import {displayBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
 import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
 
-export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing}){
+export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen}){
   const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
   const [savedIndicators]=useState(()=>{
     const store=new IndicatorPreferences(()=>globalThis.localStorage,workspaceKey,productionRegistry);
@@ -19,8 +19,10 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const [preferences,setPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const [speed,setSpeed]=useState(4),[playToken,setPlayToken]=useState(null);
   const seekInput=useRef(null);
+  const [floating,setFloating]=useState(false),[replayOffset,setReplayOffset]=useState({x:0,y:0});
   const playing=playToken===pauseToken;
   const [chartCommand,setChartCommand]=useState(null);
+  const [drawingState,setDrawingState]=useState({drawings:[],selectedId:null});
   const latest=useRef({view,onReplay});
   useEffect(()=>{latest.current={view,onReplay};},[view,onReplay]);
   useEffect(()=>{
@@ -59,19 +61,26 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>
-        {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} aria-pressed={mode===type} onClick={()=>{setPlayToken(null);setMode(type);}} aria-label={spec.name} title={spec.name}><Icon name={({"trend-line":"trend","horizontal-line":"horizontal","vertical-line":"vertical",rectangle:"rectangle",arrow:"arrow",text:"text","fibonacci-retracement":"fib",measure:"ruler",ray:"ray"})[type]||"trend"}/></button>)}
-        <button aria-pressed={mode==='long-position'} onClick={()=>{setPlayToken(null);setMode('long-position');}} aria-label="Long Position" title="Long Position"><Icon name="long"/></button>
-        <button aria-pressed={mode==='short-position'} onClick={()=>{setPlayToken(null);setMode('short-position');}} aria-label="Short Position" title="Short Position"><Icon name="short"/></button>
+        {[
+          ['Lines',['trend-line','horizontal-line','vertical-line','ray'],'trend'],
+          ['Shapes',['rectangle','arrow'],'rectangle'],
+          ['Fibonacci',['fibonacci-retracement'],'fib'],
+          ['Annotations',['text','measure'],'text'],
+          ['Positions',['long-position','short-position'],'long'],
+        ].map(([label,types,icon])=><details className="alpha-drawing-group" key={label} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary').focus();}}}><summary aria-label={`${label} drawing tools`} title={label}><Icon name={icon}/><span className="alpha-group-chevron">›</span></summary><div>{types.map(type=><button key={type} aria-pressed={mode===type} onClick={event=>{setPlayToken(null);setMode(type);event.currentTarget.closest('details').open=false;}}>{DRAWING_SPECS[type]?.name||({'long-position':'Long Position','short-position':'Short Position'})[type]}</button>)}</div></details>)}
       </nav>
       <div className="alpha-chart-host">
         <CandleChart candles={bars} transition={{kind:'forward'}} sessionId={accountStorageKey(`tick-alpha-${view.metadata.id}-${timeframe}`)} viewportKey={accountStorageKey(`${view.metadata.id}:${timeframe}`)}
           drawingWorkspace={workspaceKey} drawingStorageKey={accountTransport()?`backtest-${workspaceKey}`:view.replayStepNs?`backtest-${workspaceKey}`:`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
           tickEvidence={view.analysis} researchOnly
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
-          command={chartCommand} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing}/>
+          command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing}/>
       </div>
+      {objectsOpen&&<aside className="alpha-object-panel" aria-label="Position drawing objects"><h2>Position drawings</h2><p>Other chart drawings keep their on-chart editing controls.</p>{!drawingState.drawings.length&&<p>No position drawings yet.</p>}{drawingState.drawings.map((item,index)=><div key={item.id}><button onClick={()=>setChartCommand({action:`object:select:${item.id}`,id:crypto.randomUUID()})}>{index+1}. {item.type.replaceAll('-',' ')}</button>{['edit','hide','lock','delete'].map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} onClick={()=>setChartCommand({action:`object:${action}:${item.id}`,id:crypto.randomUUID()})}>{action==='hide'&&item.hidden?'Show':action==='lock'&&item.locked?'Unlock':action}</button>)}</div>)}</aside>}
     </div>
-    <div className="alpha-replay-controls" aria-label="Tick replay controls">
+    <div className={`alpha-replay-controls ${floating?'is-floating':'is-docked'}`} style={floating?{translate:`${replayOffset.x}px ${replayOffset.y}px`}:undefined} aria-label="Tick replay controls">
+      <button className="alpha-replay-grip" aria-label="Move replay controls" disabled={!floating} title="Drag or use arrow keys" onKeyDown={event=>{const delta={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,-10],ArrowDown:[0,10]}[event.key];if(delta){event.preventDefault();const rect=event.currentTarget.parentElement.getBoundingClientRect();setReplayOffset(current=>({x:current.x+Math.max(8-rect.left,Math.min(innerWidth-8-rect.right,delta[0])),y:current.y+Math.max(8-rect.top,Math.min(innerHeight-8-rect.bottom,delta[1]))}));}}} onPointerDown={event=>{if(event.button!==0)return;const target=event.currentTarget;let x=event.clientX,y=event.clientY;target.setPointerCapture(event.pointerId);target.onpointermove=next=>{const rect=target.parentElement.getBoundingClientRect();const dx=Math.max(8-rect.left,Math.min(innerWidth-rect.right-8,next.clientX-x));const dy=Math.max(8-rect.top,Math.min(innerHeight-rect.bottom-8,next.clientY-y));x=next.clientX;y=next.clientY;setReplayOffset(current=>({x:current.x+dx,y:current.y+dy}));};target.onpointerup=target.onpointercancel=()=>{target.onpointermove=null;target.onpointerup=null;target.onpointercancel=null;};}}>⠿</button>
+      <button onClick={()=>{setFloating(!floating);setReplayOffset({x:0,y:0});}}>{floating?'Dock replay':'Float replay'}</button>
       <button disabled={busy&&!playing||view.state.ended} aria-pressed={playing} onClick={()=>{setPlayToken(playing?null:pauseToken);emitLocal(playing?'replay_paused':'replay_started');}}>{playing?'Pause replay':'Play replay'}</button>
       <button disabled={busy||playing||view.state.ended} title={`Requests observed quotes through ${new Date(Number(BigInt(replayTarget(view,speed))/1000000n)).toISOString()}`} onClick={()=>onReplay('ADVANCE',replayTarget(view,speed))}>Step ticks</button>
       <span className="alpha-step-target">Next target: {new Date(Number(BigInt(replayTarget(view,speed))/1000000n)).toISOString().slice(11,19)} UTC</span>

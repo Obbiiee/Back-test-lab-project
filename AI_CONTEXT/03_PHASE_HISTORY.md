@@ -365,3 +365,5 @@ From aaaf416, bounded R-4 UI hierarchy, inline order errors, UTC/seek clarity, e
 ## Local-reference workspace composition — 2026-10-12
 
 From9ec82c8, UI-only adaptation of the human-approved local example: Session settings disclosure, desktop floating replay/action group and popup reusing canonical Journal. Registered frontend regression/lint/build/distribution/Node vectors and actual responsive/modal/focus/terminal checks PASS; existing design owner contains measurements and limitations. No engine/data/financial change or candle-history/V2.2 completion claim.
+
+Live-reference workspace UI refinement completed within the existing human UX grant; grouping, dock/float and position bridge objects reuse existing systems. Validation and limits: [existing design owner](../docs/PRODUCT_DESIGN_BLUEPRINT.md#live-fx-replay-reference-bounded-workspace-refinement--2026-10-12). No new phase or final V2.2 acceptance claim.
