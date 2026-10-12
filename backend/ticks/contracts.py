@@ -248,6 +248,11 @@ def chunk_content(chunk):
 
 
 def validate_chunk(chunk, manifest):
+    return _validate_chunk(chunk, manifest)
+
+
+def _validate_chunk(chunk, manifest, accepted_ticks=None):
+    """Internal reuse of owned immutable rows; public wire validation unchanged."""
     m = manifest.wire
     version = manifest.version
     tag(chunk, "BTL-TICK-CHUNK-1", "datasetId datasetVersion chunkIndex events")
@@ -257,7 +262,13 @@ def validate_chunk(chunk, manifest):
     meta = m["chunks"][index]
     require(type(chunk["events"]) is list and len(chunk["events"]) == meta["eventCount"], "chunk_count")
     require(content_hash(chunk_content(chunk)) == meta["hash"], "chunk_hash", "HASH_MISMATCH")
-    ticks = tuple(CanonicalTick.from_wire(row) for row in chunk["events"])
+    if accepted_ticks is None:
+        ticks = tuple(CanonicalTick.from_wire(row) for row in chunk["events"])
+    else:
+        ticks = tuple(accepted_ticks)
+        require(len(ticks) == len(chunk['events']) and
+                all(type(tick) is CanonicalTick and tick.wire == row
+                    for tick, row in zip(ticks, chunk['events'])), 'acceptedChunkRows')
     require(str(ticks[0].time_ns) == meta["firstNs"] and str(ticks[-1].time_ns) == meta["lastNs"], "chunk_range")
     previous, last_source, last_ordinal = -1, -1, -1
     seen, sequences, last_sequence = {}, set(), None

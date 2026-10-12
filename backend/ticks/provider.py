@@ -8,7 +8,7 @@ from copy import deepcopy
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require
 from .contracts import (CanonicalTick, TickManifest, event_id, chunk_content,
-                        validate_chunk, uint, keys, tag)
+                        validate_chunk, _validate_chunk, uint, keys, tag)
 
 
 class TickDataProvider(Protocol):
@@ -206,6 +206,7 @@ def validate_provider(provider, dataset_id, dataset_version, cancellation=None, 
     m = manifest.wire
     require(m["datasetId"] == dataset_id and m["ordering"]["timestamps"] == "VERIFIED_NONDECREASING", "ordering", "UNVERIFIED_ORDER")
     token, chunk_index, buffer, previous, last_source, last_ordinal = None, 0, [], -1, -1, -1
+    accepted_ticks = []
     tie_time, tie_sequence, tie_count = None, None, 0
     seen_ids, tie_sequences, tie_rows, tie_bytes = {}, set(), [], 0
     diagnostic_records, diagnostic_block_index = [], 0
@@ -281,11 +282,12 @@ def validate_provider(provider, dataset_id, dataset_version, cancellation=None, 
             require(duplicate is None or (duplicate in seen_ids and duplicate != row["eventId"]), "duplicate_reference", "UNVERIFIED_DUPLICATE_REFERENCE")
             last_source, last_ordinal, previous = source, ordinal, moment
             buffer.append(row)
+            accepted_ticks.append(tick)
             require(chunk_index < len(m["chunks"]), "chunks", "EXTRA_EVENT")
             if len(buffer) == m["chunks"][chunk_index]["eventCount"]:
-                validate_chunk(dict(schemaVersion=1, artifact="BTL-TICK-CHUNK-1", datasetId=dataset_id,
-                                    datasetVersion=dataset_version, chunkIndex=str(chunk_index), events=buffer), manifest)
-                chunk_index += 1; buffer = []
+                _validate_chunk(dict(schemaVersion=1, artifact="BTL-TICK-CHUNK-1", datasetId=dataset_id,
+                                    datasetVersion=dataset_version, chunkIndex=str(chunk_index), events=buffer), manifest, accepted_ticks)
+                chunk_index += 1; buffer = []; accepted_ticks = []
         require(page["events"] or page["diagnostics"]["records"] or page["endOfDataset"], "page", "NO_PROGRESS")
         if page["endOfDataset"]:
             require(page["nextToken"] is None, "eof_token")

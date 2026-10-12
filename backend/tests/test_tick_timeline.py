@@ -154,6 +154,24 @@ class TickTimelineTests(unittest.TestCase):
         bad=deepcopy(chunk);bad["events"][0]["bid"]="9"
         with self.assertRaises(ValueError):validate_chunk(bad,manifest)
 
+    def test_owned_chunk_reuse_matches_wire_and_refuses_mismatched_rows(self):
+        from ticks.contracts import _validate_chunk
+        p, _ = timeline(chunk_size=3)
+        page = p.read_page(p.dataset_id,p.dataset_version,None,3)
+        chunk = dict(schemaVersion=1,artifact="BTL-TICK-CHUNK-1",datasetId=p.dataset_id,
+                     datasetVersion=p.dataset_version,chunkIndex="0",events=page['events'])
+        manifest = TickManifest.from_wire(p.describe(p.dataset_id,p.dataset_version))
+        ticks = tuple(CanonicalTick.from_wire(r) for r in chunk['events'])
+        self.assertEqual(_validate_chunk(chunk,manifest,ticks),validate_chunk(chunk,manifest))
+        for wrong in (ticks[:-1],ticks[::-1],tuple(chunk['events'])):
+            with self.assertRaises(ValueError):_validate_chunk(chunk,manifest,wrong)
+        damaged=deepcopy(chunk);damaged['events'][0]['bid']='9'
+        with self.assertRaises(ValueError):_validate_chunk(damaged,manifest,ticks)
+        original=CanonicalTick.from_wire
+        with patch.object(CanonicalTick,'from_wire',side_effect=original) as accepted:
+            validate_provider(p,p.dataset_id,p.dataset_version)
+        self.assertEqual(accepted.call_count,3)
+
     def test_named_frozen_matrix(self):
         reject = {"duplicate_delivery", "timestamp_reversal"}
         for case in fixture_matrix()["cases"]:
