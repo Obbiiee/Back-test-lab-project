@@ -360,3 +360,8 @@ Fromfd55a79, CSS-only right order drawer and terminal presentation completed wit
 ## Senior workspace UX correction and QA walkthrough — 2026-10-12
 
 From aaaf416, bounded R-4 UI hierarchy, inline order errors, UTC/seek clarity, ended partial-close consistency and first-user guidance corrected. Actual isolated historical QA review/confirmation/replay stayed UNRESOLVED with unchanged cash; existing design owner records validation and remaining performance/mobile limits. No execution/data/contract change or V2.2 completion claim.
+
+
+## Local-reference workspace composition — 2026-10-12
+
+From9ec82c8, UI-only adaptation of the human-approved local example: Session settings disclosure, desktop floating replay/action group and popup reusing canonical Journal. Registered frontend regression/lint/build/distribution/Node vectors and actual responsive/modal/focus/terminal checks PASS; existing design owner contains measurements and limitations. No engine/data/financial change or candle-history/V2.2 completion claim.

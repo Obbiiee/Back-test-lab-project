@@ -1,5 +1,11 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — approved local design / UI only
+
+From clean/equal9ec82c8, human confirmed contoh design as inspiration and requested UI only. TickAlpha.jsx/CSS adapt composition without importing prototype candles/engine: Session settings disclosure, floating desktop replay/action group, responsive dock and Journal popup reusing existing AlphaJournal/WorkspaceModal. Six-dot terminal remains functional. Existing design owner records source zip hash, actual467px plot, responsive no-overflow/no-overlap, Journal data/focus, strategy Cancel, News unavailability and console evidence. Full frontend regression/lint/build/distribution and Node vectors passed; backend exemption applies only because backend/financial/data/transport are unchanged. Existing Inter detector warning remains disclosed. No financial commands or notes submitted; QA and user's Session preserved.
+
+NEXT-PROMPT REQUIREMENT: follow existing current-phase/design authorities and verified clean GitHub baseline. Pre-Session one-month candle history remains pending and was excluded by the UI-only grant; do not claim it implemented. Preserve frozen evidence/financial contracts, private data/drafts and capacity/HTTPS blockers. No new roadmap, lowered gates or external deployment.
+
 ## CODEX → CHATGPT — senior workspace UX correction / first-user review
 
 Human authorized critique, fixes, rechecks and a real first-user walkthrough. From clean/equal aaaf416, only four existing Alpha UI files plus existing context/design/handoff owners changed. Existing PRODUCT_DESIGN_BLUEPRINT owns findings and actual evidence. Improved terminal hierarchy, in-ticket errors/recovery, cleared stale notices, current UTC/seek, empty-state primary action, mobile targets and ended partial-close consistency; no financial/transport/provider/data/dependency change.
