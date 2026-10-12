@@ -1,5 +1,13 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — senior workspace UX correction / first-user review
+
+Human authorized critique, fixes, rechecks and a real first-user walkthrough. From clean/equal aaaf416, only four existing Alpha UI files plus existing context/design/handoff owners changed. Existing PRODUCT_DESIGN_BLUEPRINT owns findings and actual evidence. Improved terminal hierarchy, in-ticket errors/recovery, cleared stale notices, current UTC/seek, empty-state primary action, mobile targets and ended partial-close consistency; no financial/transport/provider/data/dependency change.
+
+Isolated QA Session6db95337-0a97-4182-bbac-b7cdede0e352: create/reopen, invalid quantity refusal, corrected exact review, local simulated confirmation,4-second replay, Journal/Analysis and cold reload verified. Historical evidence remained UNRESOLVED; cash10000/net0 and0completed trades. No fabricated success. User's Session untouched. Desktop/mobile no horizontal overflow/overlap, keyboard resize and honest News checked. Full frontend regression then final lint/build/distribution/focused tests and independent Node goldens passed; backend343 result remains historical. One detector warning for existing Inter retained. Remaining: December-session30-second timeout, mobile chrome density,compact385px plot (505px when collapsed), existing capacity/reference failure and deferred HTTPS. These are not waived or marked complete.
+
+NEXT-PROMPT REQUIREMENT: review the existing design-owner evidence and sole current-phase authority; continue only authorized bounded work, preserve engine/evidence/private data/drafts and separate failed capacity/read-timeout evidence. No V2.2-complete claim, weakened deadlines/contracts or external deployment. Any material capacity remediation follows applicable authorization and full gates.
+
 ## CODEX → CHATGPT — capacity hard-stop after neutral chart checkpoint
 
 Visual correction62b820bd02bd74e58b8ebda1572885ae63543573 pushed; local/origin/actual GitHub equality, clean0/0 verified. Existing unchanged ten-Session probe subsequently ran alone on a new isolated QA database; no user Session reset/raw data/runtime modification.10SUCCEEDED/queue0/mismatch0/exact cold receipts, cash9900/one closed trade each; wall24.613797600148246seconds/14.625942971020114x, maximum-of-ten acknowledgement0.6361918998882174seconds, last completion20.916244seconds.225whole-host samples/errors0/max87%, sampler stopped. Prior aggregate retained separately. Existing system blueprint owns complete limits: Windows fixture/in-process result is not Linux reference/worst-case/process-RSS certification. Third-party deprecation warning retained; dependencies unchanged.

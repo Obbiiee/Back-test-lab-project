@@ -355,3 +355,8 @@ From7c0bc06, shared supplied-brand workspace/account header, Alpha-scoped navy p
 ## Riksora order/terminal visual slice and bounded review — 2026-10-12
 
 Fromfd55a79, CSS-only right order drawer and terminal presentation completed with existing semantics/confirmation preserved. Registered frontend regression/lint/build/distribution/repository/bundle/Node vectors PASS; actual production order click, keyboard focus/Escape, review cancellation, mobile width, terminal keyboard resize and explicit unavailable News verified. Existing design owner records bounded adversarial findings and the oversized original-artwork follow-up. V2.2 final acceptance remains OPEN; no capacity/reference/HTTPS waiver or new backend correctness claim.
+
+
+## Senior workspace UX correction and QA walkthrough — 2026-10-12
+
+From aaaf416, bounded R-4 UI hierarchy, inline order errors, UTC/seek clarity, ended partial-close consistency and first-user guidance corrected. Actual isolated historical QA review/confirmation/replay stayed UNRESOLVED with unchanged cash; existing design owner records validation and remaining performance/mobile limits. No execution/data/contract change or V2.2 completion claim.
