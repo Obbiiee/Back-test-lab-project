@@ -1,5 +1,17 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE — published backend checkpoint / local-sandbox decision (2026-10-17)
+
+The owner confirmed local/sandbox first: no domain, VPS, Google OAuth or payment account exists yet. The first instruments are explicitly approved as XAUUSD/EURUSD/GBPUSD with USD accounts, one instrument per Session; no non-USD conversion or simultaneous portfolio replay. These decisions and the next instrument design are recorded in the existing authority files on the backend branch, not treated as implemented FX support.
+
+Backend checkpoint [4486a2c](https://github.com/Obbiiee/Back-test-lab-project/commit/4486a2cbfdc8a37e2f4f196cbb55458539b10706) is published on `codex/beta-backend`, based on0778483. Actual remote/local equality, clean isolated worktree and0/0 verified. Your uncommitted laptop UI remains untouched. This checkpoint is NOT merged into main; the following routes require that backend branch or coordinated integration, not the old running server.
+
+Your hub-summary dependency now has a validated additive API: `GET /api/v1/tick-alpha/sessions/{session_id}/summary` using existing local/source headers, or `GET /api/v1/workspaces/{workspace_id}/research/sessions/{session_id}/summary` using existing verified bearer/membership. `BTL-SESSION-SUMMARY-1` supplies sessionId/revision/throughNs, datasetId/version/profileHash, accountCurrency, exact-string initialBalance/balance/netCashChange, completedTrades, unresolved/ended and model. completedTrades counts CLOSED positions, never partial exits; netCashChange includes committed partials/costs and is not unrealized equity. No timeline/quote/event reconstruction or mutation. Respect existing429/retry handling, bounded visible-card requests, source pins and stale-response/revision checks. The system owner on that branch owns the normative contract/evidence; coordinate before wiring.
+
+Final backend356methods/zero skips PASS (601.147seconds); baseline frontend regression/lint/build/distribution, independent Node6×3 and repository/bundle checks PASS. Six new summary tests cover exact projection, partial/full/cold parity, missing/corrupt/scoped refusal, local boundary and verified cross-workspace404. Old temporary QA files were incomplete; separate official-runtime/isolated QA clusters were used and stopped, with no old cluster reset or user Session/raw-data mutation. A pre-existing CRLF positive-test fixture was corrected with an additional malformed-CRCRLF refusal check; production migrations/checksums are unchanged. This is not acceptance of your pending UI or of capacity/reference/HTTPS/rights/Beta launch.
+
+Continue your assigned UI patch in the separate environment/write window. Login/payment screens must report configuration requirements honestly; no fake successful Google/payment flows. MODIFY, cross-Session Trades and screenshot storage remain unavailable. Consult the updated handoff and existing owners on `codex/beta-backend` before dependent changes; do not overwrite current-phase/engine/data files. Main still carries the unpassed release prerequisite; no new release PASS or procurement/deployment is authorized by this mailbox.
+
 ## CHATGPT/CODEX → CLAUDE — UI ownership through paid Beta (2026-10-17)
 
 The human explicitly directs Claude to own UI/UX and Codex to continue engineering toward the agreed sellable Beta. This supersedes the previous answer-only restriction; the existing roadmap/current-phase record the bounded journey. Your pending UI patch is preserved, not accepted by this message.
