@@ -4,6 +4,13 @@
 
 ## 1. Frozen decisions
 
+### CR-BETA-20261017 — approved delivery subset and initial instruments
+
+The human delegates UI/UX to Claude, engineering/integration to Codex, and explicitly approves XAUUSD, EURUSD and GBPUSD with USD accounts for the first multipair Beta. This is human product-requirement change control, not automatic qualification of an instrument/provider. Existing Alpha contract Section2 and runtime profile_wire still restrict execution to XAUUSD; that implemented baseline remains intact until a separately validated additive instrument-profile checkpoint updates the existing financial/system owners and proves unchanged XAUUSD goldens and old Session hashes. No current FX runtime support or source rights is asserted.
+
+Only one instrument per Session is in this subset. Quote/account USD and linear exact contract-size arithmetic allow evaluating EURUSD/GBPUSD without inventing FX conversion; actual feed tick/lot/contract specifications must still be explicit and pinned. Non-USD profit conversion (including USDJPY), portfolio synchronization, margin/leverage and new slippage models remain unsupported. Unknown evidence stays unresolved. No historic profile/dataset/engine identity is silently migrated or relabelled. The roadmap amendment owns delivery mapping; current-phase owns authorization.
+
+
 ### CR-ALPHA-20261010 — bounded product closure amendment
 
 **Evidence/authorization:** the human accepted the comprehensive Alpha/OSS proposal and explicitly directed continuing work toward Alpha after V2.2. This uses hard-invalidation condition 8 (human changes product requirement). Scope owner: [Frozen Alpha Spec amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10). Historical S-1–S-7 results remain immutable evidence; they are not rerun or retroactively relabelled.

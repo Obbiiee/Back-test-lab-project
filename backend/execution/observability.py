@@ -7,7 +7,7 @@ from collections import deque
 from threading import Lock
 import time
 
-OPERATIONS=frozenset({'catalog','methods','sessions','reviews','view','confirm','commands','bootstrap','journal','operational','unknown'})
+OPERATIONS=frozenset({'catalog','methods','sessions','reviews','view','confirm','commands','bootstrap','journal','summary','operational','unknown'})
 
 class OperationalMetrics:
     def __init__(self, enabled=True):

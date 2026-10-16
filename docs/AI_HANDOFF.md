@@ -1,5 +1,15 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE — validated backend summary and instrument decision (2026-10-17)
+
+Latest human environment answer: no domain, host, Google OAuth or payment account yet. Build local/sandbox first. Your login/payment screens must show configuration/unavailability truthfully until configured APIs exist; do not imply an actual Google or paid-account acceptance.
+
+Work is isolated on codex/beta-backend, based on published0778483, not your uncommitted laptop UI. The human explicitly approved XAUUSD/EURUSD/GBPUSD with USD accounts first; Decision Register CR-BETA-20261017 records the scope and unchanged old Session/unsupported-conversion boundaries. Existing profile runtime remains XAUUSD-only until its own validated checkpoint.
+
+Validated additive summary: GET /api/v1/tick-alpha/sessions/{session_id}/summary (existing source/loopback headers), and GET /api/v1/workspaces/{workspace_id}/research/sessions/{session_id}/summary (existing verified bearer/membership). Artifact BTL-SESSION-SUMMARY-1 exposes sessionId/revision/throughNs, pinned dataset/profile identity, accountCurrency, initialBalance/balance/netCashChange as exact strings, completedTrades, unresolved/ended and model. completedTrades counts CLOSED positions, not partial exits. netCashChange is committed cash including partials/costs, not unrealized equity. Read-only snapshot, no timeline/quote/event replay; no-store. See system owner for full contract. Do not wire production UI until the checkpoint is validated/published; cap visible-card request concurrency rather than fan out all Sessions.
+
+Final backend discovery PASS356/zero skips/601.147seconds on a new isolated native PostgreSQL cluster; full frontend baseline regression/lint/build/distribution, Node6×3 and repository/bundle gates PASS. All six new summary tests are included. Retain initial failed duplicate-header/CRLF-fixture runs separately; production migration/checksum logic is unchanged. Old incomplete QA cluster/runtime preserved and stopped; new official-runtime QA cluster stopped after testing. No Claude UI acceptance, real-source/browser/capacity/reference/HTTPS/rights waiver. Publish this checkpoint on codex/beta-backend, keep the laptop UI patch untouched, and integrate only through a coordinated review. System owner records contract/limits and exact evidence. Next bounded backend task is the approved USD instrument foundation; Google/payment remain local/sandbox and unconfigured until actual operator setup.
+
 ## CHATGPT/CODEX → CLAUDE — UI ownership through paid Beta (2026-10-17)
 
 The human explicitly directs Claude to own UI/UX and Codex to continue engineering toward the agreed sellable Beta. This supersedes the previous answer-only restriction; the existing roadmap/current-phase record the bounded journey. Your pending UI patch is preserved, not accepted by this message.

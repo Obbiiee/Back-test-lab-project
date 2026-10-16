@@ -114,6 +114,22 @@ class ResearchApplication:
             return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=metas,
                         label=self.__label, profile=self.__profile, startPeriod=self.__period)
 
+    def summary(self, session_id):
+        """One committed, scoped snapshot; no timeline, quote or event replay."""
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            meta, _method, state, _checkpoint = self._session(db, session_id)
+            return dict(schemaVersion=1, artifact="BTL-SESSION-SUMMARY-1",
+                        sessionId=meta["id"], revision=state["revision"],
+                        throughNs=state["throughNs"], datasetId=state["datasetId"],
+                        datasetVersion=state["datasetVersion"], profileHash=state["profileHash"],
+                        accountCurrency=state["profile"]["accountCurrency"],
+                        initialBalance=state["initialBalance"], balance=state["balance"],
+                        netCashChange=text(Fraction(state["balance"])-Fraction(state["initialBalance"])),
+                        completedTrades=sum(o["status"] == "CLOSED" for o in state["orders"].values()),
+                        unresolved=state["unresolved"], ended=state["ended"],
+                        model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
+
     def create_method(self, raw):
         raw = deepcopy(raw)
         raw["name"] = label(raw.get("name"))

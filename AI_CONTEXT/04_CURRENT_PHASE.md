@@ -1,5 +1,9 @@
 # Operational phase authority
 
+Latest human environment decision (2026-10-17): no domain, VPS/hosting, Google OAuth or payment-provider account is available; prepare local/sandbox first. This narrows the current paid-Beta journey to safe engineering and sandbox validation until those operator prerequisites exist. No service procurement, live payment, fabricated Google login, public deployment or release-gate waiver. Existing full-source rights/quality/resource/reference blockers remain explicit.
+
+Latest human instrument decision (2026-10-17): explicitly approved XAUUSD, EURUSD and GBPUSD first, with USD accounts, via the change recorded in existing Decision Register CR-BETA-20261017. This authorizes designing/validating the additive profile extension, not fabricating provider eligibility or rewriting existing XAUUSD Session identity. Non-USD conversion remains unsupported. Codex works in the separate beta-backend worktree; Claude UI on laptop main remains preserved.
+
 Latest human journey grant (2026-10-17): the owner assigns UI/UX to Claude and directs Codex to publish that assignment and continue the agreed paid-Beta engineering journey. The [existing roadmap amendment](../docs/ROADMAP.md#paid-beta-delivery-amendment--2026-10-17) maps scope to existing phases; handoff owns file coordination. Codex owns backend/data/identity/entitlement/payment/capacity/recovery/integration; Claude owns frontend/design. This supersedes prior internal-only/post-Alpha scope restrictions only for Google login, paid access, selectable instrument per Session and Basic Statistics toward limited paid Beta. The readiness JSON below still records the UNPASSED Alpha prerequisite; it is not a Beta completion claim. Continue safe local checkpoints after their validation and Git gates, without routine reauthorization. Spending, merchant/provider activation, credentials, data rights and external launch remain actual prerequisites; do not assume them available or weaken frozen financial/causal contracts. Pending Claude UI is preserved and unaccepted.
 
 Latest human answer: no Linux server is available; continue local work. HTTPS and Linux reference certification remain deferred/unpassed, not waived. Bounded provider-acceptance optimization reuses already validated immutable ticks within one chunk while retaining public wire validation/hash/order/provenance checks. Local ten-session probe now20.705378x with identical receipts, but sampled whole-host RAM95% and reference certification remain incomplete; keep readiness status unchanged. Existing system owner records detailed evidence and limits.
@@ -36,20 +40,28 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 {
   "AUTHORITY": "current-phase",
   "LAST_COMPLETED_PHASE": "I-4/I-2 identity composition",
-  "CURRENT_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
-  "NEXT_PHASE": "L-1/L-2 internal Alpha acceptance",
+  "CURRENT_IMPLEMENTATION_PHASE": "Paid-Beta local/sandbox Session summary",
+  "NEXT_PHASE": "Instrument profile foundation (existing Phases23/24/41–44 subset)",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "CAPACITY_GATE_FAILED_FINAL_ACCEPTANCE_BLOCKED",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Q-3/I-5/H-2-H-5 readiness gaps",
-  "AUTHORIZED_PHASE_SEQUENCE": ["PF-0 Alpha product closure", "S-1 supplemental drawing spike", "S-2 conditional drawing and Ray", "R-4/I-3 Alpha workspace UX", "R-5 canonical journal", "R-6 pinned risk and basic metrics", "R-7 causal MAE/MFE", "R-8 frozen seeded Monte Carlo", "H-1 minimum feedback and measurement", "I-4/I-2 identity composition", "Q-3/I-5/H-2-H-5 readiness gaps", "L-1/L-2 internal Alpha acceptance"],
-  "EXECUTION_MODE": "BOUNDED_ALPHA_PRODUCT_CLOSURE_INTERNAL_FIRST",
+  "CURRENT_PHASE_STATUS": "SUMMARY_VALIDATED_BACKEND_BRANCH_CAPACITY_GATE_FAILED",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Paid-Beta local/sandbox Session summary",
+  "AUTHORIZED_PHASE_SEQUENCE": [
+    "Bounded Session summary",
+    "Existing data/instrument phases23/24/41–44 subset",
+    "Existing identity phases20–22/25/26/29 subset",
+    "Existing Basic Statistics R-5/R-6/27 subset",
+    "Existing entitlement/payment phases51–53 sandbox subset",
+    "Existing capacity/recovery/internal acceptance gates",
+    "External L-3–L-8 after operator prerequisites and separate launch approval"
+  ],
+  "EXECUTION_MODE": "PAID_BETA_LOCAL_SANDBOX_WITH_SEPARATE_CLAUDE_UI",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "Complete the accepted Alpha product closure through internal acceptance using existing ledger owners, with separate validated normal commit/push/equality/clean0/0 checkpoints. Preserve financial/evidence contracts, private2015 and draft/rollback state. No external deployment/cohort, procurement, certainty promotion or post-Alpha scope.",
+  "TARGET_CHECKPOINT": "Complete the approved local/sandbox paid-Beta subset through separately validated checkpoints: read-only Session summaries, XAUUSD/EURUSD/GBPUSD USD-account instrument foundation, Google identity and provider-independent entitlement/payment sandbox, Basic Statistics and capacity/recovery. Preserve pending Claude UI, old Sessions, private data and frozen causal/financial contracts. Existing Alpha resource/reference/HTTPS and external-rights gates remain unpassed; no procurement, live charge or external deployment.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Capacity-remediation code checkpoint 39d4c0c88c296d3a1ac89d854062664287c2beaf: 343 zero-skip backend tests and frontend/repository/bundle/goldens/protected checks pass; normal push, actual GitHub equality and clean0/0 verified. Human deferred HTTPS for this checkpoint. Target20x, worst-case30second queue, peak/reference-host capacity and final internal Alpha acceptance remain incomplete"
+  "LAST_COMPLETED_CHECKPOINT": "Bounded read-only Session summary validated on isolated codex/beta-backend: 356 backend methods/zero skips, frontend baseline regression/lint/build/distribution, Node6x3 and repository/bundle checks pass. Git publication follows; Claude UI remains unreviewed/uncommitted on laptop main. Existing capacity/resource/reference/HTTPS and final release acceptance remain incomplete."
 }
 ```
 

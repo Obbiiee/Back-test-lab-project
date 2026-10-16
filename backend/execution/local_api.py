@@ -143,6 +143,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
         except Exception:
             return response({'detail':'MEASUREMENT_UNAVAILABLE'},503)
 
+    @app.get("/api/v1/tick-alpha/sessions/{session_id}/summary")
+    async def summary(session_id: str, request: Request):
+        return await execute(application(request).summary, session_id)
+
     @app.get("/api/v1/tick-alpha/catalog")
     async def catalog(request: Request):
         return await execute(application(request).catalog)

@@ -103,6 +103,10 @@ def install(app):
         job = await anyio.to_thread.run_sync(partial(queue.inspect, app.state.dsn, user.id, workspace_id, job_id, cancel=True), limiter=limiter)
         return Response(canonical_bytes(job), media_type='application/json')
 
+    @app.get(prefix + '/sessions/{session_id}/summary')
+    async def summary(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'summary', session_id)
+
     @app.get(prefix + '/catalog')
     async def catalog(workspace_id: uuid.UUID, user: User = Depends(current)):
         return await execute(user, workspace_id, 'catalog')

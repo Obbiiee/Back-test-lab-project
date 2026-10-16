@@ -11,6 +11,7 @@ from unittest.mock import patch
 from cloud.app import create_app
 from infrastructure.database import migrate, connect
 from execution.research import ResearchApplication
+from application.models import TrustedScope
 from tests.test_identity import RecordingDelivery, client, PASSWORD
 from tests.test_research_sessions import method, review_request
 
@@ -41,6 +42,27 @@ class CloudResearchTests(unittest.TestCase):
         login = self.client.post('/api/v1/auth/login', data={'username': email, 'password': PASSWORD})
         self.assertEqual(login.status_code, 200, login.text)
         return registered.json()['id'], {'Authorization': 'Bearer ' + login.json()['access_token']}
+
+    def test_summary_requires_identity_membership_and_hides_foreign_session(self):
+        app = ResearchApplication(DSN, TrustedScope(self.workspace,self.actor))
+        m=method();app.create_method(m)
+        session='session:'+uuid.uuid4().hex
+        app.create_session(dict(id=session,name='Summary QA',methodId=m['id'],initialBalance='10000',startPeriod='2020-01'))
+        path=self.root+'/sessions/'+session+'/summary'
+        response=self.client.get(path,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json(),app.summary(session))
+        self.assertEqual(response.headers['cache-control'],'no-store')
+        self.assertNotIn('controller',response.json())
+        self.assertNotIn('quote',response.json())
+        self.assertEqual(self.client.get(path).status_code,401)
+        foreign_actor,foreign_headers=self.account()
+        self.assertNotEqual(foreign_actor,self.actor)
+        self.assertEqual(self.client.get(path,headers=foreign_headers).status_code,404)
+        other=self.client.post('/api/v1/workspaces',headers=foreign_headers,json={'name':'Foreign summary QA'}).json()['id']
+        foreign_path='/api/v1/workspaces/'+other+'/research/sessions/'+session+'/summary'
+        self.assertEqual(self.client.get(foreign_path,headers=foreign_headers).status_code,404)
+        app.close()
 
     def test_verified_scope_canonical_session_and_hostile_tenant(self):
         m = method()
