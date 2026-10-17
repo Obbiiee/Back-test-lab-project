@@ -202,7 +202,8 @@
     "backend/infrastructure/migrations/011_v2_sandbox_access.sql",
     "backend/identity/google.py",
     "backend/identity/google_store.py",
-    "backend/infrastructure/migrations/012_google_identity.sql"
+    "backend/infrastructure/migrations/012_google_identity.sql",
+    "frontend/integration/betaClient.js"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -284,7 +285,10 @@
     "backend/tests/test_analysis_v2.py",
     "backend/tests/test_research_v2.py",
     "backend/tests/test_sandbox_v2.py",
-    "backend/tests/test_google_identity.py"
+    "backend/tests/test_google_identity.py",
+    "frontend/tests/beta-client.test.mjs",
+    "frontend/tests/beta-client-native.mjs",
+    "frontend/tests/beta_client_native.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

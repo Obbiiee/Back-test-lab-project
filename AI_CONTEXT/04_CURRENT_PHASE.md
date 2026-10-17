@@ -44,12 +44,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "Opt-in Google identity adapter",
-  "CURRENT_IMPLEMENTATION_PHASE": "Google identity adapter with explicit disabled configuration",
+  "LAST_COMPLETED_PHASE": "Unmounted Beta client integration seam",
+  "CURRENT_IMPLEMENTATION_PHASE": "Unmounted Beta client integration seam",
   "NEXT_PHASE": "Claude v2 client and Google browser integration acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "VALIDATED_GOOGLE_FIXTURES_NO_LIVE_PROVIDER_OR_UI_ACCEPTANCE",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Google identity adapter with explicit disabled configuration",
+  "CURRENT_PHASE_STATUS": "VALIDATED_CLIENT_AND_NATIVE_ADAPTER_NO_UI_CUTOVER",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Unmounted Beta client integration seam",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -66,7 +66,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Full453 backend/zero skips/900.324seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS; focused10/zero skips/27.305seconds PASS. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Actual RSA verification with authored Google-shaped fixtures covers PKCE/state/browser/nonce/signature/issuer/audience/time/verified-email refusal, single-use concurrent callback/exchange, stable subject/email conflict, old password recovery compatibility, Google-only reset refusal, restricted roles and native empty-target dump/restore. No owned Google credentials, real consent/browser/TLS acceptance, Claude UI mount, merchant/data acquisition or paid Beta acceptance."
+  "LAST_COMPLETED_CHECKPOINT": "Unmounted Beta client transport validated:8 standalone Node scenario families plus actual Node-to-HTTPS-ASGI/PostgreSQL QA1 test/zero skips/16.328seconds PASS with normal shutdown. Exact10000.03USD and3/100R,16-instrument catalogue, original receipt retry/current revision separation, journal/Trash/restore/logout and old-account/stale-response safeguards pass. Full frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Backend runtime unchanged from historical453-test checkpoint; full backend was not rerun. No UI mount/browser/network TLS/real Google/merchant/source acquisition or paid Beta acceptance."
 }
 ```
 

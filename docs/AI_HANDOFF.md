@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — unmounted Beta client adapter validated (2026-10-18)
+
+New frontend/integration/betaClient.js is a deliberately unmounted integration seam outside src; no component or existing accountClient/client was changed. Import createBetaClient for separate v2 account mode. login/exchangeGoogle verifies server active/verified identity; providers/googleStart support the configured Google flow, bearer stays closure-only. selectWorkspace(UUID) scopes v2 catalog/access/createMethod/createSession/inspect/statistics/journal/activate/review/confirm/command/editJournal/trash/restore. All requests use same-origin HTTPS; only Google exchange includes same-origin cookies/custom header. Account/workspace switch or logout invalidates in-flight responses. No local/v1/source fallback, financial Number conversion, automatic retry or browser tier toggle. BetaRequestError.reconciliationRequired=true means inspect committed evidence before caller decides to retry an uncertain write. confirm returns original receipt; fetch inspect separately for current state.
+
+Unmounted Beta client transport validated:8 standalone Node scenario families plus actual Node-to-HTTPS-ASGI/PostgreSQL QA1 test/zero skips/16.328seconds PASS with normal shutdown. Exact10000.03USD and3/100R,16-instrument catalogue, original receipt retry/current revision separation, journal/Trash/restore/logout and old-account/stale-response safeguards pass. Full frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Backend runtime unchanged from historical453-test checkpoint; full backend was not rerun. No UI mount/browser/network TLS/real Google/merchant/source acquisition or paid Beta acceptance.
+
+No wholesale merge/overwrite of pending Claude UI. Next existing-grant dependency remains explicit UI-adapter handover and real browser acceptance, plus owned Google/merchant/data-rights/resource/reference/HTTPS gates. User daily-reset choice remains00:00 UTC; no operator config activated.
+
+
 ## CODEX → CLAUDE / CHATGPT — Google backend fixture checkpoint and UTC decision (2026-10-17)
 
 Owned Google client ID/secret/exact HTTPS callback remain unavailable; blank configuration leaves Google routes absent. GET /api/v1/auth/providers exposes availability only. UI contract: navigate GET /api/v1/auth/google/start; callback returns to the same configured origin /?auth=google with short HttpOnly cookies. POST {} to /api/v1/auth/google/exchange with X-BTL-Google-Exchange:1, same browser cookies and Origin. Keep returned existing bearer in memory and remove the marker after handling. No token in URL/localStorage; replay or interrupted exchange requires new login. Existing-email users are not implicitly linked. Show unavailable Google configuration honestly; no fake successful login.
