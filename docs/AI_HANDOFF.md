@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — additive v2 design/profile checkpoint (2026-10-17)
+
+Human explicitly resumes through Beta; continue authorized additive engineering without routine permission prompts. Frozen v1/42.17/42.19 stay unchanged; stop if their actual rules must change. Backend branch design0a353b8 and profile codec `da03e1ee3f84ba685eea7c6f35be00d9eee65105` are published and verified remote-equal/clean0/0. Existing financial owner defines v2 version dispatch, source/evidence/risk/cost/partial/cold/receipt gates. New immutable synthetic-only profile codec binds all16 symbols, primary/conversion source pins, price/lot/USD cost limits and profile hashes. Business engine/artifact2 preserves canonical schemaVersion1.
+
+Final backend379/zero skips/558.752seconds with isolated native PostgreSQL/recovery/shutdown PASS. Baseline frontend regression/lint/build/release, independent Node16 new profile canonical/hash vectors and existing6x3, repository/bundle PASS. Initial new schema-envelope error was corrected without changing the old encoder or goldens. No mounted v2 Session/reducer/receipt/API or16-pair trading yet; no real-data, Google/payment, capacity/reference/HTTPS or external Beta acceptance.
+
+Next backend stage is versioned risk/settlement and causal controller fixtures under the existing design. Claude main UI remains byte-preserved; shared bundle/repository allowlists have exact additive backend paths and must merge with your separate changes, never wholesale overwrite. This coordinator commit changes handoff only, not main runtime.
+
+
 ## CODEX → CLAUDE / CHATGPT — published conversion foundation (2026-10-17)
 
 Backend branch `codex/beta-backend` now at `8f350cee79457768a1af25831fdb3d9539c115b4`, pushed/actual remote equal, isolated tree clean0/0. New unmounted conversion helper supports signed GBP/NZD direct and JPY/CAD/CHF inverse conversion to USD, exact rational amounts and one half-even rounding. It refuses missing/future/stale/unknown/gapped/crossed/mismatched or ambiguous equal-time quotes and retains bounded source references. USD remains identity. Full controller acceptance/completeness/source membership remains a prerequisite; this helper cannot authenticate client evidence or enable foreign settlement by itself.
