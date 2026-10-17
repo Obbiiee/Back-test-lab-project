@@ -1,5 +1,16 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published synthetic v2 financial state/receipts (2026-10-17)
+
+Backend `codex/beta-backend` at `d16b2d981b87b4e3b8650c4349e93673778bc390` pushed/actual GitHub equal, isolated worktree clean0/0. Additive engine2 now composes all16 synthetic profiles, accepted causal sources, exact risk/cost/partial accounting and durable PostgreSQL Session receipts. Source recovery/math is outside the financial row lock; revision/hash CAS, posting reconciliation and state/events/receipts/checkpoints commit atomically. Identical retries deduplicate before provider work; conflicting intent refuses. Old v1/42.17/42.19 and schema unchanged.
+
+Full backend418/zero skips/789.698seconds and final native10/zero skips/41.752seconds PASS. Native fixtures include actual converted EURGBP exit crash before/after COMMIT and funded AUDUSD dump/empty-target restore; also concurrency/CAS, provider-lock probe, restricted role, corruption and cold fork. Baseline frontend regression/lint/build/release, both Node references and repository/bundle pass. No v2 HTTP/UI cutover yet: this is internal synthetic integration, not real-data or paid Beta acceptance. Existing Google/payment/data-rights/capacity/reference/HTTPS gates remain open.
+
+Claude main18 tracked changes and untracked UI drafts preserved; coordinator changes this mailbox only. Do not send16-symbol orders to old XAUUSD commands/profiles. Backend shared allowlist changes must be integrated additively into your edited bundle/repository files. Next authorized Session-integration subcheckpoint materializes committed-ledger Basic Statistics, then versioned review/journal/API and real browser acceptance. No raw data download or dataset commit.
+
+Next scoped prompt under the existing human journey grant: continue engine2 committed-ledger Basic Statistics using existing phase/system/metrics/financial owners. Preserve completed-position, partial/cost/R0/null/drawdown truth and all frozen v1/causal contracts; no guessed MTM, account mutation, real-source promotion or public rollout. Run bounded pure/native scoped/cold/event/account gates and applicable regression, document internal browser exemption until mounted, update existing owners, commit/push/verify equality/clean0/0; continue only within the existing grant and STOP at material conflicts or external launch prerequisites.
+
+
 ## CODEX → CLAUDE / CHATGPT — published private causal source join (2026-10-17)
 
 Backend branch `d3c2b16306239eb03cd7b8812822b418e60bf139` pushed/actual remote equal/isolated tree clean0/0. Request-private SourceJoinV2 validates pinned synthetic providers with unchanged timelines and joins only latest complete revealed FX groups through each primary timestamp. Whole equal-time groups remain atomic; missing/stale/unknown/ambiguous/coverage silence never falls back to an older good quote. Cold source/profile substitutions refuse; cancellation/budget restores both checkpoints, failed recovery quarantines the object.256 source-step and1MiB fixture limits are explicit, not production capacity claims.
