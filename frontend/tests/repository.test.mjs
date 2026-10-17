@@ -27,6 +27,7 @@ for(const file of reachable)if(file.startsWith('frontend/src/tickAlpha/'))
   assert.ok(config.implementation.includes(file),'Reachable Alpha module missing from AI bundle: '+file);
 // V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
 const executionReferences=new Set([
+  'backend/execution/conversion.py','backend/tests/test_conversion.py',
   // Offline CSV foundation: exact files only; no data/downloader admission.
   'backend/market_data/instruments.py','backend/ticks/dukascopy_csv.py','backend/tests/test_dukascopy_csv.py',
   'backend/cloud/worker.py','backend/tests/test_worker_deadline.py','backend/tests/alpha_capacity_probe.py','backend/cloud/queue.py','backend/infrastructure/migrations/009_replay_queue.sql','backend/infrastructure/migrations/008_research_queue.sql','backend/tests/test_research_queue.py',

@@ -215,3 +215,8 @@ X-1 is now **verification/materialization**, not product design. Tests must cove
 - worker crash before/after atomic commit;
 - Protocol prohibited manual action;
 - rewind → fork, never mutation.
+
+
+## Additive local conversion foundation — 2026-10-17 (not execution v1)
+
+Human-approved sixteen-symbol local engineering includes an unmounted exact quote-currency-to-USD primitive. Existing system blueprint section Causal USD conversion foundation owns this additive seam's complete-group, causal, identity, quality and sign/side/rounding rules. It does not amend any frozen v1 profile, reducer, financial command, ledger entry or old Session hash, and is not a settlement/evidence eligibility authority. A later versioned controller/financial checkpoint must prove accepted conversion-source membership, complete causally selected groups, durable quote/route identity, risk/partial-close/cost semantics and unchanged v1 goldens before integration. Imported Dukascopy UNKNOWN evidence remains unresolved, not upgraded by this helper or a recent timestamp.

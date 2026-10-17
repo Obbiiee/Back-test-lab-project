@@ -41,12 +41,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "Local 16-instrument offline data foundation",
-  "CURRENT_IMPLEMENTATION_PHASE": "Local 16-instrument offline data foundation",
-  "NEXT_PHASE": "Causal quote-to-USD conversion contract and authored fixtures; no v1 cutover",
+  "LAST_COMPLETED_PHASE": "Unmounted causal USD conversion foundation",
+  "CURRENT_IMPLEMENTATION_PHASE": "Unmounted causal USD conversion foundation",
+  "NEXT_PHASE": "Versioned conversion controller integration design; frozen v1 unchanged",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "OFFLINE_FOUNDATION_VALIDATED_REAL_DATA_ACQUISITION_BLOCKED",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Local 16-instrument offline data foundation",
+  "CURRENT_PHASE_STATUS": "CONVERSION_FOUNDATION_VALIDATED_NO_ENGINE_CUTOVER",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Unmounted causal USD conversion foundation",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -63,7 +63,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Offline catalogue/CSV importer: backend365/zero skips/629.738seconds on fresh isolated native PostgreSQL; frontend baseline regression/lint/build/distribution, Node6x3, repository/bundle pass. Git closure follows; real month, rights, conversion integration and external Beta remain incomplete. Claude main UI preserved."
+  "LAST_COMPLETED_CHECKPOINT": "Causal USD conversion primitive: backend373/zero skips/580.562seconds, fresh isolated native PostgreSQL stopped after native recovery; frontend baseline regression/lint/build/release, Node6x3 and repository/bundle pass. Git closure follows; no engine/profile/API integration, real-data acquisition or external Beta acceptance."
 }
 ```
 

@@ -185,7 +185,8 @@
     "backend/infrastructure/migrations/009_replay_queue.sql",
     "backend/cloud/worker.py",
     "backend/market_data/instruments.py",
-    "backend/ticks/dukascopy_csv.py"
+    "backend/ticks/dukascopy_csv.py",
+    "backend/execution/conversion.py"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -254,7 +255,8 @@
     "backend/tests/test_research_queue.py",
     "backend/tests/test_worker_deadline.py",
     "backend/tests/alpha_capacity_probe.py",
-    "backend/tests/test_dukascopy_csv.py"
+    "backend/tests/test_dukascopy_csv.py",
+    "backend/tests/test_conversion.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

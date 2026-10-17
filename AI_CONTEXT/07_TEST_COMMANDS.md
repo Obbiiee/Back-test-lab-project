@@ -176,3 +176,6 @@ Local past-candle context: backend `python -B -m unittest tests.test_historical_
 
 
 Offline Dukascopy CSV: from backend, `python -B -m unittest discover -s tests -p test_dukascopy_csv.py -v`, then full zero-skip discovery/native recovery in isolated QA. Authored synthetic fixtures cover16 labels, exact prices, atomic ties across chunks, UTC/month/leap boundaries, malformed/oversized/nonfinite/crossed rows, deterministic resume, source mutation/cancellation without completion and actual CLI exclusive reports. Retain frontend regression/lint/build/release, independent Node vectors, repository/bundle/protected/Git gates. Existing system owner documents offline-only browser exemption; no profile/API/UI change or capacity benchmark implied.
+
+
+Unmounted conversion: backend `python -B -m unittest discover -s tests -p test_conversion.py -v`; authored signed direct/inverse, exact repeating rational, half-even, USD identity, missing/future/stale/unknown/crossed/gapped, pins/group integrity, ambiguous trusted/untrusted ties, equivalent-tie references, bounds and mutation isolation. Full zero-skip/native recovery, existing frontend/lint/build/release, Node goldens and repository/bundle/Git gates apply. Offline pure helper has no mounted browser surface; do not claim source authentication, financial integration or Beta eligibility from its vectors.
