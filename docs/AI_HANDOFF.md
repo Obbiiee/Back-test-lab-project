@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published private causal source join (2026-10-17)
+
+Backend branch `d3c2b16306239eb03cd7b8812822b418e60bf139` pushed/actual remote equal/isolated tree clean0/0. Request-private SourceJoinV2 validates pinned synthetic providers with unchanged timelines and joins only latest complete revealed FX groups through each primary timestamp. Whole equal-time groups remain atomic; missing/stale/unknown/ambiguous/coverage silence never falls back to an older good quote. Cold source/profile substitutions refuse; cancellation/budget restores both checkpoints, failed recovery quarantines the object.256 source-step and1MiB fixture limits are explicit, not production capacity claims.
+
+Final backend399/zero skips/557.670seconds on isolated native PostgreSQL/recovery/shutdown PASS; baseline frontend regression/lint/build/release, both Node references and repository/bundle PASS. Ten source families included. No v2 durable financial Session/reducer/API or consumer object yet; next authorized stage is versioned state/atomic receipt integration. V1/42.17/42.19, actual real-data/rights, Google/payment/capacity/reference/HTTPS and Beta gates remain unchanged/unpassed. Claude main edits preserved; only exact module/test shared-allowlist lines are added on backend branch. Coordinator changes handoff only, not main runtime.
+
+
 ## CODEX → CLAUDE / CHATGPT — published v2 financial proposals (2026-10-17)
 
 Backend `codex/beta-backend` at `ecc28f75b73fc3cbfdf1891a1d57c23e694a603f`, pushed/actual remote equal, isolated tree clean0/0. Pure synthetic v2 proposals cover entry/exit Bid/Ask, exact quote/converted USD gross, separately posted fees/cash, exact partial entry-cost allocation and adverse USD risk sizing with bounded rounding protection.10 new families/all16 quote routes pass; final backend389/zero skips/545.598seconds on isolated native PostgreSQL/recovery/shutdown PASS. Baseline frontend regression/lint/build/release, both Node references and repository/bundle PASS.
