@@ -41,12 +41,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "Additive v2 exact risk and settlement proposals",
-  "CURRENT_IMPLEMENTATION_PHASE": "Additive v2 exact risk and settlement proposals",
-  "NEXT_PHASE": "V2 accepted-source causal selection controller; then state and durable receipt integration",
+  "LAST_COMPLETED_PHASE": "V2 private accepted-source causal selection controller",
+  "CURRENT_IMPLEMENTATION_PHASE": "V2 private accepted-source causal selection controller",
+  "NEXT_PHASE": "V2 financial state reducer and atomic durable receipt integration",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "V2_FINANCIAL_PROPOSALS_VALIDATED_NO_DURABLE_CUTOVER",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Additive v2 exact risk and settlement proposals",
+  "CURRENT_PHASE_STATUS": "V2_PRIVATE_SOURCE_JOIN_VALIDATED_NO_DURABLE_CUTOVER",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2 private accepted-source causal selection controller",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -63,7 +63,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "V2 exact financial proposals: backend389/zero skips/545.598seconds on isolated native PostgreSQL/native recovery stopped normally; baseline frontend regression/lint/build/release, Node16 profile vectors and existing6x3, repository/bundle pass. Ten new financial families include all16 routes, exact signed cash/cost allocation/risk and rounding bounds. Git closure follows; no v2 mounted ledger or Beta acceptance."
+  "LAST_COMPLETED_CHECKPOINT": "Private synthetic source join: backend399/zero skips/557.670seconds with fresh isolated native PostgreSQL/native recovery stopped normally; baseline frontend regression/lint/build/release, both independent Node references and repository/bundle pass. Ten real accepted-synthetic-source families cover latest full groups/coverage, cold/source substitution, future mutation and rollback/quarantine. Git closure follows; no public view, v2 ledger or Beta acceptance."
 }
 ```
 

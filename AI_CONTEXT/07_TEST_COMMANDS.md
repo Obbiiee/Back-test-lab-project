@@ -185,3 +185,6 @@ V2 authored profile codec: backend `python -B -m unittest discover -s tests -p t
 
 
 V2 financial proposals: backend `python -B -m unittest discover -s tests -p test_finance_v2.py -v`; all16 authored routes, signed primary/FX price sides, exact/posted cash, no double entry fee, partial allocations, half-even ties, lot-floor/rounding-budget refusal, uncertainty/time/pins/grid/size. Full zero-skip/native backend, baseline frontend/lint/build/release, both Node vector references and repository/bundle/Git apply. Pure proposals are not durable fill acceptance; actual review/controller/receipt/native/browser gates remain before mounting.
+
+
+V2 private source join: backend `python -B -m unittest discover -s tests -p test_sources_v2.py -v` tests actual accepted synthetic timelines and bound profiles, latest causal groups across pages, equal-time ambiguity, interval coverage/current source-end silence, missing/stale/unknown without fallback, no future prices/handles/EOF, cold reproduction, private rollback and failed-recovery quarantine. Retain zero-skip full/native backend, full baseline frontend/lint/build/release, both Node references, repository/bundle and Git checks.256-step synthetic V1 recovery cap and1MiB join payload are explicit fixture limits, not production/capacity certification. No financial commit/API/consumer surface is mounted.

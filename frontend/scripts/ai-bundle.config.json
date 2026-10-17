@@ -188,7 +188,8 @@
     "backend/ticks/dukascopy_csv.py",
     "backend/execution/conversion.py",
     "backend/execution/profile_v2.py",
-    "backend/execution/finance_v2.py"
+    "backend/execution/finance_v2.py",
+    "backend/execution/sources_v2.py"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -262,7 +263,8 @@
     "backend/tests/test_profile_v2.py",
     "backend/tests/fixtures/execution_profiles_v2.json",
     "backend/tests/verify_profile_v2_vectors.mjs",
-    "backend/tests/test_finance_v2.py"
+    "backend/tests/test_finance_v2.py",
+    "backend/tests/test_sources_v2.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

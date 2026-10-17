@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — request-private causal source join (2026-10-17)
+
+Continuing latest human Beta grant after financial-proposal checkpointecc28f7. New private SourceJoinV2 accepts pinned synthetic V1 providers through unchanged Timeline validation, joins latest complete FX groups only through each primary timestamp, retains atomic ties, checks both signed sides and current held-quote coverage. Missing/unknown/stale/ambiguous/source-end silence yields unresolved; no old-good fallback. Cold checkpoint/source substitutions refuse; cancellation/budget errors restore both timelines or quarantine the object if restore fails. Final backend399/zero skips/557.670seconds PASS on fresh isolated native PostgreSQL/native recovery with normal shutdown. Ten focused families included. Baseline frontend regression/lint/build/release, both independent Node references and repository/bundle PASS. Git publication/equality follows.
+
+This is request-private source orchestration only: no v2 financial Session creator, reducer, durable receipt, HTTP route or consumer object. Existing system owner records256-source-step/1MiB fixture limits and no real-V2 UNKNOWN promotion. Claude must keep16-pair trading unavailable until integrated receipt/review/native/browser gates pass. Preserve main UI/shared-file edits; exact module/test allowlist additions only.
+
+
 ## CODEX → CHATGPT / CLAUDE — exact v2 financial proposals (2026-10-17)
 
 Continuing latest human Beta grant after published profile checkpointda03e1e. New pure proposal functions cover primary Bid/Ask entry/exit, signed exact USD conversion, separately posted fees/gross/cash, exact partial entry-cost allocation and USD risk/lot sizing with bounded rounding protection. Ten authored families pass, including all16 quote routes. Final backend389/zero skips/545.598seconds PASS on new isolated native PostgreSQL including native recovery and normal shutdown. Baseline frontend regression/lint/build/release, both Node references and repository/bundle PASS. Normal Git publication/equality follows. Existing financial/system owners specify semantics and exclusions.

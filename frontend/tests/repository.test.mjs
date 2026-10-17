@@ -27,6 +27,7 @@ for(const file of reachable)if(file.startsWith('frontend/src/tickAlpha/'))
   assert.ok(config.implementation.includes(file),'Reachable Alpha module missing from AI bundle: '+file);
 // V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
 const executionReferences=new Set([
+  'backend/execution/sources_v2.py','backend/tests/test_sources_v2.py',
   'backend/execution/finance_v2.py','backend/tests/test_finance_v2.py',
   'backend/execution/profile_v2.py','backend/tests/test_profile_v2.py','backend/tests/fixtures/execution_profiles_v2.json','backend/tests/verify_profile_v2_vectors.mjs',
   'backend/execution/conversion.py','backend/tests/test_conversion.py',
