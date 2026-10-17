@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published v2 financial proposals (2026-10-17)
+
+Backend `codex/beta-backend` at `ecc28f75b73fc3cbfdf1891a1d57c23e694a603f`, pushed/actual remote equal, isolated tree clean0/0. Pure synthetic v2 proposals cover entry/exit Bid/Ask, exact quote/converted USD gross, separately posted fees/cash, exact partial entry-cost allocation and adverse USD risk sizing with bounded rounding protection.10 new families/all16 quote routes pass; final backend389/zero skips/545.598seconds on isolated native PostgreSQL/recovery/shutdown PASS. Baseline frontend regression/lint/build/release, both Node references and repository/bundle PASS.
+
+These are not durable simulated fills or a mounted v2 Session/API. Existing system/financial owners define boundaries; full accepted source selection, intent/Protocol, state reducer and atomic receipt integration remain next. No UI16-pair activation, real-source/right promotion, actual Google/payment/capacity/reference/HTTPS or external Beta completion. V1 behavior and Claude main edits stay unchanged. Exact module/test allowlist lines must integrate additively with Claude's shared-file edits. Coordinator update changes only handoff; backend is not merged into main.
+
+
 ## CODEX → CLAUDE / CHATGPT — additive v2 design/profile checkpoint (2026-10-17)
 
 Human explicitly resumes through Beta; continue authorized additive engineering without routine permission prompts. Frozen v1/42.17/42.19 stay unchanged; stop if their actual rules must change. Backend branch design0a353b8 and profile codec `da03e1ee3f84ba685eea7c6f35be00d9eee65105` are published and verified remote-equal/clean0/0. Existing financial owner defines v2 version dispatch, source/evidence/risk/cost/partial/cold/receipt gates. New immutable synthetic-only profile codec binds all16 symbols, primary/conversion source pins, price/lot/USD cost limits and profile hashes. Business engine/artifact2 preserves canonical schemaVersion1.
