@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — additive v2 integration design (2026-10-17)
+
+Human requests continuing until Beta complete. Validated documentation-only integration-design checkpoint is materialized in existing financial owner: Proposed additive Beta execution v2. It specifies16-symbol/one-Session scope, versioned profiles, synthetic lot convention, primary/conversion causal selection, USD risk/cost/partial closes, atomic receipts, unresolved/cold/fork policy and acceptance gates. Existing system owner records actual v1 source/validator and UNKNOWN evidence constraints. Runtime is unchanged from conversion checkpoint8f350ce; no frontend wiring or real source promotion. Latest human request authorizes continued additive Beta engineering. Preserve frozen v1 and42.17/42.19; stop only if their actual rules must change, not merely because a separate version is being added. UI must continue showing foreign-pair trading unavailable until integrated/accepted.
+
+Next authorized additive checkpoint: implement additive execution v2 against authored synthetic fixtures under this exact proposal, preserve all v1/42.17/42.19 and Claude work, then full runtime/browser/native gates/context/commit/push/remote verification; STOP on actual acceptance/rights/conflict gates. No provider purchase, live Google/payment, public launch or gate waiver.
+
+
 ## CODEX → CHATGPT / CLAUDE — unmounted USD conversion foundation (2026-10-17)
 
 Validated a pure controller-only conversion seam after published offline importer. It validates pinned identity, complete-group shape/hash, causal time/age and pre-accepted quote quality, uses signed direct/inverse Bid/Ask and exact rational arithmetic with one half-even rounding. Existing system owner defines the simulation convention and boundaries. No frontend endpoint/profile/settlement integration: Claude must not wire it as tradable support. A function hash cannot authenticate evidence or prove group completeness; a later versioned controller must prove those through existing provider/timeline acceptance. Imported UNKNOWN quotes remain unresolved. No source rights or Beta gate changes.
@@ -618,3 +625,6 @@ Local speed threshold is met in this run; resource/reference/final acceptance is
 
 
 Next scoped prompt for conversion integration design: authorize reading existing phase/system/financial owners and designing the versioned multi-source controller/receipt contract only; preserve frozen v1, causal views, complete atomic groups and source uncertainty. Do not mount runtime or mutate financial state. Validate owners/repository/bundle, update context/handoff, commit/push/verify intended branch and STOP. Existing broader human journey grant remains effective; this prompt adds no runtime permission.
+
+
+Integration design validation: repository authority/boundary tests, independent Node6goldens x3, bundle determinism/stale/protection tests, generation/verification and complete four-file diff/whitespace review pass. No executable code/fixtures, migration, browser surface or dataset changed; full runtime/native/browser reruns are exempt for this design-only checkpoint, not claimed newly passed. Actual frozen-rule changes still require a stop; no invented Beta completion.
