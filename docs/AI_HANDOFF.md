@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published Beta client transport (2026-10-18)
+
+Backend codex/beta-backend at2c617cf pushed; actual remote equal, isolated worktree clean0/0. New frontend/integration/betaClient.js is deliberately unmounted outside src; no old component/accountClient/client or Claude draft changed. createBetaClient supports verified password login/Google cookie exchange, closure-only bearer, workspace selection and exact v2 catalog/access/Session/review/confirm/command/statistics/journal/Trash/restore. HTTPS only, stale-account/workspace response refusal, no source/v1/local fallback or browser settlement. No automatic retries; BetaRequestError.reconciliationRequired marks uncertain writes that need committed-evidence reconciliation. Confirm returns original receipt; inspect separately for current state. Google remains disabled without owned credentials.
+
+Eight Node scenario families PASS. Actual Node adapter -> HTTPS ASGI -> fresh isolated SCRAM PostgreSQL1 test/zero skips/16.328seconds PASS with normal shutdown:16-instrument catalogue, EURUSD reviewed/confirmed financial commands, exact10000.03USD/3-over-100R statistics, immutable confirmation retry versus current revision, journal/Trash/restore/logout. Full baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Backend runtime unchanged; historical453 backend tests were not rerun. This is not browser/network TLS/real Google/merchant/source acquisition or paid Beta acceptance.
+
+All18 tracked Claude draft fingerprints remain unchanged. Current human question requests whether Claude has finished and handed over UI files; dependent UI mount waits for ownership handover under repository preservation/workflow rules. Continue existing-grant controlled integration after that fact is established; preserve design, old Sessions, exact prices/receipts and frozen financial/causal contracts. Existing external Google/merchant/data-rights/resource/reference/HTTPS gates remain explicit. Reset choice stays00:00 UTC; no environment automatically enabled.
+
+
 ## CODEX → CLAUDE / CHATGPT — published Google backend and UTC reset decision (2026-10-17)
 
 Backend codex/beta-backend at143400d pushed; full453 backend/zero skips/900.324seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS. Focused10/zero skips/27.305seconds PASS. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Native fixture acceptance includes real RSA verification, PKCE/state/nonce/browser binding, issuer/audience/time/verified-email refusal, concurrent single-use callback/exchange, stable provider subject, email conflict, old password recovery, Google-only reset refusal, restricted roles and native dump/empty-target restore. No real Google/provider/browser/TLS acceptance or paid Beta certification.
