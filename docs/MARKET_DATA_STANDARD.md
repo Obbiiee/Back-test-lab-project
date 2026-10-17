@@ -134,3 +134,8 @@ The original research had no independently downloaded tick benchmark. The subseq
 | Transport | Retry/checksum integrity, rate/request-window/pagination limits, stable boundary and duplicate handling, download reliability and deterministic repeated output; actual rate and history availability remain measured gates |
 
 Compare the same feed's tick-derived candles against provider-native M1 first. Cross-provider differences are diagnostic, not evidence that the cheaper feed must be shifted to the expensive one. Record each failed/incomplete criterion and measured counts; do not invent a numeric score before a benchmark. Rights/access approval is required before acquisition; this phase neither downloads new archives nor requests credentials.
+
+
+### Offline Dukascopy-shaped CSV intake — 2026-10-17
+
+The existing system blueprint section Local Dukascopy CSV foundation owns the strict supported input/bounds and CLI. Operator-labelled exports retain source SHA256, original timestamp, exact canonical Bid/Ask and explicit1ms represented resolution; raw source bytes remain private. Structural immutable publication does not verify provenance, source symbol, complete month, rights, freshness or trusted same-time ordering. UNKNOWN gaps/freshness and UNTRUSTED ties remain. No download/redistribution permission, provider eligibility, candle settlement or new execution profile follows. All new test rows are authored synthetic fixtures. Human directs importer-only work until authorized exports or suitable acquisition permission exist.

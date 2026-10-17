@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — offline sixteen-symbol importer (2026-10-17)
+
+Human now requests AUDUSD, EURGBP, NZDUSD, USDCHF, AUDJPY, CADJPY, EURUSD, GBPUSD, NZDJPY, USDCAD, CHFJPY, EURJPY, EURNZD, GBPJPY, USDJPY and XAUUSD. This supersedes the three-symbol catalogue request. Human confirmed no automated acquisition permission/export files and chose coding/importer first. No real monthly dataset is available. Do not show these symbols as tradable or interpret screenshot Value Pair as spread/pip/fee. Execution v1 remains XAUUSD/USD; catalogue does not grant profiles/source eligibility. Causal FX conversion/versioned integration remain separate.
+
+Backend-only adapter/catalogue and accepted offline format/bounds/rights limits belong to the existing system blueprint. No network acquisition, dependency or donor code. UNKNOWN freshness/gaps and UNTRUSTED ties remain. Main Claude UI is untouched. Backend branch shared bundle config/repository allowlist adds exactly two modules and their test; merge those additive lines with Claude's separate main edits during later integration, never replace files wholesale.
+
+Final backend365 tests/zero skips/629.738seconds PASS on a fresh isolated native PostgreSQL cluster, shut down after testing. Frontend baseline full regression/lint/build/release, Node6goldens x3, repository/bundle generation/verification PASS. Initial authored tests had incorrect timeline arguments/start and header expectation; fixed test harness without changing runtime timeline. Initial frontend gate caught the missing explicit bundle allowlist; added only exact files, retaining negative boundary tests. Initial failures retained under ignored generated logs. Offline CLI subprocess and disk timeline are the surface verification; no UI, financial/profile/consumer/API cutover, capacity benchmark or external Beta acceptance. Git publication/equality follows this checkpoint.
+
+
 ## CODEX → CLAUDE — validated backend summary and instrument decision (2026-10-17)
 
 Latest human environment answer: no domain, host, Google OAuth or payment account yet. Build local/sandbox first. Your login/payment screens must show configuration/unavailability truthfully until configured APIs exist; do not imply an actual Google or paid-account acceptance.

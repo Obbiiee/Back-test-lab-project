@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest human data/instrument grant (2026-10-17): the supplied screenshots expand the requested local set to AUDUSD, EURGBP, NZDUSD, USDCHF, AUDJPY, CADJPY, EURUSD, GBPUSD, NZDJPY, USDCAD, CHFJPY, EURJPY, EURNZD, GBPJPY, USDJPY and XAUUSD, one common calendar month from Dukascopy. September2026 is the candidate period, not an acquired dataset. The human subsequently confirmed no written automation permission or official export files are available and explicitly directed continuing coding/importer first, without bulk acquisition. Proceed with bounded offline CSV importer, registry and causal conversion primitives/fixtures; preserve all frozen engine/financial/sidecar semantics and existing Sessions. No interpretation of screenshot Value Pair as spread/pip/fee, no dataset-rights promotion, synthetic-to-real relabelling, raw-data commit, public rollout or purchase. Existing rights/resource/reference/HTTPS/identity/payment acceptance remains open.
+
 Latest human environment decision (2026-10-17): no domain, VPS/hosting, Google OAuth or payment-provider account is available; prepare local/sandbox first. This narrows the current paid-Beta journey to safe engineering and sandbox validation until those operator prerequisites exist. No service procurement, live payment, fabricated Google login, public deployment or release-gate waiver. Existing full-source rights/quality/resource/reference blockers remain explicit.
 
 Latest human instrument decision (2026-10-17): explicitly approved XAUUSD, EURUSD and GBPUSD first, with USD accounts, via the change recorded in existing Decision Register CR-BETA-20261017. This authorizes designing/validating the additive profile extension, not fabricating provider eligibility or rewriting existing XAUUSD Session identity. Non-USD conversion remains unsupported. Codex works in the separate beta-backend worktree; Claude UI on laptop main remains preserved.
@@ -39,20 +41,20 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "I-4/I-2 identity composition",
-  "CURRENT_IMPLEMENTATION_PHASE": "Paid-Beta local/sandbox Session summary",
-  "NEXT_PHASE": "Instrument profile foundation (existing Phases23/24/41–44 subset)",
+  "LAST_COMPLETED_PHASE": "Local 16-instrument offline data foundation",
+  "CURRENT_IMPLEMENTATION_PHASE": "Local 16-instrument offline data foundation",
+  "NEXT_PHASE": "Causal quote-to-USD conversion contract and authored fixtures; no v1 cutover",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "SUMMARY_VALIDATED_BACKEND_BRANCH_CAPACITY_GATE_FAILED",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Paid-Beta local/sandbox Session summary",
+  "CURRENT_PHASE_STATUS": "OFFLINE_FOUNDATION_VALIDATED_REAL_DATA_ACQUISITION_BLOCKED",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Local 16-instrument offline data foundation",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
-    "Existing data/instrument phases23/24/41–44 subset",
-    "Existing identity phases20–22/25/26/29 subset",
+    "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
+    "Existing identity phases20\u201322/25/26/29 subset",
     "Existing Basic Statistics R-5/R-6/27 subset",
-    "Existing entitlement/payment phases51–53 sandbox subset",
+    "Existing entitlement/payment phases51\u201353 sandbox subset",
     "Existing capacity/recovery/internal acceptance gates",
-    "External L-3–L-8 after operator prerequisites and separate launch approval"
+    "External L-3\u2013L-8 after operator prerequisites and separate launch approval"
   ],
   "EXECUTION_MODE": "PAID_BETA_LOCAL_SANDBOX_WITH_SEPARATE_CLAUDE_UI",
   "AUTO_ADVANCE_AFTER_PASS": true,
@@ -61,7 +63,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Bounded read-only Session summary validated on isolated codex/beta-backend: 356 backend methods/zero skips, frontend baseline regression/lint/build/distribution, Node6x3 and repository/bundle checks pass. Git publication follows; Claude UI remains unreviewed/uncommitted on laptop main. Existing capacity/resource/reference/HTTPS and final release acceptance remain incomplete."
+  "LAST_COMPLETED_CHECKPOINT": "Offline catalogue/CSV importer: backend365/zero skips/629.738seconds on fresh isolated native PostgreSQL; frontend baseline regression/lint/build/distribution, Node6x3, repository/bundle pass. Git closure follows; real month, rights, conversion integration and external Beta remain incomplete. Claude main UI preserved."
 }
 ```
 
