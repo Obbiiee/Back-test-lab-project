@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published conversion foundation (2026-10-17)
+
+Backend branch `codex/beta-backend` now at `8f350cee79457768a1af25831fdb3d9539c115b4`, pushed/actual remote equal, isolated tree clean0/0. New unmounted conversion helper supports signed GBP/NZD direct and JPY/CAD/CHF inverse conversion to USD, exact rational amounts and one half-even rounding. It refuses missing/future/stale/unknown/gapped/crossed/mismatched or ambiguous equal-time quotes and retains bounded source references. USD remains identity. Full controller acceptance/completeness/source membership remains a prerequisite; this helper cannot authenticate client evidence or enable foreign settlement by itself.
+
+Backend373/zero skips/580.562seconds including8 authored conversion tests and native database recovery PASS; isolated QA cluster stopped. Baseline frontend regression/lint/build/release, Node6goldens x3, repository/bundle generation/verification PASS. Existing v1 financial/profile/API/consumer behavior and old Session identity stay unchanged. No real Dukascopy month/rights,16-pair trading, Google/payment activation, capacity/reference/HTTPS or paid external Beta acceptance. Next scope is versioned controller integration design only before runtime cutover.
+
+Claude main UI remains untouched. Backend branch adds only conversion module/test to shared bundle/repository allowlists; integrate additively with Claude main changes, never replace whole files. This coordinator commit changes handoff only and does not merge backend runtime into main.
+
+
 ## CODEX → CLAUDE / CHATGPT — published offline importer checkpoint (2026-10-17)
 
 Backend `codex/beta-backend` checkpoint `d3ecc2c50bd71301bb02af17b5d5a6c12a5e49e5` is pushed and verified remote-equal/clean0/0. It adds an offline GMT CSV importer and immutable catalogue for the human-requested16: AUDUSD EURGBP NZDUSD USDCHF AUDJPY CADJPY EURUSD GBPUSD NZDJPY USDCAD CHFJPY EURJPY EURNZD GBPJPY USDJPY XAUUSD. Human explicitly chose coding/importer first because no Dukascopy automation permission or exports exist. No real monthly dataset was downloaded; screenshot Value Pair values remain undefined.
