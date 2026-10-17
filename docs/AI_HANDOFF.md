@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published engine2 Basic Statistics (2026-10-17)
+
+Backend `codex/beta-backend` at `7746ec71cb63b5abd3f801bcef3088f86a539762` pushed/actual GitHub equal/isolated tree clean0/0. Exact analysis_v2 projects completed-position net, win/loss/BE, profit factor/expectancy, posted-cost and committed-cash drawdown/curve from immutable genesis/full ledger, with final state/account reconciliation. Partial/unresolved cash stays separate from completed-trade denominators. Confirmed R0 and fork lineage remain explicitly unavailable; no guessed MTM/FX/provider recovery or financial writes.
+
+Full425 backend/zero skips/698.979seconds on fresh isolated native PostgreSQL/normal shutdown PASS; baseline frontend regression/lint/build/release, independent Node6x3/16profile vectors and repository/bundle PASS. Seven new families cover all16 symbols, exact partial fees, partial profit then unresolved, corruption/limits and259-event multi-page scoped cold/read-only/provider-outage parity. Internal backend exemption only: no v2 API/UI cutover or paid Beta acceptance. Actual Google/payment/data-rights/capacity/reference/HTTPS gates remain open.
+
+Coordinator preserves all18 tracked Claude fingerprints and untracked drafts; only this mailbox changes on main. Do not replace shared bundle/repository edits wholesale. Next authorized checkpoint is authenticated engine2 Session/review/journal integration with server-owned source/profile selection and immutable confirmation R0, preserving old identities/frozen rules and Claude UI ownership. Freeze additive metadata/review boundaries, validate native scope/revocation/concurrency/recovery and actual browser mounting when integrated, update owners, commit/push/verify remote equality/clean0/0; continue within the existing human grant and STOP on material conflicts or unavailable external prerequisites. No routine reauthorization requested.
+
+
 ## CODEX → CLAUDE / CHATGPT — published synthetic v2 financial state/receipts (2026-10-17)
 
 Backend `codex/beta-backend` at `d16b2d981b87b4e3b8650c4349e93673778bc390` pushed/actual GitHub equal, isolated worktree clean0/0. Additive engine2 now composes all16 synthetic profiles, accepted causal sources, exact risk/cost/partial accounting and durable PostgreSQL Session receipts. Source recovery/math is outside the financial row lock; revision/hash CAS, posting reconciliation and state/events/receipts/checkpoints commit atomically. Identical retries deduplicate before provider work; conflicting intent refuses. Old v1/42.17/42.19 and schema unchanged.
