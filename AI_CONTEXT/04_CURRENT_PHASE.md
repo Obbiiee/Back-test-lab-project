@@ -1,5 +1,8 @@
 # Operational phase authority
 
+Latest human sandbox reset decision (2026-10-17): Free daily allowance resets at00:00 UTC. This resolves the pending reset preference for the opt-in v2 sandbox. No implicit environment activation, commercial pricing, Google credential or live-payment approval follows.
+
+
 Latest human data/instrument grant (2026-10-17): the supplied screenshots expand the requested local set to AUDUSD, EURGBP, NZDUSD, USDCHF, AUDJPY, CADJPY, EURUSD, GBPUSD, NZDJPY, USDCAD, CHFJPY, EURJPY, EURNZD, GBPJPY, USDJPY and XAUUSD, one common calendar month from Dukascopy. September2026 is the candidate period, not an acquired dataset. The human subsequently confirmed no written automation permission or official export files are available and explicitly directed continuing coding/importer first, without bulk acquisition. Proceed with bounded offline CSV importer, registry and causal conversion primitives/fixtures; preserve all frozen engine/financial/sidecar semantics and existing Sessions. No interpretation of screenshot Value Pair as spread/pip/fee, no dataset-rights promotion, synthetic-to-real relabelling, raw-data commit, public rollout or purchase. Existing rights/resource/reference/HTTPS/identity/payment acceptance remains open.
 
 Latest human environment decision (2026-10-17): no domain, VPS/hosting, Google OAuth or payment-provider account is available; prepare local/sandbox first. This narrows the current paid-Beta journey to safe engineering and sandbox validation until those operator prerequisites exist. No service procurement, live payment, fabricated Google login, public deployment or release-gate waiver. Existing full-source rights/quality/resource/reference blockers remain explicit.
@@ -41,12 +44,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "Verified v2 sandbox access and transport composition",
-  "CURRENT_IMPLEMENTATION_PHASE": "Verified v2 sandbox access and transport composition",
-  "NEXT_PHASE": "Google identity adapter and v2 client/browser integration acceptance",
+  "LAST_COMPLETED_PHASE": "Opt-in Google identity adapter",
+  "CURRENT_IMPLEMENTATION_PHASE": "Google identity adapter with explicit disabled configuration",
+  "NEXT_PHASE": "Claude v2 client and Google browser integration acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "VALIDATED_OPT_IN_V2_SANDBOX_API_NO_FRONTEND_CUTOVER",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Verified v2 sandbox access and transport composition",
+  "CURRENT_PHASE_STATUS": "VALIDATED_GOOGLE_FIXTURES_NO_LIVE_PROVIDER_OR_UI_ACCEPTANCE",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Google identity adapter with explicit disabled configuration",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -63,7 +66,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Full443 backend/zero skips/723.340seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS; focused11/zero skips/66.680seconds PASS before the final pure configuration test, which passed in full discovery. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Twelve new families prove explicit disabled default/config/key separation, HTTPS ASGI scope/TLS/source boundaries, exact0.03USD/3/100R/journal/receipt flow, v2 account-wide saved/activation races, Trash/restore/retention, signed test-event replay/order/expiry, UTC/WIB boundaries/policy pins, deactivation serialization, separate API/operator roles and native empty-target restore. No actual Google/merchant/provider webhook/checkout, acquired month, frontend/browser cutover or paid Beta acceptance."
+  "LAST_COMPLETED_CHECKPOINT": "Full453 backend/zero skips/900.324seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS; focused10/zero skips/27.305seconds PASS. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Actual RSA verification with authored Google-shaped fixtures covers PKCE/state/browser/nonce/signature/issuer/audience/time/verified-email refusal, single-use concurrent callback/exchange, stable subject/email conflict, old password recovery compatibility, Google-only reset refusal, restricted roles and native empty-target dump/restore. No owned Google credentials, real consent/browser/TLS acceptance, Claude UI mount, merchant/data acquisition or paid Beta acceptance."
 }
 ```
 

@@ -199,7 +199,10 @@
     "backend/infrastructure/migrations/010_v2_research.sql",
     "backend/cloud/sandbox_access.py",
     "backend/cloud/research_v2.py",
-    "backend/infrastructure/migrations/011_v2_sandbox_access.sql"
+    "backend/infrastructure/migrations/011_v2_sandbox_access.sql",
+    "backend/identity/google.py",
+    "backend/identity/google_store.py",
+    "backend/infrastructure/migrations/012_google_identity.sql"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -280,7 +283,8 @@
     "backend/tests/fixtures/execution_v2.json",
     "backend/tests/test_analysis_v2.py",
     "backend/tests/test_research_v2.py",
-    "backend/tests/test_sandbox_v2.py"
+    "backend/tests/test_sandbox_v2.py",
+    "backend/tests/test_google_identity.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
@@ -289,7 +293,8 @@
     "frontend/package.json",
     "OPEN_SOURCE_NOTICES.md",
     "frontend/scripts/regression.mjs",
-    "frontend/scripts/release-audit.mjs"
+    "frontend/scripts/release-audit.mjs",
+    "docs/licenses/httpx-oauth-0.17.0-LICENSE.txt"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

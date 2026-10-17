@@ -20,6 +20,7 @@ class User(BaseModel):
     is_active: bool
     is_superuser: bool
     is_verified: bool
+    password_enabled: bool = True
 
 
 class Token(BaseModel):
@@ -62,7 +63,7 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
     async def create(self, create_dict):
         try:
             async with connection(self.dsn) as db:
-                row = await (await db.execute("INSERT INTO btl.users VALUES (%s,%s,%s,true,false,false) RETURNING *",
+                row = await (await db.execute("INSERT INTO btl.users(id,email,hashed_password,is_active,is_superuser,is_verified) VALUES (%s,%s,%s,true,false,false) RETURNING *",
                     (uuid.uuid4(), create_dict["email"].lower(), create_dict["hashed_password"]))).fetchone()
                 await audit(db, "USER_REGISTERED", row["id"])
                 return User(**row)
@@ -73,6 +74,8 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
         allowed = {"email", "hashed_password", "is_active", "is_superuser", "is_verified"}
         if not update_dict or not set(update_dict).issubset(allowed):
             raise ValueError("Unsupported identity update")
+        if "hashed_password" in update_dict and not user.password_enabled:
+            raise exceptions.InvalidResetPasswordToken()
         values = dict(update_dict)
         if "email" in values:
             values["email"] = values["email"].lower()
