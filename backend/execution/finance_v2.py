@@ -51,7 +51,7 @@ def _quote(p, group, side, opening, as_of):
         require(all(row[k] == source[k] for k in ("datasetId", "datasetVersion", "providerId", "feedId"))
                 and row["instrumentId"] == source["feedInstrumentId"], "identity", "REFUSED_V2_PRIMARY_IDENTITY")
         q = row["quality"]
-        require(q["quote"] == "VALID" and q["freshness"] == "CONFIRMED" and q["gapBefore"] in ("NONE", "KNOWN_SESSION_CLOSED"),
+        require(q["quote"] == "VALID" and q["freshness"] == "CONFIRMED" and q["gapBefore"] in ("NONE", "KNOWN_SESSION_CLOSED") and q["duplicateOf"] is None,
                 "quality", "UNRESOLVED_V2_PRIMARY_QUALITY")
         price(row["bid"], p)
         price(row["ask"], p)
@@ -105,6 +105,23 @@ def allocate_entry_cost(posted_cost, original_lots, closed_before, closing_lots,
     allocated = cost - prior if before + closing == total else cost * closing / total
     return rational(allocated)
 
+
+
+def risk_for_quantity(profile, side, entry_price, stop_price, lots, as_of_ns, *, conversion_group=None):
+    """Actual requested-size estimate; no implied budget or quantity override."""
+    p = _profile(profile)
+    size = quantity(lots, p)
+    uint(as_of_ns)
+    require(side in ("LONG", "SHORT"), "side")
+    entry, stop = price(entry_price, p), price(stop_price, p)
+    require((1 if side == "LONG" else -1) * (entry - stop) > 0, "stop", "REFUSED_GEOMETRY")
+    loss_quote = -abs(entry - stop) * exact(p["contractSize"], "contract")
+    loss, conversion = _usd(loss_quote, p, as_of_ns, conversion_group)
+    fee = exact(p["commissionPerLotSide"], "fee")
+    return dict(artifact="BTL-V2-QUANTITY-RISK-PROPOSAL-1", model="AUTHORED_SYNTHETIC_ONLY", profileHash=profile.profile_hash,
+                timeNs=as_of_ns, quantity=text(size), plannedLossUsdExact=rational(size * (-loss + 2 * fee)),
+                hypotheticalPostedRiskUsd=text(-Fraction(money(loss * size, p["moneyScale"])) + 2 * Fraction(money(fee * size, p["moneyScale"]))),
+                conversion=conversion, guarantee="NOT_A_FILL_OR_FUTURE_RATE_GUARANTEE")
 
 def planned_risk(profile, side, entry_price, stop_price, budget_usd, as_of_ns, *, conversion_group=None):
     p = _profile(profile)

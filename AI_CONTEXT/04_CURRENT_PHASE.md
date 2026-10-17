@@ -41,12 +41,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V2 private accepted-source causal selection controller",
-  "CURRENT_IMPLEMENTATION_PHASE": "V2 private accepted-source causal selection controller",
-  "NEXT_PHASE": "V2 financial state reducer and atomic durable receipt integration",
+  "LAST_COMPLETED_PHASE": "V2 synthetic financial state and durable receipt integration",
+  "CURRENT_IMPLEMENTATION_PHASE": "V2 synthetic financial state and durable receipt integration",
+  "NEXT_PHASE": "V2 committed-ledger Basic Statistics within authenticated Session integration",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "V2_PRIVATE_SOURCE_JOIN_VALIDATED_NO_DURABLE_CUTOVER",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2 private accepted-source causal selection controller",
+  "CURRENT_PHASE_STATUS": "V2_SYNTHETIC_STATE_AND_NATIVE_RECEIPTS_VALIDATED_NO_PUBLIC_CUTOVER",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2 synthetic financial state and durable receipt integration",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -59,11 +59,11 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "EXECUTION_MODE": "PAID_BETA_LOCAL_SANDBOX_WITH_SEPARATE_CLAUDE_UI",
   "AUTO_ADVANCE_AFTER_PASS": true,
   "ALLOW_SCOPE_EXPANSION": false,
-  "TARGET_CHECKPOINT": "Complete the approved local/sandbox paid-Beta subset through separately validated checkpoints: read-only Session summaries, XAUUSD/EURUSD/GBPUSD USD-account instrument foundation, Google identity and provider-independent entitlement/payment sandbox, Basic Statistics and capacity/recovery. Preserve pending Claude UI, old Sessions, private data and frozen causal/financial contracts. Existing Alpha resource/reference/HTTPS and external-rights gates remain unpassed; no procurement, live charge or external deployment.",
+  "TARGET_CHECKPOINT": "Complete the approved local/sandbox paid-Beta subset through separately validated checkpoints: read-only Session summaries, requested16-symbol synthetic USD-account instrument/conversion foundation plus offline-import preparation, Google identity and provider-independent entitlement/payment sandbox, Basic Statistics and capacity/recovery. Preserve pending Claude UI, old Sessions, private data and frozen causal/financial contracts. Existing Alpha resource/reference/HTTPS and external-rights gates remain unpassed; no procurement, live charge or external deployment.",
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Private synthetic source join: backend399/zero skips/557.670seconds with fresh isolated native PostgreSQL/native recovery stopped normally; baseline frontend regression/lint/build/release, both independent Node references and repository/bundle pass. Ten real accepted-synthetic-source families cover latest full groups/coverage, cold/source substitution, future mutation and rollback/quarantine. Git closure follows; no public view, v2 ledger or Beta acceptance."
+  "LAST_COMPLETED_CHECKPOINT": "Synthetic v2 state/controller/native receipts: full backend418/zero skips/789.698seconds on fresh isolated PostgreSQL; final native10/zero skips/41.752seconds after strengthening real financial-crash and funded dump/restore fixtures. Baseline frontend regression/lint/build/release, both Node references and repository/bundle pass. No HTTP/browser cutover, actual market source or Beta acceptance. Git closure follows."
 }
 ```
 

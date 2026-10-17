@@ -164,4 +164,20 @@ class SourcesV2Tests(unittest.TestCase):
         with self.assertRaises(ValueError):SourceJoinV2(p,primary,start_ns="100")
 
 
+    def test_risk_basis_uses_acknowledged_clock_and_cold_source_only(self):
+        p,primary,fx=setup()
+        join=SourceJoinV2(p,primary,start_ns="100",conversion_provider=fx)
+        join.reveal("106",join.checkpoint())
+        basis=join.risk_basis(join.checkpoint())
+        self.assertEqual(basis["timeNs"],"106")
+        self.assertEqual(basis["conversionGroup"]["timeNs"],"105")
+        self.assertNotIn('"999"',json.dumps(basis))
+        cold=SourceJoinV2.resume(p,primary,basis["checkpoint"],conversion_provider=fx)
+        self.assertEqual(cold.risk_basis(cold.checkpoint()),basis)
+        bad=deepcopy(basis["checkpoint"]);bad["profileHash"]="0"*64
+        before=cold.checkpoint()
+        with self.assertRaisesRegex(ContractError,"STALE_CHECKPOINT"):cold.risk_basis(bad)
+        self.assertEqual(cold.checkpoint(),before)
+
+
 if __name__ == "__main__":unittest.main()

@@ -175,3 +175,25 @@ class SourceJoinV2:
                 self.__broken = True
                 raise ContractError("REFUSED_V2_RECOVERY_FAILED", "controller") from error
             raise
+
+    def risk_basis(self, expected_checkpoint, *, cancellation=None):
+        """Private FX proof at already acknowledged primary clock; no future read."""
+        before = self.checkpoint()
+        require(expected_checkpoint == before, "checkpoint", "REFUSED_V2_STALE_CHECKPOINT")
+        cancel = cancellation or Cancellation()
+        cancel.check()
+        try:
+            as_of = self.__primary.cursor["throughNs"]
+            group, status = self.__selection(as_of, cancel)
+            result = dict(schemaVersion=1, artifact="BTL-V2-SOURCE-RISK-1", profileHash=self.__profile.profile_hash,
+                          timeNs=as_of, conversionGroup=group, conversionStatus=status, checkpoint=self.checkpoint())
+            canonical_bytes(result)
+            cancel.check()
+            return deepcopy(result)
+        except BaseException:
+            try:
+                self.__restore(before)
+            except BaseException as error:
+                self.__broken = True
+                raise ContractError("REFUSED_V2_RECOVERY_FAILED", "controller") from error
+            raise

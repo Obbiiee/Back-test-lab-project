@@ -58,7 +58,7 @@ def convert_usd(amount, currency, as_of_ns, *, pin=None, group=None, money_scale
             seen.add(row["eventId"])
             quality = row["quality"]
             require(quality["quote"] == "VALID" and quality["freshness"] == "CONFIRMED"
-                    and quality["gapBefore"] in ("NONE", "KNOWN_SESSION_CLOSED"),
+                    and quality["gapBefore"] in ("NONE", "KNOWN_SESSION_CLOSED") and quality["duplicateOf"] is None,
                     "quality", "UNRESOLVED_FX_QUALITY")
         require(make_group(rows, pin["datasetVersion"]) == group, "group", "UNRESOLVED_FX_GROUP")
         require(len({(row["bid"], row["ask"]) for row in rows}) == 1,

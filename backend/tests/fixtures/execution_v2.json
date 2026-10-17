@@ -1,0 +1,848 @@
+{
+  "schemaVersion": 1,
+  "artifact": "BTL-AUTHORED-EXECUTION-VECTORS-2",
+  "label": "SYNTHETIC ONLY; literal financial expectations before reducer implementation",
+  "scenes": [
+    {
+      "name": "long-manual-AUDUSD",
+      "symbol": "AUDUSD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": null,
+      "expected": {
+        "balance": "11000",
+        "realizedGross": "1000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-EURGBP",
+      "symbol": "EURGBP",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "12000",
+        "realizedGross": "2000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-NZDUSD",
+      "symbol": "NZDUSD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": null,
+      "expected": {
+        "balance": "11000",
+        "realizedGross": "1000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-USDCHF",
+      "symbol": "USDCHF",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-AUDJPY",
+      "symbol": "AUDJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-CADJPY",
+      "symbol": "CADJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-EURUSD",
+      "symbol": "EURUSD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": null,
+      "expected": {
+        "balance": "11000",
+        "realizedGross": "1000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-GBPUSD",
+      "symbol": "GBPUSD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": null,
+      "expected": {
+        "balance": "11000",
+        "realizedGross": "1000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-NZDJPY",
+      "symbol": "NZDJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-USDCAD",
+      "symbol": "USDCAD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-CHFJPY",
+      "symbol": "CHFJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-EURJPY",
+      "symbol": "EURJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-EURNZD",
+      "symbol": "EURNZD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "12000",
+        "realizedGross": "2000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-GBPJPY",
+      "symbol": "GBPJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-USDJPY",
+      "symbol": "USDJPY",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "10500",
+        "realizedGross": "500",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "long-manual-XAUUSD",
+      "symbol": "XAUUSD",
+      "side": "LONG",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "9",
+          "10"
+        ],
+        [
+          110,
+          "9",
+          "10"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": null,
+      "expected": {
+        "balance": "10001",
+        "realizedGross": "1",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    },
+    {
+      "name": "short-loss-USDJPY",
+      "symbol": "USDJPY",
+      "side": "SHORT",
+      "quantity": "0.01",
+      "initialBalance": "10000",
+      "primaryRows": [
+        [
+          100,
+          "10",
+          "11"
+        ],
+        [
+          110,
+          "10",
+          "11"
+        ],
+        [
+          120,
+          "11",
+          "12"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "2",
+          "2"
+        ],
+        [
+          110,
+          "2",
+          "2"
+        ],
+        [
+          120,
+          "2",
+          "2"
+        ]
+      ],
+      "expected": {
+        "balance": "9000",
+        "realizedGross": "-1000",
+        "commission": "0",
+        "status": "CLOSED",
+        "simulatedFills": 2
+      }
+    }
+  ],
+  "additional": {
+    "partialFees": {
+      "symbol": "EURUSD",
+      "quantity": "1",
+      "feePerLotSide": "3.5",
+      "closingLots": [
+        "0.33",
+        "0.33",
+        "0.34"
+      ],
+      "balances": [
+        "42995.34",
+        "75994.18",
+        "109992.99"
+      ],
+      "entryCostAllocationRatios": [
+        [
+          "231",
+          "200"
+        ],
+        [
+          "231",
+          "200"
+        ],
+        [
+          "119",
+          "100"
+        ]
+      ],
+      "expected": {
+        "balance": "109992.99",
+        "realizedGross": "100000",
+        "commission": "7.01",
+        "status": "CLOSED"
+      }
+    },
+    "protocol": {
+      "symbol": "EURGBP",
+      "entry": "1.1",
+      "sl": "1.099",
+      "tp": "1.102",
+      "riskPercent": "1",
+      "rr": "2",
+      "quantity": "0.8",
+      "primaryRows": [
+        [
+          100,
+          "1.1001",
+          "1.1002"
+        ],
+        [
+          110,
+          "1.0998",
+          "1.1"
+        ],
+        [
+          120,
+          "1.102",
+          "1.1022"
+        ]
+      ],
+      "conversionRows": [
+        [
+          100,
+          "1.25",
+          "1.25"
+        ],
+        [
+          110,
+          "1.25",
+          "1.25"
+        ],
+        [
+          120,
+          "1.25",
+          "1.25"
+        ]
+      ],
+      "expected": {
+        "balance": "10200",
+        "realizedGross": "200",
+        "commission": "0",
+        "status": "CLOSED"
+      }
+    },
+    "unavailableFx": {
+      "symbol": "EURGBP",
+      "expected": {
+        "balance": "10000",
+        "realizedGross": "0",
+        "commission": "0",
+        "status": "UNRESOLVED",
+        "reason": "UNRESOLVED_FX_COVERAGE"
+      }
+    },
+    "ambiguousPrimary": {
+      "symbol": "EURUSD",
+      "expected": {
+        "balance": "10000",
+        "realizedGross": "0",
+        "commission": "0",
+        "status": "UNRESOLVED"
+      }
+    }
+  }
+}

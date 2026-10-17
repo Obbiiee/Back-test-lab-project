@@ -3432,3 +3432,8 @@ Ten authored source families use real SyntheticTickProvider acceptance, source-b
 
 
 Private-source join acceptance: backend399/zero skips/557.670seconds PASS on fresh isolated native PostgreSQL, native recovery and normal shutdown. Ten source families included; all existing financial/identity/causal regressions preserved. Baseline frontend full regression/lint/build/release, both independent Node references and repository/bundle pass. Normal Git publication/equality closes only the unmounted source-join subcheckpoint. No v1/42.17/42.19 change, real-provider eligibility, source rights, durable-v2/API/browser or Beta completion follows.
+
+
+### Synthetic v2 state and receipt integration - 2026-10-17
+
+The existing financial owner records the additive engine2 state/controller/native receipt family, preserving all v1 and frozen42.17/42.19. It reuses opaque tick tables with strict version validation. Request-private source recovery/conversion precedes a short Session row-lock/CAS transaction; receipt dedup precedes provider work. Event cash/gross/fee postings reconcile with state, while fork and cold recovery retain immutable profile/source identity. Authored literal all16-symbol outcomes and native crash/concurrency/restricted-role/backup gates are required. No public Session dispatch, consumer future access, real-source eligibility, UI acceptance, deployment or paid Beta completion follows. The next checkpoint must compose verified identity/entitlement, versioned Session review/journal and browser acceptance before mounting.
