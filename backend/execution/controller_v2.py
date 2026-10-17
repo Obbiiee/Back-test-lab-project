@@ -19,8 +19,9 @@ class ExecutionControllerV2:
         self.__store.create(scope,state,cp)
         return deepcopy(state)
 
-    def apply(self,scope,raw):
+    def apply(self,scope,raw,*,proposal_check=None):
         command=command_wire(raw)
+        require(proposal_check is None or callable(proposal_check) and command["kind"]=="OPEN","proposalCheck")
         if command["kind"]=="FORK":return self.__store.fork(scope,command)
         stored,prior=self.__store.prepare(scope,command)
         if prior is not None:return prior
@@ -38,6 +39,7 @@ class ExecutionControllerV2:
             next_cp=frame["checkpoint"]
             replay=dict(throughNs=frame["throughNs"],exhaustedThroughBoundary=frame["exhaustedThroughBoundary"])
         elif command["kind"]=="OPEN":next_cp=basis["checkpoint"]
+        if proposal_check is not None:proposal_check(deepcopy(proposed))
         # Source acceptance/recovery/math is outside the financial row lock.
         state_hash,cp_hash=content_hash(state),content_hash(cp)
         def operation(live,checkpoint):

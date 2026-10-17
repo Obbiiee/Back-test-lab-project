@@ -197,3 +197,14 @@ class SourceJoinV2:
                 self.__broken = True
                 raise ContractError("REFUSED_V2_RECOVERY_FAILED", "controller") from error
             raise
+
+    def past_primary(self,expected_checkpoint,maximum=64):
+        """Controller display projection of already revealed groups only."""
+        require(type(maximum) is int and 1<=maximum<=64,"maximum")
+        before=self.checkpoint()
+        require(before==expected_checkpoint,"checkpoint","REFUSED_V2_STALE_CHECKPOINT")
+        end=int(self.__primary.cursor["nextGroupIndex"])
+        groups=self.__primary.read_revealed(str(max(0,end-maximum)),min(maximum,end)) if end else []
+        canonical_bytes(dict(schemaVersion=1,artifact="BTL-V2-PAST-DISPLAY-1",groups=groups))
+        require(self.checkpoint()==before,"displayCheckpoint")
+        return deepcopy(groups)

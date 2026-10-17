@@ -147,23 +147,27 @@ class PostgresExecutionStoreV2:
 
     def statistics(self,scope,session_id):
         """Read-only coherent committed ledger; no provider/source reconstruction."""
-        from .analysis_v2 import project
-        workspace,session=scoped(scope,session_id)
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-            row=db.execute("SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s",(workspace,session)).fetchone()
-            require(row is not None,"session","RESOURCE_UNAVAILABLE")
-            stored=read_snapshot(row[0],row[1]);state=stored["state"]
-            require((state["revision"],state["datasetVersion"],state["profileHash"])==tuple(row[2:]),"state","CORRUPT_RECORD")
-            first=db.execute("SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0",(workspace,session)).fetchone()
-            require(first is not None,"genesis","CORRUPT_RECORD")
-            genesis=read_snapshot(*first)["state"]
-            def events():
-                for offset in range(0,state["nextEventIndex"],256):
-                    rows=db.execute("SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s AND sequence < %s ORDER BY sequence LIMIT 256",(workspace,session,offset,state["nextEventIndex"])).fetchall()
-                    for row in rows:yield unpack(*row)
-            # Refusal happens inside project before touching the event generator.
-            return project(state,events(),genesis)
+            return self._statistics(db,scope,session_id)[0]
+
+    def _statistics(self,db,scope,session_id):
+        """Private same-snapshot seam for confirmed review enrichment."""
+        from .analysis_v2 import project
+        workspace,session=scoped(scope,session_id)
+        row=db.execute("SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s",(workspace,session)).fetchone()
+        require(row is not None,"session","RESOURCE_UNAVAILABLE")
+        stored=read_snapshot(row[0],row[1]);state=stored["state"]
+        require((state["revision"],state["datasetVersion"],state["profileHash"])==tuple(row[2:]),"state","CORRUPT_RECORD")
+        first=db.execute("SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0",(workspace,session)).fetchone()
+        require(first is not None,"genesis","CORRUPT_RECORD")
+        genesis=read_snapshot(*first)["state"]
+        def events():
+            for offset in range(0,state["nextEventIndex"],256):
+                rows=db.execute("SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s AND sequence < %s ORDER BY sequence LIMIT 256",(workspace,session,offset,state["nextEventIndex"])).fetchall()
+                for row in rows:yield unpack(*row)
+        # Refusal happens inside project before touching the event generator.
+        return project(state,events(),genesis),state
 
     def fork(self, scope, raw_command):
         command = command_wire(raw_command)

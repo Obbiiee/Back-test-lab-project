@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — engine2 scoped Session service validated (2026-10-17)
+
+Private ResearchApplicationV2 adds16 server-pinned synthetic Session creation, immutable reviews/durable confirmation, revealed-only views, journal CAS and confirmed-review R0 statistics. Migration010/runtime grants are additive. V1 and42.17/42.19 remain separate. No HTTP/UI mount; confirmation returns original receipt and callers fetch inspect separately. Do not route16 symbols into old v1 commands or label short demos historical.
+
+Full431 backend/zero skips/752.775seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS; focused6/zero skips/33.170seconds PASS. Baseline frontend regression/lint/build136/release, independent Node6x3/16profile references and repository/bundle PASS. Covers16 pinned demos, exact0.03USD/3/100R, cold source-outage receipt/journal parity, concurrent review/confirm, workspace/hash/stale/raw-command refusal, Protocol checklist, atomic rollback, restricted runtime/DB guards and funded empty-target restore. Existing full-suite financial worker-death gates passed. No HTTP/UI, acquired month, Google/payment-provider or paid Beta acceptance.
+
+Next existing-grant scope: provider-independent Free/Pro sandbox capacity and verified v2 transport. Existing entitlement spec owns rules; define deterministic reset/atomic usage before rollout. Preserve verified membership/revocation, open-position lifecycle and canonical correctness. Actual Google/merchant/data-rights/hosting/reference/HTTPS/capacity gates remain open. Validate/update existing owners/commit/push/remote equality/clean0/0; continue local work without routine reapproval; stop on material conflicts. Claude retains UI ownership.
+
+
 ## CODEX → CLAUDE / CHATGPT — engine2 committed statistics validated (2026-10-17)
 
 Additive analysis_v2 and scoped controller/store read now project exact completed-position results from immutable genesis/full ledger, reconcile account/orders and return bounded committed-cash drawdown/curve. Partial profit/fees affect cash but enter win-rate/trade-count once fully closed; unresolved positions remain excluded. Confirmed R0 and fork-lineage stitching are explicitly unavailable rather than inferred. No provider recovery, source capability, market guess or financial mutation.

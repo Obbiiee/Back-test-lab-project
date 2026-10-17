@@ -28,6 +28,7 @@ for(const file of reachable)if(file.startsWith('frontend/src/tickAlpha/'))
 // V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
 const executionReferences=new Set([
   'backend/execution/analysis_v2.py','backend/tests/test_analysis_v2.py',
+    'backend/execution/research_v2.py','backend/execution/research_fixture_v2.py','backend/infrastructure/migrations/010_v2_research.sql','backend/tests/test_research_v2.py',
   'backend/execution/kernel_v2.py','backend/execution/controller_v2.py','backend/execution/postgres_v2.py','backend/tests/test_kernel_v2.py','backend/tests/test_execution_v2_postgres.py','backend/tests/fixtures/execution_v2.json',
   'backend/execution/sources_v2.py','backend/tests/test_sources_v2.py',
   'backend/execution/finance_v2.py','backend/tests/test_finance_v2.py',
