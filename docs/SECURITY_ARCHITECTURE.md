@@ -474,3 +474,10 @@ Backtest Lab's scientific identity applies to security too:
 > **Don't trust the claim. Test it.**
 
 “Secure” is not a label earned by architecture diagrams. It is a claim that must continually be tested through authorization tests, isolation tests, restore drills, abuse tests, monitoring and review.
+
+
+## V2 sandbox access composition - 2026-10-17
+
+Explicit opt-in retains existing verified-user, bearer-session, TLS/body/rate and membership boundaries. Account quota row locking spans inner Session commits; service creator admission shares the financial-core creation transaction. Revocation must serialize with in-flight operations, not just pass preflight. Immutable activation/test-event rows bind source/profile/account/day and strict signed account sequence. Separate >=64-character server-only sandbox event key must differ from identity secret. Financial API and operator test-event roles have separate grants. Events are offline/service operator tests only; no public provider webhook, merchant account, payment redirect or funds-collected signal. Clock/timezone is server-controlled and pinned at first policy creation; changing configured timezone refuses policy drift rather than silently resetting capacity.
+
+Actual Google identity remains unconfigured. Official references reviewed: https://developers.google.com/identity/openid-connect/openid-connect and https://fastapi-users.github.io/fastapi-users/latest/configuration/oauth/ . Google server flow requires owned OAuth credentials and registered redirect URI, CSRF state, nonce replay protection and verified ID-token signature/issuer/audience/expiry. Next implementation should reuse a mature client/verifier plus existing token lifecycle, persist stable provider subject and refuse implicit email-only linking. Current custom UserStore lacks durable OAuth mapping. This paragraph records dependencies/engineering direction only; no Google flow, client credential, external login or account linking is implemented by the sandbox checkpoint.

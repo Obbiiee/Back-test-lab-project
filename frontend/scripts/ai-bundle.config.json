@@ -196,7 +196,10 @@
     "backend/execution/analysis_v2.py",
     "backend/execution/research_v2.py",
     "backend/execution/research_fixture_v2.py",
-    "backend/infrastructure/migrations/010_v2_research.sql"
+    "backend/infrastructure/migrations/010_v2_research.sql",
+    "backend/cloud/sandbox_access.py",
+    "backend/cloud/research_v2.py",
+    "backend/infrastructure/migrations/011_v2_sandbox_access.sql"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -276,7 +279,8 @@
     "backend/tests/test_execution_v2_postgres.py",
     "backend/tests/fixtures/execution_v2.json",
     "backend/tests/test_analysis_v2.py",
-    "backend/tests/test_research_v2.py"
+    "backend/tests/test_research_v2.py",
+    "backend/tests/test_sandbox_v2.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

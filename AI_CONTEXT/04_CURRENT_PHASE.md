@@ -41,12 +41,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V2 scoped Session, order-review and journal service foundation",
-  "CURRENT_IMPLEMENTATION_PHASE": "V2 scoped Session, order-review and journal service foundation",
-  "NEXT_PHASE": "Verified v2 transport/entitlement composition and browser acceptance",
+  "LAST_COMPLETED_PHASE": "Verified v2 sandbox access and transport composition",
+  "CURRENT_IMPLEMENTATION_PHASE": "Verified v2 sandbox access and transport composition",
+  "NEXT_PHASE": "Google identity adapter and v2 client/browser integration acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "V2_SCOPED_SESSION_SERVICE_VALIDATED_NO_HTTP_OR_UI",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2 scoped Session, order-review and journal service foundation",
+  "CURRENT_PHASE_STATUS": "VALIDATED_OPT_IN_V2_SANDBOX_API_NO_FRONTEND_CUTOVER",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Verified v2 sandbox access and transport composition",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -63,7 +63,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Full431 backend/zero skips/752.775seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS; focused6/zero skips/33.170seconds PASS. Baseline frontend regression/lint/build136/release, independent Node6x3/16profile references and repository/bundle PASS. Covers16 pinned demos, exact0.03USD/3/100R, cold source-outage receipt/journal parity, concurrent review/confirm, workspace/hash/stale/raw-command refusal, Protocol checklist, atomic rollback, restricted runtime/DB guards and funded empty-target restore. Existing full-suite financial worker-death gates passed. No HTTP/UI, acquired month, Google/payment-provider or paid Beta acceptance."
+  "LAST_COMPLETED_CHECKPOINT": "Full443 backend/zero skips/723.340seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS; focused11/zero skips/66.680seconds PASS before the final pure configuration test, which passed in full discovery. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Twelve new families prove explicit disabled default/config/key separation, HTTPS ASGI scope/TLS/source boundaries, exact0.03USD/3/100R/journal/receipt flow, v2 account-wide saved/activation races, Trash/restore/retention, signed test-event replay/order/expiry, UTC/WIB boundaries/policy pins, deactivation serialization, separate API/operator roles and native empty-target restore. No actual Google/merchant/provider webhook/checkout, acquired month, frontend/browser cutover or paid Beta acceptance."
 }
 ```
 

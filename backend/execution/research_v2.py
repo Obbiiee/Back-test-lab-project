@@ -119,7 +119,8 @@ class ResearchApplicationV2:
                 and state["policy"]==policy_wire(policy) and state["sessionId"]==sid and meta["startPeriod"]==PERIOD,"identity","CORRUPT_RECORD")
         label(meta["name"])
         return meta,method,state,stored["controller"]
-    def create_session(self,raw):
+    def create_session(self,raw,*,on_create=None):
+        require(on_create is None or callable(on_create),"admission")
         keys(raw,"id name methodId initialBalance startPeriod symbol");identifier(raw["id"],"sessionId")
         normalized={**raw,"name":label(raw["name"])}
         require(raw["startPeriod"]==PERIOD,"period","REFUSED_FIXTURE_PERIOD")
@@ -149,6 +150,7 @@ class ResearchApplicationV2:
                 require(db.execute("SELECT count(*) FROM btl.tick_v2_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]<128,"sessions","REFUSED_CATALOG_LIMIT")
                 self.store._insert(db,self.scope,state,cp)
                 db.execute("INSERT INTO btl.tick_v2_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))
+                if on_create is not None:on_create(db,deepcopy(meta))
         except psycopg.errors.UniqueViolation as error:
             raise ContractError("REFUSED_SESSION_IDENTITY_CONFLICT","session") from error
         return meta
