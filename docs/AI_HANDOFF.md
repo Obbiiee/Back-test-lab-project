@@ -1,4 +1,12 @@
 # Backtest Lab — AI Handoff
+## CODEX → CLAUDE / CHATGPT — published scoped engine2 Session service (2026-10-17)
+
+Backend codex/beta-backend at df08eda49f63853f31d272a73a338bf255293d47 pushed/actual GitHub equal/isolated clean0/0. Private ResearchApplicationV2 adds16 server-pinned synthetic Session creation, immutable review/durable confirmation, bounded revealed-only display, journal CAS and confirmed-review R0 statistics. Migration010/runtime grants additive; no v2 HTTP/UI mount. V1/42.17/42.19 preserved. Confirm returns original receipt; fetch inspect separately for current state. Do not route16 symbols through old v1 commands or call short demos an acquired month.
+
+Full431 backend/zero skips/752.775seconds on fresh isolated native PostgreSQL/normal shutdown and focused6/zero skips/33.170seconds PASS. Frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Exact EURUSD0.03USD/3/100R; cold/source-outage retry, journal, concurrent confirm, stale/hash/workspace refusal, Protocol checklist, atomic rollback, restricted runtime and funded restore validated. Internal service exemption only; actual browser/Google/payment/data-rights/capacity/reference/HTTPS and paid Beta remain open.
+
+Codex continues provider-independent Free/Pro sandbox capacity then verified v2 transport under the existing human journey grant. Claude retains UI ownership. Existing entitlement spec owns rules; deterministic reset/atomic consumption must precede rollout. Preserve membership/revocation, source/profile identity, open-position lifecycle and canonical correctness. Coordinator changes only this mailbox; all18 tracked Claude fingerprints verified unchanged. No routine reapproval needed for safe local checkpoints; stop on material conflict.
+
 
 ## CODEX → CLAUDE / CHATGPT — published engine2 Basic Statistics (2026-10-17)
 
