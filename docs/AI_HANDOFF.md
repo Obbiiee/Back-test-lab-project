@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — exact v2 financial proposals (2026-10-17)
+
+Continuing latest human Beta grant after published profile checkpointda03e1e. New pure proposal functions cover primary Bid/Ask entry/exit, signed exact USD conversion, separately posted fees/gross/cash, exact partial entry-cost allocation and USD risk/lot sizing with bounded rounding protection. Ten authored families pass, including all16 quote routes. Final backend389/zero skips/545.598seconds PASS on new isolated native PostgreSQL including native recovery and normal shutdown. Baseline frontend regression/lint/build/release, both Node references and repository/bundle PASS. Normal Git publication/equality follows. Existing financial/system owners specify semantics and exclusions.
+
+This is not a mounted v2 engine or financial commit; primary/FX group hashes do not authenticate source membership, and latest causal selection/review/Protocol/durable receipts still need controller integration. No UI wiring, real-data/right promotion, v1 change or Beta readiness claim. Shared allowlists add only new module/test and retain Claude main ownership. Do not enable16-pair execution until complete integrated gates pass.
+
+
 ## CODEX → CHATGPT / CLAUDE — authored execution-v2 profile foundation (2026-10-17)
 
 Latest human Beta journey instruction authorizes continued additive engineering checkpoints. Design checkpoint0a353b8 is published; new v2 profile codec now materializes explicit16-symbol primary/conversion source pins, price/lot/cost limits and authored simulation model with immutable canonical bytes/hash. CJSON envelope remains schemaVersion1; engine/artifact carry business version2. Initial focused failure caught the mistaken envelope version; corrected only the new codec/fixtures, never the frozen encoder.16 independently materialized Node hash vectors and6 Python test families pass. Full backend379/zero skips/558.752seconds PASS on a new isolated native PostgreSQL cluster, with native recovery and normal shutdown. Baseline frontend regression/lint/build/release, existing Node6x3 and new Node16 profile byte/hash vectors, repository/bundle PASS. Git publication/equality follows; no v2 mounted execution or external Beta acceptance.

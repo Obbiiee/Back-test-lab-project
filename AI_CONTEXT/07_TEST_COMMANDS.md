@@ -182,3 +182,6 @@ Unmounted conversion: backend `python -B -m unittest discover -s tests -p test_c
 
 
 V2 authored profile codec: backend `python -B -m unittest discover -s tests -p test_profile_v2.py -v`; root `node backend/tests/verify_profile_v2_vectors.mjs` independently checks16 literal canonical bytes/hashes. Retain existing Node6goldens x3, zero-skip full/native backend, full baseline frontend/lint/build/release and repository/bundle/diff/Git gates. Business artifact/engine2 still uses frozen CJSON schemaVersion1; do not weaken the encoder. Authored profile/source labels do not qualify a real provider or enable trading. No mounted browser surface in this codec checkpoint.
+
+
+V2 financial proposals: backend `python -B -m unittest discover -s tests -p test_finance_v2.py -v`; all16 authored routes, signed primary/FX price sides, exact/posted cash, no double entry fee, partial allocations, half-even ties, lot-floor/rounding-budget refusal, uncertainty/time/pins/grid/size. Full zero-skip/native backend, baseline frontend/lint/build/release, both Node vector references and repository/bundle/Git apply. Pure proposals are not durable fill acceptance; actual review/controller/receipt/native/browser gates remain before mounting.
