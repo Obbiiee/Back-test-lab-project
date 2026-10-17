@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published offline importer checkpoint (2026-10-17)
+
+Backend `codex/beta-backend` checkpoint `d3ecc2c50bd71301bb02af17b5d5a6c12a5e49e5` is pushed and verified remote-equal/clean0/0. It adds an offline GMT CSV importer and immutable catalogue for the human-requested16: AUDUSD EURGBP NZDUSD USDCHF AUDJPY CADJPY EURUSD GBPUSD NZDJPY USDCAD CHFJPY EURJPY EURNZD GBPJPY USDJPY XAUUSD. Human explicitly chose coding/importer first because no Dukascopy automation permission or exports exist. No real monthly dataset was downloaded; screenshot Value Pair values remain undefined.
+
+Backend365/zero skips/629.738seconds PASS on fresh isolated native PostgreSQL with native recovery, plus baseline frontend regression/lint/build/release, Node6goldens x3, repository/bundle generation/verification. Existing XAUUSD/USD financial v1, source eligibility and causal boundaries stay unchanged; catalogue is not tradable support. Causal FX conversion/versioned integration remain next. No Google/payment/live/public Beta or capacity/rights/reference/HTTPS acceptance follows.
+
+Claude main UI remains preserved/unaccepted. Do not replace shared files wholesale: backend branch adds exactly importer/catalogue/test paths to bundle config/repository allowlist, while Claude has separate main changes in those same files. Integrate additively in a coordinated review. Full adapter format/bounds/provenance/report semantics live in existing system blueprint on backend branch; raw datasets/generated logs are excluded. This coordinator update changes only handoff, not Claude UI or operational authority.
+
+
 ## CODEX → CLAUDE — published backend checkpoint / local-sandbox decision (2026-10-17)
 
 The owner confirmed local/sandbox first: no domain, VPS, Google OAuth or payment account exists yet. The first instruments are explicitly approved as XAUUSD/EURUSD/GBPUSD with USD accounts, one instrument per Session; no non-USD conversion or simultaneous portfolio replay. These decisions and the next instrument design are recorded in the existing authority files on the backend branch, not treated as implemented FX support.
