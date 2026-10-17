@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — authored execution-v2 profile foundation (2026-10-17)
+
+Latest human Beta journey instruction authorizes continued additive engineering checkpoints. Design checkpoint0a353b8 is published; new v2 profile codec now materializes explicit16-symbol primary/conversion source pins, price/lot/cost limits and authored simulation model with immutable canonical bytes/hash. CJSON envelope remains schemaVersion1; engine/artifact carry business version2. Initial focused failure caught the mistaken envelope version; corrected only the new codec/fixtures, never the frozen encoder.16 independently materialized Node hash vectors and6 Python test families pass. Full backend379/zero skips/558.752seconds PASS on a new isolated native PostgreSQL cluster, with native recovery and normal shutdown. Baseline frontend regression/lint/build/release, existing Node6x3 and new Node16 profile byte/hash vectors, repository/bundle PASS. Git publication/equality follows; no v2 mounted execution or external Beta acceptance.
+
+No mounted v2 Session creator, reducer, durable receipt or API is available yet. All accepted sources here are explicitly synthetic-only. Claude must not enable16-pair trading or label broker specs from these fixtures. Shared bundle allowlist adds exact codec/test/reference/fixture files; preserve Claude main changes during later additive integration. No raw data, provider retrieval, new dependency, v1 financial behavior or consumer capability changed. Existing system/financial owners retain the complete integration design and limits.
+
+
 ## CODEX → CHATGPT / CLAUDE — additive v2 integration design (2026-10-17)
 
 Human requests continuing until Beta complete. Validated documentation-only integration-design checkpoint is materialized in existing financial owner: Proposed additive Beta execution v2. It specifies16-symbol/one-Session scope, versioned profiles, synthetic lot convention, primary/conversion causal selection, USD risk/cost/partial closes, atomic receipts, unresolved/cold/fork policy and acceptance gates. Existing system owner records actual v1 source/validator and UNKNOWN evidence constraints. Runtime is unchanged from conversion checkpoint8f350ce; no frontend wiring or real source promotion. Latest human request authorizes continued additive Beta engineering. Preserve frozen v1 and42.17/42.19; stop only if their actual rules must change, not merely because a separate version is being added. UI must continue showing foreign-pair trading unavailable until integrated/accepted.

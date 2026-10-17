@@ -179,3 +179,6 @@ Offline Dukascopy CSV: from backend, `python -B -m unittest discover -s tests -p
 
 
 Unmounted conversion: backend `python -B -m unittest discover -s tests -p test_conversion.py -v`; authored signed direct/inverse, exact repeating rational, half-even, USD identity, missing/future/stale/unknown/crossed/gapped, pins/group integrity, ambiguous trusted/untrusted ties, equivalent-tie references, bounds and mutation isolation. Full zero-skip/native recovery, existing frontend/lint/build/release, Node goldens and repository/bundle/Git gates apply. Offline pure helper has no mounted browser surface; do not claim source authentication, financial integration or Beta eligibility from its vectors.
+
+
+V2 authored profile codec: backend `python -B -m unittest discover -s tests -p test_profile_v2.py -v`; root `node backend/tests/verify_profile_v2_vectors.mjs` independently checks16 literal canonical bytes/hashes. Retain existing Node6goldens x3, zero-skip full/native backend, full baseline frontend/lint/build/release and repository/bundle/diff/Git gates. Business artifact/engine2 still uses frozen CJSON schemaVersion1; do not weaken the encoder. Authored profile/source labels do not qualify a real provider or enable trading. No mounted browser surface in this codec checkpoint.

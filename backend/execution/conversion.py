@@ -15,6 +15,12 @@ _ROUTES = {"GBP": ("GBPUSD", "MULTIPLY"), "NZD": ("NZDUSD", "MULTIPLY"),
 _PIN_FIELDS = "currency symbol datasetId datasetVersion providerId feedId feedInstrumentId maxAgeNs"
 
 
+def conversion_route(currency):
+    """Immutable descriptive route; does not accept evidence or select quotes."""
+    require(type(currency) is str and currency in _ROUTES, "currency", "REFUSED_FX_ROUTE")
+    return _ROUTES[currency]
+
+
 def convert_usd(amount, currency, as_of_ns, *, pin=None, group=None, money_scale=2):
     value = exact(amount, "foreignCash")
     as_of = uint(as_of_ns, "asOfNs")
@@ -33,7 +39,7 @@ def convert_usd(amount, currency, as_of_ns, *, pin=None, group=None, money_scale
         digest(pin["datasetVersion"], "datasetVersion")
         age_limit = uint(pin["maxAgeNs"], "maxAgeNs")
         require(1 <= age_limit <= 60000000000, "maxAgeNs", "REFUSED_FX_AGE_LIMIT")
-        symbol, operation = _ROUTES[currency]
+        symbol, operation = conversion_route(currency)
         require(pin["currency"] == currency and pin["symbol"] == symbol,
                 "route", "REFUSED_FX_ROUTE")
         keys(group, "groupId timeNs order events")

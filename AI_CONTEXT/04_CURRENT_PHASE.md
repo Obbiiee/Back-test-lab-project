@@ -41,12 +41,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "Versioned multi-source financial integration design",
-  "CURRENT_IMPLEMENTATION_PHASE": "Versioned multi-source financial integration design",
-  "NEXT_PHASE": "Additive execution v2 profile and source-plan codec; no old-version changes",
+  "LAST_COMPLETED_PHASE": "Additive synthetic execution v2 profile codec",
+  "CURRENT_IMPLEMENTATION_PHASE": "Additive synthetic execution v2 profile codec",
+  "NEXT_PHASE": "Versioned v2 financial reducer and causal controller fixtures",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "DESIGN_VALIDATED_ADDITIVE_V2_JOURNEY_AUTHORIZED",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Versioned multi-source financial integration design",
+  "CURRENT_PHASE_STATUS": "V2_PROFILE_VALIDATED_NO_MOUNTED_EXECUTION",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "Additive synthetic execution v2 profile codec",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -63,7 +63,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Reviewable additive execution-v2 proposal in existing financial/system owners: version dispatch,16 profiles, causal source selection, USD risk/cost/partial-close accounting, atomic receipts/unresolved/cold/fork and acceptance. Documentation-only repository/Node6x3/bundle checks pass; executable baseline unchanged from373-test checkpoint8f350ce. Git closure follows; additive v2 checkpoints follow latest human journey grant; actual frozen-rule changes require separate authorization."
+  "LAST_COMPLETED_CHECKPOINT": "V2 synthetic-only profile codec: full backend379/zero skips/558.752seconds, new isolated native PostgreSQL/native recovery stopped normally; baseline frontend regression/lint/build/release, Node16 new profile byte/hash vectors and existing6x3, repository/bundle pass. V1 code/Session hashes preserved; Git closure follows. No real-source/financial-v2/UI/public Beta acceptance."
 }
 ```
 
