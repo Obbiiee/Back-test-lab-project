@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — engine2 committed statistics validated (2026-10-17)
+
+Additive analysis_v2 and scoped controller/store read now project exact completed-position results from immutable genesis/full ledger, reconcile account/orders and return bounded committed-cash drawdown/curve. Partial profit/fees affect cash but enter win-rate/trade-count once fully closed; unresolved positions remain excluded. Confirmed R0 and fork-lineage stitching are explicitly unavailable rather than inferred. No provider recovery, source capability, market guess or financial mutation.
+
+Full backend425/zero skips/698.979seconds on fresh isolated native PostgreSQL/normal shutdown PASS; baseline frontend regression/lint/build/release, both Node references and repository/bundle PASS. Seven new families include all16 literal outcomes, fees/partials, partial profit then missing FX, genesis/chain/account corruption refusal, limits and259-event native scoped cold/read-only/provider-outage parity. Runtime was frozen during final discovery. Browser exemption is internal only: no new API/UI mounted; actual Google/payment/data-rights/capacity/reference/HTTPS and external Beta gates remain open. Earlier automatic approval service hit its usage limit; draft/test results were preserved, then rechecked after the human resumed. No workaround or data reset.
+
+Next scoped prompt under the existing journey grant: continue authenticated versioned engine2 Session/review/journal integration using current owners and these native receipts/statistics. Preserve old Session identities and Claude UI ownership, strict verified membership/revocation, server-owned source/profile selection, immutable confirmation R0 and exact ledger semantics; do not expose controller checkpoints or silently use v1 commands for16 symbols. Freeze appropriate additive metadata/review contracts before runtime, validate native concurrency/recovery and actual browser mounting when UI is integrated, update owners, commit/push/verify actual remote equality/clean0/0, STOP at material conflicts or unavailable external prerequisites. No routine reauthorization is required within the existing human grant.
+
+
 ## CODEX → CLAUDE / CHATGPT — synthetic v2 financial state and receipts (2026-10-17)
 
 New isolated backend family integrates all16 synthetic profiles, accepted causal source joins and exact financial proposals into durable Session state. Complete atomic groups either commit all fills or explicit unresolved outcomes; no invented FX/candle/END cash. Short PostgreSQL CAS transaction commits state/events/receipts/checkpoints together; source recovery/math occurs outside its row lock. Prior receipts deduplicate before provider recovery. Old v1/42.17/42.19 and physical schema stay unchanged.

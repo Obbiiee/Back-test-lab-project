@@ -192,7 +192,8 @@
     "backend/execution/kernel_v2.py",
     "backend/execution/controller_v2.py",
     "backend/execution/postgres_v2.py",
-    "backend/execution/sources_v2.py"
+    "backend/execution/sources_v2.py",
+    "backend/execution/analysis_v2.py"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -270,7 +271,8 @@
     "backend/tests/test_sources_v2.py",
     "backend/tests/test_kernel_v2.py",
     "backend/tests/test_execution_v2_postgres.py",
-    "backend/tests/fixtures/execution_v2.json"
+    "backend/tests/fixtures/execution_v2.json",
+    "backend/tests/test_analysis_v2.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

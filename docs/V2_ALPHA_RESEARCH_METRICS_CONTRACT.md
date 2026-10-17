@@ -80,3 +80,10 @@ The following materialized vectors were independently computed in JavaScript bef
 ```
 
 The freeze precedes calculator implementation. Its validation cannot be reported as a completed Monte Carlo runtime or Alpha acceptance.
+
+
+## Additive engine2 committed-ledger projection - 2026-10-17
+
+The existing Basic Statistics/Session-integration grant includes a separate internal engine2 projector and scoped native read. All frozen metric definitions above remain unchanged. Validate the current state, immutable revision0 genesis, complete event chain and final account/order reconciliation; read bounded pages in one repeatable-read snapshot. Above4096 events return explicit UNAVAILABLE before iterating, never partial performance as complete. Fork lineage remains explicitly unavailable until a validated parent-ledger stitch exists. No financial mutation or provider/quote recovery belongs to this projection.
+
+Use posted USD gross and all posted entry/exit fees in final completed-position net. Partial exits affect cash immediately but enter trade-count/win-rate denominators only once the full position closes. All-position cash totals and completed-position net are separate quantities. Drawdown and its bounded interactive curve use exact committed cash postings in canonical event order, labelled balance/COMMITTED_CASH_POSTINGS; do not invent mark-to-market equity or FX rates. The existing pure metrics calculator remains shared. R stays null/excluded until immutable pre-entry confirmation evidence is joined; the unmounted kernel's risk estimate alone is not a confirmed-review Passport. No retrospective R0, new Monte Carlo, MAE/MFE, API route, UI acceptance, source rights or paid Beta acceptance is implied. Browser verification is deferred because this checkpoint is an unmounted backend projection.

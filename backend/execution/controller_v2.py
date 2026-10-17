@@ -48,3 +48,6 @@ class ExecutionControllerV2:
 
     def inspect(self,scope,session_id,after_sequence=0,maximum=64):
         return self.__store.inspect(scope,session_id,after_sequence,maximum)
+
+    def statistics(self,scope,session_id):
+        return self.__store.statistics(scope,session_id)

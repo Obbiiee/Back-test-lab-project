@@ -41,12 +41,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "V2 synthetic financial state and durable receipt integration",
-  "CURRENT_IMPLEMENTATION_PHASE": "V2 synthetic financial state and durable receipt integration",
-  "NEXT_PHASE": "V2 committed-ledger Basic Statistics within authenticated Session integration",
+  "LAST_COMPLETED_PHASE": "V2 committed-ledger Basic Statistics within authenticated Session integration",
+  "CURRENT_IMPLEMENTATION_PHASE": "V2 committed-ledger Basic Statistics within authenticated Session integration",
+  "NEXT_PHASE": "Authenticated v2 Session/review/journal integration and browser acceptance",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "V2_SYNTHETIC_STATE_AND_NATIVE_RECEIPTS_VALIDATED_NO_PUBLIC_CUTOVER",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2 synthetic financial state and durable receipt integration",
+  "CURRENT_PHASE_STATUS": "V2_COMMITTED_LEDGER_STATISTICS_VALIDATED_NO_HTTP_OR_UI_CUTOVER",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "V2 committed-ledger Basic Statistics within authenticated Session integration",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -63,7 +63,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Synthetic v2 state/controller/native receipts: full backend418/zero skips/789.698seconds on fresh isolated PostgreSQL; final native10/zero skips/41.752seconds after strengthening real financial-crash and funded dump/restore fixtures. Baseline frontend regression/lint/build/release, both Node references and repository/bundle pass. No HTTP/browser cutover, actual market source or Beta acceptance. Git closure follows."
+  "LAST_COMPLETED_CHECKPOINT": "V2 committed statistics: full425 backend/zero skips/698.979seconds on fresh isolated native PostgreSQL with normal shutdown; baseline frontend regression/lint/build/release, both Node references and repository/bundle pass. All16 outcomes, exact partial/fees, partial-profit-then-unresolved exclusion, genesis/chain/account corruption refusal, bounds, 259-event scoped cold/native read-only/provider-outage parity. R0/lineage remain explicitly unavailable until their confirmation/stitch integrations. No API/browser/real-market/Beta acceptance. Git closure follows."
 }
 ```
 
