@@ -157,3 +157,131 @@
 .alpha-object-panel{width:240px;flex-shrink:0;padding:12px;border-left:1px solid var(--lab-border);overflow:auto;background:var(--lab-surface-workspace)}.alpha-object-panel h2{font-size:13px}.alpha-object-panel p{font-size:12px;color:var(--lab-text-secondary)}.alpha-object-panel>div{padding:8px 0;border-bottom:1px solid var(--lab-border)}.alpha-object-panel>div>button:first-child{display:block;width:100%;text-align:left}.alpha-object-panel button{font-size:11px}@media(max-width:760px){.alpha-object-panel{position:absolute;right:0;top:40px;bottom:0;z-index:35;width:min(240px,calc(100% - 60px));box-sizing:border-box}}
 .alpha-history-context{position:relative}.alpha-history-context[open]{overflow:visible;max-height:none}.alpha-history-context>div{position:absolute;top:100%;left:10px;z-index:26;width:min(420px,calc(100vw - 85px));box-sizing:border-box;padding:12px;background:var(--lab-surface-secondary);border:1px solid var(--lab-border);border-radius:4px;box-shadow:var(--lab-elevation-menu)}
 @media(max-width:760px){.alpha-panel-handle>button:last-child,.alpha-replay-controls>.alpha-replay-grip+button{display:none}}
+/* RIKSORA brand sync (2026-10-17): Drive Master Blueprint tokens from riksoraBrand.css.
+   Chart surfaces stay the human-approved neutral dark FX Replay-inspired set; only accent,
+   selection, typography, risk/warning semantics, filled actions and light identity pages adopt the brand. */
+.tick-alpha{--lab-font-ui:var(--rk-font-ui);--lab-font-data:var(--rk-font-data);--lab-accent:var(--rk-blue-on-dark);--lab-selected:#12305e;--lab-error:var(--rk-coral);--lab-warning:var(--rk-yellow)}
+.tick-alpha :focus-visible{outline-color:var(--rk-blue)}
+.alpha-order-bar button,.tick-alpha .alpha-primary-action{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff}
+.alpha-order-bar button:hover,.tick-alpha .alpha-primary-action:hover{background:var(--rk-blue-pressed);border-color:var(--rk-blue-pressed)}
+.alpha-ticket>button{background:var(--rk-blue-strong)!important;border-color:var(--rk-blue-strong)!important}
+.alpha-identity{background:var(--rk-ice-soft);color:var(--rk-navy);font-family:var(--rk-font-ui)}
+.alpha-identity-nav{border-bottom-color:var(--rk-ice);background:var(--rk-white);color:var(--rk-navy)}
+.alpha-identity-nav>span{color:var(--rk-muted)}
+.alpha-identity-content>form input{border-color:#b9c9e0;color:var(--rk-navy)}
+.alpha-identity-content>form button,.alpha-identity-content>nav button,.alpha-identity-content>ul button,.alpha-identity-content>button,.alpha-identity-actions button{border-color:#b9c9e0;color:var(--rk-navy)}
+.alpha-identity a{color:var(--rk-blue-strong)}.alpha-identity a:hover{color:var(--rk-blue-pressed)}.alpha-identity .alpha-eyebrow{font-family:var(--rk-font-data);font-size:12px;letter-spacing:1.5px;color:var(--rk-muted)}
+@media(max-width:600px){.alpha-chart-disclosures{min-width:0;max-width:100%;flex-wrap:wrap}.alpha-chart-disclosures>.alpha-display-details{min-width:0;max-width:100%}.alpha-chart-disclosures summary{overflow-wrap:anywhere}}
+/* Testing hub (2026-10-17): Sessions overview shown when no Session is open. */
+.alpha-visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.alpha-hub{padding:clamp(20px,4vw,48px);max-width:1280px;width:100%;box-sizing:border-box;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.alpha-hub-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px}
+.alpha-hub-head h1{font-size:28px;letter-spacing:-.5px;margin:0 0 6px}
+.alpha-hub-head p{margin:0;max-width:620px;color:var(--lab-text-secondary);font-size:14px;line-height:1.6}
+.tick-alpha .alpha-hub-eyebrow{font:500 12px var(--rk-font-data);letter-spacing:1.5px;color:var(--rk-blue-on-dark);margin-bottom:8px}
+.alpha-hub-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tick-alpha .alpha-hub-actions>button:not(.alpha-primary-action){min-height:44px;padding:10px 16px}
+.alpha-hub-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.alpha-hub-steps li{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1px solid var(--lab-border);border-radius:8px;background:var(--lab-surface-workspace)}
+.alpha-hub-steps li>span[aria-hidden]{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:500 12px var(--rk-font-data);border:1px solid var(--lab-border);color:var(--lab-text-secondary)}
+.alpha-hub-steps li.done>span[aria-hidden]{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff}
+.alpha-hub-steps strong{display:block;font-size:14px}.alpha-hub-steps p{margin:4px 0 0;font-size:12px;color:var(--lab-text-secondary);line-height:1.5}
+.alpha-hub-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.alpha-hub-filters label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--lab-text-secondary)}
+.alpha-hub-filters input{min-width:240px}
+.alpha-hub-filters>span{margin-left:auto;font-size:12px;color:var(--lab-text-secondary)}
+.alpha-hub-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.alpha-hub-card{height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;padding:18px;border:1px solid var(--lab-border);border-radius:8px;background:var(--lab-surface-workspace);transition:border-color .15s}
+.alpha-hub-card:hover,.alpha-hub-card:focus-within{border-color:var(--rk-blue-on-dark)}
+.tick-alpha .alpha-hub-card>header{background:none;border:0;padding:0;min-height:0;position:static;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.alpha-hub-card h2{font-size:16px;margin:0;overflow-wrap:anywhere}
+.alpha-hub-tag{flex:none;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--lab-border);color:var(--lab-text-secondary)}
+.alpha-hub-card dl{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:0}
+.alpha-hub-card dt{font-size:11px;color:var(--lab-text-secondary)}
+.alpha-hub-card dd{margin:2px 0 0;font:500 13px var(--rk-font-data);overflow-wrap:anywhere}
+.alpha-hub-card>footer{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 0;border-top:1px solid var(--lab-border);font-size:12px;color:var(--lab-text-secondary);background:none}
+.tick-alpha .alpha-hub-card .alpha-primary-action{min-height:36px;padding:6px 18px}
+.alpha-hub-none{color:var(--lab-text-secondary)}
+.alpha-hub-strategies h2{font-size:16px;margin:8px 0 12px}
+.alpha-hub-strategies ul{list-style:none;margin:0;padding:0;border:1px solid var(--lab-border);border-radius:8px;overflow:hidden}
+.alpha-hub-strategies li{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,2fr) auto;gap:12px;padding:12px 16px;border-top:1px solid var(--lab-border);font-size:13px}
+.alpha-hub-strategies li:first-child{border-top:0}
+.alpha-hub-strategies li span{color:var(--lab-text-secondary)}
+@media(max-width:900px){.alpha-hub-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.alpha-hub-steps{grid-template-columns:1fr}.alpha-hub-filters input{min-width:0;width:100%}.alpha-hub-filters label{flex:1 1 100%}.alpha-hub-filters>span{margin-left:0}.alpha-hub-strategies li{grid-template-columns:1fr}}
+/* Order ticket ergonomics (2026-10-17): side shortcuts, risk presets, target-by-R and live estimate. */
+.alpha-order-bar .alpha-quick-side{display:inline-flex;align-items:baseline;gap:8px;min-width:0;padding:6px 12px;border-radius:4px;font-weight:600}
+.alpha-order-bar .alpha-quick-side strong{font:500 13px var(--rk-font-data)}
+.alpha-order-bar .alpha-quick-sell{background:#2c1721;border-color:#8b364a;color:var(--rk-coral)}
+.alpha-order-bar .alpha-quick-buy{background:#0d2547;border-color:var(--rk-blue-strong);color:#9cc5ff}
+.alpha-order-bar .alpha-quick-sell:hover{background:#3a1d2a;border-color:var(--rk-coral)}
+.alpha-order-bar .alpha-quick-buy:hover{background:#12305e;border-color:var(--rk-blue-on-dark)}
+.alpha-ticket-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
+.tick-alpha .alpha-ticket-chips button{min-height:32px;padding:4px 12px;border-radius:999px;font-size:12px;background:var(--lab-surface-secondary);border:1px solid var(--lab-border);color:var(--lab-text-primary)}
+.tick-alpha .alpha-ticket-chips button[aria-pressed=true]{background:#12305e;border-color:var(--rk-blue-on-dark);color:#fff}
+.alpha-ticket-risk{border:1px solid var(--lab-border);border-radius:6px;padding:8px 12px 10px;margin:4px 0}
+.alpha-ticket-risk legend{font-size:12px;color:var(--lab-text-secondary);padding:0 4px}
+.alpha-ticket-estimate{border:1px solid var(--lab-border);border-radius:6px;background:var(--lab-surface-chart);padding:10px 12px;margin:6px 0}
+.alpha-ticket-estimate dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0}
+.alpha-ticket-estimate dt{font-size:11px;color:var(--lab-text-secondary)}
+.alpha-ticket-estimate dd{margin:2px 0 0;font:500 14px var(--rk-font-data);overflow-wrap:anywhere}
+.alpha-ticket-estimate .alpha-estimate-loss dd{color:var(--rk-coral)}
+.alpha-ticket-estimate .alpha-estimate-profit dd{color:var(--lab-success)}
+.alpha-ticket-estimate p{margin:8px 0 0;font-size:11px;line-height:1.5;color:var(--lab-text-secondary)}
+.alpha-ticket-hint{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:var(--lab-text-secondary)}
+.tick-alpha .alpha-ticket-hint button{min-height:32px;padding:4px 12px}
+@media(max-width:600px){.alpha-ticket-estimate dl{grid-template-columns:repeat(2,minmax(0,1fr))}.alpha-order-bar .alpha-quick-side{padding:6px 8px}}
+/* Analysis overview (2026-10-17): headline tiles and committed balance line. */
+.alpha-equity{margin:4px 0 16px}
+.alpha-kpis{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.alpha-kpis li{border:1px solid var(--lab-border);border-radius:6px;padding:10px 12px;background:var(--lab-surface-chart)}
+.alpha-kpis span{display:block;font-size:11px;color:var(--lab-text-secondary)}
+.alpha-kpis strong{display:block;margin-top:4px;font:500 16px var(--rk-font-data);color:var(--lab-text-primary)}
+.alpha-kpis .alpha-kpi-profit{color:var(--lab-success)}.alpha-kpis .alpha-kpi-loss{color:var(--rk-coral)}
+.alpha-equity-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline}
+.alpha-equity-head h3{font-size:13px;margin:0}.alpha-equity-head span{font:12px var(--rk-font-data);color:var(--lab-text-secondary)}
+.alpha-equity-plot{display:block;width:100%;height:180px;margin-top:6px;border:1px solid var(--lab-border);border-radius:6px;background:var(--lab-surface-chart);cursor:crosshair}
+.alpha-equity-grid{stroke:var(--lab-border);stroke-width:1;vector-effect:non-scaling-stroke}
+.alpha-equity-base{stroke:var(--lab-text-secondary);stroke-width:1;stroke-dasharray:4 4;opacity:.6;vector-effect:non-scaling-stroke}
+.alpha-equity-line{fill:none;stroke:var(--rk-blue-on-dark);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.alpha-equity-cross{stroke:var(--lab-text-secondary);stroke-width:1}
+.alpha-equity-dot{fill:var(--rk-blue-on-dark);stroke:var(--lab-surface-chart);stroke-width:2}
+.alpha-equity-scale{display:flex;justify-content:space-between;font:11px var(--rk-font-data);color:var(--lab-text-secondary);margin-top:4px}
+.alpha-equity-empty{font-size:12px;color:var(--lab-text-secondary);border:1px dashed var(--lab-border);border-radius:6px;padding:16px}
+
+/* Playful hub and chrome; chart and execution remain unchanged. */
+.tick-alpha>header{border-radius:0 0 24px 24px;padding:16px 24px;gap:16px}
+.tick-alpha>header nav{display:flex;flex-wrap:wrap;gap:8px}
+.tick-alpha>header nav a{padding:10px 16px;border-radius:999px;background:#102b55;text-decoration:none;font-weight:650;min-height:44px;box-sizing:border-box;display:inline-flex;align-items:center}
+.tick-alpha>header nav a:hover{background:#193d70}
+.tick-alpha>header .alpha-badge{background:#ffce55;color:#061a3c;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:750}
+.alpha-hub{gap:28px;padding-block:40px}
+.alpha-hub-head{background:#d9eafe;color:#061a3c;border-radius:32px;padding:32px}
+.alpha-hub-head h1{font-size:clamp(28px,3.2vw,42px);line-height:1.12;font-weight:850;letter-spacing:-.03em;max-width:540px;margin-bottom:12px}
+.tick-alpha .alpha-hub-head p{color:#28496f;font-size:15px;max-width:560px}
+.tick-alpha .alpha-hub button{border-radius:999px;min-height:44px;padding:10px 18px;font-weight:700}
+.tick-alpha .alpha-hub .alpha-primary-action{background:#0f67d8;color:#fff;border-color:#0f67d8;box-shadow:0 4px 0 #08438f;transition:transform .12s,box-shadow .12s}
+.tick-alpha .alpha-hub .alpha-primary-action:hover:not(:disabled){transform:translateY(-2px);background:#0b56b9;box-shadow:0 6px 0 #08438f}
+.tick-alpha .alpha-hub .alpha-primary-action:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #08438f}
+.tick-alpha .alpha-hub-head button:not(.alpha-primary-action){background:#fff;color:#061a3c;border-color:#b0c9e8}
+.alpha-hub-steps{gap:16px}
+.alpha-hub-steps li{border-radius:24px;padding:22px;border:0;background:#10243f}
+.alpha-hub-steps li>span[aria-hidden]{width:36px;height:36px;background:#ffce55;color:#061a3c;border:0;font-size:16px;font-weight:750}
+.alpha-hub-steps li:nth-child(2)>span[aria-hidden]{background:#d9eafe}
+.alpha-hub-steps li:nth-child(3)>span[aria-hidden]{background:#ff7373}
+.alpha-hub-steps li.done>span[aria-hidden]{background:#d9eafe;color:#061a3c}
+.alpha-hub-steps strong{font-size:15px;line-height:1.35}.alpha-hub-steps p{font-size:13px;line-height:1.6}
+.alpha-hub-card{padding:24px;border-radius:24px;background:#10243f;border-color:#284564}
+.alpha-hub-card h2{font-size:20px;font-weight:750;line-height:1.25}
+.alpha-hub-tag{background:#ffce55;color:#061a3c;border:0;padding:4px 10px;font-weight:700}
+.alpha-hub-card dl{gap:18px 16px}.alpha-hub-card dt{font-size:12px}.alpha-hub-card dd{font-size:15px}
+.alpha-hub-card footer{padding-top:18px}.alpha-hub-strategies h2{font-size:22px;font-weight:750}
+.alpha-hub-strategies ul{border-radius:20px}.alpha-hub-strategies li{padding:18px 20px}
+.tick-alpha input,.tick-alpha select,.tick-alpha textarea{caret-color:#5a9df8}
+.tick-alpha ::selection,.alpha-home ::selection{background:#ffce55;color:#061a3c}
+.tick-alpha{scrollbar-color:#365276 #0c1422;scrollbar-width:thin}
+.tick-alpha .alpha-ticket{border-radius:24px}.tick-alpha .alpha-ticket button{border-radius:12px}
+.tick-alpha .alpha-ticket-estimate{border-radius:16px;padding:14px}.tick-alpha .alpha-replay-controls{border-radius:18px}
+.tick-alpha :focus-visible{outline:3px solid #ffce55;outline-offset:3px}
+@media(max-width:600px){.tick-alpha>header{padding:14px 16px;border-radius:0 0 20px 20px}.alpha-hub{padding:20px 14px}.alpha-hub-head{padding:24px 20px;border-radius:24px}.alpha-hub-actions{width:100%}.alpha-hub-grid{grid-template-columns:minmax(0,1fr)}.alpha-hub-card{min-width:0}.alpha-hub-steps li{padding:20px}.tick-alpha>header nav a{padding:8px 12px}}
+@media(prefers-reduced-motion:reduce){.tick-alpha .alpha-hub .alpha-primary-action{transition:none}.tick-alpha .alpha-hub .alpha-primary-action:hover:not(:disabled){transform:none}}

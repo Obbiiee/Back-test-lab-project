@@ -65,6 +65,13 @@ export function pagePath(page=null){
   if(page)url.searchParams.set('page',page);
   return url.pathname+url.search;
 }
+// Testing hub: same entry and source, no selected Session (account page keeps its own route).
+export function sessionsPath(){
+  const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);
+  url.searchParams.delete('session');url.searchParams.delete('page');
+  if(isAccountPage())url.searchParams.set('page','account');
+  return url.pathname+url.search;
+}
 export function selectSessionUrl(session){
   const url=new URL(window.location.href);
   url.searchParams.set('session',session);

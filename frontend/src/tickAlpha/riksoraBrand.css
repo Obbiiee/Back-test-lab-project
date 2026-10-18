@@ -1,0 +1,26 @@
+/* RIKSORA brand tokens (2026-10-17). Source: RIKSORA Master Blueprint, canonical
+   system: navy #061A3C, electric blue #1378F5, white, ice #D9EAFE; yellow only for
+   rare emphasis; coral only for genuine risk/error; Inter + IBM Plex Mono.
+   Derived shades exist only to keep WCAG AA text contrast; they are not new brand colors.
+   Fonts are self-hosted OFL files (see public/licenses); no remote font request. */
+@font-face{font-family:"Inter Variable";font-style:normal;font-weight:100 900;font-display:swap;src:url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2-variations"),url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2-variations"),url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:swap;src:url("../assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url("../assets/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2")}
+:root{
+  --rk-navy:#061a3c;
+  --rk-blue:#1378f5;
+  --rk-white:#ffffff;
+  --rk-ice:#d9eafe;
+  --rk-yellow:#ffce55;
+  --rk-coral:#ff7373;
+  /* AA helpers: white text on filled controls (5.3:1), brand-blue text on dark surfaces (6.8:1). */
+  --rk-blue-strong:#0f67d8;
+  --rk-blue-pressed:#0b55b8;
+  --rk-blue-on-dark:#5a9df8;
+  --rk-navy-line:#1d3560;
+  --rk-ice-soft:#f3f8ff;
+  --rk-muted:#52627a;
+  --rk-font-ui:"Inter Variable",Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --rk-font-data:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}

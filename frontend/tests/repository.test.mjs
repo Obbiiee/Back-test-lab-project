@@ -8,7 +8,7 @@ const source=[];
 function inventory(dir){for(const entry of readdirSync(path.join(root,dir),{withFileTypes:true})){const file=dir+'/'+entry.name;if(entry.isDirectory())inventory(file);else source.push(file);}}
 inventory('frontend/src');
 const reachable=new Set();
-function visit(file){if(reachable.has(file))return;reachable.add(file);
+let visit=function(file){if(reachable.has(file))return;reachable.add(file);
   for(const match of read(file).matchAll(/(?:from\s*|import\s*\(?\s*)["'](\.[^"']+)["']/g)){
     const base=path.posix.normalize(path.posix.join(path.posix.dirname(file),match[1]));
     assert.ok(base.startsWith('frontend/src/'),'Production must not import archives/fixtures: '+base);
@@ -16,6 +16,12 @@ function visit(file){if(reachable.has(file))return;reachable.add(file);
     assert.ok(target,'Missing local module: '+base);visit(target);
   }
 }
+// Brand fonts are reachable only through stylesheet url() references; verify each exists.
+const visitModules=visit;visit=file=>{const known=reachable.has(file);visitModules(file);if(known||!file.endsWith('.css'))return;
+  for(const match of read(file).matchAll(/url\(\s*["']?(\.[^"')]+)["']?\s*\)/g)){
+    const asset=path.posix.normalize(path.posix.join(path.posix.dirname(file),match[1]));
+    assert.ok(asset.startsWith('frontend/src/')&&existsSync(path.join(root,asset)),'Missing stylesheet asset: '+asset);reachable.add(asset);
+  }};
 visit('frontend/src/main.jsx');
 const compatibility=['frontend/src/components/TradingLevels.jsx','frontend/src/drawings/position.js'];
 assert.deepEqual(source.filter(p=>!reachable.has(p)).sort(),compatibility.sort(),'Unreachable source must have reviewed architectural purpose');
