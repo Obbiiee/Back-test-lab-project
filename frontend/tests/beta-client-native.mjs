@@ -27,6 +27,21 @@ const receipt=await c.confirm(sid,request);revision=receipt.state.revision;
 await command('ADVANCE',{targetNs:config.next});await command('CLOSE',{orderId:review.id,quantity:null});await command('ADVANCE',{targetNs:config.last});
 const stats=await c.statistics(sid);assert.equal(stats.account.balance,'10000.03');assert.deepEqual(stats.metrics.totalR,{numerator:'3',denominator:'100'});
 assert.deepEqual(await c.confirm(sid,request),receipt);assert.equal((await c.inspect(sid)).state.revision,revision);
+// All chart resolutions are read-only and keep the same durable financial state.
+const original=await c.inspect(sid);
+for(const timeframe of ['1m','3m','5m','15m','30m','1h','2h','4h','D']){
+ const framed=await c.inspect(sid,{timeframe});assert.equal(framed.chart.timeframe,timeframe);assert.deepEqual(framed.state,original.state);
+}
+// Two exits remain one completed position, with exact posted cash.
+const second=await c.review(sid,{id:'order:partial',expectedRevision:revision,payload:{...config.opening,quantity:'0.02'}});
+const secondReceipt=await c.confirm(sid,await confirmation(second));revision=secondReceipt.state.revision;
+const later=n=>String(BigInt(config.start)+BigInt(n)*15000000000n);
+await command('ADVANCE',{targetNs:later(3)});await command('CLOSE',{orderId:second.id,quantity:'0.01'});await command('ADVANCE',{targetNs:later(4)});
+assert.equal((await c.statistics(sid)).metrics.tradeCount,1,'partial exit is not a completed position');
+assert.equal((await c.inspect(sid)).state.orders[second.id].remaining,'0.01');
+await command('CLOSE',{orderId:second.id,quantity:null});await command('ADVANCE',{targetNs:later(5)});
+const partialStats=await c.statistics(sid);assert.equal(partialStats.account.balance,'10000.14');assert.equal(partialStats.metrics.tradeCount,2);
+assert.equal(partialStats.completed.find(p=>p.id===second.id).net,'0.11');
 await c.editJournal(sid,{orderId:review.id,expectedNoteRevision:0,text:'Actual Node/ASGI receipt',tags:['qa']});assert.equal((await c.journal(sid)).notes.length,1);
 const access=await c.access();assert.equal(access.mode,'SANDBOX');assert.equal(access.fundsCollected,false);
 await c.trash(sid);assert.equal((await c.inspect(sid)).savedState,'TRASHED');await c.restore(sid);assert.equal((await c.inspect(sid)).savedState,'SAVED');

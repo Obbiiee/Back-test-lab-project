@@ -22,11 +22,11 @@ class BetaClientNativeTests(unittest.TestCase):
         login=http.post('/api/v1/auth/login',data=dict(username=email,password=PASSWORD)).json()
         ws=http.post('/api/v1/workspaces',headers={'Authorization':'Bearer '+login['access_token']},json=dict(name='Node adapter isolated QA'))
         self.assertEqual(ws.status_code,201)
-        config=dict(email=email,password=PASSWORD,workspace=ws.json()['id'],method=method(),opening=opening(entry='999',sl='1.09902'),start=str(START_NS),next=str(START_NS+STEP_NS),last=str(START_NS+2*STEP_NS))
-        driver=Path(__file__).with_name('beta-client-native.mjs')
+        config=dict(email=email,password=PASSWORD,workspace=ws.json()['id'],method=method('PROTOCOL',True) if getattr(self,'protocol_case',False) else method(),opening=opening(entry='999',sl='1.09902'),start=str(START_NS),next=str(START_NS+STEP_NS),last=str(START_NS+2*STEP_NS))
+        driver=Path(__file__).with_name('beta-protocol-native.mjs' if getattr(self,'protocol_case',False) else 'beta-client-native.mjs')
         with tempfile.TemporaryFile(mode='w+t',encoding='utf-8') as errors:
             process=subprocess.Popen(['node',str(driver)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=errors,text=True,encoding='utf-8',env={k:v for k,v in os.environ.items() if k!='BTL_TEST_DATABASE_URL'})
-            deadline=threading.Timer(90,process.kill);deadline.start()
+            deadline=threading.Timer(180,process.kill);deadline.start()
             complete=False
             try:
                 process.stdin.write(json.dumps(config)+'\n');process.stdin.flush()
@@ -46,5 +46,9 @@ class BetaClientNativeTests(unittest.TestCase):
                 deadline.cancel()
                 if process.poll() is None:process.kill();process.wait()
                 process.stdout.close()
+
+    def test_protocol_ui_adapter_rules_and_locked_exits(self):
+        self.protocol_case=True
+        self.test_actual_node_adapter_commits_exact_v2_receipts()
 
 if __name__=='__main__':unittest.main(verbosity=2)

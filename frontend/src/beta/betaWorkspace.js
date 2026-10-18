@@ -1,6 +1,33 @@
 import {canonicalBytes,sha256} from '../tickReview/ReviewImport.js';
 
 export const newId=prefix=>`${prefix}:${crypto.randomUUID()}`;
+export function methodFromForm(fields,id){
+  const protocol=fields.get('kind')==='PROTOCOL';
+  return {schemaVersion:1,artifact:'BTL-LOCAL-METHOD-1',id,name:fields.get('name'),kind:protocol?'PROTOCOL':'FREE_STYLE',
+    checklistOn:protocol&&fields.get('checklist')==='ON',conditions:protocol?String(fields.get('conditions')??'').split('\n').map(s=>s.trim()).filter(Boolean).map((label,i)=>({id:`condition:${i}`,label})):[],
+    riskPercent:protocol?fields.get('risk'):null,rr:protocol?fields.get('rr'):null};
+}
+export function orderFromForm(fields,view){
+  const protocol=view.method.kind==='PROTOCOL',planned=protocol||fields.get('workflow')==='PLANNED';
+  const side=fields.get('side');
+  return {side,workflow:planned?'PLANNED':'QUICK',orderType:planned?fields.get('orderType'):'MARKET',
+    entry:planned?fields.get('entry'):side==='LONG'?view.quote?.ask:view.quote?.bid,
+    quantity:protocol?null:fields.get('quantity'),sl:fields.get('sl')||null,tp:protocol?null:fields.get('tp')||null,
+    riskPercent:protocol?null:'1',observations:protocol?view.method.conditions.map(c=>({conditionId:c.id,outcome:fields.get('condition:'+c.id)||'NOT_ASSESSED'})):[]};
+}
+// One in-flight command; pausing prevents any subsequent scheduled command.
+export function createReplayLoop({step,onStop,schedule=setTimeout,cancel=clearTimeout}){
+  let running=false,timer=null,epoch=0,pending=false;
+  function stop(){running=false;epoch++;if(timer!==null)cancel(timer);timer=null;onStop();}
+  async function pump(version){
+    if(!running||version!==epoch||pending)return;
+    pending=true;let more;
+    try{more=await step();}catch{more=false;}finally{pending=false;}
+    if(!running||version!==epoch)return;
+    if(!more){stop();return;}timer=schedule(()=>{timer=null;void pump(version);},500);
+  }
+  return {start(){if(running||pending)return false;running=true;const version=++epoch;void pump(version);return true;},stop};
+}
 export function executionCommand(view,kind,payload){
   if(view?.artifact!=='BTL-RESEARCH-SESSION-VIEW-2')throw Error('Unsupported Beta Session.');
   return {schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-2',sessionId:view.metadata.id,
@@ -17,6 +44,7 @@ export function accessMessage(access){
 export function betaNotice(error){
   if(error.reconciliationRequired)return 'The request outcome is uncertain. Reload saved evidence before submitting another change.';
   const messages={DAILY_WINDOW_LIMIT:'Today’s Free activation is used. Continue your activated Session, or return after 00:00 UTC.',
+    PROTOCOL_BLOCKED:'Protocol rules refused this order. Assess required conditions and preserve the strategy risk, target and order type.',
     SAVED_SESSION_LIMIT:'Your saved Session limit is reached. Move an unused Session to Trash before creating another.',
     WINDOW_ACTIVATION_REQUIRED:'Activate this Session before replay or trading. Free can activate one monthly window per UTC day.',
     SESSION_TRASHED:'Restore this Session from Trash before continuing.',TRASH_EXPIRED:'The 30-day restore period has expired.',

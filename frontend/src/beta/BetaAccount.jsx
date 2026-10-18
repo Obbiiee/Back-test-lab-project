@@ -10,6 +10,7 @@ export default function BetaAccount(){
   const [client]=useState(()=>createBetaClient());
   const [user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[selected,setSelected]=useState(null);
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+  const [providers,setProviders]=useState(null);
   const flight=useRef(false),live=useRef(true);
   useEffect(()=>{live.current=true;return()=>{live.current=false;client.clear();};},[client]);
   async function run(operation){
@@ -17,6 +18,20 @@ export default function BetaAccount(){
     try{await operation();}catch(error){if(live.current){setNotice(betaNotice(error));if(!client.hasSession()){setUser(null);setSelected(null);setWorkspaces([]);}}}
     finally{flight.current=false;if(live.current)setBusy(false);}
   }
+  useEffect(()=>{
+    let active=true;
+    void Promise.resolve().then(async()=>{
+      if(!active||location.protocol!=='https:')return;
+      try{const value=await client.providers();if(active)setProviders(value);}catch{if(active)setProviders({googleConfigured:false});}
+      if(!active||new URLSearchParams(location.search).get('auth')!=='google')return;
+      // Consume the one-use cookie handoff once; never retain callback state in URLs.
+      history.replaceState(null,'','/?page=beta');
+      await run(async()=>{const me=await client.exchangeGoogle();const list=await client.workspaces();if(active){setUser(me);setWorkspaces(list);}});
+    });
+    return()=>{active=false;};
+  // One verified identity client per mount; StrictMode's discarded setup is cancelled.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[client]);
   const secure=location.protocol==='https:';
   return <main className="alpha-identity beta-account">
     <header className="alpha-identity-nav"><AlphaBrand href="/?page=home"/><span>Beta sandbox</span><a href="/?page=account">Previous Sessions</a></header>
@@ -30,7 +45,7 @@ export default function BetaAccount(){
         });}}><label>Email<input name="email" type="email" autoComplete="email" maxLength={320} required disabled={busy}/></label>
           <label>Password<input name="password" type="password" autoComplete="current-password" minLength={15} maxLength={128} required disabled={busy}/></label>
           <button disabled={busy}>{busy?'Signing in…':'Sign in'}</button>
-        </form><p><a href="/?page=account">Create or verify an account, or recover access</a></p>
+        </form>{providers?.googleConfigured?<a href={client.googleStart()}>Continue with Google</a>:<p>Google sign-in is not configured for this service.</p>}<p><a href="/?page=account">Create or verify an account, or recover access</a></p>
       </>:<>
         <div className="alpha-identity-actions"><span>{user.email}</span><button disabled={busy} onClick={()=>run(async()=>{
           try{await client.logout();}finally{if(live.current){setUser(null);setSelected(null);setWorkspaces([]);}}

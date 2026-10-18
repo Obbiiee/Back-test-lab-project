@@ -104,6 +104,11 @@ def install(app,access):
         return await execute(user,workspace_id,operation,session_id)
     @app.post(prefix+'/sessions/{session_id}/{operation}')
     async def write(workspace_id:uuid.UUID,session_id:str,operation:str,request:Request,user:User=Depends(current)):
+        if operation=='view':
+            raw=await payload(request)
+            require(type(raw) is dict and set(raw)=={'timeframe'},'view')
+            require(type(raw['timeframe']) is str and raw['timeframe'] in ('1m','3m','5m','15m','30m','1h','2h','4h','D'),'timeframe')
+            return await execute(user,workspace_id,'inspect',session_id,raw['timeframe'])
         mapping={'activate':'activate','review':'review','confirm':'confirm','commands':'apply','journal':'edit_note','trash':'trash','restore':'restore'}
         require(operation in mapping,'operation','RESOURCE_UNAVAILABLE')
         raw=await payload(request)

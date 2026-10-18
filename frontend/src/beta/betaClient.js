@@ -4,7 +4,7 @@ const segment=value=>{
   if(typeof value!=='string'||value.length<1||value.length>128||!/^[-A-Za-z0-9_:]+$/.test(value))throw Error('Invalid Session identity.');
   return encodeURIComponent(value);
 };
-const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY']);
+const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY','PROTOCOL_BLOCKED']);
 export class BetaRequestError extends Error{
   constructor(code,{status=0,reconcile=false}={}){super(code);this.name='BetaRequestError';this.code=code;this.status=status;this.reconciliationRequired=reconcile;}
 }
@@ -60,9 +60,9 @@ export function createBetaClient({fetcher=fetch,secure=()=>globalThis.location?.
     if(!workspace)throw new BetaRequestError('WORKSPACE_REQUIRED');
     return `/api/v1/workspaces/${workspace}/research-v2`;
   };
-  async function research(path,body,options={}){
-    const value=await send(scope()+path,{body,signal:options.signal,mutation:body!==undefined});
-    if(![1,2].includes(value?.schemaVersion))throw new BetaRequestError('UNSUPPORTED_RESPONSE',{reconcile:body!==undefined});
+  async function research(path,body,options={},mutation=body!==undefined){
+    const value=await send(scope()+path,{body,signal:options.signal,mutation});
+    if(![1,2].includes(value?.schemaVersion))throw new BetaRequestError('UNSUPPORTED_RESPONSE',{reconcile:mutation});
     return value; // Do not round, recompute, settle or auto-retry financial values.
   }
   const write=(path,raw,options)=>{if(!raw||typeof raw!=='object'||Array.isArray(raw))return Promise.reject(new BetaRequestError('INVALID_REQUEST'));return research(path,raw,options);};
@@ -78,7 +78,7 @@ export function createBetaClient({fetcher=fetch,secure=()=>globalThis.location?.
     selectWorkspace(id){if(!uuid(id))throw new BetaRequestError('INVALID_WORKSPACE');if(!token||!subject)throw new BetaRequestError('SIGN_IN_REQUIRED');workspace=id;generation++;},
     catalog:options=>research('/catalog',undefined,options),access:options=>research('/access',undefined,options),
     createMethod:(raw,options)=>write('/methods',raw,options),createSession:(raw,options)=>write('/sessions',raw,options),
-    inspect:(id,options)=>research('/sessions/'+segment(id),undefined,options),
+    inspect:(id,options={})=>options.timeframe&&options.timeframe!=='1m'?research('/sessions/'+segment(id)+'/view',{timeframe:options.timeframe},options,false):research('/sessions/'+segment(id),undefined,options),
     statistics:(id,options)=>research('/sessions/'+segment(id)+'/statistics',undefined,options),
     journal:(id,options)=>research('/sessions/'+segment(id)+'/journal',undefined,options),
     activate:(id,options)=>research('/sessions/'+segment(id)+'/activate',{},options),

@@ -69,3 +69,9 @@ const isCode=(code,reconcile=false)=>error=>error instanceof BetaRequestError&&e
   const read=good.client.catalog();good.client.clear();paused.resolve();await assert.rejects(read,isCode('ACCOUNT_CHANGED'));
 }
 console.log('PASS Beta transport: exact v2 requests, Google cookie exchange, HTTPS, scoped identity, stale-response refusal, bounded responses, quota errors and uncertain-write reconciliation without retry.');
+
+{
+ const h=await signed();h.set(async()=>json({schemaVersion:1,artifact:'BTL-RESEARCH-SESSION-VIEW-2'}));
+ await h.client.inspect('session:one',{timeframe:'1h'});assert.ok(h.calls.at(-1)[0].endsWith('/view'));assert.deepEqual(JSON.parse(h.calls.at(-1)[1].body),{timeframe:'1h'});
+ h.set(async()=>{throw Error('network');});await assert.rejects(h.client.inspect('session:one',{timeframe:'D'}),isCode('SERVICE_UNAVAILABLE'));
+}

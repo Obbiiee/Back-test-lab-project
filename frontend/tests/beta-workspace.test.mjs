@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {confirmation,executionCommand,accessMessage,betaNotice} from '../src/beta/betaWorkspace.js';
+import {confirmation,executionCommand,accessMessage,betaNotice,methodFromForm,orderFromForm,createReplayLoop} from '../src/beta/betaWorkspace.js';
 import {createBetaClient} from '../src/beta/betaClient.js';
 const view={artifact:'BTL-RESEARCH-SESSION-VIEW-2',metadata:{id:'session:qa'},state:{revision:7,balance:'9007199254740993.03'}};
 const payload={targetNs:'1577836800000000000'};
@@ -21,3 +21,15 @@ const calls=[];const c=createBetaClient({secure:()=>true,fetcher:async(path,opti
 await assert.rejects(c.createWorkspace('Denied'),error=>error.code==='SIGN_IN_REQUIRED');assert.equal(calls.length,0);
 await c.login('qa@example.com','authored fixture');await c.createWorkspace('Exact workspace');assert.equal(calls.at(-1)[0],'/api/v1/workspaces');assert.deepEqual(JSON.parse(calls.at(-1)[1].body),{name:'Exact workspace'});
 console.log('PASS Beta UI contracts: engine isolation, exact review canonical hash, unique command identity, honest sandbox access and reconciliation messages.');
+
+const fields=new Map(Object.entries({kind:'PROTOCOL',name:'Pinned rules',checklist:'ON',conditions:'Setup valid\nTrend valid',risk:'0.5',rr:'2'}));
+const method=methodFromForm(fields,'method:pinned');assert.equal(method.kind,'PROTOCOL');assert.equal(method.conditions.length,2);assert.equal(method.checklistOn,true);
+const forged=new Map(Object.entries({side:'LONG',workflow:'QUICK',orderType:'LIMIT',entry:'1.1',quantity:'99',tp:'999',sl:'1.09',risk:'99','condition:condition:0':'PASS'}));
+const protocol=orderFromForm(forged,{method,quote:{ask:'1.2'}});assert.equal(protocol.workflow,'PLANNED');assert.equal(protocol.quantity,null);assert.equal(protocol.tp,null);assert.equal(protocol.riskPercent,null);assert.equal(protocol.observations[1].outcome,'NOT_ASSESSED');
+const free=orderFromForm(forged,{method:{kind:'FREE_STYLE'},quote:{ask:'1.2'}});assert.equal(free.entry,'1.2');assert.equal(free.orderType,'MARKET');assert.deepEqual(free.observations,[]);
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+let release,callsMade=0,stopped=0,queued=[];
+const loop=createReplayLoop({step:()=>{callsMade++;return new Promise(resolve=>{release=resolve;});},onStop:()=>stopped++,schedule:fn=>{queued.push(fn);return fn;},cancel:fn=>{queued=queued.filter(x=>x!==fn);}});
+assert.equal(loop.start(),true);assert.equal(loop.start(),false);assert.equal(callsMade,1);loop.stop();assert.equal(loop.start(),false,'in-flight command blocks restart');release(true);await settle();assert.equal(queued.length,0,'pause cannot schedule another command');
+assert.equal(loop.start(),true);release(true);await settle();assert.equal(queued.length,1);const nextTick=queued.shift();nextTick();assert.equal(callsMade,3);release(false);await settle();assert.equal(queued.length,0);assert.equal(stopped,2);
+console.log('PASS Protocol owns quantity/target/risk and checklist evidence; replay backpressure, pause-in-flight, restart and no-progress stop.');

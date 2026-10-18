@@ -306,7 +306,8 @@
     "deploy/vps/tests/test_native.py",
     "deploy/vps/tests/test_package.py",
     "backend/tests/test_midtrans.py",
-    "frontend/tests/beta-workspace.test.mjs"
+    "frontend/tests/beta-workspace.test.mjs",
+    "frontend/tests/beta-protocol-native.mjs"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

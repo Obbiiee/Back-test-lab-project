@@ -77,6 +77,20 @@ class SandboxV2Tests(unittest.TestCase):
         self.grant();self.post(self.path+'/restore',{})
         self.assertEqual(self.get('/access')['savedSessions'],6)
         self.assertEqual(self.get(self.path)['metadata']['id'],self.sid)
+    def test_timeframe_view_is_read_only_causal_and_scoped(self):
+        self.post(self.path+'/activate',{})
+        self.call('ADVANCE',dict(targetNs=str(START_NS+4*STEP_NS)))
+        before=self.get(self.path)
+        for timeframe in ('1m','3m','5m','15m','30m','1h','2h','4h','D'):
+            value=self.post(self.path+'/view',dict(timeframe=timeframe))
+            self.assertEqual(value['state'],before['state'])
+            self.assertEqual(value['chart']['timeframe'],timeframe)
+            self.assertTrue(all(c['time']*1000000000<=int(before['state']['throughNs']) for c in value['chart']['candles']))
+        for raw in ({},{'timeframe':'1s'},{'timeframe':None},{'timeframe':'1m','source':'real'}):self.post(self.path+'/view',raw,422)
+        _,other=self.account()
+        self.assertEqual(self.client.post(self.root+self.path+'/view',headers=other,json={'timeframe':'1m'}).status_code,404)
+        self.assertEqual(self.client.post(self.root+self.path+'/view',json={'timeframe':'1m'}).status_code,401)
+        self.assertEqual(self.get(self.path)['state'],before['state'])
     def test_daily_concurrent_activation_global_account_and_pro(self):
         self.post('/sessions',self.raw('session:two'))
         paths=[self.path+'/activate','/sessions/session:two/activate']

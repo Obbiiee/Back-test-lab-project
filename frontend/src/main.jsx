@@ -10,7 +10,7 @@ import TickAlphaEntry from './tickAlpha/TickAlphaEntry.jsx';
 import AlphaAccount from './tickAlpha/AlphaAccount.jsx';
 import PublicHome from './tickAlpha/AlphaHome.jsx';
 import BetaAccount from './beta/BetaAccount.jsx';
-const beta=new URLSearchParams(window.location.search).get('page')==='beta';
+const beta=new URLSearchParams(window.location.search).get('page')==='beta'||new URLSearchParams(window.location.search).get('auth')==='google';
 const privateLocal=isLocalReview(window.location.hostname)&&window.location.protocol==='http:';
 const account=new URLSearchParams(window.location.search).get('page')==='account';
 const tickAlpha=new URLSearchParams(window.location.search).get('tick-alpha')==='local'||new URLSearchParams(window.location.search).get('tick-alpha')==='exness';
