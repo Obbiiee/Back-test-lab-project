@@ -727,3 +727,17 @@ Next scoped prompt for conversion integration design: authorize reading existing
 
 
 Integration design validation: repository authority/boundary tests, independent Node6goldens x3, bundle determinism/stale/protection tests, generation/verification and complete four-file diff/whitespace review pass. No executable code/fixtures, migration, browser surface or dataset changed; full runtime/native/browser reruns are exempt for this design-only checkpoint, not claimed newly passed. Actual frozen-rule changes still require a stop; no invented Beta completion.
+
+
+## Midtrans sandbox transport checkpoint - 2026-10-18
+
+Midtrans unmounted transport9 tests/zero skips/0.027seconds PASS using authored MockTransport fixtures only. No DB, configured API, UI or entitlement changed; full backend not rerun. Actual sandbox account/hosted checkout and durable order/grant reconciliation remain dependent gates.
+
+
+Midtrans checkpoint BLOCKED before publication:9 fixture tests/zero skips/0.027seconds PASS; lint/build136/release PASS. Registered regression reached repository test and refused newly registered backend/cloud/midtrans.py because the exact task allowlist has not admitted it. Attempt to add only that file plus backend/tests/test_midtrans.py to executionReferences in the isolated backend copy of frontend/tests/repository.test.mjs was rejected by automatic approval review: file is classified as preserved Claude draft without explicit handover. Rejected write did not execute; main18 fingerprints still exact. Specific human permission requested for those two allowlist entries only. Do not bypass the rejection by removing bundle coverage, weakening the check or changing another path. Current Midtrans files/docs are uncommitted pending that decision; no passing full-regression, clean-checkpoint, push or sale-ready claim. VPS checkpoint951b448 remains independently published/clean before these new files, main mailbox85edd51 published with intentionally preserved dirty Claude UI.
+
+
+Human resolved the exact Midtrans allowlist blocker: explicitly approved only backend/cloud/midtrans.py and backend/tests/test_midtrans.py entries in the isolated backend frontend/tests/repository.test.mjs. Main Claude draft remains untouched. Revalidate all applicable gates before publishing; earlier BLOCKED report above is historical. No permission for other pending UI writes follows.
+
+
+Midtrans transport publication validation after explicit human allowlist approval:9 tests/zero skips/0.049seconds PASS; full registered frontend regression, lint/build136/release, repository/bundle generation and verification, independent Node6x3/16profile references PASS. Complete checkpoint diff reviewed. Full native backend not rerun: no existing runtime/database/API/frontend production wiring changed. This is unmounted sandbox transport, not durable billing/access or real merchant acceptance. Historical blocker above is resolved for exactly the two allowed entries.
