@@ -215,7 +215,9 @@
     "frontend/src/beta/BetaWorkspace.jsx",
     "frontend/src/beta/betaWorkspace.js",
     "frontend/src/beta/betaClient.js",
-    "frontend/src/beta/beta.css"
+    "frontend/src/beta/beta.css",
+    "backend/cloud/billing.py",
+    "backend/infrastructure/migrations/013_sandbox_billing.sql"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -307,7 +309,8 @@
     "deploy/vps/tests/test_package.py",
     "backend/tests/test_midtrans.py",
     "frontend/tests/beta-workspace.test.mjs",
-    "frontend/tests/beta-protocol-native.mjs"
+    "frontend/tests/beta-protocol-native.mjs",
+    "backend/tests/test_billing.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

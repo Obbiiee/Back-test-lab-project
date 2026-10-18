@@ -44,7 +44,7 @@ class GuardedDatabaseStrategy(DatabaseStrategy):
 
 
 def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sandbox_reset_timezone=None, sandbox_event_secret=None,
-               google_client_id=None, google_client_secret=None, google_redirect_uri=None):
+               google_client_id=None, google_client_secret=None, google_redirect_uri=None, sandbox_billing=None):
     if not dsn or type(secret) is not str or len(secret) < 64 or delivery is None:
         raise ValueError("Database, high-entropy auth secret and delivery required")
     if sandbox_event_secret is not None and sandbox_event_secret == secret:
@@ -57,6 +57,10 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
         if google_client_secret==secret:
             raise ValueError("Google secret must be separate from identity secret")
         google_config=GoogleConfig(google_client_id,google_client_secret,google_redirect_uri)
+    if sandbox_billing is not None:
+        from .billing import SandboxBilling
+        if type(sandbox_billing) is not SandboxBilling or sandbox_reset_timezone is None or sandbox_billing.access.timezone!=sandbox_reset_timezone:
+            raise ValueError("Explicit sandbox billing/reset configuration required")
     user_store, token_store = UserStore(dsn), TokenStore(dsn)
     async def manager():
         return UserManager(user_store, secret, delivery)
@@ -94,7 +98,10 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
     if sandbox_reset_timezone is not None:
         from .sandbox_access import SandboxAccess
         from .research_v2 import install as install_v2
-        install_v2(app,SandboxAccess(dsn,sandbox_reset_timezone,event_secret=sandbox_event_secret))
+        install_v2(app,SandboxAccess(dsn,sandbox_reset_timezone,event_secret=sandbox_event_secret,billing=sandbox_billing is not None))
+    if sandbox_billing is not None:
+        from .billing import install as install_billing
+        install_billing(app,sandbox_billing)
     if google_config is not None:
         from identity.google import install as install_google
         install_google(app,google_config,backend,strategy,user_store)

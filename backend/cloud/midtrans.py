@@ -106,6 +106,10 @@ class SnapSandbox:
         # MockTransport injection is for authored tests, not browser-controlled URLs.
         self._transport = transport
 
+    @property
+    def merchant_id(self):
+        return self._config.merchant_id
+
     def _request(self, method, url, payload=None):
         try:
             with httpx.Client(auth=httpx.BasicAuth(self._config.server_key, ''),

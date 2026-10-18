@@ -12,9 +12,11 @@ from execution.postgres import pack, unpack
 TIMEZONES=('UTC','Asia/Jakarta')
 
 class SandboxAccess:
-    def __init__(self,dsn,reset_timezone,*,event_secret=None):
+    def __init__(self,dsn,reset_timezone,*,event_secret=None,billing=False):
         require(reset_timezone in TIMEZONES,'resetTimezone','ACCESS_UNCONFIGURED')
         require(event_secret is None or type(event_secret) is str and len(event_secret)>=64,'eventSecret')
+        require(type(billing) is bool,'billing')
+        self.billing=billing
         self.dsn,self.timezone,self.secret=dsn,reset_timezone,event_secret
     def lock(self,db,actor):
         db.execute('INSERT INTO btl.v2_access_accounts VALUES (%s,%s) ON CONFLICT DO NOTHING',(actor,self.timezone))
@@ -29,6 +31,9 @@ class SandboxAccess:
             event=checked_event(unpack(*row[:2]))
             require(event['accountId']==str(actor) and event['id']==row[2] and event['sequence']==row[3],'event','CORRUPT_RECORD')
             if event['tier']=='PRO' and int(event['expiresAt'])>int(now.timestamp()):tier='PRO'
+        if self.billing:
+            paid=db.execute("SELECT 1 FROM btl.sandbox_billing_orders WHERE actor_id=%s AND phase='PAID' AND paid_at<=%s AND expires_at>%s LIMIT 1",(actor,int(now.timestamp()),int(now.timestamp()))).fetchone()
+            if paid:tier='PRO'
         saved=db.execute('SELECT count(*) FROM btl.v2_access_sessions WHERE actor_id=%s AND trashed_at IS NULL',(actor,)).fetchone()[0]
         used=db.execute('SELECT 1 FROM btl.v2_access_windows WHERE actor_id=%s AND free_day=%s',(actor,day)).fetchone() is not None
         return dict(schemaVersion=1,artifact='BTL-SANDBOX-ACCESS-1',mode='SANDBOX',fundsCollected=False,tier=tier,resetTimezone=self.timezone,

@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Current continuation (2026-10-19): human defers historical data until VPS and authorizes local prerequisites. Durable sandbox billing and factory-only HTTPS API/access composition validated: final13 native billing tests and separate1 native deployment test pass; previous broader59-test regression also passed before final merchant-pin refinement. No frontend checkout or environment activation, retail offer or actual merchant acceptance is claimed.
+
 Latest human steering (2026-10-19): defer historical data until VPS. Continue local payment preparation. Internal Midtrans reconciliation policy is tested offline; durable storage/API/access composition remains open. No production payment or additional readiness claim.
 
 Latest human scope (2026-10-19): prioritize working functionality without VPS; defer UI design to Claude. Current checkpoint extends v2 Protocol, partial exits, replay/timeframe controls and existing Google callback UI. Validated local471-test backend and focused native/browser checkpoint; no financial/causal contract change or sales acceptance. Continue remaining local prerequisites under existing grant after validated publication.
