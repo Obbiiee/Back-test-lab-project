@@ -203,7 +203,8 @@
     "backend/identity/google.py",
     "backend/identity/google_store.py",
     "backend/infrastructure/migrations/012_google_identity.sql",
-    "frontend/integration/betaClient.js"
+    "frontend/integration/betaClient.js",
+    "backend/ticks/dukascopy_batch.py"
   ],
   "tests": [
     "frontend/tests/stitch-analytics.test.mjs",
@@ -288,7 +289,8 @@
     "backend/tests/test_google_identity.py",
     "frontend/tests/beta-client.test.mjs",
     "frontend/tests/beta-client-native.mjs",
-    "frontend/tests/beta_client_native.py"
+    "frontend/tests/beta_client_native.py",
+    "backend/tests/test_dukascopy_batch.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
