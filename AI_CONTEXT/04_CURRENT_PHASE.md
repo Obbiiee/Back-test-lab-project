@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest human implementation checkpoint (2026-10-19): mount v2 UI and Free/Pro access under explicit /?page=beta, preserving v1/local paths. Mounted Free browser journey and focused native bridge validated; no backend mutation or sales acceptance. Historical ownership restrictions do not prohibit these requested additive components. Remaining Protocol/advanced replay, Google, durable payments, two-year OHLC, host/data/capacity gates stay open.
+
 Latest integration checkpoint (2026-10-19): human-approved public HTTPS landing/account routing and handed-over main UI integrated on backend. Full 470-test native suite and frontend gates PASS; browser v1 synthetic Session recovery/Analysis PASS. This supersedes historical pending ownership language for the four approved routing files only. Staging-source validation is not sales, mounted v2/Google/billing, Linux, domain, capacity or data-rights acceptance.
 
 Latest payment selection (2026-10-18): Midtrans Snap sandbox first. Implement the bounded unmounted provider transport before durable order/account reconciliation and eventual API/browser cutover. No chosen retail price/duration, owned merchant keys, real funds or sale-ready claim. Existing broader continuation grant remains; preserve frozen contracts and pending Claude UI.

@@ -210,7 +210,12 @@
     "backend/infrastructure/migrations/012_google_identity.sql",
     "frontend/integration/betaClient.js",
     "backend/ticks/dukascopy_batch.py",
-    "backend/cloud/midtrans.py"
+    "backend/cloud/midtrans.py",
+    "frontend/src/beta/BetaAccount.jsx",
+    "frontend/src/beta/BetaWorkspace.jsx",
+    "frontend/src/beta/betaWorkspace.js",
+    "frontend/src/beta/betaClient.js",
+    "frontend/src/beta/beta.css"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -300,7 +305,8 @@
     "backend/tests/test_dukascopy_batch.py",
     "deploy/vps/tests/test_native.py",
     "deploy/vps/tests/test_package.py",
-    "backend/tests/test_midtrans.py"
+    "backend/tests/test_midtrans.py",
+    "frontend/tests/beta-workspace.test.mjs"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

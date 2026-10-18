@@ -42,6 +42,7 @@ export default function AlphaHome(){
         <p className="alpha-home-intro">Pick a date, press Play and trade the candles as they form. No peeking at the future, no guessed fills. Just you, your plan and the replay.</p>
         <div className="alpha-home-actions">
           <a className="alpha-home-primary" href={workspace}>Start backtesting</a>
+          <a className="alpha-home-secondary" href="/?page=beta">16-pair Beta sandbox</a>
           <a className="alpha-home-secondary" href="#how"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></span>See how it works</a>
         </div>
         <p className="alpha-home-caption">Private local workspace · historical research · no live brokerage</p>

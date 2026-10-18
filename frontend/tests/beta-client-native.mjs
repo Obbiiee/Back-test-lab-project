@@ -1,7 +1,7 @@
 // Private QA stdin/stdout protocol only. Never run against a user database.
 import assert from 'node:assert/strict';
 import {createInterface} from 'node:readline';
-import {createHash} from 'node:crypto';
+import {confirmation} from '../src/beta/betaWorkspace.js';
 import {createBetaClient} from '../integration/betaClient.js';
 const lines=createInterface({input:process.stdin})[Symbol.asyncIterator]();
 const next=async()=>JSON.parse((await lines.next()).value);
@@ -10,7 +10,6 @@ const c=createBetaClient({secure:()=>true,fetcher:async(path,options)=>{
   process.stdout.write(JSON.stringify({path,options})+'\n');const response=await next();
   return new Response(response.status===204?null:response.body,{status:response.status,headers:{'content-type':'application/json'}});
 }});
-const canonical=v=>Array.isArray(v)?'['+v.map(canonical).join(',')+']':v!==null&&typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}':JSON.stringify(v);
 assert.equal((await c.providers()).googleConfigured,false);
 await c.login(config.email,config.password);c.selectWorkspace(config.workspace);
 await c.createMethod(config.method);
@@ -23,7 +22,7 @@ let revision=0;const command=async(kind,payload)=>{
 await command('ADVANCE',{targetNs:config.start});
 const review=await c.review(sid,{id:'order:node',expectedRevision:revision,payload:config.opening});
 assert.equal(review.command.payload.entry,'1.10002');
-const request={reviewId:review.id,reviewHash:createHash('sha256').update(canonical(review)).digest('hex')};
+const request=await confirmation(review);
 const receipt=await c.confirm(sid,request);revision=receipt.state.revision;
 await command('ADVANCE',{targetNs:config.next});await command('CLOSE',{orderId:review.id,quantity:null});await command('ADVANCE',{targetNs:config.last});
 const stats=await c.statistics(sid);assert.equal(stats.account.balance,'10000.03');assert.deepEqual(stats.metrics.totalR,{numerator:'3',denominator:'100'});

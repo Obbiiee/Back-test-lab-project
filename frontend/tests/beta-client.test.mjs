@@ -68,4 +68,4 @@ const isCode=(code,reconcile=false)=>error=>error instanceof BetaRequestError&&e
   const paused=deferred();good.set(async()=>new Response(new ReadableStream({async start(controller){await paused.promise;controller.enqueue(new TextEncoder().encode('{"schemaVersion":2}'));controller.close();}})));
   const read=good.client.catalog();good.client.clear();paused.resolve();await assert.rejects(read,isCode('ACCOUNT_CHANGED'));
 }
-console.log('PASS unmounted Beta transport: exact v2 requests, Google cookie exchange, HTTPS, scoped identity, stale-response refusal, bounded responses, quota errors and uncertain-write reconciliation without retry.');
+console.log('PASS Beta transport: exact v2 requests, Google cookie exchange, HTTPS, scoped identity, stale-response refusal, bounded responses, quota errors and uncertain-write reconciliation without retry.');
