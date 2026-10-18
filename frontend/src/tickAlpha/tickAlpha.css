@@ -249,6 +249,12 @@
 .alpha-equity-scale{display:flex;justify-content:space-between;font:11px var(--rk-font-data);color:var(--lab-text-secondary);margin-top:4px}
 .alpha-equity-empty{font-size:12px;color:var(--lab-text-secondary);border:1px dashed var(--lab-border);border-radius:6px;padding:16px}
 
+/* Keep the chart usable when the terminal expands; scroll rather than overlap. */
+@media(min-width:761px){
+ .tick-alpha{overflow-y:auto}
+ .tick-alpha .alpha-workspace,.tick-alpha .alpha-chart-workspace{min-height:300px}
+ .tick-alpha .alpha-chart-body,.tick-alpha .alpha-chart-host{min-height:180px}
+}
 /* Playful hub and chrome; chart and execution remain unchanged. */
 .tick-alpha>header{border-radius:0 0 24px 24px;padding:16px 24px;gap:16px}
 .tick-alpha>header nav{display:flex;flex-wrap:wrap;gap:8px}
