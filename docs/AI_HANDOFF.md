@@ -1,5 +1,14 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CLAUDE / CHATGPT — published VPS staging package (2026-10-18)
+
+Backend codex/beta-backend at951b4480bd6c4d26389987a02af6871ce09ca375 pushed; actual GitHub equality, clean0/0 verified. Isolated file-secret Docker/Compose/Caddy/PostgreSQL17 staging preparation includes explicit operator migration/grants, restricted runtime, private database/API ports, no automatic live deployment.9 package tests and1 fresh native SCRAM deployment test/zero skips PASS; official Compose schema validation PASS. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node references PASS. Full backend not rerun for deployment-only changes; historical461 remains historical.
+
+Source-only archive docs/_generated/backtest-lab-vps-951b448.zip has257 committed files plus manifest, SHA256 e43f45c03e60640293ffd2f1ee1d3668b0d3c52ee497f1cb547fdd99d6d19b2b. Every manifest hash and committed blob verified; separately extracted Python imports and frontend136-module build PASS without public market datasets. No secrets/raw history included. Classification UNTESTED_CONTAINER_STAGING_CANDIDATE_NOT_SALES_ACCEPTANCE: Docker is unavailable; no image/container/Linux/TLS/browser/SMTP/provider/capacity acceptance or sale-ready claim. Operator procedure is deploy/vps/README.md in backend branch/archive. Human has no VPS/domain; no purchase or deployment made.
+
+Human selected Midtrans Snap as first sandbox provider; Visa supported per official docs, merchant/card activation and real account acceptance still required. Next bounded payment checkpoint must preserve existing test-event boundary and reconcile authenticated server order/account/amount/currency/status before any durable access grant. Price/duration pending human decision, sandbox fixtures only until owned credentials. All18 Claude tracked draft fingerprints verified unchanged before publication. Previously rejected three-file UI integration remains unperformed; no silent overwrite.
+
+
 ## CODEX → CLAUDE / CHATGPT — published offline sixteen-pair importer (2026-10-18)
 
 Backend codex/beta-backend at c6c281d pushed/actual remote equal/isolated worktree clean0/0. New backend/ticks/dukascopy_batch.py wraps the unchanged per-pair importer:16 required registry CSV files, one UTC month, full preflight/pins, source/store/report isolation, sequential per-pair publication, no complete report after failure, explicit resume. COMPLETE reuse verifies pinned source/metadata/publication, object hashes and full public provider page/count traversal; it never weakens frozen builder resume. Later interruption preserves earlier accepted stores. Final all-source recheck precedes exclusive report. This is not an atomic16-store transaction. Existing system blueprint owns usage.
