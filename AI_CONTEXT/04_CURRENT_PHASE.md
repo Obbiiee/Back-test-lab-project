@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest human steering (2026-10-19): defer historical data until VPS. Continue local payment preparation. Internal Midtrans reconciliation policy is tested offline; durable storage/API/access composition remains open. No production payment or additional readiness claim.
+
 Latest human scope (2026-10-19): prioritize working functionality without VPS; defer UI design to Claude. Current checkpoint extends v2 Protocol, partial exits, replay/timeframe controls and existing Google callback UI. Validated local471-test backend and focused native/browser checkpoint; no financial/causal contract change or sales acceptance. Continue remaining local prerequisites under existing grant after validated publication.
 
 Latest human implementation checkpoint (2026-10-19): mount v2 UI and Free/Pro access under explicit /?page=beta, preserving v1/local paths. Mounted Free browser journey and focused native bridge validated; no backend mutation or sales acceptance. Historical ownership restrictions do not prohibit these requested additive components. Remaining Protocol/advanced replay, Google, durable payments, two-year OHLC, host/data/capacity gates stay open.

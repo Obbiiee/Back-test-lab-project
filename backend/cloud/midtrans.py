@@ -183,3 +183,63 @@ class SnapSandbox:
             elif state in ('deny', 'cancel', 'expire', 'failure'):
                 disposition = 'FAILED'
         return Observation(order.order_id, tx, state, disposition)
+
+
+@dataclass(frozen=True)
+class PaymentState:
+    """Internal sandbox reducer only, not a persisted order or access grant.
+
+    The future store must CAS this state under the account lock. Only authenticated
+    SnapSandbox.status observations may enter observe(); never notification bodies.
+    """
+    order: SandboxOrder
+    phase: str = 'CREATED'
+    transaction_id: str | None = None
+    paid_at: int | None = None
+    expires_at: int | None = None
+
+    def __post_init__(self):
+        check(type(self.order) is SandboxOrder, 'ORDER_INVALID')
+        check(self.phase in ('CREATED', 'CHECKOUT_STARTED', 'PENDING', 'FAILED', 'PAID', 'REVERSED', 'HOLD'), 'PAYMENT_STATE_INVALID')
+        check(self.transaction_id is None or text(self.transaction_id), 'TRANSACTION_INVALID')
+        check((self.paid_at is None) == (self.expires_at is None), 'PAYMENT_STATE_INVALID')
+        if self.paid_at is not None:
+            check(type(self.paid_at) is int and 0 <= self.paid_at <= 253402300799
+                  and type(self.expires_at) is int
+                  and self.expires_at == self.paid_at + self.order.duration_seconds,
+                  'PAYMENT_STATE_INVALID')
+            check(self.transaction_id is not None and self.phase in ('PAID', 'REVERSED', 'HOLD'), 'PAYMENT_STATE_INVALID')
+        check(self.phase != 'PAID' or self.paid_at is not None, 'PAYMENT_STATE_INVALID')
+
+    def begin_checkout(self):
+        # Persist CHECKOUT_STARTED before the outbound POST. A crash/timeout leaves
+        # it here; no retry method exists. Reconciliation uses authenticated GET.
+        check(self.phase == 'CREATED' and self.transaction_id is None, 'CHECKOUT_ALREADY_STARTED')
+        return PaymentState(self.order, 'CHECKOUT_STARTED')
+
+    def observe(self, evidence, observed_at):
+        check(type(evidence) is Observation and evidence.mode == 'SANDBOX'
+              and evidence.funds_collected is False, 'OBSERVATION_INVALID')
+        check(evidence.order_id == self.order.order_id, 'ORDER_EVIDENCE_MISMATCH')
+        check(text(evidence.transaction_id) and (self.transaction_id is None
+              or evidence.transaction_id == self.transaction_id), 'TRANSACTION_EVIDENCE_MISMATCH')
+        check(type(observed_at) is int and 0 <= observed_at <= 253402300799, 'CLOCK_INVALID')
+        check(evidence.disposition in ('PAID_EVIDENCE', 'REVERSED', 'PENDING', 'FAILED', 'HOLD'), 'OBSERVATION_INVALID')
+        # Reversal is terminal even when a delayed success arrives afterwards.
+        if self.phase == 'REVERSED':
+            return self
+        phase = {'PAID_EVIDENCE': 'PAID', 'REVERSED': 'REVERSED',
+                 'PENDING': 'PENDING', 'FAILED': 'FAILED', 'HOLD': 'HOLD'}[evidence.disposition]
+        paid_at, expires_at = self.paid_at, self.expires_at
+        if phase == 'PAID':
+            if paid_at is None:
+                paid_at, expires_at = observed_at, observed_at + self.order.duration_seconds
+        elif paid_at is not None and phase in ('PENDING', 'FAILED'):
+            # Out-of-order non-success cannot extend or silently revoke a grant;
+            # inconsistent evidence suspends this order until fresh reconciliation.
+            phase = 'HOLD'
+        return PaymentState(self.order, phase, evidence.transaction_id, paid_at, expires_at)
+
+    def eligible(self, now):
+        check(type(now) is int and 0 <= now <= 253402300799, 'CLOCK_INVALID')
+        return self.phase == 'PAID' and self.paid_at <= now < self.expires_at

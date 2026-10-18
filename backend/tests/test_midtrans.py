@@ -150,4 +150,81 @@ class MidtransTests(unittest.TestCase):
         self.assertEqual(options['timeout'].read,10);self.assertEqual(options['timeout'].connect,5)
 
 
+
+
+
+class PaymentStateTests(unittest.TestCase):
+    """Internal policy tests; no database, webhook mount or entitlement mutation."""
+    def state(self):
+        from cloud.midtrans import PaymentState
+        return PaymentState(ORDER)
+
+    def observation(self, disposition, **changes):
+        from cloud.midtrans import Observation
+        return replace(Observation(ORDER.order_id, 'qa-tx', 'authored', disposition), **changes)
+
+    def test_checkout_is_one_shot_even_after_uncertain_outcome(self):
+        state = self.state().begin_checkout()
+        self.assertEqual(state.phase, 'CHECKOUT_STARTED')
+        with self.assertRaises(PaymentError): state.begin_checkout()
+        pending = state.observe(self.observation('PENDING'), 100)
+        with self.assertRaises(PaymentError): pending.begin_checkout()
+        self.assertFalse(pending.eligible(100))
+
+    def test_duplicate_and_delayed_success_never_renew(self):
+        paid = self.state().begin_checkout().observe(self.observation('PAID_EVIDENCE'), 100)
+        self.assertEqual(paid.observe(self.observation('PAID_EVIDENCE'), 900), paid)
+        self.assertTrue(paid.eligible(100))
+        self.assertFalse(paid.eligible(99))
+        self.assertFalse(paid.eligible(100 + ORDER.duration_seconds))
+        self.assertFalse(paid.observe(self.observation('PAID_EVIDENCE'), 999999).eligible(999999))
+
+    def test_reversal_before_or_after_success_is_terminal(self):
+        for base in (self.state(), self.state().observe(self.observation('PAID_EVIDENCE'), 100)):
+            reversed_state = base.observe(self.observation('REVERSED'), 110)
+            self.assertFalse(reversed_state.eligible(111))
+            self.assertEqual(reversed_state.observe(self.observation('PAID_EVIDENCE'), 120), reversed_state)
+            self.assertEqual(reversed_state.observe(self.observation('PENDING'), 130), reversed_state)
+
+    def test_hold_suspends_without_resetting_first_success_time(self):
+        paid = self.state().observe(self.observation('PAID_EVIDENCE'), 100)
+        for disposition in ('PENDING', 'FAILED', 'HOLD'):
+            held = paid.observe(self.observation(disposition), 120)
+            self.assertEqual(held.phase, 'HOLD')
+            self.assertFalse(held.eligible(120))
+            self.assertEqual(held.observe(self.observation('PAID_EVIDENCE'), 140), paid)
+
+    def test_foreign_transaction_and_client_evidence_refused(self):
+        paid = self.state().observe(self.observation('PAID_EVIDENCE'), 100)
+        for evidence in (self.observation('PAID_EVIDENCE', transaction_id='other'),
+                         self.observation('PAID_EVIDENCE', order_id='other'),
+                         self.observation('PAID_EVIDENCE', mode='PRODUCTION'),
+                         self.observation('PAID_EVIDENCE', funds_collected=True),
+                         self.observation('UNKNOWN'), {'disposition':'PAID_EVIDENCE'}):
+            with self.assertRaises(PaymentError): paid.observe(evidence, 120)
+        for clock in (True, -1, 1.5, '100'):
+            with self.assertRaises(PaymentError): paid.observe(self.observation('PAID_EVIDENCE'), clock)
+            with self.assertRaises(PaymentError): paid.eligible(clock)
+
+    def test_invalid_reconstructed_state_refused(self):
+        from cloud.midtrans import PaymentState
+        for fields in ({'phase':'PAID'}, {'phase':'INVALID'},
+                       {'phase':'PAID','paid_at':100,'expires_at':999,'transaction_id':'qa-tx'},
+                       {'paid_at':100,'expires_at':100+ORDER.duration_seconds}):
+            with self.assertRaises(PaymentError): PaymentState(ORDER, **fields)
+
+    def test_authenticated_adapter_status_drives_policy_not_notification(self):
+        from cloud.midtrans import PaymentState
+        fixture = evidence()
+        adapter = SnapSandbox(CONFIG, transport=httpx.MockTransport(lambda _: httpx.Response(200, json=fixture)))
+        paid = PaymentState(ORDER).begin_checkout().observe(adapter.status(ORDER), 100)
+        self.assertTrue(paid.eligible(101))
+        fixture['transaction_status'] = 'partial_refund'
+        reversed_state = paid.observe(adapter.status(ORDER, transaction_id=paid.transaction_id), 110)
+        self.assertFalse(reversed_state.eligible(111))
+        # An authentic signature still does not authenticate notification status.
+        raw = json.dumps(notify(transaction_status='settlement')).encode()
+        with self.assertRaises(PaymentError):
+            reversed_state.observe(adapter.authenticate_notification(raw), 120)
+
 if __name__ == '__main__': unittest.main()
