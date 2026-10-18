@@ -1,3 +1,4 @@
+import {isLocalReview} from '../tickReview/LocalOrigin.js';
 // Local transport only. Financial values stay exact strings; no browser settlement.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 import {accountTransport,isAccountPage} from './accountClient.js';
@@ -65,6 +66,13 @@ export function pagePath(page=null){
   if(page)url.searchParams.set('page',page);
   return url.pathname+url.search;
 }
+// Testing hub: same entry and source, no selected Session (account page keeps its own route).
+export function sessionsPath(){
+  const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);
+  url.searchParams.delete('session');url.searchParams.delete('page');
+  if(isAccountPage())url.searchParams.set('page','account');
+  return url.pathname+url.search;
+}
 export function selectSessionUrl(session){
   const url=new URL(window.location.href);
   url.searchParams.set('session',session);
@@ -95,4 +103,13 @@ export function noticeText(message){
     REFUSED_ANALYSIS_LIMIT:'Analysis exceeded its bounded event budget. No partial result is shown.',
   };
   return explanations[message]?`${explanations[message]} (${message})`:message;
+}
+
+// Public/HTTPS landing enters verified account access, never the private HTTP feed.
+export function landingWorkspacePath(href=window.location.href){
+  const url=new URL(href);
+  if(url.protocol==='http:'&&isLocalReview(url.hostname)){
+    url.searchParams.delete('page');return url.pathname+url.search;
+  }
+  return '/?page=account';
 }

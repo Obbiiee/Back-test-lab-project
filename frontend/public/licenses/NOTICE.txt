@@ -14,3 +14,7 @@ Copyright (c) 2026 deepentropy; MIT, see lightweight-charts-drawing-ray-LICENSE.
 Source https://github.com/deepentropy/lightweight-charts-drawing at
 72290d3165682ec7bd28f96af7f9354184982dda (package0.5.1).
 Modified by BTL for offscreen anchors; native runtime/parser are not integrated.
+
+Brand fonts: Inter (Copyright 2016 The Inter Project Authors) and IBM Plex Mono
+(Copyright 2017 IBM Corp.), SIL Open Font License 1.1; see inter-OFL.txt and
+ibm-plex-mono-OFL.txt. Unmodified latin woff2 subsets from Fontsource 5.3.0.

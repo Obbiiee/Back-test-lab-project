@@ -46,6 +46,11 @@
     "frontend/src/tickAlpha/AlphaBrand.jsx",
     "frontend/src/tickAlpha/alphaBrand.css",
     "frontend/src/tickAlpha/alphaHome.css",
+    "frontend/src/tickAlpha/riksoraBrand.css",
+    "frontend/src/tickAlpha/AlphaSessions.jsx",
+    "frontend/src/tickAlpha/AlphaTicketEstimate.jsx",
+    "frontend/src/tickAlpha/orderEstimate.js",
+    "frontend/src/tickAlpha/AlphaEquityChart.jsx",
     "frontend/src/assets/riksora-mark.png",
     "frontend/src/tickAlpha/AlphaSourceDetails.jsx",
     "frontend/src/tickAlpha/AlphaOrderPresentation.jsx",
@@ -208,6 +213,7 @@
     "backend/cloud/midtrans.py"
   ],
   "tests": [
+    "frontend/tests/order-estimate.test.mjs",
     "frontend/tests/stitch-analytics.test.mjs",
     "backend/tests/stitch_analytics.py",
     "frontend/tests/stitch-trading.test.mjs",

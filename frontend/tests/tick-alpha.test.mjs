@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
+import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath,landingWorkspacePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
@@ -247,3 +247,8 @@ assert.equal(historyPage(historyView,pastPage,'1m',0)[0].open,1.001);
 for(const change of [{datasetId:'foreign'},{datasetVersion:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{endTime:1441065660},{nextOffset:256},{endOfDataset:true},{status:'BUILDING'},{candles:[{...pastPage.candles[0],time:1441065600}]},{candles:[{...pastPage.candles[0],time:1439164801}]}])assert.throws(()=>historyPage(historyView,{...pastPage,...change},'1m',0));
 assert.deepEqual(historyPage(historyView,{...pastPage,candles:[],status:'BUILDING'},'1m',0),[]);
 console.log('PASS past OHLC context identity, exact price display, Session boundary, timeframe alignment, bounded pagination and future metadata refusal.');
+
+for(const href of ['https://localhost:5443/?page=home','https://example.com/','http://localhost.example.com/','https://127.0.0.1/'])assert.equal(landingWorkspacePath(href),'/?page=account');
+assert.equal(landingWorkspacePath('http://127.0.0.1:5173/?tick-alpha=local&page=home'),'/?tick-alpha=local');
+assert.equal(landingWorkspacePath('http://localhost:5174/?page=home'),'/');
+console.log('PASS landing account admission: public/HTTPS enters accounts; private HTTP loopback preserves explicit source.');

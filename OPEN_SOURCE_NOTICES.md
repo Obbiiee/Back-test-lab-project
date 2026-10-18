@@ -25,3 +25,5 @@ Alpha supplemental S-2 (2026-10-11): `frontend/src/drawings/rayGeometry.js` adap
 
 
 Google adapter (2026-10-17): backend HTTPX OAuth0.17.0, MIT, exact PyPI distribution https://pypi.org/project/httpx-oauth/0.17.0/ and upstream https://github.com/frankie567/httpx-oauth . Installed distribution LICENSE bytes retained in docs/licenses/httpx-oauth-0.17.0-LICENSE.txt. SDK handles authorization-code/PKCE/token HTTP exchange; existing PyJWT2.15.1/cryptography performs Google signature/claims verification. No SDK example source or Google artwork copied. No actual Google credential or acceptance implied.
+
+Brand fonts (2026-10-17): `frontend/src/assets/fonts/` ships unmodified latin-subset woff2 files from Fontsource 5.3.0 npm packages: `@fontsource-variable/inter` (Inter, Copyright 2016 The Inter Project Authors) and `@fontsource/ibm-plex-mono` (IBM Plex Mono 400/500, Copyright 2017 IBM Corp.), both SIL Open Font License 1.1. Exact license texts are preserved in `frontend/public/licenses/inter-OFL.txt` and `ibm-plex-mono-OFL.txt` and shipped with the build. Files are bundled by Vite; no runtime package dependency or remote font request is added.

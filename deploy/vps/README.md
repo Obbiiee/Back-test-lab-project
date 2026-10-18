@@ -1,12 +1,12 @@
 # VPS staging candidate — not sales acceptance
 
-This is the operator procedure for the existing system blueprint's VPS preparation contract. It does not introduce architecture authority. No VPS, domain, actual Google/SMTP/merchant credentials, approved historical month or container runtime acceptance is supplied. Existing financial/causal contracts and pending Claude UI remain preserved.
+This is the operator procedure for the existing system blueprint's VPS preparation contract. It does not introduce architecture authority. No VPS, domain, actual Google/SMTP/merchant credentials, approved historical month or container runtime acceptance is supplied. Existing financial/causal contracts remain preserved. The handed-over Claude UI is now included in the integration candidate; the UI entrypoint and provider/data/host gates still require acceptance.
 
 ## What is packaged
 
 Caddy serves the built static app and proxies only `/api/v1/*` to an API listening on127.0.0.1:8001 inside the shared gateway network namespace. Only80/443 are published. PostgreSQL17 has a separate internal network and persistent volume; no database port is published. API is non-root/read-only, has no owner credentials and accepts forwarded headers only from127.0.0.1. Caddy overwrites forwarded scheme/IP and disables its admin API. Uvicorn access logs are disabled to avoid recording Google authorization codes. Do not place another proxy/CDN in front without reviewing the trust chain; real client-IP and HTTPS enforcement must be tested on the host.
 
-The build/archive excludes local public market/history files, raw source CSVs/archives/stores, credentials, dependencies and QA seeds. Frontend here is the existing engineering baseline, not an accepted integration of pending Claude UI. The image must not be sold or opened as complete Beta yet; legacy v1 is not commercially quota-certified and v2/Google browser cutover is outstanding. Sandbox Pro is simulated; no checkout or actual funds flow exists.
+The build/archive excludes local public market/history files, raw source CSVs/archives/stores, credentials, dependencies and QA seeds. Frontend includes the handed-over RIKSORA Playful UI. The tested main-branch HTTPS QA journey uses the existing v1 synthetic account flow; it does not certify the integrated v2/multipair/Google/payment UI. The image must not be sold or opened as complete Beta yet; legacy v1 is not commercially quota-certified and v2/Google browser cutover is outstanding. Sandbox Pro is simulated; no checkout or actual funds flow exists.
 
 ## Prerequisites and private configuration
 
@@ -87,3 +87,12 @@ Keep existing rights/source completeness and canonical tick eligibility, UI/v2-o
 - https://docs.docker.com/compose/how-tos/use-secrets/
 - https://docs.docker.com/compose/how-tos/startup-order/
 - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+
+
+## Candidate entrypoints and remaining product gates
+
+Before launch, verify that the actual HTTPS domain opens the public landing and its main CTA reaches verified account access. The current private HTTP loopback root is not a production entrypoint. The human explicitly approved the four-file routing correction after automatic review initially rejected it. HTTPS/default public entry now uses the landing and its CTA enters account access. Private HTTP loopback retains its separate local source. Real-domain browser/host acceptance still remains required; no TLS weakening.
+
+Main62471fa's generated-account HTTPS browser QA reached10000→9997USD with one completed0.1lot Buy, exact Ask2006.05→Bid2005.75,−3USD, then retained the same results after logout/login and reload. It used a fresh isolated PostgreSQL and authored fixture, not a merchant/provider/historical-month claim. This is an engineering reference for host acceptance, not a substitute for running it against the final integrated image.
+
+Unpopulated real datasets must fail clearly; do not copy private QA clusters, credentials, local QA CA/key, synthetic account state or raw market folders into the VPS. Provisioning data later also requires its provenance, license, coverage and causal chart/execution checks. Payment order/webhook/durable Pro composition, operator-owned provider secrets, commercial quotas, container and Linux recovery/capacity, and launch acceptance are still independent prerequisites. This package cannot honestly be described as requiring data alone.
