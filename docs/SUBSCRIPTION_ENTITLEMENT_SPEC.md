@@ -229,3 +229,18 @@ V2 sandbox access/transport acceptance (2026-10-17): Full443 backend/zero skips/
 
 
 Human decision (2026-10-17): Free daily sandbox allowance resets at00:00 UTC. This supersedes the earlier pending-reset wording for the current policy only. Pin UTC when opting in; changing an existing account timezone still refuses ACCESS_POLICY_DRIFT. Asia/Jakarta remains an authored clock-boundary test/configuration capability, not the selected current product policy. No automatic runtime enablement, provider activation, final commercial packaging or gate waiver.
+
+
+## Indonesian provider comparison requested2026-10-18
+
+Human requests a comparison, not merchant activation. Preliminary technical shortlist from official documentation:
+
+| Provider | Observed integration | Fit for this Beta | Still needs evidence |
+| --- | --- | --- | --- |
+| Midtrans | Snap supports hosted redirect or popup. Official webhook docs specify SHA512(order_id+status_code+gross_amount+ServerKey) and transaction-status verification | First sandbox candidate: hosted checkout plus server reconciliation maps to existing provider-independent entitlement boundary | Actual merchant approval/product eligibility, enabled methods, fees/tax/settlement/refund terms, sandbox keys, price/duration and real notifications |
+| Xendit | Payment Sessions supports hosted PAYMENT_LINK or embedded COMPONENTS, PAY/SAVE types, expiry and lifecycle webhooks; official IDR/ID one-time example | Equally viable hosted-checkout alternative; saved-method/recurring capabilities must not imply they are enabled for this business | Merchant activation, current fees/settlement/availability, exact webhook authentication/reconciliation contract and actual account capabilities |
+| DOKU | DOKU Checkout provides hosted redirect/embedded page with method ordering, expiry and branding options; sandbox/demo and integration guide linked by official docs | Viable hosted-checkout alternative if its onboarding/methods/terms fit the business | Actual merchant account, fees/settlement/refund terms, exact notification signature and retry/reconciliation acceptance |
+
+Engineering inference: start evaluation with Midtrans Snap hosted redirect to keep card entry on the provider page and use documented server-status reconciliation. This is not a cheapest-provider claim, commercial approval, chosen price or promise of recurring-payment availability. Xendit and DOKU remain alternatives until account eligibility and actual fee/settlement/refund quotes are compared. No live merchant account, purchase, KYC submission or payment integration was activated. Existing sandbox signed test events are not merchant payments. Never promote a redirect/client callback to paid entitlement; server order/account/amount/currency identity, authenticated notification, idempotency, replay/out-of-order/reversal and provider status must reconcile durably before granting access.
+
+Sources inspected2026-10-18: [Midtrans Snap](https://docs.midtrans.com/docs/snap), [Midtrans notifications](https://docs.midtrans.com/docs/https-notification-webhooks), [Xendit Payment Sessions](https://docs.xendit.co/docs/payment-sessions-overview), [Xendit one-time IDR example](https://docs.xendit.co/docs/payment-1), [DOKU Checkout](https://docs.doku.com/accept-payments/integration-tools/doku-checkout). Earlier attempted documentation URLs returned404 and were replaced with the official current pages; no conclusions rely on those404s.

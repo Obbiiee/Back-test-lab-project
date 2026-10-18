@@ -1,5 +1,7 @@
 # Operational phase authority
 
+Latest human VPS/sales grant (2026-10-18): work toward sellable Beta and VPS upload. Human confirms no VPS/domain exists yet and requests a VPS package first, plus comparison of Indonesian payment providers. This authorizes isolated deployment preparation under existing identity/data/recovery contracts, not fabricating a host/provider or certifying sales readiness. Preserve pending Claude UI and the outstanding targeted UI-file approval. No procurement, live charge or external launch occurs without actual prerequisites.
+
 Latest human continuation (2026-10-18): complete what can be done locally while Claude works on YouTube content. Preserve all pending Claude UI drafts; a targeted automatic approval rejection currently blocks editing main.jsx/AlphaAccount.jsx/accountClient.js without explicit UI write authorization. Continue unaffected importer-first work under the existing16-instrument grant; no bulk acquisition, live provider or external launch.
 
 Latest human sandbox reset decision (2026-10-17): Free daily allowance resets at00:00 UTC. This resolves the pending reset preference for the opt-in v2 sandbox. No implicit environment activation, commercial pricing, Google credential or live-payment approval follows.
@@ -46,12 +48,12 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
 ```json
 {
   "AUTHORITY": "current-phase",
-  "LAST_COMPLETED_PHASE": "Offline sixteen-instrument batch intake",
-  "CURRENT_IMPLEMENTATION_PHASE": "Offline sixteen-instrument batch intake",
-  "NEXT_PHASE": "Claude v2 client and Google browser integration acceptance",
+  "LAST_COMPLETED_PHASE": "VPS deployment preparation",
+  "CURRENT_IMPLEMENTATION_PHASE": "VPS deployment preparation",
+  "NEXT_PHASE": "Linux/container acceptance and controlled UI/payment integration after prerequisites",
   "NEXT_PHASE_STATUS": "AUTHORIZED_AFTER_CURRENT_PHASE_ACCEPTANCE_AND_GIT_GATES",
-  "CURRENT_PHASE_STATUS": "VALIDATED_OFFLINE_BATCH_UI_WRITE_APPROVAL_PENDING",
-  "AUTHORIZED_IMPLEMENTATION_PHASE": "Offline sixteen-instrument batch intake",
+  "CURRENT_PHASE_STATUS": "VALIDATED_VPS_SOURCE_CANDIDATE_NO_CONTAINER_OR_SALES_ACCEPTANCE",
+  "AUTHORIZED_IMPLEMENTATION_PHASE": "VPS deployment preparation",
   "AUTHORIZED_PHASE_SEQUENCE": [
     "Bounded Session summary",
     "Existing data/instrument phases23/24/41\u201344 subset: requested16, offline importer first; causal non-USD conversion versioning required",
@@ -59,6 +61,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
     "Existing Basic Statistics R-5/R-6/27 subset",
     "Existing entitlement/payment phases51\u201353 sandbox subset",
     "Existing capacity/recovery/internal acceptance gates",
+    "VPS staging package and Linux/container acceptance after actual host/domain",
     "External L-3\u2013L-8 after operator prerequisites and separate launch approval"
   ],
   "EXECUTION_MODE": "PAID_BETA_LOCAL_SANDBOX_WITH_SEPARATE_CLAUDE_UI",
@@ -68,7 +71,7 @@ Post-release maintenance: the human authorized conservative v1.0 repository clea
   "PRESERVED_RUNTIME_CHECKPOINT": "42.20",
   "PRESERVED_RUNTIME_STATUS": "INCOMPLETE_PRIVATE_BENCHMARK_SEPARATE_PRESERVED_LOCAL_WORKTREE",
   "FINAL_ROADMAP_PHASE": "75",
-  "LAST_COMPLETED_CHECKPOINT": "Full461 backend/zero skips/853.771seconds on fresh isolated SCRAM PostgreSQL with normal shutdown PASS. Focused17 CSV/batch tests/zero skips/12.716seconds PASS. Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Eight new batch families cover all16 pinned structural imports and deterministic verified COMPLETE reuse, interrupted later-pair preservation, missing/bad-header no-output preflight, month/overlap/hardlink alias refusal, changed source before/after import, corrupt completed bodies and exclusive complete-only CLI reports. Existing frozen builder, per-pair importer, financial/causal runtime and UI are unchanged. Authored tiny CSV fixtures only; no acquired month, rights/coverage/source-identity promotion, real Google/payment or paid Beta acceptance."
+  "LAST_COMPLETED_CHECKPOINT": "VPS preparation candidate:9 package/entrypoint/archive/config tests/zero skips/5.181seconds PASS; separate native deployment1 test/zero skips/9.813seconds on fresh isolated SCRAM PostgreSQL/normal shutdown PASS. Native proves explicit idempotent migrate/grants, restricted runtime identity/workspace/v1/v2 Session/activation, no test-event INSERT, refusal of privileged role/owner membership/schema ownership/missing USAGE/migration drift. Official Compose Draft202012 schema validation PASS (schema SHA256 d61cc3df8c6e6a727043e84f3405c69ffd63d341f629db8480f1d2ee5405b10c). Baseline frontend regression/lint/build136/release, repository/bundle and independent Node6x3/16profile references PASS. Core backend/frontend runtime unchanged from historical461-test checkpoint; full backend was not rerun. Docker Engine/Compose CLI/image build/Linux/browser/network TLS/SMTP/Google/merchant/data rights/capacity/sales acceptance remain NOT_CERTIFIED. Human has no VPS/domain and requests package only; no actual deployment/purchase/live charge."
 }
 ```
 

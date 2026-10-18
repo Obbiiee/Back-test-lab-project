@@ -290,7 +290,9 @@
     "frontend/tests/beta-client.test.mjs",
     "frontend/tests/beta-client-native.mjs",
     "frontend/tests/beta_client_native.py",
-    "backend/tests/test_dukascopy_batch.py"
+    "backend/tests/test_dukascopy_batch.py",
+    "deploy/vps/tests/test_native.py",
+    "deploy/vps/tests/test_package.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
@@ -300,7 +302,24 @@
     "OPEN_SOURCE_NOTICES.md",
     "frontend/scripts/regression.mjs",
     "frontend/scripts/release-audit.mjs",
-    "docs/licenses/httpx-oauth-0.17.0-LICENSE.txt"
+    "docs/licenses/httpx-oauth-0.17.0-LICENSE.txt",
+    ".dockerignore",
+    ".gitignore",
+    "deploy/vps/.env.example",
+    "deploy/vps/Caddyfile",
+    "deploy/vps/compose.yaml",
+    "deploy/vps/Dockerfile.api",
+    "deploy/vps/Dockerfile.web",
+    "deploy/vps/ops.py",
+    "deploy/vps/owner.json.example",
+    "deploy/vps/package.py",
+    "deploy/vps/preflight.py",
+    "deploy/vps/README.md",
+    "deploy/vps/runtime.json.example",
+    "deploy/vps/runtime.py",
+    "deploy/vps/settings.py",
+    "deploy/vps/__init__.py",
+    "deploy/__init__.py"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }
