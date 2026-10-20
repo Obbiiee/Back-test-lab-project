@@ -1,5 +1,40 @@
 # Backtest Lab — AI Handoff
 
+## CODEX -> CLAUDE — complete customer and Odoo UI/UX design request (2026-10-21)
+
+**Direct owner instruction:** design all remaining Riksora customer UI/UX AND the Odoo Community internal operations UI/UX. Deliver designs/specifications and coordinated implementation patches. This mailbox entry is a request, not evidence of completed design or delivery to a running Claude session.
+
+### Authority and baseline
+
+Read AGENTS.md, AI_CONTEXT/04_CURRENT_PHASE.md, AI_CONTEXT/06_WORKFLOW_RULES.md, docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md, docs/design/RIKSORA_PLAYFUL_UI_PLAN.md and integrations/odoo/{README.md,OPERATIONS.md}. Preserve the existing Claude canvas as visual authority; update its screen map/status first, then match code to accepted designs. Never create competing architecture or pretend an unseen canvas is verified. Review both existing playful Beta/account-flow patches before replacing anything.
+
+Implementation baseline: codex/beta-backend at3e86830eade437bef5002821db11e385e5d216c2; recheck actual HEAD before work. Laptop main and backend intentionally differ. Preserve existing handoff/design edits, Claude outputs, patches and QA artifacts. Do not reset/stash/discard or blindly apply old patches. Agree a fresh patch base and presentation-file ownership with Codex before implementation.
+
+### Customer UI/UX scope
+
+- Landing and consistent navigation; register/sign-in, verification, forgot/reset password, sign-out/session expiry, workspace picker, profile/account. Google availability must reflect actual configuration.
+- Sessions hub: Continue replay, cards/list, instrument, balance/P&L, progress, search/filter and quota; new Session/window selection, activation, saved state, Trash/restore.
+- Trading workspace: neutral dark chart; top/left/right toolbars, order panel, review/confirm, accepted versus filled states, pending/open/closed positions, replay controls, supported partial exits, editable drawings and R:R workflow. Separate supported actions from future features.
+- Strategies, Journal and Statistics pages using existing authoritative data, exact signed amounts and explicit empty/unresolved/excluded metrics. No invented results or history coverage.
+- Free/Pro plans and checkout: owner-selected DRAFT base prices monthly139000IDR, annual1668000IDR (139000x12, no annual discount). Design selection, provider handoff, pending/uncertain/paid/failed/reversed states and support. Term/renewal/refund/tax/promo decisions remain pending: label assumptions, do not activate billing or publish legal promises. Correct outdated 'Checkout is not enabled' text contextually; sandbox availability is not production availability.
+- Onboarding, settings, support intake/history, feedback/evidence and legal placeholders; loading/empty/error/offline/retry states. Desktop1440px and mobile375px, keyboard/focus/accessibility. English per current design owner; Indonesian setting remains planned.
+
+### Odoo Community UI/UX scope — internal operators
+
+Inspect actual pinned Odoo19 Community addon integrations/odoo/addons/btl_business and native views. Design role-specific navigation/dashboard concepts for CRM/customers, support queue/detail, payment/order and billing-only plan status, stale-sync indicators, payout/bank reconciliation, cashbook, cost plans/drafts and native invoice/report entry points. Specify search/filters, list/form/pivot hierarchy, totals, state badges, evidence references, validation/confirmation feedback and narrow-screen behavior. Proposed KPIs need existing authoritative sources or explicit backend-gap labels.
+
+Keep native Community workflows familiar and separate from public trading UI. Prefer supported addon XML/views/assets and reusable styling. No upstream core edits, Enterprise/paid module assumption, ad-hoc DB edits or live customer records in design evidence. Request a current isolated preview from Codex if needed; old ports/QA credentials may have expired.
+
+Preserve meanings: sandbox payment face value is not cash/revenue; stale plan is UNKNOWN and never grants Pro; cost plans only produce drafts; payout confirmation needs independent provider/bank evidence; confirmed money records are immutable. Odoo outage cannot block app login/replay. No actual refund/bank/email/security-role/business-config changes under this design request.
+
+### Deliverables, ownership and acceptance
+
+1. Inventory requested screens as existing/partial/design-only/missing, separate customer/operator journeys, and provide a prioritized screen map plus backend dependencies.
+2. Update existing canvas/design owner with reusable components, desktop/mobile layouts and key states; include Odoo mockups/specs, before/after rationale and screen-to-code mapping. Mark drafts and unverified behavior honestly.
+3. Return small coordinated patches with exact base and file ownership. Claude owns design/agreed presentation files; Codex owns backend/schema/accounting semantics/integration. Flag missing backend work instead of inventing it.
+4. Code slices require applicable frontend regression/lint/build/repository/bundle gates and real browser flows at1440/375px, keyboard, no overflow and persisted state. Odoo view changes additionally require isolated native addon install/upgrade and role/workflow checks, including cash/evidence protections. Preserve exact decimals/receipts, server review-confirm, timestamp atomicity, anti-look-ahead and frozen42.17/42.19; no OHLC settlement or fake enabled controls.
+5. Report exact files/base, checks run/not run, screenshots and blockers in CLAUDE -> CODEX / CHATGPT here. Keep datasets/secrets/private records outside Git. Follow existing context/commit/push/actual-remote-equality gates for validated implementation; preserve draft status until accepted. No VPS/data acquisition/production launch or paid-Beta certification. STOP on ownership/contract/scope conflict.
+
 ## CODEX → CLAUDE / CHATGPT — controlled UI/backend integration validation (2026-10-19)
 
 Human requests continuing toward a VPS candidate. Backend518e8c4 integrates main62471fa in the existing backend branch. Main and the running local QA remain unchanged. Three documentation conflicts retain both histories/notices; no source/runtime conflict occurred. Current validation is in progress, not acceptance. Existing frozen contracts and missing provider/data/host/commercial gates remain authoritative. No live launch or broad roadmap completion.
