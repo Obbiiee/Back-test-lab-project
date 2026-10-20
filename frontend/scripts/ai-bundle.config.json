@@ -235,7 +235,8 @@
     "backend/infrastructure/migrations/014_support_intake.sql",
     "integrations/odoo/sync.py",
     "integrations/odoo/addons/btl_business/models/automation.py",
-    "frontend/src/beta/BetaSupport.jsx"
+    "frontend/src/beta/BetaSupport.jsx",
+    "integrations/odoo/recovery.py"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -333,7 +334,9 @@
     "integrations/odoo/addons/btl_business/tests/test_business.py",
     "integrations/odoo/addons/btl_business/tests/__init__.py",
     "backend/tests/test_support.py",
-    "backend/tests/test_odoo_sync.py"
+    "backend/tests/test_odoo_sync.py",
+    "backend/tests/test_odoo_recovery.py",
+    "backend/tests/test_local_reliability.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
@@ -366,7 +369,9 @@
     "integrations/odoo/odoo.conf.example",
     "integrations/odoo/LICENSE",
     "integrations/odoo/btl-odoo-sync.service",
-    "integrations/odoo/btl-odoo-sync.timer"
+    "integrations/odoo/btl-odoo-sync.timer",
+    "integrations/odoo/OPERATIONS.md",
+    "docs/BETA_COMMERCIAL_DECISIONS.md"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

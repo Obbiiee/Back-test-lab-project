@@ -234,3 +234,14 @@ Odoo Community checkpoint: product-side contract/export tests from backend `pyth
 
 
 Odoo automation continuation: full backend discovery on a NEW isolated BTL_TEST_DATABASE_URL/BTL_PG_BIN; final scoped `python -B -m unittest tests.test_odoo_projection tests.test_support tests.test_odoo_sync -v` from backend. Missing DSN skip is not acceptance. Native Odoo addon now has9 test methods; install on a new empty isolated DB and use `--without-demo=True --test-enable --test-tags /btl_business --stop-after-init` (fixture stats11 are not11 independent cases). Repeated upgrade tests only on dedicated test-only DB, never business/user DB. Native deployment test includes actual support POST/list and idempotent retry via restricted app role. Real HTTP Odoo JSON2 acceptance must use source/company-bound service identity and restricted product reader, not MockTransport alone. Browser must cover durable app support -> one staff ticket, duplicate sync preserving work, billing Pro/refund Free visibility, evidenced net bank payout and PLANNED ONLY expense refusal. Systemd templates are not host acceptance. Keep frontend regression/lint/build/release, native Node bridge, Node goldens, repository/bundle/diff/commit/push/remote-equality gates.
+
+
+## Local reliability / Odoo cold recovery (2026-10-20)
+
+With backend on PYTHONPATH, a fresh isolated native PostgreSQL BTL_TEST_DATABASE_URL and matching BTL_PG_BIN (never application DB), run from backend:
+
+```text
+python -m unittest tests.test_odoo_recovery tests.test_local_reliability tests.test_tick_execution_postgres.TickExecutionPostgresTests.test_real_worker_death_after_sql_before_commit tests.test_tick_execution_postgres.TickExecutionPostgresTests.test_real_worker_death_after_commit_before_response tests.test_research_queue.QueueTests.test_replay_process_death_after_inner_commit_recovers_without_duplicate_fill tests.test_billing.BillingTests.test_uncertain_post_survives_restart_and_never_reposts -v
+```
+
+Final native8/zero skips/192.599seconds PASS; recovery-only3/zero skips/5.709seconds PASS. Missing native DSN/tool skips are not acceptance. Odoo actual restore additionally requires matched upstream/addon pins and DB+filestore fixture; follow integrations/odoo/OPERATIONS.md. Actual local6-table/source-before-after/physical-attachment comparison and restored8072 browser PASS,18.322seconds native recovery. These are bounded local results, not full regression501 rerun, long soak, Linux/container/capacity or production RTO.

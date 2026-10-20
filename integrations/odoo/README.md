@@ -53,3 +53,8 @@ Operating cost plans -> Prepare due cost draft advances the next due date and cr
 compose.yaml uses its own internal business network, database and filestore, not the product network. Host binding is127.0.0.1:8070 only. Set BTL_ODOO_IMAGE to an official odoo:19.0@sha256:... and BTL_ODOO_POSTGRES_IMAGE to postgres:17@sha256:... after reviewing actual digests. No invented digest/default latest tag. Create private secrets/db_owner_password and secrets/odoo.conf from the example with separate owner/app credentials. PostgreSQL initializes as btl_odoo_owner; explicitly create restricted LOGIN odoo NOSUPERUSER NOCREATEDB NOCREATEROLE and assign only the separate odoo database to it before app startup. Never run Odoo as the initialization superuser. This candidate has not been started on Docker/Linux; the current Windows host has no Docker/WSL runtime.
 
 Back up Odoo database and filestore together, separately from product backups, and verify recovery before actual business use. Keep upstream source/dependencies, QA credentials, customer exports and raw market data out of Git/source archives. Real merchant/provider/bank reports, company/tax/retention policy, production keys, TLS/private networking, scheduled alerting and Linux capacity remain operator acceptance prerequisites.
+
+
+## Operations and recovery
+
+See OPERATIONS.md for daily support/payment/cost handling and the explicit cold database+filestore backup/recovery procedure in recovery.py. The tool restores only a trusted-hash archive into a different new empty database and new filestore path, after operator quiescence. Actual local rehearsal evidence is recorded in the existing phase/history owners; host encryption/off-site retention and production recovery acceptance are separate.
