@@ -1,0 +1,34 @@
+services:
+  db:
+    image: ${BTL_ODOO_POSTGRES_IMAGE:?Set a digest-pinned postgres17 image}
+    environment:
+      POSTGRES_USER: btl_odoo_owner
+      POSTGRES_DB: odoo
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
+    secrets: [db_owner_password]
+    volumes: [odoo_db:/var/lib/postgresql/data]
+    networks: [business]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U btl_odoo_owner -d odoo]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  odoo:
+    image: ${BTL_ODOO_IMAGE:?Set a digest-pinned official odoo19 image}
+    command: [odoo, --config=/run/secrets/odoo_config]
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:8070:8069"]
+    secrets: [odoo_config]
+    volumes: [odoo_files:/var/lib/odoo, ./addons:/mnt/extra-addons:ro]
+    networks: [business]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+networks:
+  business: {internal: true}
+volumes:
+  odoo_db:
+  odoo_files:
+secrets:
+  db_owner_password: {file: ./secrets/db_owner_password}
+  odoo_config: {file: ./secrets/odoo.conf}

@@ -218,7 +218,19 @@
     "frontend/src/beta/beta.css",
     "backend/cloud/billing.py",
     "backend/infrastructure/migrations/013_sandbox_billing.sql",
-    "frontend/src/beta/BetaBilling.jsx"
+    "frontend/src/beta/BetaBilling.jsx",
+    "integrations/odoo/addons/btl_business/__init__.py",
+    "integrations/odoo/addons/btl_business/__manifest__.py",
+    "integrations/odoo/addons/btl_business/contract.py",
+    "integrations/odoo/addons/btl_business/models/__init__.py",
+    "integrations/odoo/addons/btl_business/models/business.py",
+    "integrations/odoo/addons/btl_business/security/groups.xml",
+    "integrations/odoo/addons/btl_business/security/ir.model.access.csv",
+    "integrations/odoo/addons/btl_business/security/rules.xml",
+    "integrations/odoo/addons/btl_business/views/business.xml",
+    "integrations/odoo/addons/btl_business/wizard/__init__.py",
+    "integrations/odoo/addons/btl_business/wizard/import_batch.py",
+    "integrations/odoo/export.py"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -311,7 +323,10 @@
     "backend/tests/test_midtrans.py",
     "frontend/tests/beta-workspace.test.mjs",
     "frontend/tests/beta-protocol-native.mjs",
-    "backend/tests/test_billing.py"
+    "backend/tests/test_billing.py",
+    "backend/tests/test_odoo_projection.py",
+    "integrations/odoo/addons/btl_business/tests/test_business.py",
+    "integrations/odoo/addons/btl_business/tests/__init__.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
@@ -338,7 +353,11 @@
     "deploy/vps/runtime.py",
     "deploy/vps/settings.py",
     "deploy/vps/__init__.py",
-    "deploy/__init__.py"
+    "deploy/__init__.py",
+    "integrations/odoo/README.md",
+    "integrations/odoo/compose.yaml",
+    "integrations/odoo/odoo.conf.example",
+    "integrations/odoo/LICENSE"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

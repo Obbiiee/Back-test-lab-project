@@ -9,6 +9,8 @@ def allowed(name):
     if p.is_absolute() or '..' in p.parts:return False
     if name in ('.dockerignore','OPEN_SOURCE_NOTICES.md'):return True
     if name.startswith('docs/licenses/'):return p.suffix=='.txt'
+    if name.startswith('integrations/odoo/'):
+        return (not any(part in {'tests','__pycache__','venv','.git','secrets'} for part in p.parts) and p.suffix in {'.py','.xml','.md','.yaml'}) or name in {'integrations/odoo/odoo.conf.example','integrations/odoo/LICENSE','integrations/odoo/addons/btl_business/security/ir.model.access.csv'}
     if name.startswith('backend/'):
         if any(part in {'venv','.venv','__pycache__'} for part in p.parts):return False
         return (p.suffix=='.py' and not name.startswith('backend/tests/')) or (name.startswith('backend/infrastructure/migrations/') and p.suffix=='.sql') or name=='backend/requirements.lock'

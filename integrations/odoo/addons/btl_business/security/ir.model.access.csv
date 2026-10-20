@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+customer_read,Customer read,model_btl_customer,group_crm,1,0,0,0
+payment_read,Payment read,model_btl_payment,group_crm,1,0,0,0
+ticket_staff,Support staff,model_btl_support_ticket,group_crm,1,1,1,0
+cash_finance,Cashbook finance,model_btl_cash_entry,group_finance,1,1,1,1
+import_wizard,Projection importer,model_btl_import_batch,group_import,1,1,1,1

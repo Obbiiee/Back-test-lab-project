@@ -39,3 +39,5 @@ Desktop.ini
 /deploy/vps/owner.json
 /deploy/vps/db_password
 /deploy/vps/secrets/
+
+/integrations/odoo/secrets/
