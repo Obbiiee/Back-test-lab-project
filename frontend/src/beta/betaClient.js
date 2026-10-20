@@ -4,7 +4,7 @@ const segment=value=>{
   if(typeof value!=='string'||value.length<1||value.length>128||!/^[-A-Za-z0-9_:]+$/.test(value))throw Error('Invalid Session identity.');
   return encodeURIComponent(value);
 };
-const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY','PROTOCOL_BLOCKED']);
+const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY','PROTOCOL_BLOCKED','CHECKOUT_ALREADY_STARTED','STALE_PAYMENT_OBSERVATION','BILLING_BUSY']);
 export class BetaRequestError extends Error{
   constructor(code,{status=0,reconcile=false}={}){super(code);this.name='BetaRequestError';this.code=code;this.status=status;this.reconciliationRequired=reconcile;}
 }
@@ -66,8 +66,16 @@ export function createBetaClient({fetcher=fetch,secure=()=>globalThis.location?.
     return value; // Do not round, recompute, settle or auto-retry financial values.
   }
   const write=(path,raw,options)=>{if(!raw||typeof raw!=='object'||Array.isArray(raw))return Promise.reject(new BetaRequestError('INVALID_REQUEST'));return research(path,raw,options);};
+  async function billing(path,body){
+    if(!token||!subject)throw new BetaRequestError('SIGN_IN_REQUIRED');
+    return send('/api/v1/billing/sandbox'+path,{body,mutation:body!==undefined});
+  }
   return Object.freeze({
     clear,hasSession:()=>!!token&&!!subject,subject:()=>subject,
+    billingPlan:()=>billing('/plan'),billingOrders:()=>billing('/orders'),billingAccess:()=>billing('/access'),
+    billingCheckout:requestId=>{if(!uuid(requestId))return Promise.reject(new BetaRequestError('INVALID_REQUEST'));return billing('/checkout',{requestId});},
+    billingResume:id=>billing('/orders/'+segment(id)+'/checkout',{}),
+    billingReconcile:id=>billing('/orders/'+segment(id)+'/reconcile',{}),
     providers:()=>send('/api/v1/auth/providers',{auth:null}),
     googleStart:()=>{if(!secure())throw new BetaRequestError('HTTPS_REQUIRED');return '/api/v1/auth/google/start';},
     exchangeGoogle:()=>authenticate('/api/v1/auth/google/exchange',{body:{},cookies:true}),

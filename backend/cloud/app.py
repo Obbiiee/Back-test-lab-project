@@ -77,7 +77,7 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
     app.include_router(users.get_reset_password_router(), prefix="/api/v1/auth")
     @app.get("/api/v1/auth/providers")
     async def providers():
-        return {"schemaVersion":1,"password":True,"googleConfigured":google_config is not None}
+        return {"schemaVersion":1,"password":True,"googleConfigured":google_config is not None,"billingConfigured":sandbox_billing is not None}
     current = users.current_user(active=True, verified=True)
     @app.get("/api/v1/auth/me", response_model=UserRead)
     async def me(user: User = Depends(current)):
@@ -111,6 +111,8 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
 
 
 def from_environment():
+    from .billing import from_config
+    billing=from_config(os.environ)
     delivery = SmtpDelivery(os.environ["BTL_SMTP_HOST"], os.environ["BTL_SMTP_USER"],
                             os.environ["BTL_SMTP_PASSWORD"], os.environ["BTL_SMTP_SENDER"])
     return create_app(os.environ["BTL_DATABASE_URL"], os.environ["BTL_AUTH_SECRET"], delivery,
@@ -118,4 +120,5 @@ def from_environment():
                       sandbox_event_secret=os.getenv("BTL_SANDBOX_EVENT_SECRET") or None,
                       google_client_id=os.getenv("BTL_GOOGLE_CLIENT_ID") or None,
                       google_client_secret=os.getenv("BTL_GOOGLE_CLIENT_SECRET") or None,
-                      google_redirect_uri=os.getenv("BTL_GOOGLE_REDIRECT_URI") or None)
+                      google_redirect_uri=os.getenv("BTL_GOOGLE_REDIRECT_URI") or None,
+                      sandbox_billing=billing)

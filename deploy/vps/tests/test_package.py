@@ -25,6 +25,15 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(runtime(settings()),settings())
         for patch in ({'BTL_DATABASE_URL':'host=db dbname=btl user=btl_owner password=private'},{'BTL_AUTH_SECRET':'short'},{'BTL_SANDBOX_V2_RESET_TIMEZONE':'Asia/Jakarta'},{'BTL_SANDBOX_EVENT_SECRET':'not-for-api'},{'BTL_TRUSTED_PROXY_IPS':'*'},{'BTL_TLS_KEY':'injected'}):
             with self.assertRaises(ConfigurationError):runtime({**settings(),**patch})
+    def test_billing_config_requires_full_sandbox_offer_and_separate_worker(self):
+        value={**settings(),'BTL_BILLING_DATABASE_URL':'host=db dbname=btl user=btl_billing password=authored-worker',
+               'BTL_MIDTRANS_SERVER_KEY':'SB-Mid-server-authored-fixture-not-real','BTL_MIDTRANS_MERCHANT_ID':'G_QA',
+               'BTL_BILLING_PLAN_VERSION':'authored-not-for-sale','BTL_BILLING_AMOUNT_IDR':'10000','BTL_BILLING_DURATION_SECONDS':'86400'}
+        self.assertEqual(runtime(value),value)
+        for patch in ({'BTL_MIDTRANS_SERVER_KEY':'Mid-server-production-refused'},{'BTL_BILLING_DATABASE_URL':settings()['BTL_DATABASE_URL']},{'BTL_BILLING_AMOUNT_IDR':'1.5'},{'BTL_BILLING_DURATION_SECONDS':'0'},{'BTL_MIDTRANS_MERCHANT_ID':''}):
+            with self.assertRaises(ConfigurationError):runtime({**value,**patch})
+        with self.assertRaises(ConfigurationError):runtime({**settings(),'BTL_BILLING_AMOUNT_IDR':'10000'})
+
     def test_google_requires_complete_config_and_separate_secret(self):
         with self.assertRaises(ConfigurationError):runtime({**settings(),'BTL_GOOGLE_CLIENT_ID':'1234-authored.apps.googleusercontent.com'})
         value={**settings(),'BTL_GOOGLE_CLIENT_ID':'1234-authored.apps.googleusercontent.com','BTL_GOOGLE_CLIENT_SECRET':'authored-client-secret','BTL_GOOGLE_REDIRECT_URI':'https://app.example.com/api/v1/auth/google/callback'}

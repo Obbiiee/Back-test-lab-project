@@ -54,3 +54,21 @@ export function betaNotice(error){
     SERVICE_BUSY:'The service is busy. Wait, then reload.',SERVICE_UNAVAILABLE:'The service is unavailable. Reload when it is ready.'};
   return messages[error.code]||'The request was refused. Reload saved evidence and check your inputs.';
 }
+
+export function checkoutAddress(value){
+  if(typeof value!=='string'||value.length>1024)throw Error('Invalid checkout address');
+  const url=new URL(value);
+  if(url.protocol!=='https:'||url.host!=='app.sandbox.midtrans.com'||url.username||url.password||url.search||url.hash||!/^\/snap\/v[0-9]+\/redir\/[A-Za-z0-9_-]+$/.test(url.pathname))throw Error('Invalid checkout address');
+  return url.href;
+}
+
+export function billingDuration(value){
+  if(typeof value!=='string'||!/^\d{1,8}$/.test(value))return 'Unavailable';
+  const seconds=BigInt(value);
+  return seconds%86400n===0n?`${seconds/86400n} days`:seconds%3600n===0n?`${seconds/3600n} hours`:`${seconds} seconds`;
+}
+export function billingExpiry(value){
+  if(typeof value!=='string'||!/^\d{1,12}$/.test(value))return 'Unavailable';
+  const date=new Date(Number(value)*1000);
+  return Number.isFinite(date.getTime())?date.toISOString().replace('T',' ').replace('.000Z',' UTC'):'Unavailable';
+}

@@ -28,7 +28,8 @@ def connection(value,user):
 
 def runtime(value):
     required={'BTL_DATABASE_URL','BTL_AUTH_SECRET','BTL_SMTP_HOST','BTL_SMTP_USER','BTL_SMTP_PASSWORD','BTL_SMTP_SENDER','BTL_SANDBOX_V2_RESET_TIMEZONE'}
-    optional={'BTL_GOOGLE_CLIENT_ID','BTL_GOOGLE_CLIENT_SECRET','BTL_GOOGLE_REDIRECT_URI'}
+    from cloud.billing import BILLING_KEYS,from_config
+    optional=set(BILLING_KEYS)|{'BTL_GOOGLE_CLIENT_ID','BTL_GOOGLE_CLIENT_SECRET','BTL_GOOGLE_REDIRECT_URI'}
     need(required<=set(value)<=required|optional,'RUNTIME_CONFIG_KEYS')
     need(all(type(v) is str for v in value.values()),'CONFIG_STRING_VALUES')
     connection(value['BTL_DATABASE_URL'],'btl_app')
@@ -41,6 +42,10 @@ def runtime(value):
         try:GoogleConfig(*google)
         except Exception:raise ConfigurationError('GOOGLE_CONFIG') from None
         need(google[1]!=value['BTL_AUTH_SECRET'],'SEPARATE_GOOGLE_SECRET')
+    if any(value.get(key,'') for key in BILLING_KEYS):
+        try:from_config(value)
+        except Exception:raise ConfigurationError('BILLING_CONFIG') from None
+        connection(value['BTL_BILLING_DATABASE_URL'],'btl_billing')
     return dict(value)
 
 def images(value):

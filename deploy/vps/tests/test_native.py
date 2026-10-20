@@ -52,6 +52,21 @@ class DeploymentNativeTests(unittest.TestCase):
         self.assertEqual(http.post(root+'/research-v2/sessions/session:deploy/activate',headers=headers,json={}).status_code,200)
         with self.assertRaises(psycopg.DatabaseError):
             with connect(limited) as db:db.execute('INSERT INTO btl.sandbox_access_events SELECT * FROM btl.sandbox_access_events LIMIT 0')
+        worker_password=secrets.token_urlsafe(32)
+        with psycopg.connect(dsn,autocommit=True) as db:db.execute(sql.SQL('CREATE ROLE btl_billing LOGIN PASSWORD {}').format(sql.Literal(worker_password)))
+        migrate_and_grant(dsn,billing=True)
+        worker=psycopg.conninfo.make_conninfo(**{**info,'user':'btl_billing','password':worker_password})
+        from cloud.billing import SandboxBilling,SandboxPlan
+        from tests.test_billing import Provider
+        billing=SandboxBilling(worker,'UTC',SandboxPlan('authored-operator-qa',10000,86400),Provider())
+        actor=http.get('/api/v1/auth/me',headers=headers).json()['id']
+        saved=billing.create(actor,str(uuid.uuid4()));billing.checkout(actor,saved.state.order.order_id);billing.reconcile(actor,saved.state.order.order_id)
+        from cloud.sandbox_access import SandboxAccess
+        with connect(limited) as db:self.assertEqual(SandboxAccess(limited,'UTC',billing=True).status(db,actor)['tier'],'PRO')
+        with self.assertRaises(psycopg.DatabaseError):
+            with connect(worker) as db:db.execute('SELECT * FROM btl.users LIMIT 0')
+        with self.assertRaises(psycopg.DatabaseError):
+            with connect(limited) as db:db.execute('INSERT INTO btl.sandbox_billing_events SELECT * FROM btl.sandbox_billing_events LIMIT 0')
         with connect(dsn) as db:db.execute("UPDATE public.btl_migrations SET checksum=repeat('f',64) WHERE version=(SELECT min(version) FROM public.btl_migrations)")
         with self.assertRaisesRegex(ConfigurationError,'MIGRATIONS_NOT_CURRENT'):database_guard(limited)
 

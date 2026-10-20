@@ -190,6 +190,8 @@ class BillingHTTPTests(unittest.TestCase):
     def test_verified_checkout_reconcile_and_pro_access(self):
         self.assertEqual(self.client.get(self.root+'/plan').status_code,401)
         self.assertEqual(self.access()['tier'],'FREE');oid=self.checkout()
+        self.assertEqual(self.client.get(self.root+'/orders',headers=self.headers).json()['orders'][0]['orderId'],oid)
+        self.assertEqual(self.client.get(self.root+'/access',headers=self.headers).json()['tier'],'FREE')
         self.assertEqual(self.access()['tier'],'FREE')
         response=self.client.post(self.root+'/orders/'+oid+'/reconcile',headers=self.headers,json={})
         self.assertEqual(response.status_code,200,response.text)
@@ -206,6 +208,14 @@ class BillingHTTPTests(unittest.TestCase):
         oid=saved.json()['orderId']
         self.assertEqual(self.client.post(self.root+'/orders/'+oid+'/reconcile',headers=self.headers,json={}).status_code,200)
         self.assertEqual(self.access()['tier'],'PRO');self.assertEqual(self.posts,1)
+
+    def test_resume_created_order_posts_once(self):
+        saved=self.billing.create(self.actor,str(uuid.uuid4()))
+        oid=saved.state.order.order_id
+        response=self.client.post(self.root+'/orders/'+oid+'/checkout',headers=self.headers,json={})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(self.client.post(self.root+'/orders/'+oid+'/checkout',headers=self.headers,json={}).status_code,409)
+        self.assertEqual(self.posts,1)
 
     def test_signed_notification_is_signal_and_refund_revokes(self):
         import hashlib,json

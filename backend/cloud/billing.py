@@ -80,6 +80,11 @@ class SandboxBilling:
         with connect(self.dsn) as db:
             return self._read(db,identity(actor),order_id)
 
+    def orders(self,actor):
+        with connect(self.dsn) as db:
+            rows=db.execute('SELECT '+COLUMNS+' FROM btl.sandbox_billing_orders WHERE actor_id=%s ORDER BY order_id LIMIT 51',(identity(actor),)).fetchall()
+            return dict(schemaVersion=1,mode='SANDBOX',fundsCollected=False,orders=[decode(row).public() for row in rows[:50]],truncated=len(rows)>50)
+
     def by_request(self,actor,request_id):
         actor,request_id=identity(actor),identity(request_id)
         with connect(self.dsn) as db:
@@ -195,6 +200,17 @@ def install(app,billing):
             try:return await call_next(request)
             except ContractError:return response(dict(detail='INVALID_REQUEST'),422)
         return await call_next(request)
+    @app.get(prefix+'/access')
+    async def access(user:User=Depends(current)):
+        def run():
+            reader=SandboxAccess(app.state.dsn,billing.access.timezone,billing=True)
+            with connect(app.state.dsn) as db:
+                reader.lock(db,user.id)
+                return reader.status(db,user.id)
+        return await execute(run)
+    @app.get(prefix+'/orders')
+    async def orders(user:User=Depends(current)):
+        return await execute(lambda:billing.orders(str(user.id)))
     @app.get(prefix+'/plan')
     async def plan(user:User=Depends(current)):
         return response(dict(schemaVersion=1,mode='SANDBOX',fundsCollected=False,planVersion=billing.plan.version,
@@ -207,6 +223,10 @@ def install(app,billing):
             result=billing.checkout(str(user.id),order.state.order.order_id)
             return dict(payment=billing.read(str(user.id),order.state.order.order_id).public(),redirectUrl=result.redirect_url)
         return await execute(run)
+    @app.post(prefix+'/orders/{order_id}/checkout')
+    async def resume_checkout(order_id:str,request:Request,user:User=Depends(current)):
+        await payload(request,())
+        return await execute(lambda:dict(redirectUrl=billing.checkout(str(user.id),order_id).redirect_url))
     @app.get(prefix+'/requests/{request_id}')
     async def by_request(request_id:str,user:User=Depends(current)):
         return await execute(lambda:billing.by_request(str(user.id),request_id).public())
@@ -227,3 +247,18 @@ def install(app,billing):
         billing.notification(raw)
         # Never expose private account/order metadata in a provider acknowledgment.
         return dict(schemaVersion=1,mode='SANDBOX',received=True,fundsCollected=False)
+
+
+BILLING_KEYS=('BTL_BILLING_DATABASE_URL','BTL_MIDTRANS_SERVER_KEY','BTL_MIDTRANS_MERCHANT_ID','BTL_BILLING_PLAN_VERSION','BTL_BILLING_AMOUNT_IDR','BTL_BILLING_DURATION_SECONDS')
+
+def from_config(config):
+    """All-or-none sandbox configuration; no default price, plan or provider key."""
+    from .midtrans import SandboxConfig,SnapSandbox
+    values=[config.get(key,'') for key in BILLING_KEYS]
+    if not any(values):return None
+    check(all(type(value) is str and value for value in values),'BILLING_CONFIG_INCOMPLETE')
+    dsn,key,merchant,version,amount,duration=values
+    check(amount.isascii() and amount.isdigit() and len(amount)<=10 and duration.isascii() and duration.isdigit() and len(duration)<=8,'BILLING_CONFIG_INVALID')
+    check(config.get('BTL_SANDBOX_V2_RESET_TIMEZONE')=='UTC','BILLING_RESET_REQUIRED')
+    check(key!=config.get('BTL_AUTH_SECRET'),'SEPARATE_BILLING_SECRET')
+    return SandboxBilling(dsn,'UTC',SandboxPlan(version,int(amount),int(duration)),SnapSandbox(SandboxConfig(key,merchant)))

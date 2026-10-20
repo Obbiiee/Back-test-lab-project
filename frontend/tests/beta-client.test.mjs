@@ -75,3 +75,15 @@ console.log('PASS Beta transport: exact v2 requests, Google cookie exchange, HTT
  await h.client.inspect('session:one',{timeframe:'1h'});assert.ok(h.calls.at(-1)[0].endsWith('/view'));assert.deepEqual(JSON.parse(h.calls.at(-1)[1].body),{timeframe:'1h'});
  h.set(async()=>{throw Error('network');});await assert.rejects(h.client.inspect('session:one',{timeframe:'D'}),isCode('SERVICE_UNAVAILABLE'));
 }
+
+{
+ const h=await signed();h.set(async()=>json({schemaVersion:1,mode:'SANDBOX'}));
+ for(const method of ['billingPlan','billingOrders','billingAccess'])await h.client[method]();
+ await h.client.billingCheckout('11111111-1111-4111-8111-111111111111');
+ assert.deepEqual(JSON.parse(h.calls.at(-1)[1].body),{requestId:'11111111-1111-4111-8111-111111111111'});
+ assert.equal(h.calls.at(-1)[0],'/api/v1/billing/sandbox/checkout');
+ await h.client.billingResume('btl-sbx-'+'a'.repeat(32));assert.equal(h.calls.at(-1)[1].body,'{}');
+ h.set(async()=>{throw Error('lost response');});await assert.rejects(h.client.billingCheckout('11111111-1111-4111-8111-111111111111'),isCode('SERVICE_UNAVAILABLE',true));
+ const count=h.calls.length;await assert.rejects(h.client.billingCheckout('../bad'),isCode('INVALID_REQUEST'));assert.equal(h.calls.length,count);
+ h.client.clear();await assert.rejects(h.client.billingOrders(),isCode('SIGN_IN_REQUIRED'));
+}

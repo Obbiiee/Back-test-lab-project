@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {confirmation,executionCommand,accessMessage,betaNotice,methodFromForm,orderFromForm,createReplayLoop} from '../src/beta/betaWorkspace.js';
+import {confirmation,executionCommand,accessMessage,betaNotice,checkoutAddress,billingDuration,billingExpiry,methodFromForm,orderFromForm,createReplayLoop} from '../src/beta/betaWorkspace.js';
 import {createBetaClient} from '../src/beta/betaClient.js';
 const view={artifact:'BTL-RESEARCH-SESSION-VIEW-2',metadata:{id:'session:qa'},state:{revision:7,balance:'9007199254740993.03'}};
 const payload={targetNs:'1577836800000000000'};
@@ -33,3 +33,8 @@ const loop=createReplayLoop({step:()=>{callsMade++;return new Promise(resolve=>{
 assert.equal(loop.start(),true);assert.equal(loop.start(),false);assert.equal(callsMade,1);loop.stop();assert.equal(loop.start(),false,'in-flight command blocks restart');release(true);await settle();assert.equal(queued.length,0,'pause cannot schedule another command');
 assert.equal(loop.start(),true);release(true);await settle();assert.equal(queued.length,1);const nextTick=queued.shift();nextTick();assert.equal(callsMade,3);release(false);await settle();assert.equal(queued.length,0);assert.equal(stopped,2);
 console.log('PASS Protocol owns quantity/target/risk and checklist evidence; replay backpressure, pause-in-flight, restart and no-progress stop.');
+
+assert.equal(checkoutAddress('https://app.sandbox.midtrans.com/snap/v4/redir/qa_1'),'https://app.sandbox.midtrans.com/snap/v4/redir/qa_1');
+for(const value of ['javascript:alert(1)','https://evil.example/snap/v4/redir/a','https://app.sandbox.midtrans.com.evil.example/snap/v4/redir/a','https://user@app.sandbox.midtrans.com/snap/v4/redir/a','https://app.sandbox.midtrans.com/snap/v4/redir/a?token=b','http://app.sandbox.midtrans.com/snap/v4/redir/a'])assert.throws(()=>checkoutAddress(value));
+
+assert.equal(billingDuration('86400'),'1 days');assert.equal(billingDuration('3600'),'1 hours');assert.equal(billingExpiry('0'),'1970-01-01 00:00:00 UTC');assert.equal(billingExpiry('bad'),'Unavailable');

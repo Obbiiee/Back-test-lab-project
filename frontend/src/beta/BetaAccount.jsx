@@ -1,4 +1,5 @@
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
+import BetaBilling from './BetaBilling.jsx';
 import {createBetaClient} from './betaClient.js';
 import {betaNotice} from './betaWorkspace.js';
 import AlphaBrand from '../tickAlpha/AlphaBrand.jsx';
@@ -22,7 +23,7 @@ export default function BetaAccount(){
     let active=true;
     void Promise.resolve().then(async()=>{
       if(!active||location.protocol!=='https:')return;
-      try{const value=await client.providers();if(active)setProviders(value);}catch{if(active)setProviders({googleConfigured:false});}
+      try{const value=await client.providers();if(active&&!client.hasSession())setProviders(value);}catch{if(active&&!client.hasSession())setProviders({googleConfigured:false});}
       if(!active||new URLSearchParams(location.search).get('auth')!=='google')return;
       // Consume the one-use cookie handoff once; never retain callback state in URLs.
       history.replaceState(null,'','/?page=beta');
@@ -40,8 +41,8 @@ export default function BetaAccount(){
         <p className="alpha-eyebrow">16 PAIRS · SYNTHETIC PRACTICE</p><h1>Sign in to Beta</h1>
         <p>Free includes trading. This sandbox uses short synthetic demos; no real payment or historical month is included.</p>
         <form onSubmit={event=>{event.preventDefault();const fields=new FormData(event.currentTarget);event.currentTarget.reset();run(async()=>{
-          const me=await client.login(fields.get('email'),fields.get('password'));const list=await client.workspaces();
-          if(live.current){setUser(me);setWorkspaces(list);}
+          const me=await client.login(fields.get('email'),fields.get('password'));const [list,configured]=await Promise.all([client.workspaces(),client.providers()]);
+          if(live.current){setUser(me);setWorkspaces(list);setProviders(configured);}
         });}}><label>Email<input name="email" type="email" autoComplete="email" maxLength={320} required disabled={busy}/></label>
           <label>Password<input name="password" type="password" autoComplete="current-password" minLength={15} maxLength={128} required disabled={busy}/></label>
           <button disabled={busy}>{busy?'Signing in…':'Sign in'}</button>
@@ -52,6 +53,7 @@ export default function BetaAccount(){
         })}>Sign out</button></div>
         {selected?<><button disabled={busy} onClick={()=>{client.selectWorkspace(selected.id);setSelected(null);}}>Back to workspaces</button>
           <Suspense fallback={<p role="status">Loading Beta workspace…</p>}><Workspace key={selected.id} client={client} workspace={selected} onExpired={()=>{client.clear();setUser(null);setSelected(null);setWorkspaces([]);}}/></Suspense></>:<>
+          {providers?.billingConfigured&&<BetaBilling key={user.id} client={client} onExpired={()=>{client.clear();setUser(null);setSelected(null);setWorkspaces([]);}}/>}
           <h1>Your workspaces</h1><p>Beta Sessions are separate from your previous Sessions. Choose a workspace to practice.</p>
           <ul className="beta-workspace-list">{workspaces.map(ws=><li key={ws.id}><button disabled={busy} onClick={()=>{client.selectWorkspace(ws.id);setSelected(ws);}}>{ws.name} · {ws.role}</button></li>)}</ul>
           <form onSubmit={event=>{event.preventDefault();const name=new FormData(event.currentTarget).get('name');run(async()=>{

@@ -217,7 +217,8 @@
     "frontend/src/beta/betaClient.js",
     "frontend/src/beta/beta.css",
     "backend/cloud/billing.py",
-    "backend/infrastructure/migrations/013_sandbox_billing.sql"
+    "backend/infrastructure/migrations/013_sandbox_billing.sql",
+    "frontend/src/beta/BetaBilling.jsx"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
