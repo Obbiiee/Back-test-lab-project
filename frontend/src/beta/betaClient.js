@@ -4,6 +4,8 @@ const segment=value=>{
   if(typeof value!=='string'||value.length<1||value.length>128||!/^[-A-Za-z0-9_:]+$/.test(value))throw Error('Invalid Session identity.');
   return encodeURIComponent(value);
 };
+// fastapi-users account outcomes (detail string, or {code} for password policy) the UI explains to people.
+const accountOutcomes=new Set(['LOGIN_BAD_CREDENTIALS','LOGIN_USER_NOT_VERIFIED','REGISTER_USER_ALREADY_EXISTS','REGISTER_INVALID_PASSWORD','VERIFY_USER_BAD_TOKEN','VERIFY_USER_ALREADY_VERIFIED','RESET_PASSWORD_BAD_TOKEN','RESET_PASSWORD_INVALID_PASSWORD']);
 const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY','PROTOCOL_BLOCKED','CHECKOUT_ALREADY_STARTED','STALE_PAYMENT_OBSERVATION','BILLING_BUSY','SUPPORT_LIMIT','SUPPORT_CONFLICT','SUPPORT_BUSY']);
 export class BetaRequestError extends Error{
   constructor(code,{status=0,reconcile=false}={}){super(code);this.name='BetaRequestError';this.code=code;this.status=status;this.reconciliationRequired=reconcile;}
@@ -39,6 +41,8 @@ export function createBetaClient({fetcher=fetch,secure=()=>globalThis.location?.
     }
     if(!response.ok){
       if(response.status===401)clear();
+      const outcome=typeof value?.detail==='string'?value.detail:value?.detail?.code;
+      if(response.status===400&&accountOutcomes.has(outcome))throw new BetaRequestError(outcome,{status:400});
       throw new BetaRequestError(refusals.has(value?.detail)?value.detail:({401:'SIGN_IN_REQUIRED',403:'NOT_PERMITTED',404:'UNAVAILABLE',409:'RELOAD_REQUIRED',422:'INVALID_REQUEST',429:'SERVICE_BUSY'})[response.status]||'SERVICE_UNAVAILABLE',
         {status:response.status,reconcile:mutation&&response.status>=500});
     }
@@ -82,6 +86,12 @@ export function createBetaClient({fetcher=fetch,secure=()=>globalThis.location?.
     googleStart:()=>{if(!secure())throw new BetaRequestError('HTTPS_REQUIRED');return '/api/v1/auth/google/start';},
     exchangeGoogle:()=>authenticate('/api/v1/auth/google/exchange',{body:{},cookies:true}),
     login:(email,password)=>authenticate('/api/v1/auth/login',{body:{username:email,password},form:true}),
+    // Account lifecycle (unauthenticated). Responses are generic on purpose; no session is created here.
+    register:(email,password)=>send('/api/v1/auth/register',{body:{email,password},auth:null}),
+    requestVerification:email=>send('/api/v1/auth/request-verify-token',{body:{email},auth:null}),
+    verify:token=>send('/api/v1/auth/verify',{body:{token},auth:null}),
+    forgotPassword:email=>send('/api/v1/auth/forgot-password',{body:{email},auth:null}),
+    resetPassword:(token,password)=>send('/api/v1/auth/reset-password',{body:{token,password},auth:null}),
     async logout(all=false){const auth=token;clear();if(auth)await send(all?'/api/v1/auth/logout-all':'/api/v1/auth/logout',{body:{},auth});},
     async workspaces(options={}){if(!token||!subject)throw new BetaRequestError('SIGN_IN_REQUIRED');return send('/api/v1/workspaces',{signal:options.signal});},
     async createWorkspace(name){if(!token||!subject)throw new BetaRequestError('SIGN_IN_REQUIRED');return send('/api/v1/workspaces',{body:{name},mutation:true});},

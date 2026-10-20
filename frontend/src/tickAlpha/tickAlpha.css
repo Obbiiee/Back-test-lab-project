@@ -291,3 +291,26 @@
 .tick-alpha :focus-visible{outline:3px solid #ffce55;outline-offset:3px}
 @media(max-width:600px){.tick-alpha>header{padding:14px 16px;border-radius:0 0 20px 20px}.alpha-hub{padding:20px 14px}.alpha-hub-head{padding:24px 20px;border-radius:24px}.alpha-hub-actions{width:100%}.alpha-hub-grid{grid-template-columns:minmax(0,1fr)}.alpha-hub-card{min-width:0}.alpha-hub-steps li{padding:20px}.tick-alpha>header nav a{padding:8px 12px}}
 @media(prefers-reduced-motion:reduce){.tick-alpha .alpha-hub .alpha-primary-action{transition:none}.tick-alpha .alpha-hub .alpha-primary-action:hover:not(:disabled){transform:none}}
+
+/* Playful account access (owner direction 2026-10-18; docs/design/RIKSORA_PLAYFUL_UI_PLAN.md). Navy page,
+   one white card, pill controls. The Beta page (.beta-account) carries its own layout in beta.css. */
+.alpha-identity:not(.beta-account){background:var(--rk-navy);color:var(--rk-white)}
+.alpha-identity:not(.beta-account) .alpha-identity-nav{background:var(--rk-navy);color:var(--rk-white);border-bottom:2px solid var(--rk-navy-line);padding-block:14px}
+.alpha-identity:not(.beta-account) .alpha-identity-nav .alpha-brand{color:var(--rk-white)!important}
+.alpha-identity:not(.beta-account) .alpha-identity-nav>span{background:var(--rk-yellow);color:var(--rk-navy);border-radius:999px;padding:5px 12px;font-weight:800}
+.alpha-identity:not(.beta-account) .alpha-identity-content:not(.alpha-identity-workspace){max-width:480px;margin:40px auto;background:var(--rk-white);color:var(--rk-navy);border-radius:32px;padding:32px;box-shadow:0 10px 0 var(--rk-blue)}
+@media(max-width:560px){.alpha-identity:not(.beta-account) .alpha-identity-content:not(.alpha-identity-workspace){margin:20px 16px;padding:22px;border-radius:26px}}
+.alpha-identity:not(.beta-account) .alpha-identity-content h1{font-weight:900;letter-spacing:-.02em;margin:6px 0 8px}
+.alpha-identity:not(.beta-account) .alpha-identity-content>p{color:var(--rk-muted);font-size:14px}
+.alpha-identity:not(.beta-account) .alpha-identity-content>form{max-width:none}
+.alpha-identity:not(.beta-account) .alpha-identity-content>form label{font-weight:700}
+.alpha-identity:not(.beta-account) .alpha-identity-content>form input{min-height:48px;border-radius:16px;border:2px solid var(--rk-ice);background:var(--rk-ice-soft)}
+.alpha-identity:not(.beta-account) .alpha-identity-content>form input:focus{border-color:var(--rk-blue);outline:none}
+.alpha-identity:not(.beta-account) .alpha-identity-content>form button{min-height:52px;border-radius:999px;border:0;background:var(--rk-blue-strong);color:var(--rk-white);font-weight:800;font-size:15px;box-shadow:0 5px 0 #0b3f8a}
+.alpha-identity:not(.beta-account) .alpha-identity-content>nav{gap:8px}
+.alpha-identity:not(.beta-account) .alpha-identity-content>nav button,.alpha-identity:not(.beta-account) .alpha-identity-actions button,.alpha-identity:not(.beta-account) .alpha-identity-content>button{border-radius:999px;border:2px solid var(--rk-ice);background:var(--rk-white);color:var(--rk-navy);font-weight:700;font-size:13px;padding:8px 14px}
+.alpha-identity:not(.beta-account) .alpha-identity-content>ul{list-style:none;padding:0;display:grid;gap:10px}
+.alpha-identity:not(.beta-account) .alpha-identity-content>ul button{width:100%;text-align:left;min-height:56px;border-radius:20px;border:0;background:var(--rk-ice-soft);color:var(--rk-navy);font-weight:800;font-size:15px;padding:0 18px;box-shadow:0 4px 0 var(--rk-blue)}
+.alpha-identity:not(.beta-account) .alpha-identity-content [role=status]:empty{display:none}
+.alpha-identity:not(.beta-account) .alpha-identity-content [role=status]{background:var(--rk-ice-soft);border-radius:16px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--rk-navy)}
+.alpha-identity:not(.beta-account) .alpha-identity-workspace{background:transparent}

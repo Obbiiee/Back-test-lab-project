@@ -526,3 +526,8 @@ Added integrations/odoo/OPERATIONS.md for support, uncertain payment status, ind
 ### UI/UX design delegation - 2026-10-21
 
 Owner requested all remaining product and Odoo Community designs. Published a bounded CODEX -> CLAUDE mailbox assignment covering customer journeys, internal business views, existing canvas ownership, draft base prices139000/1668000IDR, mobile/accessibility/state coverage and coordinated patch acceptance. Preserved main Claude draft content; copied only the new assignment to backend handoff. Documentation-only, browser/runtime tests exempt because no product code/config changed; repository/bundle/diff gates required. This publishes instructions, not completed design, automatic Claude dispatch or production acceptance.
+
+
+### Claude customer UI integration -2026-10-21
+
+Integrated reviewed3-patch series on3d347cd, preserving billing/support and financial/replay authority. BetaAuth account lifecycle, workspace/review styling and payment/support cards; cancellable fragment cleanup avoids render side effects. Fresh native26 identity/billing/support tests/zero skips/142.710seconds PASS; frontend regression/lint/build149/release, public-account transport and Node6x3/16-profile PASS. Authored HTTPS5449 browser register/verify, sign-in, Pro sandbox/status, saved support and EURUSD next-tick fill/exit -> balance10000.03/one completed trade/net0.03 verified at1440/375 with no document overflow and reload recovery. No actual provider/Google/SMTP/real password reset or full501 rerun. Main Claude drafts preserved. Full private canvas and missing backend capabilities are not accepted by this patch. Odoo UI is next separate checkpoint.

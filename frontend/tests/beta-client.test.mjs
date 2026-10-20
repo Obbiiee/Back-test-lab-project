@@ -94,3 +94,12 @@ console.log('PASS Beta transport: exact v2 requests, Google cookie exchange, HTT
  const before=h.calls.length;await assert.rejects(h.client.supportSubmit({...raw,account:user}),isCode('INVALID_REQUEST'));assert.equal(h.calls.length,before);
  h.set(async()=>{throw Error('Lost response');});await assert.rejects(h.client.supportSubmit(raw),isCode('SERVICE_UNAVAILABLE',true));assert.equal(h.calls.length,before+1);
 }
+
+// Public account lifecycle never creates a session or sends bearer/cookie credentials.
+{
+ const h=harness();h.set(async()=>json({accepted:true}));
+ const cases=[['register',['qa@example.com','authored long passphrase'],'/register',{email:'qa@example.com',password:'authored long passphrase'}],['requestVerification',['qa@example.com'],'/request-verify-token',{email:'qa@example.com'}],['verify',['authored-code'],'/verify',{token:'authored-code'}],['forgotPassword',['qa@example.com'],'/forgot-password',{email:'qa@example.com'}],['resetPassword',['authored-code','authored new passphrase'],'/reset-password',{token:'authored-code',password:'authored new passphrase'}]];
+ for(const [method,args,path,body] of cases){await h.client[method](...args);const [url,options]=h.calls.at(-1);assert.equal(url,'/api/v1/auth'+path);assert.deepEqual(JSON.parse(options.body),body);assert.equal(options.headers.Authorization,undefined);assert.equal(options.credentials,'omit');assert.equal(h.client.hasSession(),false);}
+ for(const detail of ['VERIFY_USER_BAD_TOKEN',{code:'RESET_PASSWORD_BAD_TOKEN'}]){h.set(async()=>json({detail},400));await assert.rejects(h.client.verify('authored'),isCode(typeof detail==='string'?detail:detail.code));}
+ h.set(async()=>json({detail:'untrusted internals'},400));await assert.rejects(h.client.verify('authored'),isCode('SERVICE_UNAVAILABLE'));
+}
