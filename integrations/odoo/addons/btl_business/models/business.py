@@ -62,13 +62,23 @@ class CashEntry(models.Model):
     def create(self,vals_list):
         if any(vals.get('state','draft')!='draft' for vals in vals_list):raise UserError('Create a draft first.')
         return super().create(vals_list)
+    def _lock_cash(self,operation):
+        self.check_access(operation)
+        if self:
+            self.env.cr.execute('SELECT id FROM btl_cash_entry WHERE id=ANY(%s) ORDER BY id FOR UPDATE',(self.ids,))
+            self.invalidate_recordset(['state'])
     def write(self,vals):
+        self._lock_cash('write')
         if any(row.state=='posted' for row in self):raise UserError('Confirmed cash entries are immutable; add a correcting entry.')
-        if vals.get('state')=='posted' and not self.env.context.get('btl_confirming'):raise UserError('Use Confirm.')
+        if 'state' in vals:raise UserError('Use Confirm.')
         return super().write(vals)
     def unlink(self):
+        self._lock_cash('unlink')
         if any(row.state=='posted' for row in self):raise UserError('Confirmed cash entries cannot be deleted.')
         return super().unlink()
     def action_confirm(self):
         if not self.env.user.has_group('btl_business.group_finance'):raise AccessError('Finance role required.')
-        return self.with_context(btl_confirming=True).write({'state':'posted'})
+        self._lock_cash('write')
+        drafts=self.filtered(lambda row:row.state=='draft')
+        if any(row.evidence.startswith('PLANNED ONLY:') or not row.evidence.strip() for row in drafts):raise UserError('Actual bank or receipt evidence required.')
+        return super(CashEntry,drafts).write({'state':'posted'}) if drafts else True

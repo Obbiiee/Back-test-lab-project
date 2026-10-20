@@ -15,6 +15,8 @@ class ImportBatch(models.TransientModel):
             if len(self.file)>2800000:raise ValueError()
             value=decode(base64.b64decode(self.file,validate=True))
         except (ValueError,TypeError,KeyError,UnicodeError,RecursionError):raise UserError('Invalid or oversized sandbox projection.') from None
+        bound=self.env.user.sudo().btl_source
+        if bound and value['source']!=bound:raise AccessError('Pinned source required.')
         company=self.env.company.id;source=value['source']
         key=int.from_bytes(hashlib.sha256(f'{company}:{source}'.encode()).digest()[:8],'big')&0x7fffffffffffffff
         self.env.cr.execute('SELECT pg_advisory_xact_lock(%s)',(key,))

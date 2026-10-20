@@ -33,6 +33,7 @@ class OdooExportTests(unittest.TestCase):
         def limited(dsn):
             with connect(dsn) as db:db.execute(sql.SQL('SET LOCAL ROLE {}').format(sql.Identifier(role)));yield db
         with patch.object(bridge,'connect',limited):raw=bridge.snapshot(DSN,str(uuid.uuid4()))
+        bridge.contract.sync_decode(bridge.bundle(DSN,str(uuid.uuid4())))
         value=bridge.contract.decode(raw);self.assertIn(actor,[c['id'] for c in value['customers']]);self.assertNotIn(b'never-export-password',raw)
         for statement in ('SELECT hashed_password FROM btl.users','SELECT * FROM btl.tick_sessions LIMIT 0','UPDATE btl.users SET email=email','SELECT transaction_id FROM btl.sandbox_billing_orders'):
             with self.assertRaises(psycopg.DatabaseError):
@@ -41,7 +42,7 @@ class OdooPackageTests(unittest.TestCase):
     def test_archive_admits_only_source_not_customer_exports_or_secrets(self):
         sys.path.insert(0,str(ROOT))
         from deploy.vps.package import allowed
-        for path in ('integrations/odoo/export.py','integrations/odoo/addons/btl_business/security/ir.model.access.csv','integrations/odoo/LICENSE','integrations/odoo/compose.yaml'):
+        for path in ('integrations/odoo/export.py','integrations/odoo/addons/btl_business/security/ir.model.access.csv','integrations/odoo/LICENSE','integrations/odoo/compose.yaml','integrations/odoo/btl-odoo-sync.service','integrations/odoo/btl-odoo-sync.timer'):
             self.assertTrue(allowed(path))
         for path in ('integrations/odoo/customers.json','integrations/odoo/orders.csv','integrations/odoo/secrets/private.py','integrations/odoo/tests/private.py'):
             self.assertFalse(allowed(path))

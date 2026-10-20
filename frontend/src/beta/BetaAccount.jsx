@@ -1,5 +1,6 @@
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import BetaBilling from './BetaBilling.jsx';
+import BetaSupport from './BetaSupport.jsx';
 import {createBetaClient} from './betaClient.js';
 import {betaNotice} from './betaWorkspace.js';
 import AlphaBrand from '../tickAlpha/AlphaBrand.jsx';
@@ -54,6 +55,7 @@ export default function BetaAccount(){
         {selected?<><button disabled={busy} onClick={()=>{client.selectWorkspace(selected.id);setSelected(null);}}>Back to workspaces</button>
           <Suspense fallback={<p role="status">Loading Beta workspace…</p>}><Workspace key={selected.id} client={client} workspace={selected} onExpired={()=>{client.clear();setUser(null);setSelected(null);setWorkspaces([]);}}/></Suspense></>:<>
           {providers?.billingConfigured&&<BetaBilling key={user.id} client={client} onExpired={()=>{client.clear();setUser(null);setSelected(null);setWorkspaces([]);}}/>}
+          <BetaSupport key={'support-'+user.id} client={client} onExpired={()=>{client.clear();setUser(null);setSelected(null);setWorkspaces([]);}}/>
           <h1>Your workspaces</h1><p>Beta Sessions are separate from your previous Sessions. Choose a workspace to practice.</p>
           <ul className="beta-workspace-list">{workspaces.map(ws=><li key={ws.id}><button disabled={busy} onClick={()=>{client.selectWorkspace(ws.id);setSelected(ws);}}>{ws.name} · {ws.role}</button></li>)}</ul>
           <form onSubmit={event=>{event.preventDefault();const name=new FormData(event.currentTarget).get('name');run(async()=>{

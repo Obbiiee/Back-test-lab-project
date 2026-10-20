@@ -42,6 +42,10 @@ class DeploymentNativeTests(unittest.TestCase):
         self.assertEqual(http.post('/api/v1/auth/verify',json=dict(token=delivery.token(email,'verification'))).status_code,200)
         token=http.post('/api/v1/auth/login',data=dict(username=email,password=PASSWORD));self.assertEqual(token.status_code,200)
         headers={'Authorization':'Bearer '+token.json()['access_token']}
+        support=dict(requestId=str(uuid.uuid4()),title='Deployment support QA',message='Authored fixture only')
+        saved_support=http.post('/api/v1/support',headers=headers,json=support);self.assertEqual(saved_support.status_code,200)
+        self.assertEqual(http.post('/api/v1/support',headers=headers,json=support).json(),saved_support.json())
+        self.assertEqual(len(http.get('/api/v1/support',headers=headers).json()['items']),1)
         workspace=http.post('/api/v1/workspaces',headers=headers,json=dict(name='Deployment QA'));self.assertEqual(workspace.status_code,201)
         root='/api/v1/workspaces/'+workspace.json()['id']
         self.assertEqual(http.get(root+'/research/catalog',headers=headers).status_code,200)

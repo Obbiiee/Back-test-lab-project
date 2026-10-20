@@ -1,23 +1,55 @@
-# Local Odoo Community business integration
+# Odoo Community business integration
 
-Target Odoo19 Community (LGPL-3), upstream https://github.com/odoo/odoo/tree/19.0. Native CRM/Contacts and Invoicing are Community modules. No Enterprise module or OCA dependency is silently required. Native full accounting/reporting, country tax configuration and statutory compliance are not certified by this addon.
+Odoo19 Community source is pinned to dbec872e39b030828e7cd22aae1d39d2da87c29e (LGPL-3). Native CRM/Contacts and Invoicing plus the authored btl_business addon run in a separate database/filestore. No Enterprise or OCA dependency is silently required. Company/chart/tax and statutory reporting are operator-owned and not certified here.
 
-Install `btl_business` from the addons directory on a separate private Odoo database. Add CRM, Importer and Finance groups explicitly to the corresponding internal staff. Do not grant customer/portal users these groups. Bind Odoo to loopback for local QA. Never connect Odoo directly as owner to the product database; only an explicit operator export reader may SELECT the listed business columns. Backtest ticks, passwords, provider keys and entitlement mutation are excluded.
+## Functions
 
-The addon supplies customer/contact mapping, native CRM pipeline, support tickets, immutable sandbox payment projections, and a manually evidenced whole-IDR cashbook with confirmed-entry protection and pivot reporting. Native invoice/vendor-bill operations stay in the core Invoicing application and need the operator's real company/chart/tax configuration. Cashbook is cash movement, not an automatic profit-and-loss statement or tax return.
+- CRM customers/contact mapping and native opportunity pipeline.
+- Scheduled one-way customer and sandbox payment synchronization through native Odoo19 JSON2. Stable company/source/order/revision identity makes repeated delivery idempotent. Customer email changes deliberately stop for identity review.
+- Billing-only Free/Pro projection and paid expiry for staff, with source observation time; observations older than ten minutes show STALE / UNKNOWN on read/reload. Open staff screens require reload to refresh; they are not push-refreshed. These labels do not include separate HMAC QA access events and never grant app access.
+- Verified app users submit durable account-owned support requests; the next sync creates staff tickets. Requests survive Odoo downtime. Staff status/notes are preserved on repeat import. App receipt means saved intake, not proof of delivery or staff response. There is no reply/email synchronization in this checkpoint.
+- Independent provider payout/bank reconciliation: gross minus evidenced fee/refund must equal the independently entered bank deposit. Confirmation produces exactly one immutable net bank cash entry. Do not post the same fee/refund again as bank cash; this is clearing reconciliation, not automatic revenue/tax accounting.
+- Monthly/annual operating-cost plans for VPS, domain/software/data and other costs. Due plans create drafts only. Replace estimated amount and PLANNED ONLY evidence with the actual receipt before confirmation. Unknown costs stay unknown.
 
-Run the existing backend Python with repo/backend on PYTHONPATH: `python integrations/odoo/export.py --source YOUR_STABLE_INSTALLATION_UUID --output PRIVATE_NEW_FILE.json`, supplying BTL_BUSINESS_EXPORT_DSN in protected environment/config. Output is exclusive and bounded; includes customer email, so protect it as private customer data. Import the reviewed file through Backtest Business -> Import reviewed snapshot. No unattended network transmission is added. Export source UUID must stay stable per installation. Do not merge different business/company sources. Email changes require identity review; imports never silently reassign contacts.
+Sandbox orders never create revenue, invoices, bank deposits, refund amounts, provider fees or Pro grants. Reconciliation/cost examples are authored QA amounts, not actual funds. Native invoice/vendor-bill operations remain in Invoicing after actual company/chart/tax setup. Cashbook is cash movement, not an automatic profit-and-loss statement or tax return.
 
-Snapshot import is atomic and idempotent by company/source/order/revision, refuses conflicting same revisions or identity, ignores stale revisions and preserves terminal reversals. Payment face values/statuses are SIMULATION ONLY and never generate invoices, confirmed cash, real revenue or bank settlement. Provider fee, actual refund amount, payout and tax data are not inferred. Manually enter evidenced actual cash movements only when those amounts exist, or configure approved accounting workflows later. Odoo outages cannot block app login, billing or replay.
+## Install and isolate
 
-Local tests use isolated QA databases and authored customers/orders only. Real production export, company setup, staff credentials, backups, network/TLS, retention and accounting reconciliation require operator acceptance. Odoo business storage/filestore must be backed up separately from the product database. Do not place QA secrets or upstream source in Git/source archives.
+Install btl_business from addons/ on a separate private Odoo19 database with crm,contacts,account,mail,rpc. Assign CRM, Importer and Finance only to corresponding internal staff; portal users receive none. Keep Odoo private/loopback for local QA, disable public signup and provision individual production staff credentials. Product identity, billing and replay never call Odoo in their request path; outages cannot block them.
 
+Use a separate PostgreSQL LOGIN export role with NOSUPERUSER NOCREATEDB NOCREATEROLE and only the exact column grants supplied by export.grant_export_reader, including support intake. The worker role must not inherit owner/app/billing roles or broader grants. An owner must apply migration014 before granting support SELECT and grant_support_runtime to the product app role. Never use a product owner DSN in the worker or in Odoo. Odoo itself never connects to the product database. Product operator grants now include the support intake table; no credentials/ticks/provider secrets are exported.
 
-## Optional isolated container candidate
+Create a dedicated Odoo internal service user in only the intended company, with Backtest Business Importer (no Finance/System group). As an Odoo administrator bind that user's btl_source field to the installation's stable UUID. The field is system-only and is configured through private Odoo shell/admin provisioning, not public API. Issue an expiring native Odoo API key for that service identity through the normal operator workflow and rotate it. Never use a staff administrator key or put keys in source/browser/command-line arguments.
 
-compose.yaml uses a separate internal network, database and filestore; it is not attached to the product database/network. Host binding is127.0.0.1:8070 only. Set BTL_ODOO_IMAGE to an official `odoo:19.0@sha256:...` image and BTL_ODOO_POSTGRES_IMAGE to `postgres:17@sha256:...` after reviewing real digests. No invented digest/default latest tag is supplied. Create private secrets/db_owner_password and secrets/odoo.conf from the template with separate owner/app passwords. PostgreSQL initializes as btl_odoo_owner; before starting Odoo, explicitly create a restricted LOGIN role odoo (NOSUPERUSER NOCREATEROLE NOCREATEDB) and assign ownership of only the separate odoo database to that app role. Never run the app as the PostgreSQL initialization superuser. Never put real secrets in the example. Initialize/install btl_business explicitly in Odoo; do not expose its database manager publicly. Back up both named volumes. This is a candidate until actual image/host/native acceptance; Docker is not installed on the current Windows QA host. Native local tests use an independently pinned source runtime instead.
+## Scheduled synchronization
 
+Run the existing backend Python with repository/backend on PYTHONPATH:
 
-## Verified local reference (2026-10-20)
+    python -B integrations/odoo/sync.py
 
-Actual upstream19.0 source commit dbec872e39b030828e7cd22aae1d39d2da87c29e, its exact requirements and separate Python3.12/PostgreSQL runtime passed five addon post-install test methods (zero failures/errors). Independent product exporter/contract/package tests passed three cases with zero skips. Authored browser fixtures demonstrate customer, sandbox payment, support and cash10000in/3000out/net7000IDR. These are QA amounts, not business balances. Runtime/source/databases/credentials live outside tracked source; do not use QA credentials in production. The sample Compose has not been started on Linux/Docker. Disable public signup, provision individual least-privilege staff accounts, complete company/chart/tax settings and validate separate database+filestore recovery before actual business use. Scheduled jobs/SMTP/network integrations are intentionally not activated in this local reference.
+Supply all six values privately in the worker environment:
+
+    BTL_BUSINESS_EXPORT_DSN
+    BTL_BUSINESS_SOURCE
+    BTL_ODOO_URL
+    BTL_ODOO_DATABASE
+    BTL_ODOO_API_KEY
+    BTL_ODOO_COMPANY
+
+The URL is the configured Odoo root, HTTPS required except literal localhost/127.0.0.1/::1 QA. Company is the positive numeric Odoo company ID. Source UUID must exactly match the service user's binding. The worker reads one repeatable-read/read-only snapshot, posts once to /json/2/btl.import.batch/sync_bundle, refuses redirects, ignores proxy environment and bounds requests/responses/timeouts. It prints only accepted counts or a fixed failure code. No automatic retries inside an HTTP request; the next schedule safely re-exports current state. Monitor nonzero exit codes; persistent failure must alert the operator rather than being treated as successful delivery.
+
+btl-odoo-sync.service/timer are opt-in Linux host templates (one cycle per minute, non-overlapping oneshot). They require an existing least-privilege OS user, reviewed filesystem paths and protected /etc/backtest-lab/odoo-sync.env. They are not installed or enabled automatically. Local QA uses its own process timer and authored data. The stock product Compose database has no published port: a host-native worker cannot simply resolve its internal db hostname. Do not expose the database to solve that; actual container/private network placement and HTTPS routing must be reviewed/tested on the chosen host. No Docker/Linux runtime certification is claimed.
+
+A full snapshot refuses above1000 customers,1000 orders or1000 tickets (8MiB sync /2MiB payment export), never silently truncates. Extend with reviewed bounded pagination before exceeding those limits. The importer serializes by source/company, refuses stale/future observations, same-observation conflicts, mutable order pins and terminal reversal regressions. One transaction covers contacts/payments/tickets/observation state. Manual reviewed snapshot import/export remains available for recovery; manual imports do not assert a fresh automatic observation.
+
+## Payout and cost workflow
+
+Backtest Business -> Payout reconciliation accepts independently supplied provider payout reference, bank reference, evidence/date and whole-IDR gross/fee/refund/bank amounts. A difference blocks confirmation; references are unique per company. Repeated confirmation returns the same cash entry; confirmed records cannot be edited/deleted. Current scope is positive net IDR payouts up to one billion per record, not net-negative batches, automatic bank feeds, tax journals or external settlement verification. Unknown report formats/actual provider amounts are not invented.
+
+Operating cost plans -> Prepare due cost draft advances the next due date and creates an unconfirmed draft. Planning never creates cash or a vendor bill. Confirm only after replacing the placeholder evidence and estimate with the actual receipt/amount. Native Invoicing handles vendor bills separately after accounting setup; avoid entering the same actual movement twice.
+
+## Optional isolated Odoo container candidate
+
+compose.yaml uses its own internal business network, database and filestore, not the product network. Host binding is127.0.0.1:8070 only. Set BTL_ODOO_IMAGE to an official odoo:19.0@sha256:... and BTL_ODOO_POSTGRES_IMAGE to postgres:17@sha256:... after reviewing actual digests. No invented digest/default latest tag. Create private secrets/db_owner_password and secrets/odoo.conf from the example with separate owner/app credentials. PostgreSQL initializes as btl_odoo_owner; explicitly create restricted LOGIN odoo NOSUPERUSER NOCREATEDB NOCREATEROLE and assign only the separate odoo database to it before app startup. Never run Odoo as the initialization superuser. This candidate has not been started on Docker/Linux; the current Windows host has no Docker/WSL runtime.
+
+Back up Odoo database and filestore together, separately from product backups, and verify recovery before actual business use. Keep upstream source/dependencies, QA credentials, customer exports and raw market data out of Git/source archives. Real merchant/provider/bank reports, company/tax/retention policy, production keys, TLS/private networking, scheduled alerting and Linux capacity remain operator acceptance prerequisites.

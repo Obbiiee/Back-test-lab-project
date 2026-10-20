@@ -8,13 +8,14 @@ from deploy.vps.settings import read_json,connection,need,ConfigurationError
 def migrate_and_grant(dsn,*,billing=False):
     from infrastructure.database import migrate,connect,grant_runtime,grant_workspace_runtime
     from identity.google_store import grant_google_runtime
+    from cloud.support import grant_support_runtime
     from cloud.sandbox_access import grant_sandbox_access_runtime
     migrate(dsn)
     with connect(dsn) as db:
         role=db.execute("SELECT rolcanlogin,rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname='btl_app'").fetchone()
         need(role is not None and role[0] and not any(role[1:]),'CREATE_RESTRICTED_RUNTIME_ROLE_FIRST')
         need(not db.execute("SELECT pg_has_role('btl_app','btl_owner','MEMBER')").fetchone()[0],'OWNER_MEMBERSHIP')
-    for grant in (grant_runtime,grant_workspace_runtime,grant_google_runtime,grant_sandbox_access_runtime):grant(dsn,'btl_app')
+    for grant in (grant_support_runtime,grant_runtime,grant_workspace_runtime,grant_google_runtime,grant_sandbox_access_runtime):grant(dsn,'btl_app')
     if billing:
         from cloud.billing import grant_billing_runtime,grant_billing_access_reader
         with connect(dsn) as db:

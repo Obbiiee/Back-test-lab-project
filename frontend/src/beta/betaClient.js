@@ -4,7 +4,7 @@ const segment=value=>{
   if(typeof value!=='string'||value.length<1||value.length>128||!/^[-A-Za-z0-9_:]+$/.test(value))throw Error('Invalid Session identity.');
   return encodeURIComponent(value);
 };
-const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY','PROTOCOL_BLOCKED','CHECKOUT_ALREADY_STARTED','STALE_PAYMENT_OBSERVATION','BILLING_BUSY']);
+const refusals=new Set(['DAILY_WINDOW_LIMIT','SAVED_SESSION_LIMIT','WINDOW_ACTIVATION_REQUIRED','SESSION_TRASHED','TRASH_EXPIRED','OUTSIDE_TRADABLE_WINDOW','WINDOW_CONTINUATION_UNAVAILABLE','GOOGLE_LOGIN_FAILED','GOOGLE_STATE_REFUSED','GOOGLE_BUSY','PROTOCOL_BLOCKED','CHECKOUT_ALREADY_STARTED','STALE_PAYMENT_OBSERVATION','BILLING_BUSY','SUPPORT_LIMIT','SUPPORT_CONFLICT','SUPPORT_BUSY']);
 export class BetaRequestError extends Error{
   constructor(code,{status=0,reconcile=false}={}){super(code);this.name='BetaRequestError';this.code=code;this.status=status;this.reconciliationRequired=reconcile;}
 }
@@ -71,6 +71,8 @@ export function createBetaClient({fetcher=fetch,secure=()=>globalThis.location?.
     return send('/api/v1/billing/sandbox'+path,{body,mutation:body!==undefined});
   }
   return Object.freeze({
+    supportList:()=>{if(!token||!subject)return Promise.reject(new BetaRequestError('SIGN_IN_REQUIRED'));return send('/api/v1/support');},
+    supportSubmit:raw=>{if(!token||!subject)return Promise.reject(new BetaRequestError('SIGN_IN_REQUIRED'));if(!raw||Object.keys(raw).sort().join(',')!=='message,requestId,title'||!uuid(raw.requestId))return Promise.reject(new BetaRequestError('INVALID_REQUEST'));return send('/api/v1/support',{body:raw,mutation:true});},
     clear,hasSession:()=>!!token&&!!subject,subject:()=>subject,
     billingPlan:()=>billing('/plan'),billingOrders:()=>billing('/orders'),billingAccess:()=>billing('/access'),
     billingCheckout:requestId=>{if(!uuid(requestId))return Promise.reject(new BetaRequestError('INVALID_REQUEST'));return billing('/checkout',{requestId});},

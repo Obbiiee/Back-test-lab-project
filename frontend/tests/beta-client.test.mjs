@@ -87,3 +87,10 @@ console.log('PASS Beta transport: exact v2 requests, Google cookie exchange, HTT
  const count=h.calls.length;await assert.rejects(h.client.billingCheckout('../bad'),isCode('INVALID_REQUEST'));assert.equal(h.calls.length,count);
  h.client.clear();await assert.rejects(h.client.billingOrders(),isCode('SIGN_IN_REQUIRED'));
 }
+
+{
+ const h=await signed();h.set(async()=>json({schemaVersion:1,items:[]}));await h.client.supportList();assert.equal(h.calls.at(-1)[0],'/api/v1/support');
+ const raw={requestId:other,title:'Authored support',message:'QA only'};await h.client.supportSubmit(raw);assert.deepEqual(JSON.parse(h.calls.at(-1)[1].body),raw);
+ const before=h.calls.length;await assert.rejects(h.client.supportSubmit({...raw,account:user}),isCode('INVALID_REQUEST'));assert.equal(h.calls.length,before);
+ h.set(async()=>{throw Error('Lost response');});await assert.rejects(h.client.supportSubmit(raw),isCode('SERVICE_UNAVAILABLE',true));assert.equal(h.calls.length,before+1);
+}

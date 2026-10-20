@@ -37,3 +37,27 @@ def decode(raw):
         orders.add(order['id'])
     return value
 def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
+
+
+def sync_decode(raw):
+    from datetime import datetime
+    need(type(raw) is bytes and len(raw)<=8388608)
+    def pairs(items):
+        out={}
+        for key,value in items:need(key not in out);out[key]=value
+        return out
+    value=json.loads(raw,object_pairs_hook=pairs,parse_constant=lambda _:need(False))
+    need(type(value) is dict and set(value)=={'schemaVersion','artifact','source','observedAtUs','snapshot','tickets'})
+    need(type(value['schemaVersion']) is int and value['schemaVersion']==1 and value['artifact']=='BTL-BUSINESS-SYNC-1')
+    uid(value['source']);need(type(value['observedAtUs']) is str and re.fullmatch(r'[1-9][0-9]{0,17}',value['observedAtUs']))
+    snapshot=decode(json.dumps(value['snapshot'],ensure_ascii=True).encode());need(snapshot['source']==value['source'])
+    accounts={x['id'] for x in snapshot['customers']};seen=set()
+    need(type(value['tickets']) is list and len(value['tickets'])<=1000)
+    for ticket in value['tickets']:
+        need(type(ticket) is dict and set(ticket)=={'id','account','title','message','createdAt'})
+        uid(ticket['id']);uid(ticket['account']);need(ticket['id'] not in seen and ticket['account'] in accounts);seen.add(ticket['id'])
+        for key,limit in (('title',160),('message',4000)):
+            text=ticket[key];need(type(text) is str and 1<=len(text.strip())<=limit and len(text)<=limit and all(c in '\n\t' or 32<=ord(c) and not 0xd800<=ord(c)<=0xdfff for c in text))
+        need(type(ticket['createdAt']) is str and len(ticket['createdAt'])<=40)
+        when=datetime.fromisoformat(ticket['createdAt']);need(when.tzinfo is not None and when.utcoffset().total_seconds()==0)
+    return value
