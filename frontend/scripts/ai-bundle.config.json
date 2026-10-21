@@ -213,6 +213,7 @@
     "backend/cloud/midtrans.py",
     "frontend/src/beta/BetaAccount.jsx",
     "frontend/src/beta/BetaAuth.jsx",
+    "frontend/src/beta/BetaNewSession.jsx",
     "frontend/src/beta/BetaWorkspace.jsx",
     "frontend/src/beta/betaWorkspace.js",
     "frontend/src/beta/betaClient.js",

@@ -2,9 +2,10 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import CandleChart from '../components/CandleChart.jsx';
 import {productionRegistry} from '../indicators/productionRegistry.js';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
+import {BetaNewSession,BetaTrash,BetaWindowCard} from './BetaNewSession.jsx';
 import {displayBars,stamp,TIMEFRAMES} from '../tickAlpha/display.js';
 import {ratioLabel} from '../tickAlpha/annotations.js';
-import {accessMessage,betaNotice,confirmation,executionCommand,newId,methodFromForm,orderFromForm,createReplayLoop} from './betaWorkspace.js';
+import {accessMessage,betaNotice,confirmation,executionCommand,newId,orderFromForm,createReplayLoop} from './betaWorkspace.js';
 
 const REVIEW_LABELS={entry:'Entry',quantity:'Lots',riskPercent:'Risk %',sl:'Stop loss',tp:'Take profit',orderType:'Order type',side:'Direction'};
 
@@ -12,7 +13,7 @@ export default function BetaWorkspace({client,workspace,onExpired}){
   const [catalog,setCatalog]=useState(null),[access,setAccess]=useState(null),[view,setView]=useState(null);
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[blocked,setBlocked]=useState(false);
   const [review,setReview]=useState(null),[action,setAction]=useState(null),[journal,setJournal]=useState(null);
-  const [methodKind,setMethodKind]=useState('FREE_STYLE'),[timeframe,setTimeframe]=useState('1m'),[speed,setSpeed]=useState(1),[playing,setPlaying]=useState(false);
+  const [creating,setCreating]=useState(false),[windowPrompt,setWindowPrompt]=useState(false),[timeframe,setTimeframe]=useState('1m'),[speed,setSpeed]=useState(1),[playing,setPlaying]=useState(false);
   const [tab,setTab]=useState('Positions'),[drawing,setDrawing]=useState('none'),[workflow,setWorkflow]=useState('QUICK');
   const [chartPreferences,setChartPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const flight=useRef(false),live=useRef(true),returnFocus=useRef(null);
@@ -63,24 +64,19 @@ export default function BetaWorkspace({client,workspace,onExpired}){
     <p role="status" aria-live="polite">{notice||(busy?'Loading saved evidence…':blocked?'Reload saved evidence to reconcile the last request.':'')}</p>
     {!owner&&<p>Read access. Ask the workspace owner to create or change Sessions.</p>}
     {!catalog?<p>Connect to the enabled Beta sandbox. No fallback feed is used.</p>:!view?<>
-      <div className="beta-create-grid"><form onSubmit={event=>{event.preventDefault();const f=new FormData(event.currentTarget);run(async()=>{
-        await client.createMethod(methodFromForm(f,newId('method')));await reload(null);
-      });}}><h2>Create a strategy</h2><label>Strategy type<select name="kind" value={methodKind} disabled={writeDisabled} onChange={e=>setMethodKind(e.target.value)}><option value="FREE_STYLE">Free Style</option><option value="PROTOCOL">Protocol</option></select></label>{methodKind==='PROTOCOL'&&<><label>Risk percent<input name="risk" defaultValue="1" required disabled={writeDisabled}/></label><label>Reward / risk<input name="rr" defaultValue="2" required disabled={writeDisabled}/></label><label>Checklist<select name="checklist" disabled={writeDisabled}><option>ON</option><option>OFF</option></select></label><label>Conditions, one per line<textarea name="conditions" required maxLength={4000} disabled={writeDisabled}/></label></>}<label>Strategy name<input name="name" maxLength={128} required disabled={writeDisabled}/></label><button disabled={writeDisabled}>Save strategy</button></form>
-      <form onSubmit={event=>{event.preventDefault();const f=new FormData(event.currentTarget);run(async()=>{
-        const symbol=f.get('symbol'),instrument=catalog.instruments.find(i=>i.symbol===symbol);
-        const saved=await client.createSession({id:newId('session'),name:f.get('name'),methodId:f.get('method'),symbol,startPeriod:instrument.startPeriod,initialBalance:f.get('balance')});await reload(saved.id);
-      });}}><h2>Start a Session</h2><label>Session name<input name="name" maxLength={128} required disabled={writeDisabled}/></label>
-        <label>Pair<select name="symbol" disabled={writeDisabled}>{catalog.instruments.map(i=><option key={i.symbol}>{i.symbol}</option>)}</select></label>
-        <label>Strategy<select name="method" required disabled={writeDisabled}>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-        <label>Starting balance (USD)<input name="balance" inputMode="decimal" defaultValue="10000" required disabled={writeDisabled}/></label>
-        <button disabled={writeDisabled||!catalog.methods.length||access?.savedSessions>=access?.savedLimit}>Create Session</button></form></div>
+      <div className="beta-hub">
+        <div className="beta-hub-main">{creating||!catalog.sessions.length?<BetaNewSession catalog={catalog} access={access} disabled={writeDisabled} run={run} client={client} reload={reload}
+          onCreated={()=>setCreating(false)} onCancel={catalog.sessions.length?()=>setCreating(false):null}/>
+          :<button className="beta-new-open" disabled={writeDisabled} onClick={()=>setCreating(true)}><span aria-hidden="true">+</span>New Session</button>}</div>
+        <aside className="beta-hub-side"><BetaWindowCard access={access}/>
+          <BetaTrash sessions={catalog.sessions.filter(s=>catalog.savedStates[s.id]==='TRASHED')} disabled={writeDisabled} onRestore={s=>run(()=>mutate(()=>client.restore(s.id)))}/></aside>
+      </div>
       <h2>Saved Sessions</h2><ul className="beta-session-list">{catalog.sessions.filter(s=>catalog.savedStates[s.id]==='SAVED').map(s=><li key={s.id}><div><strong>{s.name}</strong><span>{s.symbol} · {s.startPeriod}</span></div><button disabled={busy||blocked} onClick={()=>run(()=>reload(s.id))}>Open {s.name}</button><button disabled={writeDisabled} onClick={()=>run(()=>mutate(()=>client.trash(s.id)))}>Move {s.name} to Trash</button></li>)}</ul>
-      {!catalog.sessions.length&&<p>Create a strategy, then a Session to begin. Free accounts can trade.</p>}
-      <details><summary>Trash · restore within 30 days</summary><ul className="beta-session-list">{catalog.sessions.filter(s=>catalog.savedStates[s.id]==='TRASHED').map(s=><li key={s.id}><span>{s.name} · {s.symbol}</span><button disabled={writeDisabled} onClick={()=>run(()=>mutate(()=>client.restore(s.id)))}>Restore {s.name}</button></li>)}</ul></details>
+      {!catalog.sessions.length&&<p>Pick a pair, a starting balance and a strategy to create your first Session. Free accounts can trade.</p>}
     </>:<>
       <div className="beta-session-heading"><button disabled={busy||blocked||playing} onClick={()=>run(()=>reload(null))}>All Beta Sessions</button><h2>{view.metadata.name} · {view.metadata.symbol}</h2><strong>Saved balance ${view.state.balance}</strong></div>
       <p>{view.label}. Earlier two-year candle history is unavailable in these demos.</p>
-      <div className="beta-toolbar" role="group" aria-label="Chart and replay"><button disabled={tradingDisabled} onClick={()=>run(()=>mutate(()=>client.activate(view.metadata.id)))}>Activate trading window</button>
+      <div className="beta-toolbar" role="group" aria-label="Chart and replay"><button disabled={tradingDisabled} onClick={event=>{returnFocus.current=event.currentTarget;if(access?.tier==='FREE'&&access.freeActivationAvailable)setWindowPrompt(true);else run(()=>mutate(()=>client.activate(view.metadata.id)));}}>Activate trading window</button>
         <label>Timeframe<select aria-label="Beta timeframe" disabled={busy||playing} value={timeframe} onChange={e=>{const tf=e.target.value;run(async()=>{await reload(view.metadata.id,tf);setTimeframe(tf);setReview(null);});}}>{TIMEFRAMES.map(tf=><option key={tf}>{tf}</option>)}</select></label><label>Replay speed<select value={speed} disabled={busy||playing} onChange={e=>setSpeed(Number(e.target.value))}>{[1,4,16].map(n=><option key={n} value={n}>{n} intervals / step</option>)}</select></label><button disabled={playing?false:tradingDisabled} aria-pressed={playing} onClick={()=>{if(playing)replay.stop();else if(replay.start())setPlaying(true);}}>{playing?'Pause replay':'Play replay'}</button><button disabled={tradingDisabled} onClick={()=>run(step)}>Step replay</button><span>{stamp(view.state.throughNs)}</span>
         <label>Drawing<select value={drawing} onChange={e=>setDrawing(e.target.value)}><option value="none">Cursor</option><option value="trend-line">Trend line</option><option value="horizontal-line">Horizontal line</option><option value="rectangle">Rectangle</option><option value="fibonacci-retracement">Fibonacci</option><option value="text">Text</option></select></label></div>
       <div className="beta-trade"><div className="beta-chart"><CandleChart candles={bars} transition={{kind:'forward'}} researchOnly volumeAvailable={false}
@@ -110,6 +106,7 @@ export default function BetaWorkspace({client,workspace,onExpired}){
       {tab==='Evidence'&&<section className="beta-evidence"><h2>Source evidence</h2><p>{view.label}</p><dl>{Object.entries(stats?.provenance??{}).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl></section>}
     </>}
     {review&&<WorkspaceModal label="Review Beta order" returnFocusRef={returnFocus} onClose={()=>{if(!busy)setReview(null);}}><section className="alpha-dialog beta-dialog"><h2>Review exact order</h2><p>{review.value.command.payload.side} · {review.value.command.payload.orderType} · {view.metadata.symbol}</p><dl className="beta-review-values">{Object.entries(review.value.estimate).filter(([k])=>k!=='risk').map(([key,value])=><div key={key}><dt>{REVIEW_LABELS[key]??key}</dt><dd>{value??'None'}</dd></div>)}</dl>{review.value.estimate.risk&&<p>Planned loss USD {ratioLabel(review.value.estimate.risk.plannedRequestedLossUsdExact)} · budget USD {review.value.estimate.risk.budgetUsd}{review.value.estimate.risk.exceedsBudget?' · Requested size exceeds the budget.':''}</p>}<p>Actual entry requires the next eligible tick. Spread and conversion use server evidence.</p><button disabled={busy||blocked} onClick={()=>run(async()=>{await client.confirm(view.metadata.id,review.request);setReview(null);await reload();})}>Confirm order</button><button disabled={busy} onClick={()=>setReview(null)}>Back</button></section></WorkspaceModal>}
+    {windowPrompt&&view&&<WorkspaceModal label="Start today’s replay window" returnFocusRef={returnFocus} onClose={()=>{if(!busy)setWindowPrompt(false);}}><section className="alpha-dialog beta-dialog beta-dialog-window"><span className="beta-kicker">BEFORE THE FIRST TRADE</span><h2>Start today’s replay window?</h2><p>Free includes one window a day. Once started, this Session stays tradable. Next free window: 00:00 {access.resetTimezone}.</p><button disabled={busy||blocked} onClick={()=>run(async()=>{await client.activate(view.metadata.id);setWindowPrompt(false);await reload();}).then(ok=>{if(ok&&live.current&&replay.start())setPlaying(true);})}>Start window &amp; play</button><button disabled={busy} onClick={()=>setWindowPrompt(false)}>Just look around</button></section></WorkspaceModal>}
     {action&&<WorkspaceModal label="Confirm position action" returnFocusRef={returnFocus} onClose={()=>{if(!busy)setAction(null);}}><section className="alpha-dialog beta-dialog"><h2>{action.kind==='CLOSE'?'Request position exit':'Cancel pending order'}</h2><p>Order {action.payload.orderId} · quantity {action.payload.quantity??'all remaining'}. An exit request needs the next eligible liquidation-side tick.</p><button disabled={busy||blocked} onClick={()=>run(async()=>{await client.command(view.metadata.id,action);setAction(null);await reload();})}>Confirm {action.kind==='CLOSE'?'exit':'cancellation'}</button><button disabled={busy} onClick={()=>setAction(null)}>Back</button></section></WorkspaceModal>}
   </section>;
 }

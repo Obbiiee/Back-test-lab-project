@@ -248,3 +248,6 @@ Final native8/zero skips/192.599seconds PASS; recovery-only3/zero skips/5.709sec
 
 
 Odoo operator UI19.0.2.1.0 (2026-10-21): load views/operations.xml after business.xml; fresh native install with existing /btl_business test tag9 cases zero failed/errors125.970seconds. Rehearse browser kanban/search/read-only/financial confirmation gates against authored QA only; verify independent cash and invoice counts before/after. No app-data test installs or financial/schema/ACL changes.
+
+
+Claude slice09 UI acceptance (2026-10-21): registered frontend regression/lint/build150/release, beta-client/workspace, repository/bundle and Node6x3/16 profile PASS. Browser must verify Free create strategy/Session with exact50000 preset, invalid custom0 refusal, cancelled activation preserving focus/allowance, Trash count0/restore count1, Start window & play/Pause and allowance-used state,1440/375 no overflow/console errors. Existing backend tests remain preceding checkpoint evidence; no full501 rerun for this presentation-only slice.
