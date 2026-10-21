@@ -1,0 +1,77 @@
+<odoo>
+  <!-- Presentation only: all fields/actions/permissions retain their existing owners. -->
+  <record id="customer_search" model="ir.ui.view">
+    <field name="name">btl.customer.search</field><field name="model">btl.customer</field>
+    <field name="arch" type="xml"><search><field name="email"/><field name="external_id"/><field name="partner_id"/><group><filter name="by_company" string="Company" context="{'group_by':'company_id'}"/></group></search></field>
+  </record>
+  <record id="customer_form" model="ir.ui.view">
+    <field name="name">btl.customer.form</field><field name="model">btl.customer</field>
+    <field name="arch" type="xml"><form create="false" edit="false" delete="false"><sheet>
+      <div class="alert alert-info" role="status">Read-only sandbox projection. Billing visibility never grants application access. Refresh to check freshness; after ten minutes without a source observation the plan is STALE / UNKNOWN.</div>
+      <group><group string="Customer identity"><field name="email"/><field name="external_id"/><field name="partner_id"/><field name="company_id"/></group>
+      <group string="Billing-only observation"><field name="paid_plan" widget="badge" decoration-warning="paid_plan == 'STALE / UNKNOWN'"/><field name="paid_until"/><field name="sync_observed"/></group></group>
+      <group string="Source identity"><field name="source"/></group>
+      <p>Email changes require identity review in the source application. This screen does not change login details.</p>
+    </sheet></form></field>
+  </record>
+  <record id="customer_list_operator" model="ir.ui.view"><field name="name">btl.customer.list.operator</field><field name="model">btl.customer</field><field name="inherit_id" ref="customer_list"/><field name="arch" type="xml"><xpath expr="//field[@name='paid_plan']" position="attributes"><attribute name="widget">badge</attribute><attribute name="decoration-warning">paid_plan == 'STALE / UNKNOWN'</attribute></xpath></field></record>
+  <record id="customers_action" model="ir.actions.act_window"><field name="search_view_id" ref="customer_search"/></record>
+
+  <record id="support_search" model="ir.ui.view"><field name="name">btl.support.ticket.search</field><field name="model">btl.support.ticket</field><field name="arch" type="xml"><search>
+    <field name="name"/><field name="customer_id"/><field name="user_id"/>
+    <filter name="mine" string="Assigned to me" domain="[('user_id','=',uid)]"/>
+    <filter name="active_queue" string="Open and in progress" domain="[('state','!=','closed')]"/>
+    <filter name="unassigned" string="Unassigned" domain="[('user_id','=',False)]"/>
+    <filter name="closed" string="Closed" domain="[('state','=','closed')]"/>
+    <group><filter name="by_state" string="State" context="{'group_by':'state'}"/><filter name="by_owner" string="Assigned operator" context="{'group_by':'user_id'}"/></group>
+  </search></field></record>
+  <record id="support_kanban" model="ir.ui.view"><field name="name">btl.support.ticket.kanban</field><field name="model">btl.support.ticket</field><field name="arch" type="xml"><kanban default_group_by="state" quick_create="false" records_draggable="false" group_create="false" group_delete="false">
+    <field name="name"/><field name="customer_id"/><field name="user_id"/><field name="state"/>
+    <templates><t t-name="card"><div class="d-flex flex-column gap-2"><strong><field name="name"/></strong><field name="customer_id"/><div class="d-flex justify-content-between"><field name="state" widget="badge"/><field name="user_id" widget="many2one_avatar_user"/></div></div></t></templates>
+  </kanban></field></record>
+  <record id="support_form_operator" model="ir.ui.view"><field name="name">btl.support.ticket.form.operator</field><field name="model">btl.support.ticket</field><field name="inherit_id" ref="support_form"/><field name="arch" type="xml">
+    <xpath expr="//sheet/group" position="before"><div class="alert alert-info" role="status">Internal support work only. App intake is saved independently. Notes, replies and state changes are not yet delivered back to the app or by email. Use Log note for internal updates; do not send customer messages from this QA workflow.</div></xpath>
+    <xpath expr="//field[@name='user_id']" position="attributes"><attribute name="widget">many2one_avatar_user</attribute></xpath>
+  </field></record>
+  <record id="support_action" model="ir.actions.act_window"><field name="view_mode">kanban,list,form</field><field name="search_view_id" ref="support_search"/></record>
+
+  <record id="payment_search" model="ir.ui.view"><field name="name">btl.payment.search</field><field name="model">btl.payment</field><field name="arch" type="xml"><search>
+    <field name="external_id"/><field name="customer_id"/><field name="plan"/>
+    <filter name="needs_review" string="Needs review" domain="[('phase','in',['CREATED','CHECKOUT_STARTED','PENDING','HOLD'])]"/>
+    <filter name="paid" string="Paid sandbox" domain="[('phase','=','PAID')]"/><filter name="reversed" string="Reversed" domain="[('phase','=','REVERSED')]"/>
+    <group><filter name="by_phase" string="Phase" context="{'group_by':'phase'}"/><filter name="by_customer" string="Customer" context="{'group_by':'customer_id'}"/></group>
+  </search></field></record>
+  <record id="payment_form" model="ir.ui.view"><field name="name">btl.payment.form</field><field name="model">btl.payment</field><field name="arch" type="xml"><form create="false" edit="false" delete="false"><sheet>
+    <div class="alert alert-warning" role="status">Sandbox only: no real funds, revenue, bank cash or invoice is created by this order. Never confirm a bank deposit from its face value.</div>
+    <group><group string="Saved order"><field name="external_id"/><field name="customer_id"/><field name="plan"/><field name="mode"/></group><group string="Authoritative observation"><field name="phase" widget="badge"/><field name="amount_idr"/><field name="revision"/><field name="expires_at"/></group></group>
+    <group string="Provenance"><field name="company_id"/><field name="source"/><field name="payload_hash"/></group>
+    <p>Pending or uncertain payments require authenticated provider reconciliation in the application. A return link, screenshot or Odoo edit cannot grant Pro. Reversed orders remain terminal; another independent paid order can still grant access.</p>
+  </sheet></form></field></record>
+  <record id="payment_list_operator" model="ir.ui.view"><field name="name">btl.payment.list.operator</field><field name="model">btl.payment</field><field name="inherit_id" ref="payment_list"/><field name="arch" type="xml"><xpath expr="//field[@name='phase']" position="attributes"><attribute name="widget">badge</attribute><attribute name="decoration-warning">phase in ('PENDING','HOLD','CHECKOUT_STARTED')</attribute><attribute name="decoration-success">phase == 'PAID'</attribute><attribute name="decoration-danger">phase in ('FAILED','REVERSED')</attribute></xpath></field></record>
+  <record id="payments_action" model="ir.actions.act_window"><field name="search_view_id" ref="payment_search"/></record>
+
+  <record id="cash_search" model="ir.ui.view"><field name="name">btl.cash.entry.search</field><field name="model">btl.cash.entry</field><field name="arch" type="xml"><search>
+    <field name="name"/><field name="evidence"/>
+    <filter name="draft" string="Drafts - no cash" domain="[('state','=','draft')]"/><filter name="posted" string="Confirmed" domain="[('state','=','posted')]"/>
+    <filter name="cash_in" string="Cash in" domain="[('direction','=','in')]"/><filter name="cash_out" string="Cash out" domain="[('direction','=','out')]"/>
+    <group><filter name="by_category" string="Category" context="{'group_by':'category'}"/><filter name="by_month" string="Month" context="{'group_by':'date:month'}"/></group>
+  </search></field></record>
+  <record id="cash_form_operator" model="ir.ui.view"><field name="name">btl.cash.entry.form.operator</field><field name="model">btl.cash.entry</field><field name="inherit_id" ref="cash_form"/><field name="arch" type="xml">
+    <xpath expr="//sheet/group" position="before"><div class="alert alert-info" role="status">Drafts change no cash. Confirm only the actual whole-IDR amount with independent bank or receipt evidence. Confirmed entries are immutable: record an evidenced correcting movement instead of editing the original.</div></xpath>
+    <xpath expr="//button[@name='action_confirm']" position="attributes"><attribute name="groups">btl_business.group_finance</attribute><attribute name="confirm">Confirm this actual evidenced cash movement? It becomes immutable. Planned estimates are not cash.</attribute></xpath>
+    <xpath expr="//field[@name='state']" position="attributes"><attribute name="readonly">True</attribute></xpath>
+  </field></record>
+  <record id="cash_action" model="ir.actions.act_window"><field name="search_view_id" ref="cash_search"/></record>
+
+  <record id="payout_search" model="ir.ui.view"><field name="name">btl.payout.reconciliation.search</field><field name="model">btl.payout.reconciliation</field><field name="arch" type="xml"><search><field name="name"/><field name="bank_reference"/><filter name="draft" string="Needs reconciliation" domain="[('state','=','draft')]"/><filter name="confirmed" string="Confirmed" domain="[('state','=','confirmed')]"/><group><filter name="by_state" string="State" context="{'group_by':'state'}"/></group></search></field></record>
+  <record id="payout_form_operator" model="ir.ui.view"><field name="name">btl.payout.reconciliation.form.operator</field><field name="model">btl.payout.reconciliation</field><field name="inherit_id" ref="payout_form"/><field name="arch" type="xml">
+    <xpath expr="//sheet/group" position="before"><div class="alert alert-warning" role="status" invisible="difference_idr == 0">Amounts do not match. Required equation: gross minus fee minus refund equals bank deposit. Difference must be zero; all components need independent evidence.</div></xpath>
+    <xpath expr="//button[@name='action_reconcile']" position="attributes"><attribute name="groups">btl_business.group_finance</attribute><attribute name="invisible">state != 'draft' or difference_idr != 0</attribute><attribute name="confirm">Confirm the independently evidenced deposit? This creates one immutable NET bank cash entry. Do not record its fees or refunds again as bank movements.</attribute></xpath>
+    <xpath expr="//field[@name='cash_id']" position="attributes"><attribute name="string">Confirmed net cash movement</attribute></xpath>
+  </field></record>
+  <record id="payout_action" model="ir.actions.act_window"><field name="search_view_id" ref="payout_search"/></record>
+
+  <record id="cost_search" model="ir.ui.view"><field name="name">btl.operating.cost.search</field><field name="model">btl.operating.cost</field><field name="arch" type="xml"><search><field name="name"/><field name="vendor_id"/><filter name="monthly" string="Monthly plans" domain="[('period','=','month')]"/><filter name="annual" string="Annual plans" domain="[('period','=','year')]"/><group><filter name="by_category" string="Category" context="{'group_by':'category'}"/><filter name="by_vendor" string="Vendor" context="{'group_by':'vendor_id'}"/></group></search></field></record>
+  <record id="cost_form_operator" model="ir.ui.view"><field name="name">btl.operating.cost.form.operator</field><field name="model">btl.operating.cost</field><field name="inherit_id" ref="cost_form"/><field name="arch" type="xml"><xpath expr="//button[@name='action_prepare']" position="attributes"><attribute name="groups">btl_business.group_finance</attribute><attribute name="confirm">Prepare a planned cost draft and advance its next due date? This does not record a paid expense or change cash.</attribute></xpath></field></record>
+  <record id="cost_action" model="ir.actions.act_window"><field name="search_view_id" ref="cost_search"/></record>
+</odoo>

@@ -245,3 +245,6 @@ python -m unittest tests.test_odoo_recovery tests.test_local_reliability tests.t
 ```
 
 Final native8/zero skips/192.599seconds PASS; recovery-only3/zero skips/5.709seconds PASS. Missing native DSN/tool skips are not acceptance. Odoo actual restore additionally requires matched upstream/addon pins and DB+filestore fixture; follow integrations/odoo/OPERATIONS.md. Actual local6-table/source-before-after/physical-attachment comparison and restored8072 browser PASS,18.322seconds native recovery. These are bounded local results, not full regression501 rerun, long soak, Linux/container/capacity or production RTO.
+
+
+Odoo operator UI19.0.2.1.0 (2026-10-21): load views/operations.xml after business.xml; fresh native install with existing /btl_business test tag9 cases zero failed/errors125.970seconds. Rehearse browser kanban/search/read-only/financial confirmation gates against authored QA only; verify independent cash and invoice counts before/after. No app-data test installs or financial/schema/ACL changes.

@@ -229,6 +229,7 @@
     "integrations/odoo/addons/btl_business/security/ir.model.access.csv",
     "integrations/odoo/addons/btl_business/security/rules.xml",
     "integrations/odoo/addons/btl_business/views/business.xml",
+    "integrations/odoo/addons/btl_business/views/operations.xml",
     "integrations/odoo/addons/btl_business/wizard/__init__.py",
     "integrations/odoo/addons/btl_business/wizard/import_batch.py",
     "integrations/odoo/export.py",

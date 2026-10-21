@@ -58,3 +58,10 @@ Back up Odoo database and filestore together, separately from product backups, a
 ## Operations and recovery
 
 See OPERATIONS.md for daily support/payment/cost handling and the explicit cold database+filestore backup/recovery procedure in recovery.py. The tool restores only a trusted-hash archive into a different new empty database and new filestore path, after operator quiescence. Actual local rehearsal evidence is recorded in the existing phase/history owners; host encryption/off-site retention and production recovery acceptance are separate.
+
+
+## Operator views (Community, presentation-only)
+
+operations.xml extends the existing views without new models, fields, security grants or financial methods. Customers/payment details remain read-only projections; plan freshness is recomputed on read and needs a refresh, not a persistent searchable Fresh/STALE flag. Support has a non-draggable state kanban plus list/form and assignment/state searches. Internal work is labelled intake-only: app/email reply delivery is not implemented. Cashbook has evidenced/draft/direction/category/month filters and a confirmation warning; its existing signed-IDR sum still counts confirmed cash only. Payout mismatch shows the gross-fee-refund=bank rule and withholds the confirmation button until amounts agree; server-side independent evidence and immutability guards remain authoritative. Cost preparation explicitly creates a draft and advances its due date, not cash.
+
+No dashboard tiles, searchable computed freshness, sync-worker last-exit monitor, identity-review flag, correcting-entry relation, domain category or smart counts were fabricated. These need their existing model/contract owner before adding. Full canvas37-screen parity is not accepted without the requested reference export. Native Odoo styling is retained; no upstream/Enterprise patch.
