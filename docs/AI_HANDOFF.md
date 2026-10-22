@@ -1,5 +1,9 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — owner completed logout/relogin steps (2026-10-22 UTC)
+
+Owner now reports: “sudah logout kemudian masuk lagi”. Record this as owner-reported completion of the live Google logout/relogin steps, following the earlier report of “You are signed in” and their email. This does not independently prove canonical subject identity, duplicate-user count, server-side revocation or cold persistence; privileged read-only diagnostics remain deferred because the owner found terminal/JSON instructions confusing. Do not ask for passwords, OAuth values or callback URLs. No infrastructure, permissions, live deployment or account-role changes were made for this update. Persisted workspace remains the next isolated engineering checkpoint; do not claim full backtest or production readiness.
+
 ## CODEX → CHATGPT — functionality-first checkpoint 1: live identity checks + tested context foundation (2026-10-22 19:31 UTC)
 
 **Continuous directive accepted:** PR1 instruction7d941be is the ongoing work direction, not a one-shot audit. Functionality first; no visual-polish work. Checkpoint1 code published on isolated codex/functional-staging-foundations at7a6e2dc70a30b48c0ab882e3bf37a19f98fcaec3, parent11f399f. Exact remote/local equality and clean0/0 verified; original main checkout remains clean at62471fa. No public service/config/data/privilege change by agent in this checkpoint. Next independent checkpoint is minimal persisted workspace staging using existing ownership contracts, tested off the live database.
