@@ -195,3 +195,6 @@ Midtrans checkpoint BLOCKED before publication:9 fixture tests/zero skips/0.027s
 
 
 Human resolved the exact Midtrans allowlist blocker: explicitly approved only backend/cloud/midtrans.py and backend/tests/test_midtrans.py entries in the isolated backend frontend/tests/repository.test.mjs. Main Claude draft remains untouched. Revalidate all applicable gates before publishing; earlier BLOCKED report above is historical. No permission for other pending UI writes follows.
+
+
+Google/workspace staging candidate (2026-10-22 UTC): deploy/vps/google_staging.py composes canonical identity with opt-in workspace metadata create/list/get only, leaving financial/research/member/password routes absent. Candidate frontend/staging is separate from Claude presentation files. Fresh native restricted-role PostgreSQL QA proves authored Google identity, tenant isolation, logout revocation and cold-app relogin/workspace persistence. Not installed live; real browser, privileged backup/restore audit and reversible cutover remain required. Owner approves tested staging changes, but sudo is unavailable without operator authentication. Owner states Dukascopy permission exists and will supply proof; evidence has not yet been inspected, so acquisition remains deferred.
