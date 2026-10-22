@@ -109,3 +109,14 @@ Add all six keys to the private runtime JSON together: `BTL_BILLING_DATABASE_URL
 The Beta account page shows server access, saved payments, checkout, explicit reconciliation and safe resume only for CREATED orders. A lost checkout response is recovered by server order/request lookup; CHECKOUT_STARTED/PENDING/HOLD blocks new UI checkout until reconciled. The returned sandbox hosted URL is validated before rendering a separate-tab link. Signing a notification never authenticates its unsigned success status; the server independently fetches provider status. Expiry/refund may change eligibility; browser time or return URL never grants Pro. Saved order listing is bounded to50 and discloses truncation. Existing orders pin merchant and offer across restarts.
 
 Configure the provider notification destination to `https://YOUR_DOMAIN/api/v1/billing/sandbox/notification`. Real provider/account/card/HTTPS acceptance is still required after operator credentials exist. QA uses authored MockTransport only; no real card is charged. Docker/Linux/SMTP/Google/domain/capacity/data and final launch gates remain separate. Existing backup/restore commands must be exercised and scheduled on the actual host with protected backup storage; this Windows QA does not install a VPS scheduler.
+
+
+## Read-only audit of the separately installed native staging
+
+The Ubuntu PostgreSQL16 /opt/riksora-beta installation is distinct from the Compose/PostgreSQL17 candidate above. Do not rerun the old native installer or assume package/restore acceptance. After reviewing this source, an operator may run it with the installed Python environment:
+
+```sh
+sudo /opt/riksora-beta/venv/bin/python -B /path/to/reviewed/repository/deploy/vps/audit_native.py
+```
+
+This performs only file metadata, local database SELECTs in read-only transactions, and pg_restore --list of the latest private dump. Output excludes credentials, subjects and identifiers. No migrations, grants, service operations, restoration or writes occur. A valid dump hash/catalog is not an actual restore drill; a verified Google binding is not an application OWNER grant. Keep actual provider/browser, permissions and restore acceptance separate.

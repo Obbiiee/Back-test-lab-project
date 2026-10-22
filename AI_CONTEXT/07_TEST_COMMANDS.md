@@ -251,3 +251,6 @@ Odoo operator UI19.0.2.1.0 (2026-10-21): load views/operations.xml after busines
 
 
 Claude slice09 UI acceptance (2026-10-21): registered frontend regression/lint/build150/release, beta-client/workspace, repository/bundle and Node6x3/16 profile PASS. Browser must verify Free create strategy/Session with exact50000 preset, invalid custom0 refusal, cancelled activation preserving focus/allowance, Trash count0/restore count1, Start window & play/Pause and allowance-used state,1440/375 no overflow/console errors. Existing backend tests remain preceding checkpoint evidence; no full501 rerun for this presentation-only slice.
+
+
+Functionality-first context/diagnostics (no database or provider calls): from repository root, `PYTHONPATH=backend python -B -m unittest tests.test_context_warmup tests.test_kernel_v2 tests.test_sources_v2 tests.test_profile_v2 tests.test_dukascopy_csv tests.test_dukascopy_batch deploy.vps.tests.test_native_audit -q`. Uses tiny authored fixtures only. No live Google, source rights, indicator numeric convergence, OHLC-to-finance integration, deployed runtime or five-year coverage certification follows.
