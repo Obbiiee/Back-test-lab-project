@@ -1,11 +1,15 @@
-import {StrictMode, useEffect, useRef, useState} from 'react';
+import {StrictMode, Suspense, lazy, useEffect, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {createBetaClient} from '../src/beta/betaClient.js';
+import '../src/tickAlpha/tickAlpha.css';
+import '../src/beta/beta.css';
 import './workspace.css';
+const BetaWorkspace = lazy(() => import('../src/beta/BetaWorkspace.jsx'));
 
 export default function WorkspaceStaging() {
   const [client] = useState(() => createBetaClient());
   const [user, setUser] = useState(null), [ready, setReady] = useState(false);
+  const [demo, setDemo] = useState(false);
   const [items, setItems] = useState([]), [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false), [loaded, setLoaded] = useState(false);
   const [uncertain, setUncertain] = useState(false), [notice, setNotice] = useState('Checking availability…');
@@ -37,6 +41,7 @@ export default function WorkspaceStaging() {
         const providers = await client.providers();
         if (!active) return;
         setReady(providers.googleConfigured === true);
+        setDemo(providers.demoConfigured === true);
         setNotice('Google sign-in and saved workspace metadata staging.');
         if (returning) {
           const me = await client.exchangeGoogle();
@@ -60,7 +65,7 @@ export default function WorkspaceStaging() {
     catch { setNotice('Local session cleared. Server revocation was not confirmed.'); }
     finally { setUser(null); setItems([]); setSelected(null); setLoaded(false); setUncertain(false); }
   }
-  return <main><a href="/">RIKSORA · Backtest Lab</a><section>
+  return <main className={`google-workspace${demo && selected ? ' demo-mode' : ''}`}><a href="/">RIKSORA · Backtest Lab</a><section>
     <p>PRIVATE STAGING</p><h1>{user ? 'Your workspaces' : 'Sign in'}</h1>
     <p role="status" aria-live="polite">{notice}</p>
     {user ? <>
@@ -68,7 +73,7 @@ export default function WorkspaceStaging() {
       <button disabled={busy} onClick={() => run(logout)}>Sign out</button>
       <button disabled={busy} onClick={() => run(refresh)}>Refresh workspaces</button>
       {loaded && !items.length && <p>No saved workspaces yet.</p>}
-      <ul>{items.map(ws => <li key={ws.id}><button disabled={busy} onClick={() => setSelected(ws)}>{ws.name}</button> <span>{ws.role === 'OWNER' ? 'Workspace owner' : 'Workspace member'}</span></li>)}</ul>
+      <ul>{items.map(ws => <li key={ws.id}><button disabled={busy} onClick={() => { client.selectWorkspace(ws.id); setSelected(ws); }}>{ws.name}</button> <span>{ws.role === 'OWNER' ? 'Workspace owner' : 'Workspace member'}</span></li>)}</ul>
       <form onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget;
         const name = String(new FormData(form).get('name') || '').trim();
@@ -79,9 +84,19 @@ export default function WorkspaceStaging() {
         <label>Workspace name<input name="name" required maxLength={128} disabled={busy || !loaded || uncertain}/></label>
         <button disabled={busy || !loaded || uncertain}>Create workspace</button>
       </form>
-      {selected && <article><h2>{selected.name}</h2><p>This workspace is saved on the server. Trading Sessions and real-data replay are not enabled in this release.</p></article>}
+      {selected && (demo ? <article className="beta-account beta-account-workspace">
+        <h2>{selected.name}</h2>
+        <p role="note"><strong>SHORT SYNTHETIC DEMO.</strong> Practice only. This is not acquired historical data or five-year coverage. Payments are disabled.</p>
+        <button disabled={busy} onClick={() => {client.selectWorkspace(selected.id); setSelected(null);}}>Close practice view</button>
+        <Suspense fallback={<p role="status">Loading practice workspace…</p>}>
+          <BetaWorkspace key={selected.id} client={client} workspace={selected} onExpired={() => {
+            client.clear(); setUser(null); setItems([]); setSelected(null); setLoaded(false);
+            setNotice('Sign-in expired. Sign in again to recover your saved practice Sessions.');
+          }}/>
+        </Suspense>
+      </article> : <article><h2>{selected.name}</h2><p>This workspace is saved on the server. Trading Sessions and real-data replay are not enabled in this release.</p></article>)}
     </> : ready ? <a href={client.googleStart()}>Continue with Google</a> : <p>Sign-in unavailable.</p>}
-    <p>Backtest, statistics, payments and real market data are not enabled here. Workspace ownership does not grant application administration. Refreshing this page requires signing in again; saved workspaces remain on the server.</p>
+    <p>{demo ? 'Practice Sessions, journal and statistics use short synthetic demos only. Real market data, five-year backtests and payments are unavailable.' : 'Backtest, statistics, payments and real market data are not enabled here.'} Workspace ownership does not grant application administration. Refreshing this page requires signing in again; saved workspaces remain on the server.</p>
   </section></main>;
 }
 

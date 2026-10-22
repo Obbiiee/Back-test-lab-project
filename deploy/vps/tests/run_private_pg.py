@@ -15,6 +15,7 @@ import tempfile
 GROUPS = {
     'functional': ['tests.test_functional_journey'],
     'workspace': ['deploy.vps.tests.test_google_staging'],
+    'upgrade': ['deploy.vps.tests.test_native_upgrade'],
     'regression': ['tests.test_google_identity', 'tests.test_workspace',
                    'tests.test_cloud_research', 'tests.test_sandbox_v2',
                    'tests.test_local_reliability'],
