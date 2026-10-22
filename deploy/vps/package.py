@@ -15,10 +15,12 @@ def allowed(name):
         if any(part in {'venv','.venv','__pycache__'} for part in p.parts):return False
         return (p.suffix=='.py' and not name.startswith('backend/tests/')) or (name.startswith('backend/infrastructure/migrations/') and p.suffix=='.sql') or name=='backend/requirements.lock'
     if name.startswith('frontend/integration/'):return p.suffix=='.js'
+    if name.startswith('frontend/staging/'):
+        return p.name in {'workspace.html','workspaceEntry.jsx','workspace.css','vite.config.js'} and len(p.parts)==3
     if name.startswith('frontend/src/'):return p.suffix in {'.js','.jsx','.css','.png','.svg','.woff','.woff2','.ttf'}
     if name.startswith('frontend/public/licenses/'):return p.suffix=='.txt'
     if name in ('frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/vite.config.js','frontend/public/favicon.svg'):return True
-    if name.startswith('deploy/vps/') and len(p.parts)==3:return p.name in {'__init__.py','settings.py','runtime.py','ops.py','preflight.py','package.py','Dockerfile.api','Dockerfile.web','Caddyfile','compose.yaml','.env.example','runtime.json.example','owner.json.example','README.md'}
+    if name.startswith('deploy/vps/') and len(p.parts)==3:return p.name in {'__init__.py','settings.py','runtime.py','ops.py','preflight.py','package.py','google_staging.py','audit_native.py','Dockerfile.api','Dockerfile.web','Caddyfile','compose.yaml','.env.example','runtime.json.example','owner.json.example','README.md'}
     return name=='deploy/__init__.py'
 
 def archive(root,files,target,commit,reader=None):

@@ -9,6 +9,23 @@ ROOT=Path(__file__).resolve().parents[3]
 def settings():return dict(BTL_DATABASE_URL='host=db dbname=btl user=btl_app password=authored-password',BTL_AUTH_SECRET='a'*64,BTL_SMTP_HOST='smtp.example.com',BTL_SMTP_USER='qa',BTL_SMTP_PASSWORD='qa-not-real',BTL_SMTP_SENDER='qa@example.com',BTL_SANDBOX_V2_RESET_TIMEZONE='UTC')
 
 class PackageTests(unittest.TestCase):
+    def test_workspace_candidate_is_portable_without_operator_or_raw_files(self):
+        from deploy.vps.package import allowed,archive
+        selected=['frontend/staging/workspace.html','frontend/staging/workspaceEntry.jsx',
+                  'frontend/staging/workspace.css','frontend/staging/vite.config.js',
+                  'deploy/vps/google_staging.py','deploy/vps/audit_native.py']
+        refused=['frontend/staging/runtime.json','frontend/staging/.env','frontend/staging/ticks.csv',
+                 'frontend/staging/private/workspace.html','deploy/vps/operator.json',
+                 'deploy/vps/tests/test_google_staging.py','frontend/dist/workspace/assets/output.js']
+        for name in selected:self.assertTrue(allowed(name),name)
+        for name in refused:self.assertFalse(allowed(name),name)
+        with tempfile.TemporaryDirectory() as folder:
+            output=Path(folder)/'candidate.zip'
+            manifest=archive(ROOT,selected+refused,output,'authored-package-qa')
+            self.assertEqual(set(manifest['files']),set(selected))
+            with zipfile.ZipFile(output) as bundle:
+                for name in selected:self.assertEqual(bundle.read(name),(ROOT/name).read_bytes())
+
     def test_no_database_api_ports_and_separate_secrets(self):
         data=yaml.safe_load((ROOT/'deploy/vps/compose.yaml').read_text(encoding='utf-8'));services=data['services']
         self.assertNotIn('ports',services['db']);self.assertNotIn('ports',services['api'])
