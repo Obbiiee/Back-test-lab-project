@@ -48,6 +48,8 @@ const executionReferences=new Set([
   'backend/execution/finance_v2.py','backend/tests/test_finance_v2.py',
   'backend/execution/profile_v2.py','backend/tests/test_profile_v2.py','backend/tests/fixtures/execution_profiles_v2.json','backend/tests/verify_profile_v2_vectors.mjs',
   'backend/execution/conversion.py','backend/tests/test_conversion.py',
+  // Reviewed HistData replay-source composition, still no financial admission.
+  'backend/execution/histdata_source.py','backend/tests/test_histdata_source.py',
   // Reviewed private tick-context seam and its intake/warmup dependencies only.
   'backend/market_data/context_warmup.py','backend/market_data/tick_context.py',
   'backend/tests/test_context_warmup.py','backend/tests/test_tick_context.py',

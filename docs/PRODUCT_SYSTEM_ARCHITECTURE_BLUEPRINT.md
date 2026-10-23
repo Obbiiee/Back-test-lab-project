@@ -3623,3 +3623,10 @@ The output is only ContextSelection plus causal ambiguity count and fixed UNKNOW
 
 
 The checkpoint's complete regression exposed the existing twelve-cycle QA making14 same-account logins within a minute while the real account protection permits10/min. Correct only that QA journey to assert RATE_LIMITED/Retry-After60 after ten successful logins, wait the advertised60 seconds and retry once. Do not mock/bypass or raise any runtime limiter. Extend only the exact review-bundle allowlist for the adapter, existing warmup/intake dependencies and their tests; data/downloader/general backend admission remains closed.
+
+
+### Private HistData replay source composition — 2026-10-23
+
+Continue the owner-authorized functionality-first sequence with execution/histdata_source.py. It pins provider/symbol/feed/instrument/adapter/evidence identity and an immutable accepted disk version, refuses progressive prefixes as full source, and supplies the already existing IndexedTimelineCache without relabeling HistData as Exness or synthetic. Period lookup returns an actually observed start or refuses; it is not whole-month/year coverage. The controller-owned binding hash does not grant rights or establish an executable profile. Provider and context handles remain private; existing scoped checkpoint/log paths and cold recovery are reused unchanged.
+
+The source intentionally has NO financial profile, reducer, HTTP mount, tenant mutation or hosted trading claim. Bounded context retains explicit BID basis and UNKNOWN disclosures; existing exact-mid display must not silently mix it. Existing source/financial and42.17/42.19 contracts remain unchanged. The owner's instruction to skip data-use review defers that workflow only: keep rights UNKNOWN rather than claiming provider permission, and do not treat it as authorization to falsify quality/freshness or financial certainty. A separately reviewed execution model remains required before historical trade results are exposed.
