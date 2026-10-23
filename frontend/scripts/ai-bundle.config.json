@@ -239,7 +239,10 @@
     "integrations/odoo/sync.py",
     "integrations/odoo/addons/btl_business/models/automation.py",
     "frontend/src/beta/BetaSupport.jsx",
-    "integrations/odoo/recovery.py"
+    "integrations/odoo/recovery.py",
+    "backend/market_data/context_warmup.py",
+    "backend/market_data/tick_context.py",
+    "backend/ticks/histdata_v2.py"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -339,7 +342,10 @@
     "backend/tests/test_support.py",
     "backend/tests/test_odoo_sync.py",
     "backend/tests/test_odoo_recovery.py",
-    "backend/tests/test_local_reliability.py"
+    "backend/tests/test_local_reliability.py",
+    "backend/tests/test_context_warmup.py",
+    "backend/tests/test_tick_context.py",
+    "backend/tests/test_histdata_v2.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

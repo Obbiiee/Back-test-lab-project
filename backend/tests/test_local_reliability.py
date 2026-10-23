@@ -1,5 +1,5 @@
 """Bounded repeated-use acceptance; not an hours-long soak or capacity certification."""
-import os,secrets,unittest,uuid
+import os,secrets,time,unittest,uuid
 from unittest.mock import patch
 from cloud.app import create_app
 from infrastructure.database import migrate
@@ -18,8 +18,21 @@ class LocalReliabilityTests(unittest.TestCase):
         http=fresh();email=uuid.uuid4().hex+'@example.com'
         self.assertEqual(http.post('/api/v1/auth/register',json=dict(email=email,password=PASSWORD)).status_code,201)
         self.assertEqual(http.post('/api/v1/auth/verify',json=dict(token=delivery.token(email,'verification'))).status_code,200)
+        successful_logins=0
         def login():
-            r=http.post('/api/v1/auth/login',data=dict(username=email,password=PASSWORD));self.assertEqual(r.status_code,200);return {'Authorization':'Bearer '+r.json()['access_token']}
+            nonlocal successful_logins
+            r=http.post('/api/v1/auth/login',data=dict(username=email,password=PASSWORD))
+            if r.status_code==429:
+                # This journey intentionally exceeds ten same-account logins.
+                # Respect the real shared limiter, never mock or raise its limit.
+                self.assertGreaterEqual(successful_logins,10)
+                self.assertEqual(r.json()['detail'],'RATE_LIMITED')
+                self.assertEqual(r.headers['Retry-After'],'60')
+                time.sleep(60)
+                r=http.post('/api/v1/auth/login',data=dict(username=email,password=PASSWORD))
+            self.assertEqual(r.status_code,200)
+            successful_logins+=1
+            return {'Authorization':'Bearer '+r.json()['access_token']}
         headers=login();ws=http.post('/api/v1/workspaces',headers=headers,json={'name':'Bounded repeated-use QA'}).json()['id'];root='/api/v1/workspaces/'+ws+'/research-v2';sid='session:repeated';rev=0
         def post(path,value):
             r=http.post(root+path,headers=headers,json=value);self.assertEqual(r.status_code,200,r.text);return r.json()
