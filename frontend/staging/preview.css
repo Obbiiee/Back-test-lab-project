@@ -1,0 +1,1 @@
+.repository-preview{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr)}.repository-preview .ux-prototype{height:100%;min-height:0}.repository-preview>header{padding:12px 20px;background:#061a3c;color:#fff;display:flex;gap:20px;align-items:center;flex-wrap:wrap}.repository-preview>header a{color:#d9eafe}.repository-preview>header p{margin:0;font-size:12px}

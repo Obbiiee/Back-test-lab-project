@@ -36,7 +36,6 @@ function AccountMenu({user,busy,onAccount,onSupport,onSignOut,onSignOutAll}){
 export default function BetaAccount({googleOnly=false,entryPath='/?page=beta'}={}){
   const [client]=useState(()=>createBetaClient());
   const [user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[selected,setSelected]=useState(null);
-  const [workspaceSection,setWorkspaceSection]=useState('sessions');
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[uncertain,setUncertain]=useState(false),[loaded,setLoaded]=useState(false);
   const [googleFinishing,setGoogleFinishing]=useState(()=>new URLSearchParams(location.search).get('auth')==='google'),[providers,setProviders]=useState(null),[expired,setExpired]=useState(false),[area,setArea]=useState('workspaces'),[tier,setTier]=useState(null);
   const flight=useRef(false),live=useRef(true);
@@ -64,18 +63,19 @@ export default function BetaAccount({googleOnly=false,entryPath='/?page=beta'}={
   const signOut=(all=false)=>run(async()=>{try{await client.logout(all);}finally{if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setArea('workspaces');setTier(null);}}});
   const expire=()=>{client.clear();setExpired(true);setUser(null);setSelected(null);setWorkspaces([]);setArea('workspaces');setTier(null);};
   // Re-selecting the current workspace bumps the client generation, cancelling its in-flight requests.
-  const go=next=>{if(selected)client.selectWorkspace(selected.id);setSelected(null);setNotice('');setArea(next);};
+  const go=(next,keepWorkspace=false)=>{if(selected)client.selectWorkspace(selected.id);if(next==='workspaces'&&!keepWorkspace)setSelected(null);setNotice('');setArea(next);};
   const roleLabel=role=>role==='OWNER'?'Owner':'View only';
   return <main className={`alpha-identity beta-account${selected?' beta-account-workspace':''}`}>
     <header className="alpha-identity-nav beta-nav"><AlphaBrand href="/"/><span className="beta-nav-badge">Practice preview</span>
-      {user&&selected&&<nav className="beta-mainnav" aria-label="Main">{['Sessions','Strategies','Journal','Statistics'].map(label=><button key={label} type="button" aria-current={workspaceSection===label.toLowerCase()?'page':undefined} onClick={()=>setWorkspaceSection(label.toLowerCase())}>{label}</button>)}</nav>}
+      {user&&(selected||area!=='workspaces')&&<nav className="beta-mainnav" aria-label="Main"><button type="button" disabled={!selected} aria-current={area==='workspaces'?'page':undefined} onClick={()=>go('workspaces',true)}>Sessions</button>
+        {['Strategies','Journal','Statistics'].map(label=><button key={label} type="button" disabled title="Cross-Session page not implemented">{label}<small>soon</small></button>)}</nav>}
       {user?<div className="beta-userbar">{tier&&<span className="beta-tier">{tier}</span>}
-        <a href="/login/?view=features">Explore features</a><AccountMenu user={user} busy={busy} onAccount={()=>go('account')} onSupport={()=>go('support')} onSignOut={()=>signOut()} onSignOutAll={()=>signOut(true)}/></div>
-      :<nav aria-label="Public"><a href="/">Home</a> · <a href="/login/?view=features">Explore features</a></nav>}</header>
+        <AccountMenu user={user} busy={busy} onAccount={()=>go('account')} onSupport={()=>go('support')} onSignOut={()=>signOut()} onSignOutAll={()=>signOut(true)}/></div>
+      :<nav aria-label="Public"><a href="/">Home</a> · </nav>}</header>
     <section className={`alpha-identity-content${selected?' alpha-identity-workspace':''}`}>
       {!secure?<div className="beta-card beta-card-center"><h1>Open the secure Beta address</h1><p>Verified account access requires HTTPS.</p></div>:!user&&googleFinishing?<div className="beta-card beta-card-center" role="status"><h1>Finishing Google sign-in…</h1><p>This takes a second. Don’t close the tab.</p></div>:!user&&googleOnly?<div className="beta-auth"><div className="beta-auth-hero"><p className="beta-auth-title">Welcome back, <span>trader.</span></p><p>Your practice Sessions, journal and results stay saved in your workspace.</p><ul><li>16 synthetic demo pairs</li><li>Not five years of market history</li></ul></div><div className="beta-card beta-auth-card"><h1>Sign in to RIKSORA</h1><p>Use your Google account to continue.</p>{providers?.googleConfigured?<a className="beta-google" href={client.googleStart()}>Continue with Google</a>:<p role="status">{providers ? 'Google sign-in unavailable. Try again later.' : 'Checking sign-in availability…'}</p>}<p className="beta-muted">Email registration and payments are unavailable in this staging.</p></div></div>:!user?<BetaAuth client={client} providers={providers} expired={expired} onSignedIn={(me,list,configured)=>{setExpired(false);setNotice('');setUser(me);setWorkspaces(list);setLoaded(true);setArea('workspaces');setTier(null);if(configured)setProviders(configured);}}/>:<>
-        {selected?<><button className="beta-back" disabled={busy} onClick={()=>go('workspaces')}>Back to workspaces</button>
-          <Suspense fallback={<p role="status">Loading Beta workspace…</p>}>{googleOnly && providers?.demoConfigured !== true ? <p>Practice replay is unavailable in this environment.</p> : <Workspace key={selected.id} client={client} workspace={selected} section={workspaceSection} onSection={setWorkspaceSection} onExpired={expire} onPlans={()=>go('account')} onAccess={access=>setTier(access.tier)}/> }</Suspense></>
+        {selected&&area==='workspaces'?<><button className="beta-back" disabled={busy} onClick={()=>go('workspaces')}>Back to workspaces</button>
+          <Suspense fallback={<p role="status">Loading Beta workspace…</p>}>{googleOnly && providers?.demoConfigured !== true ? <p>Practice replay is unavailable in this environment.</p> : <Workspace key={selected.id} client={client} workspace={selected} onExpired={expire} onPlans={()=>go('account')} onAccess={access=>setTier(access.tier)}/> }</Suspense></>
         :area==='account'?<div className="beta-picker beta-area">
           <div className="beta-area-head"><h1>Account &amp; plan</h1><p>Your profile, today’s usage and your plan in one place.</p></div>
           <section className="beta-profile" aria-labelledby="beta-profile-h"><h2 id="beta-profile-h">Profile</h2>
@@ -91,7 +91,7 @@ export default function BetaAccount({googleOnly=false,entryPath='/?page=beta'}={
         :<div className="beta-picker">
           <h1>Where do you want<br/>to practise today?</h1><p>A workspace holds its own strategies and Sessions. Your saved Sessions remain available after signing in again.</p>
           <button disabled={busy} onClick={()=>run(async()=>{const list=await client.workspaces();setWorkspaces(list);setLoaded(true);setUncertain(false);})}>Refresh workspaces</button>
-          <ul className="beta-workspace-list">{workspaces.map(ws=><li key={ws.id}><button disabled={busy} onClick={()=>{client.selectWorkspace(ws.id);setWorkspaceSection('sessions');setSelected(ws);}}>
+          <ul className="beta-workspace-list">{workspaces.map(ws=><li key={ws.id}><button disabled={busy} onClick={()=>{client.selectWorkspace(ws.id);setSelected(ws);}}>
             <span className="beta-ws-avatar" aria-hidden="true">{ws.name.trim().charAt(0).toUpperCase()||'W'}</span><strong>{ws.name}</strong><span className={`beta-role beta-role-${ws.role==='OWNER'?'owner':'viewer'}`}>{roleLabel(ws.role)}</span><span className="beta-open">Open</span></button></li>)}
             <li><form className="beta-ws-create" onSubmit={event=>{event.preventDefault();const name=String(new FormData(event.currentTarget).get('name')||'').trim();if(!name||uncertain||!loaded||busy)return;setUncertain(true);run(async()=>{
               await client.createWorkspace(name);const list=await client.workspaces();if(live.current){setWorkspaces(list);setLoaded(true);setUncertain(false);}

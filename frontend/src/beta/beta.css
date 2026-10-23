@@ -606,6 +606,3 @@
 .beta-mainnav button[aria-current=page]{background:var(--b-ice);color:var(--b-navy);font-weight:700}
 .beta-indicator-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 14px;border:1px solid var(--b-line);border-radius:14px;background:var(--b-panel)}
 .beta-indicator-tools small{color:var(--b-muted);line-height:1.5}
-.beta-feature-library{padding:24px;background:var(--b-panel);border:1px solid var(--b-line);border-radius:20px}
-.beta-feature-library ul{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px}
-.beta-feature-library li{padding:16px;border:1px solid var(--b-line-2);border-radius:12px;overflow-wrap:anywhere}

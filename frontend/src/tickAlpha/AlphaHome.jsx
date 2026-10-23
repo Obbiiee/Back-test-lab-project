@@ -42,7 +42,7 @@ export default function AlphaHome({hostedPreview=false}={}){
         <p className="alpha-home-intro">{hostedPreview?'Sign in with Google, create a practice Session and replay synthetic bid/ask quotes. Save your orders, journal and statistics. Historical data is still being validated.':'Pick a date, press Play and trade the candles as they form. No peeking at the future, no guessed fills. Just you, your plan and the replay.'}</p>
         <div className="alpha-home-actions">
           <a className="alpha-home-primary" href={workspace}>Start backtesting</a>
-          <a className="alpha-home-secondary" href={hostedPreview?'/login/?view=features':'/?page=beta'}>{hostedPreview?'Explore all features':'16-pair Beta sandbox'}</a>
+          <a className="alpha-home-secondary" href={hostedPreview?'/login/':'/?page=beta'}>16-pair Beta sandbox</a>
           <a className="alpha-home-secondary" href="#how"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></span>See how it works</a>
         </div>
         <p className="alpha-home-caption">{hostedPreview?'Public staging · synthetic practice · Google sign-in for saved work · no payments':'Private local workspace · historical research · no live brokerage'}</p>
