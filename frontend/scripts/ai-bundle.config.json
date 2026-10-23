@@ -245,7 +245,8 @@
     "backend/ticks/histdata_v2.py",
     "backend/execution/histdata_source.py",
     "backend/ticks/serving_v2.py",
-    "backend/ticks/quality_v2.py"
+    "backend/ticks/quality_v2.py",
+    "backend/ticks/backup_v2.py"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -351,7 +352,8 @@
     "backend/tests/test_histdata_v2.py",
     "backend/tests/test_histdata_source.py",
     "backend/tests/test_serving_v2.py",
-    "backend/tests/test_quality_v2.py"
+    "backend/tests/test_quality_v2.py",
+    "backend/tests/test_backup_v2.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

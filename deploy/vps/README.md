@@ -188,3 +188,16 @@ PYTHONPATH=backend python -B -m ticks.quality_v2 --source PRIVATE_SYMBOL_YYYY-MM
 ```
 
 Default row budget20million; --max-rows up to100million. Exit0 is completed numeric/order pass,2 completed quality refusal,1 incomplete/error; none activates trading or proves source rights/coverage/freshness. Review the system blueprint's private diagnostic scope before composition. Preserve failed reports and original sources; never sort/repair automatically. Cancellation during a bounded source_pin phase is observed after that phase, not promised immediately. No infrastructure/HTTP mount is required.
+
+
+## Private accepted tick-store backup and recovery copy
+
+This utility concerns completed private V2 SQLite tick stores, NOT the PostgreSQL user/account database or raw GZIP files. Keep original validation/source stores; use a NEW private directory outside Git/webroot. Source must have trusted prior full local acceptance, and version must be independently pinned.
+
+```text
+PYTHONPATH=backend python -B -m ticks.backup_v2 --source PRIVATE_ACCEPTED_STORE --version PINNED_VERSION --destination NEW_PRIVATE_BACKUP --report NEW_PRIVATE_REPORT.json --trusted-local-completion
+```
+
+Default backup budget2GiB/65536objects/600seconds. Recheck archiveSha256 in the success report before making a separate NEW recovery copy from that trusted backup (same command, new destination/report), then cold-read/replay and compare retained identity/artifact evidence. Never overwrite the current store for a drill. Pre-publication failure leaves only staging; a late fsync failure may leave a valid archive, so inspect rather than rerun blindly. All original stores remain. Local copies are not off-host disaster recovery; live-account/database backup remains the separate authenticated operator procedure above. No root/installation/service change is required for this private utility.
+
+Keep the backup itself closed: archiveSha256 describes the unused closed snapshot. The existing reader may change SQLite journal/header bytes when opening a recovery copy; check its physical checksum BEFORE opening, then verify canonical artifact hashes/rows and replay. Do not interpret expected journal-header changes as changed canonical tick identity.
