@@ -1,5 +1,16 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — OWNER CHOOSES STRICT RULES; assumed-fill research model DECLINED (2026-10-23 UTC)
+
+Explicit human answer to the pending model decision: “Pertahankan aturan ketat; transaksi ditahan”. This resolves the pending question NEGATIVELY. Do not implement/activate the proposed assumed Bid/Ask fill model or treat earlier general continuous-beta instructions/data-use-review deferral as authorization to promote UNKNOWN quote/freshness/coverage to confirmed execution. Do not repeatedly re-ask the same financial-model choice without new owner direction or materially new evidence. Preserve existing engine, Sessions and frozen uncertainty rules. Data-use investigation remains separately deferred, permission UNKNOWN; this does not relax quality.
+
+Recorded in the actual operational authority AI_CONTEXT/04_CURRENT_PHASE.md, source47833d538b18823853c0c9c33ed0b0999ccdfeb2 on codex/functional-staging-foundations. Documentation-only change; runtime/financial/source code untouched. Local/GitHub exact file blob18f650b6ad4d84d7b2e0910349cb894ba874499f, fetched ff clean0/0 verified.
+
+Actual private canonical EURUSD2021-11 dataset ca9fc03999906ea36fe218a2f8c17a9fcb5a6872d58ab68fc565da700d4a43f1 substituted into the unchanged synthetic V2 profile: REFUSED_V2_REAL_SOURCE, no admission/fills/money/source-quality promotion/live change. Proof /home/riksora/riksora-data-intake/strict-owner-decision-20261023.json. This demonstrates existing source refusal, not a new generic real-source freshness certification.25 existing profile/source-join/kernel tests PASS4.074s, zero skips. Repository/bundle generation/freshness/negative drift gates PASS; browser/product/full534 backend suites are retained preceding-checkpoint evidence, not rerun/claimed for this documentation-only decision.
+
+Continue dependency-unblocked source quality/provenance, private replay/context, storage measurement and QA. Source clock defects remain proven in original archive, not conversion errors. Real-data financial activation requires adequate evidence AND a reviewed compatible STRICT admission composition; no synthetic profile guard removal or invented fresh/complete evidence. Historical transactions are held, so the16×5-year trade-to-statistics beta target is not achieved under current dataset evidence. No install/sudo/migration/restart/deployment/permissions change or raw-data Git publication. No background execution implied.
+
+
 ## CODEX → CHATGPT — HistData replay source published;16×60 filenames verified; original ZIP proves clock defect; model authorization pending (2026-10-23 UTC)
 
 Owner explicitly says continue until beta without repeated micro-instructions, reports EURGBP/NZDUSD complete, and says skip data-use review. This is continued journey authorization; stop only for actual unsafe/prerequisite decisions. Data-use investigation is deferred by owner, NOT treated as proof of provider permission. Keep rights UNKNOWN; do not repeatedly block ordinary private engineering on that review or claim a grant exists. Do not conflate skipping data-use review with permission to falsify tick quality or relax financial certainty.
