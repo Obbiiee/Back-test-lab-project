@@ -20,7 +20,7 @@ def allowed(name):
     if name.startswith('frontend/src/'):return p.suffix in {'.js','.jsx','.css','.png','.svg','.woff','.woff2','.ttf'}
     if name.startswith('frontend/public/licenses/'):return p.suffix=='.txt'
     if name in ('frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/vite.config.js','frontend/public/favicon.svg'):return True
-    if name.startswith('deploy/vps/') and len(p.parts)==3:return p.name in {'__init__.py','settings.py','runtime.py','ops.py','preflight.py','package.py','google_staging.py','audit_native.py','native_demo_upgrade.py','operator_bootstrap.py','Dockerfile.api','Dockerfile.web','Caddyfile','compose.yaml','.env.example','runtime.json.example','owner.json.example','README.md'}
+    if name.startswith('deploy/vps/') and len(p.parts)==3:return p.name in {'__init__.py','settings.py','runtime.py','ops.py','preflight.py','package.py','google_staging.py','audit_native.py','native_demo_upgrade.py','native_static_upgrade.py','operator_bootstrap.py','Dockerfile.api','Dockerfile.web','Caddyfile','compose.yaml','.env.example','runtime.json.example','owner.json.example','README.md'}
     return name=='deploy/__init__.py'
 
 def archive(root,files,target,commit,reader=None):

@@ -45,7 +45,8 @@
     "test:phase18.8": "node tests/phase18-8.test.mjs",
     "test:phase18.9": "node tests/phase18-9.test.mjs",
     "test:regression": "node scripts/regression.mjs",
-    "audit:release": "node scripts/release-audit.mjs"
+    "audit:release": "node scripts/release-audit.mjs",
+    "test:google-staging": "node tests/google-staging-render.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
