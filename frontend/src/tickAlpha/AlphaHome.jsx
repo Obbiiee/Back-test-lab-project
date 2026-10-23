@@ -25,8 +25,8 @@ const steps=[
   ['Learn from the results','Every trade lands in the journal and Analysis: win rate, profit factor, drawdown and the balance line.'],
 ];
 
-export default function AlphaHome(){
-  const workspace=landingWorkspacePath(),home=pagePath('home');
+export default function AlphaHome({hostedPreview=false}={}){
+  const workspace=hostedPreview?'/login/':landingWorkspacePath(),home=hostedPreview?'/':pagePath('home');
   return <main className="alpha-home">
     <a className="alpha-home-skip" href="#how">Skip to how it works</a>
     <header className="alpha-home-nav">
@@ -37,15 +37,15 @@ export default function AlphaHome(){
 
     <section className="alpha-home-hero">
       <div className="alpha-home-copy">
-        <p className="alpha-home-badge"><span>Local Alpha</span>Replay real bid/ask ticks</p>
-        <h1>Practice trading on <span className="alpha-home-sticker">yesterday’s</span> market.</h1>
-        <p className="alpha-home-intro">Pick a date, press Play and trade the candles as they form. No peeking at the future, no guessed fills. Just you, your plan and the replay.</p>
+        <p className="alpha-home-badge"><span>{hostedPreview?'Public preview':'Local Alpha'}</span>{hostedPreview?'16 short synthetic demo pairs':'Replay real bid/ask ticks'}</p>
+        <h1>{hostedPreview?'Explore your trading ideas in ':'Practice trading on '}<span className="alpha-home-sticker">{hostedPreview?'practice':'yesterday’s'}</span>{hostedPreview?' Sessions.':' market.'}</h1>
+        <p className="alpha-home-intro">{hostedPreview?'Sign in with Google, create a practice Session and replay synthetic bid/ask quotes. Save your orders, journal and statistics. Historical data is still being validated.':'Pick a date, press Play and trade the candles as they form. No peeking at the future, no guessed fills. Just you, your plan and the replay.'}</p>
         <div className="alpha-home-actions">
           <a className="alpha-home-primary" href={workspace}>Start backtesting</a>
-          <a className="alpha-home-secondary" href="/?page=beta">16-pair Beta sandbox</a>
+          <a className="alpha-home-secondary" href={hostedPreview?'/login/?view=features':'/?page=beta'}>{hostedPreview?'Explore all features':'16-pair Beta sandbox'}</a>
           <a className="alpha-home-secondary" href="#how"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></span>See how it works</a>
         </div>
-        <p className="alpha-home-caption">Private local workspace · historical research · no live brokerage</p>
+        <p className="alpha-home-caption">{hostedPreview?'Public staging · synthetic practice · Google sign-in for saved work · no payments':'Private local workspace · historical research · no live brokerage'}</p>
       </div>
       <div className="alpha-home-preview" role="img" aria-label="Illustration: a replaying XAUUSD chart with a planned long trade, a fill note and a target-hit note">
         <span className="alpha-home-blob alpha-home-blob-blue" aria-hidden="true"/>
@@ -67,20 +67,20 @@ export default function AlphaHome(){
 
     <section id="how" className="alpha-home-how">
       <h2>Three steps. One habit.</h2>
-      <ol>{steps.map(([title,text],index)=><li key={title}><span className={`alpha-home-step alpha-home-step-${index+1}`} aria-hidden="true">{index+1}</span><h3>{title}</h3><p>{text}</p></li>)}</ol>
+      <ol>{steps.map(([title,text],index)=><li key={title}><span className={`alpha-home-step alpha-home-step-${index+1}`} aria-hidden="true">{index+1}</span><h3>{title}</h3><p>{hostedPreview&&index===0?'Choose a demo pair, create your strategy and set a starting balance. No historical date selection is available yet.':text}</p></li>)}</ol>
     </section>
 
     <section id="features" className="alpha-home-features" aria-label="Features">
-      <article className="alpha-home-feature-navy"><div><span className="alpha-home-tag">Honest fills</span><h3>Real bid/ask ticks, not candle guesses.</h3><p>Buys fill at Ask, sells at Bid, stops trigger on the actual tick. When data is missing the result stays unresolved instead of guessed.</p></div><div className="alpha-home-quotes"><span>Bid</span><span>Ask</span></div></article>
-      <article className="alpha-home-feature-yellow"><h3>Risk in one tap</h3><p>Pick 0.5, 1, 2 or 3% and see the estimated loss, profit and R:R before the server review confirms the exact size.</p></article>
-      <article className="alpha-home-feature-blue"><h3>Journal and Analysis</h3><p>Every committed trade with its evidence, plus win rate, profit factor, drawdown and the balance line per Session.</p></article>
-      <article className="alpha-home-feature-white"><h3>Gold first</h3><p>The local Alpha replays XAUUSD. More instruments follow once their data is approved.</p></article>
+      <article className="alpha-home-feature-navy"><div><span className="alpha-home-tag">Honest fills</span><h3>{hostedPreview?'Bid/ask tick execution in synthetic practice.':'Real bid/ask ticks, not candle guesses.'}</h3><p>Buys fill at Ask, sells at Bid, stops trigger on the actual tick. When data is missing the result stays unresolved instead of guessed.</p></div><div className="alpha-home-quotes"><span>Bid</span><span>Ask</span></div></article>
+      <article className="alpha-home-feature-yellow"><h3>Review before confirmation</h3><p>{hostedPreview?'Review your exact order values before confirming. Accepted orders wait for the next eligible tick.':'Pick 0.5, 1, 2 or 3% and see the estimated loss, profit and R:R before the server review confirms the exact size.'}</p></article>
+      <article className="alpha-home-feature-blue"><h3>Journal and Statistics</h3><p>Every committed trade with its evidence, plus win rate, profit factor, drawdown and the balance line per Session.</p></article>
+      <article className="alpha-home-feature-white"><h3>{hostedPreview?'16 demo instruments':'Gold first'}</h3><p>{hostedPreview?'Short synthetic datasets for practice. Five-year historical coverage is not enabled.':'The local Alpha replays XAUUSD. More instruments follow once their data is approved.'}</p></article>
       <article className="alpha-home-feature-coral"><h3>Pick up where you left off</h3><p>Each Session remembers its replay position, orders and balance.</p></article>
     </section>
 
     <section id="principles" className="alpha-home-principles">
       <h2>Uncertainty is part of the result.</h2>
-      <p>Backtest Lab is a practice and research tool, not a forecast or a promise of trading returns. The local Alpha uses imported historical data with explicit source limitations. Source attribution does not imply broker endorsement or public redistribution rights.</p>
+      <p>Backtest Lab is a practice and research tool, not a forecast or a promise of trading returns. {hostedPreview?'This hosted preview uses synthetic demos; downloaded historical files are not yet enabled for execution.':'The local Alpha uses imported historical data with explicit source limitations.'} Source attribution does not imply broker endorsement or public redistribution rights.</p>
       <ul><li>Data provenance</li><li>No look-ahead</li><li>Reproducible Sessions</li><li>Explicit limitations</li></ul>
     </section>
 

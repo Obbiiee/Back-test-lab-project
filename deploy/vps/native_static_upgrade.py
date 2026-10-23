@@ -24,7 +24,7 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
-def validate(raw, expected, commit):
+def validate(raw, expected, commit, *, replace_home=False):
     require(len(raw) <= 64000000 and digest(raw) == expected, 'ARCHIVE_CHANGED')
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         infos = archive.infolist()
@@ -39,19 +39,26 @@ def validate(raw, expected, commit):
                 and set(files) | {'manifest.json'} == {i.filename for i in infos}, 'MANIFEST_FILES')
         result = {}
         for name, sha in files.items():
-            require(name == 'login/index.html' or re.fullmatch(r'assets/[A-Za-z0-9_.-]+\.(js|css|png|woff2)', name), 'PATH')
+            require(name == 'login/index.html' or (replace_home and name == 'index.html') or re.fullmatch(r'assets/[A-Za-z0-9_.-]+\.(js|css|png|woff2)', name), 'PATH')
             content = archive.read(name)
             require(type(sha) is str and digest(content) == sha, 'FILE_HASH')
             result[name] = content
         require(b'<html' in result['login/index.html'].lower(), 'LOGIN_HTML')
+        if 'index.html' in result:
+            require(b'<html' in result['index.html'].lower(), 'HOME_HTML')
+        for name, content in result.items():
+            if name.endswith('.html'):
+                references = re.findall(rb'(?:src|href)="(/assets/[^"]+)"', content)
+                require(all(ref.decode('ascii').lstrip('/') in result for ref in references), 'MISSING_HTML_ASSET')
         return result
 
 
-def prepare(old, destination, files):
+def prepare(old, destination, files, *, replace_home=False):
     require(old.is_dir() and not old.is_symlink() and not destination.exists(), 'RELEASE_PATH')
     for p in old.rglob('*'):
         require(not p.is_symlink() and (p.is_dir() or p.is_file()), 'OLD_RELEASE_TYPE')
-    landing = (old/'index.html').read_bytes()
+    landing = files['index.html'] if replace_home and 'index.html' in files else (old/'index.html').read_bytes()
+    require('index.html' not in files or replace_home, 'HOME_REPLACEMENT_NOT_AUTHORIZED')
     shutil.copytree(old, destination)
     try:
         for name, raw in files.items():
@@ -96,6 +103,17 @@ def public_login():
         return response.read(1000000)
 
 
+def public_release(files):
+    for name, expected in files.items():
+        path = '/' if name == 'index.html' else '/login/' if name == 'login/index.html' else '/' + name
+        request = urllib.request.Request('https://riksora.com' + path, headers={'Cache-Control': 'no-cache'})
+        with urllib.request.urlopen(request, timeout=20) as response:
+            require(response.status == 200 and response.url == 'https://riksora.com' + path,
+                    'PUBLIC_FILE_STATUS')
+            require(response.read(len(expected) + 1) == expected, 'PUBLIC_FILE_HASH')
+    return True
+
+
 def read_pinned(path, expected):
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(descriptor, 'rb') as stream:
@@ -109,6 +127,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive'); parser.add_argument('--sha'); parser.add_argument('--commit')
     parser.add_argument('--expected-release'); parser.add_argument('--rollback')
+    parser.add_argument('--replace-home', action='store_true', help='Explicitly replace landing with manifest-pinned repository home')
     args = parser.parse_args()
     require(os.geteuid() == 0, 'OPERATOR_SUDO_REQUIRED')
     os.umask(0o077)
@@ -135,15 +154,15 @@ def main():
         for path in [old, *old.rglob('*')]:
             require(not path.is_symlink() and path.stat().st_uid == 0
                     and not path.stat().st_mode & 0o022, 'OLD_RELEASE_OWNERSHIP')
-        files = validate(read_pinned(args.archive, args.sha), args.sha, args.commit)
+        files = validate(read_pinned(args.archive, args.sha), args.sha, args.commit, replace_home=args.replace_home)
         new = releases/(args.commit[:12] + '-claude-ui')
         snapshot = Path(tempfile.mkdtemp(prefix='static-', dir='/var/backups/riksora-beta'))
         (snapshot/'state.json').write_text(json.dumps({'old': str(old), 'new': str(new), 'commit': args.commit,
                                                      'archiveSha256': args.sha}, sort_keys=True))
         (snapshot/'installer.py').write_bytes(Path(__file__).read_bytes())
-        prepare(old, new, files)
-        verify_switch(link, new, old, files['login/index.html'], public_login)
-        print('STATIC_UI_APPLIED; DATABASE_API_CADDY_AND_LANDING_UNCHANGED')
+        prepare(old, new, files, replace_home=args.replace_home)
+        verify_switch(link, new, old, True, lambda: public_release(files))
+        print('STATIC_UI_APPLIED; DATABASE_API_AND_CADDY_UNCHANGED' if args.replace_home else 'STATIC_UI_APPLIED; DATABASE_API_CADDY_AND_LANDING_UNCHANGED')
         print('Rollback snapshot: ' + str(snapshot))
 
 

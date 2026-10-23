@@ -27,6 +27,8 @@ class StaticUpgradeTests(unittest.TestCase):
             with self.assertRaises(ValueError): validate(bad, digest(bad), 'a'*40)
         with self.assertRaises(ValueError): validate(raw, '0'*64, 'a'*40)
         with self.assertRaises(ValueError): validate(raw, digest(raw), 'b'*40)
+        missing = self.archive({'login/index.html': b'<html><script src="/assets/missing.js"></script></html>'})
+        with self.assertRaises(ValueError): validate(missing, digest(missing), 'a'*40)
 
     def test_prepare_preserves_landing_and_atomic_rollback(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -40,6 +42,18 @@ class StaticUpgradeTests(unittest.TestCase):
             switch(link, new, old); self.assertEqual(link.resolve(), new)
             with self.assertRaises(ValueError): switch(link, old, old)
             switch(link, old, new); self.assertEqual(link.resolve(), old)
+
+    def test_home_requires_explicit_authorization(self):
+        files = {'login/index.html': b'<html>login</html>', 'index.html': b'<html>repository home</html>'}
+        raw = self.archive(files)
+        with self.assertRaises(ValueError): validate(raw, digest(raw), 'a'*40)
+        self.assertEqual(validate(raw, digest(raw), 'a'*40, replace_home=True), files)
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp); old = base/'old'; old.mkdir(); (old/'index.html').write_bytes(b'old home')
+            with self.assertRaises(ValueError): prepare(old, base/'new', files)
+            prepare(old, base/'new', files, replace_home=True)
+            self.assertEqual((base/'new/index.html').read_bytes(), b'<html>repository home</html>')
+            self.assertEqual((old/'index.html').read_bytes(), b'old home')
 
     def test_public_failure_restores_pointer(self):
         with tempfile.TemporaryDirectory() as temp:

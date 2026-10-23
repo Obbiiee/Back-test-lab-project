@@ -1,5 +1,8 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import CandleChart from '../components/CandleChart.jsx';
+import IndicatorControls from '../components/IndicatorControls.jsx';
+import {IndicatorPreferences} from '../workspacePreferences.js';
+import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {productionRegistry} from '../indicators/productionRegistry.js';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {BetaNewSession,BetaSessionsHub,BetaTrash,BetaWindowCard} from './BetaNewSession.jsx';
@@ -16,7 +19,7 @@ const statusLabel=o=>o.status==='PENDING'?(o.orderType==='MARKET'?'Accepted, wai
 const signed=value=>typeof value==='string'&&!value.startsWith('-')&&!/^0(\.0+)?$/.test(value)?'+'+value:value;
 const REVIEW_LABELS={entry:'Entry',quantity:'Lots',riskPercent:'Risk %',sl:'Stop loss',tp:'Take profit',orderType:'Order type',side:'Direction'};
 
-export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPlans}){
+export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPlans,section='sessions',onSection}){
   const [catalog,setCatalog]=useState(null),[access,setAccess]=useState(null),[view,setView]=useState(null);
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[blocked,setBlocked]=useState(false);
   const [review,setReview]=useState(null),[action,setAction]=useState(null),[journal,setJournal]=useState(null);
@@ -28,6 +31,8 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
   const [replay]=useState(()=>createReplayLoop({step:()=>latest.current(),onStop:()=>{if(live.current)setPlaying(false);}}));
   useEffect(()=>{latest.current=()=>run(step);});
   useEffect(()=>()=>replay.stop(),[replay]);
+  useEffect(()=>{replay.stop();},[section,replay]);
+  const visibleTab=section==='journal'?'Journal':section==='statistics'?'Statistics':tab;
   const owner=workspace.role==='OWNER';
   async function reload(id=view?.metadata.id,tf=timeframe){
     const [nextCatalog,nextAccess]=await Promise.all([client.catalog(),client.access()]);
@@ -98,7 +103,8 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
     <p role="status" aria-live="polite">{CARD_STATES.has(blocked?'UNCERTAIN':offline?'OFFLINE':problem)?'':notice||(busy?'Loading saved evidence…':'')}</p>
     {view&&moment&&<p className="beta-moment" role="status" aria-live="polite">{moment}</p>}
     {!owner&&<p>Read access. Ask the workspace owner to create or change Sessions.</p>}
-    {!catalog?(busy?<div className="beta-skeleton" aria-hidden="true"><span/><span/><span/></div>:<p>Connect to the enabled Beta sandbox. No fallback feed is used.</p>):!view?<>
+    {catalog&&section==='strategies'?<section className="beta-feature-library"><h2>Your strategies</h2><p>Saved strategy definitions in this workspace. Financial execution stays owned by the server.</p>{catalog.methods.length?<ul>{catalog.methods.map(method=><li key={method.id}><h3>{method.name}</h3><p>{method.kind==='PROTOCOL'?'Protocol':'Free Style'}</p>{method.kind==='PROTOCOL'&&<p>Risk {method.riskPercent}% · R:R {method.rr} · {method.conditions.length} conditions</p>}</li>)}</ul>:<p>No strategies yet.</p>}<button disabled={writeDisabled} onClick={()=>{setCreating(true);onSection?.('sessions');run(()=>reload(null));}}>Create strategy in New Session</button></section>:!catalog?(busy?<div className="beta-skeleton" aria-hidden="true"><span/><span/><span/></div>:<p>Connect to the enabled Beta sandbox. No fallback feed is used.</p>):!view?<>
+      {section==='journal'||section==='statistics'?<p className="beta-demo-note">Choose a saved Session below to open its {section}. Results stay scoped to that Session; no cross-Session totals are invented.</p>:null}
       {!creating&&catalog.sessions.filter(s=>catalog.savedStates[s.id]==='SAVED').length>0?<>
         <BetaSessionsHub sessions={catalog.sessions.filter(s=>catalog.savedStates[s.id]==='SAVED')} methods={catalog.methods} access={access}
           busy={busy||blocked} writeDisabled={writeDisabled} onOpen={s=>run(()=>reload(s.id))} onTrash={s=>run(()=>mutate(()=>client.trash(s.id)))} onNew={()=>setCreating(true)}/>
@@ -116,11 +122,11 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
       <p>{view.label}. Earlier two-year candle history is unavailable in these demos.</p>
       <div className="beta-chartbar" role="group" aria-label="Chart">
         <label>Timeframe<select aria-label="Beta timeframe" disabled={busy||playing} value={timeframe} onChange={e=>{const tf=e.target.value;run(async()=>{await reload(view.metadata.id,tf);setTimeframe(tf);setReview(null);});}}>{TIMEFRAMES.map(tf=><option key={tf}>{tf}</option>)}</select></label>
-        <label>Drawing<select value={drawing} onChange={e=>setDrawing(e.target.value)}><option value="none">Cursor</option><option value="trend-line">Trend line</option><option value="horizontal-line">Horizontal line</option><option value="rectangle">Rectangle</option><option value="fibonacci-retracement">Fibonacci</option><option value="text">Text</option></select></label>
+        <label>Drawing<select value={drawing} onChange={e=>setDrawing(e.target.value)}><option value="none">Cursor</option>{Object.entries(DRAWING_SPECS).map(([type,spec])=><option key={type} value={type}>{spec.name}</option>)}</select></label>
         <span className="beta-chartbar-quote">Bid <b>{view.quote?.bid??'—'}</b> · Ask <b>{view.quote?.ask??'—'}</b></span></div>
-      <div className="beta-trade"><div className="beta-chart-col"><div className="beta-chart"><CandleChart candles={bars} transition={{kind:'forward'}} researchOnly volumeAvailable={false}
+      <div className="beta-trade"><div className="beta-chart-col"><SavedBetaChart key={view.metadata.id} preferenceKey={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} candles={bars} transition={{kind:'forward'}} researchOnly volumeAvailable={false}
         sessionId={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingWorkspace={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingStorageKey={`beta-drawings:${client.subject()}:${workspace.id}:${view.metadata.id}`}
-        drawingMode={drawing} onDrawingModeChange={setDrawing} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} indicatorRegistry={productionRegistry}/></div>
+        drawingMode={drawing} onDrawingModeChange={setDrawing} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} indicatorRegistry={productionRegistry}/>
         <div className="beta-replay" role="group" aria-label="Replay">
           <button className="beta-replay-activate" disabled={tradingDisabled} onClick={event=>{returnFocus.current=event.currentTarget;if(access?.tier==='FREE'&&access.freeActivationAvailable)setWindowPrompt(true);else run(()=>mutate(()=>client.activate(view.metadata.id)));}}>Activate trading window</button>
           <button className="beta-replay-play" disabled={playing?false:tradingDisabled} aria-pressed={playing} onClick={()=>{if(playing)replay.stop();else if(replay.start())setPlaying(true);}}>{playing?'Pause replay':'Play replay'}</button>
@@ -147,15 +153,15 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
         {view.method.kind==='PROTOCOL'&&<><p>Protocol risk {view.method.riskPercent}% · R:R {view.method.rr}. The server owns quantity and target; manual exits are locked.</p>{view.method.conditions.map(c=><label key={c.id}>{c.label}<select name={'condition:'+c.id} disabled={tradingDisabled}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</>}<button disabled={tradingDisabled||!view.quote}>Review order</button>
       </form></div>
       {!view.chart&&<p>Chart display unavailable. Committed evidence remains saved.</p>}
-      <nav className="beta-tabs" aria-label="Session views">{['Positions','Statistics','Journal','Evidence'].map(t=><button key={t} aria-pressed={tab===t} onClick={()=>setTab(t)}>{t}</button>)}</nav>
-      {tab==='Positions'&&<section className="beta-positions" aria-label="Positions">
+      <nav className="beta-tabs" aria-label="Session views">{['Positions','Statistics','Journal','Evidence'].map(t=><button key={t} aria-pressed={visibleTab===t} onClick={()=>{setTab(t);onSection?.('sessions');}}>{t}</button>)}</nav>
+      {visibleTab==='Positions'&&<section className="beta-positions" aria-label="Positions">
         <div className="beta-subtabs" role="group" aria-label="Order groups">{POSITION_GROUPS.map(([key,label])=><button key={key} type="button" aria-pressed={positionsView===key} onClick={()=>setPositionsView(key)}>{label} <span>{orders.filter(([,o])=>groupOf(o)===key).length}</span></button>)}</div>
         <div className="alpha-table-scroll"><table><caption>{POSITION_GROUPS.find(([key])=>key===positionsView)[1]} · committed by the server</caption><thead><tr><th>Order</th><th>Direction</th><th>Status</th><th>Lots</th><th>Entry</th><th>Stop loss</th><th>Take profit</th><th>Realized gross USD</th><th>Action</th></tr></thead><tbody>{orders.filter(([,o])=>groupOf(o)===positionsView).map(([id,o])=><tr key={id}><td>{id.slice(-8)}</td><td><span className={`beta-side-pill beta-side-pill-${o.side==='LONG'?'buy':'sell'}`}>{o.side==='LONG'?'Buy':'Sell'}</span></td><td>{statusLabel(o)}</td><td>{o.status==='ACTIVE'&&o.remaining!==o.quantity?`${o.remaining} of ${o.quantity} open`:o.quantity}</td><td>{o.entryPrice?<>Filled {o.entryPrice}</>:o.orderType==='MARKET'?'Market, next tick':`${o.orderType==='LIMIT'?'Limit':'Stop'} ${o.entry}`}</td><td>{o.sl??'—'}</td><td>{o.tp??'—'}</td><td>{o.entryPrice?signed(o.grossPosted):'—'}</td><td>{['PENDING','ACTIVE'].includes(o.status)&&<button disabled={tradingDisabled||!!o.exitRequest||(o.status==='ACTIVE'&&view.method.kind!=='FREE_STYLE')} onClick={event=>{returnFocus.current=event.currentTarget;setAction(executionCommand(view,o.status==='PENDING'?'CANCEL':'CLOSE',{orderId:id,...(o.status==='ACTIVE'?{quantity:null}:{})}));}}>{o.status==='PENDING'?'Cancel pending':'Close position'}</button>}{o.status==='ACTIVE'&&view.method.kind==='FREE_STYLE'&&<form onSubmit={event=>{event.preventDefault();const quantity=new FormData(event.currentTarget).get('partial');returnFocus.current=event.currentTarget.querySelector('button');setAction(executionCommand(view,'CLOSE',{orderId:id,quantity}));}}><label>Partial lots<input name="partial" aria-label={'Partial lots '+id.slice(-8)} required inputMode="decimal" disabled={tradingDisabled||!!o.exitRequest}/></label><button disabled={tradingDisabled||!!o.exitRequest}>Review partial close</button></form>}</td></tr>)}</tbody></table>
         {!orders.some(([,o])=>groupOf(o)===positionsView)&&<p className="beta-empty-row">{orders.length?'Nothing here right now.':'No orders yet. Activate trading, step the replay, then review an order.'}</p>}</div>
         <p className="beta-muted">Open positions show no unrealized value: the server does not provide it, and it is not estimated here. Realized gross is before commission.</p></section>}
-      {tab==='Statistics'&&<StatisticsPanel stats={stats}/>}
-      {tab==='Journal'&&<JournalPanel orders={orders} journal={journal} completed={stats?.status==='COMPLETE'?stats.completed:[]} disabled={writeDisabled} onSave={(orderId,note,text,tags)=>run(()=>mutate(()=>client.editJournal(view.metadata.id,{orderId,expectedNoteRevision:note?.noteRevision??0,text,tags})))}/>}
-      {tab==='Evidence'&&<section className="beta-evidence"><h2>Source evidence</h2><p>{view.label}</p><dl>{Object.entries(stats?.provenance??{}).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl></section>}
+      {visibleTab==='Statistics'&&<StatisticsPanel stats={stats}/>}
+      {visibleTab==='Journal'&&<JournalPanel orders={orders} journal={journal} completed={stats?.status==='COMPLETE'?stats.completed:[]} disabled={writeDisabled} onSave={(orderId,note,text,tags)=>run(()=>mutate(()=>client.editJournal(view.metadata.id,{orderId,expectedNoteRevision:note?.noteRevision??0,text,tags})))}/>}
+      {visibleTab==='Evidence'&&<section className="beta-evidence"><h2>Source evidence</h2><p>{view.label}</p><dl>{Object.entries(stats?.provenance??{}).map(([key,value])=><div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl></section>}
     </>}
     {review&&<WorkspaceModal label="Review Beta order" returnFocusRef={returnFocus} onClose={()=>{if(!busy)setReview(null);}}><section className="alpha-dialog beta-dialog"><h2>Review exact order</h2><p>{review.value.command.payload.side} · {review.value.command.payload.orderType} · {view.metadata.symbol}</p><dl className="beta-review-values">{Object.entries(review.value.estimate).filter(([k])=>k!=='risk').map(([key,value])=><div key={key}><dt>{REVIEW_LABELS[key]??key}</dt><dd>{value??'None'}</dd></div>)}</dl>{review.value.estimate.risk&&<p>Planned loss USD {ratioLabel(review.value.estimate.risk.plannedRequestedLossUsdExact)} · budget USD {review.value.estimate.risk.budgetUsd}{review.value.estimate.risk.exceedsBudget?' · Requested size exceeds the budget.':''}</p>}<p>Actual entry requires the next eligible tick. Spread and conversion use server evidence.</p><button disabled={busy||blocked} onClick={()=>run(async()=>{await client.confirm(view.metadata.id,review.request);setReview(null);await reload();if(live.current){setMoment('Order accepted — filling on the next tick…');setTab('Positions');setPositionsView('PENDING');}})}>Confirm order</button><button disabled={busy} onClick={()=>setReview(null)}>Back</button></section></WorkspaceModal>}
     {windowPrompt&&view&&<WorkspaceModal label="Start today’s replay window" returnFocusRef={returnFocus} onClose={()=>{if(!busy)setWindowPrompt(false);}}><section className="alpha-dialog beta-dialog beta-dialog-window"><span className="beta-kicker">BEFORE THE FIRST TRADE</span><h2>Start today’s replay window?</h2><p>Free includes one window a day. Once started, this Session stays tradable. Next free window: 00:00 {access.resetTimezone}.</p><button disabled={busy||blocked} onClick={()=>run(async()=>{await client.activate(view.metadata.id);setWindowPrompt(false);await reload();}).then(ok=>{if(ok&&live.current&&replay.start())setPlaying(true);})}>Start window &amp; play</button><button disabled={busy} onClick={()=>setWindowPrompt(false)}>Just look around</button></section></WorkspaceModal>}
@@ -271,4 +277,12 @@ function SystemState({kind,busy,onReload,onRetry,onHub,onPlans,onFreeSlot}){
     <div><h2>{title}</h2><p>{text}</p></div>
     <div className="beta-system-actions">{actions.filter(Boolean).map(([label,fn])=><button key={label} type="button" disabled={busy} onClick={fn}>{label}</button>)}</div>
   </section>;
+}
+
+// Reuse the existing chart/indicator owners with identity-and-Session scoped preferences.
+function SavedBetaChart({preferenceKey,...props}){
+  const [saved]=useState(()=>{const store=new IndicatorPreferences(()=>globalThis.localStorage,preferenceKey,productionRegistry);return {store,instances:store.load()};});
+  const [instances,setInstances]=useState(saved.instances),[status,setStatus]=useState(saved.store.status);
+  return <><div className="beta-indicator-tools"><IndicatorControls instances={instances} onChange={next=>{try{saved.store.normalize(next);}catch{setStatus('Use at most 16 valid indicator instances. Your previous configuration is unchanged.');return;}saved.store.save(next);setInstances(next);setStatus(saved.store.status);}}/><small>Indicators use revealed bars only. Insufficient history remains warmup.</small>{status&&<p role="status">{status}</p>}</div>
+    <div className="beta-chart"><CandleChart {...props} indicatorInstances={instances} onIndicatorError={()=>setStatus('Indicator configuration unavailable. Other saved evidence is unchanged.')}/></div></>;
 }

@@ -9,7 +9,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const directory=await mkdtemp(resolve('node_modules/.riksora-render-'));
 const before=globalThis.location;
 try {
-  await build({logLevel:'silent',build:{ssr:'src/beta/BetaAccount.jsx',outDir:directory,emptyOutDir:true}});
+  await build({logLevel:'silent',build:{ssr:true,rollupOptions:{input:['src/beta/BetaAccount.jsx','src/tickAlpha/AlphaHome.jsx','staging/PublicFeatures.jsx']},outDir:directory,emptyOutDir:true}});
   globalThis.location={protocol:'https:',search:'',hostname:'riksora.com'};
   const {default:Account}=await import(pathToFileURL(resolve(directory,'BetaAccount.js')).href);
   const google=renderToStaticMarkup(React.createElement(Account,{googleOnly:true,entryPath:'/login/'}));
@@ -21,6 +21,20 @@ try {
   const insecure=renderToStaticMarkup(React.createElement(Account,{googleOnly:true}));
   assert.match(insecure,/Open the secure Beta address/);
   assert.doesNotMatch(insecure,/name="password"|Create workspace/);
+  globalThis.location={protocol:'https:',search:'',hostname:'riksora.com'};
+  const {default:Home}=await import(pathToFileURL(resolve(directory,'AlphaHome.js')).href);
+  const home=renderToStaticMarkup(React.createElement(Home,{hostedPreview:true}));
+  assert.match(home,/16 short synthetic demo pairs/);
+  assert.match(home,/Explore all features/);
+  assert.match(home,/href="\/login\/\?view=features"/);
+  assert.doesNotMatch(home,/Replay real bid\/ask ticks|Local Alpha|href="http:\/\/127/);
+  const {default:Features}=await import(pathToFileURL(resolve(directory,'PublicFeatures.js')).href);
+  const features=renderToStaticMarkup(React.createElement(Features));
+  assert.match(features,/Public interactive demo/);
+  assert.match(features,/href="\/login\/\?view=prototype"/);
+  assert.match(features,/restricted to authorized operators/);
+  assert.doesNotMatch(features,/href="(?:http:\/\/|\/api|\/backend|\/admin)/);
+  console.log('PASS public repository landing/features rendering and local/private endpoint isolation; not browser acceptance.');
   console.log('PASS Google-only SSR composition: existing account owner, synthetic disclosure, no password/register form, HTTP denied. Not browser acceptance.');
 } finally {
   globalThis.location=before;
