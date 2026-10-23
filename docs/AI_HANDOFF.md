@@ -1,5 +1,41 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT — ALL16×60 order audit COMPLETE:141 refused months, storage forecast exceeds VPS; strict trading HELD (2026-10-23 UTC)
+
+Continued without another micro-instruction after validated serving checkpoint357e646. Completed read-only780 NEW monthly stream scans for remaining13 symbols and combined180 earlier completed EURUSD/EURGBP/NZDUSD reports. Total960 files2021-10..2026-09,2451954017 rows,73371 adjacent timestamp regressions in141 monthly files. EVERY instrument has8–9 refused months, so NO instrument's five consecutive years is accepted. Other819 files pass ORDER ONLY, NOT full numeric/gap/freshness/provenance/rights/financial validation. Do not call this85% valid data or beta completion.
+
+Instrument | months audited | rows | refused months | regressions
+--- | ---: | ---: | ---: | ---:
+AUDUSD |60|99002316|9|188
+EURGBP |60|99901853|8|288
+NZDUSD |60|86765239|9|281
+USDCHF |60|90275807|9|396
+AUDJPY |60|173860085|9|3006
+CADJPY |60|142589193|9|2311
+EURUSD |60|122817136|8|339
+GBPUSD |60|138978374|9|667
+NZDJPY |60|141097847|9|2096
+USDCAD |60|111505660|8|335
+CHFJPY |60|159933517|9|11870
+EURJPY |60|248913631|9|6818
+EURNZD |60|152814964|9|5734
+GBPJPY |60|214783538|9|8048
+USDJPY |60|175977408|9|3041
+XAUUSD |60|292737449|9|27953
+
+Reversal-month incidence:2021-10/2022-10/2023-10 each16 symbols;2024-10 fifteen;2025-10 sixteen;2026-06 fourteen;2026-07/08/09 each16. Association is NOT proof of timezone/DST correction. Prior original EURUSD October ZIP already proves one defect existed upstream; this does not certify original archives for every other symbol/month. No source sorting/dedup/clock repair/deletion or fresh/complete evidence invention.
+
+Private evidence /home/riksora/riksora-data-intake/remaining-order-20261023: summary.json full per-symbol refused-file lists, matrix.csv, evidence-manifest.json960 report hashes (780new/180reused), capacity-forecast.json, README.md, scanner and logs. New full-stream reports verify gzip CRC/member SHA and source inode/size/mtime stability; earlier180 reports' reuse is explicit, not claimed simultaneously rehashed today.3 nice15 workers,256MiB address-space ceiling EACH, all finished exit0. No unattended worker remains. Original downloader SHA still beed610bb78f17af91660e526bcf4274932310821a89fa2d1e153defab49f7d5, no edits/source changes.
+
+Practical capacity blocker: one measured accepted month1496361ticks occupies479637504bytes original validation plus124080128bytes serving. LINEAR EXTRAPOLATION ONLY for2451954017 audited rows:785939425471bytes (~786GB decimal) validation,989258523121bytes (~989GB decimal) validation+serving, versus162829705216bytes (~163GB decimal) free. Not measured full-corpus capacity; packing/source differences may vary actual size. This is enough to refuse blind960-file canonical ingestion, NOT authorization to delete identity validation stores, change frozen constraints or buy/expand infrastructure. A separately proven storage/lifecycle budget/optimization is needed.
+
+Recorded conclusions in actual operational/history owners, documentation commit d77d3b81a1f1540836b1bf45e800acdbe406f889 on codex/functional-staging-foundations; exact API/local tree347f7ab1ce9412379e855f068e96053658c225cf, fetched fast-forward clean0/0 verified. Repository/bundle generation/freshness/negative drift/diff gates rerun PASS. Full backend540 zero skips476.821s, complete frontend regression/lint/build150/release/Node/package gates belong to preceding runtime357e646, not rerun for these findings-only docs. Private audit has no product/browser interaction; no browser acceptance claimed.
+
+Material boundary: owner explicitly chose strict rules/transaction hold. Current data still lacks adequate chronology/gap/freshness evidence, compatible real financial source/profile/controller admission remains unaccepted, and current retained-store capacity cannot be presumed. Historical trading stays HELD; no invented assumed-fill model, synthetic-only guard removal, fake PnL/statistics or sellable beta claim. Safe next work must address verified upstream replacement/provenance/quality and storage/admission design under the existing strict rules; generic continued work does not authorize frozen financial changes. Do not ask the declined model question repeatedly. Source-rights review remains owner-deferred/UNKNOWN, not misrepresented as a permission grant or newly used to block private engineering.
+
+All7 protected services active; current live static remains2fba756 and API synthetic as before. No sudo/install/grant/migration/restart/deployment/SSH/Tailscale/GNOME/DNS/email/system change. Other original/Claude checkouts remained clean/preserved. Current checkpoint is fully reported; main16×5year trade-to-statistics sales-beta target remains NOT achieved. No new permission question was required for completed work; no background/overnight continuation is falsely promised.
+
+
 ## CODEX → CHATGPT — supported private serving replica tested/published; strict financial hold preserved (2026-10-23 UTC)
 
 Owner says continue autonomous safe checkpoints and place necessary questions at the end. Published357e646db7bd9ea8601bcb497c651bfef90fccc9 on codex/functional-staging-foundations, API tree948c81d68b936ee80cd5d7748c9e1d6f4111aecb EXACT local index; fetched fast-forward and clean0/0 verified. Additive backend/ticks/serving_v2.py plus6 authored test methods; source/identity validation archive MUST remain. Blueprint42.17 explicitly permits physical SQLite layout as implementation detail, so this is a separate serving copy, not frozen contract modification or new semantic acceptance. Explicit trusted prior local completion, original identity-table count, pinned completion/binding/journal, bounded object counts/bytes, <=1MiB decompression, hash/envelope/reference checks and publication LAST. Exact compressed bodies/receipt/binding/journal preserved; source read-only. Pre-commit failures expose no publication; post-commit fsync errors may leave a valid replica, inspect before retry. Untrusted/self-certified receipt is not admitted; replica cannot replace original acceptance store or export as one.
