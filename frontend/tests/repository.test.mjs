@@ -54,6 +54,7 @@ const executionReferences=new Set([
   'backend/market_data/context_warmup.py','backend/market_data/tick_context.py',
   'backend/tests/test_context_warmup.py','backend/tests/test_tick_context.py',
   'backend/ticks/histdata_v2.py','backend/tests/test_histdata_v2.py',
+  'backend/ticks/serving_v2.py','backend/tests/test_serving_v2.py',
   // Offline CSV foundation: exact files only; no data/downloader admission.
   'backend/market_data/instruments.py','backend/ticks/dukascopy_csv.py','backend/tests/test_dukascopy_csv.py',
   'backend/cloud/worker.py','backend/tests/test_worker_deadline.py','backend/tests/alpha_capacity_probe.py','backend/cloud/queue.py','backend/infrastructure/migrations/009_replay_queue.sql','backend/infrastructure/migrations/008_research_queue.sql','backend/tests/test_research_queue.py',

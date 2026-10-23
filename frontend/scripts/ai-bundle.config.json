@@ -243,7 +243,8 @@
     "backend/market_data/context_warmup.py",
     "backend/market_data/tick_context.py",
     "backend/ticks/histdata_v2.py",
-    "backend/execution/histdata_source.py"
+    "backend/execution/histdata_source.py",
+    "backend/ticks/serving_v2.py"
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
@@ -347,7 +348,8 @@
     "backend/tests/test_context_warmup.py",
     "backend/tests/test_tick_context.py",
     "backend/tests/test_histdata_v2.py",
-    "backend/tests/test_histdata_source.py"
+    "backend/tests/test_histdata_source.py",
+    "backend/tests/test_serving_v2.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

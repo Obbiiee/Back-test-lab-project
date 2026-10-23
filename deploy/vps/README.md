@@ -166,3 +166,14 @@ BID_OBSERVATIONS is a distinct explicit basis; the existing hosted chart uses ex
 
 
 `execution.histdata_source.HistDataReplaySource(private_store, pinned_version, symbol, log_root=private_logs)` supplies the existing `IndexedTimelineCache` without changing the Exness or synthetic compositions. Root provider/feed/instrument/symbol/adapter identity must match, and progressive prefix selections refuse as full source. `start_for_period` returns an observed period start, not complete-month coverage; `context` retains the explicit BID/UNKNOWN/nonexecution boundaries above. This source has no financial profile and mounts no HTTP route. Keep source handles, private paths, binding and checkpoint logs controller-side; the current hosted synthetic API is unchanged.
+
+
+## Private serving replica (ordinary user; not deployment)
+
+See the system blueprint “Private serving replica of retained local acceptance store” for scope. Only export your TRUSTED completed local acceptance store, never an externally supplied receipt. Keep its original validation/identity tables and source files; no net disk saving is claimed while both remain. All paths must be private, outside Git/webroot; destination and report must not exist.
+
+```text
+PYTHONPATH=backend python -B -m ticks.serving_v2 --source PRIVATE_ACCEPTED_STORE --version PINNED_DATASET_SHA256 --destination NEW_PRIVATE_SERVING_FOLDER --report NEW_PRIVATE_REPORT.json --trusted-local-completion
+```
+
+Defaults bound compressed artifact bytes to1GiB and object count to65536; one decompressed artifact <=1MiB. This is not full-corpus capacity or financial admission. A pre-commit failure leaves no publication; post-commit fsync failure may leave a valid replica, so inspect the report/store before any retry. Do not overwrite existing folders or delete acceptance evidence. No API/Caddy/database install/restart or hosted-source activation is part of this command.
