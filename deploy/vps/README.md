@@ -177,3 +177,14 @@ PYTHONPATH=backend python -B -m ticks.serving_v2 --source PRIVATE_ACCEPTED_STORE
 ```
 
 Defaults bound compressed artifact bytes to1GiB and object count to65536; one decompressed artifact <=1MiB. This is not full-corpus capacity or financial admission. A pre-commit failure leaves no publication; post-commit fsync failure may leave a valid replica, so inspect the report/store before any retry. Do not overwrite existing folders or delete acceptance evidence. No API/Caddy/database install/restart or hosted-source activation is part of this command.
+
+
+## Private numeric/order quality report (not admission or deployment)
+
+Run as ordinary user, with paths outside Git/webroot. Existing report is never overwritten:
+
+```text
+PYTHONPATH=backend python -B -m ticks.quality_v2 --source PRIVATE_SYMBOL_YYYY-MM.csv.gz --symbol EURUSD --expected-member-sha256 PREVIOUS_MEMBER_HASH --report NEW_PRIVATE_REPORT.json
+```
+
+Default row budget20million; --max-rows up to100million. Exit0 is completed numeric/order pass,2 completed quality refusal,1 incomplete/error; none activates trading or proves source rights/coverage/freshness. Review the system blueprint's private diagnostic scope before composition. Preserve failed reports and original sources; never sort/repair automatically. Cancellation during a bounded source_pin phase is observed after that phase, not promised immediately. No infrastructure/HTTP mount is required.
