@@ -99,6 +99,46 @@ export function BetaWindowCard({access}){
   </section>;
 }
 
+// Canvas 08 Sessions hub. Cards show only catalog metadata (name, pair, strategy,
+// starting balance). Current balance, P&L, replay progress, "Continue replay" and the
+// In progress/Ended filter need per-Session summary fields the catalog does not expose.
+export function BetaSessionsHub({sessions,methods,access,busy,writeDisabled,onOpen,onTrash,onNew}){
+  const methodById=new Map(methods.map(m=>[m.id,m]));
+  const left=access?Math.max(0,access.savedLimit-access.savedSessions):null;
+  const plan=access?.tier==='PRO'?'Pro':'Free';
+  return <>
+    <section className="beta-hero" aria-labelledby="beta-hero-h">
+      <span aria-hidden="true" className="beta-hero-dot beta-hero-dot-1"/><span aria-hidden="true" className="beta-hero-dot beta-hero-dot-2"/><span aria-hidden="true" className="beta-hero-dot beta-hero-dot-3"/>
+      <div className="beta-hero-copy"><h2 id="beta-hero-h">Welcome back.<br/>Ready for the next round?</h2>
+        <p>Open a Session to pick up where its replay stopped.</p>
+        <div><button type="button" className="beta-hero-new" disabled={writeDisabled||left===0} onClick={onNew}>+ New Session</button></div></div>
+      {access&&<ul className="beta-hero-stats">
+        <li><span>Sessions</span><strong className="beta-mono">{access.savedSessions}<small> / {access.savedLimit}</small></strong></li>
+        {access.tier==='FREE'&&<li><span>Today’s window</span><strong className={access.freeActivationAvailable?'beta-ready':''}>{access.freeActivationAvailable?'Ready':'Used'}</strong></li>}
+      </ul>}
+    </section>
+    <section className="beta-sessions" aria-labelledby="beta-sessions-title">
+      <h2 id="beta-sessions-title">Your Sessions</h2>
+      <ul className="beta-session-cards" aria-label="Saved Sessions">{sessions.map(s=>{
+        const [mark,tone]=avatar(s.symbol),method=methodById.get(s.methodId);
+        return <li key={s.id}><article>
+          <header><i aria-hidden="true" className={'beta-pair-mark beta-tone-'+tone}>{mark}</i>
+            <span><h3>{s.name}</h3><small>{s.symbol} · {method?method.name:'Strategy unavailable'}</small></span></header>
+          <div className="beta-card-balance"><strong className="beta-mono">{usd(s.initialBalance)}</strong><span>Starting balance · demo data</span></div>
+          <p className="beta-card-status">{method?.kind==='PROTOCOL'?'Protocol strategy':'Free Style strategy'} · balance and replay position show inside</p>
+          <div className="beta-card-actions">
+            <button className="beta-card-open" disabled={busy} onClick={()=>onOpen(s)} aria-label={'Open '+s.name}>Open</button>
+            <button className="beta-card-trash" disabled={writeDisabled} onClick={()=>onTrash(s)} aria-label={'Move '+s.name+' to Trash'}>Trash</button>
+          </div>
+        </article></li>;})}
+        <li><button type="button" className="beta-card-new" disabled={writeDisabled||left===0} onClick={onNew}>
+          <span aria-hidden="true">+</span>New Session
+          {access&&<small>{left===0?`All ${access.savedLimit} slots used · move one to Trash`:`${left} slot${left===1?'':'s'} left on ${plan}`}</small>}</button></li>
+      </ul>
+    </section>
+  </>;
+}
+
 export function BetaTrash({sessions,disabled,onRestore}){
   return <section className="beta-trash" aria-labelledby="beta-trash-title">
     <div className="beta-trash-head"><h2 id="beta-trash-title">Trash</h2><span>Kept for 30 days</span></div>
