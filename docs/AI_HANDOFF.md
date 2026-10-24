@@ -1,5 +1,23 @@
 # Backtest Lab — AI Handoff
 
+## CLAUDE / OWNER → CODEX — owner ALLOWS real-source execution for validated months, FREE beta only (2026-10-24 UTC)
+
+Owner decisions in the Claude project thread (Obi, 2026-10-24): picked window **2024-11..2025-09** for all 16 symbols (Octobers skipped for now: "kerjakan yang ada dulu ajh"), then asked to work "sampai layak jual" and answered **"Ya kerjakan"** to the explicit card *"Izinkan trading pakai data HistData yang lolos validasi?"* with the recommended option **"Ya, tapi beta gratis dulu"**. This supersedes the 2026-10-23 "Pertahankan aturan ketat; transaksi ditahan" hold **only** for HistData months that passed full numeric/order validation. Billing stays OFF until licensed data; rights remain UNKNOWN and must be shown as such.
+
+Still forbidden: sorting, dedup, clock shifting or any repair; using refused months (141 order-refused, plus EURGBP/USDCAD 2026-06 same-time ambiguity); OHLC settlement; invented intrabar paths; slippage/latency beyond the existing NONE/ZERO model.
+
+Requested scope (Codex owns engine/backend; Claude owns frontend, see PR #2 for the start-month picker that reads catalog `periods` and `dataLabel`):
+1. **Profile/source admission.** Add a real-source model next to `AUTHORED_SYNTHETIC_ONLY` (e.g. `HISTORICAL_OBSERVED_V1`) in `profile_v2.py`/`sources_v2.py`/`finance_v2.py`, accepting only `providerId=histdata`, `evidenceClass=PROVIDER_OBSERVATION` datasets whose validation report hash is pinned in an admitted-month registry. Synthetic path must stay byte-identical.
+2. **Coverage policy for admitted months.** Inside an admitted month, observed silence (weekends, illiquid periods) is not a gap: pending orders fill at the first observed crossing group after it, consistent with the existing authorized first-supplied-price gap policy. A boundary into a non-admitted month ends replay explicitly (no substitution). Same-time differing-quote groups stay UNRESOLVED.
+3. **Conversion.** Non-USD-quote symbols use the admitted same-window USD pair (GBPUSD, USDJPY, USDCAD, USDCHF, AUDUSD, NZDUSD) with the existing maxAgeNs rule; stale or missing conversion stays UNRESOLVED.
+4. **Catalog.** Expose per instrument `periods` (admitted YYYY-MM list) and `dataLabel` (e.g. "Historical · HistData"), and accept `startPeriod` from that list instead of the fixture PERIOD in `research_v2.py`.
+5. **Labels.** Session, statistics and journal show "Historical replay (HistData) · not broker fills · coverage and rights unverified".
+6. **Data.** Import/serve the window per the earlier capacity-first handoff (pilot EURUSD, measure disk, then the rest).
+7. **Rollout.** Behind a config flag; owner tests Google → Session → order → statistics → relogin on riksora.com before opening to invited users.
+
+Each step: tests for admission, refusal of non-admitted months, ambiguity, conversion staleness, plus unchanged synthetic goldens; normal commit/push. Report blockers here.
+
+
 ## CHATGPT / OWNER → CODEX — scope reduced to ONE YEAR ×16 instruments; read-only feasibility check (2026-10-24 UTC)
 
 Direct human instruction: "TARGETNYA SEKARANG 1 TAHUN UNTUK 16 PAIR AJH DULU SUPAYA MASUK DI PENYIMPANAN SEKARANG". This supersedes FIVE YEARS as the immediate public-beta history target; five years remains deferred. Keep all16 instruments, strict financial holds and existing source provenance/uncertainty. No permission to delete remaining raw history, discard validation identities, silently substitute nonconsecutive months, repair chronology or claim fit without measurement.
