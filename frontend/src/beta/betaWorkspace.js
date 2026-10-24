@@ -1,6 +1,14 @@
 import {canonicalBytes,sha256} from '../tickReview/ReviewImport.js';
 
 export const newId=prefix=>`${prefix}:${crypto.randomUUID()}`;
+// Presentation only: use the committed profile, never infer a market grid from quotes.
+export function chartPriceFormat(profile){
+  if(profile?.artifact!=='BTL-EXECUTION-PROFILE-2'||typeof profile.priceScale!=='string'||!/^10{0,18}$/.test(profile.priceScale)
+    ||typeof profile.tickSize!=='string'||!/^(0|[1-9]\d*)(\.\d+)?$/.test(profile.tickSize))throw Error('Chart price format unavailable.');
+  const precision=profile.priceScale.length-1,minMove=Number(profile.tickSize);
+  if(!Number.isFinite(minMove)||minMove<=0||(profile.tickSize.split('.')[1]?.length??0)>precision)throw Error('Chart price format unavailable.');
+  return {type:'price',precision,minMove};
+}
 export function methodFromForm(fields,id){
   const protocol=fields.get('kind')==='PROTOCOL';
   return {schemaVersion:1,artifact:'BTL-LOCAL-METHOD-1',id,name:fields.get('name'),kind:protocol?'PROTOCOL':'FREE_STYLE',
