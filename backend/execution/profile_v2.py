@@ -46,8 +46,6 @@ def validate_profile(raw):
             "currencies", "REFUSED_V2_CURRENCY")
     _source(raw["primary"], raw["model"], raw["symbol"])
     conversion = raw["conversion"]
-    # Admitted conversion sources are a later checkpoint: USD-quote symbols only.
-    require(raw["model"] == SYNTHETIC_MODEL or spec.quote == "USD", "conversion", "REFUSED_V2_ROUTE")
     if spec.quote == "USD":
         require(conversion is None, "conversion", "REFUSED_V2_ROUTE")
     else:
@@ -55,8 +53,10 @@ def validate_profile(raw):
         route, _ = conversion_route(spec.quote)
         require(conversion["currency"] == spec.quote and conversion["symbol"] == route,
                 "conversion", "REFUSED_V2_ROUTE")
+        # The conversion source has the same class as the primary: synthetic or admitted route symbol.
         _source({**{k: conversion[k] for k in ("datasetId", "datasetVersion", "providerId", "feedId", "feedInstrumentId")},
-                 "evidenceClass": "SYNTHETIC_CONTRACT_ONLY"})
+                 "evidenceClass": "ADMITTED_OBSERVATION" if raw["model"] == ADMITTED_MODEL else "SYNTHETIC_CONTRACT_ONLY"},
+                raw["model"], route)
         require(1 <= uint(conversion["maxAgeNs"], "maxAgeNs") <= 60000000000, "maxAgeNs", "REFUSED_FX_AGE_LIMIT")
     values = {}
     for field in ("tickSize", "priceScale", "contractSize", "lotStep", "minLot", "maxLot", "commissionPerLotSide"):

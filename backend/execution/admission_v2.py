@@ -8,7 +8,9 @@ only dataset identity and quality are re-labelled under the admission hash.
 Nothing is sorted, repaired, deduplicated or substituted. Refused months are
 simply never admitted, and replay cannot advance past the admitted range.
 
-USD-quote symbols only in this checkpoint; conversion sources come later.
+Non-USD quotes convert through the admitted route symbol (for example USDJPY
+for EURJPY) with the unchanged conversion evidence rules: the latest route
+group at or before each primary group, at most maxAgeNs old, one price.
 """
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -21,6 +23,7 @@ from ticks.contracts import CanonicalTick, keys, tag, uint
 from ticks.provider import Cancellation, empty_diagnostics
 from ticks.storage_v2 import DiskTickProvider
 from ticks.timeline import CURSOR_FIELDS, make_group
+from .conversion import convert_usd
 from .profile_v2 import ExecutionProfileV2, ADMITTED_MODEL
 
 ADMISSION = "BTL-HISTDATA-ADMISSION-1"
@@ -28,6 +31,7 @@ POLICY = "OWNER_2026_10_24_VALIDATED_MONTHS_FREE_BETA"
 TIMELINE = "BTL-ADMITTED-TIMELINE-1"
 LABEL = "Historical replay (HistData) · not broker fills · coverage and rights unverified"
 MAX_GROUPS, PAGE = 64, 256
+FX_LOOKBACK_NS = 7 * 24 * 3600 * 10**9
 _PERIOD = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])")
 
 
@@ -61,6 +65,13 @@ def admission_record(symbol, months):
 
 def admitted_dataset_id(record):
     return f"admitted:histdata:{record['symbol']}:{record['months'][0]['period']}:{record['months'][-1]['period']}"
+
+
+def admitted_conversion_pin(record, currency, max_age_ns="60000000000"):
+    """Profile `conversion` block for an admitted route symbol."""
+    pin = admitted_source_pin(record)
+    del pin["evidenceClass"]
+    return dict(currency=currency, symbol=record["symbol"], **pin, maxAgeNs=max_age_ns)
 
 
 def admitted_source_pin(record):
@@ -182,9 +193,16 @@ class AdmittedSourceJoin:
 
     def __init__(self, profile, primary_provider, *, start_ns, conversion_provider=None):
         require(type(profile) is ExecutionProfileV2 and profile.wire["model"] == ADMITTED_MODEL, "profile", "REFUSED_V2_PROFILE")
-        require(conversion_provider is None and profile.wire["conversion"] is None, "conversion", "REFUSED_V2_ROUTE")
         require(type(primary_provider) is AdmittedSource and primary_provider.pin == profile.wire["primary"],
                 "source", "REFUSED_V2_SOURCE_PIN")
+        fx = profile.wire["conversion"]
+        if fx is None:
+            require(conversion_provider is None, "conversion", "REFUSED_V2_IDENTITY_SOURCE")
+        else:
+            require(type(conversion_provider) is AdmittedSource
+                    and all(conversion_provider.pin[k] == fx[k] for k in ("datasetId", "datasetVersion", "providerId", "feedId", "feedInstrumentId")),
+                    "conversion", "REFUSED_V2_SOURCE_PIN")
+        self.__fx = conversion_provider
         start = uint(start_ns)
         require(primary_provider.start_ns <= start < primary_provider.end_ns, "start", "REFUSED_V2_SOURCE_WINDOW")
         self.__profile, self.__source = profile, primary_provider
@@ -197,14 +215,55 @@ class AdmittedSourceJoin:
 
     def checkpoint(self):
         return dict(schemaVersion=1, artifact="BTL-V2-SOURCE-CHECKPOINT-1", profileHash=self.__profile.profile_hash,
-                    primary=dict(cursor=deepcopy(self.__cursor), advanceTargets=[]), conversion=None)
+                    primary=dict(cursor=deepcopy(self.__cursor), advanceTargets=[]), conversion=self.__fx_cursor())
+
+    def __fx_cursor(self):
+        # Conversion selection is a stateless lookup at each primary group, so
+        # this cursor records only the acknowledged clock in the kernel shape.
+        if self.__fx is None:
+            return None
+        pin, start = self.__profile.wire["conversion"], int(self.__cursor["sessionStartNs"])
+        session = str(max(0, start - int(pin["maxAgeNs"])))
+        initial = content_hash(dict(schemaVersion=1, artifact="BTL-ADMITTED-PREFIX-1", datasetVersion=pin["datasetVersion"],
+                                    sessionStartNs=session))
+        cursor = dict(schemaVersion=1, artifact="BTL-TICK-CURSOR-1", datasetId=pin["datasetId"], datasetVersion=pin["datasetVersion"],
+                      timelineVersion=TIMELINE, generation="0", revision="0", sessionStartNs=session,
+                      throughNs=self.__cursor["throughNs"], pendingTargetNs=None, visiblePrefixHash=initial,
+                      nextGroupIndex="0", lastGroupId=None)
+        return dict(cursor=cursor, advanceTargets=[])
+
+    def __selection(self, as_of, cancel):
+        """Latest admitted route group at or before as_of, with its eligibility."""
+        if self.__fx is None:
+            return None, "IDENTITY"
+        p, at = self.__profile.wire, int(as_of)
+        # Look back past maxAgeNs (bounded) so an old quote is reported as STALE, not MISSING.
+        floor = max(self.__fx.start_ns, at - FX_LOOKBACK_NS)
+        found = self.__fx.recent(floor, at, 1, cancel) if floor <= at else []
+        if not found:
+            return None, "UNRESOLVED_FX_MISSING"
+        group = found[0]
+        try:
+            # Validate both signed sides; a zero amount alone checks only one.
+            for amount in ("1", "-1"):
+                convert_usd(amount, p["quoteCurrency"], as_of, pin=p["conversion"], group=group, money_scale=p["moneyScale"])
+        except ContractError as error:
+            if error.code.startswith("UNRESOLVED_FX_"):
+                return group, error.code
+            if error.code == "REFUSED_FINANCIAL_LIMIT":
+                return group, "UNRESOLVED_FX_PRECISION"
+            raise
+        # Silence after the group is covered only inside the admitted route range.
+        if at >= self.__fx.end_ns:
+            return group, "UNRESOLVED_FX_COVERAGE"
+        return group, "ELIGIBLE_ADMITTED"
 
     @classmethod
     def resume(cls, profile, primary_provider, checkpoint, *, conversion_provider=None):
         keys(checkpoint, "schemaVersion artifact profileHash primary conversion")
         require(checkpoint["schemaVersion"] == 1 and checkpoint["artifact"] == "BTL-V2-SOURCE-CHECKPOINT-1"
                 and type(profile) is ExecutionProfileV2 and checkpoint["profileHash"] == profile.profile_hash
-                and checkpoint["conversion"] is None, "checkpoint", "REFUSED_V2_CHECKPOINT")
+                and (checkpoint["conversion"] is None or type(checkpoint["conversion"]) is dict), "checkpoint", "REFUSED_V2_CHECKPOINT")
         keys(checkpoint["primary"], "cursor advanceTargets")
         cursor = checkpoint["primary"]["cursor"]
         tag(cursor, "BTL-TICK-CURSOR-1", CURSOR_FIELDS)
@@ -246,20 +305,26 @@ class AdmittedSourceJoin:
                           nextGroupIndex=str(int(cursor["nextGroupIndex"]) + len(groups)),
                           lastGroupId=groups[-1]["groupId"] if groups else cursor["lastGroupId"],
                           pendingTargetNs=None if done else target_ns, visiblePrefixHash=content_hash(step))
+        pairs, conversions = [], {}
+        for g in groups:
+            fx, status = self.__selection(g["timeNs"], cancel)
+            if fx is not None:
+                conversions[fx["groupId"]] = fx
+            pairs.append(dict(primaryGroup=g, conversionGroupId=None if fx is None else fx["groupId"], conversionStatus=status))
         cancel.check()
         self.__cursor = cursor
-        pairs = [dict(primaryGroup=g, conversionGroupId=None, conversionStatus="IDENTITY") for g in groups]
         result = dict(schemaVersion=1, artifact="BTL-V2-SOURCE-REVEAL-1", profileHash=self.__profile.profile_hash,
-                      throughNs=str(through), pairs=pairs, conversionGroups={}, primaryCoverage=coverage,
+                      throughNs=str(through), pairs=pairs, conversionGroups=conversions, primaryCoverage=coverage,
                       primaryDiagnostics=empty_diagnostics(), exhaustedThroughBoundary=done, checkpoint=self.checkpoint())
         canonical_bytes(result)
         return deepcopy(result)
 
     def risk_basis(self, expected_checkpoint, *, cancellation=None):
         require(expected_checkpoint == self.checkpoint(), "checkpoint", "REFUSED_V2_STALE_CHECKPOINT")
-        (cancellation or Cancellation()).check()
+        cancel = cancellation or Cancellation(); cancel.check()
+        group, status = self.__selection(self.__cursor["throughNs"], cancel)
         return dict(schemaVersion=1, artifact="BTL-V2-SOURCE-RISK-1", profileHash=self.__profile.profile_hash,
-                    timeNs=self.__cursor["throughNs"], conversionGroup=None, conversionStatus="IDENTITY",
+                    timeNs=self.__cursor["throughNs"], conversionGroup=deepcopy(group), conversionStatus=status,
                     checkpoint=self.checkpoint())
 
     def past_primary(self, expected_checkpoint, maximum=64):
