@@ -1565,3 +1565,16 @@ Ran a disposable A/B microbenchmark of request-scoped reuse in `read_revealed("0
 This is directional prototype evidence only: one block per variant, one run each, no controlled cold-cache/repeated-sample study, no cross-block or mutation-race test, and no change to the repository. It does not establish the gain for a complete dataset. The result supports a bounded request-local implementation experiment, provided it re-reads/compares exact bytes, retains per-record membership/cursor checks, and has regression coverage for changed/corrupt payloads, block transitions, checkpoint/resume, cancellation, causal clipping, and exact output parity.
 
 Source-backed XAU precision, rights, freshness and coverage remain unresolved. No production or financial-engine change is authorized by this microbenchmark alone.
+
+## Follow-up — request-local verified position-block reuse (2026-10-24)
+
+Implemented the bounded optimization described above in `backend/ticks/timeline_v2.py` and added regression coverage in `backend/tests/test_tick_storage_v2.py`. Each `read_revealed` call now keeps only its most recently used position-log block. For every row it still reads the stored body and compares exact raw bytes as well as the expected block hash before reusing the decoded object; membership, cursor, identity, generation, and offset checks remain per record. Cache lifetime is one call and does not change the execution engine or any financial rule.
+
+The focused tick evidence/storage/timeline suite passed: 77 tests, 34.198s. The added test reveals 128 groups across two blocks, verifies one decode/hash per unchanged block, then mutates a stored group identity and confirms the timeline refuses it with `IDENTITY_CONFLICT`. `git diff --check` passed.
+
+On the disposable 10k XAU converted fixture, the complete provider/replay equality, causal-prefix, checkpoint/resume, and uncertainty checks still held: 10,000 provider events equaled 10,000 replay events; 157 advances reached the requested boundary; order remained `UNTRUSTED`, coverage `UNKNOWN`, and no financial execution fields were introduced. One pre-change process run was 50.98s / 81,008 KiB peak RSS; one post-change run was 21.90s / 80,876 KiB. Temporary fixture plus replay-log storage remained 9,830,400 bytes. This is a single local-fixture comparison, not a controlled benchmark or full-year capacity result.
+
+Local commit `46a56559bc805810e7a5dd5bcc616877e052c6a9` and GitHub commit `2f0d265c7501f23f97003162dcca27382be5a7ff` have the same tree `8c3d00b4427438c63796d1fe6846b6249fd2f031`. Review is in [PR #9](https://github.com/Obbiiee/Back-test-lab-project/pull/9), currently draft. It is not merged. No raw datasets were committed, no source archive was imported, and no active service was restarted.
+
+**Decision:** GO for this scoped, request-local read-path optimization and its tested local fixture behavior. NO-GO remains for admitting XAU as financially authoritative, asserting source precision or rights/coverage/freshness, bulk importing or estimating one-year capacity. The matching authentic XAU raw archive/member and documented use rights are still blockers. Continue with isolated contract-compatible engine work and evidence-backed checkpoints; do not change execution semantics.
+
