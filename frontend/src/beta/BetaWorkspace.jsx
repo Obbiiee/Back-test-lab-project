@@ -1,4 +1,5 @@
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import Icon from '../workspace/WorkspaceIcon.jsx';
 import CandleChart from '../components/CandleChart.jsx';
 import IndicatorControls from '../components/IndicatorControls.jsx';
 import {IndicatorPreferences} from '../workspacePreferences.js';
@@ -26,6 +27,25 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
   const [creating,setCreating]=useState(false),[windowPrompt,setWindowPrompt]=useState(false),[timeframe,setTimeframe]=useState('1m'),[speed,setSpeed]=useState(1),[playing,setPlaying]=useState(false);
   const [problem,setProblem]=useState(null),[offline,setOffline]=useState(()=>globalThis.navigator?.onLine===false),[sheet,setSheet]=useState(false),sheetButton=useRef(null),[moment,setMoment]=useState(''),[quickLots,setQuickLots]=useState('0.01'),[tab,setTab]=useState('Positions'),[positionsView,setPositionsView]=useState('ACTIVE'),[drawing,setDrawing]=useState('none'),[workflow,setWorkflow]=useState('QUICK');
   const [chartPreferences,setChartPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
+  const [panel,setPanel]=useState('ORDER'),[chartCommand,setChartCommand]=useState(null);
+  const [drawingState,setDrawingState]=useState({sessionId:null,drawings:[]});
+  const terminal=useRef(null),panelOpener=useRef(null),sheetOpener=useRef(null),sheetForm=useRef(null);
+  useEffect(()=>{
+    if(!sheet)return;
+    const form=sheetForm.current;
+    if(!form)return;
+    const controls=()=>[...form.querySelectorAll('button,input,select,textarea,[tabindex]')].filter(node=>!node.disabled&&node.tabIndex>=0&&node.getClientRects().length);
+    const frame=requestAnimationFrame(()=>{(controls()[0]??form).focus({preventScroll:true});});
+    const tab=event=>{
+      if(event.key!=='Tab')return;
+      const list=controls(),first=list[0],last=list.at(-1);
+      if(!first){event.preventDefault();form.focus();return;}
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===form)){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    form.addEventListener('keydown',tab);
+    return()=>{cancelAnimationFrame(frame);form.removeEventListener('keydown',tab);};
+  },[sheet]);
   const flight=useRef(false),live=useRef(true),returnFocus=useRef(null);
   const latest=useRef(null);
   const [replay]=useState(()=>createReplayLoop({step:()=>latest.current(),onStop:()=>{if(live.current)setPlaying(false);}}));
@@ -61,8 +81,26 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
   },[]);
   const bars=useMemo(()=>view?.chart?displayBars(view):[],[view]);
   const priceFormat=useMemo(()=>view?chartPriceFormat(view.state.profile):undefined,[view]);
+  const activeSession=view?.metadata.id??null;
+  const changedDrawings=useCallback(next=>setDrawingState({sessionId:activeSession,...next}),[activeSession]);
+  const objects=drawingState.sessionId===activeSession?drawingState.drawings:[];
+  const chartAction=action=>setChartCommand({action,id:crypto.randomUUID(),sessionId:activeSession});
+  const openPanel=(next,opener)=>{panelOpener.current=opener;setPanel(next);if(next==='ORDER'&&matchMedia('(max-width:700px)').matches){sheetOpener.current=opener;setSheet(true);}};
+  const openTerminal=next=>{setTab(next);requestAnimationFrame(()=>terminal.current?.scrollIntoView({block:'nearest',behavior:'smooth'}));};
   const writeDisabled=busy||blocked||offline||playing||!owner;
   const tradingDisabled=writeDisabled||view?.savedState!=='SAVED'||view?.state.ended||view?.state.unresolved;
+  useEffect(()=>{
+    const key=event=>{
+      if(event.repeat||event.ctrlKey||event.metaKey||event.altKey||document.querySelector('[role="dialog"]')
+        ||event.target.closest?.('input,select,textarea,button,a,summary,[contenteditable="true"]'))return;
+      if(event.code==='Space'&&(playing||!tradingDisabled)){
+        event.preventDefault();if(playing)replay.stop();else if(replay.start())setPlaying(true);
+      }else if(event.shiftKey&&event.key==='ArrowRight'&&!tradingDisabled&&!playing){
+        event.preventDefault();void latest.current?.();
+      }
+    };
+    addEventListener('keydown',key);return()=>removeEventListener('keydown',key);
+  },[playing,tradingDisabled,replay]);
   const stats=view?.analysis,orders=Object.entries(view?.state.orders??{});
   async function mutate(operation){await operation();await reload();}
   // Every order, panel or quick strip, goes to server review first; confirm is a separate step.
@@ -119,29 +157,36 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
       <div className="beta-session-heading"><button disabled={busy||blocked||playing} onClick={()=>{setMoment('');run(()=>reload(null));}}>All Beta Sessions</button><h2>{view.metadata.name} · {view.metadata.symbol}</h2><span className="beta-kind">{view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}</span><strong>Saved balance ${view.state.balance}</strong></div>
       <p>{view.label}. Earlier two-year candle history is unavailable in these demos.</p>
       <div className="beta-chartbar" role="group" aria-label="Chart">
+        <span className="beta-chart-symbol"><Icon name="candles"/>{view.metadata.symbol}</span>
         <label>Timeframe<select aria-label="Beta timeframe" disabled={busy||playing} value={timeframe} onChange={e=>{const tf=e.target.value;run(async()=>{await reload(view.metadata.id,tf);setTimeframe(tf);setReview(null);});}}>{TIMEFRAMES.map(tf=><option key={tf}>{tf}</option>)}</select></label>
-        <label>Drawing<select value={drawing} onChange={e=>setDrawing(e.target.value)}><option value="none">Cursor</option>{Object.entries(DRAWING_SPECS).map(([type,spec])=><option key={type} value={type}>{spec.name}</option>)}</select></label>
+        <button type="button" onClick={()=>chartAction('fit')} title="Fit revealed candles to the chart"><Icon name="expand"/>Fit chart</button>
+        <button type="button" aria-pressed={panel==='SETTINGS'} aria-controls="beta-chart-settings" onClick={event=>openPanel(panel==='SETTINGS'?'ORDER':'SETTINGS',event.currentTarget)}><Icon name="settings"/>Chart settings</button>
         <span className="beta-chartbar-quote">Bid <b>{view.quote?.bid??'—'}</b> · Ask <b>{view.quote?.ask??'—'}</b></span></div>
       <div className="beta-trade"><div className="beta-chart-col"><SavedBetaChart key={view.metadata.id} preferenceKey={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} candles={bars} priceFormat={priceFormat} transition={{kind:'forward'}} researchOnly volumeAvailable={false}
+        drawingTools={<nav className="beta-drawing-tools" aria-label="Drawing tools">
+          <button type="button" aria-label="Cursor / Select" title="Cursor / Select" aria-pressed={drawing==='none'} onClick={()=>setDrawing('none')}><Icon name="cursor"/></button>
+          {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} type="button" aria-label={spec.name} title={spec.name} aria-pressed={drawing===type} onClick={()=>setDrawing(drawing===type?'none':type)}><Icon name={({'trend-line':'trend','horizontal-line':'horizontal','vertical-line':'vertical','fibonacci-retracement':'fib',rectangle:'rectangle',ray:'ray',arrow:'arrow',text:'text',measure:'measure'})[type]}/></button>)}
+        </nav>}
+        command={chartCommand?.sessionId===activeSession?chartCommand:null} onDrawingStateChange={changedDrawings}
         sessionId={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingWorkspace={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingStorageKey={`beta-drawings:${client.subject()}:${workspace.id}:${view.metadata.id}`}
         drawingMode={drawing} onDrawingModeChange={setDrawing} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} indicatorRegistry={productionRegistry}/>
         <div className="beta-replay" role="group" aria-label="Replay">
           <button className="beta-replay-activate" disabled={tradingDisabled} onClick={event=>{returnFocus.current=event.currentTarget;if(access?.tier==='FREE'&&access.freeActivationAvailable)setWindowPrompt(true);else run(()=>mutate(()=>client.activate(view.metadata.id)));}}>Activate trading window</button>
-          <button className="beta-replay-play" disabled={playing?false:tradingDisabled} aria-pressed={playing} onClick={()=>{if(playing)replay.stop();else if(replay.start())setPlaying(true);}}>{playing?'Pause replay':'Play replay'}</button>
-          <button disabled={tradingDisabled} onClick={()=>run(step)}>Step replay</button>
+          <button className="beta-replay-play" disabled={playing?false:tradingDisabled} aria-pressed={playing} aria-keyshortcuts="Space" title="Space · play or pause outside inputs" onClick={()=>{if(playing)replay.stop();else if(replay.start())setPlaying(true);}}>{playing?'Pause replay':'Play replay'}</button>
+          <button disabled={tradingDisabled} aria-keyshortcuts="Shift+ArrowRight" title="Shift+→ · step outside inputs" onClick={()=>run(step)}>Step replay</button>
           <label>Replay speed<select value={speed} disabled={busy||playing} onChange={e=>setSpeed(Number(e.target.value))}>{[1,4,16].map(n=><option key={n} value={n}>{n} intervals / step</option>)}</select></label>
           <span className="beta-replay-time"><small>Replay time</small>{stamp(view.state.throughNs)}</span>
         </div>
-        <button type="button" ref={sheetButton} className="beta-sheet-open" aria-expanded={sheet} aria-controls="beta-order-sheet" onClick={()=>setSheet(true)}>Order panel<small>{view.method.kind==='PROTOCOL'?'Protocol · Plan':'Market or Plan'}</small></button>
+        <button type="button" ref={sheetButton} className="beta-sheet-open" aria-expanded={sheet} aria-controls="beta-order-sheet" onClick={event=>{sheetOpener.current=event.currentTarget;setPanel('ORDER');setSheet(true);}}>Order panel<small>{view.method.kind==='PROTOCOL'?'Protocol · Plan':'Market or Plan'}</small></button>
         {view.method.kind==='FREE_STYLE'&&<div className="beta-quick" role="group" aria-label="Quick market order">
           <button type="button" className="beta-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??""}`} disabled={tradingDisabled||!view.quote||!quickLots.trim()} onClick={event=>requestReview(new Map([['side','SHORT'],['workflow','QUICK'],['quantity',quickLots.trim()]]),event.currentTarget)}>Sell<small>{view.quote?.bid??'—'}</small></button>
           <label>Lots<input value={quickLots} onChange={e=>setQuickLots(e.target.value)} inputMode="decimal" disabled={tradingDisabled}/></label>
           <button type="button" className="beta-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??""}`} disabled={tradingDisabled||!view.quote||!quickLots.trim()} onClick={event=>requestReview(new Map([['side','LONG'],['workflow','QUICK'],['quantity',quickLots.trim()]]),event.currentTarget)}>Buy<small>{view.quote?.ask??'—'}</small></button>
           <span>Market order · server review opens next, no stop or target</span>
         </div>}</div>
-      {sheet&&<div className="beta-sheet-backdrop" aria-hidden="true" onClick={()=>{setSheet(false);sheetButton.current?.focus();}}/>}
+      {sheet&&<div className="beta-sheet-backdrop" aria-hidden="true" onClick={()=>{setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}/>}
       {/* On phones (canvas 20) the panel is a bottom sheet; on desktop it is always the right-hand panel. */}
-      <form id="beta-order-sheet" className={`beta-order-form${sheet?' beta-sheet-is-open':''}`} onKeyDown={event=>{if(event.key==='Escape'&&sheet){setSheet(false);sheetButton.current?.focus();}}} onSubmit={event=>{event.preventDefault();const back=sheet?sheetButton.current:event.currentTarget.querySelector('button:not([type])');setSheet(false);requestReview(new FormData(event.currentTarget),back);}}><div className="beta-sheet-head"><h2>New order</h2><button type="button" className="beta-sheet-close" aria-label="Close order panel" onClick={()=>{setSheet(false);sheetButton.current?.focus();}}>×</button></div><p className="beta-muted">Review never fills an order. Buys fill at Ask, sells at Bid on the next eligible tick.</p>
+      <form ref={sheetForm} id="beta-order-sheet" role={sheet?'dialog':undefined} aria-modal={sheet?true:undefined} aria-label="New order" tabIndex={-1} hidden={panel!=='ORDER'&&!sheet} className={`beta-order-form${sheet?' beta-sheet-is-open':''}`} onKeyDown={event=>{if(event.key==='Escape'&&sheet){event.stopPropagation();setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}} onSubmit={event=>{event.preventDefault();const back=sheet?(sheetOpener.current??sheetButton.current):event.currentTarget.querySelector('button:not([type])');setSheet(false);requestReview(new FormData(event.currentTarget),back);}}><div className="beta-sheet-head"><h2>New order</h2><button type="button" className="beta-sheet-close" aria-label="Close order panel" onClick={()=>{setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}>×</button></div><p className="beta-muted">Review never fills an order. Buys fill at Ask, sells at Bid on the next eligible tick.</p>
         <fieldset className="beta-side" disabled={tradingDisabled}><legend>Direction</legend><label className="beta-side-sell"><input type="radio" name="side" value="SHORT"/><span>Sell<small>Bid {view.quote?.bid??'—'}</small></span></label><label className="beta-side-buy"><input type="radio" name="side" value="LONG" defaultChecked/><span>Buy<small>Ask {view.quote?.ask??'—'}</small></span></label></fieldset>
         <label>Workflow<select name="workflow" disabled={tradingDisabled||view.method.kind==='PROTOCOL'} value={view.method.kind==='PROTOCOL'?'PLANNED':workflow} onChange={e=>setWorkflow(e.target.value)}><option value="QUICK">Market</option><option value="PLANNED">Planned</option></select></label>
         {(view.method.kind==='PROTOCOL'||workflow==='PLANNED')&&<><label>Planned order type<select name="orderType" disabled={tradingDisabled}><option>LIMIT</option><option>STOP</option></select></label>
@@ -149,9 +194,28 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
         <label>Lots<input name="quantity" defaultValue={view.method.kind==='PROTOCOL'?'':'0.01'} placeholder={view.method.kind==='PROTOCOL'?'Calculated by server':undefined} inputMode="decimal" required disabled={tradingDisabled||view.method.kind==='PROTOCOL'}/></label>
         <label>Stop loss<input name="sl" inputMode="decimal" disabled={tradingDisabled}/></label><label>Take profit<input name="tp" inputMode="decimal" disabled={tradingDisabled||view.method.kind==='PROTOCOL'}/></label>
         {view.method.kind==='PROTOCOL'&&<><p>Protocol risk {view.method.riskPercent}% · R:R {view.method.rr}. The server owns quantity and target; manual exits are locked.</p>{view.method.conditions.map(c=><label key={c.id}>{c.label}<select name={'condition:'+c.id} disabled={tradingDisabled}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</>}<button disabled={tradingDisabled||!view.quote}>Review order</button>
-      </form></div>
+      </form>
+      {panel==='OBJECTS'&&<aside className="beta-sidepanel" aria-label="Drawing objects" onKeyDown={event=>{if(event.key==='Escape'){setPanel('ORDER');panelOpener.current?.focus();}}}>
+        <h2>Objects</h2><p>Drawings belong to this account and Session. They never execute trades.</p>
+        {!objects.length?<p>No drawings yet. Choose a tool, then click the chart.</p>:<ol>{objects.map((object,index)=><li key={object.id}>
+          <button type="button" className="beta-object-name" aria-pressed={drawingState.selectedId===object.id} onClick={()=>chartAction(`object:select:${object.id}`)}>{index+1}. {DRAWING_SPECS[object.type]?.name??object.type.replaceAll('-',' ')}</button>
+          <div>{['hide','lock','delete'].map(action=><button key={action} type="button" aria-label={`${action} drawing ${index+1}`} aria-pressed={action==='hide'?object.hidden:action==='lock'?object.locked:undefined} onClick={()=>chartAction(`object:${action}:${object.id}`)}><Icon name={{hide:'eye',lock:'lock',delete:'trash'}[action]}/></button>)}</div>
+        </li>)}</ol>}
+      </aside>}
+      {panel==='SETTINGS'&&<aside id="beta-chart-settings" className="beta-sidepanel" aria-label="Chart settings" onKeyDown={event=>{if(event.key==='Escape'){setPanel('ORDER');panelOpener.current?.focus();}}}>
+        <h2>Chart settings</h2><p>Display only. Tick evidence and order prices stay unchanged.</p>
+        <label><input type="checkbox" checked={chartPreferences.showGrid} onChange={event=>setChartPreferences(value=>({...value,showGrid:event.target.checked}))}/>Show grid</label>
+        <label><input type="checkbox" checked={chartPreferences.showCrosshair} onChange={event=>setChartPreferences(value=>({...value,showCrosshair:event.target.checked}))}/>Show crosshair</label>
+        <button type="button" onClick={()=>chartAction('fit')}>Reset chart view</button>
+      </aside>}
+      <nav className="beta-panel-rail" aria-label="Workspace panels">
+        {['ORDER','OBJECTS','SETTINGS'].map(next=><button key={next} type="button" aria-label={{ORDER:'Open order panel',OBJECTS:'Drawing objects',SETTINGS:'Open chart settings'}[next]} title={{ORDER:'Order',OBJECTS:'Objects',SETTINGS:'Chart settings'}[next]} aria-pressed={panel===next} onClick={event=>openPanel(next,event.currentTarget)}><Icon name={{ORDER:'order',OBJECTS:'layers',SETTINGS:'settings'}[next]}/></button>)}
+        <button type="button" aria-label="Open Session journal" title="Journal" onClick={()=>openTerminal('Journal')}><Icon name="journal"/></button>
+        <button type="button" aria-label="Open Session statistics" title="Statistics" onClick={()=>openTerminal('Statistics')}><Icon name="analytics"/></button>
+        <button type="button" disabled title="News · soon" aria-label="News · soon"><Icon name="news"/></button>
+      </nav></div>
       {!view.chart&&<p>Chart display unavailable. Committed evidence remains saved.</p>}
-      <nav className="beta-tabs" aria-label="Session views">{['Positions','Statistics','Journal','Evidence'].map(t=><button key={t} aria-pressed={tab===t} onClick={()=>setTab(t)}>{t}</button>)}</nav>
+      <nav ref={terminal} className="beta-tabs" aria-label="Session views">{['Positions','Statistics','Journal','Evidence'].map(t=><button key={t} aria-pressed={tab===t} onClick={()=>setTab(t)}>{t}</button>)}</nav>
       {tab==='Positions'&&<section className="beta-positions" aria-label="Positions">
         <div className="beta-subtabs" role="group" aria-label="Order groups">{POSITION_GROUPS.map(([key,label])=><button key={key} type="button" aria-pressed={positionsView===key} onClick={()=>setPositionsView(key)}>{label} <span>{orders.filter(([,o])=>groupOf(o)===key).length}</span></button>)}</div>
         <div className="alpha-table-scroll"><table><caption>{POSITION_GROUPS.find(([key])=>key===positionsView)[1]} · committed by the server</caption><thead><tr><th>Order</th><th>Direction</th><th>Status</th><th>Lots</th><th>Entry</th><th>Stop loss</th><th>Take profit</th><th>Realized gross USD</th><th>Action</th></tr></thead><tbody>{orders.filter(([,o])=>groupOf(o)===positionsView).map(([id,o])=><tr key={id}><td>{id.slice(-8)}</td><td><span className={`beta-side-pill beta-side-pill-${o.side==='LONG'?'buy':'sell'}`}>{o.side==='LONG'?'Buy':'Sell'}</span></td><td>{statusLabel(o)}</td><td>{o.status==='ACTIVE'&&o.remaining!==o.quantity?`${o.remaining} of ${o.quantity} open`:o.quantity}</td><td>{o.entryPrice?<>Filled {o.entryPrice}</>:o.orderType==='MARKET'?'Market, next tick':`${o.orderType==='LIMIT'?'Limit':'Stop'} ${o.entry}`}</td><td>{o.sl??'—'}</td><td>{o.tp??'—'}</td><td>{o.entryPrice?signed(o.grossPosted):'—'}</td><td>{['PENDING','ACTIVE'].includes(o.status)&&<button disabled={tradingDisabled||!!o.exitRequest||(o.status==='ACTIVE'&&view.method.kind!=='FREE_STYLE')} onClick={event=>{returnFocus.current=event.currentTarget;setAction(executionCommand(view,o.status==='PENDING'?'CANCEL':'CLOSE',{orderId:id,...(o.status==='ACTIVE'?{quantity:null}:{})}));}}>{o.status==='PENDING'?'Cancel pending':'Close position'}</button>}{o.status==='ACTIVE'&&view.method.kind==='FREE_STYLE'&&<form onSubmit={event=>{event.preventDefault();const quantity=new FormData(event.currentTarget).get('partial');returnFocus.current=event.currentTarget.querySelector('button');setAction(executionCommand(view,'CLOSE',{orderId:id,quantity}));}}><label>Partial lots<input name="partial" aria-label={'Partial lots '+id.slice(-8)} required inputMode="decimal" disabled={tradingDisabled||!!o.exitRequest}/></label><button disabled={tradingDisabled||!!o.exitRequest}>Review partial close</button></form>}</td></tr>)}</tbody></table>
@@ -278,9 +342,9 @@ function SystemState({kind,busy,onReload,onRetry,onHub,onPlans,onFreeSlot}){
 }
 
 // Reuse the existing chart/indicator owners with identity-and-Session scoped preferences.
-function SavedBetaChart({preferenceKey,...props}){
+function SavedBetaChart({preferenceKey,drawingTools,...props}){
   const [saved]=useState(()=>{const store=new IndicatorPreferences(()=>globalThis.localStorage,preferenceKey,productionRegistry);return {store,instances:store.load()};});
   const [instances,setInstances]=useState(saved.instances),[status,setStatus]=useState(saved.store.status);
-  return <><div className="beta-indicator-tools"><IndicatorControls instances={instances} onChange={next=>{try{saved.store.normalize(next);}catch{setStatus('Use at most 16 valid indicator instances. Your previous configuration is unchanged.');return;}saved.store.save(next);setInstances(next);setStatus(saved.store.status);}}/><small>Indicators use revealed bars only. Insufficient history remains warmup.</small>{status&&<p role="status">{status}</p>}</div>
-    <div className="beta-chart"><CandleChart {...props} indicatorInstances={instances} onIndicatorError={()=>setStatus('Indicator configuration unavailable. Other saved evidence is unchanged.')}/></div></>;
+  return <div className="beta-chart-surface"><div className="beta-indicator-tools"><IndicatorControls instances={instances} onChange={next=>{try{saved.store.normalize(next);}catch{setStatus('Use at most 16 valid indicator instances. Your previous configuration is unchanged.');return;}saved.store.save(next);setInstances(next);setStatus(saved.store.status);}}/><small>Indicators use revealed bars only. Insufficient history remains warmup.</small>{status&&<p role="status">{status}</p>}</div>
+    <div className="beta-chart-stage">{drawingTools}<div className="beta-chart"><CandleChart {...props} indicatorInstances={instances} onIndicatorError={()=>setStatus('Indicator configuration unavailable. Other saved evidence is unchanged.')}/></div></div></div>;
 }

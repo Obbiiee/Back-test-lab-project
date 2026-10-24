@@ -24,6 +24,7 @@ const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'b
 await context.addInitScript(()=>{const original=CanvasRenderingContext2D.prototype.fillText;globalThis.__qaCanvasPrices=[];CanvasRenderingContext2D.prototype.fillText=function(text,...args){if(/^1\.100\d{2}$/.test(String(text))&&globalThis.__qaCanvasPrices.length<256)globalThis.__qaCanvasPrices.push(String(text));return original.call(this,text,...args);};});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
+let financialWrites=0;
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
 try{
   const proof=await context.request.get(new URL('/__qa/browser-proof/'+config.nonce,url).href,{maxRedirects:0});
@@ -32,6 +33,7 @@ try{
   // Transparent real-HTTP forwarding: preserve backend bytes and status; no authored response payloads.
   await context.route('**/api/v1/**',async route=>{
     if(new URL(route.request().url()).origin!==url.origin)return route.abort();
+    if(route.request().method()==='POST'&&/\/(commands|review|confirm)$/.test(new URL(route.request().url()).pathname))financialWrites++;
     const response=await route.fetch({maxRedirects:0,maxRetries:0});
     await route.fulfill({response});
     if(route.request().method()==='POST')observed.emit('response',{url:route.request().url(),response});
@@ -96,8 +98,34 @@ try{
   await page.getByRole('button',{name:'Statistics',exact:true}).last().click();
   await expect(page.getByRole('figure',{name:/Committed balance line from 10000 to 10000.03 USD/})).toBeVisible();
   step('next_tick_close_exact_balance_and_statistics');
+  // A second revealed candle supplies a measured time span for drawing coordinates.
+  await command(page.getByRole('button',{name:'Step replay',exact:true}));
+  const drawingWrites=financialWrites;
+  await page.getByRole('button',{name:'Horizontal Line',exact:true}).click();
+  const canvas=page.locator('.candle-chart');const rect=await canvas.boundingBox();
+  await canvas.click({position:{x:rect.width*.5,y:rect.height*.5}});
+  await expect.poll(async()=>JSON.parse(await canvas.getAttribute('data-primitive-drawings')).length).toBe(1);
+  await page.getByRole('button',{name:'Drawing objects',exact:true}).click();
+  await expect(page.getByRole('button',{name:'1. Horizontal Line',exact:true})).toBeVisible();
+  const locking=page.getByRole('button',{name:'lock drawing 1',exact:true});
+  await locking.click();await expect(locking).toHaveAttribute('aria-pressed','true');
+  await locking.click();await expect(locking).toHaveAttribute('aria-pressed','false');
+  const hiding=page.getByRole('button',{name:'hide drawing 1',exact:true});
+  await hiding.click();await expect(hiding).toHaveAttribute('aria-pressed','true');
+  await hiding.click();await expect(hiding).toHaveAttribute('aria-pressed','false');
+  await page.getByRole('button',{name:'delete drawing 1',exact:true}).click();
+  await expect.poll(async()=>JSON.parse(await canvas.getAttribute('data-primitive-drawings')).length).toBe(0);
+  const settings=page.getByRole('button',{name:'Open chart settings',exact:true});
+  await settings.click();await page.getByLabel('Show grid',{exact:true}).uncheck();
+  await page.getByLabel('Show grid',{exact:true}).check();await page.keyboard.press('Escape');
+  await expect(settings).toBeFocused();
+  await page.getByRole('button',{name:'Cursor / Select',exact:true}).click();
+  await page.getByRole('button',{name:'Fit chart',exact:true}).click();
+  expect(financialWrites).toBe(drawingWrites);step('drawing_objects_and_settings_no_execution');
   await page.getByRole('button',{name:'Journal',exact:true}).last().click();
   await page.getByRole('button',{name:/Open journal for/}).click();
+  await page.getByLabel('Note',{exact:true}).press('Space');
+  await expect(page.getByRole('button',{name:'Play replay',exact:true})).toHaveAttribute('aria-pressed','false');
   await page.getByLabel('Note',{exact:true}).fill('Authored browser QA note retained after reload');
   await page.getByLabel('Tags, comma separated',{exact:true}).fill('browser, isolated');
   const saving=waitApi('/journal');
@@ -106,11 +134,32 @@ try{
   await expect(page.getByRole('button',{name:'Step replay',exact:true})).toBeEnabled();
   await expect(page.getByText('Saved balance $10000.03',{exact:true})).toBeVisible();
   for(const width of [1440,375]){
-    await page.setViewportSize({width,height:1000});await page.screenshot({path:join(evidence,`qa-${width}.png`),fullPage:true});
+    await page.setViewportSize({width,height:1000});
+    if(width===375){
+      const mobileOrder=page.getByRole('button',{name:'Open order panel',exact:true});
+      await mobileOrder.click();await expect(page.locator('#beta-order-sheet')).toBeVisible();
+      const sheet=page.getByRole('dialog',{name:'New order',exact:true});
+      const close=sheet.getByRole('button',{name:'Close order panel',exact:true});
+      await expect(close).toBeFocused();await close.press('Shift+Tab');
+      await expect(sheet.getByRole('button',{name:'Review order',exact:true})).toBeFocused();
+      await sheet.getByRole('button',{name:'Review order',exact:true}).press('Tab');await expect(close).toBeFocused();
+      await page.locator('#beta-order-sheet').press('Escape');await expect(page.locator('#beta-order-sheet')).not.toBeVisible();
+      await expect(mobileOrder).toBeFocused();
+    }
+    await page.screenshot({path:join(evidence,`qa-${width}.png`),fullPage:true});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
   expect(await page.evaluate(()=>globalThis.__qaCanvasPrices.length)).toBeGreaterThan(0);step('five_decimal_canvas_axis_labels');
   step('journal_timeframe_and_mobile_layout');
+  await page.setViewportSize({width:1440,height:1000});await page.locator('.beta-session-heading h2').click();
+  const playing=waitApi('/commands').then(r=>r.json());
+  await page.keyboard.press('Space');await expect(page.getByRole('button',{name:'Pause replay',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.keyboard.press('Space');await playing;
+  await expect(page.getByRole('button',{name:'Step replay',exact:true})).toBeEnabled();
+  const stopped=financialWrites;await page.waitForTimeout(650);expect(financialWrites).toBe(stopped);
+  const stepped=waitApi('/commands').then(r=>r.json());await page.keyboard.press('Shift+ArrowRight');
+  expect((await stepped).state.balance).toBe('10000.03');await expect(page.getByRole('button',{name:'Step replay',exact:true})).toBeEnabled();
+  step('keyboard_replay_shortcuts');
   await page.setViewportSize({width:1440,height:1000});await page.reload();
   await expect(page.getByRole('heading',{name:'Sign in to Beta',exact:true})).toBeVisible();
   const signing=waitApi('/auth/login').then(r=>r.json());

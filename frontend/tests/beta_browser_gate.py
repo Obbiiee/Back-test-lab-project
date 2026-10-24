@@ -18,8 +18,8 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 VERSION = '1.64.1'
 STEPS = ('signup_verified', 'login', 'workspace_strategy_session',
          'review_confirm_pending_no_fill', 'next_tick_fill',
-         'next_tick_close_exact_balance_and_statistics', 'five_decimal_canvas_axis_labels',
-         'journal_timeframe_and_mobile_layout', 'cold_reload_relogin_saved_state',
+         'next_tick_close_exact_balance_and_statistics', 'drawing_objects_and_settings_no_execution', 'five_decimal_canvas_axis_labels',
+         'journal_timeframe_and_mobile_layout', 'keyboard_replay_shortcuts', 'cold_reload_relogin_saved_state',
          'logout_server_revocation_and_no_page_errors')
 
 
