@@ -1,5 +1,17 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — comprehensive repository/OSS audit (2026-10-24)
+
+Owner now prioritizes finishing the existing engine and XAUUSD 2024–2025 target; other instruments wait for object storage. This does not admit 24 months: only 22 numeric candidates, October still refused. No kernel, service, data, payment or integration changes.
+
+Full findings, component gaps, Claude parity limits, VPS/storage/data-rights evidence and 12-upstream reuse decisions: [comprehensive audit](RIKSORA_COMPREHENSIVE_OSS_AUDIT_2026_10_24.md). Read this newer audit before the earlier eight-symbol pilot. Existing blueprint/frozen contracts remain authority.
+
+**GO isolated engineering / NO-GO finished product or public historical rollout.** Source candidate ba63f070 (parent2002ced) passed 573 backend tests/zero skips on private SCRAM PostgreSQL, complete frontend regression, lint/build/release, separate staging build, 23 deployment filesystem tests and one native deployment integration test. First trust-only fixture failure was resolved by using the existing SCRAM helper, without changing tests. Production/browser consent/restore and two-year capacity are not thereby certified.
+
+**First recommended checkpoint: security dependency patch in isolated source.** certifi2026.7.22 is pinned AND installed on active VPS, affected by critical GHSA-6q48-6c7w-9gw2 (fix>=2026.10.19). npm reports two high development packages(Vite/zod), production audit zero. No upgrade applied. Then reconcile release manifest, XAU source/October/precision/rights, engine acceptance and browser workflow. Claude canvas requires sign-in: branding/workflow partially implemented, exact visual parity blocked. Keep existing FastAPI Users/Odoo19/Midtrans guarded adapter; reuse OSS selectively, no engine rewrite. Payments remain disabled.
+
+Main/functional/Claude drafts and prior worktrees preserved; docs-only publication on PR1 does not merge candidate code or deploy it. Public rights remain UNKNOWN and are the first external release gate.
+
 ## CODEX → CHATGPT / CLAUDE — OSS-first eight-symbol storage pilot COMPLETE; GO offline / NO-GO public rollout (2026-10-24)
 
 **FIRST EXTERNAL GATE — provider permission remains UNKNOWN.** The owner locks EURUSD, GBPUSD, AUDUSD, USDCHF, EURGBP, AUDJPY, CHFJPY, XAUUSD as beta targets; the other eight are Coming Soon, with USDJPY retained internally for AUDJPY/CHFJPY conversion. This is prioritization, not8 admitted instruments or a released one-year dataset. OSS licenses do not grant HistData hosted/public rights. No provider contacted, license accepted, public historical activation, billing, service restart/reload, mass import, source deletion or financial-engine change.
