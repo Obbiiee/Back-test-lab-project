@@ -11,6 +11,7 @@ simply never admitted, and replay cannot advance past the admitted range.
 USD-quote symbols only in this checkpoint; conversion sources come later.
 """
 from copy import deepcopy
+from datetime import datetime, timezone
 import re
 
 from contracts.canonical import canonical_bytes, content_hash
@@ -33,6 +34,10 @@ _PERIOD = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])")
 def _next_period(period):
     year, month = int(period[:4]), int(period[5:])
     return f"{year + month // 12:04d}-{month % 12 + 1:02d}"
+
+
+def _period_ns(period):
+    return int(datetime(int(period[:4]), int(period[5:]), 1, tzinfo=timezone.utc).timestamp()) * 10**9
 
 
 def admission_record(symbol, months):
@@ -88,6 +93,8 @@ class AdmittedSource:
                         and root["evidenceClass"] == "PROVIDER_OBSERVATION", "source", "REFUSED_ADMISSION_SOURCE")
                 start, end = int(root["range"]["startNs"]), int(root["range"]["endNs"])
                 require(start < end and (previous_end is None or previous_end <= start), "range", "REFUSED_ADMISSION_ORDER")
+                require(_period_ns(month["period"]) <= start and end <= _period_ns(_next_period(month["period"])),
+                        "range", "REFUSED_ADMISSION_PERIOD")
                 previous_end = end
                 self.__bounds.append((start, end))
         except BaseException:

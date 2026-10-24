@@ -45,7 +45,7 @@ const executionReferences=new Set([
     'backend/execution/research_v2.py','backend/execution/research_fixture_v2.py','backend/infrastructure/migrations/010_v2_research.sql','backend/tests/test_research_v2.py',
   'backend/execution/kernel_v2.py','backend/execution/controller_v2.py','backend/execution/postgres_v2.py','backend/tests/test_kernel_v2.py','backend/tests/test_execution_v2_postgres.py','backend/tests/fixtures/execution_v2.json',
   'backend/execution/sources_v2.py','backend/tests/test_sources_v2.py',
-  'backend/execution/admission_v2.py','backend/tests/test_admission_v2.py',
+  'backend/execution/admission_v2.py','backend/tests/test_admission_v2.py','backend/execution/registry_v2.py','backend/tests/test_registry_v2.py',
   'backend/execution/finance_v2.py','backend/tests/test_finance_v2.py',
   'backend/execution/profile_v2.py','backend/tests/test_profile_v2.py','backend/tests/fixtures/execution_profiles_v2.json','backend/tests/verify_profile_v2_vectors.mjs',
   'backend/execution/conversion.py','backend/tests/test_conversion.py',
