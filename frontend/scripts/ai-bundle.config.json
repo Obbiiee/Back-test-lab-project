@@ -339,7 +339,11 @@
     "backend/tests/test_support.py",
     "backend/tests/test_odoo_sync.py",
     "backend/tests/test_odoo_recovery.py",
-    "backend/tests/test_local_reliability.py"
+    "backend/tests/test_local_reliability.py",
+    "frontend/tests/beta_browser_gate.py",
+    "frontend/tests/beta-browser-gate.mjs",
+    "frontend/tests/test_beta_browser_gate.py",
+    "deploy/vps/tests/run_private_pg.py"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
@@ -374,7 +378,9 @@
     "integrations/odoo/btl-odoo-sync.service",
     "integrations/odoo/btl-odoo-sync.timer",
     "integrations/odoo/OPERATIONS.md",
-    "docs/BETA_COMMERCIAL_DECISIONS.md"
+    "docs/BETA_COMMERCIAL_DECISIONS.md",
+    "frontend/tests/browser-tools/package.json",
+    "frontend/tests/browser-tools/package-lock.json"
   ],
   "currentTask": "Read files/AI_CONTEXT/04_CURRENT_PHASE.md for the sole operational pointer and files/AI_CONTEXT/06_WORKFLOW_RULES.md for authorization and checkpoint policy. No task text here grants implementation authorization."
 }

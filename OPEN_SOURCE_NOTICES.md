@@ -32,3 +32,5 @@ Brand fonts (2026-10-17): `frontend/src/assets/fonts/` ships unmodified latin-su
 ## Optional Odoo Community business runtime
 
 Odoo19 Community source: https://github.com/odoo/odoo/tree/dbec872e39b030828e7cd22aae1d39d2da87c29e (LGPL-3). It runs separately; upstream source/dependencies/QA credentials are not committed or included in the Backtest source archive. The authored btl_business addon declares LGPL-3; license text is retained at integrations/odoo/LICENSE. Native CRM/Invoicing are upstream Community modules; no Enterprise source is copied. No tax/statutory accounting certification is implied.
+
+Optional browser QA (2026-10-24): Microsoft Playwright / @playwright/test1.64.1, Apache-2.0, https://github.com/microsoft/playwright . Exact optional graph/integrities are retained in frontend/tests/browser-tools/package-lock.json. Installed npm distributions retain their own LICENSE/NOTICE. No upstream source was copied into the application; browsers and tooling are installed separately, excluded from the source release archive, and never loaded by product runtime. Software licensing does not license historical market data.

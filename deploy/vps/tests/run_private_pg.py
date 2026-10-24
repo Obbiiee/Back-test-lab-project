@@ -4,6 +4,7 @@ Never accepts a DSN or uses an existing cluster. Requires installed PostgreSQL16
 tools and the repository Python dependencies. No sudo/service operations.
 """
 import argparse
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import secrets
@@ -22,7 +23,8 @@ GROUPS = {
 }
 
 
-def run(group, *, keep=False):
+@contextmanager
+def private_postgres(*, keep=False):
     if os.geteuid() == 0:
         raise ValueError('RUN_AS_ORDINARY_USER_WITHOUT_SUDO')
     repository = Path(__file__).resolve().parents[3]
@@ -60,8 +62,7 @@ def run(group, *, keep=False):
         environment.update(BTL_TEST_DATABASE_URL=make_conninfo(
             host=str(socket), port=55439, dbname='postgres', user='qa_root', password=value),
             BTL_PG_BIN=str(binaries))
-        return subprocess.run([sys.executable, '-B', '-m', 'unittest', *GROUPS[group], '-q'],
-                              env=environment, cwd=repository, timeout=900).returncode
+        yield repository, environment
     finally:
         stopped = not started and not (data/'postmaster.pid').exists()
         if not stopped:
@@ -70,6 +71,12 @@ def run(group, *, keep=False):
         if stopped and not keep:
             shutil.rmtree(root)
         print('EXCLUSIVE_QA_STOPPED; ' + ('PRIVATE_FILES_RETAINED' if keep else 'OWN_FIXTURES_REMOVED'))
+
+
+def run(group, *, keep=False):
+    with private_postgres(keep=keep) as (repository, environment):
+        return subprocess.run([sys.executable, '-B', '-m', 'unittest', *GROUPS[group], '-q'],
+                              env=environment, cwd=repository, timeout=900).returncode
 
 
 if __name__ == '__main__':
