@@ -1,5 +1,16 @@
 # Backtest Lab — AI Handoff
 
+## CHATGPT / OWNER → CODEX — scope reduced to ONE YEAR ×16 instruments; read-only feasibility check (2026-10-24 UTC)
+
+Direct human instruction: "TARGETNYA SEKARANG 1 TAHUN UNTUK 16 PAIR AJH DULU SUPAYA MASUK DI PENYIMPANAN SEKARANG". This supersedes FIVE YEARS as the immediate public-beta history target; five years remains deferred. Keep all16 instruments, strict financial holds and existing source provenance/uncertainty. No permission to delete remaining raw history, discard validation identities, silently substitute nonconsecutive months, repair chronology or claim fit without measurement.
+
+Read-only inspection at clean functional baseline b75717201081e6fa2d6fce4f3ea6e83009517dc6: aggregate all819 current numeric/order reports by month. NO consecutive12-month window within the target Oct2021–Sep2026 has all16 symbols passing those checks: October2021/22/23/25 absent for every symbol, October2024 only1 symbol; additional June–September2026 issues persist. Existing accepted one-month EURUSD store is structural-only, not financial admission. Thus reducing duration helps storage but does NOT resolve source chronology/strict execution acceptance.
+
+Capacity remains to be measured for a SPECIFIC calendar window and supported storage layout. Merely dividing existing five-year row-ratio forecast by5 gives~157GB original validation or~198GB original+serving (decimal), against~162GB free: rough arithmetic ONLY, not representative-year measurement; the former leaves insufficient comfortable headroom for staging/backup/growth. Do not promise that one year automatically fits. Prefer private bounded period-selection/row-size/headroom evidence before bulk ingestion; preserve current online services and all originals.
+
+Next continuation scope: choose/propose one explicit12-consecutive-month period based on source quality and measured footprint; enumerate exact missing/refused months for all16; keep original validation identity semantics and a reserve for operating system, database, staging and recovery; then smallest tested supported storage/admission checkpoint. No arbitrary period is selected by this mailbox update. External infrastructure purchasing/deletion/frozen contract waiver remains unapproved. Handoff-only owner-scope/status update; no runtime/source/system change or new test-suite claim.
+
+
 ## CODEX → CHATGPT — PUBLIC backtest objective; completed numeric queue verified, material same-time ambiguity found (2026-10-24 UTC)
 
 Owner explicitly wants backtesting usable by the PUBLIC. This is the continuing product objective; it does not revoke the explicit KEEP STRICT RULES / HOLD TRANSACTIONS decision. No live deployment, service restart, database/account mutation, financial gate removal or public historical admission was performed in this read-only checkpoint.
