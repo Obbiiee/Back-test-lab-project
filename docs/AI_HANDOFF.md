@@ -1,5 +1,17 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — security dependency checkpoint COMPLETE as source candidate (2026-10-24)
+
+Owner `kerjakan` accepted the first audit checkpoint. [Draft PR8](https://github.com/Obbiiee/Back-test-lab-project/pull/8) contains exactly eight changed files on separate parent ba63f070; published source commit `21c2c2172a1de0c4f93e7b99263607e3c2fb7d9c`, validated tree `46a845195366a130675a0244f7d7bb926d9cf719`. GitHub commit tree matches local validated tree; verification branch clean0/0. Original local commit a8f0bfd retained, no reset/discard; main, functional and Claude branches not integrated. PR8 targets the separate columnar candidate, not main, and remains draft/unmerged.
+
+certifi2026.7.22→2026.10.19 (lock plus minimum requirements), Vite8.3.1→exact8.3.3, transitive Zod4.6.5→4.6.7. Package graph proves only Vite/Zod versions changed and no npm package addition/removal. No application/financial/data/migration/UI/service code changes. [Detailed evidence/limits and next prompt](SECURITY_DEPENDENCY_CHECKPOINT_2026_10_24.md).
+
+Actual fresh-venv gates: full backend573 PASS/zero skips461.306s on owned private SCRAM PostgreSQL; complete frontend regression/lint/main150+staging103 build/release;23 deployment fixture tests; repository/bundle and independent16 profile goldens PASS. pip-audit38 pins, npm full and production audits: zero known vulnerabilities. Candidate bundle removes affected root; verified Google public OIDC discovery TLS200 without credentials/consent. npm10 resolver crash resolved with local npm11.6.4 lock generation; subsequent system npm10 clean install PASS, no peer bypass/global upgrade. Browser-product/production restore acceptance not claimed.
+
+**GO source review; NO-GO calling live VPS patched.** Active certifi remains2026.7.22 until separately approved security rollout. No restart/reload, deployment, data import/deletion/admission, account mutation or payment activation. Rights UNKNOWN, XAU2024–2025/October/22 numeric candidates and expansion waiting object storage unchanged. This PR1 update is docs-only and does not merge PR8 code.
+
+Next proposed checkpoint is READ-ONLY release security preflight: reconcile actual frontend/backend/source provenance and dependency pins, prepare minimal reviewed upgrade/rollback manifest without integrating other drafts. No live patch/restart until the concrete rollout receives required approval. Existing one-phase workflow stops after this publication; ready-to-copy authorization prompt is in the evidence doc.
+
 ## CODEX → CHATGPT / CLAUDE — comprehensive repository/OSS audit (2026-10-24)
 
 Owner now prioritizes finishing the existing engine and XAUUSD 2024–2025 target; other instruments wait for object storage. This does not admit 24 months: only 22 numeric candidates, October still refused. No kernel, service, data, payment or integration changes.
