@@ -1490,3 +1490,16 @@ Browser resizing exposed chart body shrinking to34px with a311px terminal, allow
 Human explicitly approved a localhost QA CA in CurrentUser Root. It expires2026-10-25T16:36:19Z, SHA1 thumbprint E418B3FB694B05A62C478C81D7B68EA722DB6961. Critical name constraints allow only localhost/127.0.0.1/::1; root signing key never persisted. Leaf certificate expires after3days. No public binding or TLS bypass. Operator may remove this exact QA root with certutil -user -delstore Root E418B3FB694B05A62C478C81D7B68EA722DB6961 when preview is no longer needed. QA artifacts/credentials/key and local database stay ignored/private, never committed. https://localhost:5443/?page=account serves current build and existing account API. Existing design preview remains http://127.0.0.1:5174/?page=home; separate synthetic local QA uses5173/5188. Native cluster remains running for the explicitly requested local preview; not a recovery/capacity/prod certificate.
 
 Remaining launch prerequisites include controlled UI/backend branch integration, v2 product wiring and cross-version commercial quota, durable merchant orders/reconciliation/entitlements, actual Google/merchant/SMTP configuration, container/Linux/domain/HTTPS/capacity/recovery/rights/cohort acceptance. Data population later does not waive these gates. Minimal two-year causal OHLC prehistory is intended analysis context, not tick execution evidence or a claim of current dataset coverage.
+
+## CODEX → CHATGPT / CLAUDE — actual VPS and XAU parser preflight (2026-10-24)
+
+Owner clarified the prior “boleh” was an accidental repeat click; it is not treated as new approval. Full findings: [VPS security and XAU target preflight](XAU_SECURITY_PREFLIGHT_2026_10_24.md).
+
+**VPS:** Caddy, riksora-beta and PostgreSQL16 active; zero restarts. Active API source c3708454, static release2fba7560; API venv still has certifi2026.7.22 and lock differs from PR8. The checked updater refuses dependency drift. Shell user has no root write path; live package/unit changes were not made. Upgrade/rollback plan is documented. GO only after root/operator path and restore evidence.
+
+**XAU:** 22/24 source-month originals match prior SHA/size/inode/mtime evidence; numeric/order checks show112,657,023 rows and zero reversals among those22. October2024 and October2025 each have a source order reversal; both remain refused. Coverage, rights, freshness and financial admission remain UNKNOWN; no mass import or publication.
+
+An isolated 10k-row HistData ingestion/readback matched numeric timestamps and prices, and replay correctly refused a prefix as a full source. Canonical output strips raw price trailing zeroes, so source lexical scale is unresolved. All10k prices are off-grid only against the synthetic fixture tickSize0.01, which does not prove the real provider grid. No fills/replay were generated. Preserve tick rules; no import, payment, or live service action.
+
+Next: resolve source-scale/profile evidence and run controller/replay equivalence on complete immutable tick evidence; measure storage/RAM/recovery before any full-year operation. Other instruments wait for object storage.
+
