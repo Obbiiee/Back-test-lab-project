@@ -275,6 +275,36 @@ class TickStorageV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"UNREVEALED_INDEX"):
             t.consumer().read_revealed("501",64)
 
+    def test_revealed_batch_reuses_verified_position_blocks_and_refuses_mutation(self):
+        from unittest.mock import patch
+        from ticks import timeline_v2
+        _, p = self.build(times=tuple(range(1,130)), packing=(256,8,2), folder="position-cache")
+        log_folder = "position-cache-logs"
+        t = self.timeline(p, folder=log_folder)
+        first = t.advance_through("130", t.cursor)
+        second = t.advance_through("130", t.cursor)
+        expected = first["groups"] + second["groups"]
+        self.assertEqual(len(expected), 128)
+
+        with patch.object(timeline_v2, "decode_v2", wraps=timeline_v2.decode_v2) as decode, \
+             patch.object(timeline_v2, "hash_v2", wraps=timeline_v2.hash_v2) as hash_block:
+            revealed = t.read_revealed("0", 128)
+        self.assertEqual(revealed, expected)
+        # Each contiguous, content-addressed log block is decoded and hashed
+        # once per request, while records from both blocks remain represented.
+        self.assertEqual(decode.call_count, 2)
+        self.assertEqual(hash_block.call_count, 2)
+
+        db = t._IndexedTickTimeline__db
+        block_hash = db.execute("SELECT blockHash FROM position_lookup WHERE groupIndex=0").fetchone()[0]
+        raw = db.execute("SELECT body FROM blocks WHERE hash=?", (block_hash,)).fetchone()[0]
+        block = json.loads(raw)
+        block["records"][0]["groupId"] = "f"*64
+        db.execute("UPDATE blocks SET body=? WHERE hash=?", (canonical_v2_bytes(block), block_hash))
+        db.commit()
+        with self.assertRaisesRegex(ValueError, "IDENTITY_CONFLICT"):
+            t.read_revealed("0", 1)
+
     def test_streamed_view_keeps_atomic_budget_and_rechecks_acknowledged_membership(self):
         times = tuple(i*100 for i in range(1,13) for _ in range(81))
         _, p = self.build(times, packing=(256,8,2), folder="heavy-view")

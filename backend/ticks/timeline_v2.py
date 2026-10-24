@@ -324,11 +324,23 @@ class IndexedTickTimeline:
         wanted, records = min(end, start+max_groups), []
         # Rebuildable connection-private disk index. Membership is checked
         # against canonical hash-bound blocks produced by committed reveals.
+        # Position-log records are ordered, so keep only the last verified
+        # immutable block. Re-read and compare exact bytes on every lookup;
+        # a changed body must pass decode/hash validation again.
+        verified_hash = None
+        verified_raw = None
+        verified_block = None
         for index, block_hash, offset in self.__db.execute("SELECT groupIndex,blockHash,recordOffset FROM position_lookup WHERE groupIndex>=? AND groupIndex<? ORDER BY groupIndex", (start, wanted)):
             stored = self.__db.execute("SELECT body FROM blocks WHERE hash=?", (block_hash,)).fetchone()
             require(stored is not None, "log", "INCOMPLETE_INGESTION")
-            block = decode_v2(stored[0])
-            require(hash_v2(block) == block_hash and block["artifact"] == "BTL-TICK-POSITION-LOG-2"
+            raw = stored[0]
+            if block_hash != verified_hash or raw != verified_raw:
+                block = decode_v2(raw)
+                require(hash_v2(block) == block_hash, "membership", "IDENTITY_CONFLICT")
+                verified_hash, verified_raw, verified_block = block_hash, raw, block
+            else:
+                block = verified_block
+            require(block["artifact"] == "BTL-TICK-POSITION-LOG-2"
                     and block["datasetId"] == self.__id and block["datasetVersion"] == self.__version
                     and block["timelineVersion"] == VERSION and block["generation"] == str(self.__generation), "membership", "IDENTITY_CONFLICT")
             require(0 <= offset < len(block["records"]), "membership", "CORRUPT_INDEX_POINTER")
