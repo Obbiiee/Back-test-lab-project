@@ -8,7 +8,7 @@ import unittest
 
 from contracts.models import MethodPolicy
 from contracts.primitives import ContractError
-from execution.admission_v2 import AdmittedSource, AdmittedSourceJoin, admission_record, admitted_source_pin
+from execution.admission_v2 import AdmittedSource, AdmittedSourceJoin, admission_record, admitted_conversion_pin, admitted_source_pin
 from execution.kernel_v2 import advance, seed_state, submit, validate_snapshot
 from execution.profile_v2 import ADMITTED_MODEL, ExecutionProfileV2
 from tests.test_profile_v2 import vectors
@@ -25,10 +25,11 @@ def write_month(root, symbol, period, rows):
     path = root / f"{symbol}_{period}.csv.gz"
     body = "timestamp_utc,bid,ask\n" + "".join(f"{t},{b},{a}\n" for t, b, a in rows)
     path.write_bytes(gzip.compress(body.encode(), mtime=0))
-    with HistDataIngestion(path, root / f"store-{period}", symbol, first_rows=None, packing=(2, 1, 2)) as intake:
+    store = root / (f"store-{period}" if symbol == "EURUSD" else f"store-{symbol}-{period}")
+    with HistDataIngestion(path, store, symbol, first_rows=None, packing=(2, 1, 2)) as intake:
         report = intake.run()
     return dict(period=period, datasetId=report["datasetId"], datasetVersion=report["datasetVersion"],
-                validationReportHash=REPORT), root / f"store-{period}"
+                validationReportHash=REPORT), store
 
 
 def profile_for(record, symbol="EURUSD"):
@@ -43,9 +44,9 @@ def opening(entry, side="LONG", lots="0.01", tp=None, sl=None):
 
 
 class Harness:
-    def __init__(self, profile, source, start):
-        self.profile, self.source = profile, source
-        self.checkpoint = AdmittedSourceJoin(profile, source, start_ns=str(start)).checkpoint()
+    def __init__(self, profile, source, start, fx=None):
+        self.profile, self.source, self.fx = profile, source, fx
+        self.checkpoint = AdmittedSourceJoin(profile, source, start_ns=str(start), conversion_provider=fx).checkpoint()
         self.state = seed_state("fixture:admitted", profile, MethodPolicy("fixture:free", "0" * 64, "FREE_STYLE", False, ()),
                                 self.checkpoint)
         self.events = []
@@ -56,7 +57,7 @@ class Harness:
                    kind=kind, payload=payload or {})
         join = basis = None
         if kind in ("OPEN", "ADVANCE"):
-            join = AdmittedSourceJoin.resume(self.profile, self.source, self.checkpoint)
+            join = AdmittedSourceJoin.resume(self.profile, self.source, self.checkpoint, conversion_provider=self.fx)
             if kind == "OPEN":
                 basis = join.risk_basis(join.checkpoint())
         proposed, events = submit(self.state, cmd, basis)
@@ -201,6 +202,71 @@ class AdmissionTests(unittest.TestCase):
             second = h.tick(target)
             self.assertEqual((len(second["pairs"]), second["exhaustedThroughBoundary"]), (16, True))
             self.assertEqual(h.state["nextGroupIndex"], "80")
+
+
+class AdmittedConversionTests(unittest.TestCase):
+    """EURJPY converts JPY cash through admitted USDJPY under the unchanged evidence rules."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(); root = Path(self.tmp.name)
+        fx, fx_folder = write_month(root, "USDJPY", "2024-11", [
+            ("2024-11-01T05:00:00.000Z", "150.000", "150.002"),
+            ("2024-11-01T05:00:30.000Z", "150.000", "150.002"),
+            ("2024-11-01T05:01:30.000Z", "150.000", "150.002"),
+            ("2024-11-01T05:10:00.000Z", "151.000", "151.002")])
+        cross, cross_folder = write_month(root, "EURJPY", "2024-11", [
+            ("2024-11-01T05:00:00.000Z", "160.000", "160.002"),
+            ("2024-11-01T05:01:00.000Z", "160.010", "160.012"),
+            ("2024-11-01T05:02:00.000Z", "160.100", "160.102"),
+            ("2024-11-01T05:05:00.000Z", "160.200", "160.202"),
+            ("2024-11-01T05:06:00.000Z", "160.300", "160.302")])
+        self.fx_record, self.record = admission_record("USDJPY", [fx]), admission_record("EURJPY", [cross])
+        self.fx, self.source = AdmittedSource(self.fx_record, [fx_folder]), AdmittedSource(self.record, [cross_folder])
+        raw = deepcopy(next(v["input"] for v in vectors() if v["name"] == "EURJPY"))
+        raw.update(model=ADMITTED_MODEL, primary=admitted_source_pin(self.record), conversion=admitted_conversion_pin(self.fx_record, "JPY"))
+        self.profile = ExecutionProfileV2.from_wire(raw)
+        self.start = ns("2024-11-01T05:00:00Z")
+
+    def tearDown(self):
+        self.fx.close(); self.source.close(); self.tmp.cleanup()
+
+    def test_profile_requires_an_admitted_route_pin(self):
+        raw = deepcopy(self.profile.wire)
+        for change in (dict(symbol="GBPUSD"), dict(providerId="SYNTHETIC"), dict(datasetId="admitted:histdata:EURUSD:2024-11:2024-11")):
+            bad = deepcopy(raw); bad["conversion"].update(change)
+            with self.subTest(change=change), self.assertRaises(ContractError):
+                ExecutionProfileV2.from_wire(bad)
+        with self.assertRaises(ContractError):
+            AdmittedSourceJoin(self.profile, self.source, start_ns=str(self.start))
+        with self.assertRaises(ContractError):
+            AdmittedSourceJoin(self.profile, self.source, start_ns=str(self.start), conversion_provider=self.source)
+
+    def test_fill_and_take_profit_convert_through_the_admitted_route(self):
+        h = Harness(self.profile, self.source, self.start, self.fx)
+        frame = h.tick(self.start)
+        self.assertEqual(frame["pairs"][0]["conversionStatus"], "ELIGIBLE_ADMITTED")
+        fx_row = frame["conversionGroups"][frame["pairs"][0]["conversionGroupId"]]["events"][0]
+        self.assertEqual((fx_row["datasetId"], fx_row["quality"]["freshness"]), (self.profile.wire["conversion"]["datasetId"], "CONFIRMED"))
+        h.apply("OPEN", opening("160.002", lots="1", tp="160.1"), "open")
+        h.tick(ns("2024-11-01T05:02:00Z"))
+        self.assertEqual(h.state["orders"]["open"]["status"], "CLOSED")
+        self.assertFalse(h.state["unresolved"])
+        self.assertGreater(float(h.state["balance"]), 10000)
+        resumed = AdmittedSourceJoin.resume(self.profile, self.source, h.checkpoint, conversion_provider=self.fx)
+        self.assertEqual(resumed.checkpoint(), h.checkpoint)
+
+    def test_stale_conversion_blocks_risk_and_fills(self):
+        h = Harness(self.profile, self.source, self.start, self.fx)
+        h.tick(ns("2024-11-01T05:02:00Z"))
+        h.apply("OPEN", opening("160.102", lots="1", tp="160.25"), "open")
+        h.tick(ns("2024-11-01T05:05:00Z"))
+        self.assertTrue(h.state["unresolved"])
+        self.assertTrue(any(e["kind"] == "UNRESOLVED" and e["detail"]["reason"] == "UNRESOLVED_FX_STALE" for e in h.events))
+        idle = Harness(self.profile, self.source, self.start, self.fx)
+        idle.tick(ns("2024-11-01T05:05:00Z"))
+        self.assertFalse(idle.state["unresolved"])
+        with self.assertRaises(ContractError):
+            idle.apply("OPEN", opening("160.202", lots="1"), "late")
 
 
 class AdmittedSourceGuard:

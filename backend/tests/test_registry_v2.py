@@ -85,10 +85,11 @@ class RegistryTests(RegistryFixture, unittest.TestCase):
             Registry().binding(b.profile.wire)
         self.assertEqual(error.exception.code, "SOURCE_VERSION_UNAVAILABLE")
 
-    def test_builder_refuses_prefix_reports_and_conversion_symbols(self):
-        store, report = intake(self.root, "USDJPY", "2024-11", [("2024-11-01T05:00:00.000Z", "150.000", "150.002")])
-        with self.assertRaises(ContractError):
-            build_registry(["--out", str(self.root / "jpy.json"), "--entry", "USDJPY", store, report])
+    def test_builder_refuses_prefix_reports_and_missing_routes(self):
+        store, report = intake(self.root, "EURJPY", "2024-11", [("2024-11-01T05:00:00.000Z", "160.000", "160.002")])
+        with self.assertRaises(ContractError) as error:
+            build_registry(["--out", str(self.root / "jpy.json"), "--entry", "EURJPY", store, report])
+        self.assertEqual(error.exception.code, "REFUSED_ADMISSION_ROUTE")
         raw = json.loads(Path(report).read_text()); raw["sourceSelection"]["kind"] = "FIRST_COMPLETE_TIMESTAMP_GROUPS"
         Path(report).write_text(json.dumps(raw))
         with self.assertRaises(ContractError) as error:
@@ -98,6 +99,28 @@ class RegistryTests(RegistryFixture, unittest.TestCase):
         (self.root / "private" / "bad.json").write_text(json.dumps(tampered))
         with self.assertRaises(ContractError):
             Registry(self.root / "private" / "bad.json").session_bundle("EURUSD", "2024-10")
+
+
+class RouteRegistryTests(unittest.TestCase):
+    def test_cross_symbol_binds_its_admitted_route(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fx = intake(root, "USDJPY", "2024-11", [("2024-11-01T05:00:00.000Z", "150.000", "150.002")])
+            cross = intake(root, "EURJPY", "2024-11", [("2024-11-01T05:00:00.000Z", "160.000", "160.002"),
+                                                       ("2024-11-01T05:00:10.000Z", "160.010", "160.012")])
+            build_registry(["--out", str(root / "r.json"), "--entry", "EURJPY", *cross, "--entry", "USDJPY", *fx])
+            registry = Registry(root / "r.json")
+            try:
+                rows = {r["symbol"]: r for r in registry.catalogue()}
+                self.assertEqual((rows["EURJPY"]["model"], rows["USDJPY"]["model"]), ("HISTORICAL_ADMITTED_V1",) * 2)
+                b = registry.session_bundle("EURJPY", "2024-11")
+                self.assertEqual(b.profile.wire["conversion"]["symbol"], "USDJPY")
+                join = b.join(b.profile, b.primary, start_ns=str(b.start_ns), conversion_provider=b.conversion)
+                frame = join.reveal(str(b.start_ns), join.checkpoint())
+                self.assertEqual(frame["pairs"][0]["conversionStatus"], "ELIGIBLE_ADMITTED")
+                self.assertEqual(registry.binding(b.profile.wire).conversion, b.conversion)
+            finally:
+                registry.close()
 
 
 @unittest.skipUnless(DSN, "Requires isolated native PostgreSQL; skip is not acceptance")

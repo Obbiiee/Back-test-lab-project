@@ -10,7 +10,7 @@ from ticks.provider import diagnostic_counts
 from .contracts import exact, money, text, policy_wire, policy_from_wire
 from .engine import crossing, protective, coverage_complete
 from .finance_v2 import entry_proposal, exit_proposal, allocate_entry_cost, planned_risk, risk_for_quantity, quantity, price, rational
-from .profile_v2 import ExecutionProfileV2, ENGINE_VERSION
+from .profile_v2 import ExecutionProfileV2, ENGINE_VERSION, ADMITTED_MODEL
 from .conversion import convert_usd
 
 MAX_EVENTS, MAX_ORDERS = 256, 128
@@ -132,6 +132,11 @@ def validate_state(state):
     return state
 
 
+def eligible_fx(profile):
+    """Accepted conversion status for this profile's source class."""
+    return "ELIGIBLE_ADMITTED" if profile["model"]==ADMITTED_MODEL else "ELIGIBLE_SYNTHETIC"
+
+
 def validate_snapshot(state, checkpoint):
     validate_state(state)
     keys(checkpoint,"schemaVersion artifact profileHash primary conversion")
@@ -223,7 +228,7 @@ def submit(state,raw,basis=None):
         keys(basis,"schemaVersion artifact profileHash timeNs conversionGroup conversionStatus checkpoint")
         require(basis["schemaVersion"]==1 and basis["artifact"]=="BTL-V2-SOURCE-RISK-1"
                 and basis["profileHash"]==state["profileHash"] and basis["timeNs"]==state["throughNs"],"riskBasis")
-        require(basis["conversionStatus"]==("IDENTITY" if p["conversion"] is None else "ELIGIBLE_SYNTHETIC"),"conversion","UNRESOLVED_FX_INTENT")
+        require(basis["conversionStatus"]==("IDENTITY" if p["conversion"] is None else eligible_fx(p)),"conversion","UNRESOLVED_FX_INTENT")
         for amount in ("1","-1"):
             convert_usd(amount,p["quoteCurrency"],state["throughNs"],pin=p["conversion"],group=basis["conversionGroup"],money_scale=p["moneyScale"])
         require(payload["side"] in ("LONG","SHORT") and payload["orderType"] in ("MARKET","LIMIT","STOP")
@@ -379,7 +384,7 @@ def advance(state,frame,target_ns):
             digest(ref,"conversionRef");require(ref in frame["conversionGroups"],"conversion")
             fx=frame["conversionGroups"][ref];refs.add(ref)
             require(fx["groupId"]==ref and uint(fx["timeNs"])<=moment,"conversion","REFUSED_FUTURE_EVIDENCE")
-            if pair["conversionStatus"]=="ELIGIBLE_SYNTHETIC":
+            if pair["conversionStatus"]==eligible_fx(p):
                 for amount in ("1","-1"):
                     convert_usd(amount,p["quoteCurrency"],group["timeNs"],pin=p["conversion"],group=fx,money_scale=p["moneyScale"])
             else:require(type(pair["conversionStatus"]) is str and pair["conversionStatus"].startswith("UNRESOLVED_FX_"),"conversion")
@@ -401,7 +406,7 @@ def advance(state,frame,target_ns):
                     if not equivalent and changes:unresolved(state,events,"UNRESOLVED_EQUAL_TIME_ORDER",group["groupId"])
                     elif not equivalent:emit(state,events,"CHRONOLOGY_LIMITATION",groupId=group["groupId"],timeNs=group["timeNs"],commonOutcome="NO_FINANCIAL_ACTION")
                     elif changes:
-                        if pair["conversionStatus"] not in ("IDENTITY","ELIGIBLE_SYNTHETIC"):
+                        if pair["conversionStatus"] not in ("IDENTITY",eligible_fx(p)):
                             require(type(pair["conversionStatus"]) is str and pair["conversionStatus"].startswith("UNRESOLVED_FX_"),"conversionStatus")
                             unresolved(state,events,pair["conversionStatus"],group["groupId"])
                         else:
