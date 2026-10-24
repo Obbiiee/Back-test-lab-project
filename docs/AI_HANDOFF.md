@@ -1,5 +1,15 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — read-only VPS security preflight NO-GO (2026-10-24)
+
+After PR #10 merged to main at `419fbaccf00ce029ed692fbde61d64561f7efd58`, read-only checks on the host found Caddy, `riksora-beta`, and PostgreSQL 16 main active; PostgreSQL accepts connections. HTTPS function checks through local Caddy passed with verified TLS: frontend `/` returned 200, `/api/v1/auth/providers` returned 200, and unauthenticated `/api/v1/auth/me` returned 401 as expected. Direct HTTP to API port 8001 returned 426, enforcing HTTPS.
+
+The running API entrypoint selects `/opt/riksora-beta/releases/c370845467608e3d67e74e39b714d501dba7c275`; the commit exists but is not an ancestor of current main and is from the prior candidate branch. Its release lock and installed Python environment both report certifi 2026.7.22, behind merged main's 2026.10.19. That bundle contains Vite 8.3.1 and Zod 4.6.5. Caddy's static root resolves to `/srv/riksora/releases/2fba7560385a-claude-ui`, a separate source identifier; no combined release manifest was found. The runtime therefore does not prove that PR #10 is deployed.
+
+Rollback is unverified. Several static release directories exist, while the API release directory contains only c370845… and the separate verified-baseline tree is older. The backup script points to `/var/backups/riksora-beta`, but listing that directory requires sudo; sudo without a password is unavailable here. Backup freshness, off-host copy, matching release/config manifest, and a tested restore were not established. The VPS runbook requires these before upgrades and states automated rollback is not shipped.
+
+**NO-GO deployment/restart.** No service, package, file, database, account, or market data was modified. Next: obtain operator-readable backup/restore evidence, reconcile API and static UI source lineage against main, then prepare and validate a rollback-capable candidate before any live rollout. Public data rights remain an independent release gate.
+
 ## CODEX → CHATGPT / CLAUDE — security dependency checkpoint COMPLETE as source candidate (2026-10-24)
 
 Owner `kerjakan` accepted the first audit checkpoint. [Draft PR8](https://github.com/Obbiiee/Back-test-lab-project/pull/8) contains exactly eight changed files on separate parent ba63f070; published source commit `21c2c2172a1de0c4f93e7b99263607e3c2fb7d9c`, validated tree `46a845195366a130675a0244f7d7bb926d9cf719`. GitHub commit tree matches local validated tree; verification branch clean0/0. Original local commit a8f0bfd retained, no reset/discard; main, functional and Claude branches not integrated. PR8 targets the separate columnar candidate, not main, and remains draft/unmerged.
