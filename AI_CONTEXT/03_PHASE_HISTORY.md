@@ -1,5 +1,9 @@
 # Short history
 
+### Isolated security dependency candidate (2026-10-24)
+
+Owner accepted the comprehensive audit's first checkpoint. Updated only backend certifi floor/lock to2026.10.19, exact Vite8.3.3 and compatible transitive Zod4.6.7; app/financial/data/migration/UI code unchanged. Full573 backend/zero skips461.306s on fresh SCRAM PostgreSQL, registered frontend regression/lint/main+staging build/release and23 deployment fixture tests PASS. Fresh Python lock and npm full/production audits report zero known vulnerabilities; candidate CA bundle removes affected root and verifies Google public discovery over TLS. Existing native helper/official components reused; no new engine/tests mimicking metadata. [Evidence and next checkpoint](../docs/SECURITY_DEPENDENCY_CHECKPOINT_2026_10_24.md). Publication completes only after remote/tree verification. Active service venv remains unpatched; no restart, account mutation, payment, source import or frozen-contract change.
+
 Bounded chart-presentation correction (2026-10-12): preserved current functions/engine/data while returning to neutral local Figma/FX Replay-inspired styling. Existing design owner records reproduced/fixed mobile replay-over-order overlap, actual production click/responsive checks, unchanged cursor/cash and passing frontend/build/golden gates. This is not V2.2 readiness completion; operational status remains solely04_CURRENT_PHASE.
 
 ### R-4/I-3 Alpha workspace composition (2026-10-11)

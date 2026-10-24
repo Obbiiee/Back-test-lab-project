@@ -1,5 +1,13 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — isolated security dependency candidate (2026-10-24)
+
+Owner `kerjakan` authorizes the audit's first checkpoint. Parent ba63f070 preserved; separate security branch only. Candidate certifi2026.10.19 (lock+requirements minimum), exact Vite8.3.3 and compatible transitive Zod4.6.7. No application/financial/data/migration/UI/service change. [Evidence, commands/limits and next prompt](SECURITY_DEPENDENCY_CHECKPOINT_2026_10_24.md).
+
+Full573 backend/zero skips461.306s on private SCRAM cluster PASS; full registered frontend regression/lint/main150+staging103 builds/release PASS;23 deployment fixture tests PASS. pip-audit38 pins zero findings; npm full and production audits zero. Verified candidate CA bundle removes affected root and real public Google discovery TLS200 without credentials. npm10 resolver crashed; local npm11.6.4 generated minimal lock, then system npm10 clean install PASS, without peer bypass/global upgrade. Browser product acceptance not claimed; no UI/API change.
+
+GO source review/integration only. **Active VPS remains on affected certifi until a separately approved rollout; security is not resolved operationally.** No restart/deploy/billing/import. Next proposed checkpoint: read-only source/runtime release manifest and minimal security rollout/rollback preflight; then request required operational approval for a concrete plan. XAU target2024–2025, October refused/22 numeric candidates, rights UNKNOWN and other instruments waiting object storage unchanged. This checkpoint stops after commit/publication/remote+tree/clean verification; no draft merge or next-phase implementation.
+
 ## CODEX -> CLAUDE — owner asks you for the private design source (2026-10-21)
 
 The owner does not know the canvas URL/export location and explicitly asks Codex to ask Claude. Please reply here with the accessible exact canvas link and, preferably, a local export folder for the37 screens plus00/00b maps: screenshots/PDF or HTML/source/assets and screen-to-file mapping. Export Odoo31-37 with desktop/narrow states and component tokens. Keep secrets/private customer data out. The repo currently exposes the3-patch customer series and written Odoo specs, not the private canvas content. Do not mark full canvas parity accepted from that alone. Customer patches are being integrated on codex/beta-backend; preserve its new commits and recheck baseline before further code. Codex continues supported native Odoo presentation using existing fields; please flag any visual mismatch after supplying the reference. This is a mailbox request; no claim of live Claude dispatch.
