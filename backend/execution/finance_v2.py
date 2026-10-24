@@ -69,7 +69,7 @@ def entry_proposal(profile, side, lots, as_of_ns, primary_group):
     fill, proof = _quote(p, primary_group, side, True, as_of_ns)
     fee = size * exact(p["commissionPerLotSide"], "fee")
     posted = money(fee, p["moneyScale"])
-    return dict(artifact="BTL-V2-ENTRY-PROPOSAL-1", model="AUTHORED_SYNTHETIC_ONLY",
+    return dict(artifact="BTL-V2-ENTRY-PROPOSAL-1", model=p["model"],
                 profileHash=profile.profile_hash, timeNs=as_of_ns, price=text(fill), quantity=text(size),
                 commissionExact=rational(fee), commissionPosted=posted, cashDelta=text(-Fraction(posted)), evidence=proof)
 
@@ -82,7 +82,7 @@ def exit_proposal(profile, side, entry_price, lots, as_of_ns, primary_group, *, 
     gross_usd, conversion = _usd(gross_quote, p, as_of_ns, conversion_group)
     fee = size * exact(p["commissionPerLotSide"], "fee")
     gross_posted, fee_posted = money(gross_usd, p["moneyScale"]), money(fee, p["moneyScale"])
-    return dict(artifact="BTL-V2-EXIT-PROPOSAL-1", model="AUTHORED_SYNTHETIC_ONLY",
+    return dict(artifact="BTL-V2-EXIT-PROPOSAL-1", model=p["model"],
                 profileHash=profile.profile_hash, timeNs=as_of_ns, price=text(fill), quantity=text(size),
                 quoteCurrency=p["quoteCurrency"], grossQuoteExact=rational(gross_quote), grossUsdExact=rational(gross_usd),
                 grossPosted=gross_posted, commissionExact=rational(fee), commissionPosted=fee_posted,
@@ -118,7 +118,7 @@ def risk_for_quantity(profile, side, entry_price, stop_price, lots, as_of_ns, *,
     loss_quote = -abs(entry - stop) * exact(p["contractSize"], "contract")
     loss, conversion = _usd(loss_quote, p, as_of_ns, conversion_group)
     fee = exact(p["commissionPerLotSide"], "fee")
-    return dict(artifact="BTL-V2-QUANTITY-RISK-PROPOSAL-1", model="AUTHORED_SYNTHETIC_ONLY", profileHash=profile.profile_hash,
+    return dict(artifact="BTL-V2-QUANTITY-RISK-PROPOSAL-1", model=p["model"], profileHash=profile.profile_hash,
                 timeNs=as_of_ns, quantity=text(size), plannedLossUsdExact=rational(size * (-loss + 2 * fee)),
                 hypotheticalPostedRiskUsd=text(-Fraction(money(loss * size, p["moneyScale"])) + 2 * Fraction(money(fee * size, p["moneyScale"]))),
                 conversion=conversion, guarantee="NOT_A_FILL_OR_FUTURE_RATE_GUARANTEE")
@@ -146,7 +146,7 @@ def planned_risk(profile, side, entry_price, stop_price, budget_usd, as_of_ns, *
         size = candidate(budget - buffer)
     size = quantity(text(size), p)
     require(posted_risk(size) <= budget, "budget", "REFUSED_V2_RISK_BUDGET")
-    return dict(artifact="BTL-V2-RISK-PROPOSAL-1", model="AUTHORED_SYNTHETIC_ONLY", profileHash=profile.profile_hash,
+    return dict(artifact="BTL-V2-RISK-PROPOSAL-1", model=p["model"], profileHash=profile.profile_hash,
                 timeNs=as_of_ns, quantity=text(size), budgetUsd=text(budget), lossPerLotUsdExact=rational(-loss),
                 plannedLossUsdExact=rational(size * per_lot), hypotheticalPostedRiskUsd=text(posted_risk(size)),
                 conversion=conversion, guarantee="NOT_A_FILL_OR_FUTURE_RATE_GUARANTEE")

@@ -3,7 +3,8 @@ from copy import deepcopy
 from contracts.canonical import content_hash
 from contracts.primitives import require
 from .kernel_v2 import seed_state, command_wire, submit, advance
-from .profile_v2 import ExecutionProfileV2
+from .admission_v2 import AdmittedSourceJoin
+from .profile_v2 import ExecutionProfileV2, ADMITTED_MODEL
 from .sources_v2 import SourceJoinV2
 
 
@@ -12,9 +13,10 @@ class ExecutionControllerV2:
         require(type(profile) is ExecutionProfileV2,"profile")
         self.__store,self.__profile=store,profile
         self.__primary,self.__fx=primary_provider,conversion_provider
+        self.__join=AdmittedSourceJoin if profile.wire["model"]==ADMITTED_MODEL else SourceJoinV2
 
     def create(self,scope,session_id,policy,*,start_ns,balance="10000"):
-        source=SourceJoinV2(self.__profile,self.__primary,start_ns=start_ns,conversion_provider=self.__fx)
+        source=self.__join(self.__profile,self.__primary,start_ns=start_ns,conversion_provider=self.__fx)
         cp=source.checkpoint();state=seed_state(session_id,self.__profile,policy,cp,balance)
         self.__store.create(scope,state,cp)
         return deepcopy(state)
@@ -29,7 +31,7 @@ class ExecutionControllerV2:
         require(state["profileHash"]==self.__profile.profile_hash,"profile","REFUSED_V2_PROFILE")
         source=None;basis=None
         if command["kind"] in ("OPEN","ADVANCE"):
-            source=SourceJoinV2.resume(self.__profile,self.__primary,cp,conversion_provider=self.__fx)
+            source=self.__join.resume(self.__profile,self.__primary,cp,conversion_provider=self.__fx)
             if command["kind"]=="OPEN":basis=source.risk_basis(source.checkpoint())
         proposed,events=submit(state,command,basis)
         next_cp=cp;replay=None

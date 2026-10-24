@@ -27,7 +27,8 @@ def read_snapshot(raw,sha):
 
 def checked_result(result,session,command):
     tag(result,"BTL-TICK-EXECUTION-RESULT-2","commandId commandHash state events replay durable model")
-    require(result["durable"] is True and result["model"]=="AUTHORED_SYNTHETIC_ONLY"
+    profile=result["state"].get("profile") if type(result["state"]) is dict else None
+    require(result["durable"] is True and type(profile) is dict and result["model"]==profile.get("model")
             and result["commandId"]==command["commandId"] and result["commandHash"]==content_hash(command)
             and result["state"]["sessionId"]==session,"receipt","CORRUPT_RECORD")
     validate_state(result["state"])
@@ -115,7 +116,7 @@ class PostgresExecutionStoreV2:
             state_raw, state_hash = pack(snapshot(next_state, next_checkpoint))
             result = dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-RESULT-2", commandId=command["commandId"],
                           commandHash=command_hash, state=next_state, events=events, replay=replay,
-                          durable=True, model="AUTHORED_SYNTHETIC_ONLY")
+                          durable=True, model=next_state["profile"]["model"])
             result_raw, result_hash = pack(result)
             db.execute("INSERT INTO btl.tick_commands VALUES (%s,%s,%s,%s,%s,%s,%s)",
                        (workspace, session, command["commandId"], next_state["revision"], command_hash, result_raw, result_hash))
@@ -205,7 +206,7 @@ class PostgresExecutionStoreV2:
             state_raw, state_hash = pack(snapshot(state,checkpoint))
             result = dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-RESULT-2", commandId=command["commandId"],
                           commandHash=command_hash, state=state, events=events, replay=None, durable=True,
-                          model="AUTHORED_SYNTHETIC_ONLY")
+                          model=state["profile"]["model"])
             result_raw, result_hash = pack(result)
             db.execute("INSERT INTO btl.tick_commands VALUES (%s,%s,%s,%s,%s,%s,%s)",
                        (workspace,child_session,command["commandId"],1,command_hash,result_raw,result_hash))
