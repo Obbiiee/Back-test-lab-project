@@ -12,13 +12,14 @@ from infrastructure.database import connect
 from .contracts import exact, money, text, policy_wire, policy_from_wire
 from .kernel_v2 import seed_state, submit, command_wire, ratio as fraction
 from .finance_v2 import price, quantity, planned_risk
-from .profile_v2 import ENGINE_VERSION
-from .sources_v2 import SourceJoinV2
+from .profile_v2 import ENGINE_VERSION, SYNTHETIC_MODEL
 from .controller_v2 import ExecutionControllerV2
 from .postgres_v2 import PostgresExecutionStoreV2, read_snapshot
 from .postgres import pack, unpack
 from .research import label, method_policy
-from .research_fixture_v2 import bundle, binding, catalogue, START_NS, STEP_NS, PERIOD
+from .research_fixture_v2 import STEP_NS
+from .registry_v2 import default_registry
+from .admission_v2 import LABEL as ADMITTED_LABEL
 from .workspace import display_candles, TIMEFRAMES
 from .journal import request as note_request, note_text, note_tags, MAX_JOURNAL_ORDERS
 from .analysis import metrics, ratio
@@ -72,6 +73,10 @@ def checked_review(row,state):
                 and (not policy.checklist_on or all(outcomes.get(c)=="PASS" for c in policy.conditions)),"protocol")
     return value
 
+def binding(profile,registry):
+    # Module-level seam: tests isolate source outages here.
+    return registry.binding(profile)
+
 def current_quote(groups):
     if not groups:return None
     group=groups[-1];rows=group["events"]
@@ -82,9 +87,9 @@ def current_quote(groups):
     return deepcopy(rows[0])
 
 class ResearchApplicationV2:
-    def __init__(self,dsn,scope):
+    def __init__(self,dsn,scope,registry=None):
         require(type(scope) is TrustedScope,"scope","SCOPE_REQUIRED")
-        self.dsn,self.scope=dsn,scope;self.store=PostgresExecutionStoreV2(dsn)
+        self.dsn,self.scope=dsn,scope;self.store=PostgresExecutionStoreV2(dsn);self.registry=registry or default_registry()
     def _catalog_lock(self,db):db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",(self.scope.workspace_id,))
     def _method(self,db,mid):
         identifier(mid,"methodId")
@@ -116,17 +121,16 @@ class ResearchApplicationV2:
         require((state["revision"],state["datasetVersion"],state["profileHash"])==tuple(row[2:])
                 and all(meta[k]==state[k] for k in ("engineVersion","datasetId","datasetVersion","profileHash","initialBalance"))
                 and meta["symbol"]==state["profile"]["symbol"] and meta["methodHash"]==policy.definition_hash
-                and state["policy"]==policy_wire(policy) and state["sessionId"]==sid and meta["startPeriod"]==PERIOD,"identity","CORRUPT_RECORD")
+                and state["policy"]==policy_wire(policy) and state["sessionId"]==sid and self.registry.period_allowed(state["profile"],meta["startPeriod"]),"identity","CORRUPT_RECORD")
         label(meta["name"])
         return meta,method,state,stored["controller"]
     def create_session(self,raw,*,on_create=None):
         require(on_create is None or callable(on_create),"admission")
         keys(raw,"id name methodId initialBalance startPeriod symbol");identifier(raw["id"],"sessionId")
         normalized={**raw,"name":label(raw["name"])}
-        require(raw["startPeriod"]==PERIOD,"period","REFUSED_FIXTURE_PERIOD")
         require(type(raw["initialBalance"]) is str and text(exact(raw["initialBalance"],"balance",True))==raw["initialBalance"]
                 and money(Fraction(raw["initialBalance"]),2)==raw["initialBalance"],"initialBalance","REFUSED_MONEY_PRECISION")
-        b=bundle(raw["symbol"])
+        b=self.registry.session_bundle(raw["symbol"],raw["startPeriod"])
         def prior(db):
             row=db.execute("SELECT 1 FROM btl.tick_v2_research_sessions WHERE workspace_id=%s AND session_id=%s",(self.scope.workspace_id,raw["id"])).fetchone()
             if not row:return None
@@ -137,7 +141,7 @@ class ResearchApplicationV2:
             old=prior(db)
             if old:return old
             policy=method_policy(self._method(db,raw["methodId"]))
-        source=SourceJoinV2(b.profile,b.primary,start_ns=str(START_NS),conversion_provider=b.conversion)
+        source=b.join(b.profile,b.primary,start_ns=str(b.start_ns),conversion_provider=b.conversion)
         cp=source.checkpoint();state=seed_state(raw["id"],b.profile,policy,cp,raw["initialBalance"])
         meta=dict(schemaVersion=1,artifact="BTL-RESEARCH-SESSION-2",**normalized,engineVersion=ENGINE_VERSION,methodHash=policy.definition_hash,
                   datasetId=state["datasetId"],datasetVersion=state["datasetVersion"],profileHash=state["profileHash"])
@@ -164,7 +168,9 @@ class ResearchApplicationV2:
             rows=db.execute("SELECT session_id FROM btl.tick_v2_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129",(self.scope.workspace_id,)).fetchall()
             require(len(rows)<=128,"sessions","REFUSED_CATALOG_LIMIT")
             sessions=[self._session(db,r[0])[0] for r in rows]
-        return dict(schemaVersion=1,artifact="BTL-RESEARCH-CATALOG-2",methods=methods,sessions=sessions,instruments=catalogue(),label="SHORT SYNTHETIC DEMOS ONLY; NO ACQUIRED HISTORICAL MONTH")
+        instruments=self.registry.catalogue()
+        return dict(schemaVersion=1,artifact="BTL-RESEARCH-CATALOG-2",methods=methods,sessions=sessions,instruments=instruments,
+                    label="SHORT SYNTHETIC DEMOS ONLY; NO ACQUIRED HISTORICAL MONTH" if all(i["model"]==SYNTHETIC_MODEL for i in instruments) else "SYNTHETIC DEMOS AND OWNER-ADMITTED HISTORICAL MONTHS (FREE BETA)")
     def _review(self,db,sid,rid,state):
         identifier(rid,"reviewId")
         row=db.execute("SELECT r.payload,r.content_hash,r.basis_revision,r.basis_checkpoint_hash,r.command_hash,p.content_hash FROM btl.tick_v2_order_reviews r JOIN btl.tick_checkpoints p ON p.workspace_id=r.workspace_id AND p.session_id=r.session_id AND p.revision=r.basis_revision WHERE r.workspace_id=%s AND r.session_id=%s AND r.review_id=%s",(self.scope.workspace_id,sid,rid)).fetchone()
@@ -180,8 +186,8 @@ class ResearchApplicationV2:
                 require(old["requestHash"]==request_hash,"reviewId","REFUSED_IDEMPOTENCY_CONFLICT");return old
         stored,receipt=self.store.prepare(self.scope,cmd)
         require(receipt is None,"review","REFUSED_REVIEW_AFTER_CONFIRMATION")
-        state,cp=stored["state"],stored["controller"];b=binding(state["profile"])
-        source=SourceJoinV2.resume(b.profile,b.primary,cp,conversion_provider=b.conversion)
+        state,cp=stored["state"],stored["controller"];b=binding(state["profile"],self.registry)
+        source=b.join.resume(b.profile,b.primary,cp,conversion_provider=b.conversion)
         quote=current_quote(source.past_primary(source.checkpoint()))
         require(quote is not None,"quote","REFUSED_REVIEW_QUOTE")
         basis=source.risk_basis(source.checkpoint());payload=deepcopy(cmd["payload"]);policy=policy_from_wire(state["policy"])
@@ -221,7 +227,7 @@ class ResearchApplicationV2:
             db.execute("INSERT INTO btl.tick_v2_order_reviews VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",(self.scope.workspace_id,sid,value["id"],value["revision"],value["basisCheckpointHash"],content_hash(cmd),blob,sha))
         return value
     def _controller(self,state):
-        b=binding(state["profile"]);return ExecutionControllerV2(self.store,b.profile,b.primary,conversion_provider=b.conversion)
+        b=binding(state["profile"],self.registry);return ExecutionControllerV2(self.store,b.profile,b.primary,conversion_provider=b.conversion)
     def confirm(self,sid,raw):
         keys(raw,"reviewId reviewHash");digest(raw["reviewHash"],"reviewHash")
         with connect(self.dsn) as db:
@@ -274,9 +280,9 @@ class ResearchApplicationV2:
             meta,method,state,cp=self._session(db,sid);start=max(0,state["nextEventIndex"]-64)
             rows=db.execute("SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s AND sequence < %s ORDER BY sequence LIMIT 64",(self.scope.workspace_id,sid,start,state["nextEventIndex"])).fetchall()
             view=dict(schemaVersion=1,artifact="BTL-RESEARCH-SESSION-VIEW-2",metadata=meta,method=method,state=state,events=[unpack(*r) for r in rows],eventWindowStart=start,
-                      analysis=self._statistics(db,sid,state),quote=None,chart=None,displayStatus="UNAVAILABLE",label="SHORT SYNTHETIC DEMO; NOT HISTORICAL MARKET DATA",replayStepNs=str(STEP_NS))
+                      analysis=self._statistics(db,sid,state),quote=None,chart=None,displayStatus="UNAVAILABLE",label="SHORT SYNTHETIC DEMO; NOT HISTORICAL MARKET DATA" if state["profile"]["model"]==SYNTHETIC_MODEL else ADMITTED_LABEL,replayStepNs=str(STEP_NS))
         try:
-            b=binding(state["profile"]);source=SourceJoinV2.resume(b.profile,b.primary,cp,conversion_provider=b.conversion)
+            b=binding(state["profile"],self.registry);source=b.join.resume(b.profile,b.primary,cp,conversion_provider=b.conversion)
             groups=source.past_primary(source.checkpoint());view.update(quote=current_quote(groups),chart=display_candles(groups,state["throughNs"],timeframe,max(0,int(state["nextGroupIndex"])-len(groups))),displayStatus="REVEALED_PREFIX")
         except Exception:
             # Isolate optional display failure from durable financial evidence.

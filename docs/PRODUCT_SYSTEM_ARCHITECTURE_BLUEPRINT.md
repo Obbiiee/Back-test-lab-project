@@ -3671,3 +3671,12 @@ Authority: owner decision recorded in `AI_CONTEXT/04_CURRENT_PHASE.md` (validate
 - **Profile.** `profile_v2` accepts model `HISTORICAL_ADMITTED_V1` only with an admission pin (`providerId=histdata`, `evidenceClass=ADMITTED_OBSERVATION`, matching feed/instrument). Raw `PROVIDER_OBSERVATION` pins remain `REFUSED_V2_REAL_SOURCE`. Synthetic profiles are byte-identical. Proposal, receipt and statistics `model` labels now come from the profile, so synthetic artifacts are unchanged.
 - **Limits of this slice.** USD-quote symbols only (EURUSD, GBPUSD, AUDUSD, NZDUSD, XAUUSD); conversion-route admission, catalog `periods`/`dataLabel`, the Session creation route (fixture `PERIOD` in `research_v2.py`), hosted mounting, data import and browser acceptance are later checkpoints. Diagnostics sidecars are not consulted because admission requires a zero-error validation report.
 
+### Admission registry and Session route — 2026-10-24
+
+Module: `backend/execution/registry_v2.py`. `ResearchApplicationV2` now resolves sources through a registry instead of the fixture directly.
+
+- No `BTL_ADMISSION_REGISTRY`: catalog, Session creation and bindings are exactly the authored demos (`startPeriod` `2020-01`, `REFUSED_FIXTURE_PERIOD` otherwise).
+- With a registry file (`BTL-ADMISSION-REGISTRY-1`, private, folders relative to the file): each admitted symbol replaces its demo row with `model=HISTORICAL_ADMITTED_V1`, `dataLabel`, `startPeriod` and `periods` (admitted months only). `createSession` accepts any admitted month (`REFUSED_HISTDATA_PERIOD` otherwise); the Session pins the whole admission record and starts at that month's first observed tick. Stored Sessions re-bind only when the registered profile hash still matches (`SOURCE_VERSION_UNAVAILABLE` otherwise; financial records stay readable, display degrades).
+- Builder: `python -B -m execution.registry_v2 --out registry.json --entry SYMBOL STORE REPORT [STORE REPORT ...]` accepts only full-file intake reports (`sourceSelection.kind=FULL_FILE`, single-month timestamps), checks each store against its report, hashes report bytes into `validationReportHash`, and refuses non-USD-quote symbols for now. Store ranges must lie inside their declared month.
+- Hosted mounting (read-only stores, env var on the API service) is an operator/VPS checkpoint and is not changed here.
+
