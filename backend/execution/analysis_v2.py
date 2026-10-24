@@ -18,7 +18,7 @@ def project(state,events,genesis):
     provenance=dict(sessionId=state["sessionId"],revision=state["revision"],engineVersion=state["engineVersion"],
                     datasetId=state["datasetId"],datasetVersion=state["datasetVersion"],profileHash=state["profileHash"],
                     methodHash=state["policy"]["definitionHash"],eventHead=state["eventHash"],analysisVersion=VERSION,
-                    model="AUTHORED_SYNTHETIC_ONLY")
+                    model=state["profile"]["model"])
     def unavailable(reason):return dict(schemaVersion=1,artifact=VERSION,status="UNAVAILABLE",reason=reason,provenance=provenance)
     if state["nextEventIndex"]>MAX_ANALYSIS_EVENTS:return unavailable("REFUSED_ANALYSIS_LIMIT")
     if state["parent"] is not None:return unavailable("UNSUPPORTED_LINEAGE")
