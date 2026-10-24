@@ -357,7 +357,9 @@
     "backend/tests/test_histdata_source.py",
     "backend/tests/test_serving_v2.py",
     "backend/tests/test_quality_v2.py",
-    "backend/tests/test_backup_v2.py"
+    "backend/tests/test_backup_v2.py",
+    "backend/tests/columnar_storage_probe.py",
+    "backend/tests/columnar_probe.requirements.txt"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",

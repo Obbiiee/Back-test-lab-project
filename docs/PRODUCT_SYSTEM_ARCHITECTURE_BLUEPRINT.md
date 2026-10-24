@@ -3690,3 +3690,83 @@ Non-USD quote symbols (EURGBP, EURNZD, USDJPY, USDCAD, USDCHF and the JPY crosse
 - Registry: profiles are built after all records are loaded; a missing or shorter route record is `REFUSED_ADMISSION_ROUTE`.
 - Expected effect on real data: stale route quotes (above 60 s, typically around rollover or thin hours) leave the Session unresolved at that fill instead of guessing a rate.
 
+
+
+### Isolated OSS columnar probe — 2026-10-24 (no adoption/contract change)
+
+The owner selected eight beta targets: EURUSD, GBPUSD, AUDUSD, USDCHF, EURGBP,
+AUDJPY, CHFJPY, XAUUSD. Other eight Coming Soon; USDJPY remains an internal JPY
+conversion source. This is product priority, not historical availability. OPEN-SOURCE
+FIRST reuses the existing parser/canonical encoder, SQLite V2 validator/index/provider,
+timeline/financial kernel, PostgreSQL/OAuth/workspace/statistics and Lightweight Charts.
+Only optional test/operator glue is added; no production dependency or engine change.
+
+Reuse audit: PyArrow26.0.0/Parquet (Apache-2.0; wheel LICENSE/NOTICE retained) supplies
+batch IO. DuckDB2.0.0 (MIT; wheel LICENSE retained) supplies embedded local SQL, one
+thread/256MB configured memory, no extension auto-install. Existing chart5.2.1 and
+shipped license/NOTICE/attribution remain unchanged. NautilusTrader LGPLv3 is studied
+only as a catalog/architecture reference; no package installed or source copied.
+Exact upstream links, operational burden and reuse decisions belong to the handoff.
+Software licenses do NOT license HistData data.
+
+The optional `backend/tests/columnar_storage_probe.py` and separate pinned requirements
+are isolated experiments. New private SQLite snapshots retain all artifact/identity
+tables. Original SQLite/GZIP hashes verified unchanged. Inputs: EURUSD November2021
+full-store first100000 records, and existing XAUUSD October2021 prefix10000. The latter
+full source month is already order-refused; its prefix is never a full accepted month.
+Parquet retains int64 nanoseconds, exact textual Bid/Ask, event/source/rawOrdinal,
+canonical bytes/SHA256 and original raw-record bytes. Saved-ordinal ordering only
+reconstructs source order, still UNTRUSTED. No rounding, time repair, sorting by time,
+deduplication or UNKNOWN promotion. Row-group metadata is its physical query index;
+SQLite uniqueness/validation identity remains retained and is not replaced by Parquet.
+
+110000 ticks/raw prefixes match through Arrow, DuckDB and new-copy recovery;40 complete
+one-second group intervals match.17 authored literal financial scenes have exact
+state/events/checkpoints under a test-only page-payload substitution retaining
+original manifests/tokens/timeline validation. This is NOT a standalone provider.
+AUDJPY/CHFJPY retain internal USDJPY, with fresh synthetic eligibility; old evidence
+outside the existing lookup window is UNRESOLVED_FX_MISSING, while direct validation
+of the old group gives UNRESOLVED_FX_STALE. Neither quotes nor reason codes changed.
+
+Files: EURUSD100k Parquet14888706bytes; XAUUSD10k1503961bytes. EURUSD SQLite baseline
+is the WHOLE1496361-row479637504-byte store, not an equal-volume100k file; no equal-volume
+compression ratio claimed. Raw/store/backup roots plus experiment/dependencies total
+18.69GB logical/18.71GB allocated at measurement. New copies INCREASE retained disk.
+Actual11-month candidates: eight targets221619377rows; USDJPY adds35653574, total
+257272951. One-prefix/full-EURUSD-store-ratio forecast:82.47GB new validation plus
+38.39GB Parquet=120.86GB, then another120.86GB for one complete local backup, before
+staging/restore/reserve; free158.48GB. Thus NO-GO for mass intake with that retained
+local recovery budget. No continuous12-month source/footprint certificate. Forecast
+is not a measured mixed-symbol corpus or authority to delete identities/copies.
+
+Diagnostic seek/group p95 favors candidate prefixes, with differing validation/page
+costs and warm uncontrolled OS cache; not a production speed/SLO claim. EURUSD VmHWM:
+baseline46.76MB, Arrow-only153.67MB, DuckDB query-only88.62MB, combined Arrow/DuckDB full
+sorted integrity scans415.28MB. Distinguish workloads. Concurrent mixed-history,
+failure/recovery/reference-host and complete provider-contract tests remain required.
+GO for further bounded offline reuse; NO-GO for production provider replacement,
+historical public release or Beta completion. Local new-copy recovery is not off-host
+recovery/RPO/RTO certification. HistData hosted/public rights remain FIRST external gate.
+
+Compatibility proposals PREPARED, NOT APPLIED:
+
+- Source calendar: preserve all current UTC instants/hashes. A separately reviewed
+  admission version could distinguish fixed-EST source-month bounds (05:00UTC first
+  day to05:00UTC next month) from UTC Session bounds, with truthful labels and causal
+  clipping. Never add5h again to already converted UTC. New UTC-partitioned datasets
+  instead need separately authorized identities/full-group acceptance and retained
+  originals; never salvage refused months or silently change current guards.
+- XAU precision: keep exact observations and textual source scale. Do not round to
+  the inherited0.01 demo grid or infer broker tick size from6-decimal text. Establish
+  eligible-source precision and explicit supported tick/scale/risk/conversion vectors
+  under reviewed authorization before a new market-profile pin. Existing off-grid
+  REFUSED_PRICE_PRECISION and provenance/coverage/freshness UNKNOWN remain unchanged.
+- Availability: future controller/catalog policy must separate eight genuinely eligible
+  selectable targets, Coming Soon and internal route providers. Hidden USDJPY must
+  remain resolvable for AUDJPY/CHFJPY. Test server-side new-Session refusal plus
+  existing pinned Session recovery; do not delete registry instruments or migrate
+  old profiles. No catalog/UI/deployment change is made by this experiment.
+
+New source/calendar/profile/storage/catalog implementation or privileged rollout needs
+its own accepted checkpoint. Existing frozen contracts/readiness gates stay unchanged;
+billing OFF. Exact evidence, reproducible commands and publication live in the handoff.

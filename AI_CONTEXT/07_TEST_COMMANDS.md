@@ -278,3 +278,42 @@ Private quality diagnostic: `PYTHONPATH=backend python -B -m unittest backend.te
 
 
 Accepted-store backup checkpoint: `PYTHONPATH=backend python -B -m unittest backend.tests.test_backup_v2 -v`.6 authored cases cover all-table byte/registry retention and independent cold reader, explicit trust/version/budget/path guards, cancellation, corrupted compressed child, missing child and registry-loss refusals with no reader-visible archive. Run full discovery on the existing exclusive Unix-socket native PostgreSQL QA runner (no missing-DSN skips). Actual private full-month backup and NEW recovery copy additionally require source archive unchanged, all copied table rows equal, backup archive physical hash check, cold source/reader and independent sampled source values. This does not exercise live user/account backup, off-host recovery or financial admission. Existing frontend/Node/package/repository/bundle/diff/Git gates apply; unmounted utility browser exemption only. Do not interrupt or relaunch the separately running pinned802-file numeric queue.
+
+
+## Optional isolated columnar storage probe (2026-10-24)
+
+Private Linux experiment, not a production provider, dataset admission or application
+dependency. Create a NEW virtualenv and install only
+`backend/tests/columnar_probe.requirements.txt` there (PyArrow26.0.0/DuckDB2.0.0).
+From repo root use its Python with
+`PYTHONPATH=backend:<existing-runtime-site-packages>` to reuse existing fixtures read-only.
+Set `ARROW_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1`; the probe uses
+nice10/one allowed CPU. Bound each phase with `timeout 240`. No user DB required.
+
+Create a PRIVATE JSON plan: out=NEW directory, store=existing structurally accepted
+SQLite directory, source=its pinned converted GZIP, report=existing intake report
+object, reportSha256=hash of actual report file, limit=1..100000. For a batch report,
+select the instrument object but hash the retained batch file. Do not fabricate full
+month acceptance from a prefix. Neither plan nor raw data belongs in Git.
+
+Run `python -B backend/tests/columnar_storage_probe.py --plan PRIVATE.json --phase PHASE`
+SEQUENTIALLY: prepare, export, baseline, candidate, arrow_only, query_only, recovery.
+Financial mode is authored-scene parity and runs only once. Exclusive result reports,
+new snapshot/output directories, existing-export refusal and new recovery destinations
+prevent accidental reuse. Preserve partial outputs; select another versioned private
+plan after failure. No scheduling or automatic retry.
+
+Compare baseline/candidate/query_only checks exactly; compare export/Arrow/DuckDB/
+restored canonical-stream, raw-prefix and count hashes. Financial mode substitutes
+canonical page payloads only and retains existing manifest/token/timeline/kernel
+validation;17 literal financial scenes must have identical state/events/checkpoints.
+Fresh internal USDJPY conversion, bounded lookup MISSING and direct STALE refusal
+are distinct checks. This is NOT an independent production provider or real-fill test.
+
+Account for retained raw, validation identities/indexes/metadata, snapshot, Parquet,
+backup, restored copy, scratch and dependency environment. Record per-process VmHWM
+separately from getrusage, CPU/wall,20-query seek/group p95 and cache/concurrency limits.
+SQLite physical page sizes differ; only complete group intervals have exact query
+parity. Do not compare a full-month SQLite file against100k Parquet as equal volume.
+Keep native journey/vector and repository/bundle/diff gates separate. No benchmark
+permits original retirement, mass import, new public routes or service restart.
