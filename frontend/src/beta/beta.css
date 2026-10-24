@@ -290,6 +290,8 @@
 .beta-workspace .beta-chip-add{min-height:40px;border:2px dashed #b9c9e0;background:#fff;color:var(--b-navy);font-size:14px}
 .beta-workspace .beta-chip-add:hover:not(:disabled){background:#f3f8ff}
 .beta-custom{margin-top:10px;max-width:220px}
+.beta-period{display:block;margin:14px 0 0;max-width:220px}
+.beta-period select{width:100%}
 .beta-new input,.beta-new select,.beta-new textarea{background:#fff;color:var(--b-navy);border-color:var(--b-ice)}
 .beta-new input[aria-invalid=true]{border-color:#c9474f}
 .beta-field-error{color:#9e2b33;font-size:12px;font-weight:600}
