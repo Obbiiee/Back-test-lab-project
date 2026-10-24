@@ -20,8 +20,9 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
+const DEFAULT_PRICE_FORMAT = Object.freeze({type:'price',precision:3,minMove:.001});
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceFormat = DEFAULT_PRICE_FORMAT }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -139,7 +140,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       },
     });
     const series = chart.addSeries(CandlestickSeries, {
-      priceFormat: {type:'price',precision:3,minMove:.001},
+      priceFormat: DEFAULT_PRICE_FORMAT,
       upColor: "#089981",
       downColor: "#f23645",
       borderUpColor: "#089981",
@@ -186,6 +187,10 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       priceLinesRef.current = [];
     };
   }, [indicatorEngine]);
+
+  useEffect(() => {
+    seriesRef.current?.applyOptions({priceFormat});
+  }, [priceFormat, indicatorEngine]);
 
   const commitDrawings = useCallback((nextValue) => {
     const next = typeof nextValue === "function" ? nextValue(objectBridge.objects) : nextValue;

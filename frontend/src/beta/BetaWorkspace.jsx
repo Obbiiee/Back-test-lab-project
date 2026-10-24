@@ -8,7 +8,7 @@ import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {BetaNewSession,BetaSessionsHub,BetaTrash,BetaWindowCard} from './BetaNewSession.jsx';
 import {displayBars,stamp,TIMEFRAMES} from '../tickAlpha/display.js';
 import {ratioLabel} from '../tickAlpha/annotations.js';
-import {accessMessage,betaNotice,confirmation,executionCommand,newId,orderFromForm,createReplayLoop} from './betaWorkspace.js';
+import {accessMessage,betaNotice,confirmation,executionCommand,newId,orderFromForm,createReplayLoop,chartPriceFormat} from './betaWorkspace.js';
 
 // Server order status in plain words; a confirmed order is accepted, not filled, until a tick fills it.
 const POSITION_GROUPS=[['ACTIVE','Open positions'],['PENDING','Pending orders'],['DONE','Closed positions']];
@@ -60,6 +60,7 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   const bars=useMemo(()=>view?.chart?displayBars(view):[],[view]);
+  const priceFormat=useMemo(()=>view?chartPriceFormat(view.state.profile):undefined,[view]);
   const writeDisabled=busy||blocked||offline||playing||!owner;
   const tradingDisabled=writeDisabled||view?.savedState!=='SAVED'||view?.state.ended||view?.state.unresolved;
   const stats=view?.analysis,orders=Object.entries(view?.state.orders??{});
@@ -121,7 +122,7 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
         <label>Timeframe<select aria-label="Beta timeframe" disabled={busy||playing} value={timeframe} onChange={e=>{const tf=e.target.value;run(async()=>{await reload(view.metadata.id,tf);setTimeframe(tf);setReview(null);});}}>{TIMEFRAMES.map(tf=><option key={tf}>{tf}</option>)}</select></label>
         <label>Drawing<select value={drawing} onChange={e=>setDrawing(e.target.value)}><option value="none">Cursor</option>{Object.entries(DRAWING_SPECS).map(([type,spec])=><option key={type} value={type}>{spec.name}</option>)}</select></label>
         <span className="beta-chartbar-quote">Bid <b>{view.quote?.bid??'—'}</b> · Ask <b>{view.quote?.ask??'—'}</b></span></div>
-      <div className="beta-trade"><div className="beta-chart-col"><SavedBetaChart key={view.metadata.id} preferenceKey={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} candles={bars} transition={{kind:'forward'}} researchOnly volumeAvailable={false}
+      <div className="beta-trade"><div className="beta-chart-col"><SavedBetaChart key={view.metadata.id} preferenceKey={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} candles={bars} priceFormat={priceFormat} transition={{kind:'forward'}} researchOnly volumeAvailable={false}
         sessionId={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingWorkspace={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingStorageKey={`beta-drawings:${client.subject()}:${workspace.id}:${view.metadata.id}`}
         drawingMode={drawing} onDrawingModeChange={setDrawing} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} indicatorRegistry={productionRegistry}/>
         <div className="beta-replay" role="group" aria-label="Replay">

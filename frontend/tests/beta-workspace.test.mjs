@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {confirmation,executionCommand,accessMessage,betaNotice,checkoutAddress,billingDuration,billingExpiry,methodFromForm,orderFromForm,createReplayLoop} from '../src/beta/betaWorkspace.js';
+import {readFileSync} from 'node:fs';
+import {confirmation,executionCommand,accessMessage,betaNotice,checkoutAddress,billingDuration,billingExpiry,methodFromForm,orderFromForm,createReplayLoop,chartPriceFormat} from '../src/beta/betaWorkspace.js';
 import {createBetaClient} from '../src/beta/betaClient.js';
+const profiles=JSON.parse(readFileSync(new URL('../../backend/tests/fixtures/execution_profiles_v2.json',import.meta.url),'utf8')).vectors;
+for(const {name,input} of profiles){
+  const before=JSON.stringify(input),format=chartPriceFormat(input);
+  assert.deepEqual(format,{type:'price',precision:name==='XAUUSD'?2:name.endsWith('JPY')?3:5,minMove:name==='XAUUSD'?.01:name.endsWith('JPY')?.001:.00001});
+  assert.equal(JSON.stringify(input),before,'chart formatting must not mutate the profile');
+}
+for(const change of [{priceScale:'500'},{priceScale:'1e5'},{tickSize:'0'},{tickSize:'NaN'},{tickSize:'0.000001',priceScale:'1000'}])assert.throws(()=>chartPriceFormat({...profiles[0].input,...change}));
+assert.throws(()=>chartPriceFormat(null));
+console.log('PASS all16 server-profile chart formats preserve FX/JPY/gold precision and refuse unavailable formats without mutating profiles.');
 const view={artifact:'BTL-RESEARCH-SESSION-VIEW-2',metadata:{id:'session:qa'},state:{revision:7,balance:'9007199254740993.03'}};
 const payload={targetNs:'1577836800000000000'};
 const command=executionCommand(view,'ADVANCE',payload);
