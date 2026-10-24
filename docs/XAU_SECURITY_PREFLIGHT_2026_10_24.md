@@ -36,3 +36,9 @@ The actual 10k probe used `HistDataIngestion` from the unmerged candidate branch
 
 The candidate parser calls `decimal_text(decimal(value))`, dropping trailing zeros. Its metadata declares `PRESERVE_RAW_TEXT` and retains archive/member hashes, ordinal and original timestamp, so raw price lexemes are recoverable by reopening the matching source archive, not from the canonical event alone. V2 event/provenance fields are frozen. No parser/schema or engine change is safe as an opportunistic fix; resolve through a bounded controller-side sidecar checkpoint and archive/ordinal round-trip evidence. No source change, import or test was performed.
 
+## V2.19 evidence/replay tests
+
+The bounded controller-side evidence implementation already exists on main at `62471fa`: `backend/ticks/evidence_v2.py` blob `4998142d`, `storage_v2.py` `9e48372d` and `timeline_v2.py` `fcb463ee`. Existing tests exercise bounded pages, source fences, causal clipping, atomic timestamp groups, cancellation, reset/resume and corruption refusal. Four existing modules ran in the preserved `ba63f07` worktree: `test_tick_evidence_v2`, `test_tick_evidence_access_contract_spec`, `test_tick_storage_v2`, `test_tick_timeline` — **76 PASS, 0 failures, 36.671s**. All seven tested source/test blobs were verified identical to main; the worktree remained clean.
+
+This is synthetic runtime-contract evidence, not XAU replay. The 10k HistData check verified sequential source-row numeric equality; canonical tick text strips trailing zeroes. Archive/member hashes plus raw ordinal identify the source row, while a source-backed XAU profile/grid and complete replay dataset remain unproven. The partial prefix continues to be refused as a full replay source. No code or data was changed in this test checkpoint.
+

@@ -1511,3 +1511,11 @@ In the candidate parser, prices pass through `decimal_text(decimal(value))`, whi
 
 No new module, source change, import or test was made in this follow-up. Candidate branch and main remain separate.
 
+## Follow-up — V2.19 controller-side evidence/replay validation (2026-10-24)
+
+The requested sidecar path was already implemented in main at `62471fa`: `backend/ticks/evidence_v2.py` (blob `4998142d`), `storage_v2.py` (`9e48372d`) and `timeline_v2.py` (`fcb463ee`). Existing tests cover bounded queries, source fences, atomic ties, causality, no-look-ahead, cancellation, reset/resume and corruption refusal. I ran the four existing evidence/contract/storage/timeline test modules: **76 PASS, 0 failures, 36.671s**. I ran them in the preserved `ba63f07` candidate worktree; all seven relevant source/test file blobs match main exactly. Worktree remained clean. No implementation change was needed.
+
+These tests use authored synthetic records. They validate the sidecar/replay machinery, not XAU execution or real-provider grid. The separate 10k HistData probe remains numeric readback only; canonical tick text still omits trailing zeros, and the 10k prefix is refused as a full replay source. Source archive+member hashes and raw ordinal identify the original row; no random-access lexical quote API or source-backed XAU tick grid was established. Thus no real XAU fill/replay is claimed.
+
+Next gate is a source-backed XAU profile/precision basis plus complete accepted tick evidence before real replay equivalence. October reversals, coverage/rights uncertainty, object-storage capacity and live VPS privilege gates remain unchanged.
+
