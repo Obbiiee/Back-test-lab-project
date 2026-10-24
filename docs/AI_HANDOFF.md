@@ -1503,3 +1503,11 @@ An isolated 10k-row HistData ingestion/readback matched numeric timestamps and p
 
 Next: resolve source-scale/profile evidence and run controller/replay equivalence on complete immutable tick evidence; measure storage/RAM/recovery before any full-year operation. Other instruments wait for object storage.
 
+## Follow-up: parser provenance and frozen contract boundary
+
+The actual 10k probe used `HistDataIngestion` from the unmerged source candidate `codex/columnar-storage-probe-20261024` (commit ba63f070; adapter file blob cbc2c608). The checked `main` `backend/ticks/provider.py` is explicitly SYNTHETIC / TEST ONLY; it does not contain this HistData adapter. Treat the probe as candidate-code evidence, not main or live-VPS behavior.
+
+In the candidate parser, prices pass through `decimal_text(decimal(value))`, which strips trailing zeroes. It declares `originalScalePolicy=PRESERVE_RAW_TEXT` and records compressed archive/member hashes plus raw ordinal and original timestamp. That lets a reviewer recover source strings only while retaining and reopening the matching raw archive; the canonical event itself has no original Bid/Ask lexemes. The V2 schema and event/provenance field sets are frozen, so do not add fields or alter financial/profile rules as an opportunistic parser fix. This is a real data-compatibility gap to resolve in an explicitly bounded controller-side sidecar checkpoint, with archive/ordinal round-trip evidence, before canonical acceptance or execution equivalence.
+
+No new module, source change, import or test was made in this follow-up. Candidate branch and main remain separate.
+

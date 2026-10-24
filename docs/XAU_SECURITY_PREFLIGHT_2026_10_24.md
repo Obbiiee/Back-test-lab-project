@@ -29,3 +29,10 @@ Sample timestamps have three fractional digits, are monotonic, with no equal-tim
 GO: bounded read-only source comparison and isolated compatibility probes. Next resolve source-scale/profile evidence and run controller/replay equivalence on complete immutable tick evidence without changing tick rules. Before full import/admission, separately measure storage, peak temporary conversion, RAM, recovery and execution equivalence. Other instruments wait for object storage.
 
 NO-GO: live VPS changes without root/operator restore path, full two-year import/admission, or public release while rights/coverage are unknown. No payment activation. No source sorting/deletion, mass import or service restart.
+
+## Parser provenance and code location follow-up
+
+The actual 10k probe used `HistDataIngestion` from the unmerged candidate branch `codex/columnar-storage-probe-20261024` at ba63f070 (adapter blob cbc2c608). Main's `backend/ticks/provider.py` is explicitly synthetic/test only; the probe does not establish main or VPS runtime behavior.
+
+The candidate parser calls `decimal_text(decimal(value))`, dropping trailing zeros. Its metadata declares `PRESERVE_RAW_TEXT` and retains archive/member hashes, ordinal and original timestamp, so raw price lexemes are recoverable by reopening the matching source archive, not from the canonical event alone. V2 event/provenance fields are frozen. No parser/schema or engine change is safe as an opportunistic fix; resolve through a bounded controller-side sidecar checkpoint and archive/ordinal round-trip evidence. No source change, import or test was performed.
+
