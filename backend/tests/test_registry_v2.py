@@ -101,6 +101,36 @@ class RegistryTests(RegistryFixture, unittest.TestCase):
             Registry(self.root / "private" / "bad.json").session_bundle("EURUSD", "2024-10")
 
 
+class OneCommandTests(unittest.TestCase):
+    def test_source_dir_intakes_window_and_keeps_longest_accepted_run(self):
+        def gz(path, rows):
+            path.write_bytes(gzip.compress(("timestamp_utc,bid,ask\n" + "".join(f"{t},{b},{a}\n" for t, b, a in rows)).encode(), mtime=0))
+        with tempfile.TemporaryDirectory() as tmp:
+            src, work = Path(tmp) / "src", Path(tmp) / "work"; src.mkdir()
+            gz(src / "EURUSD_2024-11.csv.gz", [("2024-11-04T00:00:00.000Z", "1.1", "1.10002")])
+            gz(src / "EURUSD_2024-12.csv.gz", [("2024-12-02T00:00:00.000Z", "1.2", "1.20002"), ("2024-12-02T00:00:01.000Z", "1.3", "1.30002")])
+            # A reversed month is refused, never repaired; it splits the run.
+            gz(src / "EURUSD_2025-01.csv.gz", [("2025-01-02T00:00:05.000Z", "1.2", "1.20002"), ("2025-01-02T00:00:01.000Z", "1.3", "1.30002")])
+            gz(src / "EURUSD_2025-02.csv.gz", [("2025-02-03T00:00:00.000Z", "1.2", "1.20002")])
+            gz(src / "EURJPY_2024-11.csv.gz", [("2024-11-04T00:00:00.000Z", "160.000", "160.002")])
+            out = Path(tmp) / "registry.json"
+            build_registry(["--out", str(out), "--source-dir", str(src), "--work-dir", str(work),
+                            "--window", "2024-11", "2025-02", "--symbols", "EURUSD", "EURJPY"])
+            registry = Registry(out)
+            try:
+                rows = {r["symbol"]: r for r in registry.catalogue()}
+                self.assertEqual(rows["EURUSD"]["periods"], ["2024-11", "2024-12"])
+                self.assertEqual(rows["EURJPY"]["model"], "AUTHORED_SYNTHETIC_ONLY")  # no admitted USDJPY route
+            finally:
+                registry.close()
+            report = json.loads((work / "reports" / "EURUSD-2025-01.json").read_text())
+            self.assertEqual(report["status"], "REFUSED_NOT_PUBLISHED")
+            again = Path(tmp) / "again.json"
+            build_registry(["--out", str(again), "--source-dir", str(src), "--work-dir", str(work),
+                            "--window", "2024-11", "2025-02", "--symbols", "EURUSD", "--skip", "2024-11"])
+            self.assertEqual(json.loads(again.read_text())["entries"][0]["record"]["months"][0]["period"], "2024-12")
+
+
 class RouteRegistryTests(unittest.TestCase):
     def test_cross_symbol_binds_its_admitted_route(self):
         with tempfile.TemporaryDirectory() as tmp:
