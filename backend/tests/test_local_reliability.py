@@ -47,7 +47,10 @@ class LocalReliabilityTests(unittest.TestCase):
             stats=get(path+'/statistics');self.assertEqual(stats['account']['balance'],balance);self.assertEqual(stats['metrics']['tradeCount'],index+1)
             note=dict(orderId=oid,expectedNoteRevision=0,text='Authored cycle '+str(index),tags=['qa']);self.assertEqual(post(path+'/journal',note),post(path+'/journal',note))
             post(path+'/trash',{});post(path+'/restore',{})
-            http.post('/api/v1/auth/logout-all',headers=headers);http.close();http=fresh();headers=login()
+            # Reopen a cold HTTP/application client while retaining the still-valid
+            # bearer token. Revoke/reissue identity once above; do not turn this
+            # repeated-use test into >10 account logins in one minute.
+            http.close();http=fresh()
             self.assertEqual(get(path+'/statistics'),stats);self.assertEqual(len(get(path+'/journal')['notes']),index+1)
         self.assertEqual(stats['metrics']['wins'],8);self.assertEqual(stats['metrics']['losses'],4)
         access=get('/access');self.assertEqual(access['tier'],'FREE');same_day=access['entitlementDay']==activation_day;self.assertEqual(access['freeActivationAvailable'],not same_day)
