@@ -1,6 +1,19 @@
 import {canonicalBytes,sha256} from '../tickReview/ReviewImport.js';
 
 export const newId=prefix=>`${prefix}:${crypto.randomUUID()}`;
+// Start months the catalog says this instrument can replay. Optional `periods`
+// lists only months that passed data checks; refused months are simply absent.
+// Without it the single catalog `startPeriod` is the only choice.
+const PERIOD=/^\d{4}-(0[1-9]|1[0-2])$/;
+export function startPeriods(instrument){
+  const listed=Array.isArray(instrument?.periods)?instrument.periods.filter(p=>typeof p==='string'&&PERIOD.test(p)):[];
+  if(listed.length)return [...new Set(listed)].sort();
+  return typeof instrument?.startPeriod==='string'&&PERIOD.test(instrument.startPeriod)?[instrument.startPeriod]:[];
+}
+export function periodLabel(period){
+  const [y,m]=period.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1]+' '+y;
+}
 export function methodFromForm(fields,id){
   const protocol=fields.get('kind')==='PROTOCOL';
   return {schemaVersion:1,artifact:'BTL-LOCAL-METHOD-1',id,name:fields.get('name'),kind:protocol?'PROTOCOL':'FREE_STYLE',

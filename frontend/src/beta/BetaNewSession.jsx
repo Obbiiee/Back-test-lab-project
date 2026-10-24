@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {methodFromForm,newId} from './betaWorkspace.js';
+import {methodFromForm,newId,periodLabel,startPeriods} from './betaWorkspace.js';
 
 // Canvas 09 "New Session, daily window, Trash". Presentation only: every value
 // shown comes from catalog/access; creation uses the existing createSession route.
@@ -19,6 +19,11 @@ export function BetaNewSession({catalog,access,disabled,onCreated,onCancel,run,c
   // Gold first (the product's home market), then the server's order.
   const instruments=[...catalog.instruments].sort((a,b)=>(b.symbol==='XAUUSD')-(a.symbol==='XAUUSD'));
   const [symbol,setSymbol]=useState(instruments[0]?.symbol??'');
+  const instrument=instruments.find(i=>i.symbol===symbol);
+  const periods=startPeriods(instrument);
+  const [periodChoice,setPeriodChoice]=useState('');
+  const period=periods.includes(periodChoice)?periodChoice:periods[0]??'';
+  const historical=instruments.some(i=>Array.isArray(i.periods));
   const [preset,setPreset]=useState('10000'),[custom,setCustom]=useState('');
   const [methodId,setMethodId]=useState(catalog.methods[0]?.id??'');
   const [name,setName]=useState(''),[named,setNamed]=useState(false);
@@ -28,12 +33,11 @@ export function BetaNewSession({catalog,access,disabled,onCreated,onCancel,run,c
   const sessionName=named?name:`${symbol} ${method?.name??'Session'}`.slice(0,128);
   const free=access?Math.max(0,access.savedLimit-access.savedSessions):null;
   const full=free===0;
-  const ready=!!symbol&&!!method&&validBalance(balance)&&sessionName.trim().length>0&&!full;
+  const ready=!!symbol&&!!period&&!!method&&validBalance(balance)&&sessionName.trim().length>0&&!full;
   const filled=[!!symbol,validBalance(balance),!!method],current=filled.indexOf(false);
   function create(event){
     event.preventDefault();if(!ready||disabled)return;
-    const instrument=instruments.find(i=>i.symbol===symbol);
-    run(async()=>{const saved=await client.createSession({id:newId('session'),name:sessionName.trim(),methodId,symbol,startPeriod:instrument.startPeriod,initialBalance:balance});await reload(saved.id);onCreated?.();});
+    run(async()=>{const saved=await client.createSession({id:newId('session'),name:sessionName.trim(),methodId,symbol,startPeriod:period,initialBalance:balance});await reload(saved.id);onCreated?.();});
   }
   function saveStrategy(event){
     event.preventDefault();const f=new FormData(event.currentTarget),id=newId('method');
@@ -49,10 +53,14 @@ export function BetaNewSession({catalog,access,disabled,onCreated,onCancel,run,c
       <legend>What do you want to trade?</legend>
       <div className="beta-pair-grid">{instruments.map(i=>{const [mark,tone]=avatar(i.symbol);return <label key={i.symbol} className="beta-pair">
         <input type="radio" name="beta-pair" value={i.symbol} checked={symbol===i.symbol} onChange={()=>setSymbol(i.symbol)}/>
-        <span><i aria-hidden="true" className={'beta-pair-mark beta-tone-'+tone}>{mark}</i><span><b>{i.symbol}</b><small>Demo data</small></span></span>
+        <span><i aria-hidden="true" className={'beta-pair-mark beta-tone-'+tone}>{mark}</i><span><b>{i.symbol}</b><small>{i.dataLabel??'Demo data'}</small></span></span>
       </label>;})}</div>
-      <p className="beta-new-note">Every pair here is a short synthetic demo, not a historical month.</p>
+      <p className="beta-new-note">{historical?'Only months that passed our data checks can be picked. Results are historical replays, not broker fills.':'Every pair here is a short synthetic demo, not a historical month.'}</p>
     </fieldset>
+
+    {periods.length>1&&<label className="beta-period">Start month (UTC)
+      <select value={period} disabled={disabled} onChange={e=>setPeriodChoice(e.target.value)}>{periods.map(p=><option key={p} value={p}>{periodLabel(p)}</option>)}</select>
+    </label>}
 
     <div className="beta-new-row">
       <fieldset className="beta-chips" disabled={disabled}>
@@ -78,7 +86,7 @@ export function BetaNewSession({catalog,access,disabled,onCreated,onCancel,run,c
 
     <form className="beta-new-summary" onSubmit={create}>
       <label className="beta-name">Session name<input value={sessionName} maxLength={128} required disabled={disabled} onChange={e=>{setNamed(true);setName(e.target.value);}}/></label>
-      <span className="beta-summary-text"><b>{symbol} · {validBalance(balance)?usd(balance):'—'} · {method?.name??'Pick a strategy'}</b>
+      <span className="beta-summary-text"><b>{symbol}{periods.length>1&&period?' · '+periodLabel(period):''} · {validBalance(balance)?usd(balance):'—'} · {method?.name??'Pick a strategy'}</b>
         <span>{access?full?`All ${access.savedLimit} saved Sessions are in use. Move one to Trash to make room.`:`Uses 1 of your ${access.savedLimit} saved Sessions (${free-1} left after this)`:'Checking your saved Sessions…'}</span></span>
       {onCancel&&<button type="button" className="beta-ghost" disabled={disabled} onClick={onCancel}>Cancel</button>}
       <button className="beta-create" disabled={disabled||!ready}>Create Session</button>

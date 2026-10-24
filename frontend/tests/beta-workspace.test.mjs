@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {confirmation,executionCommand,accessMessage,betaNotice,checkoutAddress,billingDuration,billingExpiry,methodFromForm,orderFromForm,createReplayLoop} from '../src/beta/betaWorkspace.js';
+import {confirmation,executionCommand,accessMessage,betaNotice,checkoutAddress,billingDuration,billingExpiry,methodFromForm,orderFromForm,createReplayLoop,startPeriods,periodLabel} from '../src/beta/betaWorkspace.js';
 import {createBetaClient} from '../src/beta/betaClient.js';
 const view={artifact:'BTL-RESEARCH-SESSION-VIEW-2',metadata:{id:'session:qa'},state:{revision:7,balance:'9007199254740993.03'}};
 const payload={targetNs:'1577836800000000000'};
@@ -38,3 +38,9 @@ assert.equal(checkoutAddress('https://app.sandbox.midtrans.com/snap/v4/redir/qa_
 for(const value of ['javascript:alert(1)','https://evil.example/snap/v4/redir/a','https://app.sandbox.midtrans.com.evil.example/snap/v4/redir/a','https://user@app.sandbox.midtrans.com/snap/v4/redir/a','https://app.sandbox.midtrans.com/snap/v4/redir/a?token=b','http://app.sandbox.midtrans.com/snap/v4/redir/a'])assert.throws(()=>checkoutAddress(value));
 
 assert.equal(billingDuration('86400'),'1 days');assert.equal(billingDuration('3600'),'1 hours');assert.equal(billingExpiry('0'),'1970-01-01 00:00:00 UTC');assert.equal(billingExpiry('bad'),'Unavailable');
+
+assert.deepEqual(startPeriods({startPeriod:'2020-01'}),['2020-01']);
+assert.deepEqual(startPeriods({startPeriod:'2020-01',periods:['2025-09','2024-11','2024-11','2024-13','bad',7]}),['2024-11','2025-09']);
+assert.deepEqual(startPeriods({periods:[]}),[]);assert.deepEqual(startPeriods({startPeriod:'2020-1'}),[]);assert.deepEqual(startPeriods(undefined),[]);
+assert.equal(periodLabel('2024-11'),'Nov 2024');
+console.log('PASS New Session start months: only catalog-listed valid months, sorted and unique, synthetic fallback unchanged.');
