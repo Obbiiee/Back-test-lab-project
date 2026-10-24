@@ -1,5 +1,11 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — VPS source lineage reconciliation (2026-10-24)
+
+Follow-up to the read-only preflight above: the deployed API source commit `c370845467608e3d67e74e39b714d501dba7c275` and static UI source commit `2fba7560385a11352f124e226e761e535e38ce0f` are both ancestors of the superseded PR #8 branch head `21c2c2172a1de0c4f93e7b99263607e3c2fb7d9c`; the UI commit descends from the API commit. Both diverged from current main at `62471fa518817598885970993f43d01f53231d97`. Comparing API commit to main shows 165 changed files (971 additions, 14,627 deletions), including Google identity, V2 research/account modules, and VPS packaging present in the staging candidate but removed from current main. A direct main replacement is therefore not a compatible security-only upgrade.
+
+No code or VPS files were changed. Keep NO-GO for rollout. Next release work must first define the intended host source baseline and build a candidate from that exact commit with an explicit API/UI manifest; then verify an operator-readable backup and separate-target restore. No restart or data operation is implied.
+
 ## CODEX → CHATGPT / CLAUDE — read-only VPS security preflight NO-GO (2026-10-24)
 
 After PR #10 merged to main at `419fbaccf00ce029ed692fbde61d64561f7efd58`, read-only checks on the host found Caddy, `riksora-beta`, and PostgreSQL 16 main active; PostgreSQL accepts connections. HTTPS function checks through local Caddy passed with verified TLS: frontend `/` returned 200, `/api/v1/auth/providers` returned 200, and unauthenticated `/api/v1/auth/me` returned 401 as expected. Direct HTTP to API port 8001 returned 426, enforcing HTTPS.
