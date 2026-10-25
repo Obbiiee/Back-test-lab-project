@@ -275,3 +275,6 @@ Plan/R:R acceptance extends the versioned browser gate to13 stages: actual Long 
 
 
 Account recovery acceptance extends the existing gate to14 stages. QA recovery code uses the same private stdin pipe and only the known generated email; wrong code400, valid200, previously authenticated bearer401, one-use retry400, old password400 and new login/saved cash+journal are all real backend responses. Keep default isolated-only target/challenge and five refusal families. No SMTP/Google/provider acceptance is implied.
+
+
+Read-only snapshot compatibility: from repository root with the existing QA Python, run `PYTHONPATH=backend python -B -m unittest tests.test_tick_storage_v2 tests.test_tick_evidence_v2 -q`. New opt-in cases cover mode=ro SQL-write refusal even after query_only is disabled,0400/0500 snapshots, unchanged archive hash/mtime/directory entries, missing/create/symlink/WAL/companion refusal, corrupt descendants, exact lower bounds/pages/timestamp groups and causal sidecar pagination/fences/consumer restrictions. Existing defaults and wire/vector gates remain required. Full backend discovery must use a fresh owned socket-only cluster through the existing private_postgres harness; never aim an arbitrary environment DSN at user or production databases. Browser gate remains14 stages; no source financial admission is implied.

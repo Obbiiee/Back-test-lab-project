@@ -2,7 +2,9 @@
 from copy import deepcopy
 from contextlib import closing
 from pathlib import Path
+import hashlib
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -64,6 +66,101 @@ class TickStorageV2Tests(unittest.TestCase):
         t = IndexedTickTimeline(p, p.dataset_id, p.dataset_version, start, log_folder=self.path/folder)
         self.resources.append(t)
         return t
+
+    def readonly_snapshot(self, provider, folder="readonly #? snapshot"):
+        """New QA copy only; never checkpoint/reconfigure the retained source."""
+        target = self.path/folder
+        target.mkdir()
+        with closing(sqlite3.connect((self.path/"data/archive.sqlite").as_uri()+"?mode=ro", uri=True)) as source:
+            with closing(sqlite3.connect(target/"archive.sqlite")) as copy:
+                source.backup(copy)
+                copy.execute("PRAGMA journal_mode=DELETE")
+        return target, provider.dataset_version
+
+    def test_readonly_permission_restricted_snapshot_exact_pages_groups_and_no_writes(self):
+        _, original = self.build()
+        folder, version = self.readonly_snapshot(original)
+        archive = folder/"archive.sqlite"
+        before = hashlib.sha256(archive.read_bytes()).hexdigest()
+        before_stat = archive.stat()
+        archive.chmod(0o400); folder.chmod(0o500)
+        reader = None
+        try:
+            reader = DiskTickProvider(folder, version, read_only=True)
+            self.assertEqual(reader.describe_v2(reader.dataset_id, version), original.describe_v2(original.dataset_id, version))
+            for ns in ("0", "100", "150", "200", "201", "400", "401"):
+                expected = original.locate_v2(original.dataset_id, version, ns)
+                self.assertEqual(reader.locate_v2(reader.dataset_id, version, ns), expected)
+                self.assertEqual(reader.read_page_v2(reader.dataset_id, version, expected["position"], 2),
+                                 original.read_page_v2(original.dataset_id, version, expected["position"], 2))
+            baseline = pump(self.timeline(original, folder="write-reader-logs"), 400)
+            actual = pump(self.timeline(reader, folder="readonly-reader-logs"), 400)
+            self.assertEqual(actual, baseline)
+            self.assertEqual([len(g["events"]) for g in actual], [1, 3, 1, 1])
+            self.assertTrue(all(e["trustedSequence"] is None for g in actual for e in g["events"]))
+        finally:
+            if reader is not None: reader.close()
+            folder.chmod(0o700); archive.chmod(0o600)
+        self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), before)
+        self.assertEqual(archive.stat().st_mtime_ns, before_stat.st_mtime_ns)
+        self.assertEqual([p.name for p in folder.iterdir()], ["archive.sqlite"])
+
+    def test_readonly_uri_blocks_writes_even_on_writable_fixture_and_query_only_disabled(self):
+        _, original = self.build()
+        folder, _ = self.readonly_snapshot(original)
+        archive = folder/"archive.sqlite"
+        before = hashlib.sha256(archive.read_bytes()).hexdigest()
+        with closing(ArtifactStore(folder, read_only=True)) as store:
+            self.assertEqual(store.db.execute("PRAGMA query_only").fetchone()[0], 1)
+            store.db.execute("PRAGMA query_only=OFF")
+            for statement in ("DELETE FROM objects", "UPDATE journal SET value=value", "CREATE TABLE forbidden(x)"):
+                with self.assertRaises(sqlite3.OperationalError): store.db.execute(statement)
+                store.db.rollback()
+        self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), before)
+        self.assertEqual([p.name for p in folder.iterdir()], ["archive.sqlite"])
+
+    def test_readonly_refuses_wal_or_companions_instead_of_mutating_or_ignoring_them(self):
+        _, original = self.build()
+        with self.assertRaisesRegex(ValueError, "READ_ONLY_SNAPSHOT_REQUIRED"):
+            DiskTickProvider(self.path/"data", original.dataset_version, read_only=True)
+        for suffix in ("-wal", "-shm", "-journal"):
+            folder, version = self.readonly_snapshot(original, "companion"+suffix)
+            companion = folder/("archive.sqlite"+suffix)
+            companion.write_bytes(b"must remain")
+            before = hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest()
+            with self.assertRaisesRegex(ValueError, "READ_ONLY_SNAPSHOT_REQUIRED"):
+                DiskTickProvider(folder, version, read_only=True)
+            self.assertEqual(companion.read_bytes(), b"must remain")
+            self.assertEqual(hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest(), before)
+
+    def test_readonly_missing_create_symlink_and_invalid_root_refused(self):
+        missing = self.path/"missing"
+        with self.assertRaises(ValueError): ArtifactStore(missing, read_only=True)
+        with self.assertRaisesRegex(ValueError, "READ_ONLY_CREATE_REFUSED"):
+            ArtifactStore(missing, create=True, read_only=True)
+        self.assertFalse(missing.exists())
+        _, original = self.build()
+        folder, _ = self.readonly_snapshot(original)
+        before = hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest()
+        with self.assertRaises(ValueError): DiskTickProvider(folder, "f"*64, read_only=True)
+        # Windows symlink creation requires a separate privilege/developer mode.
+        if os.name != "nt":
+            linked = self.path/"linked"
+            linked.symlink_to(folder, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "SOURCE_PATH_REFUSED"):
+                DiskTickProvider(linked, original.dataset_version, read_only=True)
+        self.assertEqual(hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest(), before)
+
+    def test_readonly_still_refuses_corrupt_descendants(self):
+        _, original = self.build()
+        folder, version = self.readonly_snapshot(original)
+        with closing(sqlite3.connect(folder/"archive.sqlite")) as copy:
+            copy.execute("UPDATE objects SET body=? WHERE kind='BTL-TICK-STORAGE-CHUNK-2'", (zlib.compress(b"corrupt"),))
+            copy.commit()
+        reader = DiskTickProvider(folder, version, read_only=True)
+        self.resources.append(reader)
+        with self.assertRaisesRegex(ValueError, "CHILD_HASH_MISMATCH"):
+            reader.read_page_v2(reader.dataset_id, version, reader.locate_v2(reader.dataset_id, version, "0")["position"], 2)
 
     def test_appended_tick_retains_independent_mutable_levels(self):
         p = SyntheticTickProvider([dict(ordinal="0", timeNs="100", bid="1", ask="1.1", sequence=None)])
