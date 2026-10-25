@@ -602,6 +602,60 @@
 @keyframes beta-shimmer{to{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.beta-skeleton span{animation:none}}
 
+/* Existing Claude composition: drawing toolbar, chart, panel and rail. */
+.beta-workspace [hidden]{display:none!important}
+.beta-chart-symbol{display:flex;align-items:center;gap:8px;font:800 14px var(--rk-font-data,monospace);padding:8px 10px}
+.beta-chartbar>button{display:flex;align-items:center;gap:6px;min-height:38px}
+.beta-trade{grid-template-columns:minmax(0,1fr) 300px 46px;grid-template-areas:"chart panel rail";gap:10px}
+.beta-chart-col{grid-area:chart}
+.beta-order-form,.beta-sidepanel{grid-area:panel}
+.beta-chart-surface{display:grid;gap:8px;min-width:0}
+.beta-chart-stage{display:grid;grid-template-columns:42px minmax(0,1fr);gap:6px;align-items:stretch;min-width:0}
+.beta-chart-stage .beta-chart{min-height:420px;border-radius:12px}
+.beta-drawing-tools,.beta-panel-rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:5px 3px;border:1px solid var(--b-line);border-radius:12px;background:var(--b-panel-2);min-width:0}
+.beta-panel-rail{grid-area:rail;align-self:start}
+.beta-workspace .beta-drawing-tools>button,.beta-workspace .beta-panel-rail>button{display:grid;place-items:center;flex-shrink:0;width:34px;min-height:36px;padding:0;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--b-muted);box-shadow:none}
+.beta-workspace .beta-drawing-tools>button:hover,.beta-workspace .beta-panel-rail>button:hover{background:var(--b-line)}
+.beta-workspace .beta-drawing-tools>button[aria-pressed=true],.beta-workspace .beta-panel-rail>button[aria-pressed=true]{background:var(--b-ice);color:var(--b-navy);border-color:#9fc7ff}
+.beta-workspace .beta-panel-rail>button:disabled{color:var(--b-soft);opacity:.45;cursor:default}
+.beta-sidepanel{padding:18px;border:2px solid var(--b-line);border-radius:24px;background:#0e1a33;min-width:0}
+.beta-sidepanel h2{font-size:19px;margin:0 0 10px}
+.beta-sidepanel p{font-size:12px;color:var(--b-soft);line-height:1.6}
+.beta-sidepanel ol{display:grid;gap:8px;list-style:none;padding:0;margin:14px 0 0}
+.beta-sidepanel li{padding:8px;background:var(--b-panel);border-radius:12px}
+.beta-sidepanel li>div{display:flex;gap:6px;margin-top:6px}
+.beta-sidepanel li>div>button{display:grid;place-items:center;min-height:34px;padding:6px 9px}
+.beta-sidepanel .beta-object-name{font-size:12px;text-align:left;width:100%;overflow-wrap:anywhere}
+.beta-sidepanel button[aria-pressed=true]{border-color:var(--b-yellow);color:var(--b-yellow)}
+.beta-sidepanel label{display:flex;align-items:center;gap:10px;font-size:13px;margin:14px 0}
+.beta-sidepanel input[type=checkbox]{width:18px;min-height:18px;height:18px;margin:0;accent-color:var(--b-blue)}
+.beta-ticket-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;background:var(--b-panel);border-radius:18px}
+.beta-ticket-modes>button{min-height:38px!important;box-shadow:none!important}
+.beta-workspace .beta-ticket-modes>button[aria-pressed=true]{background:var(--b-ice);color:var(--b-navy);border-color:var(--b-ice)}
+.beta-workspace .beta-risk-presets{min-width:0;border:0;padding:0;margin:0;display:grid;gap:8px}
+.beta-risk-presets legend{font-size:12px;color:var(--b-soft);margin-bottom:6px}
+.beta-risk-presets>div{display:flex;flex-wrap:wrap;gap:5px}
+.beta-risk-presets>div>button{min-height:34px;font-size:11px;padding:5px 10px}
+.beta-workspace .beta-risk-presets>div>button[aria-pressed=true]{background:var(--b-ice);color:var(--b-navy);border-color:var(--b-ice)}
+.beta-order-form .alpha-ticket-estimate{margin:0;padding:10px;border:1px solid var(--b-line-2);border-radius:14px;background:var(--b-panel)}
+.beta-workspace .beta-order-form{max-height:min(calc(62vh + 280px),840px);overflow-y:auto;scrollbar-gutter:stable}
+.beta-order-form .alpha-ticket-estimate dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.beta-order-form .alpha-ticket-estimate dt,.beta-order-form .alpha-ticket-estimate p{color:var(--b-soft)}
+.beta-order-form .alpha-ticket-estimate dd{color:var(--b-ice)}
+@media(max-width:1100px){
+ .beta-trade{grid-template-columns:minmax(0,1fr);grid-template-areas:"rail" "chart" "panel"}
+ .beta-panel-rail{flex-direction:row;justify-content:flex-end;max-width:100%;overflow:auto}
+ .beta-chart-stage .beta-chart{height:min(58vh,500px)}
+}
+@media(max-width:700px){
+ .beta-chart-stage{grid-template-columns:minmax(0,1fr)}
+ .beta-drawing-tools{flex-direction:row;overflow-x:auto;justify-content:flex-start;max-width:100%;padding:5px}
+ .beta-workspace .beta-drawing-tools>button,.beta-workspace .beta-panel-rail>button{width:38px;min-height:40px}
+ .beta-chart-stage .beta-chart{height:min(52vh,440px);min-height:300px}
+ .beta-chartbar{gap:6px;border-radius:16px}.beta-chartbar>button{font-size:11px;padding:6px 10px}
+ .beta-chartbar-quote{width:100%;margin-left:0;font-size:12px}
+}
+
 /* Repository feature navigation and chart controls share existing owners. */
 .beta-mainnav button[aria-current=page]{background:var(--b-ice);color:var(--b-navy);font-weight:700}
 .beta-indicator-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 14px;border:1px solid var(--b-line);border-radius:14px;background:var(--b-panel)}

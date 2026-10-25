@@ -57,5 +57,26 @@ try{
   assert.equal(JSON.stringify(sourceView),sourceBefore);
   const syntheticHtml=renderToStaticMarkup(SourceDetails({historical:false,catalog:{startPeriod:'2020-01'},onClose(){}}));
   assert.ok(syntheticHtml.includes('Synthetic fixture')&&!syntheticHtml.includes('Thanks to Exness'));
+  const {BetaOrderTicket}=await server.ssrLoadModule('/src/beta/BetaWorkspace.jsx');
+  const ticketView={method:{kind:'PROTOCOL',riskPercent:'1',rr:'2',conditions:[{id:'c1',label:'Checklist'}]},quote:{bid:'1.1001',ask:'1.1002'},state:{balance:'10000',profile:{tickSize:'0.00001',quoteCurrency:'USD'}}};
+  const ticketProps={view:ticketView,disabled:false,sheet:false,onClose(){},onReview(){}};
+  const protocolHtml=renderToStaticMarkup(createElement(BetaOrderTicket,ticketProps));
+  assert.match(protocolHtml,/<button[^>]*disabled=""[^>]*>Quick<\/button>/);
+  assert.match(protocolHtml,/<input(?=[^>]*name="quantity")(?=[^>]*disabled="")[^>]*>/);
+  assert.match(protocolHtml,/<input(?=[^>]*name="tp")(?=[^>]*disabled="")[^>]*>/);
+  assert.ok(!protocolHtml.includes('name="riskPercent"'),'Protocol risk remains server-owned');
+  assert.ok(protocolHtml.includes('Checklist')&&!protocolHtml.includes('<option>MARKET</option>'));
+  const foreignHtml=renderToStaticMarkup(createElement(BetaOrderTicket,{...ticketProps,view:{...ticketView,method:{kind:'FREE_STYLE'},state:{...ticketView.state,profile:{...ticketView.state.profile,quoteCurrency:'JPY'}}},draft:{side:'LONG',entry:'150',sl:'149',tp:'152'}}));
+  assert.ok(foreignHtml.includes('Conversion preview unavailable'));
+  assert.ok(!foreignHtml.includes('-$')&&!foreignHtml.includes('+$'),'No guessed USD conversion');
+  const {default:RiskRewardSettings}=await server.ssrLoadModule('/src/trading/RiskRewardSettings.jsx');
+  const planningSettings=renderToStaticMarkup(createElement(RiskRewardSettings,{drawingSettings:long,setDrawingSettings(){},candles:[],intentOnly:true}));
+  for(const text of ['Account size','Leverage','Qty:'])assert.ok(!planningSettings.includes(text));
+  assert.ok(planningSettings.includes('Stop Loss')&&planningSettings.includes('server review'));
+  const {default:RiskRewardGeometry}=await server.ssrLoadModule('/src/trading/RiskRewardGeometry.jsx');
+  const drawing={...long,points:[{price:1.10023},{price:1.09923},{price:1.10223}]};
+  const drawingHtml=renderToStaticMarkup(createElement('svg',null,createElement(RiskRewardGeometry,{drawing,projected:[{x:20,y:50},{x:20,y:80},{x:20,y:10}],candles:[],width:500,selected:true,researchOnly:true,intentOnly:true})));
+  assert.ok(drawingHtml.includes('1.10023')&&drawingHtml.includes('Planning target 1.10223'));
+  for(const text of ['Qty:','P&amp;L','Amount:',' ticks'])assert.ok(!drawingHtml.includes(text),'No invented drawing finances or tick-size estimate');
 }finally{await server.close();}
 console.log('PASS S-5 drawing-to-draft only, Long/Short orientation/refusal, Protocol target/risk ownership, exact quote/review display, intent callbacks and escaped user text.');

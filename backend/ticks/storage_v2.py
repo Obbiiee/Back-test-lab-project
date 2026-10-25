@@ -33,24 +33,52 @@ class IndexedTickDataProvider(Protocol):
     def read_evidence_v2(self, request: dict) -> dict: ...
 
 
-def connect(path, *, allow_threads=False):
+def connect(path, *, allow_threads=False, read_only=False):
     # Cross-worker use is opt-in and requires the controller's shared RLock.
-    db = sqlite3.connect(path, check_same_thread=not allow_threads)
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA synchronous=FULL")
-    db.execute("PRAGMA cache_size=-2048" if allow_threads else "PRAGMA cache_size=-8192")
-    db.execute("PRAGMA temp_store=FILE")
-    db.execute("PRAGMA mmap_size=0")
-    return db
+    require(type(read_only) is bool, "readOnly")
+    if read_only:
+        path = Path(path)
+        require(not path.is_symlink() and path.is_file(), "store", "SOURCE_PATH_REFUSED")
+        # A serving snapshot must be closed and self-contained. Never checkpoint,
+        # change the source journal mode, or ignore a live WAL with immutable=1.
+        require(not any(p.exists() or p.is_symlink() for p in
+                        (Path(str(path)+suffix) for suffix in ("-wal", "-shm", "-journal"))),
+                "snapshot", "READ_ONLY_SNAPSHOT_REQUIRED")
+        with path.open("rb") as stream:
+            header = stream.read(20)
+        require(header[:16] == b"SQLite format 3\x00" and header[18:20] == b"\x01\x01",
+                "snapshot", "READ_ONLY_SNAPSHOT_REQUIRED")
+        db = sqlite3.connect(path.resolve().as_uri()+"?mode=ro", uri=True,
+                             check_same_thread=not allow_threads)
+    else:
+        db = sqlite3.connect(path, check_same_thread=not allow_threads)
+    try:
+        if read_only:
+            db.execute("PRAGMA query_only=ON")
+            require(db.execute("PRAGMA journal_mode").fetchone()[0] == "delete",
+                    "snapshot", "READ_ONLY_SNAPSHOT_REQUIRED")
+        else:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA synchronous=FULL")
+        db.execute("PRAGMA cache_size=-2048" if allow_threads else "PRAGMA cache_size=-8192")
+        db.execute("PRAGMA temp_store=FILE")
+        db.execute("PRAGMA mmap_size=0")
+        return db
+    except BaseException:
+        db.close()
+        raise
 
 
 class ArtifactStore:
-    def __init__(self, folder, *, create=False, allow_threads=False):
+    def __init__(self, folder, *, create=False, allow_threads=False, read_only=False):
+        require(type(read_only) is bool, "readOnly")
+        require(not (read_only and create), "create", "READ_ONLY_CREATE_REFUSED")
+        require(not read_only or not Path(folder).is_symlink(), "store", "SOURCE_PATH_REFUSED")
         self.folder = Path(folder).resolve()
         if create:
             self.folder.mkdir(parents=True, exist_ok=True)
         require((self.folder / "archive.sqlite").is_file() or create, "store", "INCOMPLETE_INGESTION")
-        self.db = connect(self.folder / "archive.sqlite", allow_threads=allow_threads)
+        self.db = connect(self.folder / "archive.sqlite", allow_threads=allow_threads, read_only=read_only)
         if create:
             self.db.executescript("""
             CREATE TABLE IF NOT EXISTS objects(hash TEXT PRIMARY KEY, body BLOB NOT NULL, kind TEXT NOT NULL) WITHOUT ROWID;
@@ -408,10 +436,13 @@ class DiskTickProvider:
     Host private completion is trusted composition (not remote self-certification).
     Every accessed immutable descendant is checked against its pinned parent.
     No all-history scan, cache or event identity index in process RAM.
+    read_only=True opts into an existing closed DELETE-mode snapshot. It never
+    converts original stores; WAL/SHM/journal companions are explicitly refused.
+    The default writer-compatible connection and every wire/hash stay unchanged.
     """
-    def __init__(self, folder, dataset_version, *, allow_threads=False):
+    def __init__(self, folder, dataset_version, *, allow_threads=False, read_only=False):
         digest(dataset_version, "version")
-        self.__store = ArtifactStore(folder, allow_threads=allow_threads)
+        self.__store = ArtifactStore(folder, allow_threads=allow_threads, read_only=read_only)
         self.__cache_limit = (4 if allow_threads else 16)*1048576
         try:
             self.__open(dataset_version)
