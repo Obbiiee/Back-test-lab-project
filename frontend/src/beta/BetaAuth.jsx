@@ -128,9 +128,9 @@ export default function BetaAuth({client,providers,expired,onSignedIn}){
 
   return <div className="beta-auth">
     <div className="beta-auth-hero" aria-hidden="true">
-      <p className="beta-auth-title">{view==='register'?<>Practise on <span>yesterday’s</span> market.</>:<>Welcome back, <span>trader.</span></>}</p>
-      <p>{view==='register'?'Replay real bid/ask ticks, trade the candles as they form, and learn from every Session.':'Your Sessions, journal and replay position are waiting where you left them.'}</p>
-      <ul><li>16 pairs in the Beta</li><li>Free plan · trade from day one</li></ul></div>
+      <p className="beta-auth-title">{view==='register'?<>Start practising, <span>one Session</span> at a time.</>:<>Welcome back, <span>trader.</span></>}</p>
+      <p>{view==='register'?'Practise with clearly labelled data, review your orders, and learn from every saved Session.':'Your Sessions, journal and replay position are waiting where you left them.'}</p>
+      <ul><li>Practice data is labelled before you start</li><li>Free plan · trade from day one</li></ul></div>
     <div key={view} className={`beta-card beta-auth-card${['verified','resetDone'].includes(view)?' beta-card-yellow':''}`}>{card}</div>
   </div>;
 }

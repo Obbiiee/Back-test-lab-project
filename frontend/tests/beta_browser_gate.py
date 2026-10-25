@@ -20,7 +20,8 @@ STEPS = ('signup_verified', 'login', 'workspace_strategy_session',
          'review_confirm_pending_no_fill', 'next_tick_fill',
          'next_tick_close_exact_balance_and_statistics', 'drawing_objects_and_settings_no_execution', 'five_decimal_canvas_axis_labels',
          'journal_timeframe_and_mobile_layout', 'keyboard_replay_shortcuts', 'cold_reload_relogin_saved_state',
-         'planned_server_risk_review_without_execution', 'logout_server_revocation_and_no_page_errors')
+         'planned_server_risk_review_without_execution', 'logout_server_revocation_and_no_page_errors',
+         'password_recovery_revocation_and_saved_state')
 
 
 def preflight(repository, tools):
@@ -180,6 +181,9 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                         item = json.loads(line)
                         if item.get('need') == 'verification' and item.get('email') == email:
                             process.stdin.write(json.dumps(dict(token=delivery.token(email, 'verification')))+'\n')
+                            process.stdin.flush()
+                        elif item.get('need') == 'recovery' and item.get('email') == email:
+                            process.stdin.write(json.dumps(dict(token=delivery.token(email, 'recovery')))+'\n')
                             process.stdin.flush()
                         elif item.get('step') in STEPS:
                             report['steps'].append(item['step'])

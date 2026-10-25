@@ -220,3 +220,6 @@ Validated Plan/R:R continuation (2026-10-25): PR18 functional line adds existing
 
 
 Validated bounded v2 evidence (2026-10-25): two fresh private10-Session/two-thread service probes, zero canonical mismatches,37.061196x/38.025288x for six virtual minutes; not H-4/historical/auth/network/queue certification. Separate6ce7bd0 donor41 tests pass, but real read-only authored-store open fails because inherited SQLite reader requests writes. No donor integration or engine/storage changes; existing handoff holds exact metrics/blockers. Continue safe browser identity recovery verification; do not bypass read-only mounting or source/financial/frozen/production gates.
+
+
+Validated account recovery continuation (2026-10-25):14-stage actual isolated browser gate plus frontend gates pass; invalid/one-use reset, old-session revocation and saved Session/journal recovered. Corrected unsupported signed-out history/instrument-count copy. Read-only XAU pins confirm22 numeric/order reports, but14 UTC-month-span conflicts and sampled6decimal prices versus synthetic0.01 grid require explicit compatible source/profile/calendar work; no source mutation or frozen donor integration. Production backup access remains root-only, sudo requires password. Beta/rollout NO-GO; exact evidence/requirements in existing handoff.

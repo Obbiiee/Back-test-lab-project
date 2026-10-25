@@ -272,3 +272,6 @@ Claude workspace control acceptance adds an actual drawing after two revealed ca
 
 
 Plan/R:R acceptance extends the versioned browser gate to13 stages: actual Long drawing copies only a draft; risk2%/entry1.1/SL1.099/RR2 reviews through the real server to2lots/TP1.102; Back preserves revision/balance/orders. Retain all prior no-fill/next-tick assertions. Registered stitch-trading SSR tests protect Protocol disabled fields, no guessed USD conversion, planning-only settings and untruncated geometry labels; order-estimate tests cover exact decimal type proposals/1.25R. No real source or paid acceptance follows.
+
+
+Account recovery acceptance extends the existing gate to14 stages. QA recovery code uses the same private stdin pipe and only the known generated email; wrong code400, valid200, previously authenticated bearer401, one-use retry400, old password400 and new login/saved cash+journal are all real backend responses. Keep default isolated-only target/challenge and five refusal families. No SMTP/Google/provider acceptance is implied.

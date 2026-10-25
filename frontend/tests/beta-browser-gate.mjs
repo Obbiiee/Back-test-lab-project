@@ -51,9 +51,10 @@ try{
   await page.getByRole('button',{name:'Verify email',exact:true}).click();
   await expect(page.getByRole('heading',{name:'You’re in!'})).toBeVisible();
   step('signup_verified');
+  let loginPassword=config.password;
   const login=async()=>{
     await page.getByLabel('Email',{exact:true}).fill(config.email);
-    await page.getByLabel('Password',{exact:true}).fill(config.password);
+    await page.getByLabel('Password',{exact:true}).fill(loginPassword);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();
     await expect(page.getByLabel('Workspace name')).toBeVisible();
   };
@@ -201,6 +202,42 @@ try{
   await page.getByRole('button',{name:'Sign out',exact:true}).click();expect((await logout).status()).toBe(204);
   expect((await context.request.get(new URL('/api/v1/auth/me',config.url).href,{headers:{Authorization:'Bearer '+bearer}})).status()).toBe(401);
   expect(errors).toEqual([]);step('logout_server_revocation_and_no_page_errors');
+  await expect(page.getByRole('heading',{name:'Sign in to Beta',exact:true})).toBeVisible();
+  // A second actual QA session proves reset revocation, independently of logout.
+  const oldLogin=await context.request.post(new URL('/api/v1/auth/login',url).href,{form:{username:config.email,password:config.password},maxRedirects:0});
+  expect(oldLogin.status()).toBe(200);const oldBearer=(await oldLogin.json()).access_token;
+  await page.getByRole('button',{name:'Forgot password?',exact:true}).click();
+  await page.getByLabel('Email',{exact:true}).fill(config.email);
+  const forgotten=waitApi('/auth/forgot-password');
+  await page.getByRole('button',{name:'Send reset code',exact:true}).click();expect((await forgotten).status()).toBe(202);
+  await expect(page.getByRole('heading',{name:'Pick a new password',exact:true})).toBeVisible();
+  process.stdout.write(JSON.stringify({need:'recovery',email:config.email})+'\n');
+  const recovery=(await next()).token,newPassword=config.password+':new';
+  await page.getByLabel('Reset code',{exact:true}).fill('invalid-qa-code');
+  await page.getByLabel('New password',{exact:true}).fill(newPassword);
+  await page.getByRole('button',{name:'Show password',exact:true}).click();
+  await expect(page.getByLabel('New password',{exact:true})).toHaveAttribute('type','text');
+  await page.getByRole('button',{name:'Hide password',exact:true}).click();
+  const invalidReset=waitApi('/auth/reset-password');
+  await page.getByRole('button',{name:'Save password',exact:true}).click();expect((await invalidReset).status()).toBe(400);
+  await expect(page.getByRole('status')).toContainText('That reset code didn’t work or has expired.');
+  await page.getByLabel('Reset code',{exact:true}).fill(recovery);
+  const reset=waitApi('/auth/reset-password');
+  await page.getByRole('button',{name:'Save password',exact:true}).click();expect((await reset).status()).toBe(200);
+  await expect(page.getByRole('heading',{name:'Password saved',exact:true})).toBeVisible();
+  expect((await context.request.get(new URL('/api/v1/auth/me',url).href,{headers:{Authorization:'Bearer '+oldBearer},maxRedirects:0})).status()).toBe(401);
+  expect((await context.request.post(new URL('/api/v1/auth/reset-password',url).href,{data:{token:recovery,password:newPassword},maxRedirects:0})).status()).toBe(400);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByLabel('Email',{exact:true}).fill(config.email);await page.getByLabel('Password',{exact:true}).fill(config.password);
+  const oldPassword=waitApi('/auth/login');await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  expect((await oldPassword).status()).toBe(400);await expect(page.getByRole('status')).toContainText('That email and password don’t match.');
+  loginPassword=newPassword;await login();
+  await page.getByRole('button',{name:/Isolated browser QA/}).click();
+  await page.getByRole('button',{name:'Open Browser EURUSD evidence',exact:true}).click();
+  await expect(page.getByText('Saved balance $10000.03',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Journal',exact:true}).last().click();await page.getByRole('button',{name:/Open journal for/}).click();
+  await expect(page.locator('.beta-journal-editor textarea')).toHaveValue('Authored browser QA note retained after reload');
+  expect(errors).toEqual([]);step('password_recovery_revocation_and_saved_state');
   await writeFile(join(evidence,'dom.txt'),await page.locator('body').innerText());
 }catch(e){
   await writeFile(join(evidence,'dom.txt'),await page.locator('body').innerText());
