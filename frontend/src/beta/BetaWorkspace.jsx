@@ -1,5 +1,8 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
+import AlphaTicketEstimate from '../tickAlpha/AlphaTicketEstimate.jsx';
+import {planningIntent} from '../tickAlpha/planningIntent.js';
+import {targetForRR,orderTypeForEntry} from '../tickAlpha/orderEstimate.js';
 import CandleChart from '../components/CandleChart.jsx';
 import IndicatorControls from '../components/IndicatorControls.jsx';
 import {IndicatorPreferences} from '../workspacePreferences.js';
@@ -25,9 +28,9 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[blocked,setBlocked]=useState(false);
   const [review,setReview]=useState(null),[action,setAction]=useState(null),[journal,setJournal]=useState(null);
   const [creating,setCreating]=useState(false),[windowPrompt,setWindowPrompt]=useState(false),[timeframe,setTimeframe]=useState('1m'),[speed,setSpeed]=useState(1),[playing,setPlaying]=useState(false);
-  const [problem,setProblem]=useState(null),[offline,setOffline]=useState(()=>globalThis.navigator?.onLine===false),[sheet,setSheet]=useState(false),sheetButton=useRef(null),[moment,setMoment]=useState(''),[quickLots,setQuickLots]=useState('0.01'),[tab,setTab]=useState('Positions'),[positionsView,setPositionsView]=useState('ACTIVE'),[drawing,setDrawing]=useState('none'),[workflow,setWorkflow]=useState('QUICK');
+  const [problem,setProblem]=useState(null),[offline,setOffline]=useState(()=>globalThis.navigator?.onLine===false),[sheet,setSheet]=useState(false),sheetButton=useRef(null),[moment,setMoment]=useState(''),[quickLots,setQuickLots]=useState('0.01'),[tab,setTab]=useState('Positions'),[positionsView,setPositionsView]=useState('ACTIVE'),[drawing,setDrawing]=useState('none');
   const [chartPreferences,setChartPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
-  const [panel,setPanel]=useState('ORDER'),[chartCommand,setChartCommand]=useState(null);
+  const [panel,setPanel]=useState('ORDER'),[chartCommand,setChartCommand]=useState(null),[planDraft,setPlanDraft]=useState(null);
   const [drawingState,setDrawingState]=useState({sessionId:null,drawings:[]});
   const terminal=useRef(null),panelOpener=useRef(null),sheetOpener=useRef(null),sheetForm=useRef(null);
   useEffect(()=>{
@@ -111,6 +114,15 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
       const request=await confirmation(result);if(live.current)setReview({value:result,request});
     });
   }
+  function usePlanningDrawing(drawing,opener){
+    try{
+      if(view.method.kind!=='FREE_STYLE')throw Error('Protocol orders use the locked Plan ticket.');
+      const intent=planningIntent(drawing,{tickSize:view.state.profile.tickSize});
+      setPlanDraft({id:crypto.randomUUID(),sessionId:activeSession,intent});
+      setPanel('ORDER');if(matchMedia('(max-width:700px)').matches){sheetOpener.current=opener;setSheet(true);}
+      setNotice('Drawing copied to a draft ticket. Review and confirm before any order is accepted.');
+    }catch(error){setNotice(error.message);}
+  }
   async function step(){
     const window=await client.activate(view.metadata.id);
     const current=BigInt(view.state.throughNs),start=BigInt(window.startNs);
@@ -166,8 +178,10 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
         drawingTools={<nav className="beta-drawing-tools" aria-label="Drawing tools">
           <button type="button" aria-label="Cursor / Select" title="Cursor / Select" aria-pressed={drawing==='none'} onClick={()=>setDrawing('none')}><Icon name="cursor"/></button>
           {Object.entries(DRAWING_SPECS).map(([type,spec])=><button key={type} type="button" aria-label={spec.name} title={spec.name} aria-pressed={drawing===type} onClick={()=>setDrawing(drawing===type?'none':type)}><Icon name={({'trend-line':'trend','horizontal-line':'horizontal','vertical-line':'vertical','fibonacci-retracement':'fib',rectangle:'rectangle',ray:'ray',arrow:'arrow',text:'text',measure:'measure'})[type]}/></button>)}
+          {['long-position','short-position'].map((type,index)=><button key={type} type="button" aria-label={index?'Short Position':'Long Position'} title={view.method.kind==='PROTOCOL'?'Protocol uses the locked Plan ticket':index?'Short Position drawing':'Long Position drawing'} disabled={view.method.kind==='PROTOCOL'} aria-pressed={drawing===type} onClick={()=>setDrawing(drawing===type?'none':type)}><Icon name={index?'short':'long'}/></button>)}
         </nav>}
         command={chartCommand?.sessionId===activeSession?chartCommand:null} onDrawingStateChange={changedDrawings}
+        onCreateOrder={view.method.kind==='FREE_STYLE'?usePlanningDrawing:undefined} createOrderLabel="Use in order ticket" orderIntentOnly
         sessionId={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingWorkspace={`beta:${client.subject()}:${workspace.id}:${view.metadata.id}`} drawingStorageKey={`beta-drawings:${client.subject()}:${workspace.id}:${view.metadata.id}`}
         drawingMode={drawing} onDrawingModeChange={setDrawing} chartPreferences={chartPreferences} onChartPreferencesChange={setChartPreferences} indicatorRegistry={productionRegistry}/>
         <div className="beta-replay" role="group" aria-label="Replay">
@@ -186,15 +200,11 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
         </div>}</div>
       {sheet&&<div className="beta-sheet-backdrop" aria-hidden="true" onClick={()=>{setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}/>}
       {/* On phones (canvas 20) the panel is a bottom sheet; on desktop it is always the right-hand panel. */}
-      <form ref={sheetForm} id="beta-order-sheet" role={sheet?'dialog':undefined} aria-modal={sheet?true:undefined} aria-label="New order" tabIndex={-1} hidden={panel!=='ORDER'&&!sheet} className={`beta-order-form${sheet?' beta-sheet-is-open':''}`} onKeyDown={event=>{if(event.key==='Escape'&&sheet){event.stopPropagation();setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}} onSubmit={event=>{event.preventDefault();const back=sheet?(sheetOpener.current??sheetButton.current):event.currentTarget.querySelector('button:not([type])');setSheet(false);requestReview(new FormData(event.currentTarget),back);}}><div className="beta-sheet-head"><h2>New order</h2><button type="button" className="beta-sheet-close" aria-label="Close order panel" onClick={()=>{setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}>×</button></div><p className="beta-muted">Review never fills an order. Buys fill at Ask, sells at Bid on the next eligible tick.</p>
-        <fieldset className="beta-side" disabled={tradingDisabled}><legend>Direction</legend><label className="beta-side-sell"><input type="radio" name="side" value="SHORT"/><span>Sell<small>Bid {view.quote?.bid??'—'}</small></span></label><label className="beta-side-buy"><input type="radio" name="side" value="LONG" defaultChecked/><span>Buy<small>Ask {view.quote?.ask??'—'}</small></span></label></fieldset>
-        <label>Workflow<select name="workflow" disabled={tradingDisabled||view.method.kind==='PROTOCOL'} value={view.method.kind==='PROTOCOL'?'PLANNED':workflow} onChange={e=>setWorkflow(e.target.value)}><option value="QUICK">Market</option><option value="PLANNED">Planned</option></select></label>
-        {(view.method.kind==='PROTOCOL'||workflow==='PLANNED')&&<><label>Planned order type<select name="orderType" disabled={tradingDisabled}><option>LIMIT</option><option>STOP</option></select></label>
-        <label>Planned entry<input name="entry" inputMode="decimal" required disabled={tradingDisabled}/></label></>}
-        <label>Lots<input name="quantity" defaultValue={view.method.kind==='PROTOCOL'?'':'0.01'} placeholder={view.method.kind==='PROTOCOL'?'Calculated by server':undefined} inputMode="decimal" required disabled={tradingDisabled||view.method.kind==='PROTOCOL'}/></label>
-        <label>Stop loss<input name="sl" inputMode="decimal" disabled={tradingDisabled}/></label><label>Take profit<input name="tp" inputMode="decimal" disabled={tradingDisabled||view.method.kind==='PROTOCOL'}/></label>
-        {view.method.kind==='PROTOCOL'&&<><p>Protocol risk {view.method.riskPercent}% · R:R {view.method.rr}. The server owns quantity and target; manual exits are locked.</p>{view.method.conditions.map(c=><label key={c.id}>{c.label}<select name={'condition:'+c.id} disabled={tradingDisabled}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</>}<button disabled={tradingDisabled||!view.quote}>Review order</button>
-      </form>
+      <BetaOrderTicket key={`${activeSession}:${planDraft?.sessionId===activeSession?planDraft.id:'manual'}`} view={view} disabled={tradingDisabled} sheet={sheet} formRef={sheetForm} hidden={panel!=='ORDER'&&!sheet}
+        draft={planDraft?.sessionId===activeSession?planDraft.intent:null}
+        onClose={()=>{setSheet(false);(sheetOpener.current??sheetButton.current)?.focus();}}
+        onReview={(fields,focus)=>{const back=sheet?(sheetOpener.current??sheetButton.current):focus;setSheet(false);requestReview(fields,back);}}/>
+
       {panel==='OBJECTS'&&<aside className="beta-sidepanel" aria-label="Drawing objects" onKeyDown={event=>{if(event.key==='Escape'){setPanel('ORDER');panelOpener.current?.focus();}}}>
         <h2>Objects</h2><p>Drawings belong to this account and Session. They never execute trades.</p>
         {!objects.length?<p>No drawings yet. Choose a tool, then click the chart.</p>:<ol>{objects.map((object,index)=><li key={object.id}>
@@ -231,6 +241,55 @@ export default function BetaWorkspace({client,workspace,onExpired,onAccess,onPla
   </section>;
 }
 
+
+export function BetaOrderTicket({view,disabled,sheet,formRef,hidden,draft,onClose,onReview}){
+  const protocol=view.method.kind==='PROTOCOL';
+  const [workflow,setWorkflow]=useState(draft||protocol?'PLANNED':'QUICK');
+  const [levels,setLevels]=useState(()=>({side:draft?.side??'LONG',entry:draft?.entry??'',sl:draft?.sl??'',tp:draft?.tp??''}));
+  const [rr,setRR]=useState(draft?'MANUAL':'2'),[risk,setRisk]=useState('1'),[sizeMode,setSizeMode]=useState('RISK');
+  const [lots,setLots]=useState('0.01'),[protocolType,setProtocolType]=useState('LIMIT');
+  const planned=protocol||workflow==='PLANNED';
+  const market=levels.side==='LONG'?view.quote?.ask:view.quote?.bid;
+  const proposedType=planned?(protocol?protocolType:orderTypeForEntry({side:levels.side,entry:levels.entry,quote:view.quote})):'MARKET';
+  const tp=protocol?'':planned&&rr!=='MANUAL'?(targetForRR({...levels,rr,tickSize:view.state.profile.tickSize})??''):levels.tp;
+  const update=(key,value)=>setLevels(current=>({...current,[key]:value}));
+  const changeWorkflow=next=>{setWorkflow(next);if(next==='PLANNED')setLevels(current=>({...current,entry:current.entry||market||''}));};
+  return <form ref={formRef} id="beta-order-sheet" role={sheet?'dialog':undefined} aria-modal={sheet?true:undefined} aria-label="New order" tabIndex={-1} hidden={hidden} className={`beta-order-form${sheet?' beta-sheet-is-open':''}`}
+    onKeyDown={event=>{if(event.key==='Escape'&&sheet){event.stopPropagation();onClose();}}}
+    onSubmit={event=>{event.preventDefault();onReview(new FormData(event.currentTarget),event.nativeEvent.submitter);}}>
+    <div className="beta-sheet-head"><h2>New order</h2><button type="button" className="beta-sheet-close" aria-label="Close order panel" onClick={onClose}>×</button></div>
+    <p className="beta-muted">Review never fills an order. Buys fill at Ask, sells at Bid on the next eligible tick.</p>
+    <input type="hidden" name="workflow" value={planned?'PLANNED':'QUICK'}/>
+    <input type="hidden" name="sizeMode" value={planned?sizeMode:'LOTS'}/>
+    <div className="beta-ticket-modes" role="group" aria-label="Order workflow">
+      <button type="button" disabled={disabled||protocol} aria-pressed={!planned} onClick={()=>changeWorkflow('QUICK')}>Quick</button>
+      <button type="button" disabled={disabled} aria-pressed={planned} onClick={()=>changeWorkflow('PLANNED')}>Plan</button>
+    </div>
+    <fieldset className="beta-side" disabled={disabled}><legend>Direction</legend>
+      {['SHORT','LONG'].map(side=><label key={side} className={side==='LONG'?'beta-side-buy':'beta-side-sell'}><input type="radio" name="side" value={side} checked={levels.side===side} onChange={()=>update('side',side)}/><span>{side==='LONG'?'Buy':'Sell'}<small>{side==='LONG'?'Ask':'Bid'} {side==='LONG'?view.quote?.ask??'—':view.quote?.bid??'—'}</small></span></label>)}
+    </fieldset>
+    {planned?<>
+      {protocol?<label>Planned order type<select name="orderType" value={protocolType} disabled={disabled} onChange={event=>setProtocolType(event.target.value)}><option>LIMIT</option><option>STOP</option></select></label>
+        :<label>Proposed order type<input name="orderType" value={proposedType??''} readOnly placeholder="Enter an entry price"/></label>}
+      <label>Planned entry<input name="entry" maxLength={128} inputMode="decimal" required disabled={disabled} value={levels.entry} onChange={event=>update('entry',event.target.value)}/></label>
+      {!protocol&&<><label>Size by<select name="sizeBy" value={sizeMode} disabled={disabled} onChange={event=>setSizeMode(event.target.value)}><option value="RISK">Risk percent · server sizes lots</option><option value="LOTS">Manual lots</option></select></label>
+        <fieldset className="beta-risk-presets" disabled={disabled}><legend>Risk · saved balance</legend>
+          <div>{['0.5','1','2','3'].map(value=><button key={value} type="button" aria-pressed={risk===value} onClick={()=>setRisk(value)}>{value}%</button>)}</div>
+          <label>Risk percent<input name="riskPercent" maxLength={128} inputMode="decimal" required value={risk} onChange={event=>setRisk(event.target.value)}/></label>
+        </fieldset>
+      </>}
+    </>:<><input type="hidden" name="orderType" value="MARKET"/><input type="hidden" name="riskPercent" value="1"/></>}
+    <label>Lots<input name="quantity" maxLength={128} value={protocol||planned&&sizeMode==='RISK'?'':lots} placeholder={protocol||planned&&sizeMode==='RISK'?'Calculated by server':undefined} onChange={event=>setLots(event.target.value)} inputMode="decimal" required disabled={disabled||protocol||planned&&sizeMode==='RISK'}/></label>
+    <label>Stop loss<input name="sl" maxLength={128} inputMode="decimal" required={planned} disabled={disabled} value={levels.sl} onChange={event=>update('sl',event.target.value)}/></label>
+    {planned&&!protocol&&<fieldset className="beta-risk-presets" disabled={disabled}><legend>Reward / risk</legend><div>{['1','1.25','1.5','2','3','MANUAL'].map(value=><button key={value} type="button" aria-pressed={rr===value} onClick={()=>{if(value==='MANUAL')update('tp',tp);setRR(value);}}>{value==='MANUAL'?'Manual':`1:${value}`}</button>)}</div></fieldset>}
+    <label>Take profit<input name="tp" maxLength={128} inputMode="decimal" required={planned&&!protocol} disabled={disabled||protocol} readOnly={planned&&rr!=='MANUAL'} value={tp} placeholder={protocol?'Calculated by server':undefined} onChange={event=>update('tp',event.target.value)}/></label>
+    {planned&&sizeMode==='LOTS'&&!protocol&&<p className="beta-muted">Manual lots selected. Review shows the exact risk and target for those lots.</p>}
+    {planned&&(protocol||sizeMode==='RISK')&&<AlphaTicketEstimate plan={{side:levels.side,entry:levels.entry,sl:levels.sl,tp,riskPercent:protocol?view.method.riskPercent:risk}} view={view}/>}
+    {draft&&<p className="beta-muted">Drawing copied to this draft. Ticket edits do not change the drawing or create an order.</p>}
+    {protocol&&<><p>Protocol risk {view.method.riskPercent}% · R:R {view.method.rr}. The server owns quantity and target; manual exits are locked.</p>{view.method.conditions.map(condition=><label key={condition.id}>{condition.label}<select name={'condition:'+condition.id} disabled={disabled}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</>}
+    <button type="submit" disabled={disabled||!view.quote||!proposedType}>Review order</button>
+  </form>;
+}
 
 // Canvas 15. Every number is the server's committed value; the line only places
 // points on screen. Open positions are excluded, so this is a balance line, not equity.

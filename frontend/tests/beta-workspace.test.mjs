@@ -48,3 +48,11 @@ assert.equal(checkoutAddress('https://app.sandbox.midtrans.com/snap/v4/redir/qa_
 for(const value of ['javascript:alert(1)','https://evil.example/snap/v4/redir/a','https://app.sandbox.midtrans.com.evil.example/snap/v4/redir/a','https://user@app.sandbox.midtrans.com/snap/v4/redir/a','https://app.sandbox.midtrans.com/snap/v4/redir/a?token=b','http://app.sandbox.midtrans.com/snap/v4/redir/a'])assert.throws(()=>checkoutAddress(value));
 
 assert.equal(billingDuration('86400'),'1 days');assert.equal(billingDuration('3600'),'1 hours');assert.equal(billingExpiry('0'),'1970-01-01 00:00:00 UTC');assert.equal(billingExpiry('bad'),'Unavailable');
+
+const plannedFields=new Map(Object.entries({side:'LONG',workflow:'PLANNED',orderType:'LIMIT',entry:'1.1',sl:'1.099',tp:'1.102',sizeMode:'RISK',riskPercent:'2',quantity:'999'}));
+const auto=orderFromForm(plannedFields,{method:{kind:'FREE_STYLE'}});
+assert.equal(auto.quantity,null);assert.equal(auto.riskPercent,'2');assert.equal(auto.tp,'1.102');
+plannedFields.set('sizeMode','LOTS');assert.equal(orderFromForm(plannedFields,{method:{kind:'FREE_STYLE'}}).quantity,'999');
+const locked=orderFromForm(plannedFields,{method:{kind:'PROTOCOL',conditions:[]}});
+assert.equal(locked.quantity,null);assert.equal(locked.riskPercent,null);assert.equal(locked.tp,null);
+console.log('PASS risk sizing delegates quantity to server and Protocol ignores caller quantity/risk/target.');

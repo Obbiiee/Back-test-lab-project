@@ -629,6 +629,19 @@
 .beta-sidepanel button[aria-pressed=true]{border-color:var(--b-yellow);color:var(--b-yellow)}
 .beta-sidepanel label{display:flex;align-items:center;gap:10px;font-size:13px;margin:14px 0}
 .beta-sidepanel input[type=checkbox]{width:18px;min-height:18px;height:18px;margin:0;accent-color:var(--b-blue)}
+.beta-ticket-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;background:var(--b-panel);border-radius:18px}
+.beta-ticket-modes>button{min-height:38px!important;box-shadow:none!important}
+.beta-workspace .beta-ticket-modes>button[aria-pressed=true]{background:var(--b-ice);color:var(--b-navy);border-color:var(--b-ice)}
+.beta-workspace .beta-risk-presets{min-width:0;border:0;padding:0;margin:0;display:grid;gap:8px}
+.beta-risk-presets legend{font-size:12px;color:var(--b-soft);margin-bottom:6px}
+.beta-risk-presets>div{display:flex;flex-wrap:wrap;gap:5px}
+.beta-risk-presets>div>button{min-height:34px;font-size:11px;padding:5px 10px}
+.beta-workspace .beta-risk-presets>div>button[aria-pressed=true]{background:var(--b-ice);color:var(--b-navy);border-color:var(--b-ice)}
+.beta-order-form .alpha-ticket-estimate{margin:0;padding:10px;border:1px solid var(--b-line-2);border-radius:14px;background:var(--b-panel)}
+.beta-workspace .beta-order-form{max-height:min(calc(62vh + 280px),840px);overflow-y:auto;scrollbar-gutter:stable}
+.beta-order-form .alpha-ticket-estimate dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.beta-order-form .alpha-ticket-estimate dt,.beta-order-form .alpha-ticket-estimate p{color:var(--b-soft)}
+.beta-order-form .alpha-ticket-estimate dd{color:var(--b-ice)}
 @media(max-width:1100px){
  .beta-trade{grid-template-columns:minmax(0,1fr);grid-template-areas:"rail" "chart" "panel"}
  .beta-panel-rail{flex-direction:row;justify-content:flex-end;max-width:100%;overflow:auto}

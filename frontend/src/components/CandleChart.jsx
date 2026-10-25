@@ -22,7 +22,7 @@ const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 const DEFAULT_PRICE_FORMAT = Object.freeze({type:'price',precision:3,minMove:.001});
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceFormat = DEFAULT_PRICE_FORMAT }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceFormat = DEFAULT_PRICE_FORMAT, createOrderLabel = 'Create order', orderIntentOnly = false }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -378,7 +378,12 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     event.preventDefault();
     if (!drawingSettings) return;
     if (drawingSettings.points.some(point => !Number.isFinite(point.price) || !Number.isFinite(point.time))) return;
-    if (isRiskReward(drawingSettings) && !positionStats(drawingSettings, candles.at(-1)?.close).valid) return;
+    if (isRiskReward(drawingSettings)) {
+      if (orderIntentOnly) {
+        const [entry,stop,target]=drawingSettings.points.map(point=>point.price);
+        if (entry<=0||stop<=0||target<=0||(drawingSettings.type==='long-position'?!(stop<entry&&entry<target):!(target<entry&&entry<stop))) return;
+      } else if (!positionStats(drawingSettings, candles.at(-1)?.close).valid) return;
+    }
     const settings = isRiskReward(drawingSettings) ? normalizeRiskRewardSettings(drawingSettings) : drawingSettings;
     commitDrawings((current) => current.map((drawing) => drawing.id === settings.id ? settings : drawing));
     setDrawingSettings(null);
@@ -550,14 +555,14 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       <DrawingControls tools={primitiveDrawings} />
       <div className="chart-canvas-layer">
         <div ref={chartContainer} tabIndex={-1} className="candle-chart" data-primitive-drawings={JSON.stringify(primitiveDrawings.objects)} data-primitive-selected={primitiveDrawings.selectedId ?? ''} data-primitive-draft={primitiveDrawings.draftActive} />
-        <TradingLayer researchOnly={researchOnly} positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
+        <TradingLayer orderIntentOnly={orderIntentOnly} researchOnly={researchOnly} positions={positions} orders={orders} onAmend={onAmendOrder} onClose={onClosePosition} onCancel={onCancelOrder} onError={onTradingError} chart={chartForOverlay} series={seriesForOverlay} candles={candles} objects={objectBridge.riskReward.objects} selectedId={selectedDrawingId} drawingMode={drawingMode} onPlacePoint={param => placementRef.current?.(param)} magnet={magnetEnabled} onSelect={setSelectedDrawingId} onStartDrag={startDrawingDrag} onEndDrag={() => chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true } })} onUpdatePoint={updateDrawingPoint} onMoveDrawing={moveDrawing} onContextMenu={menu => { if (menu.edit) { const object = objectBridge.objects.find(item => item.id === menu.id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); } else setContextMenu(menu); }} />
       </div>
       {selectedDrawingId&&drawings.find(item=>item.id===selectedDrawingId)&&<div className="selected-drawing-toolbar" aria-label="Selected drawing actions">
         <button aria-label="Drawing settings" onClick={()=>{const item=objectBridge.objects.find(item=>item.id===selectedDrawingId);setDrawingSettings({...item,points:item.points.map(point=>({...point}))});}}>⚙</button>
         <input aria-label="Drawing color" type="color" value={drawings.find(item=>item.id===selectedDrawingId)?.color||'#58a6ff'} onChange={event=>commitDrawings(current=>current.map(item=>item.id===selectedDrawingId?{...item,color:event.target.value}:item))}/>
         <button aria-label="Clone drawing" onClick={()=>{const item=objectBridge.objects.find(item=>item.id===selectedDrawingId);const copy={...item,id:crypto.randomUUID(),points:item.points.map(point=>({...point,time:point.time+(candles.intervalSeconds??60)}))};commitDrawings(current=>[...current,copy]);setSelectedDrawingId(copy.id);}}>⧉</button>
         <button aria-label="Lock selected drawing" onClick={()=>commitDrawings(current=>current.map(item=>item.id===selectedDrawingId?{...item,locked:!item.locked}:item))}>♙</button>
-        {onCreateOrder&&['long-position','short-position'].includes(drawings.find(item=>item.id===selectedDrawingId)?.type)&&<button className="drawing-create-order" onClick={()=>onCreateOrder(objectBridge.riskReward.get(selectedDrawingId))}>Create order</button>}
+        {onCreateOrder&&['long-position','short-position'].includes(drawings.find(item=>item.id===selectedDrawingId)?.type)&&<button className="drawing-create-order" onClick={event=>onCreateOrder(objectBridge.riskReward.get(selectedDrawingId),event.currentTarget)}>{createOrderLabel}</button>}
         <button aria-label="Delete selected drawing" onClick={()=>{commitDrawings(current=>current.filter(item=>item.id!==selectedDrawingId));setSelectedDrawingId(null);}}>⌫</button>
       </div>}
       {contextMenu && <div className="chart-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()} role="menu">
@@ -574,7 +579,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       </div>}
       {drawingSettings && <form className="drawing-settings" onSubmit={saveDrawingSettings}>
         <div><strong>{isRiskReward(drawingSettings) ? (drawingSettings.type === "long-position" ? "Long Position" : "Short Position") : "Object settings"}</strong><button type="button" aria-label="Tutup settings" onClick={() => setDrawingSettings(null)}>×</button></div>
-        {isRiskReward(drawingSettings) && <RiskRewardSettings drawingSettings={drawingSettings} setDrawingSettings={setDrawingSettings} candles={candles} />}
+        {isRiskReward(drawingSettings) && <RiskRewardSettings intentOnly={orderIntentOnly} drawingSettings={drawingSettings} setDrawingSettings={setDrawingSettings} candles={candles} />}
         <label>Line width<input type="number" min="1" max="24" value={drawingSettings.lineWidth || 2} onChange={event => setDrawingSettings(value => ({ ...value, lineWidth: Math.max(1, Math.min(24, Number(event.target.value))) }))} /></label>
         <label>Font size<input type="number" min="8" max="48" value={drawingSettings.fontSize || 12} onChange={event => setDrawingSettings(value => ({ ...value, fontSize: Math.max(8, Math.min(48, Number(event.target.value))) }))} /></label>
         <label>Color<input type="color" value={drawingSettings.color || "#58a6ff"} onInput={event => setDrawingSettings(value => ({ ...value, color: event.target.value }))} onChange={(event) => setDrawingSettings((value) => ({ ...value, color: event.target.value }))} /></label>

@@ -26,6 +26,15 @@ const placesOf=text=>(text.split('.')[1]||'').length;
 
 export function decimalText(value,places=2){const v=parse(String(value));return v?format(v,places):null;}
 
+// Proposed order type only. Exact quote comparison; the server still reviews it.
+export function orderTypeForEntry({side,entry,quote}){
+  if(!['LONG','SHORT'].includes(side))return null;
+  const e=parse(entry),q=parse(side==='LONG'?quote?.ask:quote?.bid);
+  if(!e||!q||sign(e)<=0||sign(q)<=0)return null;
+  const compared=sign(sub(e,q));
+  return compared===0?'MARKET':(side==='LONG'?compared<0:compared>0)?'LIMIT':'STOP';
+}
+
 // Price on the Session tick grid that sits rr × stop-distance away from entry.
 export function targetForRR({side,entry,sl,rr,tickSize}){
   const e=parse(entry),s=parse(sl),r=parse(rr),t=parse(tickSize);
@@ -45,6 +54,7 @@ export function plannedEstimate({side,entry,sl,tp,riskPercent,balance,profile}){
   const contract=parse(profile?.contractSize),step=parse(profile?.lotStep),tick=parse(profile?.tickSize);
   const commission=parse(profile?.commissionPerLotSide??'0')||{n:0n,d:1n};
   const out={valid:false,riskMoney:null,rewardMoney:null,rr:null,lots:null,stopTicks:null,targetTicks:null,reason:null};
+  if(profile?.quoteCurrency&&profile.quoteCurrency!=='USD'){out.reason='Conversion preview unavailable; use the server review for exact USD risk and lots.';return out;}
   if(!e||!s||!risk||!bal||!contract||!step||!tick){out.reason='Enter entry, stop and risk %.';return out;}
   const stopMove=side==='LONG'?sub(e,s):sub(s,e);
   if(sign(stopMove)<=0){out.reason=side==='LONG'?'Stop must be below entry for a Buy.':'Stop must be above entry for a Sell.';return out;}

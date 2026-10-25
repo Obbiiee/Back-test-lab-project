@@ -20,8 +20,8 @@ export function orderFromForm(fields,view){
   const side=fields.get('side');
   return {side,workflow:planned?'PLANNED':'QUICK',orderType:planned?fields.get('orderType'):'MARKET',
     entry:planned?fields.get('entry'):side==='LONG'?view.quote?.ask:view.quote?.bid,
-    quantity:protocol?null:fields.get('quantity'),sl:fields.get('sl')||null,tp:protocol?null:fields.get('tp')||null,
-    riskPercent:protocol?null:'1',observations:protocol?view.method.conditions.map(c=>({conditionId:c.id,outcome:fields.get('condition:'+c.id)||'NOT_ASSESSED'})):[]};
+    quantity:protocol||planned&&fields.get('sizeMode')==='RISK'?null:fields.get('quantity'),sl:fields.get('sl')||null,tp:protocol?null:fields.get('tp')||null,
+    riskPercent:protocol?null:fields.get('riskPercent')||'1',observations:protocol?view.method.conditions.map(c=>({conditionId:c.id,outcome:fields.get('condition:'+c.id)||'NOT_ASSESSED'})):[]};
 }
 // One in-flight command; pausing prevents any subsequent scheduled command.
 export function createReplayLoop({step,onStop,schedule=setTimeout,cancel=clearTimeout}){
