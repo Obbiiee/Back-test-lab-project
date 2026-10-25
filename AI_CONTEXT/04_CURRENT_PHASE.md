@@ -248,3 +248,6 @@ Validated read-only one-year8-pair contents diagnostic (2026-10-25):96 converted
 
 
 Validated current-provider original comparisons (2026-10-25): all8 January2024 source ZIPs (one current per declared beta symbol) exact-match their existing converted files over16,806,399 rows, CRC/member/converted hashes, Bid/Ask text and row order; no mismatches/reversals. Private total ZIP108.8MB, no import. This is current download→local converted fidelity only, not historic acquisition/license, months beyond Jan, full sequence trust, freshness/coverage, broker terms or admission; October reversals remain. Handoff holds hashes, retention path and failure history.
+
+
+Validated current-provider XAU October originals (2026-10-25): full current HistData ZIP comparison to local converted source for2023/2024/2025 (17,717,112 rows) is exact, zero mismatches/invalids, and local copies unchanged. Every original and converted month contains one matching timestamp reversal. The anomaly exists in the provider originals as currently served; cause/sequence trust remains UNKNOWN. Oct2025 required a separate single ZIP request at128MiB after the earlier64MiB cap stopped. Preserve ORDER_REFUSED; no repair/fill/source admission. Exact private hashes in handoff.
