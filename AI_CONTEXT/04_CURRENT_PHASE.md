@@ -251,3 +251,6 @@ Validated current-provider original comparisons (2026-10-25): all8 January2024 s
 
 
 Validated current-provider XAU October originals (2026-10-25): full current HistData ZIP comparison to local converted source for2023/2024/2025 (17,717,112 rows) is exact, zero mismatches/invalids, and local copies unchanged. Every original and converted month contains one matching timestamp reversal. The anomaly exists in the provider originals as currently served; cause/sequence trust remains UNKNOWN. Oct2025 required a separate single ZIP request at128MiB after the earlier64MiB cap stopped. Preserve ORDER_REFUSED; no repair/fill/source admission. Exact private hashes in handoff.
+
+
+Official HistData FAQ/spec claim time-ordered ticks, fixed EST/no DST, and no warranty/certification; current original Oct XAU exact-match scans show a reversal in each of2023/24/25, so the statement does not explain those observed rows. Keep ORDER_REFUSED. Reviewed official pages do not grant commercial SaaS/display/redistribution rights; rights remain UNKNOWN. Scoped source docs only, not complete legal terms or legal conclusion. Links in current handoff.
