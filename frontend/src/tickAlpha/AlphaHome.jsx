@@ -1,6 +1,7 @@
 import './riksoraBrand.css';
 import './alphaHome.css';
 import {RiksoraMark} from './AlphaBrand.jsx';
+import PlanCards from '../beta/BetaPlans.jsx';
 import {pagePath,landingWorkspacePath} from './client.js';
 
 // Playful landing (docs/design/RIKSORA_PLAYFUL_UI_PLAN.md §3, screen 1). Copy stays truthful to
@@ -19,6 +20,10 @@ function previewCandles(){
   return {up,down,upWick,downWick};
 }
 const candles=previewCandles();
+// Hosted Beta wording (docs/design/RIKSORA_WORKFLOW.md "Words"): no start date, and the
+// in-Session results tab is called Statistics. The local Alpha keeps its own wording.
+const hostedSteps=['Choose a demo pair, create your strategy and set a starting balance. No historical date selection is available yet.',null,
+  'Every trade lands in the journal and Statistics: win rate, profit factor, drawdown and the balance line.'];
 const steps=[
   ['Pick a moment','Write your strategy, choose a start month and a starting balance. The chart stops right there.'],
   ['Press Play and trade','Candles form one by one. Buy, Sell, or plan a trade with stop and target when your setup shows up.'],
@@ -31,7 +36,7 @@ export default function AlphaHome({hostedPreview=false}={}){
     <a className="alpha-home-skip" href="#how">Skip to how it works</a>
     <header className="alpha-home-nav">
       <a className="alpha-home-brand" href={home} aria-label="Riksora Labs home"><RiksoraMark size={40}/><span>RIKSORA <small>BACKTEST LAB</small></span></a>
-      <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#features">Features</a><a href="#principles">Principles</a></nav>
+      <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#features">Features</a>{hostedPreview&&<a href="#plans">Plans</a>}<a href="#principles">Principles</a></nav>
       <a className="alpha-home-pill" href={workspace}>Open workspace</a>
     </header>
 
@@ -67,7 +72,7 @@ export default function AlphaHome({hostedPreview=false}={}){
 
     <section id="how" className="alpha-home-how">
       <h2>Three steps. One habit.</h2>
-      <ol>{steps.map(([title,text],index)=><li key={title}><span className={`alpha-home-step alpha-home-step-${index+1}`} aria-hidden="true">{index+1}</span><h3>{title}</h3><p>{hostedPreview&&index===0?'Choose a demo pair, create your strategy and set a starting balance. No historical date selection is available yet.':text}</p></li>)}</ol>
+      <ol>{steps.map(([title,text],index)=><li key={title}><span className={`alpha-home-step alpha-home-step-${index+1}`} aria-hidden="true">{index+1}</span><h3>{title}</h3><p>{hostedPreview&&hostedSteps[index]||text}</p></li>)}</ol>
     </section>
 
     <section id="features" className="alpha-home-features" aria-label="Features">
@@ -77,6 +82,11 @@ export default function AlphaHome({hostedPreview=false}={}){
       <article className="alpha-home-feature-white"><h3>{hostedPreview?'16 demo instruments':'Gold first'}</h3><p>{hostedPreview?'Short synthetic datasets for practice. Five-year historical coverage is not enabled.':'The local Alpha replays XAUUSD. More instruments follow once their data is approved.'}</p></article>
       <article className="alpha-home-feature-coral"><h3>Pick up where you left off</h3><p>Each Session remembers its replay position, orders and balance.</p></article>
     </section>
+
+    {hostedPreview&&<section id="plans" className="alpha-home-plans" aria-labelledby="alpha-home-plans-h">
+      <h2 id="alpha-home-plans-h">Start free. Go Pro when you need more room.</h2>
+      <PlanCards freeAction={<a href={workspace}>Start free</a>}/>
+    </section>}
 
     <section id="principles" className="alpha-home-principles">
       <h2>Uncertainty is part of the result.</h2>

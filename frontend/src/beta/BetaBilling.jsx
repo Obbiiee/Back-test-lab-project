@@ -6,7 +6,7 @@ import {betaNotice,checkoutAddress,billingDuration,billingExpiry} from './betaWo
 const PHASES={CREATED:['Checkout not finished','open'],CHECKOUT_STARTED:['Checkout not finished','open'],PENDING:['Waiting for Midtrans','open'],HOLD:['Under review','open'],
   PAID:['Paid','paid'],FAILED:['Payment didn’t go through','failed'],REVERSED:['Payment reversed','failed']};
 
-function Meter({label,value,max,suffix=''}){
+export function Meter({label,value,max,suffix=''}){
   const pct=max>0?Math.min(100,Math.round(value*100/max)):0;
   return <div className="beta-meter"><div><span>{label}</span><span className="beta-mono">{value} / {max}{suffix}</span></div>
     <div role="meter" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max}><i style={{width:Math.max(pct,3)+'%'}}/></div></div>;

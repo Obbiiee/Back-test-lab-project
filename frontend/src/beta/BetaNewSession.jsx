@@ -42,7 +42,7 @@ export function BetaNewSession({catalog,access,disabled,onCreated,onCancel,run,c
   return <section className="beta-new" aria-labelledby="beta-new-title">
     <div className="beta-new-head">
       <h2 id="beta-new-title">New Session</h2>
-      <ol aria-label="Steps" className="beta-steps">{['Pair','Start','Strategy'].map((label,i)=><li key={label} aria-current={current===i?'step':undefined} className={filled[i]?'done':''}>{i+1} {label}{filled[i]&&<span className="beta-visually-hidden"> (done)</span>}</li>)}</ol>
+      <ol aria-label="Steps" className="beta-steps">{['Pair','Balance','Strategy'].map((label,i)=><li key={label} aria-current={current===i?'step':undefined} className={filled[i]?'done':''}>{i+1} {label}{filled[i]&&<span className="beta-visually-hidden"> (done)</span>}</li>)}</ol>
     </div>
 
     <fieldset className="beta-pairs" disabled={disabled}>

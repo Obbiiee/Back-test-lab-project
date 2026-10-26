@@ -221,6 +221,8 @@
     "backend/cloud/billing.py",
     "backend/infrastructure/migrations/013_sandbox_billing.sql",
     "frontend/src/beta/BetaBilling.jsx",
+    "frontend/src/beta/BetaPlans.jsx",
+    "frontend/src/beta/plans.css",
     "integrations/odoo/addons/btl_business/__init__.py",
     "integrations/odoo/addons/btl_business/__manifest__.py",
     "integrations/odoo/addons/btl_business/contract.py",

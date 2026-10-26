@@ -1,5 +1,6 @@
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
-import BetaBilling from './BetaBilling.jsx';
+import BetaBilling,{Meter} from './BetaBilling.jsx';
+import PlanCards from './BetaPlans.jsx';
 import BetaSupport from './BetaSupport.jsx';
 import {createBetaClient} from './betaClient.js';
 import {betaNotice} from './betaWorkspace.js';
@@ -37,7 +38,7 @@ export default function BetaAccount({googleOnly=false,entryPath='/?page=beta'}={
   const [client]=useState(()=>createBetaClient());
   const [user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[selected,setSelected]=useState(null);
   const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[uncertain,setUncertain]=useState(false),[loaded,setLoaded]=useState(false);
-  const [googleFinishing,setGoogleFinishing]=useState(()=>new URLSearchParams(location.search).get('auth')==='google'),[providers,setProviders]=useState(null),[expired,setExpired]=useState(false),[area,setArea]=useState('workspaces'),[tier,setTier]=useState(null);
+  const [googleFinishing,setGoogleFinishing]=useState(()=>new URLSearchParams(location.search).get('auth')==='google'),[providers,setProviders]=useState(null),[expired,setExpired]=useState(false),[area,setArea]=useState('workspaces'),[tier,setTier]=useState(null),[access,setAccess]=useState(null);
   const flight=useRef(false),live=useRef(true);
   useEffect(()=>{live.current=true;return()=>{live.current=false;client.clear();};},[client]);
   async function run(operation){
@@ -60,31 +61,49 @@ export default function BetaAccount({googleOnly=false,entryPath='/?page=beta'}={
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[client]);
   const secure=location.protocol==='https:';
-  const signOut=(all=false)=>run(async()=>{try{await client.logout(all);}finally{if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setArea('workspaces');setTier(null);}}});
-  const expire=()=>{client.clear();setExpired(true);setUser(null);setSelected(null);setWorkspaces([]);setArea('workspaces');setTier(null);};
+  const signOut=(all=false)=>run(async()=>{try{await client.logout(all);}finally{if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setArea('workspaces');setTier(null);setAccess(null);}}});
+  const expire=()=>{client.clear();setExpired(true);setUser(null);setSelected(null);setWorkspaces([]);setArea('workspaces');setTier(null);setAccess(null);};
   // Re-selecting the current workspace bumps the client generation, cancelling its in-flight requests.
   const go=(next,keepWorkspace=false)=>{if(selected)client.selectWorkspace(selected.id);if(next==='workspaces'&&!keepWorkspace)setSelected(null);setNotice('');setArea(next);};
   const roleLabel=role=>role==='OWNER'?'Owner':'View only';
+  // Account and Support always offer a way back, with or without an open workspace.
+  const back=<button type="button" className="beta-back" disabled={busy} onClick={()=>go('workspaces',Boolean(selected))}>{selected?'Back to Sessions':'Back to workspaces'}</button>;
   return <main className={`alpha-identity beta-account${selected?' beta-account-workspace':''}`}>
     <header className="alpha-identity-nav beta-nav"><AlphaBrand href="/"/><span className="beta-nav-badge">Practice preview</span>
-      {user&&(selected||area!=='workspaces')&&<nav className="beta-mainnav" aria-label="Main"><button type="button" disabled={!selected} aria-current={area==='workspaces'?'page':undefined} onClick={()=>go('workspaces',true)}>Sessions</button>
+      {user&&(selected||area!=='workspaces')&&<nav className="beta-mainnav" aria-label="Main"><button type="button" aria-current={area==='workspaces'?'page':undefined} onClick={()=>go('workspaces',Boolean(selected))}>Sessions</button>
         {['Strategies','Journal','Statistics'].map(label=><button key={label} type="button" disabled title="Cross-Session page not implemented">{label}<small>soon</small></button>)}</nav>}
       {user?<div className="beta-userbar">{tier&&<span className="beta-tier">{tier}</span>}
         <AccountMenu user={user} busy={busy} onAccount={()=>go('account')} onSupport={()=>go('support')} onSignOut={()=>signOut()} onSignOutAll={()=>signOut(true)}/></div>
-      :<nav aria-label="Public"><a href="/">Home</a> · </nav>}</header>
+      :<nav aria-label="Public" className="beta-public-nav"><a href="/">Home</a></nav>}</header>
     <section className={`alpha-identity-content${selected?' alpha-identity-workspace':''}`}>
       {!secure?<div className="beta-card beta-card-center"><h1>Open the secure Beta address</h1><p>Verified account access requires HTTPS.</p></div>:!user&&googleFinishing?<div className="beta-card beta-card-center" role="status"><h1>Finishing Google sign-in…</h1><p>This takes a second. Don’t close the tab.</p></div>:!user&&googleOnly?<div className="beta-auth"><div className="beta-auth-hero"><p className="beta-auth-title">Welcome back, <span>trader.</span></p><p>Your practice Sessions, journal and results stay saved in your workspace.</p><ul><li>16 synthetic demo pairs</li><li>Not five years of market history</li></ul></div><div className="beta-card beta-auth-card"><h1>Sign in to RIKSORA</h1><p>Use your Google account to continue.</p>{providers?.googleConfigured?<a className="beta-google" href={client.googleStart()}>Continue with Google</a>:<p role="status">{providers ? 'Google sign-in unavailable. Try again later.' : 'Checking sign-in availability…'}</p>}<p className="beta-muted">Email registration and payments are unavailable in this staging.</p></div></div>:!user?<BetaAuth client={client} providers={providers} expired={expired} onSignedIn={(me,list,configured)=>{setExpired(false);setNotice('');setUser(me);setWorkspaces(list);setLoaded(true);setArea('workspaces');setTier(null);if(configured)setProviders(configured);}}/>:<>
         {selected&&area==='workspaces'?<><button className="beta-back" disabled={busy} onClick={()=>go('workspaces')}>Back to workspaces</button>
-          <Suspense fallback={<p role="status">Loading Beta workspace…</p>}>{googleOnly && providers?.demoConfigured !== true ? <p>Practice replay is unavailable in this environment.</p> : <Workspace key={selected.id} client={client} workspace={selected} onExpired={expire} onPlans={()=>go('account')} onAccess={access=>setTier(access.tier)}/> }</Suspense></>
-        :area==='account'?<div className="beta-picker beta-area">
+          <Suspense fallback={<p role="status">Loading Beta workspace…</p>}>{googleOnly && providers?.demoConfigured !== true ? <p>Practice replay is unavailable in this environment.</p> : <Workspace key={selected.id} client={client} workspace={selected} onExpired={expire} onPlans={()=>go('account')} onAccess={next=>{setTier(next.tier);setAccess(next);}}/> }</Suspense></>
+        :area==='account'?<div className="beta-picker beta-area">{back}
           <div className="beta-area-head"><h1>Account &amp; plan</h1><p>Your profile, today’s usage and your plan in one place.</p></div>
           <section className="beta-profile" aria-labelledby="beta-profile-h"><h2 id="beta-profile-h">Profile</h2>
             <div className="beta-profile-who"><span aria-hidden="true">{user.email.charAt(0).toUpperCase()}</span><strong>{user.email}</strong><small>verified</small></div>
-            <button type="button" className="beta-signout" disabled={busy} onClick={()=>signOut()}>Sign out</button></section>
+          </section>
           {!googleOnly&&providers?.billingConfigured?<BetaBilling key={user.id} client={client} onExpired={expire}/>
-            :<section className="beta-plan-off" aria-label="Plan"><h2>Checkout is not set up here</h2><p>This environment has no sandbox checkout configured, so no plan can be bought from this page. Your plan and limits come from the server: open a workspace to see your saved Sessions and today’s replay window.</p></section>}
+            :<>{/* Canvas 07 usage: last server access seen in this sign-in; never estimated. */}
+              <section className="beta-account-section" aria-labelledby="beta-usage-title"><h2 id="beta-usage-title">Today’s usage</h2>
+                {access?<div className="beta-account-usage"><Meter label="Saved Sessions" value={access.savedSessions} max={access.savedLimit}/>
+                  {access.tier==='FREE'&&<Meter label="Replay window today" value={access.freeActivationAvailable?0:1} max={1} suffix=" used"/>}
+                  <p>From your last opened workspace. Resets 00:00 {access.resetTimezone}.</p></div>
+                  :<p>Open a workspace to see your saved Sessions and today’s replay window. Limits come from the server.</p>}</section>
+              <section className="beta-account-section" aria-labelledby="beta-plan-title"><h2 id="beta-plan-title">Plan</h2>
+                <PlanCards current={access?.tier??null}/>
+                <p>Checkout is not set up in this environment, so no plan can be bought here.</p></section></>}
+          <section className="beta-account-section" aria-labelledby="beta-security-title"><h2 id="beta-security-title">Security</h2>
+            <div className="beta-account-actions"><button type="button" className="beta-signout" disabled={busy} onClick={()=>signOut()}>Sign out</button>
+              <button type="button" className="beta-signout" disabled={busy} onClick={()=>signOut(true)}>Sign out on all devices</button>
+              <button type="button" className="beta-soon" disabled>{googleOnly?'Google manages your password':<>Change password<small>soon</small></>}</button></div>
+            {!googleOnly&&<p>Forgot your password? Sign out and use “Forgot password?” on the sign-in page.</p>}</section>
+          <section className="beta-account-section" aria-labelledby="beta-pref-title"><h2 id="beta-pref-title">Preferences</h2>
+            <div className="beta-account-actions"><button type="button" className="beta-soon" aria-pressed="true" disabled>English</button>
+              <button type="button" className="beta-soon" disabled>Bahasa Indonesia<small>soon</small></button></div></section>
         </div>
-        :area==='support'?<div className="beta-picker beta-area">
+        :area==='support'?<div className="beta-picker beta-area">{back}
           <div className="beta-area-head"><h1>How can we help?</h1><p>Account help and test feedback.</p></div>
           {googleOnly ? <p>Support submission is not enabled in this staging. Report test problems to the operator who invited you.</p> : <BetaSupport key={'support-'+user.id} client={client} onExpired={expire}/>}
         </div>

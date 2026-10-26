@@ -1,6 +1,6 @@
 // Server rendering is a composition check, not desktop/phone browser acceptance.
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'vite';
@@ -29,6 +29,23 @@ try {
   assert.match(home,/href="\/login\/"/);
   assert.doesNotMatch(home,/Explore all features|view=features/);
   assert.doesNotMatch(home,/Replay real bid\/ask ticks|Local Alpha|href="http:\/\/127/);
+  // Hosted wording follows docs/design/RIKSORA_WORKFLOW.md "Words": Statistics, not Analysis.
+  assert.match(home,/journal and Statistics/);
+  assert.doesNotMatch(home,/Analysis/);
+  // Canvas 03 shows the 17 Plans cards: owner draft prices, labelled not on sale, never a checkout.
+  assert.match(home,/href="#plans"/);
+  assert.match(home,/Rp0/);assert.match(home,/Rp139\.000/);assert.match(home,/Rp1\.668\.000/);
+  assert.match(home,/Draft price · not on sale/);assert.match(home,/not on sale yet/);
+  assert.doesNotMatch(home,/checkout\?|Buy Pro|Upgrade now/i);
+  // Product mark C is the favicon (owner decision 2026-10-23), linked from both staging pages.
+  const read=file=>readFile(new URL(file,import.meta.url),'utf8');
+  // Staging pages inline mark C: the static release tool ships only HTML and assets/, not public/favicon.svg.
+  const mark=(await read('../public/favicon.svg')).trim();
+  assert.match(mark,/fill="#0C2655".*stroke="#1378F5".*fill="#D9EAFE".*stroke="#FFCE55"/s);
+  for(const page of ['../staging/home.html','../staging/workspace.html']){
+    const icon=(await read(page)).match(/<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,([^"]+)"\/>/);
+    assert.ok(icon);assert.equal(decodeURIComponent(icon[1]),mark);
+  }
   console.log('PASS repository landing rendering and canonical account links; no invented feature-directory step.');
   console.log('PASS Google-only SSR composition: existing account owner, synthetic disclosure, no password/register form, HTTP denied. Not browser acceptance.');
 } finally {

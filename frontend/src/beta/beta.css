@@ -13,7 +13,7 @@
 .beta-nav-badge{margin-right:auto;background:var(--b-yellow);color:var(--b-navy)!important;border-radius:999px;padding:5px 12px;font-size:12px!important;font-weight:800;letter-spacing:.04em}
 .beta-nav>a{font-weight:700;font-size:14px;padding:8px 14px;border-radius:999px}.beta-nav>a:hover{background:var(--b-panel)}
 .beta-userbar{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--b-muted)}
-.beta-userbar button,.beta-back{min-height:40px;padding:0 16px;border-radius:999px;border:2px solid var(--b-line-2);background:transparent;color:#fff;font-weight:700;cursor:pointer}
+.beta-userbar button,.beta-back{min-height:44px;padding:0 16px;border-radius:999px;border:2px solid var(--b-line-2);background:transparent;color:#fff;font-weight:700;cursor:pointer}
 .beta-userbar button:hover,.beta-back:hover{background:var(--b-panel)}
 .beta-userbar button:disabled,.beta-back:disabled{opacity:.5;cursor:default}
 
@@ -50,6 +50,8 @@
 .beta-account .beta-auth-card form button:not(.beta-link):not(.beta-password-toggle):active{transform:translateY(3px);box-shadow:0 2px 0 #0b3f8a}
 .beta-account .beta-auth-card .beta-muted{color:#52627a;text-align:center}
 .beta-google{display:flex;align-items:center;justify-content:center;gap:10px;min-height:50px;border-radius:999px;border:2px solid var(--b-ice);color:var(--b-navy)!important;font-weight:800;text-decoration:none}
+button.beta-google{width:100%;background:#fff;font:inherit;font-weight:800}
+button.beta-google:disabled{opacity:.55;cursor:not-allowed}
 .beta-google span{width:22px;height:22px;border-radius:50%;background:var(--b-navy);color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center}
 .beta-divider{display:flex;align-items:center;gap:12px;color:#8a9ab3!important;font-size:12px!important;font-weight:600}.beta-divider::before,.beta-divider::after{content:"";flex:1;height:2px;background:#eaf2fd}
 .beta-auth-links{text-align:center}.beta-account .beta-auth-links a{color:var(--b-blue);font-weight:700}
@@ -194,7 +196,7 @@
 /* Overrides for inherited Alpha workspace shell rules (full-height, dark header, light identity buttons). */
 .beta-account .beta-workspace.tick-alpha{height:auto;min-height:0;overflow:visible;display:block;background:transparent;color:#fff}
 .beta-account .beta-workspace.tick-alpha>header{background:transparent;color:#fff;padding:0;min-height:0;border:0;justify-content:flex-start}
-.beta-account .alpha-identity-content>button.beta-back{min-height:40px;padding:0 16px;border-radius:999px;border:2px solid var(--b-line-2);background:transparent;color:#fff;font-weight:700}
+.beta-account .alpha-identity-content>button.beta-back{min-height:44px;padding:0 16px;border-radius:999px;border:2px solid var(--b-line-2);background:transparent;color:#fff;font-weight:700}
 .beta-account .beta-workspace .beta-order-form>button{background:#fff;color:var(--b-navy);border:0}
 .beta-account .beta-workspace .beta-order-form>button:disabled{background:var(--b-line-2);color:var(--b-soft);box-shadow:none}
 .beta-dialog .beta-review-values div{display:block}
@@ -425,9 +427,11 @@
 
 /* Canvas alignment 2026-10-23: header (06/08), account (07), hub (08), quick strip (10). */
 .beta-mainnav{display:flex;gap:6px;flex:1;flex-wrap:wrap;justify-content:center}
-.beta-mainnav>span,.beta-mainnav button{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;font-size:14px;font-weight:600;color:var(--b-ice);border:0;background:transparent}
+.beta-mainnav>span,.beta-mainnav button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border-radius:999px;font-size:14px;font-weight:600;color:var(--b-ice);border:0;background:transparent}
 .beta-mainnav>span[aria-current]{background:var(--b-ice);color:var(--b-navy);font-weight:700}
 .beta-mainnav button:disabled{opacity:.55;cursor:default}
+.beta-mainnav button:not(:disabled){cursor:pointer}
+.beta-public-nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 8px}
 .beta-mainnav small{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--b-panel);color:var(--b-soft);border-radius:999px;padding:2px 6px}
 .beta-tier{font-size:12px!important;font-weight:800;letter-spacing:.08em;color:var(--b-navy)!important;background:var(--b-yellow);border-radius:999px;padding:6px 12px}
 .beta-menu{position:relative}
@@ -441,6 +445,23 @@
 .beta-userbar .beta-menu-panel .beta-menu-danger{color:#9e2b33}
 .beta-area-head{display:grid;gap:6px;margin-bottom:24px}.beta-area-head h1{margin:0!important}
 .beta-area-head p{margin:0;color:var(--b-muted);font-size:16px}
+.beta-account-section{display:grid;gap:14px;margin:0 0 28px;max-width:880px}
+.beta-account-section>h2{margin:0;font-size:22px;font-weight:900}
+.beta-account-section>p,.beta-account-usage>p{margin:0;color:var(--b-muted);line-height:1.55}
+.beta-account-usage{display:grid;gap:14px;background:var(--b-panel);border:2px solid var(--b-line);border-radius:28px;padding:24px;max-width:560px}
+.beta-account-actions{display:flex;flex-wrap:wrap;gap:10px}
+.beta-account .beta-soon{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:999px;border:2px solid var(--b-line-2);background:transparent;color:var(--b-ice);font-size:14px;font-weight:700}
+.beta-account .beta-soon:disabled{opacity:.7;cursor:default}
+.beta-account .beta-soon small{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--b-panel);color:var(--b-soft);border-radius:999px;padding:2px 6px}
+.beta-account .rk-plan-note{color:var(--b-muted)}
+/* Plan cards inside Account sections: undo the generic picker list/paragraph styling. */
+.beta-picker>section ul.rk-plan-list{gap:24px}
+.beta-picker>section li.rk-plan{padding:28px;border-radius:32px;font-size:15px;color:var(--b-navy)}
+.beta-picker>section li.rk-plan-free{background:#fff}
+.beta-picker>section li.rk-plan-pro{background:var(--b-yellow)}
+.beta-picker>section .rk-plan ul{list-style:disc;padding-left:20px;gap:6px}
+.beta-picker>section .rk-plan ul li{background:transparent;border-radius:0;padding:0;font-size:15px}
+.beta-picker>section .rk-plan p{color:var(--b-navy);font-size:inherit}
 .beta-profile{background:#f3f8ff;color:var(--b-navy);border-radius:28px;padding:24px;display:grid;gap:14px;box-shadow:0 6px 0 #1378f5;margin-bottom:24px;max-width:560px}
 .beta-profile h2{margin:0;font-size:20px;font-weight:900}
 .beta-profile-who{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;align-items:center}

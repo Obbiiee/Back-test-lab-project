@@ -67,7 +67,7 @@ export default function BetaAuth({client,providers,expired,onSignedIn}){
   if(view==='signin')card=<>{tabs}
     {expired&&<div className="beta-info"><strong>Signed out for safety</strong><span>Your sign-in ended after a refresh or a while away. Your Sessions are saved.</span></div>}
     <h1>Sign in to Beta</h1>
-    {providers?.googleConfigured?<><a className="beta-google" href={client.googleStart()}><span aria-hidden="true">G</span>Continue with Google</a><p className="beta-divider"><span>or with email</span></p></>:<p className="beta-muted">Google sign-in turns on once it is set up.</p>}
+    {providers?.googleConfigured?<><a className="beta-google" href={client.googleStart()}><span aria-hidden="true">G</span>Continue with Google</a><p className="beta-divider"><span>or with email</span></p></>:<><button type="button" className="beta-google" disabled aria-describedby="beta-google-off"><span aria-hidden="true">G</span>Continue with Google</button><p id="beta-google-off" className="beta-muted">Google sign-in turns on once it is set up.</p><p className="beta-divider"><span>or with email</span></p></>}
     <form onSubmit={event=>{event.preventDefault();const f=new FormData(event.currentTarget);const address=String(f.get('email'));setEmail(address);run(async()=>{
       try{const me=await client.login(address,f.get('password'));const [list,configured]=await Promise.all([client.workspaces(),client.providers()]);if(live.current)onSignedIn(me,list,configured);}
       catch(error){if(['LOGIN_USER_NOT_VERIFIED','VERIFIED_ACCOUNT_REQUIRED'].includes(error.code)&&live.current){setView('check');}throw error;}

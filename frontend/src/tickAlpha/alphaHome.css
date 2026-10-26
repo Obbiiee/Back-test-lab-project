@@ -101,8 +101,11 @@
 .alpha-home-cta-circle{right:60px;bottom:30px;width:110px;height:110px;border-radius:50%;background:var(--rk-coral)}
 .alpha-home-cta-dot{right:200px;top:40px;width:26px;height:26px;border-radius:50%;background:var(--rk-ice)}
 
+.alpha-home-plans{max-width:1240px;margin:0 auto;padding:96px clamp(18px,4vw,28px) 24px;display:grid;gap:32px}
+.alpha-home-plans h2{font-size:clamp(30px,4vw,44px);font-weight:900;letter-spacing:-.03em;line-height:1.1;text-align:center}
+.alpha-home-plans .rk-plan-note{color:var(--home-muted);text-align:center}
 .alpha-home-footer{max-width:1240px;margin:0 auto;padding:28px clamp(18px,4vw,28px);border-top:2px solid var(--home-line);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--home-soft)}
-.alpha-home-footer a{color:var(--rk-ice);font-weight:700}
+.alpha-home-footer a{display:inline-flex;align-items:center;min-height:44px;color:var(--rk-ice);font-weight:700}
 .alpha-home-footer a:hover{color:var(--rk-white)}
 
 @media(max-width:760px){

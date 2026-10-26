@@ -1,0 +1,17 @@
+/* Free/Pro cards shared by landing (03) and Account (07); playful tokens from riksoraBrand.css.
+   Pro uses yellow with navy text; white text never sits on #1378F5. */
+.rk-plans{display:grid;gap:16px}
+.rk-plan-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:24px}
+.rk-plan{border-radius:32px;padding:28px;display:flex;flex-direction:column;gap:12px;color:var(--rk-navy,#061a3c)}
+.rk-plan-free{background:var(--rk-white,#fff);box-shadow:0 6px 0 var(--rk-ice,#d9eafe)}
+.rk-plan-pro{background:var(--rk-yellow,#ffce55);box-shadow:0 6px 0 #c99a1e}
+.rk-plan-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rk-plan-head h2,.rk-plan-head h3{margin:0;font-size:26px;font-weight:900}
+.rk-plan-chip{font-size:12px;font-weight:800;border-radius:999px;padding:5px 12px;background:var(--rk-navy,#061a3c);color:var(--rk-white,#fff)}
+.rk-plan-price{margin:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rk-plan-price strong{font:600 32px var(--rk-font-data,monospace)}
+.rk-plan-price span{font-size:15px;font-weight:700}
+.rk-plan-alt{margin:0;font-size:14px;font-weight:700}
+.rk-plan ul{margin:0;padding-left:20px;display:grid;gap:6px;font-size:15px}
+.rk-plan a,.rk-plan button{align-self:flex-start;display:inline-flex;align-items:center;min-height:48px;padding:0 24px;border-radius:999px;background:var(--rk-blue-strong,#0f67d8);color:var(--rk-white,#fff)!important;font-weight:800;text-decoration:none;box-shadow:0 5px 0 #0b3f8a}
+.rk-plan-note{margin:0;font-size:14px;line-height:1.5;opacity:.9}
