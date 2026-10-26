@@ -1,5 +1,14 @@
 # XAUUSD 2024 website target audit — 2026-10-26
 
+> Reconciled planning audit, 2026-10-26 around18:10UTC: the original observations below are historical snapshots. The sole current target/status/acceptance register is [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md#effective-xauusd-2024-beta-completion-checkpoint--2026-10-26). Do not execute old next-prompt examples or interpret old45.2m/unreleased-UI observations as current tasks.
+
+Fresh read-only reconciliation: actual GitHub candidate is a8a71da4141c5afde2b410b4e14fdfa409044377 and main949ac300c2f13251308a006f8dcadc49d89240b3; candidate tree was clean. Live static pointer is9a4b3df8b5e4-claude-ui. API/Caddy/Postgres are active at unchanged PIDs526639/349798/375695, zero service restarts; public auth endpoint Google=true/demo=true/billing=false. Existing private post-switch report records18/18disk/public matches, and deployment report records authored-QA restore/static rollback PASS with root-installer/production-backup attestation UNKNOWN. No old deployment command was rerun.
+
+Copied-stage finalizer1648119 and waiting parity continuation1664853 remain active; no ingestion completion or parity report at this observation. The continuation code only starts its pinned parity harness after a normal structural receipt; it does not perform later product implementation. Current code still imports research_fixture_v2; profile_v2 refuses real sources and sources_v2 caps256advances. context_archive is validated but unmounted. Those are separate outstanding integration/model dependencies, not reasons to download or redesign again. Hardware observation:15992MiBtotal,5923MiBavailable,91GiBfilesystem free; these idle/current values are not historical replay capacity.
+
+This reconciliation adds a concrete acceptance/dependency plan under the existing operational owner and changes no executable code, data, service, financial rule or production state. Prior report details remain for provenance; current capability is never inferred from a historical proposed next prompt.
+
+
 Owner target: use the website to backtest actual XAUUSD 2024 ticks, retain earlier OHLC for technical analysis, estimate VPS cost per user, and follow Claude's existing UI/workflow. Owner subsequently requests the whole audit first, without repeated work. This report records observations and remaining dependencies; it grants no implementation, model change, merge or deployment and creates no architecture authority.
 
 The current website cannot yet deliver that historical backtest. The engine and website contain a working synthetic trading journey, but annual tick publication, compatible financial source binding and prehistory delivery are incomplete. Download completion is not import or execution completion.
