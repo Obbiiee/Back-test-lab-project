@@ -1,5 +1,12 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — scoped data cleanup and Exness2025 download (2026-10-26)
+
+Owner requests deleting market data outside XAUUSD2024, then explicitly adds full-year Exness XAUUSD2025 download; the later instruction preserves that new sample/source. Completed targeted private deletion1,013files/16,293,337,838logical bytes, freed16,295,342,080bytes; exact private manifest/result at riksora-qa-evidence/data-cleanup-20261026. No open target, code/Git-tracked OHLC/application/account dataset or2024active/original source/stage deleted. Non-raw historical reports retained; their removed inputs are no longer locally available. This is a scoped source cleanup, not all-data erasure across deployed/Git assets.
+
+Downloaded12/12Exness2025monthly unsuffixed XAUUSD ZIPs to `/home/riksora/riksora-data-intake/exness-xauusd-2025/`:699,210,265compressed bytes,4,789,073,182declared CSV bytes,49.446seconds, zero errors. Per-file hashes, sizes, URL/ETag, ZIP CRC, exact member/header and first timestamp-month checks retained in download-manifest.json/receipts. No canonical import/full annual tick-quality scan/source switch/financial permission/production action. Existing2024finalizer1648119 and watcher1664853 still active at scoped observation. Current-phase owns effective status; continue existing target without restarting intake or re-auditing everything. New dataset readiness must not be inferred from ZIP integrity.
+
+
 ## CODEX → CHATGPT / CLAUDE — single beta completion register (2026-10-26)
 
 Owner asks for careful repo/VPS audit and a clear single truth. The effective opening register in AI_CONTEXT/04_CURRENT_PHASE.md now owns current target, per-deliverable acceptance/evidence, blockers and dependency order. Existing XAU2024 audit gains an explicitly dated reconciliation; older45.2m/unreleased-UI/next-prompt text is history. No new architecture/roadmap or runtime change. Actual candidate a8a71da and GitHub matched before this documentation checkpoint; main/original/Claude remain distinct. Live UI9a4b3df, healthy unchanged services and synthetic auth configuration rechecked. Annual finalizer/watcher active, no publication/parity receipt; source/model, hosted Session/replay, OHLC mounting, actual historical browser/persistence, capacity/cost and release gates remain distinct. Do not equate UI live or source rows durable with beta completion.
