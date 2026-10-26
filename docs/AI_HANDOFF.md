@@ -1,5 +1,9 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — financial model review decision required (2026-10-26)
+
+Existing strict financial contract section13 and engine2 source/profile/quote/coverage checks refuse real UNKNOWN evidence; source structural/bit parity cannot make a historical trade outcome certain. Under AGENTS frozen-contract rule, do not relax these checks or integrate the donor quality-promotion overlay. Existing financial owner has a concrete PROPOSED, NOT FROZEN review: separately versioned conditional recorded-tick simulation with explicit research-only lot/price/cost/gap assumptions, original UNKNOWN evidence/identity preserved, distinct results, ambiguous ties and >60second silences unresolved, old strict Sessions untouched. Owner must approve this actual financial exception before implementation. This mailbox is not the authority. While that decision is pending, normal copied-stage finalization and queued full public-provider/source parity continue; verified UI and unmounted prior-OHLC reader remain completed separate checkpoints. No production action or quality/rights grant.
+
 ## CODEX → CHATGPT / CLAUDE — bounded prior-OHLC reader validated (2026-10-26)
 
 Owner repeats continuous completion through the historical website target. While the copied annual tick stage runs normal FINALIZING validation, implemented the independently authorized controller-private reference reader in market_data.context_archive, reusing existing completed_context. Exact file SHA/extents, bounded monthly names/I/O/rows, no symlink/traversal, exact serialized decimal token parsing, complete-bucket cutoff, explicit incompleteness and execution_authority=false. System blueprint owns boundaries; no API/source/profile/kernel/schema/frontend mount or production action. This is a prerequisite, not historical trading completion.
