@@ -1,6 +1,6 @@
 # XAUUSD 2024 website target audit — 2026-10-26
 
-> Reconciled planning audit, 2026-10-26 around18:10UTC: the original observations below are historical snapshots. The sole current target/status/acceptance register is [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md#effective-xauusd-2024-beta-completion-checkpoint--2026-10-26). Do not execute old next-prompt examples or interpret old45.2m/unreleased-UI observations as current tasks.
+> Reconciled planning audit, 2026-10-26 around18:10UTC: the original observations below are historical snapshots. The sole current target/status/acceptance register is [04_CURRENT_PHASE](../AI_CONTEXT/04_CURRENT_PHASE.md#effective-xauusd-2024-and-2025-beta-completion-checkpoint--2026-10-26). Do not execute old next-prompt examples or interpret old45.2m/unreleased-UI observations as current tasks.
 
 Fresh read-only reconciliation: actual GitHub candidate is a8a71da4141c5afde2b410b4e14fdfa409044377 and main949ac300c2f13251308a006f8dcadc49d89240b3; candidate tree was clean. Live static pointer is9a4b3df8b5e4-claude-ui. API/Caddy/Postgres are active at unchanged PIDs526639/349798/375695, zero service restarts; public auth endpoint Google=true/demo=true/billing=false. Existing private post-switch report records18/18disk/public matches, and deployment report records authored-QA restore/static rollback PASS with root-installer/production-backup attestation UNKNOWN. No old deployment command was rerun.
 

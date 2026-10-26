@@ -351,6 +351,7 @@
     "frontend/tests/test_beta_browser_gate.py",
     "deploy/vps/tests/run_private_pg.py",
     "backend/tests/test_binary_source.py",
+    "backend/tests/test_exness_millisecond.py",
     "backend/tests/fixtures/binary_source_vectors.json",
     "backend/tests/verify_binary_source_vectors.mjs"
   ],

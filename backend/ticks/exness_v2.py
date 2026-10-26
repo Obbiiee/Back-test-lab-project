@@ -1,4 +1,4 @@
-"""Private local whole-second Exness-shaped CSV ingestion; no download/rights grant."""
+"""Private Exness-shaped CSV readers; explicit timestamp policy, no rights grant."""
 import csv
 from datetime import datetime, timezone
 from decimal import Decimal, localcontext
@@ -38,6 +38,11 @@ def parse_record(raw):
 
 
 class ExnessIngestion:
+    ADAPTER_VERSION = ADAPTER
+    RESOLUTION_NS = "1000000000"
+    TIMESTAMP_CONVENTION = "CSV UTC Z; observed whole-second values; subsecond ordering/provenance UNVERIFIED"
+    REQUIRE_WHOLE_SECONDS = True
+
     def __init__(self, source, folder, *, resume=False, packing=(256, 256, 1024), first_rows=None):
         require(first_rows is None or type(first_rows) is int and 1 <= first_rows <= 1000000000,
                 'firstRows', 'ARTIFACT_LIMIT')
@@ -52,15 +57,15 @@ class ExnessIngestion:
         self.source_id = "exness:csv:" + self.pin["sha256"][:24]
         self.meta = dict(datasetId="local:exness:"+self.pin["sha256"][:24], providerId="exness", feedId="local-unverified:"+self.symbol,
                          instrumentId="exness:"+self.symbol, providerSymbol=self.symbol, evidenceClass="PROVIDER_OBSERVATION",
-                         adapterVersion=ADAPTER, validatorVersion="BTL-TICK-VALIDATOR-2",
+                         adapterVersion=self.ADAPTER_VERSION, validatorVersion="BTL-TICK-VALIDATOR-2",
                          ordering=dict(timestamps="VERIFIED_NONDECREASING", ties="UNTRUSTED", sequenceScope=None, sequenceEvidenceHash=None))
         if first_rows is not None:
             # Original member hash/ordinals remain the identity authority. Only
             # dataset selection differs; this is never a complete-source claim.
             self.meta['datasetId'] += ':first:'+str(first_rows)
         sources = [dict(sourceId=self.source_id, archiveHash=None, memberHash=self.pin["sha256"], originalName=self.source.name,
-                        acquiredAtUtc=None, sourceUrl=None, timestampConvention="CSV UTC Z; observed whole-second values; subsecond ordering/provenance UNVERIFIED",
-                        resolutionNs="1000000000", originalScalePolicy="PRESERVE_RAW_TEXT")]
+                        acquiredAtUtc=None, sourceUrl=None, timestampConvention=self.TIMESTAMP_CONVENTION,
+                        resolutionNs=self.RESOLUTION_NS, originalScalePolicy="PRESERVE_RAW_TEXT")]
         self.builder = DatasetBuilder(folder, self.meta, sources, self.pin, packing=packing, resume=resume)
         self.builder.store.db.execute("CREATE TABLE IF NOT EXISTS raw_records(hash BLOB PRIMARY KEY) WITHOUT ROWID")
         self.stats = self.builder.s.setdefault("audit", dict(parsedRows=0, rejectedRows=0, malformedTimestamps=0, malformedPrices=0,
@@ -74,14 +79,14 @@ class ExnessIngestion:
         if match is None:
             self.stats["malformedTimestamps"] += 1
             require(False, "timestamp", "INVALID_TIMESTAMP")
-        require(match[1] == "000", "source_resolution", "UNSUPPORTED_RESOLUTION")
+        require(not self.REQUIRE_WHOLE_SECONDS or match[1] == "000", "source_resolution", "UNSUPPORTED_RESOLUTION")
         try:
             dt = datetime.fromisoformat(row["Timestamp"].replace("Z", "+00:00"))
         except ValueError:
             self.stats["malformedTimestamps"] += 1
             require(False, "timestamp", "INVALID_TIMESTAMP")
         delta = dt-EPOCH
-        ns = (delta.days*86400+delta.seconds)*1000000000
+        ns = (delta.days*86400+delta.seconds)*1000000000 + delta.microseconds*1000
         sides = []
         for side in ("Bid", "Ask"):
             try:
@@ -105,7 +110,7 @@ class ExnessIngestion:
         self.stats["spreadSum"] = str(spread_sum)
         self.stats["spreadMin"] = str(spread if self.stats["spreadMin"] is None else min(spread, Decimal(self.stats["spreadMin"])))
         self.stats["spreadMax"] = str(spread if self.stats["spreadMax"] is None else max(spread, Decimal(self.stats["spreadMax"])))
-        self.stats["fractional000"] += 1
+        self.stats["fractional000"] += match[1] == "000"
         previous = self.builder.s["previousTime"]
         if previous is not None:
             difference = ns-previous
@@ -121,7 +126,7 @@ class ExnessIngestion:
         return dict(schemaVersion=1, artifact="BTL-CANONICAL-TICK-1", datasetId=self.meta["datasetId"], datasetVersion=ZERO_VERSION,
                     providerId=self.meta["providerId"], feedId=self.meta["feedId"], instrumentId=self.meta["instrumentId"],
                     eventId=event_id(self.meta["providerId"], self.meta["feedId"], self.pin["sha256"], str(ordinal)),
-                    timeNs=str(ns), resolutionNs="1000000000", bid=bid, ask=ask, rawOrdinal=str(ordinal), trustedSequence=None,
+                    timeNs=str(ns), resolutionNs=self.RESOLUTION_NS, bid=bid, ask=ask, rawOrdinal=str(ordinal), trustedSequence=None,
                     provenance=dict(sourceId=self.source_id, memberHash=self.pin["sha256"], originalTimestamp=row["Timestamp"]),
                     quality=dict(evidenceHash=None, quote="CROSSED" if spread < 0 else "VALID", freshness="UNKNOWN", gapBefore="UNKNOWN_SILENCE", duplicateOf=None))
 
@@ -162,13 +167,26 @@ class ExnessIngestion:
                      atomicGroups=self.builder.s["groups"], maxGroupSize=self.builder.s["maxGroup"],
                      spreadMean=str(Decimal(stats["spreadSum"])/self.builder.s["count"]),
                      source=self.pin, datasetId=self.meta["datasetId"], datasetVersion=version,
-                     ingestionSeconds=time.perf_counter()-start, sourceResolutionNs="1000000000",
+                     ingestionSeconds=time.perf_counter()-start, sourceResolutionNs=self.RESOLUTION_NS,
                      rights="UNKNOWN", provenance="UNVERIFIED", gapClassification="UNKNOWN_SILENCE",
                      duplicateDefinition="identical original CSV record bytes excluding line endings; global disk index")
         stats["stageTimings"] = dict(self.builder.timings, indexConstructionSeconds="NOT SEPARATELY MEASURABLE: streamed alongside chunk/partition construction")
         stats['sourceSelection'] = dict(kind='FULL_SOURCE' if self.first_rows is None else 'FIRST_COMPLETE_TIMESTAMP_GROUPS',
                                        requestedRows=self.first_rows)
         return stats
+
+
+class ExnessMillisecondIngestion(ExnessIngestion):
+    """Opt-in native three-digit UTC timestamps; never a sequence/quality grant.
+
+    The original whole-second reader and CLI retain their original policy.
+    This adapter identifies a different dataset representation/version, keeps
+    original decimal/timestamp text provenance and preserves untrusted ties.
+    """
+    ADAPTER_VERSION = "EXNESS-LOCAL-CSV-MS-1"
+    RESOLUTION_NS = "1000000"
+    TIMESTAMP_CONVENTION = "CSV UTC Z; native three-digit millisecond timestamp text; ordering/provenance UNVERIFIED"
+    REQUIRE_WHOLE_SECONDS = False
 
 
 def deepcopy_stats(stats):
