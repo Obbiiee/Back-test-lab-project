@@ -4,10 +4,57 @@ from decimal import Decimal
 import json
 import re
 import hashlib
-from datetime import datetime
+import math
+import struct
+from datetime import datetime, timedelta, timezone
 
 from contracts.canonical import canonical_bytes, content_hash, decimal_text
 from contracts.primitives import require, identifier, digest, decimal
+
+BINARY64_POLICY = "BINARY64_ROUNDTRIP_DECIMAL_UTC_MS_V1"
+BINARY64_TIME = "PARQUET_TIMESTAMP_MS_UTC"
+
+
+def binary64_price_text(value):
+    """Explicit native-scalar projection; never admits floats on canonical wire."""
+    require(type(value) is float and math.isfinite(value) and value > 0, "binary64")
+    result = decimal_text(Decimal(str(value)))
+    require(struct.pack('>d', float(result)) == struct.pack('>d', value),
+            "binary64", "BINARY_SOURCE_PROJECTION_MISMATCH")
+    return result
+
+
+def utc_ms_projection(milliseconds):
+    require(type(milliseconds) is int and 0 <= milliseconds <= 253402300799999,
+            "timestamp_ms", "INVALID_BINARY_TIMESTAMP")
+    seconds, ms = divmod(milliseconds, 1000)
+    value = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=seconds, milliseconds=ms)
+    return str(milliseconds * 1000000), value.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+
+def validate_source_policy(source, evidence_class):
+    require(uint(source['resolutionNs']) > 0, "source_resolution")
+    policy = source['originalScalePolicy']
+    if policy == "PRESERVE_RAW_TEXT":
+        return
+    require(policy == BINARY64_POLICY and evidence_class == 'PROVIDER_OBSERVATION'
+            and source['resolutionNs'] == '1000000' and source['timestampConvention'] == BINARY64_TIME,
+            "source_resolution")
+
+
+def validate_source_projection(source, row):
+    """Checks typed-source projections only; raw-text behavior stays unchanged."""
+    if source['originalScalePolicy'] != BINARY64_POLICY:
+        return
+    moment = uint(row['timeNs'])
+    ns, iso = utc_ms_projection(moment // 1000000)
+    require(row['timeNs'] == ns and row['resolutionNs'] == '1000000'
+            and row['provenance']['originalTimestamp'] == iso,
+            "timestamp_projection", "BINARY_SOURCE_PROJECTION_MISMATCH")
+    for side in ('bid', 'ask'):
+        value = row[side]
+        require(type(value) is str, side, "BINARY_SOURCE_PROJECTION_MISMATCH")
+        require(binary64_price_text(float(value)) == value, side, "BINARY_SOURCE_PROJECTION_MISMATCH")
 
 
 def uint(value, field="uint", maximum=10**22):
@@ -195,7 +242,7 @@ class TickManifest:
                     datetime.fromisoformat(s["acquiredAtUtc"])
                 except ValueError:
                     require(False,"acquiredAtUtc")
-            require(uint(s["resolutionNs"]) > 0 and s["originalScalePolicy"] == "PRESERVE_RAW_TEXT", "source_resolution")
+            validate_source_policy(s, obj['evidenceClass'])
         ordering = obj["ordering"]
         keys(ordering, "timestamps ties sequenceScope sequenceEvidenceHash")
         require(ordering["timestamps"] in ("VERIFIED_NONDECREASING", "UNKNOWN", "INVALID"), "ordering")
@@ -284,6 +331,7 @@ def _validate_chunk(chunk, manifest, accepted_ticks=None):
         require(row["datasetVersion"] == version, "tick_version", "VERSION_MISMATCH")
         source = next((s for s in m["sources"] if s["sourceId"] == row["provenance"]["sourceId"]), None)
         require(source is not None and source["memberHash"] == row["provenance"]["memberHash"] and source["resolutionNs"] == row["resolutionNs"], "provenance")
+        validate_source_projection(source, row)
         source_index=source_indices[source["sourceId"]]
         ordinal=int(row["rawOrdinal"])
         require(source_index>=last_source and (source_index!=last_source or ordinal>last_ordinal),"ordinal","INVALID_SOURCE_ORDINAL")

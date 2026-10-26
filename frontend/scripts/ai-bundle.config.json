@@ -343,7 +343,10 @@
     "frontend/tests/beta_browser_gate.py",
     "frontend/tests/beta-browser-gate.mjs",
     "frontend/tests/test_beta_browser_gate.py",
-    "deploy/vps/tests/run_private_pg.py"
+    "deploy/vps/tests/run_private_pg.py",
+    "backend/tests/test_binary_source.py",
+    "backend/tests/fixtures/binary_source_vectors.json",
+    "backend/tests/verify_binary_source_vectors.mjs"
   ],
   "supporting": [
     "frontend/public/licenses/lightweight-charts-drawing-ray-LICENSE.txt",
