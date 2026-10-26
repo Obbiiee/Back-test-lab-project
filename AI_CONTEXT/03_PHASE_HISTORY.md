@@ -1,5 +1,7 @@
 # Short history
 
+2026-10-26 incomplete XAU2024 intake continuation: same pinned source, all56,208,511rows now durable and independently counted;35source hashes unchanged. Fixed only private harness checkpoint cadence after authored interruption/resume proof; production code unchanged. Finalization refused frozen raw-text source policy versus inherited FLOAT64 metadata, stateINDEXING/0publications. Material contract hard stop, not a completed phase/publication/backtest/benchmark. Exact evidence and next review scope remain in existing system/current-phase/handoff/target audit owners.
+
 Bounded chart-presentation correction (2026-10-12): preserved current functions/engine/data while returning to neutral local Figma/FX Replay-inspired styling. Existing design owner records reproduced/fixed mobile replay-over-order overlap, actual production click/responsive checks, unchanged cursor/cash and passing frontend/build/golden gates. This is not V2.2 readiness completion; operational status remains solely04_CURRENT_PHASE.
 
 ### R-4/I-3 Alpha workspace composition (2026-10-11)
