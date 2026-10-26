@@ -182,6 +182,7 @@
     "backend/ticks/storage_v2.py",
     "backend/ticks/exness_v2.py",
     "backend/ticks/compact_v2.py",
+    "backend/ticks/read_snapshot_v2.py",
     "backend/ticks/timeline_v2.py",
     "backend/ticks/evidence_v2.py",
     "backend/ticks/benchmark_v2.py",
@@ -356,6 +357,7 @@
     "backend/tests/test_exness_millisecond.py",
     "backend/tests/test_compact_storage.py",
     "backend/tests/test_observed_source.py",
+    "backend/tests/test_read_snapshot.py",
     "backend/tests/fixtures/binary_source_vectors.json",
     "backend/tests/verify_binary_source_vectors.mjs"
   ],
