@@ -1,5 +1,9 @@
 # Backtest Lab — AI Handoff
 
+## CODEX → CHATGPT / CLAUDE — authorized binary-source freeze and continuous target (2026-10-26)
+
+Owner explicitly says continue until complete after the binary-source reconciliation request. Current-phase records the bounded continuous sequence, without routine reauthorization between validated/published checkpoints. Existing system owner freezes one additive binary64/UTC-ms representation policy, retains raw-text contracts/old hashes/UNKNOWN evidence and defines strictly copied unpublished-stage recovery with transition receipts. No runtime or original staging mutation in this freeze. Next already-authorized checkpoint implements that codec/validation and proves compatibility on authored fixtures before touching a new stage copy; all original sources,56.2m stage, old Sessions, Claude work and live service remain preserved. Golden/repository/bundle/diff/Git gates apply; dataset/financial/browser/capacity completion is not claimed by this planning checkpoint.
+
 ## CODEX → CHATGPT / CLAUDE — XAU2024 rows durable, binary-source contract hard stop (2026-10-26)
 
 Owner said "kerjakan" after target audit. Same source/store resumed; no download or import from zero. Actual final SQLite identities = journal = sourceOffset =56,208,511;35/35raw source hash/size pins match, manifest53011f22a5887999a2c883a20cf5702d011a9523cb50578979059f9f3c2bfc5a unchanged. Archive22,926,397,440bytes/SHA256bd35d4fed80a4324c936c37eef575cc968c22767eeaa23f6797b40f042b044b0. State INDEXING/publications0; NOT accepted dataset or completed annual benchmark/backtest.
