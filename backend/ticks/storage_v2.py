@@ -70,6 +70,10 @@ def connect(path, *, allow_threads=False, read_only=False):
 
 
 class ArtifactStore:
+    # None is the original unmarked physical layout. Logical wire identities
+    # are independent of an explicitly selected physical writer layout.
+    LAYOUT = None
+
     def __init__(self, folder, *, create=False, allow_threads=False, read_only=False):
         require(type(read_only) is bool, "readOnly")
         require(not (read_only and create), "create", "READ_ONLY_CREATE_REFUSED")
@@ -78,15 +82,35 @@ class ArtifactStore:
         if create:
             self.folder.mkdir(parents=True, exist_ok=True)
         require((self.folder / "archive.sqlite").is_file() or create, "store", "INCOMPLETE_INGESTION")
-        self.db = connect(self.folder / "archive.sqlite", allow_threads=allow_threads, read_only=read_only)
+        archive = self.folder / "archive.sqlite"
+        if create and archive.is_file():
+            # Inspect before WAL/schema pragmas: choosing the wrong writer must
+            # not mutate an existing archive, including its journal header.
+            peek = sqlite3.connect(archive.as_uri()+"?mode=ro", uri=True)
+            try:
+                marked = peek.execute("SELECT 1 FROM sqlite_master WHERE name='storage_layout' AND type='table'").fetchone()
+                row = peek.execute("SELECT name FROM storage_layout WHERE id=1").fetchone() if marked else None
+                require(not marked or row is not None, "storageLayout", "STORAGE_LAYOUT_MISMATCH")
+                require((row[0] if row else None) == self.LAYOUT,
+                        "storageLayout", "STORAGE_LAYOUT_MISMATCH")
+            finally:
+                peek.close()
+        self.db = connect(archive, allow_threads=allow_threads, read_only=read_only)
         if create:
-            self.db.executescript("""
+            try:
+                self._initialize_schema()
+                self.db.commit()
+            except BaseException:
+                self.db.close()
+                raise
+
+    def _initialize_schema(self):
+        self.db.executescript("""
             CREATE TABLE IF NOT EXISTS objects(hash TEXT PRIMARY KEY, body BLOB NOT NULL, kind TEXT NOT NULL) WITHOUT ROWID;
             CREATE TABLE IF NOT EXISTS publications(version TEXT PRIMARY KEY, root BLOB NOT NULL, receipt BLOB NOT NULL, binding BLOB NOT NULL) WITHOUT ROWID;
             CREATE TABLE IF NOT EXISTS journal(key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
             CREATE TABLE IF NOT EXISTS identities(event BLOB PRIMARY KEY, digest BLOB NOT NULL, source TEXT NOT NULL, ordinal TEXT NOT NULL, UNIQUE(source,ordinal)) WITHOUT ROWID;
-            """)
-            self.db.commit()
+        """)
 
     def close(self):
         self.db.close()
@@ -167,9 +191,11 @@ class DatasetBuilder:
     Checkpoints commit at storage chunks; bounded unfinished tie state persists.
     Generic builder currently rejects malformed input rather than quarantining.
     """
+    STORE_CLASS = ArtifactStore
+
     def __init__(self, folder, metadata, sources, source_pin, *, packing=(256, 256, 1024), resume=False):
         require(len(packing) == 3 and all(type(v) is int and 1 <= v <= limit for v, limit in zip(packing, (256, 256, 1024))), "packing")
-        self.store = ArtifactStore(folder, create=True)
+        self.store = self.STORE_CLASS(folder, create=True)
         try:
             old = self.store.journal()
             pin = dict(metadata=metadata, sources=sources, sourcePin=source_pin, packing=list(packing))

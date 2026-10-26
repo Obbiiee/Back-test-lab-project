@@ -180,6 +180,7 @@
     "backend/ticks/contracts_v2.py",
     "backend/ticks/storage_v2.py",
     "backend/ticks/exness_v2.py",
+    "backend/ticks/compact_v2.py",
     "backend/ticks/timeline_v2.py",
     "backend/ticks/evidence_v2.py",
     "backend/ticks/benchmark_v2.py",
@@ -352,6 +353,7 @@
     "deploy/vps/tests/run_private_pg.py",
     "backend/tests/test_binary_source.py",
     "backend/tests/test_exness_millisecond.py",
+    "backend/tests/test_compact_storage.py",
     "backend/tests/fixtures/binary_source_vectors.json",
     "backend/tests/verify_binary_source_vectors.mjs"
   ],
