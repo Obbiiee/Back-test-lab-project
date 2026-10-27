@@ -143,5 +143,27 @@
     "riskPercent": "1",
     "expectedQuantity": "0.08",
     "expectedRisk": "98.76"
+  },
+  "genesis": {
+    "name": "actual-qualified-day-authored-policy-seed-not-broker-proof",
+    "seed": {
+      "schemaVersion": 1,
+      "artifact": "BTL-OBSERVED-EXECUTION-SEED-1",
+      "sessionId": "session:actual-conditional-qa",
+      "profileHash": "a7fd42d08265f60e621eceafe64351ac7ab9ffb3b8908d8bbd4be4c5d6d2232b",
+      "policy": {
+        "methodId": "method:qa",
+        "definitionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "FREE_STYLE",
+        "checklistOn": false,
+        "conditions": [],
+        "riskPercent": null,
+        "rr": null
+      },
+      "startNs": "1735776000050000000",
+      "initialBalance": "10000"
+    },
+    "canonical": "{\"artifact\":\"BTL-OBSERVED-EXECUTION-SEED-1\",\"initialBalance\":\"10000\",\"policy\":{\"checklistOn\":false,\"conditions\":[],\"definitionHash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"kind\":\"FREE_STYLE\",\"methodId\":\"method:qa\",\"riskPercent\":null,\"rr\":null},\"profileHash\":\"a7fd42d08265f60e621eceafe64351ac7ab9ffb3b8908d8bbd4be4c5d6d2232b\",\"schemaVersion\":1,\"sessionId\":\"session:actual-conditional-qa\",\"startNs\":\"1735776000050000000\"}",
+    "sha256": "173e9a75a4924ae23d4a123752b0aea5cfb809946db638ae7e701750d9d73df4"
   }
 }
