@@ -11,7 +11,7 @@ export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
     const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const queued=replay||/\/sessions\/[^/]+\/(view|bootstrap)$/.test(path);
+    const queued=replay||/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
     const jobId=queued?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
     const uncertainReplay=()=>Error('Replay outcome requires reconciliation. Reload committed Session evidence before retrying.');

@@ -66,9 +66,9 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 observed=True
             elif operation=='create_session':
                 observed=bool(args and type(args[0]) is dict and 'sourceKey' in args[0])
-            elif operation in ('summary','inspect','journal','save_note','confirm','apply','bootstrap','workspace','review'):
+            elif operation in ('summary','inspect','journal','save_note','confirm','apply','bootstrap','workspace','chart_history','review'):
                 if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
-                elif operation in ('confirm','apply','workspace','bootstrap','inspect','summary','journal','save_note') and args:session_id=args[0]
+                elif operation in ('confirm','apply','workspace','chart_history','bootstrap','inspect','summary','journal','save_note') and args:session_id=args[0]
                 if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
                 if type(session_id) is str:
                     row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
@@ -192,6 +192,7 @@ def install(app):
     async def session_operation(workspace_id: uuid.UUID, session_id: str, operation: str,
                                 request: Request, user: User = Depends(current)):
         operations = {'view': ('workspace', False), 'bootstrap': ('bootstrap', False),
+                      'chart-history': ('chart_history', False),
                       'journal': ('save_note', True), 'confirm': ('confirm', True), 'commands': ('apply', True)}
         require(operation in operations, 'operation', 'RESOURCE_UNAVAILABLE')
         name, write = operations[operation]

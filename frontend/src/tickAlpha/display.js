@@ -20,6 +20,39 @@ export function historyPage(view,page,timeframe,offset){
   if(bars.some(bar=>bar.time<start||bar.time%duration!==0||bar.time+duration>end))throw Error('Past candle context crosses the Session boundary');
   return bars;
 }
+export function referencePage(view,page,timeframe,offset){
+  const fields='schemaVersion artifact datasetId datasetVersion reference timeframe period startTime endTime trustedStartNs priceBasis volumeAvailable coverage executionAuthority status candles nextOffset'.split(' ');
+  if(!page||Object.keys(page).length!==fields.length||fields.some(key=>!Object.hasOwn(page,key))||page.schemaVersion!==1)throw Error('Invalid reference OHLC context');
+  const start=BigInt(view.state.startNs),startDate=new Date(Number(start/1000000n));
+  const monthStart=Date.UTC(startDate.getUTCFullYear(),startDate.getUTCMonth(),1)/1000;
+  const prior=new Date((monthStart-1)*1000),period=`${prior.getUTCFullYear()}-${String(prior.getUTCMonth()+1).padStart(2,'0')}`;
+  const priorStart=Date.UTC(prior.getUTCFullYear(),prior.getUTCMonth(),1)/1000;
+  const refFields='providerId priceType timezone sourceTimezone manifestSha256 executionAuthority coverage rights fileName fileSha256'.split(' ');
+  const unavailableReference=page.reference===null&&['UNAVAILABLE','WARMUP_INCOMPLETE'].includes(page.status)&&page.candles?.length===0&&page.nextOffset===null;
+  if(page.artifact!=='BTL-OBSERVED-REFERENCE-OHLC-1'||page.datasetId!==view.state.datasetId||page.datasetVersion!==view.state.datasetVersion
+    ||(page.reference===null&&!unavailableReference)
+    ||(page.reference!==null&&(!page.reference||Object.keys(page.reference).length!==refFields.length||refFields.some(key=>!Object.hasOwn(page.reference,key))
+      ||page.reference.providerId!=='HistData.com'||page.reference.priceType!=='BID'||page.reference.timezone!=='UTC'||page.reference.sourceTimezone!=='EST_FIXED_UTC-5'
+      ||!/^\d{4}-\d\d-/.test(page.reference.fileName)||!/^[a-f0-9]{64}$/.test(page.reference.fileSha256)||!/^[a-f0-9]{64}$/.test(page.reference.manifestSha256)
+      ||page.reference.executionAuthority!==false||page.reference.coverage!=='UNKNOWN'||page.reference.rights!=='UNKNOWN'))
+    ||page.timeframe!==timeframe||page.period!==period||page.startTime!==priorStart||page.endTime!==monthStart
+    ||page.trustedStartNs!==view.state.startNs||page.priceBasis!=='HISTDATA_BID_REFERENCE_ONLY'||page.volumeAvailable!==false
+    ||page.coverage!=='UNKNOWN'||page.executionAuthority!==false||!['READY','WARMUP_INCOMPLETE','UNAVAILABLE'].includes(page.status)
+    ||!Array.isArray(page.candles)||page.candles.length>512||(page.nextOffset!==null&&(page.nextOffset!==offset+page.candles.length||page.candles.length!==512)))throw Error('Invalid reference OHLC context');
+  const duration=timeframe==='D'?86400:parseInt(timeframe,10)*(timeframe.endsWith('h')?3600:60);
+  let previous=-1;
+  const bars=page.candles.map(bar=>{
+    if(!Number.isSafeInteger(bar.time)||bar.time<=previous||bar.time%duration||bar.time<page.startTime||bar.time+duration>page.endTime
+      ||BigInt(bar.time+duration)*1000000000n>start)throw Error('Reference OHLC crosses the observed Session boundary');
+    previous=bar.time;const prices=Object.fromEntries(['open','high','low','close'].map(key=>{
+      if(typeof bar[key]!=='string'||!/^[0-9]+(?:\.[0-9]+)?$/.test(bar[key]))throw Error('Invalid reference price');
+      const value=Number(bar[key]);if(!Number.isFinite(value))throw Error('Invalid reference price');return[key,value];
+    }));
+    if(prices.low<=0||prices.low>Math.min(prices.open,prices.close)||prices.high<Math.max(prices.open,prices.close))throw Error('Invalid reference OHLC envelope');
+    return{time:bar.time,...prices};
+  });
+  return bars;
+}
 export function displayBars(view){
   const chart=view.chart;
   if(!chart||chart.priceBasis!=='EXACT_REVEALED_MID_DISPLAY_ONLY'||chart.volumeAvailable!==false

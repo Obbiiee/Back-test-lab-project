@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath,landingWorkspacePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
-import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
+import {displayBars,historyPage,referencePage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
 import {createAccountClient,setAccountTransport,clearAccountTransport,accountStorageKey} from '../src/tickAlpha/accountClient.js';
 
@@ -31,13 +31,18 @@ const queuedCalls=[];
 let queuedId;
 const queuedAccount={subject:()=> '22222222-2222-4222-8222-222222222222',request:async(path,options={})=>{
   queuedCalls.push([path,options]);
-  if(path.endsWith('/view')){queuedId=options.jobId;return {schemaVersion:1,jobId:queuedId,state:'QUEUED',result:null};}
+  if(path.endsWith('/view')||path.endsWith('/chart-history')){queuedId=options.jobId;return {schemaVersion:1,jobId:queuedId,state:'QUEUED',result:null};}
   return {schemaVersion:1,jobId:queuedId,state:'SUCCEEDED',result:{schemaVersion:1,label:'Bounded queued read'}};
 }};
 setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
 const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
+queuedCalls.length=0;
+const queuedHistory=await api('/sessions/session:queue/chart-history',{timeframe:'1m',offset:0});
+assert.equal(queuedHistory.label,'Bounded queued read');
+assert.equal(queuedCalls.length,2);
+assert.match(queuedCalls[0][0],/\/chart-history$/);
 assert.match(queuedId,/^[0-9a-f-]{36}$/);
 assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
@@ -247,6 +252,19 @@ assert.equal(historyPage(historyView,pastPage,'1m',0)[0].open,1.001);
 for(const change of [{datasetId:'foreign'},{datasetVersion:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{endTime:1441065660},{nextOffset:256},{endOfDataset:true},{status:'BUILDING'},{candles:[{...pastPage.candles[0],time:1441065600}]},{candles:[{...pastPage.candles[0],time:1439164801}]}])assert.throws(()=>historyPage(historyView,{...pastPage,...change},'1m',0));
 assert.deepEqual(historyPage(historyView,{...pastPage,candles:[],status:'BUILDING'},'1m',0),[]);
 console.log('PASS past OHLC context identity, exact price display, Session boundary, timeframe alignment, bounded pagination and future metadata refusal.');
+const observedStart=String(Date.parse('2024-01-02T00:00:30Z')*1000000),referenceView={state:{startNs:observedStart,datasetId:'exness:xauusd:2024',datasetVersion:'a'.repeat(64)}};
+const reference={schemaVersion:1,artifact:'BTL-OBSERVED-REFERENCE-OHLC-1',datasetId:referenceView.state.datasetId,datasetVersion:referenceView.state.datasetVersion,
+  reference:{providerId:'HistData.com',priceType:'BID',timezone:'UTC',sourceTimezone:'EST_FIXED_UTC-5',manifestSha256:'b'.repeat(64),fileName:'2023-12-1m.json',fileSha256:'c'.repeat(64),executionAuthority:false,coverage:'UNKNOWN',rights:'UNKNOWN'},
+  timeframe:'1m',period:'2023-12',startTime:1701388800,endTime:1704067200,trustedStartNs:observedStart,priceBasis:'HISTDATA_BID_REFERENCE_ONLY',volumeAvailable:false,coverage:'UNKNOWN',executionAuthority:false,status:'READY',candles:[{time:1704067140,open:'2062.1',high:'2062.2',low:'2061.9',close:'2062.0'}],nextOffset:null};
+assert.equal(referencePage(referenceView,reference,'1m',0)[0].close,2062.0);
+for(const change of [{datasetId:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY'},
+  {reference:{...reference.reference,priceType:'ASK'}},{reference:{...reference.reference,rights:'GRANTED'}},{trustedStartNs:'0'},
+  {candles:[{...reference.candles[0],time:1704067200}]},{candles:[{...reference.candles[0],high:'2061.99'}]}])
+  assert.throws(()=>referencePage(referenceView,{...reference,...change},'1m',0));
+assert.deepEqual(referencePage(referenceView,{...reference,reference:null,status:'UNAVAILABLE',candles:[]},'1m',0),[]);
+assert.throws(()=>referencePage(referenceView,{...reference,reference:null,status:'READY'},'1m',0));
+assert.throws(()=>referencePage(referenceView,{...reference,reference:{...reference.reference,hiddenManifest:[]}},'1m',0));
+console.log('PASS reference OHLC source identity, immutable hash provenance, explicit unknown rights/coverage, complete-bar clipping and no execution authority.');
 
 for(const href of ['https://localhost:5443/?page=home','https://example.com/','http://localhost.example.com/','https://127.0.0.1/'])assert.equal(landingWorkspacePath(href),'/?page=account');
 assert.equal(landingWorkspacePath('http://127.0.0.1:5173/?tick-alpha=local&page=home'),'/?tick-alpha=local');

@@ -5,7 +5,7 @@ import IndicatorControls from '../components/IndicatorControls.jsx';
 import {productionRegistry} from '../indicators/productionRegistry.js';
 import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {IndicatorPreferences} from '../workspacePreferences.js';
-import {displayBars,historyPage,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
+import {displayBars,historyPage,referencePage,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
 import {api,sessionPath} from './client.js';
 import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
@@ -25,19 +25,18 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const observed=view.metadata.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION';
   const [chartCommand,setChartCommand]=useState(null);
   const [drawingState,setDrawingState]=useState({drawings:[],selectedId:null});
-  const [past,setPast]=useState({key:'',bars:[],status:''}),[historyRetry,setHistoryRetry]=useState(0);
+  const [past,setPast]=useState({key:'',bars:[],status:'',nextOffset:null}),[historyRetry,setHistoryRetry]=useState(0),[historyBusy,setHistoryBusy]=useState(false);
   const historyKey=`${view.metadata.id}:${timeframe}`;
   useEffect(()=>{
     const controller=new AbortController();
     const key=`${view.metadata.id}:${timeframe}`;
-    if(!view.replayStepNs||accountTransport())return;
+    if(!view.replayStepNs||(!observed&&accountTransport()))return;
     const load=async()=>{
-      const loaded=[];let offset=0;
-      setPast({key,bars:[],status:'Loading the previous month of candle context…'});
+      setPast({key,bars:[],status:observed?'Loading prior HistData reference candles…':'Loading the previous month of candle context…',nextOffset:null});
       try{
-        for(let requests=0;requests<2000;requests++){
-          let page;
-          try{page=await api(sessionPath(view.metadata.id)+'/chart-history',{timeframe,offset},{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(30000)])});}
+        for(let requests=0;requests<40;requests++){
+          let page;const offset=0;
+          try{page=await api(sessionPath(view.metadata.id)+'/chart-history',{timeframe,offset:0},{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(30000)])});}
           catch(error){
             if(!controller.signal.aborted&&['LOCAL_BUSY','RATE_LIMITED'].includes(error.message)){
               await new Promise(resolve=>setTimeout(resolve,error.message==='RATE_LIMITED'?10000:2000));
@@ -45,24 +44,39 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
             }
             throw error;
           }
-          const bars=historyPage(view,page,timeframe,offset);
+          const bars=observed?referencePage(view,page,timeframe,offset):historyPage(view,page,timeframe,offset);
           if(page.status==='BUILDING'){await new Promise(resolve=>setTimeout(resolve,500));if(controller.signal.aborted)return;continue;}
-          if(bars.length&&loaded.length&&bars[0].time<=loaded.at(-1).time)throw Error('Overlapping past candle context');
-          loaded.push(...bars);
-          if(loaded.length>50000)throw Error('Past candle context exceeds the display limit');
-          if(page.nextOffset===null){
-            if(!controller.signal.aborted)setPast({key,bars:loaded,status:loaded.length?'Previous calendar month: recorded candles only; coverage remains unknown.':'No candles are available before this Session in the selected dataset.'});
-            return;
-          }
-          offset=page.nextOffset;
+          if(bars.length>50000)throw Error('Past candle context exceeds the display limit');
+          const more=page.nextOffset!==null;
+          const status=bars.length?(observed?`HistData.com BID OHLC · reference-only technical context; coverage and rights unknown. Tick execution uses observed Bid/Ask. ${more?'More prior candles are available.':'No further pinned bars are available.'}`:`Previous calendar month: recorded candles only; coverage remains unknown. ${more?'More prior candles are available.':'No further candles are available.'}`):(observed?'No pinned prior-month OHLC is available. Tick data was not substituted.':'No candles are available before this Session in the selected dataset.');
+          if(!controller.signal.aborted)setPast({key,bars,status,nextOffset:page.nextOffset});
+          return;
         }
-        throw Error('Past candle context did not finish within the work budget');
-      }catch(error){if(!controller.signal.aborted)setPast({key,bars:[],status:`Earlier candles unavailable: ${error.message}. Retry earlier candles when the service is ready.`});}
+        throw Error('Earlier candle page did not finish within the work budget');
+      }catch(error){if(!controller.signal.aborted)setPast({key,bars:[],nextOffset:null,status:`Earlier candles unavailable: ${error.message}. Retry earlier candles when the service is ready.`});}
     };
     void load();return()=>controller.abort();
   // Session/timeframe own this request; cursor changes must not restart it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[view.metadata.id,timeframe,historyRetry]);
+  const loadMorePast=async()=>{
+    const current=past;if(current.key!==historyKey||current.nextOffset===null||historyBusy)return;
+    setHistoryBusy(true);
+    try{
+      const page=await api(sessionPath(view.metadata.id)+'/chart-history',{timeframe,offset:current.nextOffset},{signal:AbortSignal.timeout(30000)});
+      if(page.status==='BUILDING')throw Error('History page is still being prepared; retry shortly');
+      const more=observed?referencePage(view,page,timeframe,current.nextOffset):historyPage(view,page,timeframe,current.nextOffset);
+      setPast(previous=>{
+        if(previous.key!==historyKey)return previous;
+        if(more.length&&previous.bars.length&&more[0].time<=previous.bars.at(-1).time)return {...previous,status:'Earlier candle page overlapped existing data; retry is available.',nextOffset:current.nextOffset};
+        const bars=[...previous.bars,...more];
+        if(bars.length>50000)return {...previous,status:'Earlier candle context reached the 50,000 bar display limit.',nextOffset:null};
+        const hasMore=page.nextOffset!==null;
+        return {key:historyKey,bars,nextOffset:page.nextOffset,status:observed?`HistData.com BID OHLC · reference-only technical context; coverage and rights unknown. Tick execution uses observed Bid/Ask. ${hasMore?'More prior candles are available.':'No further pinned bars are available.'}`:`Previous calendar month: recorded candles only; coverage remains unknown. ${hasMore?'More prior candles are available.':'No further candles are available.'}`};
+      });
+    }catch(error){setPast(previous=>previous.key===historyKey?{...previous,nextOffset:null,status:`Earlier candles unavailable: ${error.message}. Retry earlier candles when the service is ready.`}:previous);}
+    finally{setHistoryBusy(false);}
+  };
   const latest=useRef({view,onReplay});
   useEffect(()=>{latest.current={view,onReplay};},[view,onReplay]);
   useEffect(()=>{
@@ -113,7 +127,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <span>Mid-price display · volume unavailable</span>
     </div>
     {savedIndicators.store.status&&<p className="alpha-chart-note" role="alert">{savedIndicators.store.status}</p>}
-    {past.key===historyKey&&past.status&&<details className="alpha-display-details alpha-history-context"><summary>Earlier candle context</summary><div><p role="status">{past.status}</p><button onClick={()=>setHistoryRetry(value=>value+1)}>Retry earlier candles</button></div></details>}
+    {past.key===historyKey&&past.status&&<details className="alpha-display-details alpha-history-context"><summary>{observed?'Earlier OHLC reference · HistData':'Earlier candle context'}</summary><div><p role="status">{past.status}</p>{past.nextOffset!==null?<button disabled={historyBusy} onClick={loadMorePast}>{historyBusy?'Loading…':'Load more prior candles'}</button>:past.status.includes('unavailable:')?<button disabled={historyBusy} onClick={()=>setHistoryRetry(value=>value+1)}>Retry earlier candles</button>:null}</div></details>}
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>

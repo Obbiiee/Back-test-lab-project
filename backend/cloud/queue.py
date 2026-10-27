@@ -22,7 +22,7 @@ GLOBAL_LIMIT = 16
 USER_LIMIT = 2
 RETAINED_LIMIT = 32
 WORKERS = 2
-OPERATIONS = frozenset(('workspace', 'bootstrap', 'replay'))
+OPERATIONS = frozenset(('workspace', 'bootstrap', 'chart_history', 'replay'))
 
 
 def scoped(db, actor_id, workspace_id):

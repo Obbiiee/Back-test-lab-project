@@ -192,7 +192,7 @@ class ObservedResearchApplication:
         for r in rows:
             completed.append(dict(id=r['id'],side=r['side'],status='CLOSED',quantity=r['quantity'],remaining='0',entry=r['entryPrice'],entryPrice=r['entryPrice'],entryTimeNs=r['entryTimeNs'],entryFillRef=r['entryFillRef'],sl=state['orders'][r['id']]['sl'],tp=state['orders'][r['id']]['tp'],exitPrice=r['exitPrice'],exitFillRef=r['exitFillRef'],exitReason=r['exitReason'],gross=r['grossExact'],commission='0',net=r['netPosted'],durationNs=r['durationNs'],mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',rMultiple=r['rMultiple'],rReason=r['rReason']))
         provenance=deepcopy(projection['provenance']);provenance['analysisVersion']=RESEARCH_VERSION
-        base.update(status='COMPLETE',provenance=provenance,metrics=metrics,orders=orders,completed=completed,equity=deepcopy(projection['balanceCurve']),analysisProjection=projection)
+        base.update(status='COMPLETE',provenance=provenance,metrics=metrics,orders=orders,completed=completed,equity=deepcopy(projection['balanceCurve']),annotations=deepcopy(projection['annotations']),annotationWindowStart=projection['annotationWindowStart'],analysisProjection=projection)
         return base
 
     def bootstrap(self,session_id,raw):
@@ -214,6 +214,42 @@ class ObservedResearchApplication:
     def workspace(self,session_id,raw):
         keys(raw,'timeframe')
         return self.inspect(session_id,raw['timeframe'])
+
+    def chart_history(self,session_id,raw):
+        from datetime import datetime,timezone
+        from market_data.context_warmup import FrameWarmup,MAX_BARS
+        from .workspace import TIMEFRAMES
+        keys(raw,'timeframe offset');timeframe=raw['timeframe'];offset=raw['offset']
+        require(type(timeframe) is str and timeframe in TIMEFRAMES,'timeframe','REFUSED_TIMEFRAME')
+        require(type(offset) is int and 0<=offset<=50000,'offset','INVALID_INPUT')
+        archive,source_info=self.catalog.reference_context()
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');meta,method,state,cp=self._session(db,session_id)
+        start=int(state['startNs']);stamp=datetime.fromtimestamp(start//10**9,timezone.utc)
+        prior_year,prior_month=(stamp.year-1,12) if stamp.month==1 else (stamp.year,stamp.month-1)
+        month=f'{prior_year:04d}-{prior_month:02d}';end=datetime(stamp.year,stamp.month,1,tzinfo=timezone.utc)
+        begin=datetime(prior_year,prior_month,1,tzinfo=timezone.utc);start_s=int(begin.timestamp());end_s=int(end.timestamp())
+        duration=TIMEFRAMES[timeframe]
+        suffix={60:'1m',180:'3m',300:'5m',900:'15m',1800:'30m',3600:'1h',7200:'2h',14400:'4h',86400:'D'}[duration]
+        pin=self.catalog.reference_pin(f'{month}-{suffix}.json') if archive is not None else None
+        reference=None if source_info is None or pin is None else {**source_info,'fileName':pin['name'],'fileSha256':pin['sha256']}
+        result=dict(schemaVersion=1,artifact='BTL-OBSERVED-REFERENCE-OHLC-1',datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],
+                    reference=reference,timeframe=timeframe,period=month,startTime=start_s,endTime=end_s,trustedStartNs=str(start),
+                    priceBasis='HISTDATA_BID_REFERENCE_ONLY',volumeAvailable=False,coverage='UNKNOWN',executionAuthority=False,
+                    status='UNAVAILABLE' if archive is None else 'WARMUP_INCOMPLETE',candles=[],nextOffset=None)
+        if archive is None:return result
+        required=MAX_BARS
+        selection=archive.select(FrameWarmup(duration,required,1e-6),trusted_start_ns=start,month=month)
+        candles=[]
+        for bar in selection.candles:
+            t=bar.open_ns//10**9
+            if t>=start_s and bar.close_ns<=start and t+duration<=end_s:
+                candles.append(dict(time=t,open=bar.open,high=bar.high,low=bar.low,close=bar.close))
+        # One calendar month is the reference window. Gaps/rights remain unknown.
+        page=candles[offset:offset+512]
+        result.update(status='READY' if candles else 'WARMUP_INCOMPLETE',candles=page,
+                      nextOffset=offset+len(page) if offset+len(page)<len(candles) else None)
+        return result
 
     def journal(self,session_id):
         # Reuse the immutable committed analysis projection. Notes are held

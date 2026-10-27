@@ -29,7 +29,7 @@ class LedgerFold:
         seed=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=genesis['sessionId'],profileHash=genesis['profileHash'],policy=genesis['policy'],startNs=genesis['startNs'],initialBalance=genesis['initialBalance'])
         require(content_hash(seed)==genesis['eventHash'],'genesisHash','CORRUPT_RECORD')
         self.genesis=deepcopy(genesis);self.profile=ObservedExecutionProfile.from_wire(genesis['profile']);self.next=0;self.head=genesis['eventHash'];self.orders={};self.entry_times={};self.exit_times={};self.entry_refs={};self.exit_refs={};self.exit_prices={};self.exit_reasons={};self.exact_gross={};self.exit_counts={};self.exit_sequences={}
-        self.balance=self.peak=Fraction(genesis['initialBalance']);self.gross=self.max_dd=self.max_dd_rate=Fraction(0);self.curve=deque(maxlen=256);self.financial_count=0;self.unresolved=False;self.ended=False;self.last_fill=int(genesis['startNs'])
+        self.balance=self.peak=Fraction(genesis['initialBalance']);self.gross=self.max_dd=self.max_dd_rate=Fraction(0);self.curve=deque(maxlen=256);self.annotations=deque(maxlen=512);self.financial_count=0;self.unresolved=False;self.ended=False;self.last_fill=int(genesis['startNs'])
 
     def consume(self,e):
         next_,head=check_events([e],self.genesis,self.next,self.head);kind=e['kind'];oid=e['orderId'];d=e['detail'];p=self.profile.wire
@@ -60,6 +60,7 @@ class LedgerFold:
                 else:require(d['reason']==protective(o,dict(bid=evidence['bid'],ask=evidence['ask'])) and size==Fraction(o['remaining']),'protection','CORRUPT_RECORD')
                 posted=Fraction(d['grossPosted']);self.balance+=posted;self.gross+=posted;self.exact_gross[oid]=self.exact_gross.get(oid,Fraction(0))+Fraction(d['grossExact']);self.exit_counts[oid]=self.exit_counts.get(oid,0)+1
                 o.update(remaining=d['remaining'],status='CLOSED' if remaining==0 else 'ACTIVE',exitRequest=None,grossPosted=text(Fraction(o['grossPosted'])+posted));self.exit_times[oid]=moment;self.exit_sequences[oid]=e['sequence'];self.exit_refs[oid]=e['eventId'];self.exit_prices[oid]=d['price'];self.exit_reasons[oid]=d['reason']
+            self.annotations.append(dict(eventId=e['eventId'],orderId=oid,kind=kind,timeNs=evidence['timeNs'],price=d['price'],side=o['side'],reason=d.get('reason'),chronologyLimited=evidence['chronologyLimited']))
             self.financial_count+=1;self.peak=max(self.peak,self.balance);dd=self.peak-self.balance;self.max_dd=max(self.max_dd,dd);self.max_dd_rate=max(self.max_dd_rate,dd/self.peak)
             self.curve.append(dict(sequence=e['sequence'],eventId=e['eventId'],orderId=oid,timeNs=str(moment),balance=text(self.balance),drawdown=text(dd)))
         self.next,self.head=next_,head
@@ -80,7 +81,7 @@ class LedgerFold:
         # BE streak reset, duration and null-denominator semantics.
         metrics=committed_metrics([dict(row,net=row['netPosted']) for row in rows])
         metrics.update(closed=total,profitFactorReason='NO_REALIZED_LOSSES' if metrics['profitFactor'] is None else None,realizedNetCompleted=text(sum((Fraction(r['netPosted']) for r in rows),Fraction(0))),unresolved=sum(o['status']=='UNRESOLVED' for o in self.orders.values()),expired=sum(o['status']=='EXPIRED' for o in self.orders.values()),cancelled=sum(o['status']=='CANCELLED' for o in self.orders.values()),totalR=None,rAvailable=0,rReason='INCOMPLETE_R_COVERAGE',rBasis='IMMUTABLE_PREENTRY_CONFIRMED_RISK_REQUIRED',maxDrawdown=text(self.max_dd),maxDrawdownRate=ratio(self.max_dd_rate),unrealizedExcluded=True)
-        return dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='COMPLETE',provenance=dict(sessionId=state['sessionId'],revision=state['revision'],engineVersion=state['engineVersion'],model=MODEL,datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash'],eventHead=state['eventHash']),metrics=metrics,completed=page,nextTradeOffset=offset+len(page) if offset+len(page)<total else None,account=dict(currency='USD',initialBalance=state['initialBalance'],balance=state['balance'],realizedGross=state['realizedGross'],commission='0'),balanceCurve=list(self.curve),curveWindowStart=max(0,self.financial_count-256),markToMarketAvailable=False)
+        return dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='COMPLETE',provenance=dict(sessionId=state['sessionId'],revision=state['revision'],engineVersion=state['engineVersion'],model=MODEL,datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash']),metrics=metrics,completed=page,nextTradeOffset=offset+len(page) if offset+len(page)<total else None,account=dict(currency='USD',initialBalance=state['initialBalance'],balance=state['balance'],realizedGross=state['realizedGross'],commission='0'),balanceCurve=list(self.curve),curveWindowStart=max(0,self.financial_count-256),annotations=list(self.annotations),annotationWindowStart=max(0,self.financial_count-512),markToMarketAvailable=False)
 
 
 class ObservedStatistics:

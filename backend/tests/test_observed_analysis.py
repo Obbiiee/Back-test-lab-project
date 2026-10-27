@@ -31,9 +31,11 @@ class ObservedAnalysisTests(unittest.TestCase):
         self.start([(0,'2300','2300.1'),(S,'2300.9','2301'),(2*S,'2302','2302.1'),(3*S,'2303','2303.1')]);self.advance(0);self.opening(quantity='0.02',sl='2299');self.advance(S)
         self.call('CLOSE',dict(orderId='order:z',quantity='0.01'));self.advance(2*S)
         partial=self.project();self.assertEqual(partial['metrics']['closed'],0);self.assertEqual(partial['account']['balance'],'10001');self.assertEqual(partial['metrics']['realizedNetCompleted'],'0')
+        self.assertEqual([item['kind'] for item in partial['annotations']],['ENTRY_FILL','EXIT_FILL'])
         self.call('CLOSE',dict(orderId='order:z',quantity=None));self.advance(3*S);r=self.project()
         self.assertEqual((r['metrics']['closed'],r['metrics']['wins'],r['account']['balance']),(1,1,'10003'))
         self.assertEqual(r['completed'][0]['grossExact'],'3');self.assertEqual(r['completed'][0]['exitFills'],2);self.assertIsNone(r['metrics']['totalR']);self.assertEqual(r['completed'][0]['rReason'],'PREENTRY_REVIEW_RISK_NOT_JOINED');self.assertFalse(r['markToMarketAvailable'])
+        self.assertEqual([item['kind'] for item in r['annotations']],['ENTRY_FILL','EXIT_FILL','EXIT_FILL'])
 
     def test_short_loss_drawdown_no_stop_r_is_explicitly_unavailable(self):
         self.start([(0,'2300','2300.1'),(S,'2300','2300.1'),(2*S,'2301','2301.1')]);self.advance(0);self.opening(side='SHORT',entry='2300');self.advance(S);self.call('CLOSE',dict(orderId='order:z',quantity=None));self.advance(2*S);r=self.project()

@@ -105,3 +105,14 @@ class WorkerDeadlineTests(unittest.TestCase):
                 with self.assertRaises(ContractError):worker.pooled_invoke('unused',{'schemaVersion':1},deadline=deadline)
             with self.assertRaises(ContractError):worker.invoke('unused',{'schemaVersion':1,'oversize':'a'*32769})
             process.assert_not_called()
+
+    def test_chart_history_is_an_allowed_read_only_worker_operation(self):
+        import json
+        from cloud import research
+        actor='11111111-1111-4111-8111-111111111111';workspace='22222222-2222-4222-8222-222222222222'
+        payload={'schemaVersion':1,'actor':actor,'workspace':workspace,'operation':'chart_history',
+                 'args':['session:qa',{'timeframe':'1m','offset':0}],'write':False}
+        expected={'schemaVersion':1,'artifact':'BTL-OBSERVED-REFERENCE-OHLC-1','candles':[]}
+        with patch.dict(os.environ,{'BTL_WORKER_DATABASE':'authored-qa'}),patch.object(research,'run',return_value=expected):
+            result=json.loads(worker._execute(json.dumps(payload).encode()))
+        self.assertEqual(result,{'schemaVersion':1,'result':expected})
