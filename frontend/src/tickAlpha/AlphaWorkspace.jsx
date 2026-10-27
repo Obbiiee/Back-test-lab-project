@@ -20,7 +20,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const [preferences,setPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const [speed,setSpeed]=useState(4),[playToken,setPlayToken]=useState(null);
   const seekInput=useRef(null);
-  const [floating,setFloating]=useState(false),[replayOffset,setReplayOffset]=useState({x:0,y:0});
+  const [floating,setFloating]=useState(()=>typeof window!=='undefined'&&window.matchMedia?.('(min-width: 1001px)').matches===true),[replayOffset,setReplayOffset]=useState({x:0,y:0});
   const playing=playToken===pauseToken;
   const observed=view.metadata.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION';
   const [chartCommand,setChartCommand]=useState(null);

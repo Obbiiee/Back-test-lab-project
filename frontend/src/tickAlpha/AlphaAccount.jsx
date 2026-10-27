@@ -53,7 +53,7 @@ export default function AlphaAccount(){
           <button type="submit" disabled={busy}>{busy?'Working…':modes[mode]}</button>
         </form><nav aria-label="Account actions">{Object.entries(modes).filter(([key])=>key!==mode).map(([key,label])=><button key={key} disabled={busy} onClick={()=>{setMode(key);setNotice('');}}>{label}</button>)}</nav>
       </>:<>
-        <div className="alpha-identity-actions"><span>{user.email}</span><button disabled={busy} onClick={()=>logout(false)}>Sign out</button><button disabled={busy} onClick={()=>logout(true)}>Sign out all sessions</button></div>
+        <div className="alpha-identity-actions"><span title={user.email}>{user.email}</span><button disabled={busy} onClick={()=>logout(false)}>Sign out</button><button disabled={busy} onClick={()=>logout(true)}>Sign out all sessions</button></div>
         {selected?<><button disabled={busy} onClick={()=>{clearAccountTransport();setSelected(null);}}>Back to workspaces</button><p>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access; owner required for changes'}</p><Suspense fallback={<p>Loading workspace…</p>}><Workspace key={selected.id}/></Suspense></>:<>
           <h1>Your workspaces</h1><p>Available research sources are configured by the operator for each workspace. Source identity and limitations appear in the workspace. This list shows at most 50 authorized workspaces.</p>
           <ul>{workspaces.map(workspace=><li key={workspace.id}><button disabled={busy} onClick={()=>open(workspace)}>{workspace.name} · {workspace.role}</button></li>)}</ul>
