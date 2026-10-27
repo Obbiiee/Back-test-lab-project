@@ -178,6 +178,7 @@
     "frontend/src/workspace/WorkspaceModal.jsx",
     "backend/execution/historical.py",
     "backend/execution/observed_source.py",
+    "backend/execution/observed_context.py",
     "backend/ticks/contracts_v2.py",
     "backend/ticks/storage_v2.py",
     "backend/ticks/exness_v2.py",
@@ -357,6 +358,7 @@
     "backend/tests/test_exness_millisecond.py",
     "backend/tests/test_compact_storage.py",
     "backend/tests/test_observed_source.py",
+    "backend/tests/test_observed_context.py",
     "backend/tests/test_read_snapshot.py",
     "backend/tests/fixtures/binary_source_vectors.json",
     "backend/tests/verify_binary_source_vectors.mjs"
