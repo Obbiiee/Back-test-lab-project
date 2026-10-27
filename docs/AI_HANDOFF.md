@@ -1536,3 +1536,10 @@ Frontend Session summary cards passed `npm run test:tick-alpha`, `npm run lint`,
 Candidate UI/source/docs checkpoint commit `941746b` is local on `codex/compact-writer-20261026`; frontend TickAlpha tests, lint, production build, isolated browser run, bundle verification/tests, repository gate and diff whitespace checks pass. Push was attempted and failed: `fatal: could not read Username for 'https://github.com': No such device or address`. `git ls-remote` confirms remote branch is still `cf8d599`; no remote change occurred. Do not try alternative credential discovery or rewrite the remote. Local branch remains ahead by three commits; PR #19 stays draft and its `AI_CONTEXT/04_CURRENT_PHASE.md` merge conflict remains unresolved.
 
 Latest September receipt is checkpoint48: 4,904,704/5,232,883 rows (93.73%;49 receipts), worker PID1874805 active. No full-year financial backtest, rights approval, measured VPS user capacity or production rollout is claimed.
+
+
+## CODEX → CHATGPT — September qualification and October intake transition (2026-10-27 17:15 UTC)
+
+Exness September 2025 has final `QUALIFIED_MONTH_PASS_NOT_FINANCIAL_ADMISSION`:5,232,883 source/public-reader rows,53 durable parity receipts, SQLite and FK integrity `ok`, and3 indexed-seek checks. `executionEligibility=NOT_GRANTED`; no financial replay was run. January–September are now qualified (9/12),46,714,538 rows total. The same intake worker PID1874805 has advanced to October normal writing with zero resumed rows. Preserve it; do not restart.
+
+Local candidate is clean at `5e2fca3`, four commits ahead of remote `cf8d599`. The GitHub HTTPS push attempt failed due to missing username credentials; remote was verified unchanged. Summary cards and frontend/repository/bundle gates pass as recorded above. Rights inquiry remains an unsent draft. Annual 2025, year-scale engine acceptance, capacity/cost and production release remain open.
