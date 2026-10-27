@@ -1,0 +1,147 @@
+{
+  "scope": "FROZEN_MODEL_LITERALS_NOT_SOURCE_OR_FINANCIAL_ADMISSION",
+  "profiles": [
+    {
+      "name": "exness-qualified-day-identity-not-admission",
+      "profile": {
+        "schemaVersion": 1,
+        "artifact": "BTL-OBSERVED-EXECUTION-PROFILE-1",
+        "engineVersion": "BTL-TICK-EXECUTION-OBSERVED-1",
+        "model": "CONDITIONAL_OBSERVED_TICK_SIMULATION",
+        "symbol": "XAUUSD",
+        "baseCurrency": "XAU",
+        "quoteCurrency": "USD",
+        "accountCurrency": "USD",
+        "conversion": null,
+        "tickSize": "0.001",
+        "priceScale": "1000",
+        "contractSize": "100",
+        "lotStep": "0.01",
+        "minLot": "0.01",
+        "maxLot": "100",
+        "moneyScale": 2,
+        "commissionModel": "NONE",
+        "commissionPerLotSide": "0",
+        "commissionCurrency": "USD",
+        "slippageModel": "NONE",
+        "latencyModel": "ZERO",
+        "maxObservedSilenceNs": "60000000000",
+        "primary": {
+          "datasetId": "private:exness:XAUUSD:2025-01-02:34b9a7b8cc641222ede9e4b2",
+          "datasetVersion": "169d659a1fc8bb3ea5496c4b837f548d9e4959181eabb5263bda5ffc9a0b0cba",
+          "providerId": "exness",
+          "feedId": "archive:unsuffixed:XAUUSD",
+          "feedInstrumentId": "exness:XAUUSD",
+          "providerSymbol": "XAUUSD",
+          "evidenceClass": "PROVIDER_OBSERVATION"
+        }
+      },
+      "canonical": "{\"accountCurrency\":\"USD\",\"artifact\":\"BTL-OBSERVED-EXECUTION-PROFILE-1\",\"baseCurrency\":\"XAU\",\"commissionCurrency\":\"USD\",\"commissionModel\":\"NONE\",\"commissionPerLotSide\":\"0\",\"contractSize\":\"100\",\"conversion\":null,\"engineVersion\":\"BTL-TICK-EXECUTION-OBSERVED-1\",\"latencyModel\":\"ZERO\",\"lotStep\":\"0.01\",\"maxLot\":\"100\",\"maxObservedSilenceNs\":\"60000000000\",\"minLot\":\"0.01\",\"model\":\"CONDITIONAL_OBSERVED_TICK_SIMULATION\",\"moneyScale\":2,\"priceScale\":\"1000\",\"primary\":{\"datasetId\":\"private:exness:XAUUSD:2025-01-02:34b9a7b8cc641222ede9e4b2\",\"datasetVersion\":\"169d659a1fc8bb3ea5496c4b837f548d9e4959181eabb5263bda5ffc9a0b0cba\",\"evidenceClass\":\"PROVIDER_OBSERVATION\",\"feedId\":\"archive:unsuffixed:XAUUSD\",\"feedInstrumentId\":\"exness:XAUUSD\",\"providerId\":\"exness\",\"providerSymbol\":\"XAUUSD\"},\"quoteCurrency\":\"USD\",\"schemaVersion\":1,\"slippageModel\":\"NONE\",\"symbol\":\"XAUUSD\",\"tickSize\":\"0.001\"}",
+      "sha256": "a7fd42d08265f60e621eceafe64351ac7ab9ffb3b8908d8bbd4be4c5d6d2232b"
+    },
+    {
+      "name": "hf-2024-identity-not-admission",
+      "profile": {
+        "schemaVersion": 1,
+        "artifact": "BTL-OBSERVED-EXECUTION-PROFILE-1",
+        "engineVersion": "BTL-TICK-EXECUTION-OBSERVED-1",
+        "model": "CONDITIONAL_OBSERVED_TICK_SIMULATION",
+        "symbol": "XAUUSD",
+        "baseCurrency": "XAU",
+        "quoteCurrency": "USD",
+        "accountCurrency": "USD",
+        "conversion": null,
+        "tickSize": "0.001",
+        "priceScale": "1000",
+        "contractSize": "100",
+        "lotStep": "0.01",
+        "minLot": "0.01",
+        "maxLot": "100",
+        "moneyScale": 2,
+        "commissionModel": "NONE",
+        "commissionPerLotSide": "0",
+        "commissionCurrency": "USD",
+        "slippageModel": "NONE",
+        "latencyModel": "ZERO",
+        "maxObservedSilenceNs": "60000000000",
+        "primary": {
+          "datasetId": "local:hf-community:XAUUSD:2024:53011f22a5887999a2c883a2",
+          "datasetVersion": "87e3c3355dccc3afafef837a56d24046275dcf8ee6d1173a929a10279f14e743",
+          "providerId": "hf-community",
+          "feedId": "ccby-xauusd-2024",
+          "feedInstrumentId": "hf-community:XAUUSD",
+          "providerSymbol": "XAUUSD",
+          "evidenceClass": "PROVIDER_OBSERVATION"
+        }
+      },
+      "canonical": "{\"accountCurrency\":\"USD\",\"artifact\":\"BTL-OBSERVED-EXECUTION-PROFILE-1\",\"baseCurrency\":\"XAU\",\"commissionCurrency\":\"USD\",\"commissionModel\":\"NONE\",\"commissionPerLotSide\":\"0\",\"contractSize\":\"100\",\"conversion\":null,\"engineVersion\":\"BTL-TICK-EXECUTION-OBSERVED-1\",\"latencyModel\":\"ZERO\",\"lotStep\":\"0.01\",\"maxLot\":\"100\",\"maxObservedSilenceNs\":\"60000000000\",\"minLot\":\"0.01\",\"model\":\"CONDITIONAL_OBSERVED_TICK_SIMULATION\",\"moneyScale\":2,\"priceScale\":\"1000\",\"primary\":{\"datasetId\":\"local:hf-community:XAUUSD:2024:53011f22a5887999a2c883a2\",\"datasetVersion\":\"87e3c3355dccc3afafef837a56d24046275dcf8ee6d1173a929a10279f14e743\",\"evidenceClass\":\"PROVIDER_OBSERVATION\",\"feedId\":\"ccby-xauusd-2024\",\"feedInstrumentId\":\"hf-community:XAUUSD\",\"providerId\":\"hf-community\",\"providerSymbol\":\"XAUUSD\"},\"quoteCurrency\":\"USD\",\"schemaVersion\":1,\"slippageModel\":\"NONE\",\"symbol\":\"XAUUSD\",\"tickSize\":\"0.001\"}",
+      "sha256": "8718488807a66a68763c5a2427e1cbd7a714c9f7f79ade874ad0c736b86978d8"
+    }
+  ],
+  "arithmetic": [
+    {
+      "side": "LONG",
+      "entry": "2300.125",
+      "exit": "2301.275",
+      "quantity": "0.37",
+      "expectedGross": "42.55",
+      "expectedPosted": "42.55"
+    },
+    {
+      "side": "SHORT",
+      "entry": "2300.125",
+      "exit": "2298.775",
+      "quantity": "0.37",
+      "expectedGross": "49.95",
+      "expectedPosted": "49.95"
+    },
+    {
+      "side": "LONG",
+      "entry": "2300",
+      "exit": "2300.005",
+      "quantity": "0.01",
+      "expectedGross": "0.005",
+      "expectedPosted": "0"
+    },
+    {
+      "side": "LONG",
+      "entry": "2300",
+      "exit": "2300.015",
+      "quantity": "0.01",
+      "expectedGross": "0.015",
+      "expectedPosted": "0.02"
+    },
+    {
+      "side": "LONG",
+      "entry": "2300",
+      "exit": "2299.995",
+      "quantity": "0.01",
+      "expectedGross": "-0.005",
+      "expectedPosted": "0"
+    },
+    {
+      "side": "SHORT",
+      "entry": "2300",
+      "exit": "2300.015",
+      "quantity": "0.01",
+      "expectedGross": "-0.015",
+      "expectedPosted": "-0.02"
+    },
+    {
+      "side": "LONG",
+      "entry": "2300.125",
+      "exit": "2300.025",
+      "quantity": "0.01",
+      "expectedGross": "-0.1",
+      "expectedPosted": "-0.1"
+    }
+  ],
+  "risk": {
+    "entry": "2300.125",
+    "stop": "2287.78",
+    "balance": "10000",
+    "riskPercent": "1",
+    "expectedQuantity": "0.08",
+    "expectedRisk": "98.76"
+  }
+}

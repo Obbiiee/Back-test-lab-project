@@ -361,6 +361,8 @@
     "backend/tests/test_observed_context.py",
     "backend/tests/test_read_snapshot.py",
     "backend/tests/fixtures/binary_source_vectors.json",
+    "backend/tests/fixtures/observed_profile_vectors.json",
+    "backend/tests/verify_observed_vectors.mjs",
     "backend/tests/verify_binary_source_vectors.mjs"
   ],
   "supporting": [
