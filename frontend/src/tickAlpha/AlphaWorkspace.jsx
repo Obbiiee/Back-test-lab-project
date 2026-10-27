@@ -22,6 +22,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const seekInput=useRef(null);
   const [floating,setFloating]=useState(false),[replayOffset,setReplayOffset]=useState({x:0,y:0});
   const playing=playToken===pauseToken;
+  const observed=view.metadata.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION';
   const [chartCommand,setChartCommand]=useState(null);
   const [drawingState,setDrawingState]=useState({drawings:[],selectedId:null});
   const [past,setPast]=useState({key:'',bars:[],status:''}),[historyRetry,setHistoryRetry]=useState(0);
@@ -100,6 +101,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   };
   const stopAndSeek=()=>{
     setPlayToken(null);
+    if(observed){onNotice('This observed Session is forward-only. Create another Session for a different start time.');return;}
     try{onReplay('SEEK',seekTarget(seekInput.current.value));}catch(error){onNotice(error.message);}
   };
   return <section className="alpha-chart-workspace" aria-label="Tick replay workspace">
@@ -139,7 +141,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <button disabled={busy||playing||view.state.ended} aria-keyshortcuts="Shift+ArrowRight" title={`Shift+→ · requests observed quotes through ${new Date(Number(BigInt(replayTarget(view,speed))/1000000n)).toISOString()}`} onClick={()=>onReplay('ADVANCE',replayTarget(view,speed))}>Step ticks</button>
       <span className="alpha-step-target">Next target: {new Date(Number(BigInt(replayTarget(view,speed))/1000000n)).toISOString().slice(11,19)} UTC</span>
       <label>Replay speed<select aria-label="Replay speed" disabled={busy||playing} value={speed} onChange={e=>setSpeed(Number(e.target.value))}><option value={1}>1 interval / step</option><option value={4}>4 intervals / step</option><option value={16}>16 intervals / step</option></select></label>
-      <details className="alpha-seek" onToggle={event=>{if(event.currentTarget.open&&seekInput.current)seekInput.current.value=new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19);}}><summary>Go to time</summary><div><label>Seek (UTC)<input ref={seekInput} aria-label="Seek UTC" type="datetime-local" step="1" disabled={busy||playing} defaultValue={new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19)}/></label><button disabled={busy||playing} onClick={stopAndSeek}>Seek replay</button></div></details>
+      <details className="alpha-seek" onToggle={event=>{if(event.currentTarget.open&&seekInput.current)seekInput.current.value=new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19);}}><summary>Go to time</summary><div><label>{observed?'Observed time (forward-only)':'Seek (UTC)'}<input ref={seekInput} aria-label="Seek UTC" type="datetime-local" step="1" disabled={busy||playing||observed} defaultValue={new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19)}/></label><button disabled={busy||playing||observed} onClick={stopAndSeek}>Seek replay</button>{observed&&<p>This Session advances through accepted ticks only. Create a separate Session for a different start time.</p>}</div></details>
     </div>
     <div className="alpha-chart-disclosures"><details className="alpha-display-details alpha-replay-evidence"><summary>Replay time (UTC): {new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().replace("T"," ").replace(".000Z"," UTC")} · {view.chart.candles.at(-1)?.incomplete?"forming candle":"complete candle"}</summary><p className="alpha-chart-note">Acknowledged cursor: {new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString()} · {view.chart.candles.length} revealed bars · latest bucket {view.chart.candles.at(-1)?.incomplete?'incomplete':'complete'}. Bid {view.quote?.bid??'unavailable'} / Ask {view.quote?.ask??'unavailable'}.</p></details>
     <details className="alpha-display-details"><summary>Chart and replay limitations</summary><p className="alpha-chart-note">Drawings and indicators are research aids; position drawings are planning estimates. Execution uses observed Bid/Ask ticks. {view.replayStepNs?'Historical candles use recorded row order for research display; order within a timestamp remains unverified. ':''}{view.chart.windowStartGroup!=='0'?'The bounded chart window may start inside a bucket. ':''}Committed financial history cannot be rewound; create a separate Session for another experiment.</p></details></div>

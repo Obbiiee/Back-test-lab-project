@@ -28,7 +28,7 @@ class LedgerFold:
         validate_state(genesis);require(genesis['revision']==0 and genesis['nextEventIndex']==0 and genesis['orders']=={} and genesis['balance']==genesis['initialBalance'] and not genesis['unresolved'] and not genesis['ended'],'genesis','CORRUPT_RECORD')
         seed=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=genesis['sessionId'],profileHash=genesis['profileHash'],policy=genesis['policy'],startNs=genesis['startNs'],initialBalance=genesis['initialBalance'])
         require(content_hash(seed)==genesis['eventHash'],'genesisHash','CORRUPT_RECORD')
-        self.genesis=deepcopy(genesis);self.profile=ObservedExecutionProfile.from_wire(genesis['profile']);self.next=0;self.head=genesis['eventHash'];self.orders={};self.entry_times={};self.exit_times={};self.exact_gross={};self.exit_counts={};self.exit_sequences={}
+        self.genesis=deepcopy(genesis);self.profile=ObservedExecutionProfile.from_wire(genesis['profile']);self.next=0;self.head=genesis['eventHash'];self.orders={};self.entry_times={};self.exit_times={};self.entry_refs={};self.exit_refs={};self.exit_prices={};self.exit_reasons={};self.exact_gross={};self.exit_counts={};self.exit_sequences={}
         self.balance=self.peak=Fraction(genesis['initialBalance']);self.gross=self.max_dd=self.max_dd_rate=Fraction(0);self.curve=deque(maxlen=256);self.financial_count=0;self.unresolved=False;self.ended=False;self.last_fill=int(genesis['startNs'])
 
     def consume(self,e):
@@ -49,7 +49,7 @@ class LedgerFold:
             o=self.orders[oid];evidence=d['evidence'];moment=uint(evidence['timeNs']);require(self.last_fill<=moment and int(o['availableNs'])<=moment and d['commission']=='0','fill','CORRUPT_RECORD');self.last_fill=moment
             expected_side='ask' if (o['side']=='LONG')==(kind=='ENTRY_FILL') else 'bid';require(d['price']==evidence[expected_side],'side','CORRUPT_RECORD')
             if kind=='ENTRY_FILL':
-                require(o['status']=='PENDING' and d['quantity']==o['quantity'] and d['balanceDelta']=='0','entry','CORRUPT_RECORD');o.update(status='ACTIVE',entryPrice=d['price'],entryFillRef=e['eventId']);self.entry_times[oid]=moment
+                require(o['status']=='PENDING' and d['quantity']==o['quantity'] and d['balanceDelta']=='0','entry','CORRUPT_RECORD');o.update(status='ACTIVE',entryPrice=d['price'],entryFillRef=e['eventId']);self.entry_times[oid]=moment;self.entry_refs[oid]=e['eventId']
             else:
                 size=Fraction(d['quantity']);remaining=Fraction(o['remaining'])-size
                 require(o['status']=='ACTIVE' and 0<size<=Fraction(o['remaining']) and remaining==Fraction(d['remaining']) and d['entryFillRef']==o['entryFillRef'],'exit','CORRUPT_RECORD')
@@ -59,7 +59,7 @@ class LedgerFold:
                     request=o['exitRequest'];require(protective(o,dict(bid=evidence['bid'],ask=evidence['ask'])) is None and request is not None and request['quantity']==d['quantity'] and int(request['availableNs'])<=moment,'exitRequest','CORRUPT_RECORD')
                 else:require(d['reason']==protective(o,dict(bid=evidence['bid'],ask=evidence['ask'])) and size==Fraction(o['remaining']),'protection','CORRUPT_RECORD')
                 posted=Fraction(d['grossPosted']);self.balance+=posted;self.gross+=posted;self.exact_gross[oid]=self.exact_gross.get(oid,Fraction(0))+Fraction(d['grossExact']);self.exit_counts[oid]=self.exit_counts.get(oid,0)+1
-                o.update(remaining=d['remaining'],status='CLOSED' if remaining==0 else 'ACTIVE',exitRequest=None,grossPosted=text(Fraction(o['grossPosted'])+posted));self.exit_times[oid]=moment;self.exit_sequences[oid]=e['sequence']
+                o.update(remaining=d['remaining'],status='CLOSED' if remaining==0 else 'ACTIVE',exitRequest=None,grossPosted=text(Fraction(o['grossPosted'])+posted));self.exit_times[oid]=moment;self.exit_sequences[oid]=e['sequence'];self.exit_refs[oid]=e['eventId'];self.exit_prices[oid]=d['price'];self.exit_reasons[oid]=d['reason']
             self.financial_count+=1;self.peak=max(self.peak,self.balance);dd=self.peak-self.balance;self.max_dd=max(self.max_dd,dd);self.max_dd_rate=max(self.max_dd_rate,dd/self.peak)
             self.curve.append(dict(sequence=e['sequence'],eventId=e['eventId'],orderId=oid,timeNs=str(moment),balance=text(self.balance),drawdown=text(dd)))
         self.next,self.head=next_,head
@@ -73,7 +73,7 @@ class LedgerFold:
             # Frozen research owner requires immutable PRE-ENTRY confirmation
             # R0; actual-entry geometry is not a retrospective substitute.
             r=None;reason='PREENTRY_REVIEW_RISK_NOT_JOINED'
-            rows.append(dict(id=oid,side=o['side'],entryTimeNs=str(self.entry_times[oid]),exitTimeNs=str(self.exit_times[oid]),entryPrice=o['entryPrice'],quantity=o['quantity'],exitFills=self.exit_counts[oid],netPosted=o['grossPosted'],grossExact=text(self.exact_gross[oid]),rMultiple=None if r is None else ratio(r),rReason=reason,durationNs=str(self.exit_times[oid]-self.entry_times[oid])))
+            rows.append(dict(id=oid,side=o['side'],entryTimeNs=str(self.entry_times[oid]),exitTimeNs=str(self.exit_times[oid]),entryPrice=o['entryPrice'],quantity=o['quantity'],exitFills=self.exit_counts[oid],entryFillRef=self.entry_refs[oid],exitFillRef=self.exit_refs[oid],exitPrice=self.exit_prices[oid],exitReason=self.exit_reasons[oid],commission='0',net=o['grossPosted'],netPosted=o['grossPosted'],grossExact=text(self.exact_gross[oid]),rMultiple=None if r is None else ratio(r),rReason=reason,durationNs=str(self.exit_times[oid]-self.entry_times[oid])))
         require(type(offset) is int and 0<=offset<=len(rows) and type(maximum) is int and 1<=maximum<=64,'pagination')
         total=len(rows);page=rows[offset:offset+maximum]
         # Reuse the frozen pure calculator, including signed average loss,

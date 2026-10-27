@@ -159,5 +159,35 @@ class ObservedPostgresTests(unittest.TestCase):
                 AdmittedObservedSource(folder,other.profile,receipt_path=proof,receipt_sha256=hashlib.sha256(proof.read_bytes()).hexdigest(),log_root=other.root/'guarded-logs')
         finally:folder.chmod(0o700);archive.chmod(0o600);other.tearDown()
 
+    def test_observed_research_application_method_session_review_statistics_journal(self):
+        from threading import RLock
+        from collections import OrderedDict
+        from execution.observed_catalog import ObservedCatalog
+        from execution.observed_profile import MODEL
+        from execution.observed_research import ObservedResearchApplication
+        catalog=object.__new__(ObservedCatalog);key='source:2024-01'
+        catalog._entries={key:dict(key=key,period='2024-01',label='Authored QA XAUUSD',profile=self.fx.profile.wire)}
+        private=dict(profile=self.fx.profile.wire,folder=str(self.folder),receiptPath=str(self.proof),receiptSha256=self.proof_hash,logRoot=str(self.root/'controller-logs'))
+        catalog._profiles={self.fx.profile.profile_hash:private};catalog._cache=OrderedDict([(self.fx.profile.profile_hash,self.source)]);catalog._lock=RLock()
+        catalog.public=lambda:[dict(key=key,period='2024-01',label='Authored QA XAUUSD',model=MODEL,profileHash=self.fx.profile.profile_hash,profile=self.fx.profile.wire)]
+        app=ObservedResearchApplication(DSN,self.scope,catalog)
+        method=dict(schemaVersion=1,artifact='BTL-LOCAL-METHOD-1',id='method:observed-app',name='Observed app QA',kind='FREE_STYLE',checklistOn=False,conditions=[],riskPercent=None,rr=None)
+        app_sid='session:observed-app';session=dict(id=app_sid,name='Observed app QA',methodId=method['id'],initialBalance='10000',sourceKey=key,period='2024-01',day=None)
+        with patch.object(self.source,'start_for_period',return_value=0):
+            app.create_method(method);view=app.create_session(session)
+            self.assertEqual(view['metadata']['model'],MODEL);self.assertEqual(view['analysis']['status'],'COMPLETE')
+            app.apply(app_sid,command(app_sid,'app:advance:0',0,'ADVANCE',dict(targetNs='0')))
+            request=dict(sessionId=app_sid,requestId='app:order',expectedRevision=1,planId=None,planRevision=None,
+                draft=dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]))
+            reviewed=app.review(request);accepted=app.confirm(app_sid,dict(reviewId='app:order',reviewHash=reviewed['reviewHash']))
+            self.assertTrue(accepted['durable'])
+            latest=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:1',latest['revision'],'ADVANCE',dict(targetNs=str(S))))
+            current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:close',current['revision'],'CLOSE',dict(orderId='app:order',quantity=None)))
+            current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:2',current['revision'],'ADVANCE',dict(targetNs=str(2*S))))
+            result=app.inspect(app_sid);self.assertEqual(result['analysis']['metrics']['tradeCount'],1)
+            self.assertEqual(result['analysis']['completed'][0]['id'],'app:order')
+            saved=app.save_note(app_sid,dict(orderId='app:order',expectedNoteRevision=0,text='Observed app acceptance',tags=['qa']))
+            self.assertEqual(saved['noteRevision'],1);self.assertEqual(app.journal(app_sid)['notes'][0]['text'],'Observed app acceptance')
+
 
 if __name__=='__main__' and '--worker' in sys.argv:worker()

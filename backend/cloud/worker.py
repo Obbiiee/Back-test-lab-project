@@ -49,6 +49,8 @@ def close():
     for slot in _slots:
         with slot.lock:
             slot.close()
+    from .research import close_operator_catalogs
+    close_operator_catalogs()
 
 
 atexit.register(close)
@@ -56,7 +58,8 @@ atexit.register(close)
 
 def _environment(dsn):
     environment = {k: v for k, v in os.environ.items()
-                   if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')}
+                   if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
+                   or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256')}
     environment['BTL_WORKER_DATABASE'] = dsn
     return environment
 

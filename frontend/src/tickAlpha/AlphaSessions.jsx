@@ -17,7 +17,9 @@ export default function AlphaSessions({catalog,busy,onOpen,onCreate,onSource}){
       .sort((a,b)=>a.name.localeCompare(b.name));
   },[catalog.sessions,query,strategy,methods]);
   const hasMethods=catalog.methods.length>0,hasSessions=catalog.sessions.length>0;
-  const source=sourceContext()==='historical'?'Exness XAUUSD':'Synthetic fixture';
+  const sourceFor=session=>session.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION'
+    ?(catalog.datasets?.find(dataset=>dataset.key===session.datasetKey)?.label??'Observed XAUUSD ticks')
+    :sourceContext()==='historical'?'Exness XAUUSD':'Synthetic fixture';
   const steps=[['Create a strategy','Write the rules you want to test.',hasMethods],['Create a Session','Pick a start month and starting balance.',hasSessions],['Replay and trade','Reveal history one step at a time and place orders.',false],['Review the evidence','Check the journal and Analysis for each Session.',false]];
   return <section className="alpha-hub" aria-labelledby="alpha-hub-title">
     <div className="alpha-hub-head">
@@ -40,10 +42,10 @@ export default function AlphaSessions({catalog,busy,onOpen,onCreate,onSource}){
         <dl>
           <div><dt>Instrument</dt><dd>XAUUSD</dd></div>
           <div><dt>Starting balance</dt><dd>{money(session.initialBalance)}</dd></div>
-          <div><dt>Start month</dt><dd>{session.startPeriod}</dd></div>
+          <div><dt>Start month</dt><dd>{session.period??session.startPeriod}</dd></div>
           <div><dt>Strategy</dt><dd>{method?.name||'Unavailable'}</dd></div>
         </dl>
-        <footer><span>{source}</span><button className="alpha-primary-action" disabled={busy} onClick={()=>onOpen(session.id)} aria-label={`Open ${session.name}`}>Open</button></footer>
+        <footer><span>{sourceFor(session)}</span><button className="alpha-primary-action" disabled={busy} onClick={()=>onOpen(session.id)} aria-label={`Open ${session.name}`}>Open</button></footer>
       </article></li>;})}</ul>:<p className="alpha-hub-none">No Session matches this search.</p>)}
     {hasMethods&&<section className="alpha-hub-strategies" aria-labelledby="alpha-hub-strategies"><h2 id="alpha-hub-strategies">Strategies</h2><ul>{catalog.methods.map(m=><li key={m.id}><strong>{m.name}</strong><span>{kindLabel(m.kind)}{m.kind==='PROTOCOL'&&m.riskPercent?` · risk ${m.riskPercent}%`:''}{m.kind==='PROTOCOL'&&m.rr?` · R:R ${m.rr}`:''}</span><span>{catalog.sessions.filter(s=>s.methodId===m.id).length} Sessions</span></li>)}</ul></section>}
   </section>;

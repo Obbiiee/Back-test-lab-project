@@ -61,7 +61,7 @@ class ObservedExecutionStore:
     def _read(self,db,workspace,session,*,lock=False):
         row=db.execute('SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s'+(' FOR UPDATE' if lock else ''),(workspace,session)).fetchone()
         require(row is not None,'session','RESOURCE_UNAVAILABLE');stored=read_snapshot(row[0],row[1]);s=stored['state']
-        require((s['revision'],s['datasetVersion'],s['profileHash'])==tuple(row[2:]),'state','CORRUPT_RECORD')
+        require(s['sessionId']==session and (s['revision'],s['datasetVersion'],s['profileHash'])==tuple(row[2:]),'state','CORRUPT_RECORD')
         tip=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(workspace,session,s['revision'])).fetchone()
         require(tip is not None and bytes(tip[0])==bytes(row[0]) and tip[1]==row[1],'immutableTip','CORRUPT_RECORD')
         return stored
@@ -71,11 +71,13 @@ class ObservedExecutionStore:
         if row is None:return None
         require(row[0]==content_hash(command),'commandId','REFUSED_IDEMPOTENCY_CONFLICT');return checked_result(row[1],row[2],command)
 
-    def create(self,scope,state,checkpoint):
+    def _insert(self,db,scope,state,checkpoint):
         workspace,session=scoped(scope,state['sessionId']);require(state['revision']==0,'initialRevision');raw,sha=pack(validate_snapshot(state,checkpoint))
-        with connect(self.dsn) as db:
-            db.execute('INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,state['datasetVersion'],state['profileHash'],0,raw,sha))
-            db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw,sha))
+        db.execute('INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,state['datasetVersion'],state['profileHash'],0,raw,sha))
+        db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw,sha))
+
+    def create(self,scope,state,checkpoint):
+        with connect(self.dsn) as db:self._insert(db,scope,state,checkpoint)
 
     def prepare(self,scope,raw):
         command=command_wire(raw);workspace,session=scoped(scope,command['sessionId'])

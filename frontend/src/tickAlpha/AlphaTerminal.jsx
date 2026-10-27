@@ -19,7 +19,7 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback}){
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   const evidence=view.analysis;
-  if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
+  if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>{evidence?.status==='BUILDING'?'Building committed statistics':'Analysis unavailable'}</h2>{evidence?.status==='BUILDING'?<p role="status">Verified {evidence.progress.processedEvents} of {evidence.progress.totalEvents} committed events. No partial financial metrics are shown. Reload this Session to continue.</p>:<p>{evidence?.reason??'The service has no compatible analysis projection.'} No partial history is presented as a complete result.</p>}</section>;
   const {account,metrics,provenance}=evidence;
   const closed=tab==='Closed trades';
   const rows=tab==='Pending orders'?evidence.orders.filter(o=>o.status==='PENDING'):closed?evidence.completed:evidence.orders.filter(o=>['ACTIVE','UNRESOLVED'].includes(o.status));

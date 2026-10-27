@@ -1,5 +1,9 @@
 """Verified workspace composition; private loopback datasets are never mounted."""
 from functools import partial
+from collections import OrderedDict
+from threading import RLock
+import hashlib
+import os
 import uuid
 
 import anyio
@@ -18,18 +22,71 @@ from workspace.policy import owner
 from workspace.store import WorkspaceUnit
 from . import queue
 
+_OPERATOR_LOCK=RLock()
+_OPERATOR_CATALOGS=OrderedDict()
+
+
+def _operator_catalog(dsn):
+    path=os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG');sha=os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG_SHA256')
+    require((path is None)==(sha is None),'operatorCatalog','REFUSED_OPERATOR_CATALOG')
+    if path is None:return None
+    require(len(path)<=4096 and os.path.isabs(path),'operatorCatalog','REFUSED_OPERATOR_CATALOG')
+    from execution.observed_catalog import ObservedCatalog
+    key=(hashlib.sha256(dsn.encode()).hexdigest(),path,sha)
+    with _OPERATOR_LOCK:
+        catalog=_OPERATOR_CATALOGS.get(key)
+        if catalog is None:
+            catalog=ObservedCatalog(path,sha);_OPERATOR_CATALOGS[key]=catalog
+        _OPERATOR_CATALOGS.move_to_end(key)
+        # A single configured catalog per DB process; changing its pin requires
+        # a clean worker restart, which also closes the exact old capability.
+        require(len(_OPERATOR_CATALOGS)<=1,'operatorCatalog','SOURCE_PIN_CHANGED')
+        return catalog
+
+
+def close_operator_catalogs():
+    with _OPERATOR_LOCK:
+        for catalog in _OPERATOR_CATALOGS.values():catalog.close()
+        _OPERATOR_CATALOGS.clear()
+
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
     # Keep verified-user/membership locks through the INNER service commit.
-    # A preflight check alone would allow revocation between check and write.
+    # The external source selector is an operator catalog; HTTP supplies only
+    # public keys, periods and normal trading intentions.
     with connect(dsn) as db:
         db.row_factory = dict_row
         unit = WorkspaceUnit(db, actor_id, workspace_id)
         if write:
             owner(unit.role)
-        research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)))
+        catalog=_operator_catalog(dsn)
+        observed=False;session_id=None
+        if catalog is not None:
+            if operation in ('catalog','create_method'):
+                observed=True
+            elif operation=='create_session':
+                observed=bool(args and type(args[0]) is dict and 'sourceKey' in args[0])
+            elif operation in ('summary','inspect','journal','save_note','confirm','apply','bootstrap','workspace','review'):
+                if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
+                elif operation in ('confirm','apply','workspace','bootstrap','inspect','summary','journal','save_note') and args:session_id=args[0]
+                if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
+                if type(session_id) is str:
+                    row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
+                    if row is not None:
+                        try:
+                            from execution.postgres import unpack
+                            meta=unpack(row['payload'],row['content_hash']);observed=meta.get('artifact')=='BTL-OBSERVED-RESEARCH-SESSION-1'
+                        except (TypeError,ValueError,UnicodeError):
+                            raise ContractError('CORRUPT_RECORD','session')
+            if observed:
+                from execution.observed_research import ObservedResearchApplication
+                research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog)
+            else:
+                research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)))
+        else:
+            research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)))
         try:
-            return getattr(research, operation)(*args)
+            return research.catalog_view() if observed and operation=='catalog' else getattr(research,operation)(*args)
         finally:
             research.close()
 
