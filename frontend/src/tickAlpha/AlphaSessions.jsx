@@ -1,11 +1,90 @@
-import {useMemo,useState} from 'react';
-import {sourceContext} from './client.js';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {api,sessionPath,sourceContext} from './client.js';
 
-// Testing hub shown when no Session is open. Reads only the existing catalog
-// (Session metadata and strategies); it never fetches per-Session financial state,
-// so opening the hub adds no replay work. Balances shown are starting balances.
-const money=value=>{const [whole,fraction]=String(value).split('.');return '$'+whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction?'.'+fraction:'');};
+// Hub cards request committed read-only summaries only near the viewport. The
+// bounded queue avoids a fan-out across every saved Session and never advances replay.
+const money=(value,currency='USD')=>{const [whole,fraction]=String(value).split('.');return (currency==='USD'?'$':`${currency} `)+whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction?'.'+fraction:'');};
 const kindLabel=kind=>kind==='PROTOCOL'?'Protocol':'Free Style';
+const exactDecimal=value=>typeof value==='string'&&/^-?\d+(?:\.\d+)?$/.test(value);
+const SUMMARY_ARTIFACTS=new Set(['BTL-SESSION-SUMMARY-1','BTL-OBSERVED-SESSION-SUMMARY-1']);
+const SUMMARY_LIMIT=2;
+let activeSummaryReads=0;
+const summaryQueue=[];
+
+function drainSummaryQueue(){
+  while(activeSummaryReads<SUMMARY_LIMIT&&summaryQueue.length){
+    const task=summaryQueue.shift();
+    if(task.cancelled||task.signal?.aborted)continue;
+    activeSummaryReads++;
+    api(sessionPath(task.sessionId)+'/summary',undefined,{signal:task.signal})
+      .then(task.resolve,task.reject)
+      .finally(()=>{task.signal?.removeEventListener('abort',task.abort);activeSummaryReads--;drainSummaryQueue();});
+  }
+}
+
+function queuedSummary(sessionId,signal){
+  return new Promise((resolve,reject)=>{
+    const task={sessionId,signal,resolve,reject,cancelled:false};
+    task.abort=()=>{
+      task.cancelled=true;
+      const queued=summaryQueue.indexOf(task);if(queued>=0)summaryQueue.splice(queued,1);
+      signal?.removeEventListener('abort',task.abort);
+      reject(signal.reason??Error('Request cancelled'));
+    };
+    if(signal?.aborted){task.abort();return;}
+    signal?.addEventListener('abort',task.abort,{once:true});
+    summaryQueue.push(task);drainSummaryQueue();
+  });
+}
+
+function replayTime(value){
+  if(value===null||value===undefined)return 'Not started';
+  try{
+    const milliseconds=Number(BigInt(value)/1000000n);
+    if(!Number.isSafeInteger(milliseconds))return 'Unavailable';
+    return new Intl.DateTimeFormat('en-US',{timeZone:'UTC',dateStyle:'medium',timeStyle:'short'}).format(milliseconds)+' UTC';
+  }catch{return 'Unavailable';}
+}
+
+function signedMoney(value,currency){
+  const negative=String(value).startsWith('-'),absolute=negative?String(value).slice(1):String(value);
+  return `${negative?'−':'+'}${money(absolute,currency)}`;
+}
+
+function SessionSummary({session}){
+  const target=useRef(null);
+  const [visible,setVisible]=useState(()=>typeof IntersectionObserver==='undefined'),[attempt,setAttempt]=useState(0),[state,setState]=useState({status:'WAITING'});
+  useEffect(()=>{
+    if(!target.current||visible||typeof IntersectionObserver==='undefined')return;
+    const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'240px'});
+    observer.observe(target.current);return()=>observer.disconnect();
+  },[visible]);
+  useEffect(()=>{
+    if(!visible)return;
+    const controller=new AbortController();
+    queuedSummary(session.id,controller.signal).then(summary=>{
+      if(!SUMMARY_ARTIFACTS.has(summary?.artifact)||summary.sessionId!==session.id||!exactDecimal(summary.balance)||!exactDecimal(summary.netCashChange)||typeof summary.accountCurrency!=='string'||!/^[A-Z]{3}$/.test(summary.accountCurrency)||!Number.isSafeInteger(summary.completedTrades)||summary.completedTrades<0||typeof summary.unresolved!=='boolean'||typeof summary.ended!=='boolean'||(summary.throughNs!==null&&typeof summary.throughNs!=='string'))throw Error('Unsupported Session summary');
+      setState({status:'READY',summary});
+    }).catch(error=>{if(!controller.signal.aborted)setState({status:'ERROR',message:error.message});});
+    return()=>controller.abort();
+  },[session.id,visible,attempt]);
+  const summary=state.summary;
+  const status=visible&&state.status==='WAITING'?'LOADING':state.status;
+  return <div className="alpha-hub-summary" ref={target} aria-label={`Saved results for ${session.name}`} aria-live="polite">
+    {status==='WAITING'&&<p>Session results load when this card is nearby.</p>}
+    {status==='LOADING'&&<p>Loading saved results…</p>}
+    {status==='ERROR'&&<div><p role="status">Saved results are temporarily unavailable.</p><button type="button" onClick={()=>{setState({status:'LOADING'});setAttempt(value=>value+1);}}>Retry results</button></div>}
+    {summary&&<>
+      <dl>
+        <div><dt>Current balance</dt><dd>{money(summary.balance,summary.accountCurrency)}</dd></div>
+        <div><dt>Net cash change</dt><dd>{signedMoney(summary.netCashChange,summary.accountCurrency)}</dd></div>
+        <div><dt>Closed trades</dt><dd>{summary.completedTrades}</dd></div>
+        <div><dt>Replay position</dt><dd>{replayTime(summary.throughNs)}</dd></div>
+      </dl>
+      <p className="alpha-hub-summary-state">{summary.ended?'Session ended':summary.unresolved?'Evidence unresolved':'Saved replay state'} · committed values</p>
+    </>}
+  </div>;
+}
 
 export default function AlphaSessions({catalog,busy,onOpen,onCreate,onSource}){
   const [query,setQuery]=useState(''),[strategy,setStrategy]=useState('');
@@ -45,6 +124,7 @@ export default function AlphaSessions({catalog,busy,onOpen,onCreate,onSource}){
           <div><dt>Start month</dt><dd>{session.period??session.startPeriod}</dd></div>
           <div><dt>Strategy</dt><dd>{method?.name||'Unavailable'}</dd></div>
         </dl>
+        <SessionSummary session={session}/>
         <footer><span>{sourceFor(session)}</span><button className="alpha-primary-action" disabled={busy} onClick={()=>onOpen(session.id)} aria-label={`Open ${session.name}`}>Open</button></footer>
       </article></li>;})}</ul>:<p className="alpha-hub-none">No Session matches this search.</p>)}
     {hasMethods&&<section className="alpha-hub-strategies" aria-labelledby="alpha-hub-strategies"><h2 id="alpha-hub-strategies">Strategies</h2><ul>{catalog.methods.map(m=><li key={m.id}><strong>{m.name}</strong><span>{kindLabel(m.kind)}{m.kind==='PROTOCOL'&&m.riskPercent?` · risk ${m.riskPercent}%`:''}{m.kind==='PROTOCOL'&&m.rr?` · R:R ${m.rr}`:''}</span><span>{catalog.sessions.filter(s=>s.methodId===m.id).length} Sessions</span></li>)}</ul></section>}
