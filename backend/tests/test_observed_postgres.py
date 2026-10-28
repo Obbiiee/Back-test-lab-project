@@ -179,6 +179,16 @@ class ObservedPostgresTests(unittest.TestCase):
             app.apply(app_sid,command(app_sid,'app:advance:0',0,'ADVANCE',dict(targetNs='0')))
             request=dict(sessionId=app_sid,requestId='app:order',expectedRevision=1,planId=None,planRevision=None,
                 draft=dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]))
+            # The browser's planned ticket omits quantity and asks the server
+            # to size it from risk. Explicit-lot API requests miss this path.
+            planned=deepcopy(request)
+            planned.update(requestId='app:planned-review',planId='plan:browser',planRevision=0)
+            planned['draft'].update(orderType='LIMIT',workflow='PLANNED',entry='2300',
+                                    quantity=None,sl='2299',tp='2302',riskPercent='0.1')
+            sized=app.review(planned)
+            self.assertEqual(sized['review']['command']['payload']['quantity'],'0.1')
+            self.assertEqual(app.review(planned),sized)
+            self.assertEqual(app.summary(app_sid)['revision'],1)
             reviewed=app.review(request);accepted=app.confirm(app_sid,dict(reviewId='app:order',reviewHash=reviewed['reviewHash']))
             self.assertTrue(accepted['durable'])
             latest=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:1',latest['revision'],'ADVANCE',dict(targetNs=str(S))))
@@ -186,8 +196,11 @@ class ObservedPostgresTests(unittest.TestCase):
             current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:2',current['revision'],'ADVANCE',dict(targetNs=str(2*S))))
             result=app.inspect(app_sid);self.assertEqual(result['analysis']['metrics']['tradeCount'],1)
             self.assertEqual(result['analysis']['completed'][0]['id'],'app:order')
+            self.assertEqual(result['analysis']['completed'][0]['exitTimeNs'],str(2*S))
             saved=app.save_note(app_sid,dict(orderId='app:order',expectedNoteRevision=0,text='Observed app acceptance',tags=['qa']))
-            self.assertEqual(saved['noteRevision'],1);self.assertEqual(app.journal(app_sid)['notes'][0]['text'],'Observed app acceptance')
+            self.assertEqual(saved['noteRevision'],1)
+            with patch.object(catalog,'resolve',side_effect=AssertionError('Journal must not admit market archives')):
+                self.assertEqual(app.journal(app_sid)['notes'][0]['text'],'Observed app acceptance')
 
 
 if __name__=='__main__' and '--worker' in sys.argv:worker()

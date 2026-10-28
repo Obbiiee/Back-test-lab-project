@@ -20,7 +20,7 @@ from contracts.primitives import require,identifier,revision
 from ticks.contracts import keys,tag,uint
 from infrastructure.database import connect
 from .analysis import RESEARCH_VERSION,planned_risk
-from .contracts import exact,open_payload,policy_wire,text
+from .contracts import exact,open_payload,policy_wire,text,risk_quantity
 from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
@@ -190,7 +190,7 @@ class ObservedResearchApplication:
             orders.append(dict(id=oid,side=o['side'],status=o['status'],quantity=o['quantity'],remaining=o['remaining'],entry=o['entry'],entryPrice=o['entryPrice'],entryTimeNs=None if row is None else row['entryTimeNs'],entryFillRef=None if row is None else row['entryFillRef'],sl=o['sl'],tp=o['tp'],exitRequested=o['exitRequest'] is not None,exitPrice=None if row is None else row['exitPrice'],exitFillRef=None if row is None else row['exitFillRef'],exitReason=None if row is None else row['exitReason'],gross=o['grossPosted'],commission='0',net=o['grossPosted'],netCashChange=o['grossPosted'],unrealizedIndicative=None,mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED'))
         completed=[]
         for r in rows:
-            completed.append(dict(id=r['id'],side=r['side'],status='CLOSED',quantity=r['quantity'],remaining='0',entry=r['entryPrice'],entryPrice=r['entryPrice'],entryTimeNs=r['entryTimeNs'],entryFillRef=r['entryFillRef'],sl=state['orders'][r['id']]['sl'],tp=state['orders'][r['id']]['tp'],exitPrice=r['exitPrice'],exitFillRef=r['exitFillRef'],exitReason=r['exitReason'],gross=r['grossExact'],commission='0',net=r['netPosted'],durationNs=r['durationNs'],mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',rMultiple=r['rMultiple'],rReason=r['rReason']))
+            completed.append(dict(id=r['id'],side=r['side'],status='CLOSED',quantity=r['quantity'],remaining='0',entry=r['entryPrice'],entryPrice=r['entryPrice'],entryTimeNs=r['entryTimeNs'],exitTimeNs=r['exitTimeNs'],entryFillRef=r['entryFillRef'],sl=state['orders'][r['id']]['sl'],tp=state['orders'][r['id']]['tp'],exitPrice=r['exitPrice'],exitFillRef=r['exitFillRef'],exitReason=r['exitReason'],gross=r['grossExact'],commission='0',net=r['netPosted'],durationNs=r['durationNs'],mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',rMultiple=r['rMultiple'],rReason=r['rReason']))
         provenance=deepcopy(projection['provenance']);provenance['analysisVersion']=RESEARCH_VERSION
         base.update(status='COMPLETE',provenance=provenance,metrics=metrics,orders=orders,completed=completed,equity=deepcopy(projection['balanceCurve']),annotations=deepcopy(projection['annotations']),annotationWindowStart=projection['annotationWindowStart'],analysisProjection=projection)
         return base
@@ -255,11 +255,16 @@ class ObservedResearchApplication:
         # Reuse the immutable committed analysis projection. Notes are held
         # separately and cannot affect financial results.
         from .journal import MAX_JOURNAL_ORDERS
-        view=self.inspect(session_id)
-        require(view['analysis']['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
-        orders=view['analysis']['orders']
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            state=self._session(db,session_id)[2]
+        projection=self._complete_statistics(session_id,state)
+        require(self._same_projection(projection,state),'journal','REFUSED_STALE_REVISION')
+        analysis=self._view_analysis(state,projection)
+        require(analysis['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
+        orders=analysis['orders']
         require(len(orders)<=MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
-        state=view['state'];notes=[]
+        notes=[]
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             live=self._session(db,session_id)[2]
@@ -270,7 +275,7 @@ class ObservedResearchApplication:
             for blob,sha,note_revision,order_id in saved:
                 value=validate_note(unpack(blob,sha),state,indexed)
                 require((value['orderId'],value['noteRevision'])==(order_id,note_revision),'journal','CORRUPT_RECORD');notes.append(value)
-        return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',provenance=view['analysis']['provenance'],orders=orders,notes=notes,
+        return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',provenance=analysis['provenance'],orders=orders,notes=notes,
                     financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
 
     def save_note(self,session_id,raw):

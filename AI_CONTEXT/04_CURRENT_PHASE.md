@@ -1,3 +1,11 @@
+# Browser product continuation — 2026-10-28
+
+Owner requested recovery and completion of the existing browser workflow, minimum relevant validation, no annual rerun and no production change. Private browser journey now PASS: sign in → create Free Style strategy → create January XAUUSD Session via UI → chart/step replay → planned LIMIT with risk-derived quantity and SL/TP → confirm pending → observed Ask entry/Bid SL exit → Closed trades → save journal note revision 1 → Analysis. One completed 0.01 lot trade: Ask 2064.635→Bid 2062.785, net -1.85 USD, balance 9998.15, no browser errors. This is a short conditional observed-tick simulation; TP was configured but no TP-hit browser gate, year/capacity or production acceptance is claimed. Annual replay remains DEFERRED NOT PASS; do not restart it. Historical distribution rights remain UNKNOWN; public accounts stay synthetic.
+
+Three concrete integration blockers fixed: missing risk_quantity import on browser risk sizing; missing committed exitTimeNs in completed rows crashed Closed trades; journal unnecessarily called chart inspection and cold archive admission, exceeding the browser deadline. Journal now uses the same verified committed projection without source access, retaining immutable-tip, revision/event-head and note checks. 10 native observed PostgreSQL tests/zero skips/2.992 s PASS, including resolver refusal during journal read; 14 worker/queue tests, TickAlpha regression, lint/build and repository checks PASS. Evidence: /home/riksora/riksora-qa-evidence/browser-product-closure-20261028/report.json, result.json, desktop.png and retained failure reports. Exclusive QA database stopped/own fixtures removed. Candidate only; production unchanged.
+
+Publish only these bounded product fixes and regression/status hunks. Existing queue/replay-to/timeline/UI draft changes remain intentionally separate and uncommitted; do not claim a clean worktree or whole-candidate release acceptance. Next: controlled candidate integration/public-synthetic release preparation after existing provenance/recovery/release blockers are resolved; production still requires owner approval. No new large audit or annual test is needed to establish this short browser journey.
+
 # Operational phase authority
 
 ## Current state reconciliation — 2026-10-27 17:15 UTC
