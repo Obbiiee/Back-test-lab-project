@@ -1,5 +1,7 @@
 # VPS staging candidate — not sales acceptance
 
+For the merged functional Beta candidate and its prepared artifacts, see [the 2026-10-28 release and rollback runbook](../../docs/BETA_RC_20261028.md). It records the current candidate acceptance, synthetic-only public policy and the schema-aware rollback boundary. Production execution still requires owner approval.
+
 This is the operator procedure for the existing system blueprint's VPS preparation contract. It does not introduce architecture authority. No VPS, domain, actual Google/SMTP/merchant credentials, approved historical month or container runtime acceptance is supplied. Existing financial/causal contracts remain preserved. The handed-over Claude UI is now included in the integration candidate; the UI entrypoint and provider/data/host gates still require acceptance.
 
 ## What is packaged
