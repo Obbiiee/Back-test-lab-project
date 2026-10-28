@@ -1,5 +1,9 @@
 """Verified workspace composition; private loopback datasets are never mounted."""
 from functools import partial
+from collections import OrderedDict
+from threading import RLock
+import hashlib
+import os
 import uuid
 
 import anyio
@@ -18,18 +22,84 @@ from workspace.policy import owner
 from workspace.store import WorkspaceUnit
 from . import queue
 
+_OPERATOR_LOCK=RLock()
+_OPERATOR_CATALOGS=OrderedDict()
+
+
+def _operator_catalog(dsn):
+    path=os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG');sha=os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG_SHA256')
+    require((path is None)==(sha is None),'operatorCatalog','REFUSED_OPERATOR_CATALOG')
+    if path is None:return None
+    require(len(path)<=4096 and os.path.isabs(path),'operatorCatalog','REFUSED_OPERATOR_CATALOG')
+    from execution.observed_catalog import ObservedCatalog
+    key=(hashlib.sha256(dsn.encode()).hexdigest(),path,sha)
+    with _OPERATOR_LOCK:
+        catalog=_OPERATOR_CATALOGS.get(key)
+        if catalog is None:
+            catalog=ObservedCatalog(path,sha);_OPERATOR_CATALOGS[key]=catalog
+        _OPERATOR_CATALOGS.move_to_end(key)
+        # A single configured catalog per DB process; changing its pin requires
+        # a clean worker restart, which also closes the exact old capability.
+        require(len(_OPERATOR_CATALOGS)<=1,'operatorCatalog','SOURCE_PIN_CHANGED')
+        return catalog
+
+
+def close_operator_catalogs():
+    with _OPERATOR_LOCK:
+        for catalog in _OPERATOR_CATALOGS.values():catalog.close()
+        _OPERATOR_CATALOGS.clear()
+
+
+def warm_operator_sources(dsn):
+    """Admit configured source pins before a Session request needs them."""
+    catalog = _operator_catalog(dsn)
+    if catalog is None:
+        return False
+    for profile_hash in sorted(catalog._profiles):
+        catalog.resolve(profile_hash)
+    return True
+
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
     # Keep verified-user/membership locks through the INNER service commit.
-    # A preflight check alone would allow revocation between check and write.
+    # The external source selector is an operator catalog; HTTP supplies only
+    # public keys, periods and normal trading intentions.
     with connect(dsn) as db:
         db.row_factory = dict_row
         unit = WorkspaceUnit(db, actor_id, workspace_id)
         if write:
             owner(unit.role)
-        research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)))
+        catalog=_operator_catalog(dsn)
+        observed=False;session_id=None
+        if catalog is not None:
+            if operation in ('catalog','create_method'):
+                observed=True
+            elif operation=='create_session':
+                observed=bool(args and type(args[0]) is dict and 'sourceKey' in args[0])
+            elif operation=='replay_to':
+                session_id=args[0] if args else None
+                observed=True
+            elif operation in ('summary','inspect','journal','save_note','confirm','apply','bootstrap','workspace','chart_history','review'):
+                if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
+                elif operation in ('confirm','apply','workspace','chart_history','bootstrap','inspect','summary','journal','save_note') and args:session_id=args[0]
+                if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
+                if type(session_id) is str:
+                    row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
+                    if row is not None:
+                        try:
+                            from execution.postgres import unpack
+                            meta=unpack(row['payload'],row['content_hash']);observed=meta.get('artifact')=='BTL-OBSERVED-RESEARCH-SESSION-1'
+                        except (TypeError,ValueError,UnicodeError):
+                            raise ContractError('CORRUPT_RECORD','session')
+        if operation=='replay_to':
+            require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
+        if observed:
+            from execution.observed_research import ObservedResearchApplication
+            research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog)
+        else:
+            research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)))
         try:
-            return getattr(research, operation)(*args)
+            return research.catalog_view() if observed and operation=='catalog' else getattr(research,operation)(*args)
         finally:
             research.close()
 
@@ -117,7 +187,14 @@ def install(app):
 
     @app.post(prefix + '/sessions')
     async def create_session(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):
-        return await execute(user, workspace_id, 'create_session', await json_body(request), write=True)
+        job_id = request.headers.get('x-btl-job')
+        if job_id is not None:
+            try:
+                job_id = uuid.UUID(job_id)
+            except ValueError:
+                require(False, 'jobId')
+        return await execute(user, workspace_id, 'create_session', await json_body(request), write=True,
+                             job_id=job_id)
 
     @app.post(prefix + '/reviews')
     async def review(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):
@@ -131,10 +208,22 @@ def install(app):
     async def journal(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'journal', session_id)
 
+    @app.post(prefix + '/sessions/{session_id}/replay-to')
+    async def replay_to(workspace_id: uuid.UUID, session_id: str, request: Request,
+                        user: User = Depends(current)):
+        raw=await json_body(request)
+        queue.replay_to_request(raw,session_id)
+        job_id=request.headers.get('x-btl-job')
+        if job_id is not None:
+            try:job_id=uuid.UUID(job_id)
+            except ValueError:require(False,'jobId')
+        return await execute(user,workspace_id,'replay_to',session_id,raw,write=True,job_id=job_id)
+
     @app.post(prefix + '/sessions/{session_id}/{operation}')
     async def session_operation(workspace_id: uuid.UUID, session_id: str, operation: str,
                                 request: Request, user: User = Depends(current)):
         operations = {'view': ('workspace', False), 'bootstrap': ('bootstrap', False),
+                      'chart-history': ('chart_history', False),
                       'journal': ('save_note', True), 'confirm': ('confirm', True), 'commands': ('apply', True)}
         require(operation in operations, 'operation', 'RESOURCE_UNAVAILABLE')
         name, write = operations[operation]

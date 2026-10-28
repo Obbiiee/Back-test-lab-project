@@ -38,6 +38,7 @@ def parse_record(raw):
 
 
 class ExnessIngestion:
+    BUILDER_CLASS = DatasetBuilder
     ADAPTER_VERSION = ADAPTER
     RESOLUTION_NS = "1000000000"
     TIMESTAMP_CONVENTION = "CSV UTC Z; observed whole-second values; subsecond ordering/provenance UNVERIFIED"
@@ -66,7 +67,7 @@ class ExnessIngestion:
         sources = [dict(sourceId=self.source_id, archiveHash=None, memberHash=self.pin["sha256"], originalName=self.source.name,
                         acquiredAtUtc=None, sourceUrl=None, timestampConvention=self.TIMESTAMP_CONVENTION,
                         resolutionNs=self.RESOLUTION_NS, originalScalePolicy="PRESERVE_RAW_TEXT")]
-        self.builder = DatasetBuilder(folder, self.meta, sources, self.pin, packing=packing, resume=resume)
+        self.builder = self.BUILDER_CLASS(folder, self.meta, sources, self.pin, packing=packing, resume=resume)
         self.builder.store.db.execute("CREATE TABLE IF NOT EXISTS raw_records(hash BLOB PRIMARY KEY) WITHOUT ROWID")
         self.stats = self.builder.s.setdefault("audit", dict(parsedRows=0, rejectedRows=0, malformedTimestamps=0, malformedPrices=0,
             nonFinite=0, nonpositiveBid=0, nonpositiveAsk=0, crossedQuotes=0, exactDuplicateSourceRecords=0,

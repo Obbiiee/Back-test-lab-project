@@ -85,7 +85,7 @@ class IndexedTickTimeline:
         return RevealedView(read, cursor)
 
     def __groups(self, position):
-        rows, time = [], None
+        rows, time, group_position = [], None, None
         while position is not None:
             page = self.__provider.read_page_v2(self.__id, self.__version, position, 256)
             shape(page, "BTL-TICK-PAGE-2")
@@ -107,16 +107,22 @@ class IndexedTickTimeline:
                 require(previous is None or previous[0] == body, "diagnostic", "IDENTITY_CONFLICT")
                 self.__db.execute("INSERT OR IGNORE INTO page_diagnostics VALUES(?,?,?,?)", (*identity, body))
             require(type(page["endOfDataset"]) is bool and page["endOfDataset"] == (page["nextPosition"] is None), "eof", "SCHEMA_MISMATCH")
-            for row in page["events"]:
+            for offset, row in enumerate(page["events"]):
                 CanonicalTick._validate(row)
                 require(row["datasetVersion"] == self.__version and all(row[k] == self.__root[k] for k in
                         ("datasetId", "providerId", "feedId", "instrumentId")), "event", "IDENTITY_CONFLICT")
                 require(int(row["timeNs"]) >= self.__start and (time is None or int(row["timeNs"]) >= int(time)), "time", "ORDER_REVERSAL")
                 if time is not None and row["timeNs"] != time:
-                    start = self.__provider.locate_v2(self.__id, self.__version, time)["position"]
-                    require(start is not None, "boundary", "INCOMPLETE_ATOMIC_BOUNDARY")
-                    yield start, make_group(rows, self.__version)
-                    rows = []
+                    require(group_position is not None, "boundary", "INCOMPLETE_ATOMIC_BOUNDARY")
+                    yield group_position, make_group(rows, self.__version)
+                    rows, group_position = [], None
+                if group_position is None:
+                    # The page start is provider-validated. Its event offset and
+                    # global ordinal give the exact first event of this atomic
+                    # timestamp group without a second index lookup per group.
+                    group_position = dict(position,
+                                          eventOffset=str(int(position["eventOffset"])+offset),
+                                          globalOrdinal=str(int(position["globalOrdinal"])+offset))
                 time = row["timeNs"]
                 rows.append(row)
                 require(len(rows) <= 1024, "group", "GROUP_LIMIT")
@@ -125,9 +131,8 @@ class IndexedTickTimeline:
                 require(successor != position and int(successor["globalOrdinal"]) == int(position["globalOrdinal"])+len(page["events"]), "position", "CORRUPT_INDEX_POINTER")
             position = successor
         if rows:
-            start = self.__provider.locate_v2(self.__id, self.__version, time)["position"]
-            require(start is not None, "boundary", "INCOMPLETE_ATOMIC_BOUNDARY")
-            yield start, make_group(rows, self.__version)
+            require(group_position is not None, "boundary", "INCOMPLETE_ATOMIC_BOUNDARY")
+            yield group_position, make_group(rows, self.__version)
 
     def __peek(self):
         if not self.__has_pending:
