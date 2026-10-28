@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import stat
+from threading import RLock
 
 from .context_warmup import ContextBar, completed_context
 
@@ -78,28 +79,63 @@ class PinnedContextArchive:
                 raise ValueError('Invalid reference pin')
             checked[pin.name] = (pin, _FRAMES[match[1]])
         self.__folder, self.__pins = folder.resolve(), tuple(checked.values())
+        self.__cache_lock = RLock()
+        self.__selection_cache = {}
 
-    def select(self, plan, *, trusted_start_ns):
+    def pin(self, name):
+        if type(name) is not str:
+            raise ValueError('Invalid reference pin')
+        for pin, _ in self.__pins:
+            if pin.name == name:
+                return dict(name=pin.name,sha256=pin.sha256,firstNs=str(pin.first_ns),lastNs=str(pin.last_ns))
+        return None
+
+    def select(self, plan, *, trusted_start_ns, month=None):
         # Validate the trusted request before filesystem reads.
         completed_context((), plan, trusted_start_ns=trusted_start_ns)
+        if month is not None and (type(month) is not str or re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', month) is None):
+            raise ValueError('Invalid reference month')
         candidates = sorted((p for p, frame in self.__pins if frame == plan.timeframe_seconds
-                             and p.first_ns < trusted_start_ns), key=lambda p: p.first_ns)
+                             and p.first_ns < trusted_start_ns
+                             and (month is None or p.name.startswith(month+'-'))), key=lambda p: p.first_ns)
         if any(a.last_ns >= b.first_ns for a, b in zip(candidates, candidates[1:])):
             raise ValueError('Overlapping reference pins')
         # Use a bounded suffix. Too little history remains WARMUP_INCOMPLETE.
         selected = candidates[-MAX_FILES:]
 
-        def bars():
-            for pin in selected:
-                path = self.__folder / pin.name
-                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-                with os.fdopen(descriptor, 'rb') as stream:
-                    info = os.fstat(stream.fileno())
-                    if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE_BYTES:
-                        raise ValueError('Reference file type or byte bound')
-                    raw = stream.read(MAX_FILE_BYTES + 1)
-                if len(raw) > MAX_FILE_BYTES or hashlib.sha256(raw).hexdigest() != pin.sha256:
-                    raise ValueError('Reference file hash mismatch')
-                yield from _rows(raw, pin, plan.timeframe_seconds)
+        def read_pin(pin):
+            path = self.__folder / pin.name
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(descriptor, 'rb') as stream:
+                info = os.fstat(stream.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE_BYTES:
+                    raise ValueError('Reference file type or byte bound')
+                raw = stream.read(MAX_FILE_BYTES + 1)
+            if len(raw) > MAX_FILE_BYTES or hashlib.sha256(raw).hexdigest() != pin.sha256:
+                raise ValueError('Reference file hash mismatch')
+            return raw
 
-        return completed_context(bars(), plan, trusted_start_ns=trusted_start_ns)
+        if len(selected) > 1:
+            def bars():
+                for pin in selected:
+                    yield from _rows(read_pin(pin), pin, plan.timeframe_seconds)
+            return completed_context(bars(), plan, trusted_start_ns=trusted_start_ns)
+
+        # The same Session requests bounded 512-bar pages repeatedly. Reuse its
+        # immutable clipped selection after rechecking the file hash each time;
+        # never parse the full monthly JSON once per page. One selection is
+        # retained per archive instance and remains controller-private.
+        cache_key = (selected[0].name, selected[0].sha256, plan, trusted_start_ns, month) if selected else None
+        with self.__cache_lock:
+            if cache_key is not None:
+                raw = read_pin(selected[0])
+                if cache_key in self.__selection_cache:
+                    return self.__selection_cache[cache_key]
+                bars = _rows(raw, selected[0], plan.timeframe_seconds)
+            else:
+                bars = ()
+            result = completed_context(bars, plan, trusted_start_ns=trusted_start_ns)
+            if cache_key is not None:
+                self.__selection_cache.clear()
+                self.__selection_cache[cache_key] = result
+            return result

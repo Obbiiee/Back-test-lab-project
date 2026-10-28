@@ -281,6 +281,13 @@
 .alpha-hub-card h2{font-size:20px;font-weight:750;line-height:1.25}
 .alpha-hub-tag{background:#ffce55;color:#061a3c;border:0;padding:4px 10px;font-weight:700}
 .alpha-hub-card dl{gap:18px 16px}.alpha-hub-card dt{font-size:12px}.alpha-hub-card dd{font-size:15px}
+.alpha-hub-summary{margin-top:18px;padding:16px;border:1px solid #284564;border-radius:18px;background:#0b1b31;min-height:44px}
+.alpha-hub-summary>dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0}
+.alpha-hub-summary>dl>div{min-width:0}.alpha-hub-summary dt{font-size:11px;color:#b8c9df}.alpha-hub-summary dd{margin:4px 0 0;font-family:var(--lab-font-data);font-size:14px;font-weight:650;overflow-wrap:anywhere}
+.alpha-hub-summary>p,.alpha-hub-summary>div>p{margin:0;color:#b8c9df;font-size:12px;line-height:1.5}
+.alpha-hub-summary>div{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.alpha-hub-summary>div button{background:#fff;color:#061a3c;border-color:#b0c9e8}
+.alpha-hub-summary .alpha-hub-summary-state{margin-top:12px;font-size:11px}
 .alpha-hub-card footer{padding-top:18px}.alpha-hub-strategies h2{font-size:22px;font-weight:750}
 .alpha-hub-strategies ul{border-radius:20px}.alpha-hub-strategies li{padding:18px 20px}
 .tick-alpha input,.tick-alpha select,.tick-alpha textarea{caret-color:#5a9df8}
@@ -289,8 +296,26 @@
 .tick-alpha .alpha-ticket{border-radius:24px}.tick-alpha .alpha-ticket button{border-radius:12px}
 .tick-alpha .alpha-ticket-estimate{border-radius:16px;padding:14px}.tick-alpha .alpha-replay-controls{border-radius:18px}
 .tick-alpha :focus-visible{outline:3px solid #ffce55;outline-offset:3px}
-@media(max-width:600px){.tick-alpha>header{padding:14px 16px;border-radius:0 0 20px 20px}.alpha-hub{padding:20px 14px}.alpha-hub-head{padding:24px 20px;border-radius:24px}.alpha-hub-actions{width:100%}.alpha-hub-grid{grid-template-columns:minmax(0,1fr)}.alpha-hub-card{min-width:0}.alpha-hub-steps li{padding:20px}.tick-alpha>header nav a{padding:8px 12px}}
+@media(max-width:600px){.tick-alpha>header{padding:14px 16px;border-radius:0 0 20px 20px}.alpha-hub{padding:20px 14px}.alpha-hub-head{padding:24px 20px;border-radius:24px}.alpha-hub-actions{width:100%}.alpha-hub-grid{grid-template-columns:minmax(0,1fr)}.alpha-hub-card{min-width:0}.alpha-hub-steps li{padding:20px}.tick-alpha>header nav a{padding:8px 12px}.alpha-hub-summary{padding:14px}.alpha-hub-summary>dl{gap:10px}}
 @media(prefers-reduced-motion:reduce){.tick-alpha .alpha-hub .alpha-primary-action{transition:none}.tick-alpha .alpha-hub .alpha-primary-action:hover:not(:disabled){transform:none}}
+
+/* Claude workspace alignment: float replay on wide charts and keep authenticated identity compact. */
+.alpha-identity-workspace .alpha-identity-actions>span{min-width:0;max-width:min(52vw,560px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alpha-identity-workspace>.alpha-eyebrow{margin:0 12px 4px}
+.alpha-identity-workspace>.alpha-identity-actions{margin:0 12px 6px;gap:8px}
+.alpha-identity-workspace>button{margin:0 12px 4px;min-height:36px}
+.alpha-identity-workspace>button+p{display:inline-block;vertical-align:middle;margin:0 0 4px 4px;font-size:12px}
+.alpha-order-bar .alpha-quick-side,.tick-alpha .alpha-order-bar>button:not(.alpha-quick-side){border-radius:999px}
+.alpha-chart-workspace .alpha-replay-controls.is-floating{border-radius:18px}
+@media(max-width:560px){
+ .alpha-identity-workspace .alpha-identity-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0}
+ .alpha-identity-workspace .alpha-identity-actions>span{grid-column:1/-1;max-width:100%;font-size:13px;padding:0 4px}
+ .alpha-identity-workspace .alpha-identity-actions button{min-width:0;min-height:40px;padding:7px 10px;white-space:nowrap}
+ .alpha-identity-workspace>.alpha-eyebrow{margin:0 12px 4px}
+ .alpha-identity-workspace>button{margin:0 12px 4px}
+ .alpha-identity-workspace>button+p{display:block;margin:0 12px 6px}
+ .alpha-order-bar .alpha-quick-side,.tick-alpha .alpha-order-bar>button:not(.alpha-quick-side){min-height:44px}
+}
 
 /* Playful account access (owner direction 2026-10-18; docs/design/RIKSORA_PLAYFUL_UI_PLAN.md). Navy page,
    one white card, pill controls. The Beta page (.beta-account) carries its own layout in beta.css. */

@@ -89,5 +89,28 @@ class ContextArchiveTests(unittest.TestCase):
         self.assertEqual(PinnedContextArchive(self.folder,[]).select(self.plan,trusted_start_ns=0).available_bars,0)
         with self.assertRaises(ValueError): PinnedContextArchive(self.folder,[pin]).select(self.plan,trusted_start_ns=-1)
 
+    def test_period_selection_reads_only_the_requested_past_reference_month(self):
+        dec=self.file('2023-12-1m.json',[[1704067080,10,11,9,10]])
+        jan=self.file('2024-01-1m.json',[[1704067200,900,901,899,900]])
+        archive=PinnedContextArchive(self.folder,[dec,jan])
+        result=archive.select(FrameWarmup(60,1,1e-6),trusted_start_ns=1704067230*NS,month='2023-12')
+        self.assertEqual([bar.open for bar in result.candles],['10'])
+        self.assertEqual(archive.pin('2023-12-1m.json')['sha256'],dec.sha256)
+        self.assertIsNone(archive.pin('2023-11-1m.json'))
+        with self.assertRaises(ValueError): archive.select(self.plan,trusted_start_ns=120*NS,month='../2023-12')
+
+    def test_same_pinned_period_reuses_only_hash_verified_clipped_selection(self):
+        from market_data import context_archive
+        pin=self.file(rows=[[1704067080,10,11,9,10],[1704067140,10,11,9,10]])
+        archive=PinnedContextArchive(self.folder,[pin]);plan=FrameWarmup(60,1,1e-6);start=1704067200*NS
+        with patch('market_data.context_archive._rows',wraps=context_archive._rows) as parse_rows:
+            first=archive.select(plan,trusted_start_ns=start,month='2023-12')
+            second=archive.select(plan,trusted_start_ns=start,month='2023-12')
+        self.assertEqual(first,second)
+        self.assertEqual(parse_rows.call_count,1)
+        (self.folder/pin.name).write_bytes(b'[]')
+        with self.assertRaisesRegex(ValueError,'hash'):
+            archive.select(plan,trusted_start_ns=start,month='2023-12')
+
 
 if __name__ == '__main__': unittest.main()

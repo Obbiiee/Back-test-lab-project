@@ -19,7 +19,7 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback}){
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   const evidence=view.analysis;
-  if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
+  if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>{evidence?.status==='BUILDING'?'Building committed statistics':'Analysis unavailable'}</h2>{evidence?.status==='BUILDING'?<p role="status">Verified {evidence.progress.processedEvents} of {evidence.progress.totalEvents} committed events. No partial financial metrics are shown. Reload this Session to continue.</p>:<p>{evidence?.reason??'The service has no compatible analysis projection.'} No partial history is presented as a complete result.</p>}</section>;
   const {account,metrics,provenance}=evidence;
   const closed=tab==='Closed trades';
   const rows=tab==='Pending orders'?evidence.orders.filter(o=>o.status==='PENDING'):closed?evidence.completed:evidence.orders.filter(o=>['ACTIVE','UNRESOLVED'].includes(o.status));
@@ -32,7 +32,7 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback}){
     <div className="alpha-account" aria-label="Committed account"><span>Balance <strong>${account.balance}</strong></span><span>Net cash change <strong>${account.netCashChange}</strong></span><span>Commission <strong>${account.commission}</strong></span><span>Indicative unrealized <strong>{account.unrealizedIndicative===null?'Unavailable':'$'+account.unrealizedIndicative}</strong></span><span>Indicative equity <strong>{account.equityIndicative===null?'Unavailable':'$'+account.equityIndicative}</strong></span></div>
     <details className="alpha-account-explanation"><summary>How account estimates work</summary><p className="alpha-chart-note">Marks use the last revealed liquidation side: Bid for Long, Ask for Short. Marks are estimates; committed cash and completed-position metrics remain separate.</p></details>
     {tab==='Analysis'&&onFeedback&&view.state.revision>1&&view.analysis.orders.some(order=>typeof order.entryTimeNs==='string'||order.status==='UNRESOLVED')&&<button disabled={busy} onClick={onFeedback}>Optional research feedback</button>}
-    <div hidden={tab!=='Journal'}><AlphaJournal key={view.metadata.id} view={view}/></div>
+    {tab==='Journal'?<AlphaJournal key={view.metadata.id} view={view}/>:null}
     {tab==='Journal'?null:tab==='Analysis'?<div className="alpha-analysis"><AlphaEquityChart view={view}/><h2>Committed position Analysis</h2><dl>{[
       ['Completed trades',metrics.tradeCount],['Wins / losses / breakeven',`${metrics.wins} / ${metrics.losses} / ${metrics.breakeven}`],
       ['Win rate',ratioLabel(metrics.winRate,{percent:true})],['Average win (USD)',ratioLabel(metrics.averageWin)],['Average loss (USD)',ratioLabel(metrics.averageLoss)],

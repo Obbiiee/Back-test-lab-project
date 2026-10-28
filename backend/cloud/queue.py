@@ -4,6 +4,7 @@ Row + advisory transaction locks own a worker until completion. A process death
 rolls back the claim: the original QUEUED row survives without a lease guess.
 No provider handle/evidence is serialized. Worker authorization is revalidated.
 """
+import logging
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -12,17 +13,18 @@ from time import monotonic
 import anyio
 from psycopg.rows import dict_row
 from contracts.canonical import canonical_bytes, content_hash
-from contracts.primitives import require, ContractError, identifier
+from contracts.primitives import require, ContractError, identifier, revision
 from infrastructure.database import connect
 from workspace.store import WorkspaceUnit
 from workspace.policy import owner
 from execution.contracts import command_wire
+from ticks.contracts import tag, uint
 
 GLOBAL_LIMIT = 16
 USER_LIMIT = 2
 RETAINED_LIMIT = 32
 WORKERS = 2
-OPERATIONS = frozenset(('workspace', 'bootstrap', 'replay'))
+OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to'))
 
 
 def scoped(db, actor_id, workspace_id):
@@ -35,21 +37,53 @@ def view(row):
             'result': json.loads(bytes(row['result'])) if row['result'] is not None else None}
 
 
+def replay_command(raw, session_id):
+    """Validate the frozen command dialect selected by this request's tag.
+
+    The worker still resolves the persisted Session family and revalidates the
+    command there. Queue admission only performs bounded wire validation.
+    """
+    if type(raw) is dict and raw.get('artifact') == 'BTL-OBSERVED-EXECUTION-COMMAND-1':
+        from execution.observed_kernel import command_wire as validate
+    else:
+        validate = command_wire
+    command = validate(raw)
+    require(command['sessionId'] == session_id and command['kind'] in ('ADVANCE', 'SEEK'), 'replay')
+    return command
+
+
+def replay_to_request(raw, session_id):
+    tag(raw, 'BTL-OBSERVED-REPLAY-TO-1', 'requestId sessionId expectedRevision targetNs timeframe')
+    require(raw['sessionId'] == session_id, 'replayTo')
+    require(type(raw['requestId']) is str and len(raw['requestId']) == 32
+            and all(char in '0123456789abcdef' for char in raw['requestId']), 'requestId')
+    revision(raw['expectedRevision'])
+    uint(raw['targetNs'])
+    require(type(raw['timeframe']) is str and raw['timeframe'] in ('1m','3m','5m','15m','30m','1h','2h','4h','D'), 'timeframe')
+    return raw
+
+
 def submit(dsn, actor_id, workspace_id, job_id, operation, args):
     job_id = uuid.UUID(str(job_id))
-    require(operation in OPERATIONS and type(args) in (tuple, list) and len(args) == 2, 'job')
-    identifier(args[0], 'sessionId')
-    require(type(args[1]) is dict, 'request')
+    require(operation in OPERATIONS and type(args) in (tuple, list)
+            and len(args) == (1 if operation == 'create_session' else 2), 'job')
+    if operation == 'create_session':
+        require(type(args[0]) is dict, 'sessionRequest')
+        identifier(args[0].get('id'), 'sessionId')
+    else:
+        identifier(args[0], 'sessionId')
+        require(type(args[1]) is dict, 'request')
     if operation == 'replay':
-        command = command_wire(args[1])
-        require(command['sessionId'] == args[0] and command['kind'] in ('ADVANCE','SEEK'), 'replay')
+        replay_command(args[1], args[0])
+    elif operation == 'replay_to':
+        replay_to_request(args[1], args[0])
     payload = {'schemaVersion': 1, 'operation': operation, 'args': list(args)}
     raw = canonical_bytes(payload)
     require(len(raw) <= 16384, 'request')
     digest = content_hash(payload)
     with connect(dsn) as db:
         unit = scoped(db, actor_id, workspace_id)
-        if operation == 'replay':
+        if operation in ('replay', 'replay_to', 'create_session'):
             owner(unit.role)
         # Serialize inexpensive count/admission across all API processes.
         db.execute('SELECT pg_advisory_xact_lock(2020,300)')
@@ -58,7 +92,7 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
             require((previous['actor_id'], previous['workspace_id']) == (actor_id, workspace_id), 'job', 'RESOURCE_UNAVAILABLE')
             require(previous['input_hash'] == digest, 'jobInput', 'IDEMPOTENCY_CONFLICT')
             return view(previous)
-        db.execute("UPDATE btl.research_jobs SET state=CASE WHEN operation='replay' THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,finished_at=clock_timestamp() WHERE id IN (SELECT id FROM btl.research_jobs WHERE state='QUEUED' AND expires_at<clock_timestamp() FOR UPDATE SKIP LOCKED)")
+        db.execute("UPDATE btl.research_jobs SET state=CASE WHEN operation IN ('replay','replay_to') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,finished_at=clock_timestamp() WHERE id IN (SELECT id FROM btl.research_jobs WHERE state='QUEUED' AND expires_at<clock_timestamp() FOR UPDATE SKIP LOCKED)")
         counts = db.execute("SELECT count(*) AS global_count,count(*) FILTER (WHERE actor_id=%s) AS user_count FROM btl.research_jobs WHERE state='QUEUED'", (actor_id,)).fetchone()
         require(counts['global_count'] < GLOBAL_LIMIT and counts['user_count'] < USER_LIMIT, 'queue', 'QUEUE_CAPACITY')
         # Bounded completed operational receipts; canonical financial history is untouched.
@@ -83,10 +117,10 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
             if row['state'] != 'QUEUED':
                 return view(row)
             if cancel:
-                state = 'RECONCILE_REQUIRED' if row['operation'] == 'replay' else 'CANCELLED'
+                state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else 'CANCELLED'
                 row = db.execute("UPDATE btl.research_jobs SET state=%s,finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *", (state, job_id)).fetchone() or row
             elif not db.execute('SELECT clock_timestamp()<%s AS valid',(row['expires_at'],)).fetchone()['valid']:
-                state = 'RECONCILE_REQUIRED' if row['operation'] == 'replay' else 'EXPIRED'
+                state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else 'EXPIRED'
                 row = db.execute("UPDATE btl.research_jobs SET state=%s,finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *",(state, job_id)).fetchone()
         return view(row)
 
@@ -116,6 +150,13 @@ def work_one(dsn, runner):
                 # Existing permanent command dedup recovers an inner COMMIT if
                 # the process died before this operational job acknowledgement.
                 result = runner(dsn, row['actor_id'], row['workspace_id'], 'apply', tuple(args), write=True)
+            elif row['operation'] == 'replay_to':
+                result = runner(dsn, row['actor_id'], row['workspace_id'], 'replay_to', tuple(args), write=True)
+                # The native worker applies its 30s execution deadline after
+                # any bounded pinned-source re-admission. Keep that separate
+                # startup allowance from the queue transaction's wall time.
+            elif row['operation'] == 'create_session':
+                result = runner(dsn, row['actor_id'], row['workspace_id'], 'create_session', tuple(args), write=True)
             else:
                 result = runner(dsn, row['actor_id'], row['workspace_id'], row['operation'], tuple(args))
                 require(monotonic()-start <= 30, 'deadline', 'EXPIRED')
@@ -123,8 +164,11 @@ def work_one(dsn, runner):
             require(len(raw) <= 8388608, 'result', 'REFUSED_RESPONSE_LIMIT')
             state = 'SUCCEEDED'
         except ContractError as error:
+            logging.getLogger(__name__).warning(
+                'research_job_failed job_id=%s operation=%s error_code=%s',
+                row['id'], row['operation'], error.code)
             raw = None
-            state = 'RECONCILE_REQUIRED' if row['operation'] == 'replay' else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
+            state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
         # Infrastructure/process faults intentionally roll back, leaving QUEUED.
         db.execute('UPDATE btl.research_jobs SET state=%s,result=%s,finished_at=clock_timestamp() WHERE id=%s', (state, raw, row['id']))
         return True
@@ -132,7 +176,7 @@ def work_one(dsn, runner):
 
 @asynccontextmanager
 async def lifespan(app):
-    from .worker import run, close
+    from .worker import run, close, warm_sources
     limiter = anyio.CapacityLimiter(WORKERS)
     async def worker():
         while True:
@@ -143,6 +187,9 @@ async def lifespan(app):
                 await anyio.sleep(1)
             await anyio.sleep(.25)
     try:
+        # Hash/admit configured immutable sources before a replay job receives
+        # its separate 30-second execution budget. No consumer sees this handle.
+        await anyio.to_thread.run_sync(warm_sources, app.state.dsn)
         async with anyio.create_task_group() as group:
             for _ in range(WORKERS):
                 group.start_soon(worker)

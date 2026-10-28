@@ -92,6 +92,35 @@ class CloudResearchTests(unittest.TestCase):
         self.assertIn('SYNTHETIC', view['label'])
         self.assertNotIn('sidecar', created.text)
 
+    def test_session_creation_honors_durable_job_header(self):
+        method_id = 'method:' + uuid.uuid4().hex
+        request = {'id': 'session:' + uuid.uuid4().hex, 'name': 'Queued session',
+                   'methodId': method_id, 'initialBalance': '10000', 'startPeriod': '2020-01'}
+        job_id = str(uuid.uuid4())
+        queued = {'schemaVersion': 1, 'jobId': job_id, 'state': 'QUEUED', 'result': None}
+        with patch('cloud.research.queue.submit', return_value=queued) as submit:
+            response = self.client.post(self.root + '/sessions', headers={**self.headers, 'X-BTL-Job': job_id}, json=request)
+        self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual(response.json(), queued)
+        args = submit.call_args.args
+        self.assertEqual(args[4], 'create_session')
+        self.assertEqual(args[5], (request,))
+        self.assertEqual(str(args[3]), job_id)
+        invalid = self.client.post(self.root + '/sessions', headers={**self.headers, 'X-BTL-Job': 'not-a-uuid'}, json=request)
+        self.assertEqual(invalid.status_code, 422, invalid.text)
+
+    def test_observed_replay_to_honors_durable_job_header(self):
+        session='session:'+uuid.uuid4().hex
+        request={'schemaVersion':1,'artifact':'BTL-OBSERVED-REPLAY-TO-1','requestId':uuid.uuid4().hex,
+                 'sessionId':session,'expectedRevision':0,'targetNs':'1700000000000000000','timeframe':'1m'}
+        job_id=str(uuid.uuid4());queued={'schemaVersion':1,'jobId':job_id,'state':'QUEUED','result':None}
+        with patch('cloud.research.queue.submit',return_value=queued) as submit:
+            response=self.client.post(self.root+'/sessions/'+session+'/replay-to',
+                                      headers={**self.headers,'X-BTL-Job':job_id},json=request)
+        self.assertEqual(response.status_code,202,response.text);self.assertEqual(response.json(),queued)
+        args=submit.call_args.args
+        self.assertEqual(args[3:5],(uuid.UUID(job_id),'replay_to'));self.assertEqual(args[5],(session,request))
+
     def test_member_read_only_then_revocation_and_logout(self):
         member, header = self.account()
         target = '/api/v1/workspaces/' + self.workspace + '/members'

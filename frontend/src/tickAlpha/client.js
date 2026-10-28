@@ -10,8 +10,9 @@ export function sourceContext(){
 export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
-    const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const queued=replay||/\/sessions\/[^/]+\/(view|bootstrap)$/.test(path);
+    const replay=(/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind))
+      ||/\/sessions\/[^/]+\/replay-to$/.test(path);
+    const queued=replay||(path==='/sessions'&&body!==undefined)||/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
     const jobId=queued?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
     const uncertainReplay=()=>Error('Replay outcome requires reconciliation. Reload committed Session evidence before retrying.');
@@ -79,7 +80,9 @@ export function selectSessionUrl(session){
   window.history.replaceState(null,'',url);
 }
 export function command(view,kind,payload){
-  return {schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-1',sessionId:view.metadata.id,
+  const artifact=view.metadata.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION'||view.state.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION'
+    ?'BTL-OBSERVED-EXECUTION-COMMAND-1':'BTL-TICK-EXECUTION-COMMAND-1';
+  return {schemaVersion:1,artifact,sessionId:view.metadata.id,
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
