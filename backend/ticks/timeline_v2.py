@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 import sqlite3
 import json
+import zlib
 
 from contracts.primitives import require, digest
 from .contracts import keys, uint, CanonicalTick
@@ -20,7 +21,8 @@ VERSION = "BTL-TICK-TIMELINE-2"
 
 
 class IndexedTickTimeline:
-    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False):
+    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None):
+        require(log_codec in (None, 'raw', 'zlib-1'), 'logCodec', 'INVALID_INPUT')
         described = provider.describe_v2(dataset_id, dataset_version)
         keys(described, "root completion indexBinding")
         for key, artifact in (("completion", "BTL-TICK-COMPLETION-2"), ("indexBinding", "BTL-TICK-INDEX-BINDING-2")):
@@ -33,7 +35,25 @@ class IndexedTickTimeline:
         self.__root = described["root"]
         folder = Path(log_folder); folder.mkdir(parents=True, exist_ok=True)
         self.__log_path = folder / "timeline.sqlite"
+        # Physical-only opt-in on NEW logs. Existing archives are never migrated.
+        # Existing compressed logs identify themselves on cold resume; wire/hash
+        # identity always refers to the original uncompressed canonical bytes.
+        present = None
+        if self.__log_path.exists():
+            with sqlite3.connect(self.__log_path.resolve().as_uri()+'?mode=ro', uri=True) as probe:
+                if probe.execute("SELECT 1 FROM sqlite_master WHERE name='log_layout'").fetchone():
+                    rows = probe.execute('SELECT codec FROM log_layout').fetchall()
+                    require(rows == [('zlib-1',)], 'logCodec', 'CORRUPT_RECORD')
+                    present = 'zlib-1'
+                else:
+                    present = 'raw'
+        require(present is None or log_codec is None or present == log_codec,
+                'logCodec', 'REFUSED_LOG_LAYOUT')
+        self.__log_codec = present or log_codec or 'raw'
         self.__db = connect(self.__log_path, allow_threads=allow_threads)
+        if self.__log_codec == 'zlib-1':
+            self.__db.execute('CREATE TABLE IF NOT EXISTS log_layout(codec TEXT PRIMARY KEY) WITHOUT ROWID')
+            self.__db.execute("INSERT OR IGNORE INTO log_layout VALUES('zlib-1')")
         self.__db.execute("CREATE TABLE IF NOT EXISTS blocks(hash TEXT PRIMARY KEY, body BLOB NOT NULL) WITHOUT ROWID")
         self.__db.execute("CREATE TABLE IF NOT EXISTS heads(id INTEGER PRIMARY KEY CHECK(id=1), body BLOB NOT NULL)")
         self.__db.execute("CREATE TEMP TABLE fences(source TEXT PRIMARY KEY, ordinal TEXT NOT NULL, sourceOrder INTEGER NOT NULL) WITHOUT ROWID")
@@ -148,9 +168,34 @@ class IndexedTickTimeline:
         block = dict(schemaVersion=2, artifact=artifact, datasetId=self.__id, datasetVersion=self.__version,
                      timelineVersion=VERSION, generation=str(self.__generation), blockIndex=str(index), previousHash=previous, records=records)
         raw, hash_ = canonical_v2_bytes(block), hash_v2(block)
-        self.__db.execute("INSERT OR IGNORE INTO blocks VALUES(?,?)", (hash_, raw))
-        require(self.__db.execute("SELECT body FROM blocks WHERE hash=?", (hash_,)).fetchone()[0] == raw, "log", "IDENTITY_CONFLICT")
+        body = b'BTL-TIMELINE-ZLIB-1\0'+zlib.compress(raw, 6) if self.__log_codec == 'zlib-1' else raw
+        self.__db.execute("INSERT OR IGNORE INTO blocks VALUES(?,?)", (hash_, body))
+        require(self.__read_block(hash_) == raw, "log", "IDENTITY_CONFLICT")
         return hash_
+
+    def __read_block(self, hash_):
+        # Bound both input and inflation before allocating an attacker-controlled
+        # SQLite blob. A compressed stream must terminate exactly once, with no
+        # trailing/concatenated stream. Canonical/hash checks remain unchanged.
+        row = self.__db.execute('SELECT substr(body,1,1049601),length(body) FROM blocks WHERE hash=?', (hash_,)).fetchone()
+        if row is None:
+            return None
+        body, size = row
+        require(type(body) is bytes, 'log', 'CORRUPT_RECORD')
+        require(size <= 1049600, 'log', 'ARTIFACT_LIMIT')
+        if self.__log_codec == 'zlib-1':
+            prefix = b'BTL-TIMELINE-ZLIB-1\0'
+            require(body.startswith(prefix), 'log', 'CORRUPT_RECORD')
+            try:
+                decoder = zlib.decompressobj()
+                raw = decoder.decompress(body[len(prefix):], 1048577)
+            except zlib.error:
+                require(False, 'log', 'CORRUPT_RECORD')
+            require(len(raw) <= 1048576 and decoder.eof and not decoder.unused_data
+                    and not decoder.unconsumed_tail, 'log', 'CORRUPT_RECORD')
+            return raw
+        require(len(body) <= 1048576, 'log', 'ARTIFACT_LIMIT')
+        return body
 
     def __evidence(self, old, through, groups, cancel, epoch):
         for group in groups:
@@ -231,9 +276,9 @@ class IndexedTickTimeline:
     def __blocks(self, tip, artifact):
         expected = None
         while tip is not None:
-            row = self.__db.execute("SELECT body FROM blocks WHERE hash=?", (tip,)).fetchone()
+            row = self.__read_block(tip)
             require(row is not None, "log", "INCOMPLETE_INGESTION")
-            block = decode_v2(row[0])
+            block = decode_v2(row)
             keys(block, "schemaVersion artifact datasetId datasetVersion timelineVersion generation blockIndex previousHash records")
             require(hash_v2(block) == tip and block["artifact"] == artifact, "log", "IDENTITY_CONFLICT")
             require(block["datasetId"] == self.__id and block["datasetVersion"] == self.__version and block["timelineVersion"] == VERSION
@@ -330,9 +375,9 @@ class IndexedTickTimeline:
         # Rebuildable connection-private disk index. Membership is checked
         # against canonical hash-bound blocks produced by committed reveals.
         for index, block_hash, offset in self.__db.execute("SELECT groupIndex,blockHash,recordOffset FROM position_lookup WHERE groupIndex>=? AND groupIndex<? ORDER BY groupIndex", (start, wanted)):
-            stored = self.__db.execute("SELECT body FROM blocks WHERE hash=?", (block_hash,)).fetchone()
+            stored = self.__read_block(block_hash)
             require(stored is not None, "log", "INCOMPLETE_INGESTION")
-            block = decode_v2(stored[0])
+            block = decode_v2(stored)
             require(hash_v2(block) == block_hash and block["artifact"] == "BTL-TICK-POSITION-LOG-2"
                     and block["datasetId"] == self.__id and block["datasetVersion"] == self.__version
                     and block["timelineVersion"] == VERSION and block["generation"] == str(self.__generation), "membership", "IDENTITY_CONFLICT")
@@ -379,7 +424,7 @@ class IndexedTickTimeline:
 
     def replace_dataset(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder):
         require(self.__active, "timeline", "REPLACED_TIMELINE")
-        replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder)
+        replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder, log_codec=self.__log_codec)
         replacement.__generation = self.__generation+1; replacement.__initialize()
         self.cancel(); self.__active = False
         return replacement
@@ -390,14 +435,14 @@ class IndexedTickTimeline:
                     advanceLogHash=self.__advance_tip, positionLogHash=self.__position_tip)
 
     @classmethod
-    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False):
+    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None):
         keys(checkpoint, "schemaVersion artifact cursor advanceLogHash positionLogHash")
         require(checkpoint["artifact"] == "BTL-TICK-CHECKPOINT-2", "checkpoint", "SCHEMA_MISMATCH")
         canonical_v2_bytes(checkpoint)
         cursor = checkpoint["cursor"]
         keys(cursor, "schemaVersion artifact " + CURSOR_FIELDS)
         require(cursor["artifact"] == "BTL-TICK-CURSOR-2" and cursor["timelineVersion"] == VERSION, "cursor", "SCHEMA_MISMATCH")
-        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads)
+        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec)
         try:
             return result.__reconstruct(checkpoint, cursor)
         except BaseException:

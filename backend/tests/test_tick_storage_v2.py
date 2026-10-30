@@ -333,6 +333,63 @@ class TickStorageV2Tests(unittest.TestCase):
                         self.assertIsNone(db.execute("SELECT 1 FROM blocks WHERE hash=?", (removed,)).fetchone(),
                                           "Failed resume must not repair the missing acknowledged block")
 
+    def test_lossless_compressed_log_has_exact_wire_checkpoint_and_cold_parity(self):
+        import zlib
+        _, p = self.build()
+        raw = self.timeline(p, folder='raw-parity')
+        packed = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'packed-parity',log_codec='zlib-1')
+        self.resources.append(packed)
+        for target in ('100','200','400'):
+            self.assertEqual(packed.advance_through(target,packed.cursor),raw.advance_through(target,raw.cursor))
+            self.assertEqual(packed.checkpoint(),raw.checkpoint())
+            self.assertEqual(packed.consumer().read_revealed(),raw.consumer().read_revealed())
+        checkpoint=packed.checkpoint();packed.close()
+        with closing(sqlite3.connect(self.path/'raw-parity/timeline.sqlite')) as a, closing(sqlite3.connect(self.path/'packed-parity/timeline.sqlite')) as b:
+            expected=dict(a.execute('SELECT hash,body FROM blocks'))
+            actual={key:zlib.decompress(body[len(b'BTL-TIMELINE-ZLIB-1\0'):]) for key,body in b.execute('SELECT hash,body FROM blocks')}
+            self.assertEqual(expected,actual)
+            self.assertEqual(a.execute('SELECT body FROM heads').fetchall(),b.execute('SELECT body FROM heads').fetchall())
+        restored=IndexedTickTimeline.resume(p,checkpoint,log_folder=self.path/'packed-parity');self.resources.append(restored)
+        self.assertEqual(restored.checkpoint(),raw.checkpoint())
+        self.assertEqual(restored.consumer().read_revealed(),raw.consumer().read_revealed())
+        with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
+            restored.consumer().read_revealed('999')
+
+    def test_compressed_log_refuses_inflation_trailing_truncation_and_bad_hash(self):
+        import zlib
+        _,p=self.build()
+        prefix=b'BTL-TIMELINE-ZLIB-1\0'
+        for case in ('bomb','trailing','truncated','wrong-prefix','changed-group'):
+            with self.subTest(case=case):
+                folder=self.path/case
+                t=IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=folder,log_codec='zlib-1')
+                t.advance_through('100',t.cursor);cp=t.checkpoint();t.close()
+                with closing(sqlite3.connect(folder/'timeline.sqlite')) as db,db:
+                    body=db.execute('SELECT body FROM blocks WHERE hash=?',(cp['positionLogHash'],)).fetchone()[0]
+                    if case=='bomb':bad=prefix+zlib.compress(b'x'*1048577)
+                    elif case=='trailing':bad=body+b'x'
+                    elif case=='truncated':bad=body[:-1]
+                    elif case=='wrong-prefix':bad=b'x'+body[1:]
+                    else:
+                        value=json.loads(zlib.decompress(body[len(prefix):]));value['records'][0]['groupId']='f'*64
+                        bad=prefix+zlib.compress(canonical_v2_bytes(value))
+                    db.execute('UPDATE blocks SET body=? WHERE hash=?',(bad,cp['positionLogHash']))
+                with self.assertRaises(ValueError):IndexedTickTimeline.resume(p,cp,log_folder=folder)
+
+    def test_compressed_log_missing_evidence_is_not_repaired_and_mixed_layout_refuses(self):
+        _,p=self.build();raw=self.timeline(p,folder='legacy-refuse');raw.advance_through('100',raw.cursor);raw.close()
+        path=self.path/'legacy-refuse/timeline.sqlite';before=hashlib.sha256(path.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(ValueError,'REFUSED_LOG_LAYOUT'):
+            IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=path.parent,log_codec='zlib-1')
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),before)
+        t=IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'packed-missing',log_codec='zlib-1')
+        t.advance_through('100',t.cursor);ancestor=t.checkpoint()['positionLogHash'];t.advance_through('200',t.cursor);cp=t.checkpoint();t.close()
+        path=self.path/'packed-missing/timeline.sqlite'
+        with closing(sqlite3.connect(path)) as db,db:db.execute('DELETE FROM blocks WHERE hash=?',(ancestor,))
+        with self.assertRaisesRegex(ValueError,'INCOMPLETE_INGESTION'):
+            IndexedTickTimeline.resume(p,cp,log_folder=path.parent)
+        with closing(sqlite3.connect(path)) as db:self.assertIsNone(db.execute('SELECT 1 FROM blocks WHERE hash=?',(ancestor,)).fetchone())
+
     def test_cancellation_rolls_back_cursor_and_prefix(self):
         _,p=self.build();t=self.timeline(p)
         before=t.checkpoint();cancel=Cancellation(True)

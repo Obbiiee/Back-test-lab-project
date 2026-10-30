@@ -65,7 +65,8 @@ atexit.register(close)
 def _environment(dsn):
     environment = {k: v for k, v in os.environ.items()
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
-                   or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256')}
+                   or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256','BTL_QA_TIMELINE_LOG_CODEC')}
+    require(environment.get('BTL_QA_TIMELINE_LOG_CODEC') in (None, 'raw', 'zlib-1'), 'logCodec')
     environment['BTL_WORKER_DATABASE'] = dsn
     require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')
     environment['BTL_WORKER_MAX_JOBS'] = str(MAX_JOBS)

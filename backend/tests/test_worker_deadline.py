@@ -30,6 +30,12 @@ class WorkerDeadlineTests(unittest.TestCase):
         with patch.object(worker, 'MAX_JOBS', 0), self.assertRaises(ContractError):
             worker._environment('private-dsn')
 
+    def test_private_log_codec_is_propagated_and_unknown_values_refuse(self):
+        with patch.dict(os.environ,{'BTL_QA_TIMELINE_LOG_CODEC':'zlib-1'}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_QA_TIMELINE_LOG_CODEC'],'zlib-1')
+        with patch.dict(os.environ,{'BTL_QA_TIMELINE_LOG_CODEC':'unknown'}),self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
     def test_actual_serve_crosses_4096_and_recycles_at_propagated_parent_limit(self):
         # Exercise the production serve loop, with only DB/source work replaced
         # by authored replies. A child silently retaining 4096 exits early.

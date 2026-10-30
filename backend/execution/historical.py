@@ -8,6 +8,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import os
 import re
 from threading import RLock
 from time import monotonic
@@ -180,7 +181,8 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             provider = self.source.provider()
             try:
                 timeline = IndexedTickTimeline(provider, self.source.dataset_id, self.source.version, str(start),
-                                               log_folder=self._folder(scope, session), allow_threads=True)
+                                               log_folder=self._folder(scope, session), allow_threads=True,
+                                               log_codec=os.environ.get('BTL_QA_TIMELINE_LOG_CODEC'))
             except BaseException:
                 provider.close(); raise
             self._creating[id(timeline)] = provider
