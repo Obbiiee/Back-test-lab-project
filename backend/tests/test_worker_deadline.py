@@ -30,6 +30,26 @@ class WorkerDeadlineTests(unittest.TestCase):
         with patch.object(worker, 'MAX_JOBS', 0), self.assertRaises(ContractError):
             worker._environment('private-dsn')
 
+    def test_actual_serve_crosses_4096_and_recycles_at_propagated_parent_limit(self):
+        # Exercise the production serve loop, with only DB/source work replaced
+        # by authored replies. A child silently retaining 4096 exits early.
+        entry = '''import os,sys
+sys.path[:0]=sys.argv[1:]
+from cloud import worker,research
+from contracts.canonical import canonical_bytes
+research._operator_catalog=lambda dsn:None
+worker._execute=lambda raw:canonical_bytes({"schemaVersion":1,"result":{"pid":os.getpid(),"limit":int(os.environ["BTL_WORKER_MAX_JOBS"])}})
+worker.serve()
+'''
+        with patch.object(worker, 'SERVE_ENTRY', entry), patch.object(worker, 'MAX_JOBS', 4100):
+            first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion':1})
+            self.assertEqual(first['limit'], 4100)
+            for _ in range(4099):
+                self.assertEqual(worker.pooled_invoke('authored-not-a-database', {'schemaVersion':1}), first)
+            recycled = worker.pooled_invoke('authored-not-a-database', {'schemaVersion':1})
+            self.assertNotEqual(recycled['pid'], first['pid'])
+            self.assertEqual(recycled['limit'], 4100)
+
     def test_native_pool_reuses_child_and_recycles_at_its_bound(self):
         with patch.object(worker,'SERVE_ENTRY',POOL_ENTRY):
             first=worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
