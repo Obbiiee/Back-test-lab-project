@@ -17,7 +17,7 @@ from ticks.timeline import CURSOR_FIELDS, make_group
 from ticks.timeline_v2 import VERSION as TIMELINE_VERSION
 from .contracts import exact, money, open_payload, policy_from_wire, policy_wire, price, quantity, text
 from .engine import crossing, protective, can_change
-from .observed_profile import ENGINE_VERSION, MODEL, ObservedExecutionProfile
+from .observed_profile import ENGINE_VERSION, MODEL, MODEL_V2, ObservedExecutionProfile
 from .observed_finance import exit_amount
 
 MAX_EVENTS, MAX_ORDERS = 256, 128
@@ -53,7 +53,7 @@ def _checkpoint(cp, profile):
 
 def validate_state(state):
     _tag(state,'BTL-OBSERVED-EXECUTION-STATE-1',STATE_FIELDS)
-    require(state['engineVersion']==ENGINE_VERSION and state['model']==MODEL,'model')
+    require(state['engineVersion']==ENGINE_VERSION and state['model']==ObservedExecutionProfile.from_wire(state['profile']).wire['model'],'model')
     profile=ObservedExecutionProfile.from_wire(state['profile']);p=profile.wire
     require(state['profileHash']==profile.profile_hash and all(state[k]==p['primary'][k] for k in ('datasetId','datasetVersion')),'profile','CORRUPT_RECORD')
     identifier(state['sessionId'], 'identifier');revision(state['revision']);revision(state['nextEventIndex'])
@@ -114,7 +114,7 @@ def seed_state(session_id,profile,policy,checkpoint,balance='10000'):
     c=_checkpoint(checkpoint,profile);require(c['nextGroupIndex']=='0' and c['revision']=='0' and c['throughNs']==c['sessionStartNs'],'initialCursor')
     initial=money(exact(balance,'balance',True),2);require(exact(initial,'initial',True)>0,'balance');p=profile.wire;policy=policy_wire(policy)
     genesis=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=session_id,profileHash=profile.profile_hash,policy=policy,startNs=c['sessionStartNs'],initialBalance=initial)
-    state=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-STATE-1',sessionId=session_id,datasetId=p['primary']['datasetId'],datasetVersion=p['primary']['datasetVersion'],engineVersion=ENGINE_VERSION,model=MODEL,profile=p,profileHash=profile.profile_hash,policy=policy,revision=0,initialBalance=initial,balance=initial,realizedGross='0',commission='0',startNs=c['sessionStartNs'],throughNs=c['throughNs'],nextGroupIndex='0',nextEventIndex=0,eventHash=content_hash(genesis),sourceCheckpointHash=hash_v2(checkpoint),sourcePrefixHash=c['visiblePrefixHash'],sourceCursorRevision='0',lastObservedNs=None,quoteBasis=None,orders={},unresolved=False,ended=False,financial=False,parent=None)
+    state=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-STATE-1',sessionId=session_id,datasetId=p['primary']['datasetId'],datasetVersion=p['primary']['datasetVersion'],engineVersion=ENGINE_VERSION,model=p['model'],profile=p,profileHash=profile.profile_hash,policy=policy,revision=0,initialBalance=initial,balance=initial,realizedGross='0',commission='0',startNs=c['sessionStartNs'],throughNs=c['throughNs'],nextGroupIndex='0',nextEventIndex=0,eventHash=content_hash(genesis),sourceCheckpointHash=hash_v2(checkpoint),sourcePrefixHash=c['visiblePrefixHash'],sourceCursorRevision='0',lastObservedNs=None,quoteBasis=None,orders={},unresolved=False,ended=False,financial=False,parent=None)
     validate_snapshot(state,checkpoint);return state
 
 
@@ -130,7 +130,7 @@ def command_wire(raw):
 
 def emit(state,events,kind,*,order_id=None,classification='OBSERVED_FEED_EVENT',**detail):
     require(len(events)<MAX_EVENTS,'events','REFUSED_EVENT_LIMIT')
-    e=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-EVENT-1',engineVersion=ENGINE_VERSION,model=MODEL,sessionId=state['sessionId'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash'],sequence=state['nextEventIndex'],previousHash=state['eventHash'],kind=kind,classification=classification,orderId=order_id,detail=detail)
+    e=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-EVENT-1',engineVersion=ENGINE_VERSION,model=state['model'],sessionId=state['sessionId'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash'],sequence=state['nextEventIndex'],previousHash=state['eventHash'],kind=kind,classification=classification,orderId=order_id,detail=detail)
     e['eventId']=content_hash(e);state['eventHash']=e['eventId'];state['nextEventIndex']+=1;events.append(e);return e['eventId']
 
 
@@ -216,11 +216,14 @@ def _advance(s,events,raw,frame,checkpoint):
             for r in rows:price(r['bid'],p);price(r['ask'],p)
         except ContractError:precision_bad=True
         equivalent=len({(r['bid'],r['ask']) for r in rows})==1
-        if live and moment-anchor>guard:_unresolved(s,events,'UNRESOLVED_OBSERVED_SILENCE',group['groupId'])
-        elif live and any(previous<=int(d['timeNs'])<=moment for d in diag['records']):_unresolved(s,events,'UNRESOLVED_DIAGNOSTIC',group['groupId'])
-        elif live and _incomplete(coverage,previous,moment):_unresolved(s,events,'UNRESOLVED_KNOWN_COVERAGE',group['groupId'])
-        elif live and (quality_bad or precision_bad):_unresolved(s,events,'UNRESOLVED_QUOTE_QUALITY' if quality_bad else 'UNRESOLVED_QUOTE_PRECISION',group['groupId'])
-        elif live:
+        if live and moment-anchor>guard and s['model']!=MODEL_V2:_unresolved(s,events,'UNRESOLVED_OBSERVED_SILENCE',group['groupId'])
+        elif live and moment-anchor>guard:
+            closed=all(r['quality']['gapBefore']=='KNOWN_SESSION_CLOSED' for r in rows)
+            emit(s,events,'DATA_GAP_LIMITATION',groupId=group['groupId'],gapStartNs=str(anchor),gapEndNs=str(moment),elapsedNs=str(moment-anchor),gapKind='MARKET_CLOSED' if closed else 'UNKNOWN_COVERAGE_GAP',affectedOrders=[k for k,v in sorted(s['orders'].items()) if v['status'] in ('PENDING','ACTIVE')],quoteAvailable=True,execution='OBSERVED_QUOTES_ONLY',sourceQuality='UNKNOWN')
+        if live and not s['unresolved'] and any(previous<=int(d['timeNs'])<=moment for d in diag['records']):_unresolved(s,events,'UNRESOLVED_DIAGNOSTIC',group['groupId'])
+        elif live and not s['unresolved'] and _incomplete(coverage,previous,moment):_unresolved(s,events,'UNRESOLVED_KNOWN_COVERAGE',group['groupId'])
+        elif live and not s['unresolved'] and (quality_bad or precision_bad):_unresolved(s,events,'UNRESOLVED_QUOTE_QUALITY' if quality_bad else 'UNRESOLVED_QUOTE_PRECISION',group['groupId'])
+        if live and not s['unresolved']:
             changes=any(can_change(s,r) for r in rows)
             if not equivalent and changes:_unresolved(s,events,'UNRESOLVED_EQUAL_TIME_ORDER',group['groupId'])
             elif not equivalent:emit(s,events,'CHRONOLOGY_LIMITATION',groupId=group['groupId'],timeNs=group['timeNs'],commonOutcome='NO_FINANCIAL_ACTION')
@@ -231,7 +234,12 @@ def _advance(s,events,raw,frame,checkpoint):
         s['lastObservedNs']=group['timeNs'];s['nextGroupIndex']=str(int(s['nextGroupIndex'])+1);previous=moment
     if _live(s) and not s['unresolved'] and not s['ended']:
         anchor=int(s['lastObservedNs']) if s['lastObservedNs'] is not None else int(s['startNs'])
-        if through-anchor>guard:_unresolved(s,events,'UNRESOLVED_OBSERVED_SILENCE')
+        if through-anchor>guard and s['model']!=MODEL_V2:_unresolved(s,events,'UNRESOLVED_OBSERVED_SILENCE')
+        elif through-anchor>guard:
+            if s['quoteBasis'] is not None:
+                emit(s,events,'STALE_QUOTE',classification='OBSERVED_FEED_EVENT',quoteTimeNs=s['quoteBasis']['timeNs'],throughNs=str(through),ageNs=str(through-int(s['quoteBasis']['timeNs'])),gapKind='UNKNOWN_COVERAGE_GAP')
+                s['quoteBasis']=None
+            emit(s,events,'DATA_GAP_LIMITATION',gapStartNs=str(anchor),gapEndNs=str(through),elapsedNs=str(through-anchor),gapKind='UNKNOWN_COVERAGE_GAP',affectedOrders=[k for k,v in sorted(s['orders'].items()) if v['status'] in ('PENDING','ACTIVE')],quoteAvailable=False,execution='OBSERVED_QUOTES_ONLY',sourceQuality='UNKNOWN')
         elif any(previous<=int(d['timeNs'])<=through for d in diag['records']):_unresolved(s,events,'UNRESOLVED_DIAGNOSTIC')
         elif _incomplete(coverage,previous,through):_unresolved(s,events,'UNRESOLVED_KNOWN_COVERAGE')
     if s['quoteBasis'] is not None and (any(int(d['timeNs'])>=int(s['quoteBasis']['timeNs']) for d in diag['records']) or _incomplete(coverage,int(s['quoteBasis']['timeNs']),through)):

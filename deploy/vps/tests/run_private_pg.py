@@ -24,7 +24,7 @@ GROUPS = {
 
 
 @contextmanager
-def private_postgres(*, keep=False):
+def private_postgres(*, keep=False, root_dir=None):
     if os.geteuid() == 0:
         raise ValueError('RUN_AS_ORDINARY_USER_WITHOUT_SUDO')
     repository = Path(__file__).resolve().parents[3]
@@ -32,7 +32,11 @@ def private_postgres(*, keep=False):
     for name in ('initdb', 'pg_ctl', 'pg_dump', 'pg_restore'):
         if not (binaries/name).is_file():
             raise ValueError('POSTGRESQL16_TOOLS_REQUIRED')
-    root = Path(tempfile.mkdtemp(prefix='riksora-exclusive-qa-'))
+    if root_dir is None:
+        root = Path(tempfile.mkdtemp(prefix='riksora-exclusive-qa-'))
+    else:
+        root = Path(root_dir)
+        root.mkdir(mode=0o700, parents=False, exist_ok=False)
     root.chmod(0o700)
     socket = root/'socket'
     socket.mkdir(mode=0o700)
@@ -44,6 +48,7 @@ def private_postgres(*, keep=False):
     environment = {k: v for k, v in os.environ.items()
                    if not k.startswith(('PG', 'BTL_'))}
     environment.update(PYTHONDONTWRITEBYTECODE='1', PYTHONPATH=str(repository/'backend'))
+    environment['BTL_QA_CLUSTER_ROOT'] = str(root)
     data = root/'data'
     started = False
     def pg(args):

@@ -12,7 +12,7 @@ from pathlib import Path
 from contracts.primitives import digest,require
 from ticks.contracts_v2 import shape,validate_container
 from ticks.storage_v2 import ArtifactStore
-from .observed_profile import ObservedExecutionProfile
+from .observed_profile import ObservedExecutionProfile, MODEL_V2
 from .observed_source import ObservedDatasetPin,ObservedReplaySource
 from .historical import IndexedTimelineCache
 
@@ -34,6 +34,12 @@ class AdmittedObservedSource:
         with os.fdopen(descriptor,'rb') as stream:
             require(stat.S_ISREG(os.fstat(stream.fileno()).st_mode),'receipt','REFUSED_QUALIFICATION_PROOF');raw=stream.read(1048577)
         require(len(raw)<=1048576 and hashlib.sha256(raw).hexdigest()==receipt_sha256,'receipt','SOURCE_PIN_CHANGED');r=json.loads(raw)
+        if profile.wire['model']==MODEL_V2:
+            require(profile.wire['technicalEligibility']['qualificationReceiptHash']==receipt_sha256,
+                    'qualificationReceiptHash','REFUSED_TECHNICAL_ELIGIBILITY')
+            require(profile.wire['sourceQuality']['rights']=='UNKNOWN' and
+                    profile.wire['sourceQuality']['provenance']=='PROVIDER_OBSERVATION',
+                    'sourceQuality','REFUSED_SOURCE_DISCLOSURE')
         rows=r.get('rows');require(type(rows) is int and 0<rows<=17179869184,'rows','REFUSED_QUALIFICATION_PROOF')
         if r.get('status')=='READONLY_PROJECTION_REAL_DAY_PASS':
             require(r.get('fullPublicReaderParityRows')==rows and r.get('allCanonicalObjectsAndPublicationsExactlyEqual') is True and r.get('parentHashAndMtimeUnchanged') is True,'receipt','REFUSED_QUALIFICATION_PROOF');archive_hash=r['archiveSha256']
@@ -59,6 +65,11 @@ class AdmittedObservedSource:
         # Admission is static operator configuration. No future catalog fields
         # or refusal diagnostics are projected into an active revealed view.
         self.dataset_id=p['datasetId'];self.version=p['datasetVersion'];self.log_root=Path(log_root);self.qualification_hash=receipt_sha256
+        # Technical simulation eligibility is deliberately separate from strict
+        # broker/source financial admission and from external data-use rights.
+        self.technical_simulation_eligibility='PASS'
+        self.execution_eligibility='NOT_GRANTED'
+        self.execution_label=profile.wire.get('executionLabel','CONDITIONAL OBSERVED-TICK SIMULATION')
         self.cache=IndexedTimelineCache(self)
 
     def _protected_fingerprint(self):

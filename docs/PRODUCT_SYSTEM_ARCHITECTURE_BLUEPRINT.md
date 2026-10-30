@@ -2843,6 +2843,26 @@ Failure names reuse frozen SCHEMA_MISMATCH, DATASET_MISMATCH, VERSION_MISMATCH, 
 | Resume ignores metadata or seek jumps over its session prefix | Reconstruct fences/diagnostics and exact prefix hash from the pinned schedule |
 | Consumer calls sidecar API or infers total from a private token | Capability absent from RevealedView; no request/page/token/catalog counters projected |
 
+## 42.20 Owner-authorized QA historical technical simulation — versioned, isolated
+
+**Scope:** internal QA only. This additive model does not change the source, provider, reveal, Session, financial admission or production behavior of the existing families. Sections 42.17 and 42.19 remain normative for their existing contracts. No migration or production dispatch is implied.
+
+The owner authorizes a separate profile artifact `BTL-HISTORICAL-TECHNICAL-SIMULATION-PROFILE-2` and model `HISTORICAL_TECHNICAL_TICK_SIMULATION_V2`. It is admitted for simulation only when pinned to an independently accepted technical qualification receipt and immutable dataset identity. Required technical evidence covers timestamp ordering, valid Bid/Ask, atomic timestamp groups, stable source identity/content hashes, deterministic quote interpretation, instrument specification and causal reveal. Broker-fill certification is not a prerequisite for this QA model. `execution_eligibility` and production financial admission remain `NOT_GRANTED`.
+
+The profile binds `BTL-HISTORICAL-TECHNICAL-ELIGIBILITY-1`, `BTL-OBSERVED-GAP-POLICY-2`, source-quality disclosure and the fixed result label `EXPERIMENTAL — UNVERIFIED SOURCE — SIMULATED EXECUTION`. Provenance remains `PROVIDER_OBSERVATION`; completeness, freshness and third-party usage rights remain `UNKNOWN` unless supported by their own evidence. Internal QA authorization is not a grant to redistribute data, claim broker executions or deploy the model.
+
+Gap Policy V2 uses only timestamped observations already revealed to the Session:
+
+- A quote basis older than the configured 60-second staleness threshold cannot authorize a new order. It is invalidated and never refreshed from future data.
+- Elapsed time with no quote produces no market event, quote, fill or inferred price. Live orders and positions remain available for later observed-quote evaluation; a `DATA_GAP_LIMITATION` discloses the gap and whether a quote was available.
+- A gap is labeled `MARKET_CLOSED` only when the current observed tick carries validated `KNOWN_SESSION_CLOSED` quality with its evidence reference. The engine does not infer a weekend calendar or venue hours from elapsed time. Otherwise the gap is `UNKNOWN_COVERAGE_GAP`.
+- Pending LIMIT/STOP, open positions and protective levels are evaluated when the next valid timestamp group is revealed. Any fill price is the actual observed Ask/Bid selected by the existing engine. A gap-through stop/target uses that observed price, never the unobserved trigger level. Intraperiod crossings without observed quotes are not reconstructed.
+- Known incomplete coverage, invalid/stale quote quality, causal diagnostics and outcome-changing ambiguous timestamp groups remain unresolved under the existing conservative rules. Data gaps are retained as source-quality limitations; they do not certify source completeness.
+
+The policy is compatible with existing timestamp atomicity, reducer arithmetic, order/event ordering, receipts, idempotency, checkpoints and no-look-ahead. Every new state/result stays bound to the v2 profile hash, while v1 profile validation and stored records retain their original exact meaning. Rollback is selecting the existing v1 profile family; no saved v1 Session is rewritten.
+
+Acceptance requires v1 regression/golden parity; v2 profile/receipt rejection tests; stale quote, evidenced closure, unknown gap, weekend, price-jump, SL/TP, save/cold-resume and independent financial reconciliation tests; and one bounded full UTC trading-day QA run. The source must be opened read-only, the QA database isolated, and the 30 GiB disk reserve maintained. This section authorizes no annual replay.
+
 Application capability isolation is for trusted host composition, not an arbitrary-Python reflection sandbox. Timing/I/O side-channel resistance against malicious same-process code is not certified. Hashes remain opaque identity; do not expose future numeric metadata with them.
 
 ### H. Impact on preserved 42.18 draft and next authorization

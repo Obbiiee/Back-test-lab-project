@@ -1,0 +1,443 @@
+"""QA-only, one-UTC-day observed-tick financial simulation (no production wiring).
+
+Run with a new BTL_HISTORICAL_QA_ROOT outside the repository. The isolated
+PostgreSQL cluster and all generated logs/evidence stay under that directory.
+"""
+from collections import Counter, defaultdict
+from copy import deepcopy
+from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_EVEN
+from fractions import Fraction
+import hashlib
+import json
+import os
+from pathlib import Path
+import resource
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
+import uuid
+
+from contracts.canonical import canonical_bytes, content_hash
+from contracts.models import MethodPolicy
+from execution.observed_admission import AdmittedObservedSource
+from execution.observed_controller import ObservedExecutionController
+from execution.observed_kernel import validate_state
+from execution.observed_postgres import ObservedExecutionStore
+from execution.observed_profile import ObservedExecutionProfile, historical_technical_profile
+from infrastructure.database import connect, migrate
+from ticks.storage_v2 import DiskTickProvider
+
+DAY = '2024-01-02'
+PERIOD = '2024-01'
+S = 1_000_000_000
+MAX_WALL = 3600.0
+MAX_ARTIFACT = 512 * 1024 * 1024
+MAX_RAM = 1024 * 1024 * 1024
+MIN_FREE = 30 * 1024 * 1024 * 1024
+PEAK_RAM = 0
+PEAK_ARTIFACT = 0
+SOURCE = Path('/home/riksora/riksora-qa-evidence/beta-checkpoints-20261025-jtbqjj1o/xau-binary-recovery-20261026/verified-serving-snapshot')
+PROOF = Path('/home/riksora/riksora-qa-evidence/beta-checkpoints-20261025-jtbqjj1o/xau-binary-recovery-20261026/resumable-parity/final-report.json')
+PROFILE_FIXTURE = Path(__file__).parent/'fixtures/observed_profile_vectors.json'
+CONFIG_FIXTURE = Path(__file__).parent/'fixtures/historical_technical_simulation_qa.json'
+
+
+def allocated(root):
+    total = 0
+    for base, dirs, files in os.walk(root):
+        for name in files:
+            try:
+                total += (Path(base)/name).stat().st_blocks * 512
+            except FileNotFoundError:
+                pass
+    return total
+
+
+def _proc(pid):
+    """Return parent pid, CPU seconds and current RSS for a Linux process."""
+    try:
+        raw = Path(f'/proc/{pid}/stat').read_text()
+        rest = raw[raw.rfind(')')+2:].split()
+        ppid = int(rest[1]); ticks = int(rest[11])+int(rest[12])
+        status = Path(f'/proc/{pid}/status').read_text()
+        rss_kib = int(next(line.split()[1] for line in status.splitlines() if line.startswith('VmRSS:')))
+        return ppid, ticks/os.sysconf('SC_CLK_TCK'), rss_kib*1024
+    except (OSError, StopIteration, ValueError, IndexError):
+        return None
+
+
+def resource_sample(cluster_root):
+    own_status = Path('/proc/self/status').read_text()
+    own_rss = int(next(line.split()[1] for line in own_status.splitlines() if line.startswith('VmRSS:'))) * 1024
+    own = resource.getrusage(resource.RUSAGE_SELF)
+    child = resource.getrusage(resource.RUSAGE_CHILDREN)
+    cpu = own.ru_utime + own.ru_stime + child.ru_utime + child.ru_stime
+    rss = max(own_rss, own.ru_maxrss*1024)
+    postmaster_file = Path(cluster_root)/'data/postmaster.pid'
+    if postmaster_file.exists():
+        try: root_pid = int(postmaster_file.read_text().splitlines()[0])
+        except (OSError, ValueError, IndexError): root_pid = None
+        if root_pid:
+            procs = {}
+            for item in Path('/proc').iterdir():
+                if item.name.isdigit():
+                    stats = _proc(item.name)
+                    if stats: procs[int(item.name)] = stats
+            included = {root_pid}
+            changed = True
+            while changed:
+                changed = False
+                for pid, (ppid, _, _) in procs.items():
+                    if ppid in included and pid not in included:
+                        included.add(pid); changed = True
+            for pid in included:
+                if pid in procs:
+                    _, proc_cpu, proc_rss = procs[pid]; cpu += proc_cpu; rss += proc_rss
+    return cpu, rss
+
+
+def assert_budgets(root, cluster_root, started):
+    global PEAK_RAM, PEAK_ARTIFACT
+    if time.monotonic()-started > MAX_WALL: raise RuntimeError('RESOURCE_STOP_WALL_60_MIN')
+    if shutil.disk_usage(root).free < MIN_FREE: raise RuntimeError('RESOURCE_STOP_DISK_RESERVE_30_GIB')
+    used = allocated(root)
+    if used > MAX_ARTIFACT: raise RuntimeError('RESOURCE_STOP_ARTIFACT_512_MIB')
+    cpu, ram = resource_sample(cluster_root)
+    PEAK_RAM=max(PEAK_RAM,ram);PEAK_ARTIFACT=max(PEAK_ARTIFACT,used)
+    if ram > MAX_RAM: raise RuntimeError('RESOURCE_STOP_RAM_1_GIB')
+    return used, cpu, ram
+
+
+def command(sid, cid, revision, kind, payload=None):
+    return dict(schemaVersion=1, artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                sessionId=sid, commandId=cid, expectedRevision=revision,
+                kind=kind, payload=payload or {})
+
+
+def load_source(profile, source_path, proof_path, proof_hash, log_root):
+    return AdmittedObservedSource(source_path, profile, receipt_path=proof_path,
+                                  receipt_sha256=proof_hash, log_root=log_root)
+
+
+def _db_command_ids(dsn, workspace, session):
+    with connect(dsn) as db:
+        rows = db.execute('SELECT command_id FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s',
+                          (workspace, session)).fetchall()
+    result=[]
+    for (cid,) in rows:
+        parts=cid.split(':')
+        if len(parts)>=4 and parts[:2]==['order','stage'] and parts[2].isdigit():
+            result.append(int(parts[2]))
+    return max(result) if result else -1
+
+
+def _stage_orders(controller, store, source, scope, sid, state, stage, basis):
+    if basis is None or int(state['throughNs'])-int(basis['timeNs']) > 60*S: return False
+    pending=[oid for oid,o in state['orders'].items() if o['status']=='PENDING' and not oid.startswith('order:far:')]
+    for oid in pending:
+        state=store.inspect(scope,sid)['state']
+        controller.apply(scope,command(sid,f'cancel:stage:{stage:02d}:{oid.rsplit(":",1)[-1]}',state['revision'],'CANCEL',{'orderId':oid}))
+    state=store.inspect(scope,sid)['state'];b=state['quoteBasis']
+    if b is None or int(state['throughNs'])-int(b['timeNs'])>60*S:return False
+    bid=Decimal(b['bid']);ask=Decimal(b['ask']);step=Decimal('0.001')
+    # Protective levels must clear the currently observed spread. Otherwise a
+    # pending order can fill on Ask/Bid and immediately stop out on the
+    # opposite side of that same quote. Size the symmetric bracket from only
+    # this revealed quote; no future prices are consulted.
+    risk=max(Decimal('0.50'),ask-bid+Decimal('0.01'))
+    plans=(
+        ('LONG','LIMIT',ask-step,ask-step-risk,ask-step+risk),
+        ('LONG','STOP',ask+step,ask+step-risk,ask+step+risk),
+        ('SHORT','LIMIT',bid+step,bid+step+risk,bid+step-risk),
+        ('SHORT','STOP',bid-step,bid-step+risk,bid-step-risk),
+    )
+    for side,otype,entry,sl,tp in plans:
+        state=store.inspect(scope,sid)['state'];cid=f'order:stage:{stage:02d}:{side.lower()}:{otype.lower()}'
+        payload=dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
+                     sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])
+        controller.apply(scope,command(sid,cid,state['revision'],'OPEN',payload))
+    return True
+
+
+def advance_until(controller, store, scope, sid, target, root, cluster_root, started):
+    eod_ns=None
+    exhausted=False
+    while not exhausted:
+        state=store.inspect(scope,sid)['state']
+        raw=command(sid,f'advance:{state["revision"]}',state['revision'],'ADVANCE',{'targetNs':str(target)})
+        result=controller.apply(scope,raw)
+        exhausted=result['replay']['exhaustedThroughBoundary']
+        state=result['state']
+        used,cpu,ram=assert_budgets(root,cluster_root,started)
+        progress=dict(status='RUNNING',sessionId=sid,revision=state['revision'],throughNs=state['throughNs'],
+                      nextGroupIndex=state['nextGroupIndex'],targetNs=str(target),allocatedBytes=used,
+                      cpuSeconds=round(cpu,3),ramBytes=ram,updatedUnixNs=time.time_ns())
+        temp=Path(root)/'.progress.tmp';temp.write_text(json.dumps(progress,sort_keys=True)+'\n');os.chmod(temp,0o600);temp.replace(Path(root)/'progress.json')
+        if eod_ns is None:eod_ns=int(state['startNs'])+23*3600*S
+        if int(state['throughNs'])>=eod_ns and not state['unresolved']:
+            for oid,order in sorted(state['orders'].items()):
+                if order['status']=='PENDING':
+                    state=store.inspect(scope,sid)['state']
+                    controller.apply(scope,command(sid,f'eod:cancel:{oid}',state['revision'],'CANCEL',{'orderId':oid}))
+                elif order['status']=='ACTIVE' and order['exitRequest'] is None:
+                    state=store.inspect(scope,sid)['state']
+                    controller.apply(scope,command(sid,f'eod:close:{oid}',state['revision'],'CLOSE',{'orderId':oid,'quantity':None}))
+            state=store.inspect(scope,sid)['state']
+        # Stage orders only from the current revealed quote and durable clock.
+        stage=min(23,max(0,(int(state['throughNs'])-int(state['startNs']))//(3600*S)))
+        current=_db_command_ids(os.environ['BTL_TEST_DATABASE_URL'],scope.workspace_id,sid)
+        if int(state['throughNs']) < eod_ns and current < stage:
+            source=controller._source(ObservedExecutionProfile.from_wire(state['profile']))
+            _stage_orders(controller,store,source,scope,sid,state,stage,state['quoteBasis'])
+            if stage==0:
+                after=store.inspect(scope,sid)['state'];bid=Decimal(after['quoteBasis']['bid']);ask=Decimal(after['quoteBasis']['ask'])
+                for label,side,otype,entry,sl,tp in (
+                    ('long-limit','LONG','LIMIT',bid-Decimal('50'),bid-Decimal('51'),bid-Decimal('49')),
+                    ('long-stop','LONG','STOP',ask+Decimal('50'),ask+Decimal('49'),ask+Decimal('51')),
+                ):
+                    after=store.inspect(scope,sid)['state']
+                    controller.apply(scope,command(sid,f'order:far:{label}',after['revision'],'OPEN',
+                        dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
+                             sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
+        yield result
+
+
+def _all_events(store, scope, sid):
+    result=[];offset=0
+    while True:
+        page=store.inspect(scope,sid,after_sequence=offset,maximum=64)
+        events=page['events'];result.extend(events)
+        if page['nextEventSequence'] is None:break
+        offset=page['nextEventSequence']
+    return result
+
+
+def independent_verify(source, store, scope, sid, start_ns, end_ns):
+    state=store.inspect(scope,sid)['state'];events=_all_events(store,scope,sid)
+    validate_state(state)
+    # Recompute the whole event commitment chain independently from stored rows.
+    if events:
+        genesis=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=sid,
+            profileHash=state['profileHash'],policy=state['policy'],startNs=state['startNs'],initialBalance=state['initialBalance']))
+        previous=genesis
+        for i,event in enumerate(events):
+            body={k:v for k,v in event.items() if k!='eventId'}
+            if event['sequence']!=i or event['previousHash']!=previous or event['eventId']!=content_hash(body):
+                raise RuntimeError('INDEPENDENT_EVENT_CHAIN_MISMATCH')
+            previous=event['eventId']
+        if previous!=state['eventHash']:raise RuntimeError('INDEPENDENT_EVENT_HEAD_MISMATCH')
+    fills=[e for e in events if e['classification']=='SIMULATED_FILL']
+    by_time=defaultdict(list)
+    for event in fills:by_time[event['detail']['evidence']['timeNs']].append(event)
+    provider=source.provider()
+    try:
+        located=provider.locate_v2(source.dataset_id,source.version,str(start_ns));position=located['position']
+        if position is None:raise RuntimeError('INDEPENDENT_SOURCE_START_MISSING')
+        time_ns=None;rows=[];seen=0;groups=0;gaps=0;matched=0
+        def verify_group(moment,group_rows):
+            nonlocal groups,matched
+            groups+=1
+            if len(group_rows)>1: raise RuntimeError('INDEPENDENT_UNTRUSTED_TIE_IN_ONE_DAY')
+            row=group_rows[0];ids=[r['eventId'] for r in group_rows]
+            gid=content_hash(dict(schemaVersion=1,artifact='BTL-TICK-GROUP-ID-1',datasetVersion=source.version,
+                                  timeNs=str(moment),eventIds=ids))
+            for fill in by_time.get(str(moment),[]):
+                evidence=fill['detail']['evidence'];order=state['orders'][fill['orderId']]
+                if evidence['groupId']!=gid or evidence['eventIds']!=ids or evidence['bid']!=row['bid'] or evidence['ask']!=row['ask']:
+                    raise RuntimeError('INDEPENDENT_FILL_SOURCE_EVIDENCE_MISMATCH')
+                if fill['kind']=='ENTRY_FILL': expected=row['ask'] if order['side']=='LONG' else row['bid']
+                else: expected=row['bid'] if order['side']=='LONG' else row['ask']
+                if fill['detail']['price']!=expected:raise RuntimeError('INDEPENDENT_FILL_PRICE_MISMATCH')
+                matched+=1
+        while position is not None:
+            page=provider.read_page_v2(source.dataset_id,source.version,position,256)
+            for row in page['events']:
+                moment=int(row['timeNs'])
+                if moment>end_ns:
+                    position=None;break
+                if moment<start_ns:continue
+                if time_ns is None:time_ns=moment
+                if moment!=time_ns:
+                    verify_group(time_ns,rows);rows=[];time_ns=moment
+                rows.append(row);seen+=1
+            if position is not None:
+                position=page['nextPosition']
+                if not page['events'] and position is not None:raise RuntimeError('INDEPENDENT_SOURCE_NO_PROGRESS')
+        if rows:verify_group(time_ns,rows)
+    finally:provider.close()
+    if matched!=len(fills):raise RuntimeError('INDEPENDENT_FILL_COUNT_MISMATCH')
+    exact_total=Fraction(0)
+    fill_count=Counter()
+    for event in fills:
+        fill_count[event['kind']]+=1
+        if event['kind']=='EXIT_FILL':exact_total+=Fraction(event['detail']['grossPosted'])
+    if Fraction(state['balance'])!=Fraction(state['initialBalance'])+exact_total:
+        raise RuntimeError('INDEPENDENT_CASH_RECONCILIATION_MISMATCH')
+    if Fraction(state['realizedGross'])!=exact_total:raise RuntimeError('INDEPENDENT_REALIZED_GROSS_MISMATCH')
+    return dict(status='PASS',independentSourceTicks=seen,independentTimestampGroups=groups,
+                independentlyMatchedFills=matched,entryFills=fill_count['ENTRY_FILL'],exitFills=fill_count['EXIT_FILL'],
+                reconciledGross=format(exact_total,'f'),reconciledBalance=state['balance'],
+                eventChainHead=state['eventHash'])
+
+
+def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid, day_end):
+    global PEAK_RAM,PEAK_ARTIFACT
+    os.environ['BTL_TEST_DATABASE_URL']=dsn
+    proof=json.loads(Path(proof_path).read_text())
+    with connect(dsn) as db:
+        row=db.execute('SELECT payload,content_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                       (workspace,sid)).fetchone()
+    if row is None:raise RuntimeError('COLD_RESUME_SESSION_MISSING')
+    from execution.postgres import unpack
+    snapshot=unpack(row[0],row[1]);state=snapshot['state']
+    profile=ObservedExecutionProfile.from_wire(state['profile'])
+    source=load_source(profile,Path(source_path),Path(proof_path),proof_hash,root/'source-logs')
+    PEAK_RAM=max(PEAK_RAM,resource_sample(os.environ['BTL_QA_CLUSTER_ROOT'])[1])
+    store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
+    controller=ObservedExecutionController(store,lambda _:source)
+    start=int(state['startNs']);target=min(day_end,start+86400*S)
+    for _ in advance_until(controller,store,scope,sid,target,root,os.environ['BTL_QA_CLUSTER_ROOT'],float(os.environ['BTL_QA_RUN_STARTED'])):
+        pass
+    Path(root,'worker-resource.json').write_text(json.dumps(dict(peakRamBytes=PEAK_RAM,peakArtifactBytes=PEAK_ARTIFACT),sort_keys=True)+'\n')
+    os.chmod(Path(root,'worker-resource.json'),0o600)
+    source.close()
+    return dict(status='PASS',workerProcessRestarted=True,throughNs=store.inspect(scope,sid)['state']['throughNs'])
+
+
+def main_worker():
+    data=json.loads(os.environ['BTL_HISTORICAL_DAY_V2_WORKER'])
+    result=worker(data['dsn'],Path(data['root']),data['source'],data['proof'],data['proofHash'],
+                  data['workspace'],data['actor'],data['session'],int(data['dayEnd']))
+    Path(data['root'],'worker-result.json').write_text(json.dumps(result,sort_keys=True)+'\n')
+    print(json.dumps(result,sort_keys=True))
+
+
+def main():
+    global PEAK_RAM,PEAK_ARTIFACT
+    root_text=os.environ.get('BTL_HISTORICAL_QA_ROOT')
+    if not root_text:raise RuntimeError('SET_BTL_HISTORICAL_QA_ROOT_TO_NEW_EMPTY_PATH')
+    root=Path(root_text)
+    if root.exists():raise RuntimeError('QA_OUTPUT_PATH_MUST_NOT_EXIST')
+    if shutil.disk_usage(root.parent if root.parent.exists() else Path('/')).free<MIN_FREE:
+        raise RuntimeError('PREFLIGHT_DISK_RESERVE_BELOW_30_GIB')
+    root.mkdir(mode=0o700,parents=False)
+    os.chmod(root,0o700);tempfile.tempdir=str(root);os.environ['TMPDIR']=str(root)
+    os.environ['PYTHONDONTWRITEBYTECODE']='1'
+    available=os.sched_getaffinity(0)
+    if available:os.sched_setaffinity(0,{min(available)})
+    started=time.monotonic();wall_start=time.time();initial_free=shutil.disk_usage(root).free
+    proof_raw=PROOF.read_bytes();proof_hash=hashlib.sha256(proof_raw).hexdigest();proof=json.loads(proof_raw)
+    vector=json.loads(PROFILE_FIXTURE.read_text());base=next(v['profile'] for v in vector['profiles'] if v['name']=='hf-2024-identity-not-admission')
+    profile=ObservedExecutionProfile.from_wire(historical_technical_profile(base,proof_hash))
+    config=json.loads(CONFIG_FIXTURE.read_text())
+    if config['productionEnabled'] or config['executionLabel']!=profile.wire['executionLabel'] or config['gapPolicy']!=profile.wire['gapPolicy']:
+        raise RuntimeError('QA_CONFIGURATION_CONTRACT_MISMATCH')
+    if profile.wire['primary']['datasetId']!=proof['datasetId'] or profile.wire['primary']['datasetVersion']!=proof['datasetVersion']:
+        raise RuntimeError('SOURCE_PROFILE_RECEIPT_MISMATCH')
+    if proof.get('status')!='PASS' or proof.get('classification')!='FULL_BINARY_SOURCE_PUBLIC_PAGE_PARITY_NOT_FINANCIAL_ADMISSION':
+        raise RuntimeError('SOURCE_QUALIFICATION_RECEIPT_NOT_ACCEPTED')
+    calendar=datetime.strptime(DAY,'%Y-%m-%d').replace(tzinfo=timezone.utc)
+    day_end=int((calendar.replace(day=calendar.day)+__import__('datetime').timedelta(days=1)).timestamp()*S)
+    session='session:hist-v2:'+uuid.uuid4().hex
+    workspace='observedqa:hist-v2:'+uuid.uuid4().hex;actor='fixture:internal-qa'
+    method=MethodPolicy('method:hist-v2:'+uuid.uuid4().hex,'a'*64,'FREE_STYLE',False,())
+    metrics=dict(cpuStart=resource_sample(root/'postgres')[0],peakRam=0,peakArtifact=0)
+    summary={}
+    from deploy.vps.tests.run_private_pg import private_postgres
+    with private_postgres(keep=True,root_dir=root/'postgres') as (repository,env):
+        os.environ.update(env);dsn=env['BTL_TEST_DATABASE_URL'];migrate(dsn)
+        source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs')
+        PEAK_RAM=max(PEAK_RAM,resource_sample(root/'postgres')[1])
+        store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
+        controller=ObservedExecutionController(store,lambda _:source)
+        initial=controller.create(scope,session,profile,method,period=PERIOD,day=DAY,balance='10000')
+        start=int(initial['startNs']);day_end=int((calendar+__import__('datetime').timedelta(days=1)).timestamp()*S)-1
+        # Reveal the opening quote, then submit the first order batch using only
+        # this already revealed Bid/Ask. Duplicate retry is required to be exact.
+        first=command(session,'advance:opening',0,'ADVANCE',{'targetNs':str(start)})
+        receipt=controller.apply(scope,first);retry=controller.apply(scope,first)
+        if canonical_bytes(receipt)!=canonical_bytes(retry):raise RuntimeError('IDEMPOTENT_RETRY_MISMATCH')
+        state=receipt['state'];basis=state['quoteBasis']
+        if basis is None:raise RuntimeError('OPENING_QUOTE_NOT_REVEALED')
+        _stage_orders(controller,store,source,scope,session,state,0,basis)
+        state=store.inspect(scope,session)['state'];bid=Decimal(state['quoteBasis']['bid']);ask=Decimal(state['quoteBasis']['ask'])
+        for label,side,otype,entry,sl,tp in (
+            ('long-limit','LONG','LIMIT',bid-Decimal('50'),bid-Decimal('51'),bid-Decimal('49')),
+            ('long-stop','LONG','STOP',ask+Decimal('50'),ask+Decimal('49'),ask+Decimal('51')),
+        ):
+            state=store.inspect(scope,session)['state']
+            controller.apply(scope,command(session,f'order:far:{label}',state['revision'],'OPEN',
+                dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
+                     sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
+        # Durable progress before a real worker process restart.
+        resume_target=start+4*3600*S
+        for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started):pass
+        before_restart=store.inspect(scope,session)['state']
+        source.close()
+        worker_data=dict(dsn=dsn,root=str(root),source=str(SOURCE),proof=str(PROOF),proofHash=proof_hash,
+                         workspace=workspace,actor=actor,session=session,dayEnd=day_end)
+        env=dict(os.environ,BTL_HISTORICAL_DAY_V2_WORKER=json.dumps(worker_data),
+                 BTL_TEST_DATABASE_URL=dsn,BTL_QA_CLUSTER_ROOT=str(root/'postgres'),
+                 BTL_QA_RUN_STARTED=str(started),PYTHONDONTWRITEBYTECODE='1')
+        proc=subprocess.run([sys.executable,'-B','-m','tests.qa_historical_day_v2','--worker'],cwd=repository,
+                            env=env,capture_output=True,text=True,timeout=max(1,int(MAX_WALL-(time.monotonic()-started))))
+        if proc.returncode!=0:raise RuntimeError('COLD_RESUME_WORKER_FAILED:'+proc.stderr[-2000:])
+        state=store.inspect(scope,session)['state']
+        if int(state['throughNs'])<day_end:raise RuntimeError('UTC_DAY_BOUNDARY_NOT_REACHED')
+        final=source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs-independent')
+        verification=independent_verify(source,store,scope,session,start,day_end)
+        source.close()
+        events=_all_events(store,scope,session)
+        observed_orders={oid:{'side':o['side'],'orderType':o['orderType'],'status':o['status'],'entryPrice':o['entryPrice'],
+                              'remaining':o['remaining']} for oid,o in sorted(state['orders'].items())}
+        order_types=Counter(o['orderType'] for o in state['orders'].values())
+        statuses=Counter(o['status'] for o in state['orders'].values())
+        kinds=Counter(e['kind'] for e in events)
+        gap_events=[e for e in events if e['kind']=='DATA_GAP_LIMITATION']
+        worker_resource=json.loads((root/'worker-resource.json').read_text()) if (root/'worker-resource.json').exists() else {}
+        summary=dict(status='PASS',classification=profile.wire['executionLabel'],
+            executionEligibility='NOT_GRANTED',technicalSimulationEligibility='PASS',sourceRights='UNKNOWN',
+            sourceProvenance='PROVIDER_OBSERVATION',datasetId=profile.wire['primary']['datasetId'],
+            datasetVersion=profile.wire['primary']['datasetVersion'],qualificationReceiptSha256=proof_hash,
+            archiveSha256=proof['snapshotSha256'],period=DAY,dayStartNs=str(start),dayEndNs=str(day_end),
+            tickCount=verification['independentSourceTicks'],timestampGroupCount=verification['independentTimestampGroups'],
+            gapCount=len(gap_events),gapKinds=dict(Counter(e['detail']['gapKind'] for e in gap_events)),
+            commandCount=state['revision'],eventCount=len(events),orderTypeCounts=dict(order_types),
+            orderStatusCounts=dict(statuses),eventKinds=dict(kinds),orders=observed_orders,
+            startingBalance=state['initialBalance'],endingBalance=state['balance'],
+            realizedGross=state['realizedGross'],independentVerification=verification,
+            coldResume=dict(status='PASS',processRestarted=True,resumedFromRevision=before_restart['revision'],
+                            finalRevision=state['revision'],sameSession=session),
+            idempotencyRetry='PASS',productionChanged=False,sourceChanged=False,
+            measured=dict(elapsedSeconds=round(time.monotonic()-started,3),cpuSeconds=round(resource_sample(root/'postgres')[0]-metrics['cpuStart'],3),
+                          peakRamBytes=max(PEAK_RAM,worker_resource.get('peakRamBytes',0)),peakArtifactBytes=max(PEAK_ARTIFACT,worker_resource.get('peakArtifactBytes',0),allocated(root)),
+                          initialFreeBytes=initial_free,finalFreeBytes=shutil.disk_usage(root).free,
+                          replayWallSeconds=round(time.monotonic()-started,3),vCPUEquivalentLimit=1,
+                          peakRamLimitBytes=MAX_RAM,artifactLimitBytes=MAX_ARTIFACT))
+        if not kinds['ENTRY_FILL'] or not kinds['EXIT_FILL'] or not kinds['DATA_GAP_LIMITATION']:
+            summary['status']='FAIL';summary['acceptanceFailure']='REQUIRED_FILL_OR_GAP_EVIDENCE_ABSENT'
+        if not any(e['kind']=='EXIT_FILL' and e['detail']['reason']=='TP' for e in events) or not any(e['kind']=='EXIT_FILL' and e['detail']['reason']=='SL' for e in events):
+            summary['status']='FAIL';summary['acceptanceFailure']='BOTH_SL_AND_TP_NOT_OBSERVED'
+        report=root/'report.json';report.write_text(json.dumps(summary,indent=2,sort_keys=True,ensure_ascii=False)+'\n');report.chmod(0o600)
+        metrics['peakArtifact']=allocated(root)
+        assert_budgets(root,root/'postgres',started)
+        (root/'resource-final.json').write_text(json.dumps(dict(cpuSeconds=summary['measured']['cpuSeconds'],
+            peakRamBytes=metrics['peakRam'],peakArtifactBytes=allocated(root),freeBytes=shutil.disk_usage(root).free),sort_keys=True)+'\n')
+        os.chmod(root/'resource-final.json',0o600)
+        print(json.dumps(summary,sort_keys=True,ensure_ascii=False))
+    return 0 if summary['status']=='PASS' else 2
+
+
+if __name__=='__main__':
+    if len(sys.argv)>1 and sys.argv[1]=='--worker':
+        try:main_worker()
+        except BaseException:
+            traceback.print_exc();raise SystemExit(1)
+    else:
+        try:raise SystemExit(main())
+        except BaseException:
+            traceback.print_exc();raise SystemExit(1)
