@@ -5,7 +5,9 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import signal
 import sqlite3
+import multiprocessing
 import tempfile
 import unittest
 import zlib
@@ -26,6 +28,14 @@ def pump(t, target):
         groups.extend(r["groups"])
         if r["exhaustedThroughBoundary"]:
             return groups
+
+
+def _kill_after_durable_256(source_path, version, log_path, checkpoint_path):
+    provider=DiskTickProvider(source_path,version)
+    timeline=IndexedTickTimeline(provider,provider.dataset_id,version,log_folder=log_path,max_groups_per_advance=256)
+    timeline.advance_through('1000',timeline.cursor)
+    Path(checkpoint_path).write_text(json.dumps(timeline.checkpoint(),sort_keys=True))
+    os.kill(os.getpid(),signal.SIGKILL)
 
 
 class TickStorageV2Tests(unittest.TestCase):
@@ -334,6 +344,58 @@ class TickStorageV2Tests(unittest.TestCase):
         tail=pump(resumed,'1000')
         self.assertEqual(first['groups']+tail,baseline_groups)
         self.assertEqual(len(tail),12)
+
+    def test_bounded_fast_forward_256_groups_preserves_atomicity_and_cold_resume(self):
+        rows=[dict(ordinal=str(i),timeNs=str(100+i),bid="1.001",ask="1.003",sequence=None) for i in range(300)]
+        source=SyntheticTickProvider(rows);meta=source.describe(source.dataset_id,source.dataset_version)
+        fields=("datasetId","providerId","feedId","instrumentId","providerSymbol","evidenceClass","adapterVersion","validatorVersion","ordering")
+        builder=DatasetBuilder(self.path/'batch-256-source',{k:meta[k] for k in fields},meta['sources'],{},packing=(16,1,1));self.resources.append(builder.store)
+        token=None
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,32)
+            for row in page['events']:builder.append(dict(row,datasetVersion=ZERO_VERSION))
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        version=builder.finish();provider=DiskTickProvider(self.path/'batch-256-source',version);self.resources.append(provider)
+        baseline=self.timeline(provider,folder='batch-256-default')
+        expected=pump(baseline,'1000')
+        candidate=self.timeline(provider,folder='batch-256',max_groups_per_advance=256)
+        first=candidate.advance_through('1000',candidate.cursor)
+        self.assertEqual(len(first['groups']),256)
+        self.assertFalse(first['exhaustedThroughBoundary'])
+        checkpoint=candidate.checkpoint()
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.path/'batch-256',max_groups_per_advance=256)
+        self.resources.append(resumed)
+        self.assertEqual(resumed.cursor,candidate.cursor)
+        tail=pump(resumed,'1000')
+        self.assertEqual(first['groups']+tail,expected)
+        self.assertEqual(len(tail),44)
+
+    def test_sigkill_after_256_group_commit_cold_resumes_exactly(self):
+        rows=[dict(ordinal=str(i),timeNs=str(100+i),bid="1.001",ask="1.003",sequence=None) for i in range(300)]
+        source=SyntheticTickProvider(rows);meta=source.describe(source.dataset_id,source.dataset_version)
+        fields=("datasetId","providerId","feedId","instrumentId","providerSymbol","evidenceClass","adapterVersion","validatorVersion","ordering")
+        builder=DatasetBuilder(self.path/'sigkill-256-source',{k:meta[k] for k in fields},meta['sources'],{},packing=(16,1,1));self.resources.append(builder.store)
+        token=None
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,32)
+            for row in page['events']:builder.append(dict(row,datasetVersion=ZERO_VERSION))
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        version=builder.finish();provider=DiskTickProvider(self.path/'sigkill-256-source',version);self.resources.append(provider)
+        expected=pump(self.timeline(provider,folder='sigkill-256-baseline'),'1000')
+        log_path=self.path/'sigkill-256';checkpoint_path=self.path/'sigkill-256-checkpoint.json'
+        child=multiprocessing.get_context('fork').Process(target=_kill_after_durable_256,
+            args=(str(self.path/'sigkill-256-source'),version,str(log_path),str(checkpoint_path)))
+        child.start();child.join(10)
+        if child.is_alive():child.kill();child.join();self.fail('SIGKILL_WORKER_TIMEOUT')
+        self.assertEqual(child.exitcode,-signal.SIGKILL)
+        checkpoint=json.loads(checkpoint_path.read_text())
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=log_path,max_groups_per_advance=256)
+        self.resources.append(resumed)
+        self.assertEqual(resumed.cursor,checkpoint['cursor'])
+        self.assertEqual(resumed.read_revealed('0',256),expected[:256])
+        self.assertEqual(pump(resumed,'1000'),expected[256:])
 
     def test_resume_refuses_missing_or_corrupt_original_position_chain(self):
         import json

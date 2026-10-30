@@ -161,7 +161,7 @@ class IndexedTickTimeline:
     def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64):
         require(log_codec in (None, 'raw', 'zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'INVALID_INPUT')
         require(lookup_layout in ('dense', 'range-v1'), 'lookupLayout', 'INVALID_INPUT')
-        require(type(max_groups_per_advance) is int and 1 <= max_groups_per_advance <= 128,
+        require(type(max_groups_per_advance) is int and 1 <= max_groups_per_advance <= 256,
                 'maxGroupsPerAdvance', 'INVALID_INPUT')
         described = provider.describe_v2(dataset_id, dataset_version)
         keys(described, "root completion indexBinding")
@@ -496,13 +496,19 @@ class IndexedTickTimeline:
                                                  [dict(targetNs=target_ns, predecessorCursorHash=hash_v2(self.__cursor), successorCursorHash=cursor_hash)])
                 if groups:
                     start_index = int(self.__cursor["nextGroupIndex"])
-                    position_tip = self.__append_block("BTL-TICK-POSITION-LOG-2", self.__position_blocks, position_tip,
-                        [dict(groupIndex=str(start_index+i), position=p, groupId=g["groupId"], successorCursorHash=cursor_hash)
-                         for i, (p, g) in enumerate(zip(positions, groups))])
-                    if self.__lookup_layout == 'range-v1':
-                        self.__db.execute("INSERT INTO position_lookup VALUES(?,?,?)", (start_index, len(groups), position_tip))
-                    else:
-                        self.__db.executemany("INSERT INTO position_lookup VALUES(?,?,?)", [(start_index+i, position_tip, i) for i in range(len(groups))])
+                    position_block_count = 0
+                    for offset in range(0, len(groups), 128):
+                        stop = min(len(groups), offset + 128)
+                        records = [dict(groupIndex=str(start_index+i), position=p, groupId=g["groupId"], successorCursorHash=cursor_hash)
+                                   for i, (p, g) in enumerate(zip(positions[offset:stop], groups[offset:stop]), start=offset)]
+                        position_tip = self.__append_block("BTL-TICK-POSITION-LOG-2", self.__position_blocks+position_block_count,
+                                                            position_tip, records)
+                        position_block_count += 1
+                        if self.__lookup_layout == 'range-v1':
+                            self.__db.execute("INSERT INTO position_lookup VALUES(?,?,?)", (start_index+offset, stop-offset, position_tip))
+                        else:
+                            self.__db.executemany("INSERT INTO position_lookup VALUES(?,?,?)",
+                                [(start_index+i, position_tip, i-offset) for i in range(offset, stop)])
                 persisted = dict(schemaVersion=2, artifact="BTL-TICK-CHECKPOINT-2", cursor=updated,
                                  advanceLogHash=advance_tip, positionLogHash=position_tip)
                 self.__db.execute("INSERT OR REPLACE INTO heads VALUES(1,?)", (canonical_v2_bytes(persisted),))
@@ -515,7 +521,9 @@ class IndexedTickTimeline:
             raise
         if not noop:
             self.__advance_tip, self.__position_tip = advance_tip, position_tip
-            self.__advance_blocks += 1; self.__position_blocks += bool(groups)
+            self.__advance_blocks += 1
+            if groups:
+                self.__position_blocks += (len(groups)+127)//128
         self.__cursor = updated
         self.__next_position = None if pending is None else pending[0]
         return deepcopy(result)

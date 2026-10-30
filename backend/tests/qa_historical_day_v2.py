@@ -122,7 +122,7 @@ def command(sid, cid, revision, kind, payload=None):
 
 def load_source(profile, source_path, proof_path, proof_hash, log_root):
     batch_groups=int(os.environ.get('BTL_QA_HISTORICAL_BATCH_GROUPS','64'))
-    if batch_groups not in (64,96,128):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
+    if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
     source=AdmittedObservedSource(source_path, profile, receipt_path=proof_path,
                                   receipt_sha256=proof_hash, log_root=log_root)
     # This opt-in is confined to the isolated QA runner. Product and manual
@@ -394,13 +394,13 @@ def main():
     os.chmod(root,0o700);tempfile.tempdir=str(root);os.environ['TMPDIR']=str(root)
     os.environ['PYTHONDONTWRITEBYTECODE']='1'
     batch_groups=int(os.environ.get('BTL_QA_HISTORICAL_BATCH_GROUPS','64'))
-    if batch_groups not in (64,96,128):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
+    if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
     os.environ['BTL_QA_HISTORICAL_BATCH_GROUPS']=str(batch_groups)
     decision_fixture=json.loads((Path(__file__).parent/'fixtures/historical_day_v2_decision_schedule.json').read_text())
     if decision_fixture.get('day')!=DAY:
         raise RuntimeError('ORDER_DECISION_SCHEDULE_DAY_MISMATCH')
     (root/'replay-config.json').write_text(json.dumps(dict(schemaVersion=1,artifact='BTL-QA-REPLAY-CONFIG-1',
-        batchGroups=batch_groups,maximumBatchGroups=128,orderDecisionBoundarySeconds=3600,
+        batchGroups=batch_groups,maximumBatchGroups=256,orderDecisionBoundarySeconds=3600,
         decisionSchedule=decision_fixture,sourceProcessing='ALL_OBSERVED_GROUPS',productionEnabled=False),sort_keys=True)+'\n')
     os.chmod(root/'replay-config.json',0o600)
     available=os.sched_getaffinity(0)
