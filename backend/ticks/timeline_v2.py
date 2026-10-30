@@ -21,8 +21,9 @@ VERSION = "BTL-TICK-TIMELINE-2"
 
 
 class IndexedTickTimeline:
-    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None):
+    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense"):
         require(log_codec in (None, 'raw', 'zlib-1'), 'logCodec', 'INVALID_INPUT')
+        require(lookup_layout in ('dense', 'range-v1'), 'lookupLayout', 'INVALID_INPUT')
         described = provider.describe_v2(dataset_id, dataset_version)
         keys(described, "root completion indexBinding")
         for key, artifact in (("completion", "BTL-TICK-COMPLETION-2"), ("indexBinding", "BTL-TICK-INDEX-BINDING-2")):
@@ -50,6 +51,7 @@ class IndexedTickTimeline:
         require(present is None or log_codec is None or present == log_codec,
                 'logCodec', 'REFUSED_LOG_LAYOUT')
         self.__log_codec = present or log_codec or 'raw'
+        self.__lookup_layout = lookup_layout
         self.__db = connect(self.__log_path, allow_threads=allow_threads)
         if self.__log_codec == 'zlib-1':
             self.__db.execute('CREATE TABLE IF NOT EXISTS log_layout(codec TEXT PRIMARY KEY) WITHOUT ROWID')
@@ -59,7 +61,10 @@ class IndexedTickTimeline:
         self.__db.execute("CREATE TEMP TABLE fences(source TEXT PRIMARY KEY, ordinal TEXT NOT NULL, sourceOrder INTEGER NOT NULL) WITHOUT ROWID")
         self.__db.execute("CREATE TEMP TABLE delivered(source TEXT, ordinal TEXT, code TEXT, body TEXT NOT NULL, PRIMARY KEY(source,ordinal,code)) WITHOUT ROWID")
         self.__db.execute("CREATE TEMP TABLE page_diagnostics(source TEXT, ordinal TEXT, code TEXT, body TEXT NOT NULL, PRIMARY KEY(source,ordinal,code)) WITHOUT ROWID")
-        self.__db.execute("CREATE TEMP TABLE position_lookup(groupIndex INTEGER PRIMARY KEY, blockHash TEXT NOT NULL, recordOffset INTEGER NOT NULL)")
+        if self.__lookup_layout == 'range-v1':
+            self.__db.execute("CREATE TEMP TABLE position_lookup(groupStart INTEGER PRIMARY KEY, groupCount INTEGER NOT NULL, blockHash TEXT NOT NULL)")
+        else:
+            self.__db.execute("CREATE TEMP TABLE position_lookup(groupIndex INTEGER PRIMARY KEY, blockHash TEXT NOT NULL, recordOffset INTEGER NOT NULL)")
         self.__db.commit()
         self.__start, self.__generation, self.__epoch, self.__active = uint(session_start_ns), 0, 0, True
         try:
@@ -341,7 +346,10 @@ class IndexedTickTimeline:
                     position_tip = self.__append_block("BTL-TICK-POSITION-LOG-2", self.__position_blocks, position_tip,
                         [dict(groupIndex=str(start_index+i), position=p, groupId=g["groupId"], successorCursorHash=cursor_hash)
                          for i, (p, g) in enumerate(zip(positions, groups))])
-                    self.__db.executemany("INSERT INTO position_lookup VALUES(?,?,?)", [(start_index+i, position_tip, i) for i in range(len(groups))])
+                    if self.__lookup_layout == 'range-v1':
+                        self.__db.execute("INSERT INTO position_lookup VALUES(?,?,?)", (start_index, len(groups), position_tip))
+                    else:
+                        self.__db.executemany("INSERT INTO position_lookup VALUES(?,?,?)", [(start_index+i, position_tip, i) for i in range(len(groups))])
                 persisted = dict(schemaVersion=2, artifact="BTL-TICK-CHECKPOINT-2", cursor=updated,
                                  advanceLogHash=advance_tip, positionLogHash=position_tip)
                 self.__db.execute("INSERT OR REPLACE INTO heads VALUES(1,?)", (canonical_v2_bytes(persisted),))
@@ -374,18 +382,40 @@ class IndexedTickTimeline:
         wanted, records = min(end, start+max_groups), []
         # Rebuildable connection-private disk index. Membership is checked
         # against canonical hash-bound blocks produced by committed reveals.
-        for index, block_hash, offset in self.__db.execute("SELECT groupIndex,blockHash,recordOffset FROM position_lookup WHERE groupIndex>=? AND groupIndex<? ORDER BY groupIndex", (start, wanted)):
-            stored = self.__read_block(block_hash)
-            require(stored is not None, "log", "INCOMPLETE_INGESTION")
-            block = decode_v2(stored)
-            require(hash_v2(block) == block_hash and block["artifact"] == "BTL-TICK-POSITION-LOG-2"
-                    and block["datasetId"] == self.__id and block["datasetVersion"] == self.__version
-                    and block["timelineVersion"] == VERSION and block["generation"] == str(self.__generation), "membership", "IDENTITY_CONFLICT")
-            require(0 <= offset < len(block["records"]), "membership", "CORRUPT_INDEX_POINTER")
-            record = block["records"][offset]
-            keys(record, "groupIndex position groupId successorCursorHash")
-            require(uint(record["groupIndex"]) == index, "membership", "IDENTITY_CONFLICT")
-            records.append(record)
+        if self.__lookup_layout == 'range-v1':
+            anchors = self.__db.execute("SELECT groupStart,groupCount,blockHash FROM position_lookup WHERE groupStart<? AND groupStart+groupCount>? ORDER BY groupStart", (wanted, start))
+            covered = start
+            for group_start, group_count, block_hash in anchors:
+                require(group_start <= covered < group_start+group_count, "membership", "INCOMPLETE_INGESTION")
+                stored = self.__read_block(block_hash)
+                require(stored is not None, "log", "INCOMPLETE_INGESTION")
+                block = decode_v2(stored)
+                require(hash_v2(block) == block_hash and block["artifact"] == "BTL-TICK-POSITION-LOG-2"
+                        and block["datasetId"] == self.__id and block["datasetVersion"] == self.__version
+                        and block["timelineVersion"] == VERSION and block["generation"] == str(self.__generation), "membership", "IDENTITY_CONFLICT")
+                require(type(block["records"]) is list and len(block["records"]) == group_count, "membership", "CORRUPT_INDEX_POINTER")
+                for offset, record in enumerate(block["records"]):
+                    index = group_start+offset
+                    if index < start or index >= wanted:
+                        continue
+                    keys(record, "groupIndex position groupId successorCursorHash")
+                    require(uint(record["groupIndex"]) == index, "membership", "IDENTITY_CONFLICT")
+                    records.append(record)
+                    covered = index+1
+            require(covered == wanted, "prefix", "INCOMPLETE_ATOMIC_BOUNDARY")
+        else:
+            for index, block_hash, offset in self.__db.execute("SELECT groupIndex,blockHash,recordOffset FROM position_lookup WHERE groupIndex>=? AND groupIndex<? ORDER BY groupIndex", (start, wanted)):
+                stored = self.__read_block(block_hash)
+                require(stored is not None, "log", "INCOMPLETE_INGESTION")
+                block = decode_v2(stored)
+                require(hash_v2(block) == block_hash and block["artifact"] == "BTL-TICK-POSITION-LOG-2"
+                        and block["datasetId"] == self.__id and block["datasetVersion"] == self.__version
+                        and block["timelineVersion"] == VERSION and block["generation"] == str(self.__generation), "membership", "IDENTITY_CONFLICT")
+                require(0 <= offset < len(block["records"]), "membership", "CORRUPT_INDEX_POINTER")
+                record = block["records"][offset]
+                keys(record, "groupIndex position groupId successorCursorHash")
+                require(uint(record["groupIndex"]) == index, "membership", "IDENTITY_CONFLICT")
+                records.append(record)
         require(len(records) == wanted-start, "prefix", "INCOMPLETE_ATOMIC_BOUNDARY")
         records.sort(key=lambda r: int(r["groupIndex"]))
         packed = CanonicalGroupBudget("BTL-TICK-VIEW-CHECK-2")
@@ -424,7 +454,7 @@ class IndexedTickTimeline:
 
     def replace_dataset(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder):
         require(self.__active, "timeline", "REPLACED_TIMELINE")
-        replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder, log_codec=self.__log_codec)
+        replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder, log_codec=self.__log_codec, lookup_layout=self.__lookup_layout)
         replacement.__generation = self.__generation+1; replacement.__initialize()
         self.cancel(); self.__active = False
         return replacement
@@ -435,14 +465,14 @@ class IndexedTickTimeline:
                     advanceLogHash=self.__advance_tip, positionLogHash=self.__position_tip)
 
     @classmethod
-    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None):
+    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense"):
         keys(checkpoint, "schemaVersion artifact cursor advanceLogHash positionLogHash")
         require(checkpoint["artifact"] == "BTL-TICK-CHECKPOINT-2", "checkpoint", "SCHEMA_MISMATCH")
         canonical_v2_bytes(checkpoint)
         cursor = checkpoint["cursor"]
         keys(cursor, "schemaVersion artifact " + CURSOR_FIELDS)
         require(cursor["artifact"] == "BTL-TICK-CURSOR-2" and cursor["timelineVersion"] == VERSION, "cursor", "SCHEMA_MISMATCH")
-        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec)
+        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout)
         try:
             return result.__reconstruct(checkpoint, cursor)
         except BaseException:

@@ -355,6 +355,34 @@ class TickStorageV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
             restored.consumer().read_revealed('999')
 
+    def test_sparse_range_lookup_preserves_exact_reveals_and_cold_resume(self):
+        _, p = self.build(times=tuple([100+i for i in range(160)]), packing=(16, 4, 4))
+        dense = self.timeline(p, folder='dense-lookup')
+        ranged = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'range-lookup',lookup_layout='range-v1')
+        self.resources.append(ranged)
+        for target in ('160','175','259'):
+            left=dense.advance_through(target,dense.cursor)
+            right=ranged.advance_through(target,ranged.cursor)
+            self.assertEqual(left,right)
+            self.assertEqual(dense.checkpoint(),ranged.checkpoint())
+            end=int(dense.cursor['nextGroupIndex'])
+            probes=[(0,16),(3,19),(63,64),(64,64),(max(0,end-1),8)]
+            for start,maximum in probes:
+                if start>end: continue
+                maximum=max(1,min(maximum,end-start))
+                with self.subTest(target=target,start=start):
+                    self.assertEqual(dense.read_revealed(str(start),maximum),ranged.read_revealed(str(start),maximum))
+        checkpoint=ranged.checkpoint();ranged.close()
+        restored=IndexedTickTimeline.resume(p,checkpoint,log_folder=self.path/'range-lookup',lookup_layout='range-v1')
+        self.resources.append(restored)
+        self.assertEqual(restored.checkpoint(),dense.checkpoint())
+        self.assertEqual(restored.read_revealed('3',64),dense.read_revealed('3',64))
+        with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
+            restored.read_revealed('999',1)
+        with closing(sqlite3.connect((self.path/'range-lookup/timeline.sqlite').as_uri()+'?mode=ro',uri=True)) as db:
+            rows=db.execute('SELECT count(*) FROM blocks').fetchone()[0]
+            self.assertGreater(rows,0)
+
     def test_compressed_log_refuses_inflation_trailing_truncation_and_bad_hash(self):
         import zlib
         _,p=self.build()
