@@ -355,6 +355,36 @@ class TickStorageV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
             restored.consumer().read_revealed('999')
 
+    def test_delta_dictionary_compressed_log_matches_zlib_logical_history(self):
+        import zlib
+        from ticks.timeline_v2 import _expand_compact_block
+        _, p = self.build()
+        baseline = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'zlib-baseline',log_codec='zlib-1')
+        compact = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'delta-dictionary',log_codec='delta-dict-zlib-1')
+        self.resources.extend((baseline,compact))
+        for target in ('100','200','400'):
+            expected = baseline.advance_through(target,baseline.cursor)
+            actual = compact.advance_through(target,compact.cursor)
+            self.assertEqual(actual,expected)
+            self.assertEqual(compact.checkpoint(),baseline.checkpoint())
+            self.assertEqual(compact.consumer().read_revealed(),baseline.consumer().read_revealed())
+        checkpoint=compact.checkpoint();compact.close()
+        with closing(sqlite3.connect(self.path/'zlib-baseline/timeline.sqlite')) as a, closing(sqlite3.connect(self.path/'delta-dictionary/timeline.sqlite')) as b:
+            zlib_rows=dict(a.execute('SELECT hash,body FROM blocks'))
+            compact_rows=dict(b.execute('SELECT hash,body FROM blocks'))
+            self.assertEqual(set(compact_rows),set(zlib_rows))
+            for block_hash,body in compact_rows.items():
+                encoded=zlib.decompress(body[len(b'BTL-TIMELINE-DDZ-1\0'):])
+                logical=_expand_compact_block(encoded)
+                self.assertEqual(canonical_v2_bytes(logical),zlib.decompress(zlib_rows[block_hash][len(b'BTL-TIMELINE-ZLIB-1\0'):]))
+            self.assertEqual(a.execute('SELECT body FROM heads').fetchall(),b.execute('SELECT body FROM heads').fetchall())
+        restored=IndexedTickTimeline.resume(p,checkpoint,log_folder=self.path/'delta-dictionary')
+        self.resources.append(restored)
+        self.assertEqual(restored.checkpoint(),baseline.checkpoint())
+        self.assertEqual(restored.consumer().read_revealed(),baseline.consumer().read_revealed())
+        with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
+            restored.consumer().read_revealed('999')
+
     def test_sparse_range_lookup_preserves_exact_reveals_and_cold_resume(self):
         _, p = self.build(times=tuple([100+i for i in range(160)]), packing=(16, 4, 4))
         dense = self.timeline(p, folder='dense-lookup')

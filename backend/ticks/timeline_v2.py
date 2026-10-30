@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 import json
 import zlib
+import re
 
 from contracts.primitives import require, digest
 from .contracts import keys, uint, CanonicalTick
@@ -19,10 +20,146 @@ from .provider import diagnostic_counts
 
 VERSION = "BTL-TICK-TIMELINE-2"
 
+_HASH_TEXT = re.compile(r"^[0-9a-f]{64}$")
+_DELTA_KEYS = {"generation", "blockIndex", "groupIndex", "directoryIndex", "partitionIndex",
+               "chunkIndex", "eventOffset", "globalOrdinal", "recordOffset", "targetNs",
+               "rawOrdinal", "revision", "nextGroupIndex"}
+
+
+def _varint(value):
+    out = bytearray()
+    while value >= 0x80:
+        out.append((value & 0x7f) | 0x80)
+        value >>= 7
+    out.append(value)
+    return bytes(out)
+
+
+def _read_varint(data, offset):
+    value = shift = 0
+    while offset < len(data) and shift <= 63:
+        byte = data[offset]; offset += 1
+        value |= (byte & 0x7f) << shift
+        if byte < 0x80:
+            return value, offset
+        shift += 7
+    raise ValueError("CORRUPT_RECORD")
+
+
+def _compact_block(raw):
+    """Reversible block-local dictionary, numeric delta and binary-hash codec."""
+    root = json.loads(raw)
+    frequencies, order = {}, []
+    def visit(value):
+        if isinstance(value, str):
+            if value not in frequencies: order.append(value); frequencies[value] = 0
+            frequencies[value] += 1
+        elif isinstance(value, list):
+            for child in value: visit(child)
+        elif isinstance(value, dict):
+            for key, child in value.items(): visit(key); visit(child)
+    visit(root)
+    dictionary = [s for s in order if frequencies[s] >= 2 and len(s.encode("utf-8")) >= 4 and not _HASH_TEXT.fullmatch(s)]
+    refs = {value: index for index, value in enumerate(dictionary)}
+    out = bytearray(b"BTL-TIMELINE-DDZ-1\0")
+    out.extend(_varint(len(dictionary)))
+    for value in dictionary:
+        encoded = value.encode("utf-8"); out.extend(_varint(len(encoded))); out.extend(encoded)
+    previous = {}
+    def string(value, key=None):
+        if key in _DELTA_KEYS and value.isascii() and value.isdecimal():
+            current = int(value); delta = current - previous.get(key, 0); previous[key] = current
+            zigzag = 2 * delta if delta >= 0 else -2 * delta - 1
+            out.append(5); out.extend(_varint(zigzag)); return
+        if _HASH_TEXT.fullmatch(value):
+            out.append(4); out.extend(bytes.fromhex(value)); return
+        if value in refs:
+            out.append(3); out.extend(_varint(refs[value])); return
+        encoded = value.encode("utf-8"); out.append(2); out.extend(_varint(len(encoded))); out.extend(encoded)
+    def node(value, key=None):
+        if value is None: out.append(0)
+        elif value is False: out.append(1)
+        elif value is True: out.append(2)
+        elif type(value) is int:
+            out.append(6); out.extend(_varint(value))
+        elif isinstance(value, str): out.append(9); string(value, key)
+        elif isinstance(value, list):
+            out.append(7); out.extend(_varint(len(value)))
+            for child in value: node(child)
+        elif isinstance(value, dict):
+            out.append(8); out.extend(_varint(len(value)))
+            for child_key, child in value.items(): string(child_key); node(child, child_key)
+        else: raise ValueError("SCHEMA_MISMATCH")
+    node(root)
+    return bytes(out)
+
+
+def _expand_compact_block(encoded):
+    data = memoryview(encoded); offset = len(b"BTL-TIMELINE-DDZ-1\0")
+    count, offset = _read_varint(data, offset)
+    if count > 4096: raise ValueError("ARTIFACT_LIMIT")
+    dictionary = []
+    for _ in range(count):
+        size, offset = _read_varint(data, offset)
+        if size > 1048576 or offset + size > len(data): raise ValueError("CORRUPT_RECORD")
+        dictionary.append(bytes(data[offset:offset+size]).decode("utf-8")); offset += size
+    previous, node_count = {}, [0]
+    def string(key=None):
+        nonlocal offset
+        if offset >= len(data): raise ValueError("CORRUPT_RECORD")
+        tag = data[offset]; offset += 1
+        if tag == 2:
+            size, offset = _read_varint(data, offset)
+            if size > 1048576 or offset + size > len(data): raise ValueError("CORRUPT_RECORD")
+            value = bytes(data[offset:offset+size]).decode("utf-8"); offset += size
+        elif tag == 3:
+            index, offset = _read_varint(data, offset)
+            if index >= len(dictionary): raise ValueError("CORRUPT_RECORD")
+            value = dictionary[index]
+        elif tag == 4:
+            if offset + 32 > len(data): raise ValueError("CORRUPT_RECORD")
+            value = bytes(data[offset:offset+32]).hex(); offset += 32
+        elif tag == 5:
+            zigzag, offset = _read_varint(data, offset)
+            delta = zigzag // 2 if zigzag % 2 == 0 else -(zigzag // 2)-1
+            value = str(previous.get(key, 0)+delta); previous[key] = int(value)
+        else: raise ValueError("CORRUPT_RECORD")
+        return value
+    def node(key=None, depth=0):
+        nonlocal offset
+        if depth > 32: raise ValueError("ARTIFACT_LIMIT")
+        node_count[0] += 1
+        if node_count[0] > 16384: raise ValueError("ARTIFACT_LIMIT")
+        if offset >= len(data): raise ValueError("CORRUPT_RECORD")
+        tag = data[offset]; offset += 1
+        if tag == 0: return None
+        if tag == 1: return False
+        if tag == 2: return True
+        if tag == 9: return string(key)
+        if tag == 6:
+            value, offset = _read_varint(data, offset); return value
+        if tag == 7:
+            size, offset = _read_varint(data, offset)
+            if size > 32768: raise ValueError("ARTIFACT_LIMIT")
+            return [node(depth=depth+1) for _ in range(size)]
+        if tag == 8:
+            size, offset = _read_varint(data, offset)
+            if size > 16384: raise ValueError("ARTIFACT_LIMIT")
+            result = {}
+            for _ in range(size):
+                child_key = string()
+                if child_key in result: raise ValueError("CORRUPT_RECORD")
+                result[child_key] = node(child_key, depth+1)
+            return result
+        raise ValueError("CORRUPT_RECORD")
+    result = node()
+    if offset != len(data): raise ValueError("CORRUPT_RECORD")
+    return result
+
 
 class IndexedTickTimeline:
     def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense"):
-        require(log_codec in (None, 'raw', 'zlib-1'), 'logCodec', 'INVALID_INPUT')
+        require(log_codec in (None, 'raw', 'zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'INVALID_INPUT')
         require(lookup_layout in ('dense', 'range-v1'), 'lookupLayout', 'INVALID_INPUT')
         described = provider.describe_v2(dataset_id, dataset_version)
         keys(described, "root completion indexBinding")
@@ -44,8 +181,8 @@ class IndexedTickTimeline:
             with sqlite3.connect(self.__log_path.resolve().as_uri()+'?mode=ro', uri=True) as probe:
                 if probe.execute("SELECT 1 FROM sqlite_master WHERE name='log_layout'").fetchone():
                     rows = probe.execute('SELECT codec FROM log_layout').fetchall()
-                    require(rows == [('zlib-1',)], 'logCodec', 'CORRUPT_RECORD')
-                    present = 'zlib-1'
+                    require(len(rows) == 1 and rows[0][0] in ('zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'CORRUPT_RECORD')
+                    present = rows[0][0]
                 else:
                     present = 'raw'
         require(present is None or log_codec is None or present == log_codec,
@@ -53,9 +190,9 @@ class IndexedTickTimeline:
         self.__log_codec = present or log_codec or 'raw'
         self.__lookup_layout = lookup_layout
         self.__db = connect(self.__log_path, allow_threads=allow_threads)
-        if self.__log_codec == 'zlib-1':
+        if self.__log_codec != 'raw':
             self.__db.execute('CREATE TABLE IF NOT EXISTS log_layout(codec TEXT PRIMARY KEY) WITHOUT ROWID')
-            self.__db.execute("INSERT OR IGNORE INTO log_layout VALUES('zlib-1')")
+            self.__db.execute("INSERT OR IGNORE INTO log_layout VALUES(?)", (self.__log_codec,))
         self.__db.execute("CREATE TABLE IF NOT EXISTS blocks(hash TEXT PRIMARY KEY, body BLOB NOT NULL) WITHOUT ROWID")
         self.__db.execute("CREATE TABLE IF NOT EXISTS heads(id INTEGER PRIMARY KEY CHECK(id=1), body BLOB NOT NULL)")
         self.__db.execute("CREATE TEMP TABLE fences(source TEXT PRIMARY KEY, ordinal TEXT NOT NULL, sourceOrder INTEGER NOT NULL) WITHOUT ROWID")
@@ -173,7 +310,12 @@ class IndexedTickTimeline:
         block = dict(schemaVersion=2, artifact=artifact, datasetId=self.__id, datasetVersion=self.__version,
                      timelineVersion=VERSION, generation=str(self.__generation), blockIndex=str(index), previousHash=previous, records=records)
         raw, hash_ = canonical_v2_bytes(block), hash_v2(block)
-        body = b'BTL-TIMELINE-ZLIB-1\0'+zlib.compress(raw, 6) if self.__log_codec == 'zlib-1' else raw
+        if self.__log_codec == 'zlib-1':
+            body = b'BTL-TIMELINE-ZLIB-1\0'+zlib.compress(raw, 6)
+        elif self.__log_codec == 'delta-dict-zlib-1':
+            body = b'BTL-TIMELINE-DDZ-1\0'+zlib.compress(_compact_block(raw), 6)
+        else:
+            body = raw
         self.__db.execute("INSERT OR IGNORE INTO blocks VALUES(?,?)", (hash_, body))
         require(self.__read_block(hash_) == raw, "log", "IDENTITY_CONFLICT")
         return hash_
@@ -188,8 +330,8 @@ class IndexedTickTimeline:
         body, size = row
         require(type(body) is bytes, 'log', 'CORRUPT_RECORD')
         require(size <= 1049600, 'log', 'ARTIFACT_LIMIT')
-        if self.__log_codec == 'zlib-1':
-            prefix = b'BTL-TIMELINE-ZLIB-1\0'
+        if self.__log_codec in ('zlib-1', 'delta-dict-zlib-1'):
+            prefix = b'BTL-TIMELINE-ZLIB-1\0' if self.__log_codec == 'zlib-1' else b'BTL-TIMELINE-DDZ-1\0'
             require(body.startswith(prefix), 'log', 'CORRUPT_RECORD')
             try:
                 decoder = zlib.decompressobj()
@@ -198,6 +340,14 @@ class IndexedTickTimeline:
                 require(False, 'log', 'CORRUPT_RECORD')
             require(len(raw) <= 1048576 and decoder.eof and not decoder.unused_data
                     and not decoder.unconsumed_tail, 'log', 'CORRUPT_RECORD')
+            if self.__log_codec == 'delta-dict-zlib-1':
+                try:
+                    logical = _expand_compact_block(raw)
+                    canonical = canonical_v2_bytes(logical)
+                except (UnicodeDecodeError, ValueError, OverflowError):
+                    require(False, 'log', 'CORRUPT_RECORD')
+                require(len(canonical) <= 1048576, 'log', 'ARTIFACT_LIMIT')
+                return canonical
             return raw
         require(len(body) <= 1048576, 'log', 'ARTIFACT_LIMIT')
         return body
