@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import resource
+import re
 import shutil
 import subprocess
 import sys
@@ -30,6 +31,7 @@ from execution.observed_postgres import ObservedExecutionStore
 from execution.observed_profile import ObservedExecutionProfile, historical_technical_profile
 from infrastructure.database import connect, migrate
 from ticks.storage_v2 import DiskTickProvider
+from tests import qa_perf_instrumentation as PERF
 
 DAY = '2024-01-02'
 PERIOD = '2024-01'
@@ -163,13 +165,23 @@ def _stage_orders(controller, store, source, scope, sid, state, stage, basis):
     return True
 
 
-def advance_until(controller, store, scope, sid, target, root, cluster_root, started):
+def advance_until(controller, store, scope, sid, target, root, cluster_root, started, *, first_stage=None):
     eod_ns=None
     exhausted=False
+    first=True
+    # This runner is the sole writer for its isolated QA Session. Reuse the
+    # exact state returned by the preceding durable apply instead of opening a
+    # separate PostgreSQL inspect transaction before every ADVANCE. The
+    # controller's prepare/commit revision checks remain authoritative, so a
+    # concurrent or stale write still fails closed.
+    state=store.inspect(scope,sid)['state']
     while not exhausted:
-        state=store.inspect(scope,sid)['state']
         raw=command(sid,f'advance:{state["revision"]}',state['revision'],'ADVANCE',{'targetNs':str(target)})
-        result=controller.apply(scope,raw)
+        if first and first_stage:
+            with PERF.stage(first_stage): result=controller.apply(scope,raw)
+        else:
+            result=controller.apply(scope,raw)
+        first=False
         exhausted=result['replay']['exhaustedThroughBoundary']
         state=result['state']
         used,cpu,ram=assert_budgets(root,cluster_root,started)
@@ -203,6 +215,10 @@ def advance_until(controller, store, scope, sid, target, root, cluster_root, sta
                     controller.apply(scope,command(sid,f'order:far:{label}',after['revision'],'OPEN',
                         dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
                              sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
+            # Staging is a separate series of durable order commands. Refresh
+            # once after that bounded batch so the next ADVANCE carries its
+            # actual committed revision into the controller's CAS checks.
+            state=store.inspect(scope,sid)['state']
         yield result
 
 
@@ -287,28 +303,36 @@ def independent_verify(source, store, scope, sid, start_ns, end_ns):
 def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid, day_end):
     global PEAK_RAM,PEAK_ARTIFACT
     os.environ['BTL_TEST_DATABASE_URL']=dsn
-    proof=json.loads(Path(proof_path).read_text())
-    with connect(dsn) as db:
-        row=db.execute('SELECT payload,content_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
-                       (workspace,sid)).fetchone()
-    if row is None:raise RuntimeError('COLD_RESUME_SESSION_MISSING')
-    from execution.postgres import unpack
-    snapshot=unpack(row[0],row[1]);state=snapshot['state']
-    profile=ObservedExecutionProfile.from_wire(state['profile'])
-    source=load_source(profile,Path(source_path),Path(proof_path),proof_hash,root/'source-logs')
-    PEAK_RAM=max(PEAK_RAM,resource_sample(os.environ['BTL_QA_CLUSTER_ROOT'])[1])
+    with PERF.stage('cold_resume_setup'):
+        proof=json.loads(Path(proof_path).read_text())
+        with connect(dsn) as db:
+            row=db.execute('SELECT payload,content_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                           (workspace,sid)).fetchone()
+        if row is None:raise RuntimeError('COLD_RESUME_SESSION_MISSING')
+        from execution.postgres import unpack
+        snapshot=unpack(row[0],row[1]);state=snapshot['state']
+        profile=ObservedExecutionProfile.from_wire(state['profile'])
+        source=load_source(profile,Path(source_path),Path(proof_path),proof_hash,root/'source-logs')
+        PEAK_RAM=max(PEAK_RAM,resource_sample(os.environ['BTL_QA_CLUSTER_ROOT'])[1])
     store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
     controller=ObservedExecutionController(store,lambda _:source)
+    resume_revision=state['revision'];resume_state_hash=content_hash(state)
     start=int(state['startNs']);target=min(day_end,start+86400*S)
-    for _ in advance_until(controller,store,scope,sid,target,root,os.environ['BTL_QA_CLUSTER_ROOT'],float(os.environ['BTL_QA_RUN_STARTED'])):
-        pass
+    with PERF.stage('replay'):
+        for _ in advance_until(controller,store,scope,sid,target,root,os.environ['BTL_QA_CLUSTER_ROOT'],
+                               float(os.environ['BTL_QA_RUN_STARTED']),first_stage='cold_resume_first_command'):
+            pass
     Path(root,'worker-resource.json').write_text(json.dumps(dict(peakRamBytes=PEAK_RAM,peakArtifactBytes=PEAK_ARTIFACT),sort_keys=True)+'\n')
     os.chmod(Path(root,'worker-resource.json'),0o600)
+    Path(root,'worker-performance.json').write_text(json.dumps(PERF.snapshot(),sort_keys=True)+'\n')
+    os.chmod(Path(root,'worker-performance.json'),0o600)
     source.close()
-    return dict(status='PASS',workerProcessRestarted=True,throughNs=store.inspect(scope,sid)['state']['throughNs'])
+    return dict(status='PASS',workerProcessRestarted=True,throughNs=store.inspect(scope,sid)['state']['throughNs'],
+                resumeRevision=resume_revision,resumeStateHash=resume_state_hash)
 
 
 def main_worker():
+    PERF.install()
     data=json.loads(os.environ['BTL_HISTORICAL_DAY_V2_WORKER'])
     result=worker(data['dsn'],Path(data['root']),data['source'],data['proof'],data['proofHash'],
                   data['workspace'],data['actor'],data['session'],int(data['dayEnd']))
@@ -318,6 +342,7 @@ def main_worker():
 
 def main():
     global PEAK_RAM,PEAK_ARTIFACT
+    PERF.install()
     root_text=os.environ.get('BTL_HISTORICAL_QA_ROOT')
     if not root_text:raise RuntimeError('SET_BTL_HISTORICAL_QA_ROOT_TO_NEW_EMPTY_PATH')
     root=Path(root_text)
@@ -342,9 +367,11 @@ def main():
         raise RuntimeError('SOURCE_QUALIFICATION_RECEIPT_NOT_ACCEPTED')
     calendar=datetime.strptime(DAY,'%Y-%m-%d').replace(tzinfo=timezone.utc)
     day_end=int((calendar.replace(day=calendar.day)+__import__('datetime').timedelta(days=1)).timestamp()*S)
-    session='session:hist-v2:'+uuid.uuid4().hex
-    workspace='observedqa:hist-v2:'+uuid.uuid4().hex;actor='fixture:internal-qa'
-    method=MethodPolicy('method:hist-v2:'+uuid.uuid4().hex,'a'*64,'FREE_STYLE',False,())
+    run_id=os.environ.get('BTL_HISTORICAL_QA_RUN_ID',uuid.uuid4().hex)
+    if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,31}',run_id):raise RuntimeError('INVALID_QA_RUN_ID')
+    session='session:hist-v2:'+run_id
+    workspace='observedqa:hist-v2:'+run_id;actor='fixture:internal-qa'
+    method=MethodPolicy('method:hist-v2:'+run_id,'a'*64,'FREE_STYLE',False,())
     metrics=dict(cpuStart=resource_sample(root/'postgres')[0],peakRam=0,peakArtifact=0)
     summary={}
     from deploy.vps.tests.run_private_pg import private_postgres
@@ -375,7 +402,8 @@ def main():
                      sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
         # Durable progress before a real worker process restart.
         resume_target=start+4*3600*S
-        for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started):pass
+        with PERF.stage('replay'):
+            for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started):pass
         before_restart=store.inspect(scope,session)['state']
         source.close()
         worker_data=dict(dsn=dsn,root=str(root),source=str(SOURCE),proof=str(PROOF),proofHash=proof_hash,
@@ -389,16 +417,32 @@ def main():
         state=store.inspect(scope,session)['state']
         if int(state['throughNs'])<day_end:raise RuntimeError('UTC_DAY_BOUNDARY_NOT_REACHED')
         final=source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs-independent')
-        verification=independent_verify(source,store,scope,session,start,day_end)
+        verify_started=time.perf_counter_ns();verify_cpu=time.process_time_ns()
+        with PERF.stage('independent_verification'):
+            verification=independent_verify(source,store,scope,session,start,day_end)
+        PERF._record('independent_verify.total',time.perf_counter_ns()-verify_started,
+                     time.process_time_ns()-verify_cpu)
         source.close()
         events=_all_events(store,scope,session)
+        with connect(dsn) as db:
+            receipt_rows=db.execute('SELECT revision,command_id,command_hash,content_hash FROM btl.tick_commands '
+                                    'WHERE workspace_id=%s AND session_id=%s ORDER BY revision',
+                                    (scope.workspace_id,session)).fetchall()
+        event_transcript_hash=hashlib.sha256(canonical_bytes(dict(schemaVersion=1,
+            artifact='BTL-OBSERVED-EVENT-TRANSCRIPT-1',eventIds=[e['eventId'] for e in events]))).hexdigest()
+        receipt_ledger_hash=hashlib.sha256(canonical_bytes(dict(schemaVersion=1,
+            artifact='BTL-OBSERVED-RECEIPT-LEDGER-1',rows=[dict(revision=r[0],commandId=r[1],
+            commandHash=r[2],receiptHash=r[3]) for r in receipt_rows]))).hexdigest()
         observed_orders={oid:{'side':o['side'],'orderType':o['orderType'],'status':o['status'],'entryPrice':o['entryPrice'],
                               'remaining':o['remaining']} for oid,o in sorted(state['orders'].items())}
         order_types=Counter(o['orderType'] for o in state['orders'].values())
         statuses=Counter(o['status'] for o in state['orders'].values())
         kinds=Counter(e['kind'] for e in events)
         gap_events=[e for e in events if e['kind']=='DATA_GAP_LIMITATION']
+        worker_result=json.loads((root/'worker-result.json').read_text()) if (root/'worker-result.json').exists() else {}
         worker_resource=json.loads((root/'worker-resource.json').read_text()) if (root/'worker-resource.json').exists() else {}
+        worker_phases=json.loads((root/'worker-performance.json').read_text()) if (root/'worker-performance.json').exists() else {}
+        phase_metrics=PERF.merge(PERF.snapshot(),worker_phases)
         summary=dict(status='PASS',classification=profile.wire['executionLabel'],
             executionEligibility='NOT_GRANTED',technicalSimulationEligibility='PASS',sourceRights='UNKNOWN',
             sourceProvenance='PROVIDER_OBSERVATION',datasetId=profile.wire['primary']['datasetId'],
@@ -410,9 +454,12 @@ def main():
             orderStatusCounts=dict(statuses),eventKinds=dict(kinds),orders=observed_orders,
             startingBalance=state['initialBalance'],endingBalance=state['balance'],
             realizedGross=state['realizedGross'],independentVerification=verification,
+            parity=dict(eventTranscriptSha256=event_transcript_hash,receiptLedgerSha256=receipt_ledger_hash,
+                        finalStateSha256=content_hash(state),resumeStateSha256=worker_result.get('resumeStateHash')),
             coldResume=dict(status='PASS',processRestarted=True,resumedFromRevision=before_restart['revision'],
                             finalRevision=state['revision'],sameSession=session),
             idempotencyRetry='PASS',productionChanged=False,sourceChanged=False,
+            performanceBreakdown=dict(exclusive=False,phases=phase_metrics),
             measured=dict(elapsedSeconds=round(time.monotonic()-started,3),cpuSeconds=round(resource_sample(root/'postgres')[0]-metrics['cpuStart'],3),
                           peakRamBytes=max(PEAK_RAM,worker_resource.get('peakRamBytes',0)),peakArtifactBytes=max(PEAK_ARTIFACT,worker_resource.get('peakArtifactBytes',0),allocated(root)),
                           initialFreeBytes=initial_free,finalFreeBytes=shutil.disk_usage(root).free,
@@ -438,6 +485,6 @@ if __name__=='__main__':
         except BaseException:
             traceback.print_exc();raise SystemExit(1)
     else:
-        try:raise SystemExit(main())
-        except BaseException:
-            traceback.print_exc();raise SystemExit(1)
+        # Do not catch SystemExit(0) as a failure: main() uses its return code
+        # as the QA runner's process status after writing the durable report.
+        raise SystemExit(main())
