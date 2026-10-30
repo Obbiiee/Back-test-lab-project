@@ -159,6 +159,9 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
         self._creating = {}
         self._window_key = None
         self._window_rows = None
+        # The product and interactive default is still 64. The isolated QA
+        # fast-forward runner may opt into a larger bounded reveal.
+        self.max_groups_per_advance = 64
 
     def validate_checkpoint(self, checkpoint):
         keys(checkpoint, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
@@ -182,7 +185,8 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             try:
                 timeline = IndexedTickTimeline(provider, self.source.dataset_id, self.source.version, str(start),
                                                log_folder=self._folder(scope, session), allow_threads=True,
-                                               log_codec=os.environ.get('BTL_QA_TIMELINE_LOG_CODEC'))
+                                               log_codec=os.environ.get('BTL_QA_TIMELINE_LOG_CODEC'),
+                                               max_groups_per_advance=self.max_groups_per_advance)
             except BaseException:
                 provider.close(); raise
             self._creating[id(timeline)] = provider
@@ -218,7 +222,8 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             provider = self.source.provider()
             try:
                 timeline = IndexedTickTimeline.resume(provider, checkpoint, log_folder=self._folder(scope, session),
-                                                       allow_threads=True)
+                                                       allow_threads=True,
+                                                       max_groups_per_advance=self.max_groups_per_advance)
             except BaseException:
                 provider.close(); raise
             self._publish(scope, session, timeline, provider)

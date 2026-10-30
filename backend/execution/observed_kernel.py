@@ -182,7 +182,10 @@ def _advance(s,events,raw,frame,checkpoint):
             and (not frame['exhaustedThroughBoundary'] or through==target),'time','REFUSED_FUTURE_EVIDENCE')
     require(frame['cursor']==c and frame['datasetId']==s['datasetId'] and frame['datasetVersion']==s['datasetVersion'] and frame['timelineVersion']==TIMELINE_VERSION and frame['generation']=='0' and frame['sessionStartNs']==s['startNs'] and c['throughNs']==frame['throughNs'] and c['visiblePrefixHash']==frame['visiblePrefixHash'],'source','REFUSED_OBSERVED_SOURCE_IDENTITY')
     require(c['pendingTargetNs']==(None if frame['exhaustedThroughBoundary'] else raw['payload']['targetNs']),'target')
-    groups=frame['groups'];require(type(groups) is list and len(groups)<=64,'groups')
+    # The timeline's default/manual reveal remains 64 groups. Internal
+    # fast-forward may request a larger bounded frame (up to 128, the durable
+    # position-block ceiling); per-group order evaluation below is unchanged.
+    groups=frame['groups'];require(type(groups) is list and len(groups)<=128,'groups')
     require(int(c['nextGroupIndex'])==int(s['nextGroupIndex'])+len(groups) and 0<=int(c['revision'])-int(s['sourceCursorRevision'])<=1,'cursor')
     if groups:require(c['lastGroupId']==groups[-1]['groupId'] and int(c['revision'])==int(s['sourceCursorRevision'])+1,'cursor')
     coverage=frame['coverage'];require(type(coverage) is list and len(coverage)<=2048,'coverage')

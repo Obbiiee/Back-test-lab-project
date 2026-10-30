@@ -62,8 +62,9 @@ class TickStorageV2Tests(unittest.TestCase):
         self.resources.append(provider)
         return b, provider
 
-    def timeline(self, p, start="0", folder="logs"):
-        t = IndexedTickTimeline(p, p.dataset_id, p.dataset_version, start, log_folder=self.path/folder)
+    def timeline(self, p, start="0", folder="logs", *, max_groups_per_advance=64):
+        t = IndexedTickTimeline(p, p.dataset_id, p.dataset_version, start, log_folder=self.path/folder,
+                                max_groups_per_advance=max_groups_per_advance)
         self.resources.append(t)
         return t
 
@@ -304,6 +305,35 @@ class TickStorageV2Tests(unittest.TestCase):
         bad=deepcopy(checkpoint);bad["cursor"]["visiblePrefixHash"]="f"*64
         with self.assertRaises(ValueError):
             IndexedTickTimeline.resume(p,bad,log_folder=self.path/"logs")
+
+    def test_bounded_fast_forward_128_groups_preserves_default_results_and_cold_resume(self):
+        rows=[dict(ordinal=str(i),timeNs=str(100+i),bid="1.001",ask="1.003",sequence=None) for i in range(140)]
+        source=SyntheticTickProvider(rows);meta=source.describe(source.dataset_id,source.dataset_version)
+        fields=("datasetId","providerId","feedId","instrumentId","providerSymbol","evidenceClass","adapterVersion","validatorVersion","ordering")
+        builder=DatasetBuilder(self.path/'batch-source',{k:meta[k] for k in fields},meta['sources'],{},packing=(1,1,1));self.resources.append(builder.store)
+        token=None
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,32)
+            for row in page['events']:builder.append(dict(row,datasetVersion=ZERO_VERSION))
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        version=builder.finish();provider=DiskTickProvider(self.path/'batch-source',version);self.resources.append(provider)
+        baseline=self.timeline(provider,folder='batch-default')
+        default_first=baseline.advance_through('1000',baseline.cursor)
+        self.assertEqual(len(default_first['groups']),64)
+        self.assertFalse(default_first['exhaustedThroughBoundary'])
+        baseline_groups=default_first['groups']+pump(baseline,'1000')
+        candidate=self.timeline(provider,folder='batch-128',max_groups_per_advance=128)
+        first=candidate.advance_through('1000',candidate.cursor)
+        self.assertEqual(len(first['groups']),128)
+        self.assertFalse(first['exhaustedThroughBoundary'])
+        checkpoint=candidate.checkpoint()
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.path/'batch-128',max_groups_per_advance=128)
+        self.resources.append(resumed)
+        self.assertEqual(resumed.cursor,candidate.cursor)
+        tail=pump(resumed,'1000')
+        self.assertEqual(first['groups']+tail,baseline_groups)
+        self.assertEqual(len(tail),12)
 
     def test_resume_refuses_missing_or_corrupt_original_position_chain(self):
         import json

@@ -158,9 +158,11 @@ def _expand_compact_block(encoded):
 
 
 class IndexedTickTimeline:
-    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense"):
+    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64):
         require(log_codec in (None, 'raw', 'zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'INVALID_INPUT')
         require(lookup_layout in ('dense', 'range-v1'), 'lookupLayout', 'INVALID_INPUT')
+        require(type(max_groups_per_advance) is int and 1 <= max_groups_per_advance <= 128,
+                'maxGroupsPerAdvance', 'INVALID_INPUT')
         described = provider.describe_v2(dataset_id, dataset_version)
         keys(described, "root completion indexBinding")
         for key, artifact in (("completion", "BTL-TICK-COMPLETION-2"), ("indexBinding", "BTL-TICK-INDEX-BINDING-2")):
@@ -189,6 +191,7 @@ class IndexedTickTimeline:
                 'logCodec', 'REFUSED_LOG_LAYOUT')
         self.__log_codec = present or log_codec or 'raw'
         self.__lookup_layout = lookup_layout
+        self.__max_groups_per_advance = max_groups_per_advance
         self.__db = connect(self.__log_path, allow_threads=allow_threads)
         if self.__log_codec != 'raw':
             self.__db.execute('CREATE TABLE IF NOT EXISTS log_layout(codec TEXT PRIMARY KEY) WITHOUT ROWID')
@@ -460,7 +463,7 @@ class IndexedTickTimeline:
         try:
             while (pending := self.__peek()) is not None and int(pending[1]["timeNs"]) <= target:
                 cancel.check(); require(epoch == self.__epoch, "cancel", "CANCELLED")
-                if len(groups) == 64:
+                if len(groups) >= self.__max_groups_per_advance:
                     break
                 try:
                     packed.append(pending[1])
@@ -604,7 +607,9 @@ class IndexedTickTimeline:
 
     def replace_dataset(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder):
         require(self.__active, "timeline", "REPLACED_TIMELINE")
-        replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder, log_codec=self.__log_codec, lookup_layout=self.__lookup_layout)
+        replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder,
+                                           log_codec=self.__log_codec, lookup_layout=self.__lookup_layout,
+                                           max_groups_per_advance=self.__max_groups_per_advance)
         replacement.__generation = self.__generation+1; replacement.__initialize()
         self.cancel(); self.__active = False
         return replacement
@@ -615,14 +620,14 @@ class IndexedTickTimeline:
                     advanceLogHash=self.__advance_tip, positionLogHash=self.__position_tip)
 
     @classmethod
-    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense"):
+    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64):
         keys(checkpoint, "schemaVersion artifact cursor advanceLogHash positionLogHash")
         require(checkpoint["artifact"] == "BTL-TICK-CHECKPOINT-2", "checkpoint", "SCHEMA_MISMATCH")
         canonical_v2_bytes(checkpoint)
         cursor = checkpoint["cursor"]
         keys(cursor, "schemaVersion artifact " + CURSOR_FIELDS)
         require(cursor["artifact"] == "BTL-TICK-CURSOR-2" and cursor["timelineVersion"] == VERSION, "cursor", "SCHEMA_MISMATCH")
-        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout)
+        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout, max_groups_per_advance=max_groups_per_advance)
         try:
             return result.__reconstruct(checkpoint, cursor)
         except BaseException:

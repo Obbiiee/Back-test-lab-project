@@ -56,6 +56,14 @@ def phase(name, *, postgres_cpu=False):
 
 
 @contextmanager
+def measured_stage(name):
+    """Record a stage's own wall/CPU span, separately from nested calls."""
+    with stage(name):
+        with phase('stage.wall'):
+            yield
+
+
+@contextmanager
 def stage(name):
     global _stage
     previous = _stage; _stage = name
