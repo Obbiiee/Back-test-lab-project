@@ -68,7 +68,7 @@ Therefore the current representation has not shown a viable path to 500 MB/user.
 - Successful paired experiment: 19.60 s wall, 19.15 s CPU, 198,225,920 B cgroup peak memory and 53,384 KiB process peak RSS.
 - Exact raw/compressed parity rerun: 18.99 s wall, 18.62 s CPU, 198,369,280 B cgroup peak memory; independent read-only database parity check took 0.547 s.
 - Every workload ran under 1 CPU-equivalent, 1 GiB memory, swap disabled, and a 900-second runtime cap. No cap was reached.
-- Cumulative new QA artifacts: 347,103,232 B allocated, below the 536,870,912 B budget. Filesystem available at final check: 59,979,034,624 B, above the 32,212,254,720 B reserve. Exact file hashes and the final H1/source fingerprint check are in `final-evidence-index.json` under the private evidence root.
+- Cumulative new QA artifacts including the evidence index: 347,107,328 B allocated, below the 536,870,912 B budget. Filesystem available at final check: 59,978,092,544 B, above the 32,212,254,720 B reserve. Exact file hashes and the final H1/source fingerprint check are in `final-evidence-index.json` under the private evidence root.
 - PostgreSQL clones and workers stopped. Failed setup/reporting attempts were tooling errors (missing interpreter dependency, SQL placeholder escaping, test UUID construction, and a parity reporter import); they did not indicate data or engine parity failures and remain in the private evidence directory.
 
 ## Implementation and decision
