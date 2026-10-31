@@ -15,6 +15,7 @@ from pathlib import Path
 import resource
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -26,7 +27,7 @@ from contracts.canonical import canonical_bytes, content_hash
 from contracts.models import MethodPolicy
 from execution.observed_admission import AdmittedObservedSource
 from execution.observed_controller import ObservedExecutionController
-from execution.observed_kernel import validate_state
+from execution.observed_kernel import MAX_ORDERS, validate_state
 from execution.observed_postgres import ObservedExecutionStore
 from execution.observed_profile import ObservedExecutionProfile, historical_technical_profile
 from infrastructure.database import connect, migrate
@@ -78,7 +79,8 @@ def resource_sample(cluster_root):
     own = resource.getrusage(resource.RUSAGE_SELF)
     child = resource.getrusage(resource.RUSAGE_CHILDREN)
     cpu = own.ru_utime + own.ru_stime + child.ru_utime + child.ru_stime
-    rss = max(own_rss, own.ru_maxrss*1024)
+    own_peak_rss = max(own_rss, own.ru_maxrss*1024)
+    postgres_rss = 0
     postmaster_file = Path(cluster_root)/'data/postmaster.pid'
     if postmaster_file.exists():
         try: root_pid = int(postmaster_file.read_text().splitlines()[0])
@@ -98,8 +100,27 @@ def resource_sample(cluster_root):
                         included.add(pid); changed = True
             for pid in included:
                 if pid in procs:
-                    _, proc_cpu, proc_rss = procs[pid]; cpu += proc_cpu; rss += proc_rss
-    return cpu, rss
+                    _, proc_cpu, proc_rss = procs[pid]; cpu += proc_cpu; postgres_rss += proc_rss
+    # Keep the historical QA cap measurement unchanged: process high-water RSS
+    # plus the current RSS of the isolated PostgreSQL process tree. Also return
+    # current RSS components so multi-day runs can distinguish growth from a
+    # one-time high-water mark.
+    return cpu, own_peak_rss+postgres_rss, own_rss, postgres_rss
+
+
+def memory_sample(root, cluster_root, phase, *, state=None, started=None):
+    cpu, cap_rss, process_rss, postgres_rss = resource_sample(cluster_root)
+    row=dict(phase=phase,pid=os.getpid(),elapsedSeconds=round(time.monotonic()-started,3) if started else None,
+             processCurrentRssBytes=process_rss,postgresTreeCurrentRssBytes=postgres_rss,
+             capMethodSampleBytes=cap_rss,processHighWaterRssBytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,
+             revision=state.get('revision') if state else None,nextGroupIndex=state.get('nextGroupIndex') if state else None,
+             throughNs=state.get('throughNs') if state else None,retainedOrderCount=len(state.get('orders',{})) if state else None,
+             cpuSeconds=round(cpu,3))
+    path=Path(root)/'memory-trace.jsonl'
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_APPEND,0o600)
+    with os.fdopen(fd,'a') as stream:
+        stream.write(json.dumps(row,sort_keys=True)+'\n');stream.flush()
+    return row
 
 
 def assert_budgets(root, cluster_root, started):
@@ -108,10 +129,10 @@ def assert_budgets(root, cluster_root, started):
     if shutil.disk_usage(root).free < MIN_FREE: raise RuntimeError('RESOURCE_STOP_DISK_RESERVE_30_GIB')
     used = allocated(root)
     if used > MAX_ARTIFACT: raise RuntimeError('RESOURCE_STOP_ARTIFACT_512_MIB')
-    cpu, ram = resource_sample(cluster_root)
+    cpu, ram, current_process_rss, postgres_rss = resource_sample(cluster_root)
     PEAK_RAM=max(PEAK_RAM,ram);PEAK_ARTIFACT=max(PEAK_ARTIFACT,used)
     if ram > MAX_RAM: raise RuntimeError('RESOURCE_STOP_RAM_1_GIB')
-    return used, cpu, ram
+    return used, cpu, ram, current_process_rss, postgres_rss
 
 
 def command(sid, cid, revision, kind, payload=None):
@@ -143,7 +164,30 @@ def _db_command_ids(dsn, workspace, session):
     return max(result) if result else -1
 
 
-def _stage_orders(controller, store, source, scope, sid, state, stage, basis):
+def _pending_timeline_target(controller, scope, sid, state):
+    """Return a committed partial ADVANCE target, validating its state binding.
+
+    A Batch-256 reveal can stop before its requested time boundary. After a
+    cold resume the runner must continue that exact durable target before it
+    chooses a later hourly decision boundary.
+    """
+    source=controller._source(ObservedExecutionProfile.from_wire(state['profile']))
+    path=source.cache._folder(scope,sid)/'timeline.sqlite'
+    if not path.exists():return None
+    with sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True) as db:
+        row=db.execute('SELECT body FROM heads WHERE id=1').fetchone()
+    if row is None:raise RuntimeError('TIMELINE_HEAD_MISSING')
+    checkpoint=json.loads(row[0]);cursor=checkpoint.get('cursor',{})
+    expected=(state['datasetId'],state['datasetVersion'],state['throughNs'],state['nextGroupIndex'],
+              state['sourceCursorRevision'],state['sourcePrefixHash'])
+    actual=(cursor.get('datasetId'),cursor.get('datasetVersion'),cursor.get('throughNs'),cursor.get('nextGroupIndex'),
+            cursor.get('revision'),cursor.get('visiblePrefixHash'))
+    if actual!=expected:raise RuntimeError('DURABLE_TIMELINE_STATE_MISMATCH')
+    pending=cursor.get('pendingTargetNs')
+    return None if pending is None else int(pending)
+
+
+def _stage_orders(controller, store, source, scope, sid, state, stage, basis, *, selected_plan=None):
     if basis is None or int(state['throughNs'])-int(basis['timeNs']) > 60*S: return False
     pending=[oid for oid,o in state['orders'].items() if o['status']=='PENDING' and not oid.startswith('order:far:')]
     for oid in pending:
@@ -163,6 +207,9 @@ def _stage_orders(controller, store, source, scope, sid, state, stage, basis):
         ('SHORT','LIMIT',bid+step,bid+step+risk,bid+step-risk),
         ('SHORT','STOP',bid-step,bid-step+risk,bid-step-risk),
     )
+    if selected_plan is not None:
+        plans=tuple(plan for plan in plans if plan[:2]==selected_plan)
+        if len(plans)!=1:raise RuntimeError('TWO_DAY_ORDER_PLAN_INVALID')
     for side,otype,entry,sl,tp in plans:
         state=store.inspect(scope,sid)['state'];cid=f'order:stage:{stage:02d}:{side.lower()}:{otype.lower()}'
         payload=dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
@@ -171,8 +218,8 @@ def _stage_orders(controller, store, source, scope, sid, state, stage, basis):
     return True
 
 
-def advance_until(controller, store, scope, sid, target, root, cluster_root, started, *, decision_targets, first_stage=None):
-    eod_ns=None
+def advance_until(controller, store, scope, sid, target, root, cluster_root, started, *, decision_targets,
+                  order_decision_stages, eod_ns, day_hours, first_stage=None):
     reached=False
     first=True
     # This runner is the sole writer for its isolated QA Session. Reuse the
@@ -182,14 +229,16 @@ def advance_until(controller, store, scope, sid, target, root, cluster_root, sta
     # concurrent or stale write still fails closed.
     state=store.inspect(scope,sid)['state']
     target=int(target)
+    pending_target=_pending_timeline_target(controller,scope,sid,state)
     while not reached:
         elapsed=max(0,int(state['throughNs'])-int(state['startNs']))
-        stage_before=min(23,elapsed//(3600*S))
+        stage_before=min(day_hours-1,elapsed//(3600*S))
         decision_boundary=int(decision_targets.get(str(stage_before+1),target))
         eod_decision=int(os.environ.get('BTL_QA_HISTORICAL_EOD_DECISION_NS',str(target)))
-        if stage_before>=max(map(int,decision_targets)) and int(state['throughNs'])<eod_decision:
+        if stage_before>=max(order_decision_stages) and int(state['throughNs'])<eod_decision:
             decision_boundary=min(decision_boundary,eod_decision)
-        advance_target=min(target,decision_boundary) if decision_boundary>int(state['throughNs']) else target
+        advance_target=(pending_target if pending_target is not None else
+                        min(target,decision_boundary) if decision_boundary>int(state['throughNs']) else target)
         raw=command(sid,f'advance:{state["revision"]}',state['revision'],'ADVANCE',{'targetNs':str(advance_target)})
         if first and first_stage:
             with PERF.measured_stage(first_stage): result=controller.apply(scope,raw)
@@ -198,12 +247,14 @@ def advance_until(controller, store, scope, sid, target, root, cluster_root, sta
         first=False
         reached=result['replay']['exhaustedThroughBoundary'] and advance_target>=target
         state=result['state']
-        used,cpu,ram=assert_budgets(root,cluster_root,started)
+        pending_target=None if result['replay']['exhaustedThroughBoundary'] else advance_target
+        used,cpu,ram,current_process_rss,postgres_rss=assert_budgets(root,cluster_root,started)
         progress=dict(status='RUNNING',sessionId=sid,revision=state['revision'],throughNs=state['throughNs'],
                       nextGroupIndex=state['nextGroupIndex'],targetNs=str(advance_target),allocatedBytes=used,
-                      cpuSeconds=round(cpu,3),ramBytes=ram,updatedUnixNs=time.time_ns())
+                      cpuSeconds=round(cpu,3),ramBytes=ram,currentProcessRssBytes=current_process_rss,
+                      postgresTreeCurrentRssBytes=postgres_rss,retainedOrderCount=len(state['orders']),updatedUnixNs=time.time_ns())
+        memory_sample(root,cluster_root,first_stage or 'replay',state=state,started=started)
         temp=Path(root)/'.progress.tmp';temp.write_text(json.dumps(progress,sort_keys=True)+'\n');os.chmod(temp,0o600);temp.replace(Path(root)/'progress.json')
-        if eod_ns is None:eod_ns=int(state['startNs'])+23*3600*S
         if int(state['throughNs'])>=eod_ns and not state['unresolved']:
             for oid,order in sorted(state['orders'].items()):
                 if order['status']=='PENDING':
@@ -214,11 +265,15 @@ def advance_until(controller, store, scope, sid, target, root, cluster_root, sta
                     controller.apply(scope,command(sid,f'eod:close:{oid}',state['revision'],'CLOSE',{'orderId':oid,'quantity':None}))
             state=store.inspect(scope,sid)['state']
         # Stage orders only from the current revealed quote and durable clock.
-        stage=min(23,max(0,(int(state['throughNs'])-int(state['startNs']))//(3600*S)))
+        stage=min(day_hours-1,max(0,(int(state['throughNs'])-int(state['startNs']))//(3600*S)))
         current=_db_command_ids(os.environ['BTL_TEST_DATABASE_URL'],scope.workspace_id,sid)
-        if int(state['throughNs']) < eod_ns and current < stage:
+        if int(state['throughNs']) < eod_ns and stage in order_decision_stages and current < stage:
             source=controller._source(ObservedExecutionProfile.from_wire(state['profile']))
-            _stage_orders(controller,store,source,scope,sid,state,stage,state['quoteBasis'])
+            selected_plan=None
+            if day_hours==48 and stage>=24:
+                rotations=(('LONG','LIMIT'),('SHORT','STOP'),('LONG','STOP'),('SHORT','LIMIT'))
+                selected_plan=rotations[(stage-24)%len(rotations)]
+            _stage_orders(controller,store,source,scope,sid,state,stage,state['quoteBasis'],selected_plan=selected_plan)
             if stage==0:
                 after=store.inspect(scope,sid)['state'];bid=Decimal(after['quoteBasis']['bid']);ask=Decimal(after['quoteBasis']['ask'])
                 for label,side,otype,entry,sl,tp in (
@@ -272,7 +327,7 @@ def verify_durable_receipts(dsn, workspace, sid, expected_revision):
                     artifact='BTL-INDEPENDENT-COMMAND-LEDGER-1',rows=ledger))).hexdigest())
 
 
-def independent_verify(source, store, scope, sid, start_ns, end_ns):
+def independent_verify(source, store, scope, sid, start_ns, end_ns, *, gap_threshold_ns=60*S):
     state=store.inspect(scope,sid)['state'];events=_all_events(store,scope,sid)
     validate_state(state)
     # Recompute the whole event commitment chain independently from stored rows.
@@ -293,12 +348,19 @@ def independent_verify(source, store, scope, sid, start_ns, end_ns):
     try:
         located=provider.locate_v2(source.dataset_id,source.version,str(start_ns));position=located['position']
         if position is None:raise RuntimeError('INDEPENDENT_SOURCE_START_MISSING')
-        time_ns=None;rows=[];seen=0;groups=0;gaps=0;matched=0
+        time_ns=None;rows=[];seen=0;groups=0;matched=0;first_quote_ns=None;last_quote_ns=None;previous_group_ns=None
+        source_gaps=[]
         def verify_group(moment,group_rows):
-            nonlocal groups,matched
+            nonlocal groups,matched,first_quote_ns,last_quote_ns,previous_group_ns
             groups+=1
             if len(group_rows)>1: raise RuntimeError('INDEPENDENT_UNTRUSTED_TIE_IN_ONE_DAY')
             row=group_rows[0];ids=[r['eventId'] for r in group_rows]
+            if first_quote_ns is None:first_quote_ns=str(moment)
+            if previous_group_ns is not None and moment-previous_group_ns>gap_threshold_ns:
+                closed=all(r['quality']['gapBefore']=='KNOWN_SESSION_CLOSED' for r in group_rows)
+                source_gaps.append(dict(startNs=str(previous_group_ns),endNs=str(moment),elapsedNs=str(moment-previous_group_ns),
+                    kind='MARKET_CLOSED' if closed else 'UNKNOWN_COVERAGE_GAP',quoteAvailable=True,sourceQuality='UNKNOWN'))
+            previous_group_ns=moment;last_quote_ns=str(moment)
             gid=content_hash(dict(schemaVersion=1,artifact='BTL-TICK-GROUP-ID-1',datasetVersion=source.version,
                                   timeNs=str(moment),eventIds=ids))
             for fill in by_time.get(str(moment),[]):
@@ -326,6 +388,16 @@ def independent_verify(source, store, scope, sid, start_ns, end_ns):
         if rows:verify_group(time_ns,rows)
     finally:provider.close()
     if matched!=len(fills):raise RuntimeError('INDEPENDENT_FILL_COUNT_MISMATCH')
+    by_order=defaultdict(list)
+    for event in events:
+        if event['kind'] in ('ENTRY_FILL','EXIT_FILL'):by_order[event['orderId']].append(event)
+    for oid,history in by_order.items():
+        entries=[e for e in history if e['kind']=='ENTRY_FILL']
+        if len(entries)!=1:raise RuntimeError('INDEPENDENT_ORDER_ENTRY_CARDINALITY_MISMATCH:'+oid)
+        entry=entries[0]
+        for exit_event in (e for e in history if e['kind']=='EXIT_FILL'):
+            if exit_event['sequence']<=entry['sequence'] or int(exit_event['detail']['evidence']['timeNs'])<int(entry['detail']['evidence']['timeNs']):
+                raise RuntimeError('INDEPENDENT_ORDER_EVENT_ORDER_MISMATCH:'+oid)
     exact_total=Fraction(0)
     fill_count=Counter()
     for event in fills:
@@ -337,10 +409,12 @@ def independent_verify(source, store, scope, sid, start_ns, end_ns):
     return dict(status='PASS',independentSourceTicks=seen,independentTimestampGroups=groups,
                 independentlyMatchedFills=matched,entryFills=fill_count['ENTRY_FILL'],exitFills=fill_count['EXIT_FILL'],
                 reconciledGross=format(exact_total,'f'),reconciledBalance=state['balance'],
-                eventChainHead=state['eventHash'])
+                eventChainHead=state['eventHash'],firstSourceQuoteNs=first_quote_ns,lastSourceQuoteNs=last_quote_ns,
+                sourceObservedGaps=source_gaps,sourceConsistentOrderOrdering='PASS')
 
 
-def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid, day_end, decision_targets):
+def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid, day_end, decision_targets,
+           order_decision_stages, eod_ns, day_hours):
     global PEAK_RAM,PEAK_ARTIFACT
     os.environ['BTL_TEST_DATABASE_URL']=dsn
     with PERF.measured_stage('cold_resume_setup'):
@@ -357,10 +431,11 @@ def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid
     store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
     controller=ObservedExecutionController(store,lambda _:source)
     resume_revision=state['revision'];resume_state_hash=content_hash(state)
-    start=int(state['startNs']);target=min(day_end,start+86400*S)
+    start=int(state['startNs']);target=day_end
     with PERF.measured_stage('replay'):
         for _ in advance_until(controller,store,scope,sid,target,root,os.environ['BTL_QA_CLUSTER_ROOT'],
                                float(os.environ['BTL_QA_RUN_STARTED']),decision_targets=decision_targets,
+                               order_decision_stages=order_decision_stages,eod_ns=eod_ns,day_hours=day_hours,
                                first_stage='cold_resume_first_command'):
             pass
     Path(root,'worker-resource.json').write_text(json.dumps(dict(peakRamBytes=PEAK_RAM,peakArtifactBytes=PEAK_ARTIFACT),sort_keys=True)+'\n')
@@ -376,7 +451,8 @@ def main_worker():
     PERF.install()
     data=json.loads(os.environ['BTL_HISTORICAL_DAY_V2_WORKER'])
     result=worker(data['dsn'],Path(data['root']),data['source'],data['proof'],data['proofHash'],
-                  data['workspace'],data['actor'],data['session'],int(data['dayEnd']),data['decisionTargets'])
+                  data['workspace'],data['actor'],data['session'],int(data['dayEnd']),data['decisionTargets'],
+                  set(data['orderDecisionStages']),int(data['eodNs']),int(data['dayHours']))
     Path(data['root'],'worker-result.json').write_text(json.dumps(result,sort_keys=True)+'\n')
     print(json.dumps(result,sort_keys=True))
 
@@ -396,13 +472,12 @@ def main():
     batch_groups=int(os.environ.get('BTL_QA_HISTORICAL_BATCH_GROUPS','64'))
     if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
     os.environ['BTL_QA_HISTORICAL_BATCH_GROUPS']=str(batch_groups)
+    day_count=int(os.environ.get('BTL_QA_HISTORICAL_DAYS','1'))
+    if day_count not in (1,2):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
+    day_hours=24*day_count
     decision_fixture=json.loads((Path(__file__).parent/'fixtures/historical_day_v2_decision_schedule.json').read_text())
     if decision_fixture.get('day')!=DAY:
         raise RuntimeError('ORDER_DECISION_SCHEDULE_DAY_MISMATCH')
-    (root/'replay-config.json').write_text(json.dumps(dict(schemaVersion=1,artifact='BTL-QA-REPLAY-CONFIG-1',
-        batchGroups=batch_groups,maximumBatchGroups=256,orderDecisionBoundarySeconds=3600,
-        decisionSchedule=decision_fixture,sourceProcessing='ALL_OBSERVED_GROUPS',productionEnabled=False),sort_keys=True)+'\n')
-    os.chmod(root/'replay-config.json',0o600)
     available=os.sched_getaffinity(0)
     if available:os.sched_setaffinity(0,{min(available)})
     started=time.monotonic();wall_start=time.time();initial_free=shutil.disk_usage(root).free
@@ -419,9 +494,45 @@ def main():
     if decision_fixture.get('datasetVersion')!=profile.wire['primary']['datasetVersion'] or decision_fixture.get('day')!=DAY:
         raise RuntimeError('ORDER_DECISION_SCHEDULE_SOURCE_MISMATCH')
     decision_targets=decision_fixture['decisionTargets']
-    os.environ['BTL_QA_HISTORICAL_EOD_DECISION_NS']=decision_fixture['baselineEodDecisionNs']
     calendar=datetime.strptime(DAY,'%Y-%m-%d').replace(tzinfo=timezone.utc)
-    day_end=int((calendar.replace(day=calendar.day)+__import__('datetime').timedelta(days=1)).timestamp()*S)
+    midnight_ns=int(calendar.timestamp()*S)
+    day_end=midnight_ns+day_hours*3600*S-1
+    order_decision_stages=set(range(0,22))
+    eod_ns=midnight_ns+(23*3600*S)
+    if day_count==2:
+        # Keep the accepted Jan-2 targets byte-for-byte. Shift those same
+        # decision moments by one UTC day. Add deterministic no-order clock
+        # boundaries for the two omitted hours so no batch can cross an hour.
+        offset_ns=int(decision_targets['0'])-midnight_ns
+        decision_targets={str(k):v for k,v in decision_targets.items()}
+        for hour in (22,23):decision_targets[str(hour)]=str(midnight_ns+hour*3600*S+offset_ns)
+        for hour in range(24):
+            source_hour=hour
+            if source_hour<=21:
+                decision_targets[str(24+hour)]=str(int(decision_targets[str(source_hour)])+86400*S)
+            else:
+                decision_targets[str(24+hour)]=str(midnight_ns+(24+hour)*3600*S+offset_ns)
+        order_decision_stages.update(range(24,46))
+        # The first day's accepted four-order batches account for 90 retained
+        # orders including two far non-triggers. One order is submitted at each
+        # pinned hourly decision on day two: 112 cumulative orders, below the
+        # engine's immutable 128-order state ceiling.
+        eod_ns=midnight_ns+47*3600*S
+        eod_decision=int(decision_fixture['baselineEodDecisionNs'])+86400*S
+    else:
+        decision_targets={str(k):v for k,v in decision_targets.items()}
+        eod_decision=int(decision_fixture['baselineEodDecisionNs'])
+    os.environ['BTL_QA_HISTORICAL_EOD_DECISION_NS']=str(eod_decision)
+    (root/'memory-trace.jsonl').touch(mode=0o600)
+    os.chmod(root/'memory-trace.jsonl',0o600)
+    schedule_config=dict(schemaVersion=1,artifact='BTL-QA-REPLAY-CONFIG-1',batchGroups=batch_groups,
+        maximumBatchGroups=256,continuousDays=day_count,orderDecisionBoundarySeconds=3600,
+        firstDayOrderStages=sorted(range(0,22)),secondDayOrderStages=sorted(range(24,46)) if day_count==2 else [],
+        maxCumulativeOrders=MAX_ORDERS,secondDayOrdersPerDecision=1 if day_count==2 else None,
+        decisionTargets=decision_targets,eodDecisionNs=str(eod_decision),sourceProcessing='ALL_OBSERVED_GROUPS',
+        productionEnabled=False)
+    (root/'replay-config.json').write_text(json.dumps(schedule_config,sort_keys=True)+'\n')
+    os.chmod(root/'replay-config.json',0o600)
     run_id=os.environ.get('BTL_HISTORICAL_QA_RUN_ID',uuid.uuid4().hex)
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,31}',run_id):raise RuntimeError('INVALID_QA_RUN_ID')
     session='session:hist-v2:'+run_id
@@ -437,7 +548,8 @@ def main():
         store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
         controller=ObservedExecutionController(store,lambda _:source)
         initial=controller.create(scope,session,profile,method,period=PERIOD,day=DAY,balance='10000')
-        start=int(initial['startNs']);day_end=int((calendar+__import__('datetime').timedelta(days=1)).timestamp()*S)-1
+        start=int(initial['startNs'])
+        eod_ns=start+(day_hours-1)*3600*S
         # Reveal the opening quote, then submit the first order batch using only
         # this already revealed Bid/Ask. Duplicate retry is required to be exact.
         first=command(session,'advance:opening',0,'ADVANCE',{'targetNs':str(start)})
@@ -456,15 +568,18 @@ def main():
                 dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
                      sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
         # Durable progress before a real worker process restart.
-        resume_target=start+4*3600*S
+        resume_target=start+(24*3600*S-1 if day_count==2 else 4*3600*S)
         with PERF.measured_stage('replay'):
             for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started,
-                                   decision_targets=decision_targets):pass
+                                   decision_targets=decision_targets,order_decision_stages=order_decision_stages,
+                                   eod_ns=eod_ns,day_hours=day_hours):pass
         before_restart=store.inspect(scope,session)['state']
+        memory_sample(root,root/'postgres','before_cold_resume',state=before_restart,started=started)
         source.close()
         worker_data=dict(dsn=dsn,root=str(root),source=str(SOURCE),proof=str(PROOF),proofHash=proof_hash,
                          workspace=workspace,actor=actor,session=session,dayEnd=day_end,
-                         decisionTargets=decision_targets)
+                         decisionTargets=decision_targets,orderDecisionStages=sorted(order_decision_stages),
+                         eodNs=eod_ns,dayHours=day_hours)
         env=dict(os.environ,BTL_HISTORICAL_DAY_V2_WORKER=json.dumps(worker_data),
                  BTL_TEST_DATABASE_URL=dsn,BTL_QA_CLUSTER_ROOT=str(root/'postgres'),
                  BTL_QA_RUN_STARTED=str(started),PYTHONDONTWRITEBYTECODE='1')
@@ -478,6 +593,7 @@ def main():
             verification=independent_verify(source,store,scope,session,start,day_end)
             receipt_verification=verify_durable_receipts(dsn,scope.workspace_id,session,state['revision'])
         source.close()
+        memory_sample(root,root/'postgres','independent_verification_complete',state=state,started=started)
         events=_all_events(store,scope,session)
         with connect(dsn) as db:
             receipt_rows=db.execute('SELECT revision,command_id,command_hash,content_hash FROM btl.tick_commands '
@@ -508,6 +624,26 @@ def main():
         statuses=Counter(o['status'] for o in state['orders'].values())
         kinds=Counter(e['kind'] for e in events)
         gap_events=[e for e in events if e['kind']=='DATA_GAP_LIMITATION']
+        order_acceptance_events=[e for e in events if e['kind']=='ORDER_ACCEPTED']
+        accepted_order_ids={e['orderId'] for e in order_acceptance_events}
+        retained_order_ids=set(state['orders'])
+        order_history_complete=accepted_order_ids==retained_order_ids and len(retained_order_ids)<=MAX_ORDERS
+        if not order_history_complete:raise RuntimeError('DURABLE_ORDER_HISTORY_MISMATCH')
+        memory_rows=[json.loads(line) for line in (root/'memory-trace.jsonl').read_text().splitlines() if line.strip()]
+        current_rss=[int(r['processCurrentRssBytes'])+int(r['postgresTreeCurrentRssBytes']) for r in memory_rows]
+        cold_samples=[r for r in memory_rows if r['phase']=='cold_resume_first_command']
+        memory_summary=dict(measurement='max(process VmRSS, process ru_maxrss) + current isolated PostgreSQL descendant VmRSS; separate current process and PG components recorded per ADVANCE',
+            historicalCheckpointMethodSha256='8a1e97452254ff80144ab0e226feb29a3ace84ac34974d9ac36457cd17e58911',
+            historicalBatch128MethodSameAsBatch256=True,traceSamples=len(memory_rows),
+            peakCapMethodSampleBytes=max((int(r['capMethodSampleBytes']) for r in memory_rows),default=0),
+            peakCurrentProcessPlusPostgresRssBytes=max(current_rss,default=0),
+            firstReplayCurrentRssBytes=current_rss[0] if current_rss else None,
+            beforeColdResumeCurrentRssBytes=(current_rss[-2] if len(current_rss)>=2 else None),
+            afterColdResumeFirstAdvance=dict(processCurrentRssBytes=cold_samples[0]['processCurrentRssBytes'],
+                postgresTreeCurrentRssBytes=cold_samples[0]['postgresTreeCurrentRssBytes'],
+                capMethodSampleBytes=cold_samples[0]['capMethodSampleBytes']) if cold_samples else None,
+            finalCurrentRssBytes=current_rss[-1] if current_rss else None,
+            maxRetainedOrderCount=max((int(r['retainedOrderCount']) for r in memory_rows if r['retainedOrderCount'] is not None),default=0))
         worker_result=json.loads((root/'worker-result.json').read_text()) if (root/'worker-result.json').exists() else {}
         worker_resource=json.loads((root/'worker-resource.json').read_text()) if (root/'worker-resource.json').exists() else {}
         worker_phases=json.loads((root/'worker-performance.json').read_text()) if (root/'worker-performance.json').exists() else {}
@@ -519,15 +655,23 @@ def main():
         pg_commit=sum(row.get('wallNs',0) for phases in phase_metrics.values() for key,row in phases.items() if key=='postgres.commit')/1e9
         replay_apply=sum(row.get('wallNs',0) for name,phases in phase_metrics.items()
                          if name in ('replay','cold_resume_first_command') for key,row in phases.items() if key=='command.total')/1e9
+        with connect(dsn) as db:postgres_db_bytes=int(db.execute('SELECT pg_database_size(current_database())').fetchone()[0])
         summary=dict(status='PASS',classification=profile.wire['executionLabel'],
             executionEligibility='NOT_GRANTED',technicalSimulationEligibility='PASS',sourceRights='UNKNOWN',
             sourceProvenance='PROVIDER_OBSERVATION',datasetId=profile.wire['primary']['datasetId'],
             datasetVersion=profile.wire['primary']['datasetVersion'],qualificationReceiptSha256=proof_hash,
-            archiveSha256=proof['snapshotSha256'],period=DAY,dayStartNs=str(start),dayEndNs=str(day_end),
+            archiveSha256=proof['snapshotSha256'],period=DAY if day_count==1 else '2024-01-02/2024-01-03',
+            dayStartNs=str(start),dayEndNs=str(day_end),continuousDays=day_count,
+            firstSourceQuoteNs=verification['firstSourceQuoteNs'],lastSourceQuoteNs=verification['lastSourceQuoteNs'],
             tickCount=verification['independentSourceTicks'],timestampGroupCount=verification['independentTimestampGroups'],
             gapCount=len(gap_events),gapKinds=dict(Counter(e['detail']['gapKind'] for e in gap_events)),
+            sourceObservedGaps=verification['sourceObservedGaps'],
+            unknownCoverageGapCount=sum(g['kind']=='UNKNOWN_COVERAGE_GAP' for g in verification['sourceObservedGaps']),
             commandCount=state['revision'],eventCount=len(events),orderTypeCounts=dict(order_types),
             orderStatusCounts=dict(statuses),eventKinds=dict(kinds),orders=observed_orders,
+            cumulativeOrderHistory=dict(status='PASS',retainedOrderCount=len(retained_order_ids),
+                maximumRetainedOrders=MAX_ORDERS,durableOrderAcceptedEvents=len(accepted_order_ids),
+                noHistoricalOrderPruning=True,allOrderIdsMatchState=True),
             startingBalance=state['initialBalance'],endingBalance=state['balance'],
             realizedGross=state['realizedGross'],independentVerification=verification,
             parity=dict(eventTranscriptSha256=event_transcript_hash,receiptLedgerSha256=receipt_ledger_hash,
@@ -535,7 +679,7 @@ def main():
                         finalStateSha256=content_hash(state),resumeStateSha256=worker_result.get('resumeStateHash')),
             coldResume=dict(status='PASS',processRestarted=True,resumedFromRevision=before_restart['revision'],
                             finalRevision=state['revision'],sameSession=session),
-            idempotencyRetry='PASS',productionChanged=False,sourceChanged=False,
+            idempotencyRetry='PASS',productionChanged=False,sourceChanged=False,memory=memory_summary,
             performanceBreakdown=dict(exclusive=False,phases=phase_metrics),
             replayBatch=dict(maxGroups=batch_groups,advanceCommands=receipt_verification['advanceCommands'],
                              averageTicksPerAdvance=round(verification['independentSourceTicks']/receipt_verification['advanceCommands'],3),
@@ -548,6 +692,8 @@ def main():
                 controllerApplyWallSeconds=round(replay_apply,3),postgresPrepareWallSeconds=round(pg_prepare,3),
                 postgresCommitWallSeconds=round(pg_commit,3),postgresPersistenceWallSeconds=round(pg_prepare+pg_commit,3),
                 independentFullVerificationWallSeconds=round(verify_wall,3)),
+            storage=dict(postgresDatabaseBytes=postgres_db_bytes,postgresClusterAllocatedBytes=allocated(root/'postgres'),
+                totalQaArtifactBytes=allocated(root)),
             measured=dict(elapsedSeconds=round(time.monotonic()-started,3),cpuSeconds=round(resource_sample(root/'postgres')[0]-metrics['cpuStart'],3),
                           peakRamBytes=max(PEAK_RAM,worker_resource.get('peakRamBytes',0)),peakArtifactBytes=max(PEAK_ARTIFACT,worker_resource.get('peakArtifactBytes',0),allocated(root)),
                           initialFreeBytes=initial_free,finalFreeBytes=shutil.disk_usage(root).free,
@@ -557,15 +703,20 @@ def main():
             summary['status']='FAIL';summary['acceptanceFailure']='REQUIRED_FILL_OR_GAP_EVIDENCE_ABSENT'
         if not any(e['kind']=='EXIT_FILL' and e['detail']['reason']=='TP' for e in events) or not any(e['kind']=='EXIT_FILL' and e['detail']['reason']=='SL' for e in events):
             summary['status']='FAIL';summary['acceptanceFailure']='BOTH_SL_AND_TP_NOT_OBSERVED'
-        expected=decision_fixture['baselineResults']
         actual=dict(entries=kinds['ENTRY_FILL'],exits=kinds['EXIT_FILL'],
             stopLosses=sum(e['kind']=='EXIT_FILL' and e['detail']['reason']=='SL' for e in events),
             takeProfits=sum(e['kind']=='EXIT_FILL' and e['detail']['reason']=='TP' for e in events),
             endingBalance=state['balance'],realizedGross=state['realizedGross'])
-        if (semantic_event_hash!=decision_fixture['baselineSemanticFinancialEventSha256'] or
-            financial_state_hash!=decision_fixture['baselineFinancialStateSha256'] or actual!=expected):
-            summary['status']='FAIL';summary['acceptanceFailure']='CANONICAL_FINANCIAL_PARITY_MISMATCH'
-            summary['baselineParityExpected']=expected;summary['candidateParityActual']=actual
+        if day_count==1:
+            expected=decision_fixture['baselineResults']
+            if (semantic_event_hash!=decision_fixture['baselineSemanticFinancialEventSha256'] or
+                financial_state_hash!=decision_fixture['baselineFinancialStateSha256'] or actual!=expected):
+                summary['status']='FAIL';summary['acceptanceFailure']='CANONICAL_FINANCIAL_PARITY_MISMATCH'
+                summary['baselineParityExpected']=expected;summary['candidateParityActual']=actual
+        else:
+            summary['twoDayFinancialResult']=actual
+            if len(retained_order_ids)>MAX_ORDERS:
+                summary['status']='FAIL';summary['acceptanceFailure']='CUMULATIVE_ORDER_LIMIT_EXCEEDED'
         report=root/'report.json';report.write_text(json.dumps(summary,indent=2,sort_keys=True,ensure_ascii=False)+'\n');report.chmod(0o600)
         metrics['peakArtifact']=allocated(root)
         assert_budgets(root,root/'postgres',started)
