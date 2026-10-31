@@ -3,6 +3,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import cProfile
+import pstats
 import signal
 import shutil
 import subprocess
@@ -166,6 +168,7 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
         compact_lsn_before = _lsn()
         compact_hashes = []
         compact_timings = []
+        profile_result = None
         for index, raw in enumerate(commands):
             if index == len(commands) - 1:
                 # The last CANCEL is committed in a dedicated worker and the
@@ -189,8 +192,23 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
                 # cold reconstruction must return the legacy-equivalent result.
                 result = compact.apply(compact_scope, raw)
             else:
-                t = time.perf_counter(); result = compact.apply(compact_scope, raw)
-                compact_timings.append(time.perf_counter() - t)
+                if os.environ.get('BTL_QA_DELTA_V3_PROFILE_APPLY') == '1' \
+                        and raw['commandId'] == f'order:scale:{MAX_ORDERS:04d}':
+                    profiler=cProfile.Profile(); t=time.perf_counter()
+                    result=profiler.runcall(compact.apply,compact_scope,raw)
+                    profiled_seconds=time.perf_counter()-t
+                    stats=pstats.Stats(profiler)
+                    rows=[]
+                    for (filename,line,function),(primitive,calls,total,cumulative,_callers) in stats.stats.items():
+                        rows.append(dict(function=f'{Path(filename).name}:{line}:{function}',calls=calls,
+                                         selfSeconds=round(total,6),cumulativeSeconds=round(cumulative,6)))
+                    rows.sort(key=lambda row:row['cumulativeSeconds'],reverse=True)
+                    profile_result=dict(commandId=raw['commandId'],orderCountBefore=MAX_ORDERS-1,
+                        profiledApplySeconds=round(profiled_seconds,6),functionCount=len(rows),
+                        topFunctionsByCumulative=rows[:40])
+                else:
+                    t = time.perf_counter(); result = compact.apply(compact_scope, raw)
+                    compact_timings.append(time.perf_counter() - t)
             compact_hashes.append(hashlib.sha256(canonical_bytes(result)).hexdigest())
             if index % 16 == 0:
                 _guard(root, started)
@@ -216,10 +234,18 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
             ObservedExecutionStore(compact_dsn, order_retention_policy=QA_ORDER_RETENTION_V2,
                                    qa_state_delta_v3=True), lambda _: self.source,
             order_retention_policy=QA_ORDER_RETENTION_V2)
+        cold_stats_before=cold.store.qa_state_cache_stats
         t = time.perf_counter(); compact_cold = cold.inspect(compact_scope, session)
         cold_resume_seconds = time.perf_counter() - t
         if canonical_bytes(compact_cold['state']) != canonical_bytes(legacy_final):
             raise AssertionError('COLD_RESUME_STATE_MISMATCH')
+        cold_stats_after=cold.store.qa_state_cache_stats
+        if cold_stats_after['fullReconstructions'] <= cold_stats_before['fullReconstructions']:
+            raise AssertionError('COLD_RESUME_DID_NOT_REBUILD_DURABLE_CHAIN')
+        cold_hits_before=cold.store.qa_state_cache_stats['hits']
+        cold.inspect(compact_scope,session)
+        if cold.store.qa_state_cache_stats['hits']<=cold_hits_before:
+            raise AssertionError('VERIFIED_CACHE_NOT_REUSED_AFTER_COLD_REBUILD')
         for index in (0, len(commands) // 2, len(commands) - 1):
             retried = cold.apply(compact_scope, commands[index])
             if hashlib.sha256(canonical_bytes(retried)).hexdigest() != legacy_hashes[index]:
@@ -281,10 +307,54 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
         if any(e['classification']=='SIMULATED_FILL' for e in events):
             raise AssertionError('UNEXPECTED_FILL_IN_CANCELLED_ORDER_STORAGE_FIXTURE')
 
+        # A new store has no warm state and must refuse missing, reordered and
+        # byte-corrupted durable deltas. Savepoints keep each fault probe
+        # isolated from the retained QA database.
+        def rejects_delta_mutation(label, mutate):
+            probe=ObservedExecutionStore(compact_dsn,order_retention_policy=QA_ORDER_RETENTION_V2,
+                                         qa_state_delta_v3=True)
+            with connect(compact_dsn) as db:
+                savepoint='qa_probe_'+label
+                db.execute(f'SAVEPOINT {savepoint}')
+                # The evidence tables are intentionally append-only. Only this
+                # private QA corruption probe suppresses their guard trigger;
+                # rollback to the savepoint restores both rows and trigger
+                # mode before the connection commits.
+                db.execute('SET LOCAL session_replication_role = replica')
+                mutate(db)
+                with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+                    probe._read(db,compact_scope.workspace_id,session)
+                db.execute(f'ROLLBACK TO SAVEPOINT {savepoint}')
+
+        rejects_delta_mutation('missing',lambda db:db.execute(
+            'DELETE FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=128',
+            (compact_scope.workspace_id,session)))
+
+        def reorder(db):
+            a=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=128',
+                         (compact_scope.workspace_id,session)).fetchone()
+            b=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=129',
+                         (compact_scope.workspace_id,session)).fetchone()
+            db.execute('UPDATE btl.tick_checkpoints SET payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s AND revision=128',
+                       (b[0],b[1],compact_scope.workspace_id,session))
+            db.execute('UPDATE btl.tick_checkpoints SET payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s AND revision=129',
+                       (a[0],a[1],compact_scope.workspace_id,session))
+        rejects_delta_mutation('reordered',reorder)
+        rejects_delta_mutation('corrupt',lambda db:db.execute(
+            'UPDATE btl.tick_checkpoints SET payload=%s WHERE workspace_id=%s AND session_id=%s AND revision=128',
+            (b'corrupt-delta',compact_scope.workspace_id,session)))
+
         legacy_growth = legacy_after - legacy_before
         compact_growth = compact_after - compact_before
         if compact_growth >= legacy_growth:
             raise AssertionError('QA_V3_HAS_NO_NET_DATABASE_GROWTH_SAVING')
+        saved_percent=100*(legacy_growth-compact_growth)/legacy_growth
+        if saved_percent<30:
+            raise AssertionError('DATABASE_STORAGE_SAVING_BELOW_30_PERCENT')
+        legacy_median=sorted(legacy_timings)[len(legacy_timings)//2]
+        compact_median=sorted(compact_timings)[len(compact_timings)//2]
+        if compact_median>1.5*legacy_median:
+            raise AssertionError('QA_V3_APPLY_MEDIAN_ABOVE_1_5X_LEGACY')
         elapsed = time.monotonic() - started
         guard = _guard(root, started)
         report = dict(status='PASS', classification='CP6A4_QA_V3_256_ORDER_STORAGE_SCALE',
@@ -299,7 +369,10 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
                         sourceIdentityEqual=legacy_final['datasetVersion']==compact_final['datasetVersion']),
             recovery=dict(coldResume='PASS', coldResumeSeconds=round(cold_resume_seconds,6),
                           sigkillAfterCommit='PASS', exactRetry='PASS',
-                          independentDeltaReconstruction='PASS', receipts='PASS', eventChain='PASS'),
+                          independentDeltaReconstruction='PASS', receipts='PASS', eventChain='PASS',
+                          missingDelta='REJECTED',reorderedDelta='REJECTED',corruptedDelta='REJECTED'),
+            cache=dict(warmStore=compact_store.qa_state_cache_stats,
+                       afterColdRebuild=cold.store.qa_state_cache_stats),
             storage=dict(legacy=dict(beforeBytes=legacy_before,afterBytes=legacy_after,growthBytes=legacy_growth,
                                       logical=legacy_storage),
                          qaV3=dict(beforeBytes=compact_before,afterBytes=compact_after,growthBytes=compact_growth,
@@ -308,11 +381,12 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
                          databaseGrowthSavedPercent=round(100*(legacy_growth-compact_growth)/legacy_growth,3),
                          walBytesGenerated=dict(legacy=legacy_wal_bytes,qaV3=compact_wal_bytes),
                          allocatedWalBytes=_allocated_wal()),
-            latency=dict(legacyApplyMedianSeconds=sorted(legacy_timings)[len(legacy_timings)//2],
+            latency=dict(legacyApplyMedianSeconds=legacy_median,
                          legacyApplyP95Seconds=sorted(legacy_timings)[int(.95*(len(legacy_timings)-1))],
-                         qaV3ApplyMedianSeconds=sorted(compact_timings)[len(compact_timings)//2],
+                         qaV3ApplyMedianSeconds=compact_median,
                          qaV3ApplyP95Seconds=sorted(compact_timings)[int(.95*(len(compact_timings)-1))],
                          elapsedSeconds=round(elapsed,3)),
+            profile=profile_result,
             resources=dict(cpuSeconds=guard['cpuSeconds'],peakCapRssBytes=guard['capRssBytes'],
                            artifactBytes=guard['artifactBytes'],freeDiskBytes=guard['freeDiskBytes'],
                            cpuAffinity=guard['cpuAffinity'],limits=dict(artifactBytes=MAX_ARTIFACT_BYTES,
@@ -322,6 +396,45 @@ class ObservedDeltaV3OrderScaleTests(pg_fixtures.ObservedPostgresTests):
         report_path = Path(os.environ['BTL_QA_DELTA_V3_SCALE_REPORT'])
         report_path.write_text(json.dumps(report, sort_keys=True, indent=2) + '\n')
         self.assertLessEqual(elapsed, MAX_WALL_SECONDS)
+
+    def test_qa_v3_short_sl_matches_legacy_and_cold_resume(self):
+        suffix=uuid.uuid4().hex[:10];session='session:qa3-sl:'+suffix
+        legacy_dsn=pg_fixtures.isolated_database(pg_fixtures.DSN,'cp6a5_sll_'+suffix)
+        compact_dsn=pg_fixtures.isolated_database(pg_fixtures.DSN,'cp6a5_slv_'+suffix)
+        legacy_scope=TrustedScope('observedqa:'+uuid.uuid4().hex,self.scope.actor_ref)
+        compact_scope=TrustedScope('observedqa:'+uuid.uuid4().hex,self.scope.actor_ref)
+        legacy=ObservedExecutionController(ObservedExecutionStore(legacy_dsn),lambda _:self.source)
+        compact=ObservedExecutionController(ObservedExecutionStore(compact_dsn,qa_state_delta_v3=True),
+                                            lambda _:self.source)
+        for controller,scope in ((legacy,legacy_scope),(compact,compact_scope)):
+            controller.create(scope,session,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+        commands=[
+            dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=session,
+                 commandId='sl:quote:0',expectedRevision=0,kind='ADVANCE',payload={'targetNs':'0'}),
+            dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=session,
+                 commandId='sl:short',expectedRevision=1,kind='OPEN',payload=dict(side='SHORT',
+                 orderType='MARKET',workflow='PLANNED',entry='2300',quantity='0.01',sl='2300.8',
+                 tp='2299',riskPercent='1',observations=[])),
+            dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=session,
+                 commandId='sl:entry',expectedRevision=2,kind='ADVANCE',payload={'targetNs':str(10**9)}),
+            dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=session,
+                 commandId='sl:exit',expectedRevision=3,kind='ADVANCE',payload={'targetNs':str(2*10**9)}),
+        ]
+        legacy_results=[];compact_results=[]
+        for raw in commands:
+            old=legacy.apply(legacy_scope,raw);new=compact.apply(compact_scope,raw)
+            self.assertEqual(canonical_bytes(old),canonical_bytes(new))
+            legacy_results.append(old);compact_results.append(new)
+        events=[event for result in compact_results for event in result['events']]
+        fills=[event for event in events if event['classification']=='SIMULATED_FILL']
+        self.assertEqual([event['kind'] for event in fills],['ENTRY_FILL','EXIT_FILL'])
+        self.assertEqual(fills[-1]['detail']['reason'],'SL')
+        self.assertEqual(compact_results[-1]['state']['orders']['sl:short']['status'],'CLOSED')
+        cold=ObservedExecutionController(ObservedExecutionStore(compact_dsn,qa_state_delta_v3=True),
+                                         lambda _:self.source)
+        resumed=cold.inspect(compact_scope,session)
+        self.assertEqual(canonical_bytes(resumed['state']),canonical_bytes(legacy_results[-1]['state']))
+        self.assertEqual(resumed['state']['balance'],legacy_results[-1]['state']['balance'])
 
 
 if __name__ == '__main__' and '--worker' in sys.argv:

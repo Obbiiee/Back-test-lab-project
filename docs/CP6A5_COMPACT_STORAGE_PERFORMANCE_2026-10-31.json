@@ -1,0 +1,101 @@
+{
+  "checkpoint": "CP6A-5",
+  "status": "PASS",
+  "scope": "isolated QA; identical 256-order workload; no production path change",
+  "profile": {
+    "instrumentedLateApplySeconds": 12.629952,
+    "qaReconstructCalls": 2,
+    "qaReconstructCumulativeSeconds": 11.049031,
+    "reconstructCompleteCumulativeSeconds": 10.67198,
+    "canonicalNormalizeCumulativeSeconds": 10.172626,
+    "contentHashCumulativeSeconds": 0.378134,
+    "unpackCumulativeSeconds": 0.362483,
+    "finding": "Repeated full-chain reconstruction and canonical state hashing dominated; measured DB decode/hash work was small."
+  },
+  "optimization": {
+    "kind": "bounded per-store LRU of reconstructed QA-v3 states",
+    "maximumSessions": 4,
+    "cacheIsAuthority": false,
+    "cacheValidation": [
+      "durable session revision/stateHash/chainHash pointer match",
+      "state hash recomputation",
+      "controller snapshot validation",
+      "immutable durable tip validation"
+    ],
+    "coldMiss": "reconstruct and verify complete durable chain"
+  },
+  "workload": {
+    "cumulativeOrders": 256,
+    "durableCommands": 513,
+    "legacyQaV3PerCommandResultHashesEqual": true,
+    "finalLogicalStateEqual": true,
+    "sourceIdentityEqual": true,
+    "fillsInScaleFixture": 0
+  },
+  "storage": {
+    "legacyDatabaseGrowthBytes": 7741440,
+    "qaV3DatabaseGrowthBytes": 3858432,
+    "savedBytes": 3883008,
+    "savedPercent": 50.159,
+    "gateMinimumPercent": 30,
+    "gatePass": true,
+    "legacyWalBytesGenerated": 9417760,
+    "qaV3WalBytesGenerated": 3908776
+  },
+  "latency": {
+    "legacyApplyMedianMs": 286.724,
+    "qaV3ApplyMedianMs": 266.899,
+    "qaV3ToLegacyMedianRatio": 0.931,
+    "maximumRatio": 1.5,
+    "gatePass": true,
+    "legacyApplyP95Ms": 506.517,
+    "qaV3ApplyP95Ms": 491.259,
+    "coldResumeFullReconstructionSeconds": 1.32949,
+    "priorProfiledQaV3MedianMs": 989.521,
+    "ownerProvidedCp6a4QaV3MedianMs": 1010
+  },
+  "correctnessRecovery": {
+    "financialParity": "PASS",
+    "receiptAndEventChainVerification": "PASS",
+    "independentDeltaReconstruction": "PASS",
+    "coldResume": "PASS",
+    "sigkillAfterCommitAndIdempotentRetry": "PASS",
+    "missingDeltaRejected": true,
+    "reorderedDeltaRejected": true,
+    "corruptedDeltaRejected": true,
+    "shortSlLegacyParityAndColdResume": "PASS",
+    "longStopTpLimitCancelRollbackAtomicityRegression": "PASS",
+    "testCount": 3,
+    "testErrors": 0,
+    "testExitCode": 0
+  },
+  "resources": {
+    "cpuAffinity": [0],
+    "cpuSeconds": 284.262,
+    "peakSampledRssBytes": 802357248,
+    "newArtifactBytes": 86228992,
+    "freeDiskBytesAtCompletion": 54011887616,
+    "minimumFreeDiskReserveBytes": 32212254720,
+    "artifactLimitBytes": 536870912,
+    "ramLimitBytes": 1073741824,
+    "wallSeconds": 305.234
+  },
+  "evidence": [
+    {
+      "path": "/home/riksora/riksora-qa-evidence/cp6a5-profile-20261031/evidence.json",
+      "sha256": "9da765a0022a759d72b262b809aa81f59513fc9acc60abcabe483de67f531812"
+    },
+    {
+      "path": "/home/riksora/riksora-qa-evidence/cp6a5-optimized-256b-20261031/evidence.json",
+      "sha256": "8dda0781deb2bee27b3358f9ab9662cc51c95e08d04a9f6474c46d1a5b7b2f0c"
+    },
+    {
+      "path": "/home/riksora/riksora-qa-evidence/cp6a5-optimized-256b-20261031/result.txt",
+      "sha256": "7fb0be33309f223748cf2ceea110b35685c887e95e5bb5d3cd9a3e50c691ac77"
+    },
+    {
+      "path": "/home/riksora/riksora-qa-evidence/cp6a5-optimized-256b-20261031/small-financial-regression.json",
+      "sha256": "2774ec57a2697ad5927b1e0119762dd957cc575d7c94a0a0e2b279dd77e178b1"
+    }
+  ]
+}

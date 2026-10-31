@@ -36,10 +36,14 @@ def main():
             os.environ.update(environment)
             os.environ['BTL_QA_DELTA_V3_SCALE_ROOT'] = str(root)
             os.environ['BTL_QA_DELTA_V3_SCALE_REPORT'] = str(root / 'evidence.json')
+            os.environ['BTL_QA_DELTA_V3_REPORT'] = str(root / 'small-financial-regression.json')
             from tests.test_observed_postgres_256_order import ObservedDeltaV3OrderScaleTests
-            suite = unittest.defaultTestLoader.loadTestsFromName(
-                'test_256_order_legacy_vs_qa_v3_with_cold_resume_and_post_commit_kill',
-                ObservedDeltaV3OrderScaleTests)
+            from tests.test_observed_postgres import ObservedPostgresTests
+            suite = unittest.TestSuite([
+                ObservedDeltaV3OrderScaleTests('test_256_order_legacy_vs_qa_v3_with_cold_resume_and_post_commit_kill'),
+                ObservedDeltaV3OrderScaleTests('test_qa_v3_short_sl_matches_legacy_and_cold_resume'),
+                ObservedPostgresTests('test_qa_v3_postgres_delta_atomic_financial_parity_and_recovery'),
+            ])
             result = unittest.TextTestRunner(stream=output, verbosity=2).run(suite)
             status = 0 if result.wasSuccessful() else 1
         (root / 'result.txt').write_text(output.getvalue())

@@ -4,7 +4,9 @@ No migration or old-family dispatch changes. Market work happens outside row
 locks; only validated proposals after CAS become published SIMULATED_FILLs.
 """
 from copy import deepcopy
+from collections import OrderedDict
 from fractions import Fraction
+from threading import RLock
 
 from contracts.canonical import canonical_bytes,content_hash
 from contracts.primitives import require,revision
@@ -102,6 +104,41 @@ class ObservedExecutionStore:
         order_limits(order_retention_policy)
         require(type(qa_state_delta_v3) is bool,'qaStateDeltaV3')
         self.dsn=dsn;self.order_retention_policy=deepcopy(order_retention_policy);self.qa_state_delta_v3=qa_state_delta_v3
+        self._qa_state_cache=OrderedDict();self._qa_state_cache_lock=RLock();self._qa_state_cache_max=4
+        self._qa_state_cache_stats=dict(hits=0,misses=0,fullReconstructions=0,evictions=0)
+
+    @property
+    def qa_state_cache_stats(self):
+        with self._qa_state_cache_lock:
+            return dict(self._qa_state_cache_stats,entries=len(self._qa_state_cache),
+                        maxEntries=self._qa_state_cache_max)
+
+    def _qa_state_cache_read(self,workspace,session,wire):
+        key=(workspace,session)
+        with self._qa_state_cache_lock:
+            entry=self._qa_state_cache.get(key)
+            if entry is None:
+                self._qa_state_cache_stats['misses']+=1
+                return None
+            if (entry['revision'],entry['stateHash'],entry['chainHash']) != (
+                    wire['revision'],wire['stateHash'],wire['chainHash']):
+                del self._qa_state_cache[key]
+                self._qa_state_cache_stats['misses']+=1
+                return None
+            self._qa_state_cache.move_to_end(key)
+            self._qa_state_cache_stats['hits']+=1
+            return deepcopy(entry['state'])
+
+    def _qa_state_cache_write(self,workspace,session,state,chain_hash):
+        if not self.qa_state_delta_v3:return
+        key=(workspace,session);state_hash=content_hash(state)
+        with self._qa_state_cache_lock:
+            self._qa_state_cache[key]=dict(revision=state['revision'],stateHash=state_hash,
+                                           chainHash=chain_hash,state=deepcopy(state))
+            self._qa_state_cache.move_to_end(key)
+            while len(self._qa_state_cache)>self._qa_state_cache_max:
+                self._qa_state_cache.popitem(last=False)
+                self._qa_state_cache_stats['evictions']+=1
 
     def _has_qa_base(self,db,workspace,session):
         if not self.qa_state_delta_v3:return False
@@ -109,6 +146,7 @@ class ObservedExecutionStore:
         return db.execute('SELECT 1 FROM public.btl_qa_state_base_v3 WHERE workspace_id=%s AND session_id=%s',(workspace,session)).fetchone() is not None
 
     def _qa_reconstruct(self,db,workspace,session,*,upto_revision=None,require_tip=False):
+        with self._qa_state_cache_lock:self._qa_state_cache_stats['fullReconstructions']+=1
         base_row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
         require(base_row is not None,'qaDeltaBase','CORRUPT_RECORD')
         base_record=unpack(*base_row)
@@ -178,8 +216,13 @@ class ObservedExecutionStore:
             require(self.qa_state_delta_v3,'qaSessionVersion','REFUSED_QA_SESSION_VERSION')
             keys(wire,'schemaVersion formatVersion artifact revision stateHash chainHash controller')
             require(wire['schemaVersion']==1 and wire['formatVersion']==3 and wire['revision']==row[2],'snapshot','CORRUPT_RECORD')
-            state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=row[2],require_tip=True)
-            require(wire['stateHash']==content_hash(state) and wire['chainHash']==chain_hash,'qaCheckpoint','CORRUPT_RECORD')
+            state=self._qa_state_cache_read(workspace,session,wire)
+            if state is None:
+                state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=row[2],require_tip=True)
+            else:
+                chain_hash=wire['chainHash']
+            state_hash=content_hash(state)
+            require(wire['stateHash']==state_hash and wire['chainHash']==chain_hash,'qaCheckpoint','CORRUPT_RECORD')
             validate_snapshot(state,wire['controller'],order_retention_policy=self.order_retention_policy)
             stored=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-CHECKPOINT-1',
                         state=state,controller=wire['controller']);storage_format='qa3'
@@ -197,9 +240,10 @@ class ObservedExecutionStore:
         if storage_format=='qa3':
             tip_wire=unpack(*tip)
             require(tip_wire.get('artifact') in (QA3_CHECKPOINT_BASE,QA3_CHECKPOINT_DELTA)
-                    and tip_wire.get('revision')==s['revision'] and tip_wire.get('stateHash')==content_hash(s)
+                    and tip_wire.get('revision')==s['revision'] and tip_wire.get('stateHash')==state_hash
                     and tip_wire.get('chainHash')==chain_hash and tip_wire.get('controller')==stored['controller'],
                     'immutableTip','CORRUPT_RECORD')
+            self._qa_state_cache_write(workspace,session,s,chain_hash)
         else:
             require(bytes(tip[0])==bytes(row[0]) and tip[1]==row[1],'immutableTip','CORRUPT_RECORD')
         return (stored,storage_format,chain_hash) if include_format else stored
@@ -235,6 +279,9 @@ class ObservedExecutionStore:
 
     def create(self,scope,state,checkpoint):
         with connect(self.dsn) as db:self._insert(db,scope,state,checkpoint)
+        if self.qa_state_delta_v3:
+            workspace,session=scoped(scope,state['sessionId'])
+            self._qa_state_cache_write(workspace,session,state,content_hash(state))
 
     def prepare(self,scope,raw):
         command=command_wire(raw);workspace,session=scoped(scope,command['sessionId'])
@@ -291,6 +338,7 @@ class ObservedExecutionStore:
             if legacy_delta_mode:
                 delta_raw,delta_hash=pack(delta_record)
                 db.execute('INSERT INTO public.btl_qa_state_delta_v3 VALUES (%s,%s,%s,%s,%s,%s)',(workspace,session,after['revision'],command['commandId'],delta_raw,delta_hash))
+        if compact_mode:self._qa_state_cache_write(workspace,session,after,chain_hash)
         return deepcopy(result)
 
     def inspect(self,scope,session_id,after_sequence=0,maximum=64):
