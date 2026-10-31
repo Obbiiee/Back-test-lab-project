@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
-import hashlib,json,os,subprocess,sys,unittest,uuid
+import hashlib,json,os,signal,subprocess,sys,time,unittest,uuid
 
 from application.models import TrustedScope
 from contracts.canonical import canonical_bytes
@@ -34,8 +34,11 @@ def worker():
                 yield db
                 if calls[0]==2:os._exit(73)
         storage.connect=interrupted
-    controller=ObservedExecutionController(ObservedExecutionStore(DSN),lambda _:source)
-    controller.apply(TrustedScope(data['workspace'],'authored:worker'),data['command']);os._exit(74)
+    store=ObservedExecutionStore(DSN,qa_state_delta_v3=bool(data.get('qaStateDeltaV3',False)))
+    controller=ObservedExecutionController(store,lambda _:source)
+    controller.apply(TrustedScope(data['workspace'],data.get('actor','authored:worker')),data['command'])
+    if data['phase']=='delta_after_commit':os.kill(os.getpid(),signal.SIGKILL)
+    os._exit(74)
 
 
 @unittest.skipUnless(DSN,'Requires exclusive native PostgreSQL; skipped is not acceptance')
@@ -114,8 +117,118 @@ class ObservedPostgresTests(unittest.TestCase):
         before=run('before');self.assertEqual(before.returncode,73,before.stderr);self.assertEqual(self.c.inspect(self.scope,self.sid)['state']['revision'],0)
         after=run('after');self.assertEqual(after.returncode,74,after.stderr);view=self.c.inspect(self.scope,self.sid);self.assertEqual(view['state']['revision'],1)
         retry=self.c.apply(self.scope,raw);self.assertEqual(retry['state'],view['state'])
+
+    def test_qa_v3_postgres_delta_atomic_financial_parity_and_recovery(self):
+        from execution.observed_postgres import pack,unpack
+        from contextlib import contextmanager
+        import execution.observed_postgres as storage
+        legacy_scope=self.scope
+        qa_scope=TrustedScope(self.scope.workspace_id+':delta-v3',self.scope.actor_ref)
+        sid=self.sid
+        delta_store=ObservedExecutionStore(DSN,qa_state_delta_v3=True)
+        legacy_controller=self.c
+        delta_controller=ObservedExecutionController(delta_store,lambda _:self.source)
+        delta_controller.create(qa_scope,sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+
+        paired_timings=[]
+        def pair(kind,payload=None,cid=None):
+            rev=legacy_controller.inspect(legacy_scope,sid)['state']['revision']
+            raw=command(sid,cid or f'parity:{rev}',rev,kind,payload)
+            start=time.perf_counter();a=legacy_controller.apply(legacy_scope,raw);legacy_elapsed=time.perf_counter()-start
+            start=time.perf_counter();b=delta_controller.apply(qa_scope,raw);delta_elapsed=time.perf_counter()-start
+            paired_timings.append((legacy_elapsed,delta_elapsed))
+            self.assertEqual(canonical_bytes(a),canonical_bytes(b))
+            return a
+
+        pair('ADVANCE',dict(targetNs='0'),'parity:open-quote')
+        basis=legacy_controller.inspect(legacy_scope,sid)['state']['quoteBasis'];bid=float(basis['bid']);ask=float(basis['ask'])
+        stop=dict(side='LONG',orderType='STOP',workflow='PLANNED',entry=f'{ask+0.1:.3f}',quantity='0.01',
+                  sl=f'{ask-0.1:.3f}',tp=f'{ask+1.0:.3f}',riskPercent='1',observations=[])
+        pair('OPEN',stop,'order:parity-stop')
+        limit=dict(side='LONG',orderType='LIMIT',workflow='PLANNED',entry=f'{bid-5:.3f}',quantity='0.01',
+                   sl=f'{bid-6:.3f}',tp=f'{bid-4:.3f}',riskPercent='1',observations=[])
+        pair('OPEN',limit,'order:parity-cancel')
+        pair('ADVANCE',dict(targetNs=str(S)),'parity:entry')
+        pair('ADVANCE',dict(targetNs=str(2*S)),'parity:exit')
+        pair('CANCEL',dict(orderId='order:parity-cancel'),'parity:cancel')
+        full=legacy_controller.inspect(legacy_scope,sid)['state'];delta_state=delta_controller.inspect(qa_scope,sid)['state']
+        self.assertEqual(canonical_bytes(full),canonical_bytes(delta_state))
+        self.assertEqual([e['kind'] for e in legacy_controller.inspect(legacy_scope,sid,maximum=64)['events']],
+                         [e['kind'] for e in delta_controller.inspect(qa_scope,sid,maximum=64)['events']])
         with connect(DSN) as db:
-            self.assertEqual(db.execute('SELECT count(*) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,self.sid)).fetchone()[0],1)
+            rows=db.execute('SELECT revision,payload,content_hash FROM public.btl_qa_state_delta_v3 WHERE workspace_id=%s AND session_id=%s ORDER BY revision',(qa_scope.workspace_id,sid)).fetchall()
+            receipts=db.execute('SELECT command_id,command_hash,payload,content_hash FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s ORDER BY revision',(qa_scope.workspace_id,sid)).fetchall()
+            events=db.execute('SELECT event_id,payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',(qa_scope.workspace_id,sid)).fetchall()
+            legacy_receipts=db.execute('SELECT command_id,command_hash,payload,content_hash FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s ORDER BY revision',(legacy_scope.workspace_id,sid)).fetchall()
+            legacy_events=db.execute('SELECT event_id,payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',(legacy_scope.workspace_id,sid)).fetchall()
+            physical_delta_bytes=db.execute("SELECT pg_total_relation_size('public.btl_qa_state_delta_v3')+pg_total_relation_size('public.btl_qa_state_base_v3')").fetchone()[0]
+            database_bytes=db.execute('SELECT pg_database_size(current_database())').fetchone()[0]
+        self.assertEqual(len(rows),full['revision']);self.assertEqual(len(receipts),full['revision']);self.assertGreater(len(events),0)
+        self.assertEqual([(r[0],r[1],bytes(r[2]),r[3]) for r in receipts],[(r[0],r[1],bytes(r[2]),r[3]) for r in legacy_receipts])
+        self.assertEqual([(r[0],bytes(r[1]),r[2]) for r in events],[(r[0],bytes(r[1]),r[2]) for r in legacy_events])
+        from execution.observed_postgres import unpack
+        from contracts.canonical import content_hash
+        with connect(DSN) as db:
+            initial_raw,initial_hash=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(qa_scope.workspace_id,sid)).fetchone()
+        previous=unpack(initial_raw,initial_hash)['state']['eventHash']
+        for expected_revision,(command_id,command_hash,payload,receipt_hash) in enumerate(receipts,1):
+            result=unpack(payload,receipt_hash)
+            self.assertEqual((result['commandId'],result['commandHash'],result['state']['revision']),(command_id,command_hash,expected_revision))
+        for sequence,(event_id,payload,event_hash) in enumerate(events):
+            event=unpack(payload,event_hash)
+            self.assertEqual(event['eventId'],event_id)
+            self.assertEqual(content_hash({k:v for k,v in event.items() if k!='eventId'}),event_id)
+            self.assertEqual((event['sequence'],event['previousHash']),(sequence,previous))
+            previous=event_id
+        self.assertEqual(previous,delta_state['eventHash'])
+        self.assertGreater(float(full['realizedGross']),0)
+        delta_bytes=sum(len(bytes(r[1])) for r in rows)
+        self.assertGreater(delta_bytes,0)
+        # Force an exception after the QA delta INSERT but before PostgreSQL
+        # context exit; the event, receipt, checkpoint, tip, and delta all roll back.
+        rollback=command(sid,'parity:rollback',full['revision'],'ADVANCE',dict(targetNs=str(3*S)))
+        native=storage.connect;calls=[0]
+        @contextmanager
+        def fail_after_transaction(dsn):
+            calls[0]+=1
+            with native(dsn) as db:
+                yield db
+                if calls[0]==2:raise RuntimeError('QA_V3_FORCED_ABORT')
+        storage.connect=fail_after_transaction
+        try:
+            with self.assertRaisesRegex(RuntimeError,'QA_V3_FORCED_ABORT'):delta_controller.apply(qa_scope,rollback)
+        finally:storage.connect=native
+        after=delta_controller.inspect(qa_scope,sid)['state'];self.assertEqual(canonical_bytes(after),canonical_bytes(full))
+        with connect(DSN) as db:
+            self.assertIsNone(db.execute('SELECT 1 FROM public.btl_qa_state_delta_v3 WHERE workspace_id=%s AND session_id=%s AND command_id=%s',(qa_scope.workspace_id,sid,'parity:rollback')).fetchone())
+            self.assertIsNone(db.execute('SELECT 1 FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id=%s',(qa_scope.workspace_id,sid,'parity:rollback')).fetchone())
+        retry=delta_controller.apply(qa_scope,rollback);self.assertEqual(retry['state']['revision'],full['revision']+1)
+        # Committed retry after process death reuses native worker fault hook.
+        tip=delta_controller.inspect(qa_scope,sid)['state'];raw=command(sid,'parity:sigkill',tip['revision'],'ADVANCE',dict(targetNs=str(4*S)))
+        worker_data=dict(profile=self.fx.profile.wire,folder=str(self.folder),proof=str(self.proof),proofHash=self.proof_hash,
+            logs=str(self.root/'controller-logs'),workspace=qa_scope.workspace_id,actor=qa_scope.actor_ref,command=raw,
+            phase='delta_after_commit',qaStateDeltaV3=True)
+        proc=subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],
+            env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(worker_data)),capture_output=True,text=True,timeout=60)
+        self.assertEqual(proc.returncode,-signal.SIGKILL,proc.stderr)
+        final=delta_controller.inspect(qa_scope,sid)['state'];retry=delta_controller.apply(qa_scope,raw)
+        self.assertEqual(canonical_bytes(retry['state']),canonical_bytes(final))
+        with connect(DSN) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id=%s',(qa_scope.workspace_id,sid,'parity:sigkill')).fetchone()[0],1)
+        with connect(DSN) as db:
+            payload=bytes(db.execute('SELECT payload FROM public.btl_qa_state_delta_v3 WHERE workspace_id=%s AND session_id=%s ORDER BY revision DESC LIMIT 1',(qa_scope.workspace_id,sid)).fetchone()[0])
+            db.execute('UPDATE public.btl_qa_state_delta_v3 SET payload=%s WHERE workspace_id=%s AND session_id=%s AND revision=%s',(payload[:-1]+bytes([payload[-1]^1]),qa_scope.workspace_id,sid,final['revision']))
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):delta_controller.inspect(qa_scope,sid)
+        report=dict(status='PASS',revisions=full['revision'],
+                    fullReceiptPayloadBytes=sum(len(bytes(r[2])) for r in receipts),
+                    deltaPayloadBytes=sum(len(bytes(r[1])) for r in rows),
+                    deltaAndBaseAllocatedBytes=int(physical_delta_bytes),databaseBytes=int(database_bytes),
+                    events=len(events),simulatedFillEvents=sum(1 for _,payload,event_hash in events if unpack(payload,event_hash)['kind'] in ('ENTRY_FILL','EXIT_FILL')),
+                    legacyApplySeconds=[round(x[0],6) for x in paired_timings],
+                    deltaApplySeconds=[round(x[1],6) for x in paired_timings],
+                    note='Full-state checkpoint and receipt format retained; delta measurements are additive, not storage savings.')
+        report_path=os.environ.get('BTL_QA_DELTA_V3_REPORT')
+        if report_path:Path(report_path).write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
 
     def test_mutated_session_tip_cannot_replace_immutable_checkpoint(self):
         from execution.postgres import pack
