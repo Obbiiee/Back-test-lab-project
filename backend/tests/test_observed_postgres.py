@@ -47,7 +47,8 @@ def worker():
         storage.connect=interrupted
     order_policy=data.get('orderRetentionPolicy')
     store=ObservedExecutionStore(data.get('dsn',DSN),order_retention_policy=order_policy,
-                                qa_state_delta_v3=bool(data.get('qaStateDeltaV3',False)))
+                                qa_state_delta_v3=bool(data.get('qaStateDeltaV3',False)),
+                                qa_order_archive_v1=bool(data.get('qaOrderArchiveV1',False)))
     controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_policy)
     started=time.perf_counter()
     controller.apply(TrustedScope(data['workspace'],data.get('actor','authored:worker')),data['command'])
@@ -86,6 +87,188 @@ class ObservedPostgresTests(unittest.TestCase):
 
     def call(self,kind,payload=None,cid=None):
         raw=command(self.sid,cid or 'cmd:'+str(self.rev),self.rev,kind,payload);result=self.controller().apply(self.scope,raw);self.rev=result['state']['revision'];return result
+
+    def test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger(self):
+        from contextlib import contextmanager
+        from execution.observed_kernel import QA_ORDER_RETENTION_V3
+        from execution.observed_analysis import ObservedStatistics
+        import execution.observed_postgres as storage
+        # The shared fixture used by the surrounding class has three quotes;
+        # this bounded parity test needs a fourth observed quote to trigger TP.
+        self.source.close();self.folder.chmod(0o700);(self.folder/'archive.sqlite').chmod(0o600);self.fx.tearDown()
+        self.fx=fixtures.ObservedKernelTests();self.fx.setUp()
+        self.fx.setup_stream([(0,'2300','2300.1'),(S,'2300.9','2301'),
+                              (2*S,'2302','2302.1'),(3*S,'2303','2303.1')])
+        self.root=self.fx.root;self.folder=self.root/'store';archive=self.folder/'archive.sqlite'
+        self.proof=self.root/'qualification.json'
+        self.receipt=dict(status='QUALIFIED_MONTH_PASS_NOT_FINANCIAL_ADMISSION',scope='AUTHORED_QA_ONLY_NOT_MARKET_DATA',
+            rows=4,sourceParityReceipts=1,sqliteIntegrity='ok',indexedSeekChecks=3,
+            datasetId=self.fx.profile.wire['primary']['datasetId'],datasetVersion=self.fx.profile.wire['primary']['datasetVersion'],
+            readArchiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest())
+        self.proof.write_text(json.dumps(self.receipt));self.proof_hash=hashlib.sha256(self.proof.read_bytes()).hexdigest()
+        archive.chmod(0o400);self.folder.chmod(0o500)
+        self.source=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
+            receipt_sha256=self.proof_hash,log_root=self.root/'controller-logs')
+        previous_gate=os.environ.get('BTL_ENABLE_QA_ORDER_ARCHIVE_V1')
+        os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']='1'
+        suffix=uuid.uuid4().hex[:10]
+        qa_dsn=isolated_database(DSN,'orderarch_'+suffix)
+        qa_scope=TrustedScope('observedqa:archive:'+suffix,'authored:actor');sid='session:archive:'+suffix
+        self.scope=qa_scope;self.sid=sid
+        qa_source=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
+            receipt_sha256=self.proof_hash,log_root=self.root/'archive-controller-logs')
+        try:
+            qa_store=ObservedExecutionStore(qa_dsn,order_retention_policy=QA_ORDER_RETENTION_V3,
+                qa_state_delta_v3=True,qa_order_archive_v1=True)
+            qa=ObservedExecutionController(qa_store,lambda _:qa_source,order_retention_policy=QA_ORDER_RETENTION_V3)
+            qa.create(qa_scope,sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+            def call(raw):return qa.apply(qa_scope,raw)
+            results=[];commands=[]
+            def issue(cid,rev,kind,payload):
+                raw=command(sid,cid,rev,kind,payload);commands.append(raw);results.append(call(raw));return results[-1]
+            issue('archive:quote',0,'ADVANCE',dict(targetNs='0'))
+            plan=dict(side='LONG',orderType='STOP',workflow='PLANNED',entry='2301.5',quantity='0.01',
+                sl='2300.5',tp='2302.5',riskPercent='1',observations=[])
+            issue('order:archive:closed',1,'OPEN',plan)
+            issue('archive:entry',2,'ADVANCE',dict(targetNs=str(2*S)))
+            closed=issue('archive:tp',3,'ADVANCE',dict(targetNs=str(3*S)))
+            self.assertEqual(closed['state']['orders'],{},
+                'ORDER_NOT_ARCHIVED: '+json.dumps(closed['state']['orders'],sort_keys=True)+' events='+
+                json.dumps(closed['events'],sort_keys=True))
+            self.assertEqual(closed['state']['orderArchive']['count'],1)
+            self.assertGreater(float(closed['state']['realizedGross']),0)
+            archived=qa_store.archive_order(qa_scope,sid,'order:archive:closed')
+            self.assertEqual(archived['status'],'CLOSED')
+            self.assertEqual(qa_store.order_history(qa_scope,sid)['total'],1)
+
+            # Existing full-history reducer is the reference. Run the exact
+            # commands in a second isolated QA database and compare every event
+            # plus financial outputs while preserving its legacy state format.
+            legacy_dsn=isolated_database(DSN,'orderref_'+suffix)
+            reference_source=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
+                receipt_sha256=self.proof_hash,log_root=self.root/'archive-reference-logs')
+            legacy_scope=TrustedScope(qa_scope.workspace_id,qa_scope.actor_ref)
+            legacy=ObservedExecutionController(ObservedExecutionStore(legacy_dsn),lambda _:reference_source)
+            legacy.create(legacy_scope,sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+            legacy_results=[legacy.apply(legacy_scope,raw) for raw in commands]
+            for compact,full in zip(results,legacy_results):
+                self.assertEqual(compact['events'],full['events'])
+                self.assertEqual((compact['state']['balance'],compact['state']['realizedGross']),
+                                 (full['state']['balance'],full['state']['realizedGross']))
+            self.assertEqual(archived,legacy_results[-1]['state']['orders']['order:archive:closed'])
+
+            # Archive the other supported terminal outcomes through the real
+            # kernel path: END expires a pending order and marks an open
+            # position unresolved without synthesizing an exit fill.
+            terminal_sid='session:archive:terminal:'+suffix
+            terminal_scope=TrustedScope('observedqa:archive-terminal:'+suffix,'authored:actor')
+            qa.create(terminal_scope,terminal_sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+            terminal_state=qa.apply(terminal_scope,command(terminal_sid,'terminal:quote',0,'ADVANCE',dict(targetNs='0')))['state']
+            pending=dict(plan,side='LONG',orderType='LIMIT',entry='2290',sl='2289',tp='2291')
+            terminal_state=qa.apply(terminal_scope,command(terminal_sid,'terminal:pending',terminal_state['revision'],'OPEN',pending))['state']
+            live=dict(plan,side='LONG',orderType='STOP',entry='2301.5',sl='2300.5',tp='2302.5')
+            terminal_state=qa.apply(terminal_scope,command(terminal_sid,'terminal:live',terminal_state['revision'],'OPEN',live))['state']
+            terminal_state=qa.apply(terminal_scope,command(terminal_sid,'terminal:entry',terminal_state['revision'],'ADVANCE',dict(targetNs=str(2*S))) )['state']
+            terminal_end=qa.apply(terminal_scope,command(terminal_sid,'terminal:end',terminal_state['revision'],'END'))['state']
+            self.assertEqual(terminal_end['orderArchive']['count'],2)
+            terminal_history=qa_store.order_history(terminal_scope,terminal_sid,maximum=8)['records']
+            self.assertEqual({row['order']['status'] for row in terminal_history},{'EXPIRED','UNRESOLVED'})
+            self.assertEqual(terminal_end['balance'],'10000')
+            terminal_cold=ObservedExecutionController(ObservedExecutionStore(qa_dsn,
+                order_retention_policy=QA_ORDER_RETENTION_V3,qa_state_delta_v3=True,qa_order_archive_v1=True),
+                lambda _:qa_source,order_retention_policy=QA_ORDER_RETENTION_V3)
+            self.assertEqual(terminal_cold.inspect(terminal_scope,terminal_sid)['state'],terminal_end)
+
+            # Fresh store has no LRU entry: it must reconstruct the delta chain,
+            # stream the event ledger, and verify every archive record.
+            fresh_store=ObservedExecutionStore(qa_dsn,order_retention_policy=QA_ORDER_RETENTION_V3,
+                qa_state_delta_v3=True,qa_order_archive_v1=True)
+            fresh=ObservedExecutionController(fresh_store,lambda _:qa_source,order_retention_policy=QA_ORDER_RETENTION_V3)
+            recovered=fresh.inspect(qa_scope,sid)['state']
+            self.assertEqual(recovered,closed['state'])
+            self.assertGreaterEqual(fresh_store.qa_state_cache_stats['fullReconstructions'],2)
+            stats=ObservedStatistics(fresh_store).inspect(qa_scope,sid)
+            self.assertEqual(stats['status'],'COMPLETE')
+            self.assertEqual(stats['metrics']['closed'],1)
+            self.assertEqual(fresh.apply(qa_scope,commands[-1]),closed)
+
+            # Open a second terminal order and abort the DB context after all
+            # writes but before commit. State, event, receipt and archive must
+            # all roll back together.
+            current=fresh.inspect(qa_scope,sid)['state']
+            pending=dict(plan,orderType='LIMIT',entry='2290',sl='2289',tp='2291')
+            open_raw=command(sid,'order:archive:cancel',current['revision'],'OPEN',pending)
+            opened=fresh.apply(qa_scope,open_raw);cancel_raw=command(sid,'archive:cancel',opened['state']['revision'],
+                'CANCEL',dict(orderId='order:archive:cancel'))
+            native=storage.connect;counter=[0]
+            @contextmanager
+            def fail_before_commit(dsn):
+                counter[0]+=1
+                with native(dsn) as db:
+                    yield db
+                    if counter[0]==2:raise RuntimeError('QA_ARCHIVE_ROLLBACK_INJECTED')
+            with patch.object(storage,'connect',fail_before_commit):
+                with self.assertRaisesRegex(RuntimeError,'QA_ARCHIVE_ROLLBACK_INJECTED'):
+                    fresh.apply(qa_scope,cancel_raw)
+            post_rollback=fresh.inspect(qa_scope,sid)['state']
+            self.assertEqual(post_rollback['revision'],opened['state']['revision'])
+            self.assertEqual(post_rollback['orderArchive']['count'],1)
+
+            # A process killed after commit must recover one archive append;
+            # retry returns the durable receipt and cannot append it twice.
+            worker_data=dict(profile=self.fx.profile.wire,folder=str(self.folder),proof=str(self.proof),
+                proofHash=self.proof_hash,logs=str(self.root/'archive-worker-logs'),workspace=qa_scope.workspace_id,
+                actor=qa_scope.actor_ref,dsn=qa_dsn,command=cancel_raw,phase='delta_after_commit',
+                qaStateDeltaV3=True,qaOrderArchiveV1=True,orderRetentionPolicy=QA_ORDER_RETENTION_V3)
+            env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(worker_data,sort_keys=True),
+                     BTL_TEST_DATABASE_URL=qa_dsn,BTL_ENABLE_QA_ORDER_ARCHIVE_V1='1')
+            proc=subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],
+                cwd=Path(__file__).resolve().parents[2],env=env,capture_output=True,text=True,timeout=90)
+            self.assertEqual(proc.returncode,-signal.SIGKILL,proc.stderr)
+            after_kill=fresh.inspect(qa_scope,sid)['state']
+            self.assertEqual(after_kill['orderArchive']['count'],2)
+            retried=fresh.apply(qa_scope,cancel_raw)
+            self.assertEqual(retried['state'],after_kill)
+            self.assertEqual(qa_store.order_history(qa_scope,sid,offset=0,maximum=8)['total'],2)
+            with connect(qa_dsn) as db:
+                saved=db.execute('SELECT workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash '
+                    'FROM public.btl_qa_terminal_order_archive_v1 WHERE workspace_id=%s AND session_id=%s AND sequence=0',
+                    (qa_scope.workspace_id,sid)).fetchone()
+                db.execute('ALTER TABLE public.btl_qa_terminal_order_archive_v1 DISABLE TRIGGER ALL')
+                db.execute('DELETE FROM public.btl_qa_terminal_order_archive_v1 WHERE workspace_id=%s AND session_id=%s AND sequence=0',
+                    (qa_scope.workspace_id,sid))
+                db.execute('ALTER TABLE public.btl_qa_terminal_order_archive_v1 ENABLE TRIGGER ALL')
+            with self.assertRaises(ValueError):
+                ObservedExecutionController(ObservedExecutionStore(qa_dsn,order_retention_policy=QA_ORDER_RETENTION_V3,
+                    qa_state_delta_v3=True,qa_order_archive_v1=True),lambda _:qa_source,
+                    order_retention_policy=QA_ORDER_RETENTION_V3).inspect(qa_scope,sid)
+            with connect(qa_dsn) as db:
+                db.execute('INSERT INTO public.btl_qa_terminal_order_archive_v1 '
+                    '(workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash) '
+                    'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',saved)
+                db.execute('ALTER TABLE public.btl_qa_terminal_order_archive_v1 DISABLE TRIGGER ALL')
+                db.execute('UPDATE public.btl_qa_terminal_order_archive_v1 SET sequence=7 '
+                    'WHERE workspace_id=%s AND session_id=%s AND sequence=0',(qa_scope.workspace_id,sid))
+                db.execute('ALTER TABLE public.btl_qa_terminal_order_archive_v1 ENABLE TRIGGER ALL')
+            with self.assertRaises(ValueError):
+                ObservedExecutionController(ObservedExecutionStore(qa_dsn,order_retention_policy=QA_ORDER_RETENTION_V3,
+                    qa_state_delta_v3=True,qa_order_archive_v1=True),lambda _:qa_source,
+                    order_retention_policy=QA_ORDER_RETENTION_V3).inspect(qa_scope,sid)
+            with connect(qa_dsn) as db:
+                db.execute('ALTER TABLE public.btl_qa_terminal_order_archive_v1 DISABLE TRIGGER ALL')
+                db.execute('UPDATE public.btl_qa_terminal_order_archive_v1 SET sequence=0,record_hash=%s '
+                    'WHERE workspace_id=%s AND session_id=%s AND sequence=7',
+                    ('0'*64,qa_scope.workspace_id,sid))
+                db.execute('ALTER TABLE public.btl_qa_terminal_order_archive_v1 ENABLE TRIGGER ALL')
+            with self.assertRaises(ValueError):
+                ObservedExecutionController(ObservedExecutionStore(qa_dsn,order_retention_policy=QA_ORDER_RETENTION_V3,
+                    qa_state_delta_v3=True,qa_order_archive_v1=True),lambda _:qa_source,
+                    order_retention_policy=QA_ORDER_RETENTION_V3).inspect(qa_scope,sid)
+            reference_source.close()
+        finally:
+            qa_source.close()
+            if previous_gate is None:os.environ.pop('BTL_ENABLE_QA_ORDER_ARCHIVE_V1',None)
+            else:os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']=previous_gate
 
     def opening(self):return dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])
 

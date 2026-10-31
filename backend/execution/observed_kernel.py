@@ -19,14 +19,19 @@ from .contracts import exact, money, open_payload, policy_from_wire, policy_wire
 from .engine import crossing, protective, can_change
 from .observed_profile import ENGINE_VERSION, MODEL, MODEL_V2, ObservedExecutionProfile
 from .observed_finance import exit_amount
+from .observed_order_archive_v1 import append as archive_append, advance as archive_advance, summary as archive_summary
 
 MAX_EVENTS, MAX_ORDERS = 256, 128
 MAX_ACTIVE_ORDERS = 128
 QA_ORDER_RETENTION_V2 = dict(schemaVersion=1,artifact='BTL-QA-ORDER-RETENTION-2',scope='ISOLATED_QA_ONLY',
                             maxCumulativeOrders=512,maxActiveOrders=MAX_ACTIVE_ORDERS)
+QA_ORDER_RETENTION_V3 = dict(schemaVersion=1,artifact='BTL-QA-ORDER-RETENTION-3',scope='ISOLATED_QA_ONLY',
+                            maxCumulativeOrders=1024,maxActiveOrders=MAX_ACTIVE_ORDERS)
 STATE_FIELDS = ('sessionId datasetId datasetVersion engineVersion model profile profileHash policy revision '
                 'initialBalance balance realizedGross commission startNs throughNs nextGroupIndex nextEventIndex '
                 'eventHash sourceCheckpointHash sourcePrefixHash sourceCursorRevision lastObservedNs quoteBasis orders unresolved ended financial parent')
+STATE_FIELDS_QA_ARCHIVE_V1 = STATE_FIELDS+' orderArchive'
+STATE_QA_ARCHIVE_V1 = 'BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
 PLAN_FIELDS = 'side orderType workflow entry quantity sl tp riskPercent observations'
 ORDER_FIELDS = PLAN_FIELDS+' status availableNs remaining entryPrice entryFillRef entryCost exitRequest grossPosted riskBalance riskBasisHash'
 
@@ -39,7 +44,8 @@ def _tag(raw, artifact, fields):
 def order_limits(policy=None):
     if policy is None:return MAX_ORDERS,MAX_ORDERS
     keys(policy,'schemaVersion artifact scope maxCumulativeOrders maxActiveOrders')
-    require(policy==QA_ORDER_RETENTION_V2 and policy['scope']=='ISOLATED_QA_ONLY','orderRetention','REFUSED_POLICY')
+    require(policy in (QA_ORDER_RETENTION_V2,QA_ORDER_RETENTION_V3) and policy['scope']=='ISOLATED_QA_ONLY',
+            'orderRetention','REFUSED_POLICY')
     canonical_bytes(policy)
     return policy['maxCumulativeOrders'],policy['maxActiveOrders']
 
@@ -63,7 +69,9 @@ def _checkpoint(cp, profile):
 
 
 def validate_state(state,*,order_retention_policy=None):
-    _tag(state,'BTL-OBSERVED-EXECUTION-STATE-1',STATE_FIELDS)
+    archive_v1=type(state) is dict and state.get('artifact')==STATE_QA_ARCHIVE_V1
+    _tag(state,STATE_QA_ARCHIVE_V1 if archive_v1 else 'BTL-OBSERVED-EXECUTION-STATE-1',
+         STATE_FIELDS_QA_ARCHIVE_V1 if archive_v1 else STATE_FIELDS)
     require(state['engineVersion']==ENGINE_VERSION and state['model']==ObservedExecutionProfile.from_wire(state['profile']).wire['model'],'model')
     profile=ObservedExecutionProfile.from_wire(state['profile']);p=profile.wire
     require(state['profileHash']==profile.profile_hash and all(state[k]==p['primary'][k] for k in ('datasetId','datasetVersion')),'profile','CORRUPT_RECORD')
@@ -87,7 +95,22 @@ def validate_state(state,*,order_retention_policy=None):
         for eid in basis['eventIds']:digest(eid, 'digest')
         require(price(basis['bid'],p)<=price(basis['ask'],p),'basis')
     max_cumulative,max_active=order_limits(order_retention_policy)
-    require(type(state['orders']) is dict and len(state['orders'])<=max_cumulative,'orders','REFUSED_STATE_LIMIT')
+    require(archive_v1 or order_retention_policy!=QA_ORDER_RETENTION_V3,
+            'orderRetention','REFUSED_POLICY')
+    require(type(state['orders']) is dict,'orders','CORRUPT_RECORD')
+    if archive_v1:
+        keys(state['orderArchive'],'schemaVersion artifact count grossPosted headHash')
+        require(order_retention_policy is not None and state['orderArchive']['artifact']=='BTL-QA-TERMINAL-ORDER-ARCHIVE-1-SUMMARY',
+                'orderArchive','REFUSED_POLICY')
+        require(state['orderArchive']['schemaVersion']==1 and type(state['orderArchive']['count']) is int
+                and state['orderArchive']['count']>=0 and state['orderArchive']['count']+len(state['orders'])<=max_cumulative,
+                'orderArchive','CORRUPT_RECORD')
+        digest(state['orderArchive']['headHash'],'digest')
+        archived_gross=exact(state['orderArchive']['grossPosted'],'archiveGrossPosted')
+        require(text(archived_gross)==state['orderArchive']['grossPosted'],'orderArchive','CORRUPT_RECORD')
+        require(len(state['orders'])<=max_active,'orders','REFUSED_ACTIVE_ORDER_LIMIT')
+    else:
+        require(len(state['orders'])<=max_cumulative,'orders','REFUSED_STATE_LIMIT')
     require(sum(type(o) is dict and o.get('status') in ('PENDING','ACTIVE') for o in state['orders'].values())<=max_active,
             'orders','REFUSED_ACTIVE_ORDER_LIMIT')
     total=Fraction(0)
@@ -100,6 +123,7 @@ def validate_state(state,*,order_retention_policy=None):
         size=quantity(o['quantity'],p);remaining=exact(o['remaining'],'remaining')
         require(0<=remaining<=size and (remaining/exact(p['lotStep'],'step')).denominator==1,'remaining')
         require(o['status'] in ('PENDING','ACTIVE','CLOSED','CANCELLED','EXPIRED','UNRESOLVED') and o['entryCost']=='0','order')
+        if archive_v1:require(o['status'] in ('PENDING','ACTIVE'),'hotOrder','CORRUPT_RECORD')
         if o['entryPrice'] is None:
             require(o['entryFillRef'] is None and remaining==size and o['grossPosted']=='0' and o['status']!='ACTIVE' and o['status']!='CLOSED','entry')
         else:
@@ -110,6 +134,7 @@ def validate_state(state,*,order_retention_policy=None):
         if o['exitRequest'] is not None:
             keys(o['exitRequest'],'quantity availableNs');require(o['status']=='ACTIVE' and 0<quantity(o['exitRequest']['quantity'],p)<=remaining,'exitRequest')
             require(int(o['availableNs'])<=uint(o['exitRequest']['availableNs'])<=int(state['throughNs']),'exitRequest')
+    if archive_v1:total+=archived_gross
     require(total==Fraction(state['realizedGross']),'account','CORRUPT_RECORD')
     require(not state['unresolved'] or not _live(state),'unresolved')
     canonical_bytes(state)
@@ -123,12 +148,14 @@ def validate_snapshot(state,checkpoint,*,order_retention_policy=None):
     return dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-CHECKPOINT-1',state=state,controller=checkpoint)
 
 
-def seed_state(session_id,profile,policy,checkpoint,balance='10000',*,order_retention_policy=None):
+def seed_state(session_id,profile,policy,checkpoint,balance='10000',*,order_retention_policy=None,qa_order_archive_v1=False):
     require(type(profile) is ObservedExecutionProfile,'profile');identifier(session_id, 'identifier')
     c=_checkpoint(checkpoint,profile);require(c['nextGroupIndex']=='0' and c['revision']=='0' and c['throughNs']==c['sessionStartNs'],'initialCursor')
     initial=money(exact(balance,'balance',True),2);require(exact(initial,'initial',True)>0,'balance');p=profile.wire;policy=policy_wire(policy)
     genesis=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=session_id,profileHash=profile.profile_hash,policy=policy,startNs=c['sessionStartNs'],initialBalance=initial)
-    state=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-STATE-1',sessionId=session_id,datasetId=p['primary']['datasetId'],datasetVersion=p['primary']['datasetVersion'],engineVersion=ENGINE_VERSION,model=p['model'],profile=p,profileHash=profile.profile_hash,policy=policy,revision=0,initialBalance=initial,balance=initial,realizedGross='0',commission='0',startNs=c['sessionStartNs'],throughNs=c['throughNs'],nextGroupIndex='0',nextEventIndex=0,eventHash=content_hash(genesis),sourceCheckpointHash=hash_v2(checkpoint),sourcePrefixHash=c['visiblePrefixHash'],sourceCursorRevision='0',lastObservedNs=None,quoteBasis=None,orders={},unresolved=False,ended=False,financial=False,parent=None)
+    require(type(qa_order_archive_v1) is bool,'qaOrderArchive')
+    state=dict(schemaVersion=1,artifact=STATE_QA_ARCHIVE_V1 if qa_order_archive_v1 else 'BTL-OBSERVED-EXECUTION-STATE-1',sessionId=session_id,datasetId=p['primary']['datasetId'],datasetVersion=p['primary']['datasetVersion'],engineVersion=ENGINE_VERSION,model=p['model'],profile=p,profileHash=profile.profile_hash,policy=policy,revision=0,initialBalance=initial,balance=initial,realizedGross='0',commission='0',startNs=c['sessionStartNs'],throughNs=c['throughNs'],nextGroupIndex='0',nextEventIndex=0,eventHash=content_hash(genesis),sourceCheckpointHash=hash_v2(checkpoint),sourcePrefixHash=c['visiblePrefixHash'],sourceCursorRevision='0',lastObservedNs=None,quoteBasis=None,orders={},unresolved=False,ended=False,financial=False,parent=None)
+    if qa_order_archive_v1:state['orderArchive']=archive_summary()
     validate_snapshot(state,checkpoint,order_retention_policy=order_retention_policy);return state
 
 
@@ -267,21 +294,28 @@ def _advance(s,events,raw,frame,checkpoint):
     if not events:emit(s,events,'REPLAY_ADVANCED',throughNs=s['throughNs'])
 
 
-def apply(state,raw,*,reveal=None,checkpoint=None,order_retention_policy=None):
+def apply(state,raw,*,reveal=None,checkpoint=None,order_retention_policy=None,
+          qa_order_archive_v1=False,archived_order_lookup=None):
     validate_state(state,order_retention_policy=order_retention_policy);raw=command_wire(raw)
+    archive_mode=state.get('artifact')==STATE_QA_ARCHIVE_V1
+    require(archive_mode is qa_order_archive_v1,'qaOrderArchive','REFUSED_STATE_VERSION')
+    require(not archive_mode or callable(archived_order_lookup),'archiveLookup','REFUSED_STATE_VERSION')
     max_cumulative,max_active=order_limits(order_retention_policy)
     require(raw['sessionId']==state['sessionId'] and raw['expectedRevision']==state['revision'],'revision','REFUSED_STALE_REVISION')
     kind=raw['kind'];require(not state['ended'] or kind=='ADVANCE','ended','REFUSED_SESSION_ENDED')
     require(not state['unresolved'] or kind in ('ADVANCE','END'),'unresolved','REFUSED_UNRESOLVED_SESSION')
-    s=deepcopy(state);events=[];p=s['profile'];payload=raw['payload'];policy=policy_from_wire(s['policy'])
+    s=deepcopy(state);events=[];archive_rows=[];p=s['profile'];payload=raw['payload'];policy=policy_from_wire(s['policy'])
     if kind=='ADVANCE':_advance(s,events,raw,reveal,checkpoint)
     else:
         require(reveal is None and checkpoint is None,'unexpectedControllerFrame')
         if kind=='OPEN':
-            require(len(s['orders'])<max_cumulative,'orders','REFUSED_STATE_LIMIT')
+            cumulative=len(s['orders'])+(s['orderArchive']['count'] if archive_mode else 0)
+            require(cumulative<max_cumulative,'orders','REFUSED_STATE_LIMIT')
             require(sum(o['status'] in ('PENDING','ACTIVE') for o in s['orders'].values())<max_active,
                     'orders','REFUSED_ACTIVE_ORDER_LIMIT')
             oid=raw['commandId'];require(oid not in s['orders'],'order')
+            if archive_mode:
+                require(archived_order_lookup(oid) is None,'order','REFUSED_DUPLICATE_ORDER_ID')
             basis=s['quoteBasis'];require(basis is not None and int(s['throughNs'])-int(basis['timeNs'])<=int(p['maxObservedSilenceNs']),'quote','UNRESOLVED_RISK_QUOTE')
             require(exact(s['balance'],'balance',True)>0,'balance');plan=open_payload(payload,p,policy,s['balance'])
             if plan['orderType']=='MARKET':require(plan['entry']==basis['ask' if plan['side']=='LONG' else 'bid'],'quote','REFUSED_STALE_QUOTE')
@@ -289,7 +323,9 @@ def apply(state,raw,*,reveal=None,checkpoint=None,order_retention_policy=None):
             s['orders'][oid]=dict(plan,status='PENDING',availableNs=s['throughNs'],remaining=plan['quantity'],entryPrice=None,entryFillRef=None,entryCost='0',exitRequest=None,grossPosted='0',riskBalance=s['balance'],riskBasisHash=bh)
             emit(s,events,'ORDER_ACCEPTED',order_id=oid,classification='ACCEPTED_COMMAND',plan=plan,availableNs=s['throughNs'],riskBalance=s['balance'],riskBasisHash=bh)
         elif kind in ('CANCEL','CLOSE'):
-            oid=payload['orderId'];o=s['orders'].get(oid);require(o is not None,'order','RESOURCE_UNAVAILABLE')
+            oid=payload['orderId'];o=s['orders'].get(oid)
+            if o is None and archive_mode:o=archived_order_lookup(oid)
+            require(o is not None,'order','RESOURCE_UNAVAILABLE')
             if kind=='CANCEL':
                 require(o['status']=='PENDING','order','REFUSED_NOT_PENDING');validate_action(policy,'CANCEL_PENDING');o['status']='CANCELLED';emit(s,events,'ORDER_CANCELLED',order_id=oid,classification='ACCEPTED_COMMAND')
             else:
@@ -303,6 +339,13 @@ def apply(state,raw,*,reveal=None,checkpoint=None,order_retention_policy=None):
                 if o['status']=='PENDING':o['status']='EXPIRED';emit(s,events,'EXPIRED_NO_QUOTE',order_id=oid,classification='UNRESOLVED')
             if _live(s):_unresolved(s,events,'UNRESOLVED_SESSION_END_ACTIVE')
             s['ended']=True;emit(s,events,'SESSION_ENDED',classification='ACCEPTED_COMMAND')
+    if archive_mode:
+        terminal=[(oid,o) for oid,o in sorted(s['orders'].items()) if o['status'] in ('CANCELLED','CLOSED','EXPIRED','UNRESOLVED')]
+        summary=s['orderArchive']
+        for oid,order in terminal:
+            row=archive_append(summary,session_id=s['sessionId'],revision=s['revision']+1,order_id=oid,order=order)
+            archive_rows.append(row);summary=archive_advance(summary,[row]);del s['orders'][oid]
+        s['orderArchive']=summary
     s['revision']+=1;validate_state(s,order_retention_policy=order_retention_policy)
     if kind=='ADVANCE':validate_snapshot(s,checkpoint,order_retention_policy=order_retention_policy)
-    return s,events
+    return (s,events,archive_rows) if archive_mode else (s,events)

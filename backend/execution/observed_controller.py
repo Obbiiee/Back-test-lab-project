@@ -1,5 +1,6 @@
 """New-family private orchestration. No HTTP-supplied frames or source paths."""
 from contracts.primitives import require
+from copy import deepcopy
 from .observed_profile import ObservedExecutionProfile
 from .observed_admission import AdmittedObservedSource
 from .observed_kernel import apply,command_wire,seed_state,order_limits
@@ -20,7 +21,8 @@ class ObservedExecutionController:
         timeline=source.cache.new_timeline(scope,session_id,start)
         try:
             cp=timeline.checkpoint()
-            state=seed_state(session_id,profile,policy,cp,balance,order_retention_policy=self.order_retention_policy)
+            state=seed_state(session_id,profile,policy,cp, balance,order_retention_policy=self.order_retention_policy,
+                             qa_order_archive_v1=self.store.qa_order_archive_v1)
             self.store.create(scope,state,cp);source.cache.seed(scope,session_id,timeline)
         except BaseException:timeline.close();raise
         return state
@@ -34,8 +36,24 @@ class ObservedExecutionController:
             frame,next_cp=source.cache.reveal(scope,state['sessionId'],cp,command['payload']['targetNs'])
             kwargs=dict(reveal=frame,checkpoint=next_cp);cp=next_cp
             replay=dict(throughNs=frame['throughNs'],exhaustedThroughBoundary=frame['exhaustedThroughBoundary'])
+        if self.store.qa_order_archive_v1:
+            proposed,events,archive_records=apply(state,command,order_retention_policy=self.order_retention_policy,
+                qa_order_archive_v1=True,
+                archived_order_lookup=lambda oid:self.store.archive_order(scope,state['sessionId'],oid),**kwargs)
+            return self.store.commit(scope,command,before,proposed,cp,events,replay,archive_records=archive_records)
         proposed,events=apply(state,command,order_retention_policy=self.order_retention_policy,**kwargs)
         return self.store.commit(scope,command,before,proposed,cp,events,replay)
 
     def inspect(self,scope,session_id,after_sequence=0,maximum=64):
         return self.store.inspect(scope,session_id,after_sequence,maximum)
+
+    def order_history(self,scope,session_id,offset=0,maximum=64):
+        """Paged historical orders; terminal records never inflate hot state."""
+        return self.store.order_history(scope,session_id,offset,maximum)
+
+    def order(self,scope,session_id,order_id):
+        """Retrieve one hot or archived order without reconstructing the ledger."""
+        state=self.store.inspect(scope,session_id)['state']
+        active=state['orders'].get(order_id)
+        if active is not None:return deepcopy(active)
+        return self.store.archive_order(scope,session_id,order_id)

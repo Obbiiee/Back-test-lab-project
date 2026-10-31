@@ -11,7 +11,7 @@ from execution.observed_profile import ObservedExecutionProfile,MODEL
 from execution.observed_finance import exit_amount
 from execution.observed_kernel import validate_state
 from execution.analysis import metrics as committed_metrics
-from execution.observed_postgres import check_events
+from execution.observed_postgres import check_events,QA3_CHECKPOINT_BASE
 from collections import OrderedDict
 from threading import RLock
 from infrastructure.database import connect
@@ -23,12 +23,17 @@ def ratio(v):return dict(numerator=str(v.numerator),denominator=str(v.denominato
 
 
 class LedgerFold:
-    """At most128orders and256cash curve points, regardless of replay history."""
-    def __init__(self,genesis):
-        validate_state(genesis);require(genesis['revision']==0 and genesis['nextEventIndex']==0 and genesis['orders']=={} and genesis['balance']==genesis['initialBalance'] and not genesis['unresolved'] and not genesis['ended'],'genesis','CORRUPT_RECORD')
+    """Independent event projection; finance curve is bounded, order history is complete.
+
+    QA archive sessions keep the active canonical state bounded and reconcile
+    terminal order records against this event fold. Analysis may materialize
+    historical trades for a response, but never writes them back into hot state.
+    """
+    def __init__(self,genesis,order_retention_policy=None):
+        validate_state(genesis,order_retention_policy=order_retention_policy);require(genesis['revision']==0 and genesis['nextEventIndex']==0 and genesis['orders']=={} and genesis['balance']==genesis['initialBalance'] and not genesis['unresolved'] and not genesis['ended'],'genesis','CORRUPT_RECORD')
         seed=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=genesis['sessionId'],profileHash=genesis['profileHash'],policy=genesis['policy'],startNs=genesis['startNs'],initialBalance=genesis['initialBalance'])
         require(content_hash(seed)==genesis['eventHash'],'genesisHash','CORRUPT_RECORD')
-        self.genesis=deepcopy(genesis);self.profile=ObservedExecutionProfile.from_wire(genesis['profile']);self.next=0;self.head=genesis['eventHash'];self.orders={};self.entry_times={};self.exit_times={};self.entry_refs={};self.exit_refs={};self.exit_prices={};self.exit_reasons={};self.exact_gross={};self.exit_counts={};self.exit_sequences={}
+        self.genesis=deepcopy(genesis);self.order_retention_policy=deepcopy(order_retention_policy);self.profile=ObservedExecutionProfile.from_wire(genesis['profile']);self.next=0;self.head=genesis['eventHash'];self.orders={};self.entry_times={};self.exit_times={};self.entry_refs={};self.exit_refs={};self.exit_prices={};self.exit_reasons={};self.exact_gross={};self.exit_counts={};self.exit_sequences={}
         self.balance=self.peak=Fraction(genesis['initialBalance']);self.gross=self.max_dd=self.max_dd_rate=Fraction(0);self.curve=deque(maxlen=256);self.annotations=deque(maxlen=512);self.financial_count=0;self.unresolved=False;self.ended=False;self.last_fill=int(genesis['startNs'])
 
     def consume(self,e):
@@ -65,9 +70,16 @@ class LedgerFold:
             self.curve.append(dict(sequence=e['sequence'],eventId=e['eventId'],orderId=oid,timeNs=str(moment),balance=text(self.balance),drawdown=text(dd)))
         self.next,self.head=next_,head
 
-    def project(self,state,offset=0,maximum=64):
-        validate_state(state);require(all(state[k]==self.genesis[k] for k in ('sessionId','datasetId','datasetVersion','profileHash','profile','policy','initialBalance','startNs','parent')),'context','CORRUPT_RECORD')
-        require(self.next==state['nextEventIndex'] and self.head==state['eventHash'] and self.orders==state['orders'] and self.balance==Fraction(state['balance']) and self.gross==Fraction(state['realizedGross']) and self.unresolved==state['unresolved'] and self.ended==state['ended'] and state['financial'] is (self.financial_count>0) and self.last_fill<=int(state['throughNs']),'ledgerHead','CORRUPT_RECORD')
+    def project(self,state,offset=0,maximum=64,archive_orders=None):
+        validate_state(state,order_retention_policy=self.order_retention_policy);require(all(state[k]==self.genesis[k] for k in ('sessionId','datasetId','datasetVersion','profileHash','profile','policy','initialBalance','startNs','parent')),'context','CORRUPT_RECORD')
+        if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
+            active={oid:o for oid,o in self.orders.items() if o['status'] in ('PENDING','ACTIVE')}
+            terminal={oid:o for oid,o in self.orders.items() if o['status'] not in ('PENDING','ACTIVE')}
+            require(type(archive_orders) is dict and terminal==archive_orders and active==state['orders'],
+                    'archiveLedgerParity','CORRUPT_RECORD')
+        else:
+            terminal={};require(self.orders==state['orders'],'ledgerOrders','CORRUPT_RECORD')
+        require(self.next==state['nextEventIndex'] and self.head==state['eventHash'] and self.balance==Fraction(state['balance']) and self.gross==Fraction(state['realizedGross']) and self.unresolved==state['unresolved'] and self.ended==state['ended'] and state['financial'] is (self.financial_count>0) and self.last_fill<=int(state['throughNs']),'ledgerHead','CORRUPT_RECORD')
         rows=[]
         for oid,o in sorted(self.orders.items(),key=lambda pair:self.exit_sequences.get(pair[0],-1)):
             if o['status']!='CLOSED':continue
@@ -103,9 +115,13 @@ class ObservedStatistics:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self.store._read(db,workspace,session)['state']
             seed=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
-            require(seed is not None,'genesis','CORRUPT_RECORD');genesis=read_snapshot(*seed)['state']
+            require(seed is not None,'genesis','CORRUPT_RECORD')
+            seed_wire=unpack(*seed)
+            if seed_wire.get('artifact')==QA3_CHECKPOINT_BASE:
+                genesis,_=self.store._qa_reconstruct(db,workspace,session,upto_revision=0)
+            else:genesis=read_snapshot(*seed)['state']
             key=(workspace,session,content_hash(genesis));prior=self._folds.get(key)
-            fold=deepcopy(prior) if prior is not None else LedgerFold(genesis)
+            fold=deepcopy(prior) if prior is not None else LedgerFold(genesis,self.store.order_retention_policy)
             require(fold.next<=state['nextEventIndex'],'eventRegression','CORRUPT_RECORD')
             for _ in range(16):
                 if fold.next==state['nextEventIndex']:break
@@ -113,7 +129,11 @@ class ObservedStatistics:
                 require(len(rows)==min(64,state['nextEventIndex']-fold.next),'eventCount','CORRUPT_RECORD')
                 for row in rows:fold.consume(unpack(*row))
             if fold.next==state['nextEventIndex']:
-                result=fold.project(state,offset,maximum)
+                archive_orders=None
+                if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
+                    self.store._verify_order_archive(db,workspace,session,state,full=True)
+                    archive_orders={row['orderId']:row['order'] for row in self.store._archive_rows(db,workspace,session)}
+                result=fold.project(state,offset,maximum,archive_orders=archive_orders)
             else:
                 result=dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='BUILDING',sessionId=session,revision=state['revision'],processedEvents=fold.next,totalEvents=state['nextEventIndex'],metrics=None,completed=[],nextTradeOffset=None)
             # Failed validation never replaces an accepted cached prefix.

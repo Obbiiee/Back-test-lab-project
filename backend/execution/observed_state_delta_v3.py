@@ -55,12 +55,13 @@ def encode_delta_v4(previous,state,previous_hash):
     return dict(schemaVersion=1,formatVersion=4,artifact=ARTIFACT_V4+'-DELTA',body=core)
 
 
-def reconstruct(base,deltas):
+def reconstruct(base,deltas,*,state_callback=None):
     require(base.get('schemaVersion')==1 and base.get('formatVersion')==3
             and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3'),
             'base','CORRUPT_RECORD')
     state=deepcopy(base['state']);prev=base['stateHash']
     require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')
+    if state_callback is not None:state_callback(state,0)
     for row in deltas:
         core=row.get('body',{})
         body={k:v for k,v in core.items() if k!='recordHash'}
@@ -90,14 +91,15 @@ def reconstruct(base,deltas):
             require(scalars.get('revision')==core['revision'],'revision','CORRUPT_RECORD')
             state=scalars;state['orders']=orders
         require(hashlib.sha256(canonical_bytes(state)).hexdigest()==core['stateHash'],'stateHash','CORRUPT_RECORD')
+        if state_callback is not None:state_callback(state,core['revision'])
         prev=core['recordHash']
     return state
 
 
-def reconstruct_complete(base,deltas,expected_revision):
+def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None):
     require(type(expected_revision) is int and expected_revision>=0 and len(deltas)==expected_revision,
             'deltaCount','CORRUPT_RECORD')
-    state=reconstruct(base,deltas)
+    state=reconstruct(base,deltas,state_callback=state_callback)
     require(state['revision']==expected_revision,'deltaRevision','CORRUPT_RECORD')
     return state
 

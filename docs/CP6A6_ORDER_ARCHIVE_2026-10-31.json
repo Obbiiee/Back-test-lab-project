@@ -1,0 +1,36 @@
+{
+  "checkpoint": "CP6A-6B",
+  "status": "NO-GO",
+  "branch": "codex/beta-integration-20261028",
+  "head_at_start": "478f9e959c85d16b5893d3176398e2ca717666a3",
+  "integration_code_added": true,
+  "bounded_kernel_tests": {
+    "command": "PYTHONPATH=backend python3 -m unittest tests.test_observed_order_archive_v1 -v",
+    "result": "PASS",
+    "tests": 4,
+    "coverage": [
+      "archive append and cold record reconstruction",
+      "missing, reordered and corrupted record rejection",
+      "terminal order removed from QA hot state",
+      "STOP entry and TP financial/event parity against legacy kernel",
+      "active order 129 refused without state mutation"
+    ]
+  },
+  "postgres_integration": {
+    "test_added": "backend/tests/test_observed_postgres.py::ObservedPostgresTests.test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger",
+    "result": "NOT_RUN",
+    "attempted_command": "PYTHONPATH=backend python3 -m unittest tests.test_observed_postgres.ObservedPostgresTests.test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger -v",
+    "blocker": "ModuleNotFoundError: No module named 'psycopg'",
+    "qa_dsn": "BTL_TEST_DATABASE_URL missing"
+  },
+  "scale": {
+    "orders_128_512_800_1024": "NOT_RUN",
+    "reason": "bounded PostgreSQL integration gate unavailable",
+    "node_budget_failure": "Prior evidence: attempted order 816, INVALID_INPUT: nodeBudget"
+  },
+  "resource_measurements": "NOT_AVAILABLE",
+  "production_changed": false,
+  "commit": null,
+  "push": null,
+  "report": "docs/CP6A6_ORDER_ARCHIVE_2026-10-31.md"
+}
