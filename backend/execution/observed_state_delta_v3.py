@@ -12,6 +12,7 @@ from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require
 
 ARTIFACT = 'BTL-QA-OBSERVED-STATE-DELTA-3'
+ARTIFACT_V4 = 'BTL-QA-OBSERVED-STATE-DELTA-4'
 
 
 def encode_base(state):
@@ -33,25 +34,71 @@ def encode_delta(previous,state,previous_hash):
     return dict(schemaVersion=1,formatVersion=3,artifact=ARTIFACT+'-DELTA',body=core)
 
 
+def encode_delta_v4(previous,state,previous_hash):
+    """Sparse scalar/order transition; immutable base fields are not recopied."""
+    require(state['revision']==previous['revision']+1,'revision','CORRUPT_RECORD')
+    def same(left,right):
+        return json.dumps(left,sort_keys=True,separators=(',',':'),ensure_ascii=False)==json.dumps(right,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+    old={k:v for k,v in previous.items() if k!='orders'}
+    new={k:v for k,v in state.items() if k!='orders'}
+    scalar_upserts={k:deepcopy(v) for k,v in new.items()
+                    if k not in old or not same(old[k],v)}
+    scalar_deletes=sorted(set(old)-set(new))
+    old_orders=previous['orders'];new_orders=state['orders']
+    order_upserts={k:deepcopy(v) for k,v in new_orders.items()
+                   if k not in old_orders or not same(old_orders[k],v)}
+    core=dict(schemaVersion=4,artifact=ARTIFACT_V4,revision=state['revision'],previousHash=previous_hash,
+              scalarUpserts=scalar_upserts,scalarDeletes=scalar_deletes,
+              orderUpserts=order_upserts,orderDeletes=sorted(set(old_orders)-set(new_orders)))
+    core['stateHash']=hashlib.sha256(canonical_bytes(state)).hexdigest()
+    core['recordHash']=content_hash(dict(schemaVersion=1,artifact=ARTIFACT_V4+'-RECORD',body=core))
+    return dict(schemaVersion=1,formatVersion=4,artifact=ARTIFACT_V4+'-DELTA',body=core)
+
+
 def reconstruct(base,deltas):
-    require(base.get('schemaVersion')==1 and base.get('formatVersion')==3 and base.get('artifact')==ARTIFACT+'-BASE','base','CORRUPT_RECORD')
+    require(base.get('schemaVersion')==1 and base.get('formatVersion')==3
+            and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3'),
+            'base','CORRUPT_RECORD')
     state=deepcopy(base['state']);prev=base['stateHash']
     require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')
     for row in deltas:
         core=row.get('body',{})
         body={k:v for k,v in core.items() if k!='recordHash'}
-        require(row.get('formatVersion')==3 and row.get('artifact')==ARTIFACT+'-DELTA' and core['previousHash']==prev and
-                core['recordHash']==content_hash(dict(schemaVersion=1,artifact=ARTIFACT+'-RECORD',body=body)),
+        if row.get('formatVersion')==3 and row.get('artifact')==ARTIFACT+'-DELTA':
+            require(core['recordHash']==content_hash(dict(schemaVersion=1,artifact=ARTIFACT+'-RECORD',body=body)),
+                    'deltaChain','CORRUPT_RECORD')
+        elif row.get('formatVersion')==4 and row.get('artifact')==ARTIFACT_V4+'-DELTA':
+            require(core['schemaVersion']==4 and core['artifact']==ARTIFACT_V4 and
+                    core['recordHash']==content_hash(dict(schemaVersion=1,artifact=ARTIFACT_V4+'-RECORD',body=body)),
+                    'deltaChain','CORRUPT_RECORD')
+        else:
+            require(False,'deltaVersion','CORRUPT_RECORD')
+        require(core['previousHash']==prev and core['revision']==state['revision']+1,
                 'deltaChain','CORRUPT_RECORD')
-        require(core['revision']==state['revision']+1 and core['scalarState']['revision']==core['revision'],
-                'revision','CORRUPT_RECORD')
         orders=state['orders']
         for oid in core['orderDeletes']:
             require(oid in orders,'missingDeleteTarget','CORRUPT_RECORD');del orders[oid]
         for oid,value in core['orderUpserts'].items():orders[oid]=deepcopy(value)
-        state=deepcopy(core['scalarState']);state['orders']=orders
+        if row['formatVersion']==3:
+            require(core['scalarState']['revision']==core['revision'],'revision','CORRUPT_RECORD')
+            state=deepcopy(core['scalarState']);state['orders']=orders
+        else:
+            scalars={k:deepcopy(v) for k,v in state.items() if k!='orders'}
+            for key in core['scalarDeletes']:
+                require(key in scalars,'missingScalarDeleteTarget','CORRUPT_RECORD');del scalars[key]
+            scalars.update(deepcopy(core['scalarUpserts']))
+            require(scalars.get('revision')==core['revision'],'revision','CORRUPT_RECORD')
+            state=scalars;state['orders']=orders
         require(hashlib.sha256(canonical_bytes(state)).hexdigest()==core['stateHash'],'stateHash','CORRUPT_RECORD')
         prev=core['recordHash']
+    return state
+
+
+def reconstruct_complete(base,deltas,expected_revision):
+    require(type(expected_revision) is int and expected_revision>=0 and len(deltas)==expected_revision,
+            'deltaCount','CORRUPT_RECORD')
+    state=reconstruct(base,deltas)
+    require(state['revision']==expected_revision,'deltaRevision','CORRUPT_RECORD')
     return state
 
 
