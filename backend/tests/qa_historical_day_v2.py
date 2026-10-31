@@ -37,8 +37,9 @@ from tests import qa_perf_instrumentation as PERF
 DAY = '2024-01-02'
 PERIOD = '2024-01'
 S = 1_000_000_000
-MAX_WALL = 3600.0
-MAX_ARTIFACT = 512 * 1024 * 1024
+WEEKLY_QA = os.environ.get("BTL_QA_HISTORICAL_DAYS") == "7"
+MAX_WALL = 5400.0 if WEEKLY_QA else 3600.0
+MAX_ARTIFACT = (1536 if WEEKLY_QA else 512) * 1024 * 1024
 MAX_RAM = 1024 * 1024 * 1024
 MIN_FREE = 30 * 1024 * 1024 * 1024
 PEAK_RAM = 0
@@ -125,10 +126,10 @@ def memory_sample(root, cluster_root, phase, *, state=None, started=None):
 
 def assert_budgets(root, cluster_root, started):
     global PEAK_RAM, PEAK_ARTIFACT
-    if time.monotonic()-started > MAX_WALL: raise RuntimeError('RESOURCE_STOP_WALL_60_MIN')
+    if time.monotonic()-started > MAX_WALL: raise RuntimeError('RESOURCE_STOP_WALL_BUDGET')
     if shutil.disk_usage(root).free < MIN_FREE: raise RuntimeError('RESOURCE_STOP_DISK_RESERVE_30_GIB')
     used = allocated(root)
-    if used > MAX_ARTIFACT: raise RuntimeError('RESOURCE_STOP_ARTIFACT_512_MIB')
+    if used > MAX_ARTIFACT: raise RuntimeError('RESOURCE_STOP_ARTIFACT_BUDGET')
     cpu, ram, current_process_rss, postgres_rss = resource_sample(cluster_root)
     PEAK_RAM=max(PEAK_RAM,ram);PEAK_ARTIFACT=max(PEAK_ARTIFACT,used)
     if ram > MAX_RAM: raise RuntimeError('RESOURCE_STOP_RAM_1_GIB')
@@ -475,9 +476,9 @@ def main():
     if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
     os.environ['BTL_QA_HISTORICAL_BATCH_GROUPS']=str(batch_groups)
     day_count=int(os.environ.get('BTL_QA_HISTORICAL_DAYS','1'))
-    if day_count not in (1,2,3):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
+    if day_count not in (1,2,3,7):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
     day_hours=24*day_count
-    order_retention_policy=QA_ORDER_RETENTION_V2 if day_count==3 else None
+    order_retention_policy=QA_ORDER_RETENTION_V2 if day_count>=3 else None
     decision_fixture=json.loads((Path(__file__).parent/'fixtures/historical_day_v2_decision_schedule.json').read_text())
     if decision_fixture.get('day')!=DAY:
         raise RuntimeError('ORDER_DECISION_SCHEDULE_DAY_MISMATCH')
@@ -552,6 +553,7 @@ def main():
         scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
         controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_retention_policy)
         initial=controller.create(scope,session,profile,method,period=PERIOD,day=DAY,balance='10000')
+        initial_state_bytes=len(canonical_bytes(initial))
         start=int(initial['startNs'])
         eod_ns=start+(day_hours-1)*3600*S
         # Reveal the opening quote, then submit the first order batch using only
@@ -572,7 +574,7 @@ def main():
                 dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
                      sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
         # Durable progress before a real worker process restart.
-        resume_target=start+(24*3600*S-1 if day_count==2 else 4*3600*S)
+        resume_target=start+(24*3600*S-1 if day_count>=2 else 4*3600*S)
         with PERF.measured_stage('replay'):
             for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started,
                                    decision_targets=decision_targets,order_decision_stages=order_decision_stages,
@@ -666,13 +668,14 @@ def main():
             executionEligibility='NOT_GRANTED',technicalSimulationEligibility='PASS',sourceRights='UNKNOWN',
             sourceProvenance='PROVIDER_OBSERVATION',datasetId=profile.wire['primary']['datasetId'],
             datasetVersion=profile.wire['primary']['datasetVersion'],qualificationReceiptSha256=proof_hash,
-            archiveSha256=proof['snapshotSha256'],period=DAY if day_count==1 else '2024-01-02/2024-01-03',
+            archiveSha256=proof['snapshotSha256'],period=DAY if day_count==1 else DAY+'/'+datetime.fromtimestamp(day_end//S,timezone.utc).strftime('%Y-%m-%d'),
             dayStartNs=str(start),dayEndNs=str(day_end),continuousDays=day_count,
             firstSourceQuoteNs=verification['firstSourceQuoteNs'],lastSourceQuoteNs=verification['lastSourceQuoteNs'],
             tickCount=verification['independentSourceTicks'],timestampGroupCount=verification['independentTimestampGroups'],
             gapCount=len(gap_events),gapKinds=dict(Counter(e['detail']['gapKind'] for e in gap_events)),
             sourceObservedGaps=verification['sourceObservedGaps'],
             unknownCoverageGapCount=sum(g['kind']=='UNKNOWN_COVERAGE_GAP' for g in verification['sourceObservedGaps']),
+            stateGrowth=dict(initialCanonicalBytes=initial_state_bytes,finalCanonicalBytes=len(canonical_bytes(state))),
             commandCount=state['revision'],eventCount=len(events),orderTypeCounts=dict(order_types),
             orderStatusCounts=dict(statuses),eventKinds=dict(kinds),orders=observed_orders,
             cumulativeOrderHistory=dict(status='PASS',retainedOrderCount=len(retained_order_ids),
@@ -701,7 +704,7 @@ def main():
             storage=dict(postgresDatabaseBytes=postgres_db_bytes,postgresClusterAllocatedBytes=allocated(root/'postgres'),
                 totalQaArtifactBytes=allocated(root)),
             measured=dict(elapsedSeconds=round(time.monotonic()-started,3),cpuSeconds=round(resource_sample(root/'postgres')[0]-metrics['cpuStart'],3),
-                          peakRamBytes=max(PEAK_RAM,worker_resource.get('peakRamBytes',0)),peakArtifactBytes=max(PEAK_ARTIFACT,worker_resource.get('peakArtifactBytes',0),allocated(root)),
+                          peakRamBytes=max(PEAK_RAM,worker_resource.get('peakRamBytes',0),memory_summary['peakCapMethodSampleBytes']),peakArtifactBytes=max(PEAK_ARTIFACT,worker_resource.get('peakArtifactBytes',0),allocated(root)),
                           initialFreeBytes=initial_free,finalFreeBytes=shutil.disk_usage(root).free,
                           vCPUEquivalentLimit=1,
                           peakRamLimitBytes=MAX_RAM,artifactLimitBytes=MAX_ARTIFACT))
@@ -720,7 +723,7 @@ def main():
                 summary['status']='FAIL';summary['acceptanceFailure']='CANONICAL_FINANCIAL_PARITY_MISMATCH'
                 summary['baselineParityExpected']=expected;summary['candidateParityActual']=actual
         else:
-            summary['twoDayFinancialResult']=actual
+            summary['multiDayFinancialResult']=actual
             if len(retained_order_ids)>max_retained_orders:
                 summary['status']='FAIL';summary['acceptanceFailure']='CUMULATIVE_ORDER_LIMIT_EXCEEDED'
         report=root/'report.json';report.write_text(json.dumps(summary,indent=2,sort_keys=True,ensure_ascii=False)+'\n');report.chmod(0o600)
