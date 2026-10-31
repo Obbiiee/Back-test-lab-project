@@ -45,9 +45,16 @@ def worker():
                 yield db
                 if calls[0]==2:os._exit(73)
         storage.connect=interrupted
-    store=ObservedExecutionStore(data.get('dsn',DSN),qa_state_delta_v3=bool(data.get('qaStateDeltaV3',False)))
-    controller=ObservedExecutionController(store,lambda _:source)
+    order_policy=data.get('orderRetentionPolicy')
+    store=ObservedExecutionStore(data.get('dsn',DSN),order_retention_policy=order_policy,
+                                qa_state_delta_v3=bool(data.get('qaStateDeltaV3',False)))
+    controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_policy)
+    started=time.perf_counter()
     controller.apply(TrustedScope(data['workspace'],data.get('actor','authored:worker')),data['command'])
+    if data.get('evidenceRoot'):
+        marker=Path(data['evidenceRoot'])/'post-commit-worker.json'
+        marker.write_text(json.dumps(dict(commandId=data['command']['commandId'],
+            commitWallSeconds=time.perf_counter()-started,processId=os.getpid()),sort_keys=True)+'\n')
     if data['phase']=='delta_after_commit':os.kill(os.getpid(),signal.SIGKILL)
     os._exit(74)
 
