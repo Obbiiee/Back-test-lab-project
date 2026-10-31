@@ -21,6 +21,9 @@ from .observed_profile import ENGINE_VERSION, MODEL, MODEL_V2, ObservedExecution
 from .observed_finance import exit_amount
 
 MAX_EVENTS, MAX_ORDERS = 256, 128
+MAX_ACTIVE_ORDERS = 128
+QA_ORDER_RETENTION_V2 = dict(schemaVersion=1,artifact='BTL-QA-ORDER-RETENTION-2',scope='ISOLATED_QA_ONLY',
+                            maxCumulativeOrders=512,maxActiveOrders=MAX_ACTIVE_ORDERS)
 STATE_FIELDS = ('sessionId datasetId datasetVersion engineVersion model profile profileHash policy revision '
                 'initialBalance balance realizedGross commission startNs throughNs nextGroupIndex nextEventIndex '
                 'eventHash sourceCheckpointHash sourcePrefixHash sourceCursorRevision lastObservedNs quoteBasis orders unresolved ended financial parent')
@@ -31,6 +34,14 @@ ORDER_FIELDS = PLAN_FIELDS+' status availableNs remaining entryPrice entryFillRe
 def _tag(raw, artifact, fields):
     keys(raw, 'schemaVersion artifact '+fields)
     require(type(raw['schemaVersion']) is int and raw['schemaVersion']==1 and raw['artifact']==artifact, 'artifact')
+
+
+def order_limits(policy=None):
+    if policy is None:return MAX_ORDERS,MAX_ORDERS
+    keys(policy,'schemaVersion artifact scope maxCumulativeOrders maxActiveOrders')
+    require(policy==QA_ORDER_RETENTION_V2 and policy['scope']=='ISOLATED_QA_ONLY','orderRetention','REFUSED_POLICY')
+    canonical_bytes(policy)
+    return policy['maxCumulativeOrders'],policy['maxActiveOrders']
 
 
 def _checkpoint(cp, profile):
@@ -51,7 +62,7 @@ def _checkpoint(cp, profile):
     return cursor
 
 
-def validate_state(state):
+def validate_state(state,*,order_retention_policy=None):
     _tag(state,'BTL-OBSERVED-EXECUTION-STATE-1',STATE_FIELDS)
     require(state['engineVersion']==ENGINE_VERSION and state['model']==ObservedExecutionProfile.from_wire(state['profile']).wire['model'],'model')
     profile=ObservedExecutionProfile.from_wire(state['profile']);p=profile.wire
@@ -75,7 +86,10 @@ def validate_state(state):
         digest(basis['groupId'], 'digest');require(type(basis['eventIds']) is list and 1<=len(basis['eventIds'])<=1024 and len(set(basis['eventIds']))==len(basis['eventIds']),'basis')
         for eid in basis['eventIds']:digest(eid, 'digest')
         require(price(basis['bid'],p)<=price(basis['ask'],p),'basis')
-    require(type(state['orders']) is dict and len(state['orders'])<=MAX_ORDERS,'orders','REFUSED_STATE_LIMIT')
+    max_cumulative,max_active=order_limits(order_retention_policy)
+    require(type(state['orders']) is dict and len(state['orders'])<=max_cumulative,'orders','REFUSED_STATE_LIMIT')
+    require(sum(type(o) is dict and o.get('status') in ('PENDING','ACTIVE') for o in state['orders'].values())<=max_active,
+            'orders','REFUSED_ACTIVE_ORDER_LIMIT')
     total=Fraction(0)
     for oid,o in state['orders'].items():
         identifier(oid, 'identifier');keys(o,ORDER_FIELDS)
@@ -102,20 +116,20 @@ def validate_state(state):
     return state
 
 
-def validate_snapshot(state,checkpoint):
-    validate_state(state);c=_checkpoint(checkpoint,ObservedExecutionProfile.from_wire(state['profile']))
+def validate_snapshot(state,checkpoint,*,order_retention_policy=None):
+    validate_state(state,order_retention_policy=order_retention_policy);c=_checkpoint(checkpoint,ObservedExecutionProfile.from_wire(state['profile']))
     require(hash_v2(checkpoint)==state['sourceCheckpointHash'] and c['visiblePrefixHash']==state['sourcePrefixHash'] and all(c[a]==state[b] for a,b in
             (('sessionStartNs','startNs'),('throughNs','throughNs'),('nextGroupIndex','nextGroupIndex'),('revision','sourceCursorRevision'))),'checkpoint','CORRUPT_RECORD')
     return dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-CHECKPOINT-1',state=state,controller=checkpoint)
 
 
-def seed_state(session_id,profile,policy,checkpoint,balance='10000'):
+def seed_state(session_id,profile,policy,checkpoint,balance='10000',*,order_retention_policy=None):
     require(type(profile) is ObservedExecutionProfile,'profile');identifier(session_id, 'identifier')
     c=_checkpoint(checkpoint,profile);require(c['nextGroupIndex']=='0' and c['revision']=='0' and c['throughNs']==c['sessionStartNs'],'initialCursor')
     initial=money(exact(balance,'balance',True),2);require(exact(initial,'initial',True)>0,'balance');p=profile.wire;policy=policy_wire(policy)
     genesis=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=session_id,profileHash=profile.profile_hash,policy=policy,startNs=c['sessionStartNs'],initialBalance=initial)
     state=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-STATE-1',sessionId=session_id,datasetId=p['primary']['datasetId'],datasetVersion=p['primary']['datasetVersion'],engineVersion=ENGINE_VERSION,model=p['model'],profile=p,profileHash=profile.profile_hash,policy=policy,revision=0,initialBalance=initial,balance=initial,realizedGross='0',commission='0',startNs=c['sessionStartNs'],throughNs=c['throughNs'],nextGroupIndex='0',nextEventIndex=0,eventHash=content_hash(genesis),sourceCheckpointHash=hash_v2(checkpoint),sourcePrefixHash=c['visiblePrefixHash'],sourceCursorRevision='0',lastObservedNs=None,quoteBasis=None,orders={},unresolved=False,ended=False,financial=False,parent=None)
-    validate_snapshot(state,checkpoint);return state
+    validate_snapshot(state,checkpoint,order_retention_policy=order_retention_policy);return state
 
 
 def command_wire(raw):
@@ -253,8 +267,9 @@ def _advance(s,events,raw,frame,checkpoint):
     if not events:emit(s,events,'REPLAY_ADVANCED',throughNs=s['throughNs'])
 
 
-def apply(state,raw,*,reveal=None,checkpoint=None):
-    validate_state(state);raw=command_wire(raw)
+def apply(state,raw,*,reveal=None,checkpoint=None,order_retention_policy=None):
+    validate_state(state,order_retention_policy=order_retention_policy);raw=command_wire(raw)
+    max_cumulative,max_active=order_limits(order_retention_policy)
     require(raw['sessionId']==state['sessionId'] and raw['expectedRevision']==state['revision'],'revision','REFUSED_STALE_REVISION')
     kind=raw['kind'];require(not state['ended'] or kind=='ADVANCE','ended','REFUSED_SESSION_ENDED')
     require(not state['unresolved'] or kind in ('ADVANCE','END'),'unresolved','REFUSED_UNRESOLVED_SESSION')
@@ -263,7 +278,10 @@ def apply(state,raw,*,reveal=None,checkpoint=None):
     else:
         require(reveal is None and checkpoint is None,'unexpectedControllerFrame')
         if kind=='OPEN':
-            require(len(s['orders'])<MAX_ORDERS,'orders','REFUSED_STATE_LIMIT');oid=raw['commandId'];require(oid not in s['orders'],'order')
+            require(len(s['orders'])<max_cumulative,'orders','REFUSED_STATE_LIMIT')
+            require(sum(o['status'] in ('PENDING','ACTIVE') for o in s['orders'].values())<max_active,
+                    'orders','REFUSED_ACTIVE_ORDER_LIMIT')
+            oid=raw['commandId'];require(oid not in s['orders'],'order')
             basis=s['quoteBasis'];require(basis is not None and int(s['throughNs'])-int(basis['timeNs'])<=int(p['maxObservedSilenceNs']),'quote','UNRESOLVED_RISK_QUOTE')
             require(exact(s['balance'],'balance',True)>0,'balance');plan=open_payload(payload,p,policy,s['balance'])
             if plan['orderType']=='MARKET':require(plan['entry']==basis['ask' if plan['side']=='LONG' else 'bid'],'quote','REFUSED_STALE_QUOTE')
@@ -285,6 +303,6 @@ def apply(state,raw,*,reveal=None,checkpoint=None):
                 if o['status']=='PENDING':o['status']='EXPIRED';emit(s,events,'EXPIRED_NO_QUOTE',order_id=oid,classification='UNRESOLVED')
             if _live(s):_unresolved(s,events,'UNRESOLVED_SESSION_END_ACTIVE')
             s['ended']=True;emit(s,events,'SESSION_ENDED',classification='ACCEPTED_COMMAND')
-    s['revision']+=1;validate_state(s)
-    if kind=='ADVANCE':validate_snapshot(s,checkpoint)
+    s['revision']+=1;validate_state(s,order_retention_policy=order_retention_policy)
+    if kind=='ADVANCE':validate_snapshot(s,checkpoint,order_retention_policy=order_retention_policy)
     return s,events

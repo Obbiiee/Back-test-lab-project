@@ -9,7 +9,8 @@ import unittest
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.models import MethodPolicy
 from execution.observed_profile import ObservedExecutionProfile, MODEL_V2, historical_technical_profile
-from execution.observed_kernel import apply, seed_state, validate_snapshot, validate_state
+from execution.observed_kernel import (QA_ORDER_RETENTION_V2, apply, order_limits, seed_state,
+                                       validate_snapshot, validate_state)
 from execution.contracts import validate_state as old_validate_state
 from ticks.compact_v2 import CompactDatasetBuilder
 from ticks.contracts import event_id
@@ -137,6 +138,13 @@ class ObservedKernelTests(unittest.TestCase):
         ):
             changed=deepcopy(raw);mutate(changed)
             with self.subTest(changed=changed),self.assertRaises(ValueError):ObservedExecutionProfile.from_wire(changed)
+
+    def test_cumulative_order_retention_v2_is_qa_only_and_keeps_live_limit(self):
+        self.assertEqual(order_limits(),(128,128))
+        self.assertEqual(order_limits(QA_ORDER_RETENTION_V2),(512,128))
+        changed=deepcopy(QA_ORDER_RETENTION_V2);changed['maxCumulativeOrders']=513
+        with self.assertRaisesRegex(ValueError,'REFUSED_POLICY'):
+            order_limits(changed)
 
     def setup_v2_state(self,quotes,*,gap_kinds=None):
         self.setup_stream(quotes,gap_kinds=gap_kinds)

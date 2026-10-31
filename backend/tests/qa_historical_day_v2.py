@@ -27,7 +27,7 @@ from contracts.canonical import canonical_bytes, content_hash
 from contracts.models import MethodPolicy
 from execution.observed_admission import AdmittedObservedSource
 from execution.observed_controller import ObservedExecutionController
-from execution.observed_kernel import MAX_ORDERS, validate_state
+from execution.observed_kernel import MAX_ORDERS, QA_ORDER_RETENTION_V2, validate_state
 from execution.observed_postgres import ObservedExecutionStore
 from execution.observed_profile import ObservedExecutionProfile, historical_technical_profile
 from infrastructure.database import connect, migrate
@@ -270,7 +270,7 @@ def advance_until(controller, store, scope, sid, target, root, cluster_root, sta
         if int(state['throughNs']) < eod_ns and stage in order_decision_stages and current < stage:
             source=controller._source(ObservedExecutionProfile.from_wire(state['profile']))
             selected_plan=None
-            if day_hours==48 and stage>=24:
+            if day_hours>=48 and stage>=24:
                 rotations=(('LONG','LIMIT'),('SHORT','STOP'),('LONG','STOP'),('SHORT','LIMIT'))
                 selected_plan=rotations[(stage-24)%len(rotations)]
             _stage_orders(controller,store,source,scope,sid,state,stage,state['quoteBasis'],selected_plan=selected_plan)
@@ -327,9 +327,10 @@ def verify_durable_receipts(dsn, workspace, sid, expected_revision):
                     artifact='BTL-INDEPENDENT-COMMAND-LEDGER-1',rows=ledger))).hexdigest())
 
 
-def independent_verify(source, store, scope, sid, start_ns, end_ns, *, gap_threshold_ns=60*S):
+def independent_verify(source, store, scope, sid, start_ns, end_ns, *, gap_threshold_ns=60*S,
+                       order_retention_policy=None):
     state=store.inspect(scope,sid)['state'];events=_all_events(store,scope,sid)
-    validate_state(state)
+    validate_state(state,order_retention_policy=order_retention_policy)
     # Recompute the whole event commitment chain independently from stored rows.
     if events:
         genesis=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=sid,
@@ -414,7 +415,7 @@ def independent_verify(source, store, scope, sid, start_ns, end_ns, *, gap_thres
 
 
 def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid, day_end, decision_targets,
-           order_decision_stages, eod_ns, day_hours):
+           order_decision_stages, eod_ns, day_hours, order_retention_policy=None):
     global PEAK_RAM,PEAK_ARTIFACT
     os.environ['BTL_TEST_DATABASE_URL']=dsn
     with PERF.measured_stage('cold_resume_setup'):
@@ -428,8 +429,9 @@ def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid
         profile=ObservedExecutionProfile.from_wire(state['profile'])
         source=load_source(profile,Path(source_path),Path(proof_path),proof_hash,root/'source-logs')
         PEAK_RAM=max(PEAK_RAM,resource_sample(os.environ['BTL_QA_CLUSTER_ROOT'])[1])
-    store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
-    controller=ObservedExecutionController(store,lambda _:source)
+    store=ObservedExecutionStore(dsn,order_retention_policy=order_retention_policy)
+    scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
+    controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_retention_policy)
     resume_revision=state['revision'];resume_state_hash=content_hash(state)
     start=int(state['startNs']);target=day_end
     with PERF.measured_stage('replay'):
@@ -452,7 +454,7 @@ def main_worker():
     data=json.loads(os.environ['BTL_HISTORICAL_DAY_V2_WORKER'])
     result=worker(data['dsn'],Path(data['root']),data['source'],data['proof'],data['proofHash'],
                   data['workspace'],data['actor'],data['session'],int(data['dayEnd']),data['decisionTargets'],
-                  set(data['orderDecisionStages']),int(data['eodNs']),int(data['dayHours']))
+                  set(data['orderDecisionStages']),int(data['eodNs']),int(data['dayHours']),data.get('orderRetentionPolicy'))
     Path(data['root'],'worker-result.json').write_text(json.dumps(result,sort_keys=True)+'\n')
     print(json.dumps(result,sort_keys=True))
 
@@ -473,8 +475,9 @@ def main():
     if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
     os.environ['BTL_QA_HISTORICAL_BATCH_GROUPS']=str(batch_groups)
     day_count=int(os.environ.get('BTL_QA_HISTORICAL_DAYS','1'))
-    if day_count not in (1,2):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
+    if day_count not in (1,2,3):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
     day_hours=24*day_count
+    order_retention_policy=QA_ORDER_RETENTION_V2 if day_count==3 else None
     decision_fixture=json.loads((Path(__file__).parent/'fixtures/historical_day_v2_decision_schedule.json').read_text())
     if decision_fixture.get('day')!=DAY:
         raise RuntimeError('ORDER_DECISION_SCHEDULE_DAY_MISMATCH')
@@ -499,26 +502,23 @@ def main():
     day_end=midnight_ns+day_hours*3600*S-1
     order_decision_stages=set(range(0,22))
     eod_ns=midnight_ns+(23*3600*S)
-    if day_count==2:
-        # Keep the accepted Jan-2 targets byte-for-byte. Shift those same
-        # decision moments by one UTC day. Add deterministic no-order clock
-        # boundaries for the two omitted hours so no batch can cross an hour.
+    if day_count>=2:
+        # Keep the accepted Jan-2 targets byte-for-byte. Shift the same pinned
+        # decision moments for each additional day; add no-order boundaries for
+        # the two omitted hours so no batch can cross an hour.
         offset_ns=int(decision_targets['0'])-midnight_ns
         decision_targets={str(k):v for k,v in decision_targets.items()}
         for hour in (22,23):decision_targets[str(hour)]=str(midnight_ns+hour*3600*S+offset_ns)
-        for hour in range(24):
-            source_hour=hour
-            if source_hour<=21:
-                decision_targets[str(24+hour)]=str(int(decision_targets[str(source_hour)])+86400*S)
-            else:
-                decision_targets[str(24+hour)]=str(midnight_ns+(24+hour)*3600*S+offset_ns)
-        order_decision_stages.update(range(24,46))
-        # The first day's accepted four-order batches account for 90 retained
-        # orders including two far non-triggers. One order is submitted at each
-        # pinned hourly decision on day two: 112 cumulative orders, below the
-        # engine's immutable 128-order state ceiling.
-        eod_ns=midnight_ns+47*3600*S
-        eod_decision=int(decision_fixture['baselineEodDecisionNs'])+86400*S
+        for day_index in range(1,day_count):
+            shift=day_index*86400*S
+            for hour in range(24):
+                key=day_index*24+hour
+                if hour<=21:
+                    decision_targets[str(key)]=str(int(decision_fixture['decisionTargets'][str(hour)])+shift)
+                    order_decision_stages.add(key)
+                else:decision_targets[str(key)]=str(midnight_ns+key*3600*S+offset_ns)
+        eod_ns=midnight_ns+(day_hours-1)*3600*S
+        eod_decision=int(decision_fixture['baselineEodDecisionNs'])+(day_count-1)*86400*S
     else:
         decision_targets={str(k):v for k,v in decision_targets.items()}
         eod_decision=int(decision_fixture['baselineEodDecisionNs'])
@@ -527,8 +527,11 @@ def main():
     os.chmod(root/'memory-trace.jsonl',0o600)
     schedule_config=dict(schemaVersion=1,artifact='BTL-QA-REPLAY-CONFIG-1',batchGroups=batch_groups,
         maximumBatchGroups=256,continuousDays=day_count,orderDecisionBoundarySeconds=3600,
-        firstDayOrderStages=sorted(range(0,22)),secondDayOrderStages=sorted(range(24,46)) if day_count==2 else [],
-        maxCumulativeOrders=MAX_ORDERS,secondDayOrdersPerDecision=1 if day_count==2 else None,
+        firstDayOrderStages=sorted(range(0,22)),
+        additionalDayOrderStages=[sorted(range(d*24,d*24+22)) for d in range(1,day_count)],
+        orderRetentionPolicy=order_retention_policy or dict(schemaVersion=1,artifact='BTL-ORDER-RETENTION-V1',maxCumulativeOrders=MAX_ORDERS),
+        maxCumulativeOrders=(order_retention_policy or {}).get('maxCumulativeOrders',MAX_ORDERS),
+        additionalDayOrdersPerDecision=1 if day_count>1 else None,
         decisionTargets=decision_targets,eodDecisionNs=str(eod_decision),sourceProcessing='ALL_OBSERVED_GROUPS',
         productionEnabled=False)
     (root/'replay-config.json').write_text(json.dumps(schedule_config,sort_keys=True)+'\n')
@@ -545,8 +548,9 @@ def main():
         os.environ.update(env);dsn=env['BTL_TEST_DATABASE_URL'];migrate(dsn)
         source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs')
         PEAK_RAM=max(PEAK_RAM,resource_sample(root/'postgres')[1])
-        store=ObservedExecutionStore(dsn);scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
-        controller=ObservedExecutionController(store,lambda _:source)
+        store=ObservedExecutionStore(dsn,order_retention_policy=order_retention_policy)
+        scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
+        controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_retention_policy)
         initial=controller.create(scope,session,profile,method,period=PERIOD,day=DAY,balance='10000')
         start=int(initial['startNs'])
         eod_ns=start+(day_hours-1)*3600*S
@@ -579,7 +583,7 @@ def main():
         worker_data=dict(dsn=dsn,root=str(root),source=str(SOURCE),proof=str(PROOF),proofHash=proof_hash,
                          workspace=workspace,actor=actor,session=session,dayEnd=day_end,
                          decisionTargets=decision_targets,orderDecisionStages=sorted(order_decision_stages),
-                         eodNs=eod_ns,dayHours=day_hours)
+                         eodNs=eod_ns,dayHours=day_hours,orderRetentionPolicy=order_retention_policy)
         env=dict(os.environ,BTL_HISTORICAL_DAY_V2_WORKER=json.dumps(worker_data),
                  BTL_TEST_DATABASE_URL=dsn,BTL_QA_CLUSTER_ROOT=str(root/'postgres'),
                  BTL_QA_RUN_STARTED=str(started),PYTHONDONTWRITEBYTECODE='1')
@@ -590,7 +594,8 @@ def main():
         if int(state['throughNs'])<day_end:raise RuntimeError('UTC_DAY_BOUNDARY_NOT_REACHED')
         final=source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs-independent')
         with PERF.measured_stage('independent_verification'):
-            verification=independent_verify(source,store,scope,session,start,day_end)
+            verification=independent_verify(source,store,scope,session,start,day_end,
+                                            order_retention_policy=order_retention_policy)
             receipt_verification=verify_durable_receipts(dsn,scope.workspace_id,session,state['revision'])
         source.close()
         memory_sample(root,root/'postgres','independent_verification_complete',state=state,started=started)
@@ -627,7 +632,8 @@ def main():
         order_acceptance_events=[e for e in events if e['kind']=='ORDER_ACCEPTED']
         accepted_order_ids={e['orderId'] for e in order_acceptance_events}
         retained_order_ids=set(state['orders'])
-        order_history_complete=accepted_order_ids==retained_order_ids and len(retained_order_ids)<=MAX_ORDERS
+        max_retained_orders=(order_retention_policy or {}).get('maxCumulativeOrders',MAX_ORDERS)
+        order_history_complete=accepted_order_ids==retained_order_ids and len(retained_order_ids)<=max_retained_orders
         if not order_history_complete:raise RuntimeError('DURABLE_ORDER_HISTORY_MISMATCH')
         memory_rows=[json.loads(line) for line in (root/'memory-trace.jsonl').read_text().splitlines() if line.strip()]
         current_rss=[int(r['processCurrentRssBytes'])+int(r['postgresTreeCurrentRssBytes']) for r in memory_rows]
@@ -670,7 +676,7 @@ def main():
             commandCount=state['revision'],eventCount=len(events),orderTypeCounts=dict(order_types),
             orderStatusCounts=dict(statuses),eventKinds=dict(kinds),orders=observed_orders,
             cumulativeOrderHistory=dict(status='PASS',retainedOrderCount=len(retained_order_ids),
-                maximumRetainedOrders=MAX_ORDERS,durableOrderAcceptedEvents=len(accepted_order_ids),
+                maximumRetainedOrders=max_retained_orders,durableOrderAcceptedEvents=len(accepted_order_ids),
                 noHistoricalOrderPruning=True,allOrderIdsMatchState=True),
             startingBalance=state['initialBalance'],endingBalance=state['balance'],
             realizedGross=state['realizedGross'],independentVerification=verification,
@@ -715,7 +721,7 @@ def main():
                 summary['baselineParityExpected']=expected;summary['candidateParityActual']=actual
         else:
             summary['twoDayFinancialResult']=actual
-            if len(retained_order_ids)>MAX_ORDERS:
+            if len(retained_order_ids)>max_retained_orders:
                 summary['status']='FAIL';summary['acceptanceFailure']='CUMULATIVE_ORDER_LIMIT_EXCEEDED'
         report=root/'report.json';report.write_text(json.dumps(summary,indent=2,sort_keys=True,ensure_ascii=False)+'\n');report.chmod(0o600)
         metrics['peakArtifact']=allocated(root)

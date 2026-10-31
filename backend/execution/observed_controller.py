@@ -2,12 +2,14 @@
 from contracts.primitives import require
 from .observed_profile import ObservedExecutionProfile
 from .observed_admission import AdmittedObservedSource
-from .observed_kernel import apply,command_wire,seed_state
+from .observed_kernel import apply,command_wire,seed_state,order_limits
 
 
 class ObservedExecutionController:
-    def __init__(self,store,resolve_source):
-        require(callable(resolve_source),'sourceResolver');self.store=store;self.resolve_source=resolve_source
+    def __init__(self,store,resolve_source,*,order_retention_policy=None):
+        require(callable(resolve_source),'sourceResolver');order_limits(order_retention_policy)
+        require(store.order_retention_policy==order_retention_policy,'orderRetention','REFUSED_POLICY_MISMATCH')
+        self.store=store;self.resolve_source=resolve_source;self.order_retention_policy=order_retention_policy
 
     def _source(self,profile):
         source=self.resolve_source(profile.profile_hash)
@@ -17,7 +19,9 @@ class ObservedExecutionController:
         require(type(profile) is ObservedExecutionProfile,'profile');source=self._source(profile);start=source.start_for_period(period,day=day)
         timeline=source.cache.new_timeline(scope,session_id,start)
         try:
-            cp=timeline.checkpoint();state=seed_state(session_id,profile,policy,cp,balance);self.store.create(scope,state,cp);source.cache.seed(scope,session_id,timeline)
+            cp=timeline.checkpoint()
+            state=seed_state(session_id,profile,policy,cp,balance,order_retention_policy=self.order_retention_policy)
+            self.store.create(scope,state,cp);source.cache.seed(scope,session_id,timeline)
         except BaseException:timeline.close();raise
         return state
 
@@ -30,7 +34,7 @@ class ObservedExecutionController:
             frame,next_cp=source.cache.reveal(scope,state['sessionId'],cp,command['payload']['targetNs'])
             kwargs=dict(reveal=frame,checkpoint=next_cp);cp=next_cp
             replay=dict(throughNs=frame['throughNs'],exhaustedThroughBoundary=frame['exhaustedThroughBoundary'])
-        proposed,events=apply(state,command,**kwargs)
+        proposed,events=apply(state,command,order_retention_policy=self.order_retention_policy,**kwargs)
         return self.store.commit(scope,command,before,proposed,cp,events,replay)
 
     def inspect(self,scope,session_id,after_sequence=0,maximum=64):
