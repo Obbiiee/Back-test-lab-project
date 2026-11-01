@@ -1120,6 +1120,7 @@ def main():
                                      qa_order_archive_v1=QA_ORDER_ARCHIVE_V1)
         scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
         controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_retention_policy)
+        partial_probe_state=None
         if resume_existing:
             progress=json.loads((root/'progress.json').read_text())
             if (progress.get('status')!='RUNNING' or progress.get('sessionId')!=session or
@@ -1177,7 +1178,10 @@ def main():
                 sourceDatasetId=profile.wire['primary']['datasetId'],
                 sourceDatasetVersion=profile.wire['primary']['datasetVersion'],sourceRights='UNKNOWN',
                 executionEligibility='NOT_GRANTED',verifiedUtc=datetime.now(timezone.utc).isoformat())
-            checkpoint_path=root/'resume-checkpoint-verification.json'
+            resume_attempt=os.environ.get('BTL_QA_HISTORICAL_RESUME_ATTEMPT','1')
+            if not re.fullmatch(r'[1-9][0-9]{0,2}',resume_attempt):
+                raise RuntimeError('RESUME_ANNUAL_ATTEMPT_ID_INVALID')
+            checkpoint_path=root/f'resume-checkpoint-verification-attempt-{resume_attempt}.json'
             if checkpoint_path.exists():
                 raise RuntimeError('RESUME_ANNUAL_CHECKPOINT_EVIDENCE_ALREADY_EXISTS')
             checkpoint_tmp=root/'.resume-checkpoint-verification.tmp'
@@ -1210,7 +1214,6 @@ def main():
                         controller.apply(scope,command(session,f'order:far:{label}',state['revision'],'OPEN',
                             dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
                                  sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
-            partial_probe_state=None
             if TRADE_GRID_V1:
                 partial_probe_id='order:far:cp6a7-partial-probe'
                 state=store.inspect(scope,session)['state'];basis=state['quoteBasis']

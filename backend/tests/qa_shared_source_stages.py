@@ -269,6 +269,7 @@ def resume_annual(evidence_root, attempt_number):
     _write(status_path,attempt)
     env=_stage_env(year_root,366,'2024-01-01','cp6a10-year-20261101')
     env.update(BTL_QA_HISTORICAL_RESUME_EXISTING='1',
+        BTL_QA_HISTORICAL_RESUME_ATTEMPT=str(attempt_number),
         BTL_QA_HISTORICAL_PRIOR_ELAPSED_SECONDS=str(prior_elapsed),
         BTL_QA_HISTORICAL_PRIOR_CPU_SECONDS=str(progress.get('cpuSeconds',0)),
         BTL_QA_HISTORICAL_INITIAL_FREE_BYTES=str(preflight['currentFreeBytes']))
