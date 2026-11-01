@@ -225,7 +225,7 @@ def _poll_locked(root, annual_unit, annual_handoff_report, annual_report, load_r
             log_file = stage_root/'runner.log'
             with log_file.open('ab') as stream:
                 try:
-                    result = run([str(runner_path), '--users', str(users), '--evidence-root', str(stage_root)],
+                    result = run([sys.executable, str(runner_path), '--users', str(users), '--evidence-root', str(stage_root)],
                                  stdout=stream, stderr=subprocess.STDOUT, timeout=STAGE_TIMEOUT_SECONDS[users],
                                  check=False, start_new_session=True)
                 except subprocess.TimeoutExpired:

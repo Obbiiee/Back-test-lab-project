@@ -69,8 +69,8 @@ class PostannualSupervisorTests(unittest.TestCase):
         runner=self.root/'load-runner';runner.write_text('#!/bin/sh\nexit 0\n');runner.chmod(0o700)
         invocations=[]
         def run(argv,**kwargs):
-            users=int(argv[2]);invocations.append(users)
-            report=Path(argv[4])/'report.json'
+            users=int(argv[3]);invocations.append(users)
+            report=Path(argv[5])/'report.json'
             report.write_text(json.dumps(dict(status='PASS',concurrentSessions=users,
                 sharedSourceMode='shared-source-v1',sourceDatasetId=SOURCE_ID,sourceSha256=SOURCE_SHA256,
                 sessionIsolation='PASS',financialIntegrity='PASS',
@@ -96,8 +96,8 @@ class PostannualSupervisorTests(unittest.TestCase):
         runner=self.root/'load-runner';runner.write_text('#!/bin/sh\nexit 0\n');runner.chmod(0o700)
         invocations=[]
         def run(argv,**kwargs):
-            users=int(argv[2]);invocations.append(users)
-            Path(argv[4],'report.json').write_text(json.dumps(dict(status='FAIL',concurrentSessions=users)))
+            users=int(argv[3]);invocations.append(users)
+            Path(argv[5],'report.json').write_text(json.dumps(dict(status='FAIL',concurrentSessions=users)))
             return type('Result',(),{'returncode':0})()
         state=poll_once(self.root/'state','annual.service',self.handoff,self.annual,
                         runner,self.show(active='inactive'),run)
