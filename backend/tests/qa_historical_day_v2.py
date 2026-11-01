@@ -4,6 +4,7 @@ Run with a new BTL_HISTORICAL_QA_ROOT outside the repository. The isolated
 PostgreSQL cluster and all generated logs/evidence stay under that directory.
 """
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_EVEN
@@ -15,6 +16,7 @@ from pathlib import Path
 import resource
 import re
 import shutil
+import stat
 import sqlite3
 import subprocess
 import sys
@@ -37,27 +39,165 @@ from infrastructure.database import connect, migrate
 from ticks.storage_v2 import DiskTickProvider
 from tests import qa_perf_instrumentation as PERF
 
-DAY = '2024-01-02'
-PERIOD = '2024-01'
+DAY = os.environ.get('BTL_QA_HISTORICAL_START_DAY', '2024-01-02')
+PERIOD = DAY[:7]
 S = 1_000_000_000
 REQUESTED_DAY_COUNT = int(os.environ.get('BTL_QA_HISTORICAL_DAYS', '1'))
 WEEKLY_QA = REQUESTED_DAY_COUNT == 7
 MONTHLY_QA = REQUESTED_DAY_COUNT == 30
+ANNUAL_QA = REQUESTED_DAY_COUNT == 366
+ANNUAL_ORDER_SCHEDULE_V1 = os.environ.get('BTL_QA_ANNUAL_ORDER_SCHEDULE_V1') == '1'
 QA_STATE_DELTA_V3 = os.environ.get('BTL_QA_HISTORICAL_STATE_FORMAT') == 'qa-v3'
 QA_ORDER_ARCHIVE_V1 = os.environ.get('BTL_QA_ORDER_ARCHIVE_V1') == '1'
 USE_QA_STATE_DELTA_V3 = QA_STATE_DELTA_V3 or QA_ORDER_ARCHIVE_V1
 TRADE_GRID_V1 = os.environ.get('BTL_QA_TRADE_SCENARIO') == 'observed-hourly-grid-v1'
 STOP_AFTER_COMPLETED_TRADES = int(os.environ.get('BTL_QA_STOP_AFTER_COMPLETED_TRADES','0'))
-MAX_WALL = 18_000.0 if MONTHLY_QA else 5400.0 if WEEKLY_QA else 3600.0
-MAX_ARTIFACT = (4608 if MONTHLY_QA else 1536 if WEEKLY_QA else 512) * 1024 * 1024
+MAX_WALL = 259_200.0 if ANNUAL_QA else 18_000.0 if MONTHLY_QA else 5400.0 if WEEKLY_QA else 3600.0
+MAX_ARTIFACT = (8192 if ANNUAL_QA else 4608 if MONTHLY_QA else 1536 if WEEKLY_QA else 512) * 1024 * 1024
 MAX_RAM = 1024 * 1024 * 1024
 MIN_FREE = 30 * 1024 * 1024 * 1024
 PEAK_RAM = 0
 PEAK_ARTIFACT = 0
+CPU_OFFSET = 0.0
 SOURCE = Path('/home/riksora/riksora-qa-evidence/beta-checkpoints-20261025-jtbqjj1o/xau-binary-recovery-20261026/verified-serving-snapshot')
 PROOF = Path('/home/riksora/riksora-qa-evidence/beta-checkpoints-20261025-jtbqjj1o/xau-binary-recovery-20261026/resumable-parity/final-report.json')
 PROFILE_FIXTURE = Path(__file__).parent/'fixtures/observed_profile_vectors.json'
 CONFIG_FIXTURE = Path(__file__).parent/'fixtures/historical_technical_simulation_qa.json'
+WORKER_PAYLOAD_MAX_BYTES = 4 * 1024 * 1024
+
+
+def _persist_worker_payload(root, payload):
+    """Persist bounded private worker state and return its path and digest."""
+    root = Path(root).resolve(strict=True)
+    path = root/'cold-resume-worker.json'
+    raw = json.dumps(payload, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    if len(raw) > WORKER_PAYLOAD_MAX_BYTES:
+        raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_TOO_LARGE')
+    digest = hashlib.sha256(raw).hexdigest()
+    if path.exists() or path.is_symlink():
+        existing = path.lstat()
+        if (not stat.S_ISREG(existing.st_mode) or existing.st_uid != os.getuid() or
+                existing.st_mode & 0o077 or existing.st_size != len(raw) or
+                hashlib.sha256(path.read_bytes()).hexdigest() != digest):
+            raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_EXISTING_MISMATCH')
+        return path, digest
+    temporary = root/('.cold-resume-worker-' + uuid.uuid4().hex + '.tmp')
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary,path)
+        except FileExistsError:
+            existing=path.lstat()
+            if (not stat.S_ISREG(existing.st_mode) or existing.st_uid!=os.getuid() or
+                    existing.st_mode & 0o077 or existing.st_size!=len(raw) or
+                    hashlib.sha256(path.read_bytes()).hexdigest()!=digest):
+                raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_CONCURRENT_MISMATCH')
+        directory_fd = os.open(root, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+    return path, digest
+
+
+def _load_worker_payload(path=None, expected_sha256=None):
+    root = Path(os.environ['BTL_HISTORICAL_QA_ROOT']).resolve(strict=True)
+    if path is None:
+        path_text = os.environ.get('BTL_HISTORICAL_DAY_V2_WORKER_FILE')
+        expected_sha256 = os.environ.get('BTL_HISTORICAL_DAY_V2_WORKER_SHA256')
+        if not path_text or not expected_sha256:
+            raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_REFERENCE_MISSING')
+        path = Path(path_text)
+    path = Path(path)
+    original_info = path.lstat()
+    if not stat.S_ISREG(original_info.st_mode):
+        raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_FILE_INVALID')
+    resolved = path.resolve(strict=True)
+    if resolved.parent != root or path.name != 'cold-resume-worker.json':
+        raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_PATH_INVALID')
+    info = resolved.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or
+            info.st_mode & 0o077 or info.st_size > WORKER_PAYLOAD_MAX_BYTES):
+        raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_FILE_INVALID')
+    raw = resolved.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if not expected_sha256 or digest != expected_sha256:
+        raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_HASH_MISMATCH')
+    payload = json.loads(raw)
+    required = {'dsn','root','source','proof','proofHash','workspace','actor','session','dayEnd',
+                'decisionTargets','orderDecisionStages','eodNs','dayHours','orderRetentionPolicy',
+                'qaStateDeltaV3','qaOrderArchiveV1','stopAfterCompletedTrades','partialProbeState'}
+    if (type(payload) is not dict or not required.issubset(payload) or
+            type(payload.get('decisionTargets')) is not dict or
+            len(payload['decisionTargets']) > 10000 or
+            type(payload.get('orderDecisionStages')) is not list or
+            len(payload['orderDecisionStages']) > 2000 or
+            payload.get('root') != str(root)):
+        raise RuntimeError('COLD_RESUME_WORKER_PAYLOAD_SHAPE_INVALID')
+    return payload
+
+
+@contextmanager
+def _resume_existing_private_postgres(root_dir):
+    """Start a stopped, pre-existing private QA cluster without reinitializing it."""
+    supplied_root=Path(root_dir)
+    if supplied_root.is_symlink():
+        raise RuntimeError('RESUME_PRIVATE_POSTGRES_CLUSTER_PATH_IS_SYMLINK')
+    root = supplied_root.resolve(strict=True)
+    data = root/'data'
+    password = root/'password'
+    socket = root/'socket'
+    log = root/'server.log'
+    pg_ctl = Path('/usr/lib/postgresql/16/bin/pg_ctl')
+    if (root.name != 'postgres' or not root.is_dir() or root.is_symlink() or
+            root.stat().st_uid!=os.getuid() or root.stat().st_mode & 0o077 or
+            not data.is_dir() or data.is_symlink() or data.stat().st_uid!=os.getuid() or
+            data.stat().st_mode & 0o077 or
+            (data/'PG_VERSION').read_text().strip() != '16' or
+            not password.is_file() or password.is_symlink() or
+            password.stat().st_uid != os.getuid() or password.stat().st_mode & 0o077 or
+            not socket.is_dir() or socket.is_symlink() or socket.stat().st_uid!=os.getuid() or
+            socket.stat().st_mode & 0o077 or
+            (log.is_symlink() or (log.exists() and (not log.is_file() or log.stat().st_uid!=os.getuid()))) or
+            (data/'postmaster.pid').exists()):
+        raise RuntimeError('RESUME_PRIVATE_POSTGRES_CLUSTER_INVALID_OR_ACTIVE')
+    status = subprocess.run([str(pg_ctl), '-D', str(data), 'status'],
+                            capture_output=True, text=True, timeout=30)
+    if status.returncode == 0:
+        raise RuntimeError('RESUME_PRIVATE_POSTGRES_ALREADY_ACTIVE')
+    environment = {key: value for key, value in os.environ.items()
+                   if not key.startswith(('PG', 'BTL_'))}
+    environment.update(PYTHONDONTWRITEBYTECODE='1',
+                       PYTHONPATH=str(Path(__file__).resolve().parents[1]))
+    try:
+        from psycopg.conninfo import make_conninfo
+    except ImportError as error:
+        raise RuntimeError('RESUME_PRIVATE_POSTGRES_PSYCOPG_UNAVAILABLE') from error
+    dsn = make_conninfo(host=str(socket), port=55439, dbname='postgres', user='qa_root',
+                        password=password.read_text().strip())
+    started = False
+    try:
+        subprocess.run([str(pg_ctl), '-D', str(data), '-l', str(log), '-o',
+                        f"-c listen_addresses='' -k {socket} -p 55439 "
+                        '-c shared_buffers=32MB -c max_connections=50', '-w', 'start'],
+                       env=environment, check=True, capture_output=True, text=True, timeout=90)
+        started = True
+        environment['BTL_TEST_DATABASE_URL'] = dsn
+        environment['BTL_PG_BIN'] = '/usr/lib/postgresql/16/bin'
+        yield Path(__file__).resolve().parents[2], environment
+    finally:
+        if started:
+            subprocess.run([str(pg_ctl), '-D', str(data), '-m', 'fast', '-w', 'stop'],
+                           env=environment, check=True, capture_output=True, text=True, timeout=90)
 
 
 def allocated(root):
@@ -69,6 +209,21 @@ def allocated(root):
             except FileNotFoundError:
                 pass
     return total
+
+
+def annual_order_decision_stages(day_count):
+    """Deterministic four-slot UTC schedule used for the CP6A-10 bounded gates."""
+    if type(day_count) is not int or day_count not in (7, 30, 366):
+        raise ValueError('ANNUAL_ORDER_SCHEDULE_DAY_COUNT_INVALID')
+    return {day*24+hour for day in range(day_count) for hour in (0, 6, 12, 18)}
+
+
+def annual_order_acceptance_upper_bound(day_count):
+    if type(day_count) is not int or day_count not in (7, 30, 366):
+        raise ValueError('ANNUAL_ORDER_SCHEDULE_DAY_COUNT_INVALID')
+    # Opening quote creates four near orders and two far controls; the other
+    # three first-day slots plus all later slots create at most one each.
+    return 9+4*(day_count-1)
 
 
 def _hash_canonical_records(artifact,records):
@@ -145,7 +300,7 @@ def resource_sample(cluster_root):
     # plus the current RSS of the isolated PostgreSQL process tree. Also return
     # current RSS components so multi-day runs can distinguish growth from a
     # one-time high-water mark.
-    return cpu, own_peak_rss+postgres_rss, own_rss, postgres_rss
+    return cpu+CPU_OFFSET, own_peak_rss+postgres_rss, own_rss, postgres_rss
 
 
 def memory_sample(root, cluster_root, phase, *, state=None, started=None):
@@ -429,11 +584,15 @@ def advance_until(controller, store, scope, sid, target, root, cluster_root, sta
         if not gate_reached and int(state['throughNs']) < eod_ns and stage in order_decision_stages and current < stage:
             source=controller._source(ObservedExecutionProfile.from_wire(state['profile']))
             selected_plan=None
-            if day_hours>=48 and stage>=24 and not TRADE_GRID_V1:
+            if ANNUAL_ORDER_SCHEDULE_V1 and stage>0 and not TRADE_GRID_V1:
+                rotations=(('LONG','LIMIT'),('SHORT','STOP'),('LONG','STOP'),('SHORT','LIMIT'))
+                day_index,hour_index=divmod(stage,24)
+                selected_plan=rotations[(day_index*4+hour_index//6)%len(rotations)]
+            elif day_hours>=48 and stage>=24 and not TRADE_GRID_V1:
                 rotations=(('LONG','LIMIT'),('SHORT','STOP'),('LONG','STOP'),('SHORT','LIMIT'))
                 selected_plan=rotations[(stage-24)%len(rotations)]
-            _stage_orders(controller,store,source,scope,sid,state,stage,state['quoteBasis'],selected_plan=selected_plan)
-            if stage==0:
+            staged=_stage_orders(controller,store,source,scope,sid,state,stage,state['quoteBasis'],selected_plan=selected_plan)
+            if stage==0 and staged:
                 after=store.inspect(scope,sid)['state'];bid=Decimal(after['quoteBasis']['bid']);ask=Decimal(after['quoteBasis']['ask'])
                 for label,side,otype,entry,sl,tp in (
                     ('long-limit','LONG','LIMIT',bid-Decimal('50'),bid-Decimal('51'),bid-Decimal('49')),
@@ -730,8 +889,10 @@ def worker(dsn, root, source_path, proof_path, proof_hash, workspace, actor, sid
 
 
 def main_worker():
+    global CPU_OFFSET
     PERF.install()
-    data=json.loads(os.environ['BTL_HISTORICAL_DAY_V2_WORKER'])
+    CPU_OFFSET=float(os.environ.get('BTL_QA_HISTORICAL_PRIOR_CPU_SECONDS','0'))
+    data=_load_worker_payload()
     result=worker(data['dsn'],Path(data['root']),data['source'],data['proof'],data['proofHash'],
                   data['workspace'],data['actor'],data['session'],int(data['dayEnd']),data['decisionTargets'],
                   set(data['orderDecisionStages']),int(data['eodNs']),int(data['dayHours']),
@@ -743,25 +904,38 @@ def main_worker():
 
 
 def main():
-    global PEAK_RAM,PEAK_ARTIFACT
+    global PEAK_RAM,PEAK_ARTIFACT,CPU_OFFSET
     PERF.install()
     root_text=os.environ.get('BTL_HISTORICAL_QA_ROOT')
     if not root_text:raise RuntimeError('SET_BTL_HISTORICAL_QA_ROOT_TO_NEW_EMPTY_PATH')
     root=Path(root_text)
-    if root.exists():raise RuntimeError('QA_OUTPUT_PATH_MUST_NOT_EXIST')
+    resume_existing=os.environ.get('BTL_QA_HISTORICAL_RESUME_EXISTING')=='1'
+    if root.exists() and not resume_existing:raise RuntimeError('QA_OUTPUT_PATH_MUST_NOT_EXIST')
+    if resume_existing and not root.is_dir():raise RuntimeError('RESUME_QA_OUTPUT_PATH_MISSING')
     disk_free_before=shutil.disk_usage(root.parent if root.parent.exists() else Path('/')).free
     if disk_free_before<MIN_FREE:
         raise RuntimeError('PREFLIGHT_DISK_RESERVE_BELOW_30_GIB')
-    if MONTHLY_QA and disk_free_before<MIN_FREE+MAX_ARTIFACT:
-        raise RuntimeError('PREFLIGHT_MONTH_BUDGET_WOULD_BREACH_30_GIB_RESERVE')
-    root.mkdir(mode=0o700,parents=False)
-    os.chmod(root,0o700);tempfile.tempdir=str(root);os.environ['TMPDIR']=str(root)
+    if (MONTHLY_QA or ANNUAL_QA) and disk_free_before<MIN_FREE+MAX_ARTIFACT:
+        raise RuntimeError('PREFLIGHT_BOUNDED_STAGE_BUDGET_WOULD_BREACH_30_GIB_RESERVE')
+    if not resume_existing:
+        root.mkdir(mode=0o700,parents=False)
+        os.chmod(root,0o700)
+    elif root.is_symlink() or root.stat().st_uid!=os.getuid() or root.stat().st_mode & 0o077:
+        raise RuntimeError('RESUME_QA_OUTPUT_PATH_OWNERSHIP_OR_MODE_INVALID')
+    tempfile.tempdir=str(root);os.environ['TMPDIR']=str(root)
     os.environ['PYTHONDONTWRITEBYTECODE']='1'
     batch_groups=int(os.environ.get('BTL_QA_HISTORICAL_BATCH_GROUPS','64'))
     if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
     os.environ['BTL_QA_HISTORICAL_BATCH_GROUPS']=str(batch_groups)
     day_count=int(os.environ.get('BTL_QA_HISTORICAL_DAYS','1'))
-    if day_count not in (1,2,3,7,30):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
+    if day_count not in (1,2,3,7,30,366):raise RuntimeError('INVALID_QA_HISTORICAL_DAY_COUNT')
+    if resume_existing and (day_count!=366 or not ANNUAL_ORDER_SCHEDULE_V1 or DAY!='2024-01-01' or
+                            os.environ.get('BTL_HISTORICAL_QA_RUN_ID')!='cp6a10-year-20261101'):
+        raise RuntimeError('RESUME_EXISTING_RESERVED_FOR_PINNED_CP6A10_ANNUAL_SESSION')
+    if ANNUAL_QA and (not ANNUAL_ORDER_SCHEDULE_V1 or DAY!='2024-01-01'):
+        raise RuntimeError('ANNUAL_QA_REQUIRES_PINNED_2024_START_AND_ORDER_SCHEDULE')
+    if ANNUAL_ORDER_SCHEDULE_V1 and day_count not in (7,30,366):
+        raise RuntimeError('ANNUAL_ORDER_SCHEDULE_RESERVED_FOR_WEEK_MONTH_OR_YEAR')
     if QA_STATE_DELTA_V3 and day_count != 30:raise RuntimeError('QA_V3_HISTORICAL_PATH_RESERVED_FOR_MONTH_GATE')
     if TRADE_GRID_V1 and (day_count not in (1,30) or not QA_ORDER_ARCHIVE_V1 or
                           (day_count==30 and STOP_AFTER_COMPLETED_TRADES!=2000) or
@@ -802,14 +976,18 @@ def main():
                 raise RuntimeError('TRADE_GRID_PROJECTED_DISK_RESERVE_EXCEEDED')
         preflight=dict(status='PASS',period='2024-01-02..2024-01-31 UTC',continuousDays=30,
             sourceRights='CC-BY-4.0 dataset card; underlying feed authority not independently verified',
-            orderLimit=(QA_ORDER_RETENTION_V4 if TRADE_GRID_V1 else
+            orderLimit=(QA_ORDER_RETENTION_V4 if TRADE_GRID_V1 or ANNUAL_ORDER_SCHEDULE_V1 else
                         QA_ORDER_RETENTION_V3 if QA_ORDER_ARCHIVE_V1 else QA_ORDER_RETENTION_V2)['maxCumulativeOrders'],
-            orderCountUpperBound=(179+29*22*8 if TRADE_GRID_V1 else 90+29*22),
+            orderCountUpperBound=(179+29*22*8 if TRADE_GRID_V1 else
+                                  annual_order_acceptance_upper_bound(day_count) if ANNUAL_ORDER_SCHEDULE_V1 else 90+29*22),
             orderCountEmpiricalProjection=(projected_orders if TRADE_GRID_V1 else
+                                           annual_order_acceptance_upper_bound(day_count) if ANNUAL_ORDER_SCHEDULE_V1 else
                                            round(90+(178-90)/6*29)),
-            full30DayMaximumScheduledOrders=(179+29*22*8 if TRADE_GRID_V1 else None),
+            full30DayMaximumScheduledOrders=(179+29*22*8 if TRADE_GRID_V1 else
+                                             annual_order_acceptance_upper_bound(day_count) if ANNUAL_ORDER_SCHEDULE_V1 else None),
             full30DayMaximumWouldExceedArchiveLimit=(179+29*22*8>QA_ORDER_RETENTION_V4['maxCumulativeOrders']
-                if TRADE_GRID_V1 else False),
+                if TRADE_GRID_V1 else annual_order_acceptance_upper_bound(day_count)>QA_ORDER_RETENTION_V4['maxCumulativeOrders']
+                if ANNUAL_ORDER_SCHEDULE_V1 else False),
             priorSevenDayOrders=178,priorSevenDayArtifactsBytes=722509824,
             measuredTwoDayArtifactsBytes=252645376,measuredTwoDayRuntimeSeconds=1278.426,
             targetTradeCount=STOP_AFTER_COMPLETED_TRADES if TRADE_GRID_V1 else None,
@@ -836,15 +1014,19 @@ def main():
         (root/'preflight.json').write_text(json.dumps(preflight,sort_keys=True,indent=2)+'\n')
         os.chmod(root/'preflight.json',0o600)
     day_hours=24*day_count
-    order_retention_policy=(QA_ORDER_RETENTION_V4 if TRADE_GRID_V1 else
+    order_retention_policy=(QA_ORDER_RETENTION_V4 if TRADE_GRID_V1 or ANNUAL_ORDER_SCHEDULE_V1 else
                             QA_ORDER_RETENTION_V3 if QA_ORDER_ARCHIVE_V1 else
                             QA_ORDER_RETENTION_V2 if day_count>=3 else None)
     decision_fixture=json.loads((Path(__file__).parent/'fixtures/historical_day_v2_decision_schedule.json').read_text())
-    if decision_fixture.get('day')!=DAY:
-        raise RuntimeError('ORDER_DECISION_SCHEDULE_DAY_MISMATCH')
+    if decision_fixture.get('day')!='2024-01-02':
+        raise RuntimeError('ORDER_DECISION_SCHEDULE_FIXTURE_DAY_MISMATCH')
     available=os.sched_getaffinity(0)
     if available:os.sched_setaffinity(0,{min(available)})
-    started=time.monotonic();wall_start=time.time();initial_free=shutil.disk_usage(root).free
+    prior_elapsed=float(os.environ.get('BTL_QA_HISTORICAL_PRIOR_ELAPSED_SECONDS','0')) if resume_existing else 0.0
+    CPU_OFFSET=float(os.environ.get('BTL_QA_HISTORICAL_PRIOR_CPU_SECONDS','0')) if resume_existing else 0.0
+    started=time.monotonic()-prior_elapsed;wall_start=time.time()-prior_elapsed
+    initial_free=(int(os.environ['BTL_QA_HISTORICAL_INITIAL_FREE_BYTES']) if resume_existing
+                  else shutil.disk_usage(root).free)
     proof_raw=PROOF.read_bytes();proof_hash=hashlib.sha256(proof_raw).hexdigest();proof=json.loads(proof_raw)
     vector=json.loads(PROFILE_FIXTURE.read_text());base=next(v['profile'] for v in vector['profiles'] if v['name']=='hf-2024-identity-not-admission')
     profile=ObservedExecutionProfile.from_wire(historical_technical_profile(base,proof_hash))
@@ -855,64 +1037,82 @@ def main():
         raise RuntimeError('SOURCE_PROFILE_RECEIPT_MISMATCH')
     if proof.get('status')!='PASS' or proof.get('classification')!='FULL_BINARY_SOURCE_PUBLIC_PAGE_PARITY_NOT_FINANCIAL_ADMISSION':
         raise RuntimeError('SOURCE_QUALIFICATION_RECEIPT_NOT_ACCEPTED')
-    if decision_fixture.get('datasetVersion')!=profile.wire['primary']['datasetVersion'] or decision_fixture.get('day')!=DAY:
+    if decision_fixture.get('datasetVersion')!=profile.wire['primary']['datasetVersion']:
         raise RuntimeError('ORDER_DECISION_SCHEDULE_SOURCE_MISMATCH')
     decision_targets=decision_fixture['decisionTargets']
     calendar=datetime.strptime(DAY,'%Y-%m-%d').replace(tzinfo=timezone.utc)
     midnight_ns=int(calendar.timestamp()*S)
+    fixture_midnight_ns=int(datetime.strptime('2024-01-02','%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp()*S)
+    schedule_shift_ns=midnight_ns-fixture_midnight_ns
     day_end=midnight_ns+day_hours*3600*S-1
-    order_decision_stages=set(range(0,22))
+    order_decision_stages=(annual_order_decision_stages(day_count) if ANNUAL_ORDER_SCHEDULE_V1 else set(range(0,22)))
     eod_ns=midnight_ns+(23*3600*S)
     if day_count>=2:
         # Keep the accepted Jan-2 targets byte-for-byte. Shift the same pinned
         # decision moments for each additional day; add no-order boundaries for
         # the two omitted hours so no batch can cross an hour.
-        offset_ns=int(decision_targets['0'])-midnight_ns
-        decision_targets={str(k):v for k,v in decision_targets.items()}
+        offset_ns=int(decision_targets['0'])-fixture_midnight_ns
+        decision_targets={str(k):str(int(v)+schedule_shift_ns) for k,v in decision_targets.items()}
         for hour in (22,23):decision_targets[str(hour)]=str(midnight_ns+hour*3600*S+offset_ns)
         for day_index in range(1,day_count):
             shift=day_index*86400*S
             for hour in range(24):
                 key=day_index*24+hour
                 if hour<=21:
-                    decision_targets[str(key)]=str(int(decision_fixture['decisionTargets'][str(hour)])+shift)
-                    order_decision_stages.add(key)
+                    decision_targets[str(key)]=str(int(decision_fixture['decisionTargets'][str(hour)])+
+                                                     schedule_shift_ns+shift)
+                    if not ANNUAL_ORDER_SCHEDULE_V1 or hour in (0,6,12,18):
+                        order_decision_stages.add(key)
                 else:decision_targets[str(key)]=str(midnight_ns+key*3600*S+offset_ns)
         eod_ns=midnight_ns+(day_hours-1)*3600*S
-        eod_decision=int(decision_fixture['baselineEodDecisionNs'])+(day_count-1)*86400*S
+        eod_decision=int(decision_fixture['baselineEodDecisionNs'])+schedule_shift_ns+(day_count-1)*86400*S
     else:
-        decision_targets={str(k):v for k,v in decision_targets.items()}
-        eod_decision=int(decision_fixture['baselineEodDecisionNs'])
+        decision_targets={str(k):str(int(v)+schedule_shift_ns) for k,v in decision_targets.items()}
+        eod_decision=int(decision_fixture['baselineEodDecisionNs'])+schedule_shift_ns
     os.environ['BTL_QA_HISTORICAL_EOD_DECISION_NS']=str(eod_decision)
     (root/'memory-trace.jsonl').touch(mode=0o600)
     os.chmod(root/'memory-trace.jsonl',0o600)
     schedule_config=dict(schemaVersion=1,artifact='BTL-QA-REPLAY-CONFIG-1',batchGroups=batch_groups,
         maximumBatchGroups=256,continuousDays=day_count,orderDecisionBoundarySeconds=3600,
         timelineStorageMode='shared-source-v1' if os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1' else 'session-log-v2',
-        tradeScenario='OBSERVED_HOURLY_GRID_V1_TWO_PRICE_BANDS' if TRADE_GRID_V1 else 'ACCEPTED_CP5_DECISION_SCHEDULE',
+        tradeScenario='OBSERVED_HOURLY_GRID_V1_TWO_PRICE_BANDS' if TRADE_GRID_V1 else
+            'CP6A10_ANNUAL_FOUR_UTC_SLOTS_V1' if ANNUAL_ORDER_SCHEDULE_V1 else 'ACCEPTED_CP5_DECISION_SCHEDULE',
         ordersPerHourlyDecision=8 if TRADE_GRID_V1 else 1,
         stopAfterCompletedTrades=STOP_AFTER_COMPLETED_TRADES if TRADE_GRID_V1 else None,
         persistenceFormat='QA_ARCHIVE_V1+QA_STATE_DELTA_V3' if QA_ORDER_ARCHIVE_V1 else
             'QA_STATE_DELTA_V3' if QA_STATE_DELTA_V3 else 'LEGACY_FULL_STATE',
-        firstDayOrderStages=sorted(range(0,22)),
-        additionalDayOrderStages=[sorted(range(d*24,d*24+22)) for d in range(1,day_count)],
+        firstDayOrderStages=sorted(order_decision_stages.intersection(range(0,24))),
+        additionalDayOrderStages=[sorted(order_decision_stages.intersection(range(d*24,d*24+24))) for d in range(1,day_count)],
         orderRetentionPolicy=order_retention_policy or dict(schemaVersion=1,artifact='BTL-ORDER-RETENTION-V1',maxCumulativeOrders=MAX_ORDERS),
         maxCumulativeOrders=(order_retention_policy or {}).get('maxCumulativeOrders',MAX_ORDERS),
+        maximumScheduledOrderAcceptances=(annual_order_acceptance_upper_bound(day_count) if ANNUAL_ORDER_SCHEDULE_V1 else None),
         additionalDayOrdersPerDecision=8 if TRADE_GRID_V1 else 1 if day_count>1 else None,
         decisionTargets=decision_targets,eodDecisionNs=str(eod_decision),sourceProcessing='ALL_OBSERVED_GROUPS',
+        annualSchedule=dict(version='cp6a10-annual-v1',utcSlots=[0,6,12,18],
+            firstDayMaximumAcceptances=9,subsequentDayMaximumAcceptances=4,
+            maximumAcceptances=annual_order_acceptance_upper_bound(day_count),annualLimit=4096) if ANNUAL_ORDER_SCHEDULE_V1 else None,
         productionEnabled=False)
-    (root/'replay-config.json').write_text(json.dumps(schedule_config,sort_keys=True)+'\n')
-    os.chmod(root/'replay-config.json',0o600)
+    replay_config_path=root/'replay-config.json'
+    if resume_existing:
+        if not replay_config_path.is_file() or json.loads(replay_config_path.read_text())!=schedule_config:
+            raise RuntimeError('RESUME_ANNUAL_REPLAY_CONFIG_MISMATCH')
+    else:
+        replay_config_path.write_text(json.dumps(schedule_config,sort_keys=True)+'\n')
+        os.chmod(replay_config_path,0o600)
     run_id=os.environ.get('BTL_HISTORICAL_QA_RUN_ID',uuid.uuid4().hex)
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,31}',run_id):raise RuntimeError('INVALID_QA_RUN_ID')
     session='session:hist-v2:'+run_id
     workspace='observedqa:hist-v2:'+run_id;actor='fixture:internal-qa'
     method=MethodPolicy('method:hist-v2:'+run_id,'a'*64,'FREE_STYLE',False,())
-    metrics=dict(cpuStart=resource_sample(root/'postgres')[0],peakRam=0,peakArtifact=0)
+    metrics=dict(cpuStart=0,peakRam=0,peakArtifact=0)
     summary={}
     from deploy.vps.tests.run_private_pg import private_postgres
-    with private_postgres(keep=True,root_dir=root/'postgres') as (repository,env):
-        os.environ.update(env);dsn=env['BTL_TEST_DATABASE_URL'];migrate(dsn)
+    pg_context=(_resume_existing_private_postgres(root/'postgres') if resume_existing else
+                private_postgres(keep=True,root_dir=root/'postgres'))
+    with pg_context as (repository,env):
+        os.environ.update(env);dsn=env['BTL_TEST_DATABASE_URL']
+        if not resume_existing:migrate(dsn)
+        metrics['cpuStart']=0.0 if resume_existing else resource_sample(root/'postgres')[0]
         source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs')
         PEAK_RAM=max(PEAK_RAM,resource_sample(root/'postgres')[1])
         store=ObservedExecutionStore(dsn,order_retention_policy=order_retention_policy,
@@ -920,46 +1120,112 @@ def main():
                                      qa_order_archive_v1=QA_ORDER_ARCHIVE_V1)
         scope=__import__('application.models',fromlist=['TrustedScope']).TrustedScope(workspace,actor)
         controller=ObservedExecutionController(store,lambda _:source,order_retention_policy=order_retention_policy)
-        initial=controller.create(scope,session,profile,method,period=PERIOD,day=DAY,balance='10000')
-        initial_state_bytes=len(canonical_bytes(initial))
-        start=int(initial['startNs'])
-        eod_ns=start+(day_hours-1)*3600*S
-        # Reveal the opening quote, then submit the first order batch using only
-        # this already revealed Bid/Ask. Duplicate retry is required to be exact.
-        first=command(session,'advance:opening',0,'ADVANCE',{'targetNs':str(start)})
-        receipt=controller.apply(scope,first);retry=controller.apply(scope,first)
-        if canonical_bytes(receipt)!=canonical_bytes(retry):raise RuntimeError('IDEMPOTENT_RETRY_MISMATCH')
-        state=receipt['state'];basis=state['quoteBasis']
-        if basis is None:raise RuntimeError('OPENING_QUOTE_NOT_REVEALED')
-        _stage_orders(controller,store,source,scope,session,state,0,basis)
-        state=store.inspect(scope,session)['state'];bid=Decimal(state['quoteBasis']['bid']);ask=Decimal(state['quoteBasis']['ask'])
-        for label,side,otype,entry,sl,tp in (
-            ('long-limit','LONG','LIMIT',bid-Decimal('50'),bid-Decimal('51'),bid-Decimal('49')),
-            ('long-stop','LONG','STOP',ask+Decimal('50'),ask+Decimal('49'),ask+Decimal('51')),
-        ):
+        if resume_existing:
+            progress=json.loads((root/'progress.json').read_text())
+            if (progress.get('status')!='RUNNING' or progress.get('sessionId')!=session or
+                    not isinstance(progress.get('revision'),int) or
+                    not isinstance(progress.get('nextGroupIndex'),str)):
+                raise RuntimeError('RESUME_ANNUAL_PROGRESS_IDENTITY_INVALID')
             state=store.inspect(scope,session)['state']
-            controller.apply(scope,command(session,f'order:far:{label}',state['revision'],'OPEN',
-                dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
-                     sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
-        partial_probe_state=None
-        if TRADE_GRID_V1:
-            partial_probe_id='order:far:cp6a7-partial-probe'
-            state=store.inspect(scope,session)['state'];basis=state['quoteBasis']
-            entry=Decimal(basis['ask'])+Decimal('0.001')
-            controller.apply(scope,command(session,'order:far:cp6a7-partial-probe',state['revision'],'OPEN',
-                dict(side='LONG',orderType='STOP',workflow='PLANNED',entry=format(entry,'f'),quantity='0.02',
-                     sl=format(entry-Decimal('50'),'f'),tp=format(entry+Decimal('50'),'f'),
-                     riskPercent='1',observations=[])))
-            partial_probe_state=dict(orderId=partial_probe_id,stage='WAIT_ENTRY',observedEvents=[])
-        # Durable progress before a real worker process restart.
-        resume_target=start+(24*3600*S-1 if day_count>=2 else 4*3600*S)
-        with PERF.measured_stage('replay'):
-            for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started,
-                                   decision_targets=decision_targets,order_decision_stages=order_decision_stages,
-                                   eod_ns=eod_ns,day_hours=day_hours,partial_probe=partial_probe_state):pass
-        before_restart=store.inspect(scope,session)['state']
-        memory_sample(root,root/'postgres','before_cold_resume',state=before_restart,started=started)
-        source.close()
+            if (state['revision']!=progress['revision'] or state['throughNs']!=progress.get('throughNs') or
+                    str(state['nextGroupIndex'])!=progress['nextGroupIndex']):
+                raise RuntimeError('RESUME_ANNUAL_PROGRESS_CHECKPOINT_MISMATCH')
+            if state['profileHash']!=profile.profile_hash or state['datasetVersion']!=profile.wire['primary']['datasetVersion']:
+                raise RuntimeError('RESUME_ANNUAL_SESSION_SOURCE_IDENTITY_MISMATCH')
+            with connect(dsn) as db:
+                stored,storage_format,checkpoint_chain_hash=store._read(
+                    db,scope.workspace_id,session,include_format=True)
+                initial_state,_=store._qa_reconstruct(db,scope.workspace_id,session,upto_revision=0)
+                event_rows_before=db.execute('SELECT count(*) FROM btl.tick_events '
+                    'WHERE workspace_id=%s AND session_id=%s',(scope.workspace_id,session)).fetchone()[0]
+            events_before=_all_events(store,scope,session)
+            counts_before=(event_rows_before,sum(e['kind']=='ENTRY_FILL' for e in events_before),
+                           sum(e['kind']=='EXIT_FILL' for e in events_before))
+            if stored['state']!=state or checkpoint_chain_hash is None:
+                raise RuntimeError('RESUME_ANNUAL_CHECKPOINT_CHAIN_INVALID')
+            initial_state_bytes=len(canonical_bytes(initial_state))
+            start=int(state['startNs'])
+            before_restart=state
+            receipt_verification=verify_durable_receipts(dsn,scope.workspace_id,session,state['revision'])
+            if receipt_verification.get('status')!='PASS' or receipt_verification.get('commands')!=state['revision']:
+                raise RuntimeError('RESUME_ANNUAL_DURABLE_RECEIPT_LEDGER_FAILED')
+            opening=command(session,'advance:opening',0,'ADVANCE',{'targetNs':str(start)})
+            opening_first=controller.apply(scope,opening)
+            opening_retry=controller.apply(scope,opening)
+            if canonical_bytes(opening_first)!=canonical_bytes(opening_retry):
+                raise RuntimeError('RESUME_ANNUAL_IDEMPOTENCY_RETRY_MISMATCH')
+            state_after_retry=store.inspect(scope,session)['state']
+            with connect(dsn) as db:
+                event_rows_after=db.execute('SELECT count(*) FROM btl.tick_events '
+                    'WHERE workspace_id=%s AND session_id=%s',(scope.workspace_id,session)).fetchone()[0]
+            events_after=_all_events(store,scope,session)
+            counts_after=(event_rows_after,sum(e['kind']=='ENTRY_FILL' for e in events_after),
+                          sum(e['kind']=='EXIT_FILL' for e in events_after))
+            if (state_after_retry['revision']!=state['revision'] or counts_after!=counts_before or
+                    opening_retry['state']['revision']!=state['revision']):
+                raise RuntimeError('RESUME_ANNUAL_IDEMPOTENCY_MUTATED_SESSION')
+            checkpoint_evidence=dict(status='PASS',sessionId=session,revision=state['revision'],
+                nextGroupIndex=str(state['nextGroupIndex']),throughNs=state['throughNs'],
+                stateEventHash=state['eventHash'],checkpointChainHash=checkpoint_chain_hash,
+                storageFormat=storage_format,durableReceiptVerification=receipt_verification,
+                idempotentOpeningRetry='PASS',eventCountsBefore=dict(total=counts_before[0],entryFills=counts_before[1],exitFills=counts_before[2]),
+                eventCountsAfter=dict(total=counts_after[0],entryFills=counts_after[1],exitFills=counts_after[2]),
+                sourceDatasetId=profile.wire['primary']['datasetId'],
+                sourceDatasetVersion=profile.wire['primary']['datasetVersion'],sourceRights='UNKNOWN',
+                executionEligibility='NOT_GRANTED',verifiedUtc=datetime.now(timezone.utc).isoformat())
+            checkpoint_path=root/'resume-checkpoint-verification.json'
+            if checkpoint_path.exists():
+                raise RuntimeError('RESUME_ANNUAL_CHECKPOINT_EVIDENCE_ALREADY_EXISTS')
+            checkpoint_tmp=root/'.resume-checkpoint-verification.tmp'
+            checkpoint_tmp.write_text(json.dumps(checkpoint_evidence,sort_keys=True,indent=2)+'\n')
+            os.chmod(checkpoint_tmp,0o600);checkpoint_tmp.replace(checkpoint_path)
+            memory_sample(root,root/'postgres','before_cold_resume',state=state,started=started)
+            source.close()
+        else:
+            initial=controller.create(scope,session,profile,method,period=PERIOD,day=DAY,balance='10000')
+            initial_state_bytes=len(canonical_bytes(initial))
+            start=int(initial['startNs'])
+            eod_ns=start+(day_hours-1)*3600*S
+            # Reveal the opening quote, then submit the first order batch using only
+            # this already revealed Bid/Ask. Duplicate retry is required to be exact.
+            first=command(session,'advance:opening',0,'ADVANCE',{'targetNs':str(start)})
+            receipt=controller.apply(scope,first);retry=controller.apply(scope,first)
+            if canonical_bytes(receipt)!=canonical_bytes(retry):raise RuntimeError('IDEMPOTENT_RETRY_MISMATCH')
+            state=receipt['state'];basis=state['quoteBasis']
+            if basis is None and not (ANNUAL_QA and DAY=='2024-01-01'):
+                raise RuntimeError('OPENING_QUOTE_NOT_REVEALED')
+            if basis is not None:
+                staged=_stage_orders(controller,store,source,scope,session,state,0,basis)
+                if staged:
+                    state=store.inspect(scope,session)['state'];bid=Decimal(state['quoteBasis']['bid']);ask=Decimal(state['quoteBasis']['ask'])
+                    for label,side,otype,entry,sl,tp in (
+                        ('long-limit','LONG','LIMIT',bid-Decimal('50'),bid-Decimal('51'),bid-Decimal('49')),
+                        ('long-stop','LONG','STOP',ask+Decimal('50'),ask+Decimal('49'),ask+Decimal('51')),
+                    ):
+                        state=store.inspect(scope,session)['state']
+                        controller.apply(scope,command(session,f'order:far:{label}',state['revision'],'OPEN',
+                            dict(side=side,orderType=otype,workflow='PLANNED',entry=format(entry,'f'),quantity='0.01',
+                                 sl=format(sl,'f'),tp=format(tp,'f'),riskPercent='1',observations=[])))
+            partial_probe_state=None
+            if TRADE_GRID_V1:
+                partial_probe_id='order:far:cp6a7-partial-probe'
+                state=store.inspect(scope,session)['state'];basis=state['quoteBasis']
+                entry=Decimal(basis['ask'])+Decimal('0.001')
+                controller.apply(scope,command(session,'order:far:cp6a7-partial-probe',state['revision'],'OPEN',
+                    dict(side='LONG',orderType='STOP',workflow='PLANNED',entry=format(entry,'f'),quantity='0.02',
+                         sl=format(entry-Decimal('50'),'f'),tp=format(entry+Decimal('50'),'f'),
+                         riskPercent='1',observations=[])))
+                partial_probe_state=dict(orderId=partial_probe_id,stage='WAIT_ENTRY',observedEvents=[])
+            # Durable progress before a real worker process restart.
+            resume_target=start+(24*3600*S-1 if day_count>=2 else 4*3600*S)
+            with PERF.measured_stage('replay'):
+                for _ in advance_until(controller,store,scope,session,resume_target,root,root/'postgres',started,
+                                       decision_targets=decision_targets,order_decision_stages=order_decision_stages,
+                                       eod_ns=eod_ns,day_hours=day_hours,partial_probe=partial_probe_state):pass
+            before_restart=store.inspect(scope,session)['state']
+            memory_sample(root,root/'postgres','before_cold_resume',state=before_restart,started=started)
+            source.close()
+        eod_ns=start+(day_hours-1)*3600*S
         worker_data=dict(dsn=dsn,root=str(root),source=str(SOURCE),proof=str(PROOF),proofHash=proof_hash,
                          workspace=workspace,actor=actor,session=session,dayEnd=day_end,
                          decisionTargets=decision_targets,orderDecisionStages=sorted(order_decision_stages),
@@ -968,7 +1234,12 @@ def main():
                          stopAfterCompletedTrades=STOP_AFTER_COMPLETED_TRADES,
                          partialProbeState=({k:partial_probe_state[k] for k in ('orderId','stage')}
                                             if partial_probe_state else None))
-        env=dict(os.environ,BTL_HISTORICAL_DAY_V2_WORKER=json.dumps(worker_data),
+        worker_payload_path, worker_payload_sha256 = _persist_worker_payload(root, worker_data)
+        env=dict(os.environ)
+        env.pop('BTL_HISTORICAL_DAY_V2_WORKER',None)
+        env.update(BTL_HISTORICAL_QA_ROOT=str(root),
+                 BTL_HISTORICAL_DAY_V2_WORKER_FILE=str(worker_payload_path),
+                 BTL_HISTORICAL_DAY_V2_WORKER_SHA256=worker_payload_sha256,
                  BTL_TEST_DATABASE_URL=dsn,BTL_QA_CLUSTER_ROOT=str(root/'postgres'),
                  BTL_QA_RUN_STARTED=str(started),PYTHONDONTWRITEBYTECODE='1')
         proc=subprocess.run([sys.executable,'-B','-m','tests.qa_historical_day_v2','--worker'],cwd=repository,
@@ -1200,6 +1471,14 @@ def main():
 if __name__=='__main__':
     if len(sys.argv)>1 and sys.argv[1]=='--worker':
         try:main_worker()
+        except BaseException:
+            traceback.print_exc();raise SystemExit(1)
+    elif len(sys.argv)>1 and sys.argv[1]=='--validate-worker-payload':
+        try:
+            payload=_load_worker_payload()
+            print(json.dumps(dict(status='PASS',decisionTargetCount=len(payload.get('decisionTargets',{})),
+                                  sessionId=payload.get('session'),revision=payload.get('revision')),
+                             sort_keys=True))
         except BaseException:
             traceback.print_exc();raise SystemExit(1)
     else:
