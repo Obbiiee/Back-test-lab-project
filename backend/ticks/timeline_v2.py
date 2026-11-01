@@ -158,9 +158,13 @@ def _expand_compact_block(encoded):
 
 
 class IndexedTickTimeline:
-    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64):
+    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64, storage_mode="session-log-v2", source_pin=None):
         require(log_codec in (None, 'raw', 'zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'INVALID_INPUT')
         require(lookup_layout in ('dense', 'range-v1'), 'lookupLayout', 'INVALID_INPUT')
+        require(storage_mode in ('session-log-v2', 'shared-source-v1'), 'storageMode', 'INVALID_INPUT')
+        require((storage_mode == 'session-log-v2' and source_pin is None) or
+                (storage_mode == 'shared-source-v1' and type(source_pin) is dict),
+                'sourcePin', 'INVALID_INPUT')
         require(type(max_groups_per_advance) is int and 1 <= max_groups_per_advance <= 256,
                 'maxGroupsPerAdvance', 'INVALID_INPUT')
         described = provider.describe_v2(dataset_id, dataset_version)
@@ -173,6 +177,15 @@ class IndexedTickTimeline:
         require(described["root"]["datasetId"] == dataset_id and hash_v2(described["root"]) == dataset_version, "root", "VERSION_MISMATCH")
         self.__provider, self.__id, self.__version = provider, dataset_id, dataset_version
         self.__root = described["root"]
+        self.__storage_mode = storage_mode
+        self.__source_pin = deepcopy(source_pin)
+        if storage_mode == 'shared-source-v1':
+            require(source_pin.get('datasetId') == dataset_id and
+                    source_pin.get('datasetVersion') == dataset_version and
+                    source_pin.get('manifestHash') == dataset_version and
+                    source_pin.get('rootHash') == hash_v2(self.__root) and
+                    source_pin.get('indexContentHash') == self.__root['indexContentHash'],
+                    'sourcePin', 'VERSION_MISMATCH')
         folder = Path(log_folder); folder.mkdir(parents=True, exist_ok=True)
         self.__log_path = folder / "timeline.sqlite"
         # Physical-only opt-in on NEW logs. Existing archives are never migrated.
@@ -228,6 +241,9 @@ class IndexedTickTimeline:
         self.__has_pending = False
         self.__advance_tip = self.__position_tip = None
         self.__advance_blocks = self.__position_blocks = 0
+        self.__read_iterator = None
+        self.__read_next_index = None
+        self.__read_pending = None
         initial = dict(schemaVersion=2, artifact="BTL-TICK-PREFIX-2", datasetId=self.__id, datasetVersion=self.__version,
                        timelineVersion=VERSION, generation=str(self.__generation), sessionStartNs=str(self.__start),
                        throughNs=str(self.__start), groups=[], coverage=[], diagnostics=empty_diagnostics())
@@ -470,7 +486,8 @@ class IndexedTickTimeline:
                 except ValueError:
                     require(bool(groups), "group", "GROUP_LIMIT")
                     break
-                positions.append(pending[0])
+                if self.__storage_mode == 'session-log-v2':
+                    positions.append(pending[0])
                 self.__has_pending = False
             pending = self.__peek()
             done = pending is None or int(pending[1]["timeNs"]) > target
@@ -494,7 +511,7 @@ class IndexedTickTimeline:
                 cursor_hash = hash_v2(updated)
                 advance_tip = self.__append_block("BTL-TICK-ADVANCE-LOG-2", self.__advance_blocks, advance_tip,
                                                  [dict(targetNs=target_ns, predecessorCursorHash=hash_v2(self.__cursor), successorCursorHash=cursor_hash)])
-                if groups:
+                if groups and self.__storage_mode == 'session-log-v2':
                     start_index = int(self.__cursor["nextGroupIndex"])
                     position_block_count = 0
                     for offset in range(0, len(groups), 128):
@@ -509,8 +526,7 @@ class IndexedTickTimeline:
                         else:
                             self.__db.executemany("INSERT INTO position_lookup VALUES(?,?,?)",
                                 [(start_index+i, position_tip, i-offset) for i in range(offset, stop)])
-                persisted = dict(schemaVersion=2, artifact="BTL-TICK-CHECKPOINT-2", cursor=updated,
-                                 advanceLogHash=advance_tip, positionLogHash=position_tip)
+                persisted = self.__checkpoint_value(updated, advance_tip, position_tip)
                 self.__db.execute("INSERT OR REPLACE INTO heads VALUES(1,?)", (canonical_v2_bytes(persisted),))
                 self.__db.commit()
             else:
@@ -540,6 +556,40 @@ class IndexedTickTimeline:
         require(type(max_groups) is int and 1 <= max_groups <= 1024, "groups")
         end = int(self.__cursor["nextGroupIndex"])
         require(start <= end, "index", "UNREVEALED_INDEX")
+        if self.__storage_mode == 'shared-source-v1':
+            # Positions are derived from the immutable shared source. This
+            # constant-memory iterator is only a convenience cache; cold
+            # resume always replays the durable advance chain from the source.
+            if self.__read_iterator is None or self.__read_next_index != start:
+                position = self.__provider.locate_v2(self.__id, self.__version, str(self.__start))['position']
+                self.__read_iterator = self.__groups(position)
+                self.__read_next_index = 0
+                while self.__read_next_index < start:
+                    try:
+                        next(self.__read_iterator)
+                    except StopIteration:
+                        require(False, 'index', 'INCOMPLETE_ATOMIC_BOUNDARY')
+                    self.__read_next_index += 1
+            packed = CanonicalGroupBudget("BTL-TICK-VIEW-CHECK-2")
+            result = []
+            while self.__read_next_index < min(end, start + max_groups):
+                if self.__read_pending is None:
+                    try:
+                        _, self.__read_pending = next(self.__read_iterator)
+                    except StopIteration:
+                        require(False, 'prefix', 'INCOMPLETE_ATOMIC_BOUNDARY')
+                group=self.__read_pending
+                require(int(group['timeNs']) <= int(self.__cursor['throughNs']),
+                        'prefix', 'IDENTITY_CONFLICT')
+                try:
+                    packed.append(group)
+                except ValueError:
+                    require(bool(result), 'group', 'GROUP_LIMIT')
+                    break
+                result.append(group)
+                self.__read_pending=None
+                self.__read_next_index += 1
+            return deepcopy(result)
         wanted, records = min(end, start+max_groups), []
         # Rebuildable connection-private disk index. Membership is checked
         # against canonical hash-bound blocks produced by committed reveals.
@@ -615,27 +665,44 @@ class IndexedTickTimeline:
 
     def replace_dataset(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder):
         require(self.__active, "timeline", "REPLACED_TIMELINE")
+        require(self.__storage_mode=='session-log-v2', 'dataset', 'REFUSED_PINNED_SHARED_SOURCE_REPLACEMENT')
         replacement = IndexedTickTimeline(provider, dataset_id, dataset_version, session_start_ns, log_folder=log_folder,
                                            log_codec=self.__log_codec, lookup_layout=self.__lookup_layout,
-                                           max_groups_per_advance=self.__max_groups_per_advance)
+                                           max_groups_per_advance=self.__max_groups_per_advance,
+                                           storage_mode=self.__storage_mode,
+                                           source_pin=self.__source_pin if self.__storage_mode=='shared-source-v1' else None)
         replacement.__generation = self.__generation+1; replacement.__initialize()
         self.cancel(); self.__active = False
         return replacement
 
     def checkpoint(self):
         require(self.__active, "timeline", "REPLACED_TIMELINE")
-        return dict(schemaVersion=2, artifact="BTL-TICK-CHECKPOINT-2", cursor=self.cursor,
-                    advanceLogHash=self.__advance_tip, positionLogHash=self.__position_tip)
+        return self.__checkpoint_value(self.cursor, self.__advance_tip, self.__position_tip)
+
+    def __checkpoint_value(self, cursor, advance_tip, position_tip):
+        if self.__storage_mode == 'shared-source-v1':
+            return dict(schemaVersion=2, artifact="BTL-TICK-SHARED-SOURCE-CHECKPOINT-1",
+                        sourcePin=deepcopy(self.__source_pin), cursor=deepcopy(cursor),
+                        advanceLogHash=advance_tip)
+        return dict(schemaVersion=2, artifact="BTL-TICK-CHECKPOINT-2", cursor=deepcopy(cursor),
+                    advanceLogHash=advance_tip, positionLogHash=position_tip)
 
     @classmethod
-    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64):
-        keys(checkpoint, "schemaVersion artifact cursor advanceLogHash positionLogHash")
-        require(checkpoint["artifact"] == "BTL-TICK-CHECKPOINT-2", "checkpoint", "SCHEMA_MISMATCH")
+    def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64, storage_mode=None, source_pin=None):
+        shared = type(checkpoint) is dict and checkpoint.get('artifact') == 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-1'
+        if shared:
+            keys(checkpoint, "schemaVersion artifact sourcePin cursor advanceLogHash")
+            require(storage_mode == 'shared-source-v1' and type(source_pin) is dict and
+                    checkpoint['schemaVersion'] == 2 and checkpoint['sourcePin'] == source_pin,
+                    'sourcePin', 'VERSION_MISMATCH')
+        else:
+            keys(checkpoint, "schemaVersion artifact cursor advanceLogHash positionLogHash")
+            require(checkpoint["artifact"] == "BTL-TICK-CHECKPOINT-2" and storage_mode in (None, 'session-log-v2'), "checkpoint", "SCHEMA_MISMATCH")
         canonical_v2_bytes(checkpoint)
         cursor = checkpoint["cursor"]
         keys(cursor, "schemaVersion artifact " + CURSOR_FIELDS)
         require(cursor["artifact"] == "BTL-TICK-CURSOR-2" and cursor["timelineVersion"] == VERSION, "cursor", "SCHEMA_MISMATCH")
-        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout, max_groups_per_advance=max_groups_per_advance)
+        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout, max_groups_per_advance=max_groups_per_advance, storage_mode='shared-source-v1' if shared else 'session-log-v2', source_pin=source_pin if shared else None)
         try:
             return result.__reconstruct(checkpoint, cursor)
         except BaseException:
@@ -648,18 +715,22 @@ class IndexedTickTimeline:
         # Verify the ORIGINAL position chain before replay can regenerate any
         # blocks. Reconstruction must not silently repair a missing/corrupt
         # acknowledged log and turn incomplete durable evidence into success.
-        remaining = uint(cursor["nextGroupIndex"])
-        for block in result.__blocks(checkpoint["positionLogHash"], "BTL-TICK-POSITION-LOG-2"):
-            for record in reversed(block["records"]):
-                keys(record, "groupIndex position groupId successorCursorHash")
-                remaining -= 1
-                require(remaining >= 0 and uint(record["groupIndex"]) == remaining, "position_log", "INCOMPLETE_INGESTION")
-                digest(record["groupId"], "groupId"); digest(record["successorCursorHash"], "cursorHash")
-                position = record["position"]
-                shape(position, "BTL-TICK-POSITION-2")
-                require(position["datasetId"] == result.__id and position["datasetVersion"] == result.__version
-                        and position["manifestHash"] == result.__version, "position_log", "VERSION_MISMATCH")
-        require(remaining == 0, "position_log", "INCOMPLETE_INGESTION")
+        if result.__storage_mode == 'session-log-v2':
+            remaining = uint(cursor["nextGroupIndex"])
+            for block in result.__blocks(checkpoint["positionLogHash"], "BTL-TICK-POSITION-LOG-2"):
+                for record in reversed(block["records"]):
+                    keys(record, "groupIndex position groupId successorCursorHash")
+                    remaining -= 1
+                    require(remaining >= 0 and uint(record["groupIndex"]) == remaining, "position_log", "INCOMPLETE_INGESTION")
+                    digest(record["groupId"], "groupId"); digest(record["successorCursorHash"], "cursorHash")
+                    position = record["position"]
+                    shape(position, "BTL-TICK-POSITION-2")
+                    require(position["datasetId"] == result.__id and position["datasetVersion"] == result.__version
+                            and position["manifestHash"] == result.__version, "position_log", "VERSION_MISMATCH")
+            require(remaining == 0, "position_log", "INCOMPLETE_INGESTION")
+        else:
+            require(checkpoint['advanceLogHash'] is None if uint(cursor['revision']) == 0 else checkpoint['advanceLogHash'] is not None,
+                    'advance_log', 'INCOMPLETE_INGESTION')
         result.__db.execute("CREATE TEMP TABLE reconstruction(blockIndex INTEGER PRIMARY KEY, record TEXT NOT NULL)")
         count = 0
         for block in result.__blocks(checkpoint["advanceLogHash"], "BTL-TICK-ADVANCE-LOG-2"):

@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 _data = defaultdict(lambda: {'wallNs': 0, 'cpuNs': 0, 'calls': 0})
+_command_samples_ns = defaultdict(list)
 _stage = 'setup'
 _installed = False
 
@@ -20,6 +21,8 @@ def _record(name, wall, cpu, server_cpu=0):
     row['cpuNs'] += cpu
     row['calls'] += 1
     if server_cpu: row['postgresServerCpuNs'] = row.get('postgresServerCpuNs', 0) + server_cpu
+    if name == 'command.total':
+        _command_samples_ns[_stage].append(wall)
 
 
 def _postgres_cpu_ns():
@@ -180,15 +183,27 @@ def snapshot():
     result = {}
     for (stage_name, name), value in sorted(_data.items()):
         result.setdefault(stage_name, {})[name] = dict(value)
+    if _command_samples_ns:
+        result['_commandLatencySamplesNs'] = {
+            stage_name: list(samples) for stage_name, samples in _command_samples_ns.items()
+        }
     return result
 
 
 def merge(*snapshots):
     result = defaultdict(lambda: defaultdict(lambda: {'wallNs': 0, 'cpuNs': 0, 'calls': 0}))
+    command_samples = defaultdict(list)
     for snap in snapshots:
         for stage_name, phases in snap.items():
+            if stage_name == '_commandLatencySamplesNs':
+                for sample_stage, samples in phases.items():
+                    command_samples[sample_stage].extend(samples)
+                continue
             for name, row in phases.items():
                 target = result[stage_name][name]
                 for key in ('wallNs', 'cpuNs', 'calls', 'postgresServerCpuNs'):
                     if key in row: target[key] = target.get(key, 0) + row[key]
-    return {stage_name: dict(phases) for stage_name, phases in result.items()}
+    merged = {stage_name: dict(phases) for stage_name, phases in result.items()}
+    if command_samples:
+        merged['_commandLatencySamplesNs'] = dict(command_samples)
+    return merged

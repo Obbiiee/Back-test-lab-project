@@ -26,7 +26,7 @@ def _sha(path):
 
 class AdmittedObservedSource:
     """Private model capability, not strict financial/source-quality eligibility."""
-    def __init__(self,folder,profile,*,receipt_path,receipt_sha256,log_root):
+    def __init__(self,folder,profile,*,receipt_path,receipt_sha256,log_root,timeline_storage_mode='session-log-v2'):
         require(type(profile) is ObservedExecutionProfile,'profile');digest(receipt_sha256,'receiptHash')
         self.profile=profile;self._folder=Path(folder);self._archive=self._folder/'archive.sqlite';proof=Path(receipt_path)
         require(not proof.is_symlink() and proof.stat().st_size<=1048576,'receipt','REFUSED_QUALIFICATION_PROOF')
@@ -65,12 +65,31 @@ class AdmittedObservedSource:
         # Admission is static operator configuration. No future catalog fields
         # or refusal diagnostics are projected into an active revealed view.
         self.dataset_id=p['datasetId'];self.version=p['datasetVersion'];self.log_root=Path(log_root);self.qualification_hash=receipt_sha256
+        require(timeline_storage_mode in ('session-log-v2','shared-source-v1'),
+                'timelineStorageMode','INVALID_INPUT')
+        if timeline_storage_mode=='shared-source-v1':
+            # This versioned path is only reachable from the isolated
+            # historical QA runner; production adapters keep the legacy mode.
+            require(bool(os.environ.get('BTL_HISTORICAL_QA_ROOT')) and
+                    os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1',
+                    'timelineStorageMode','REFUSED_QA_ONLY_MODE')
+        self.timeline_storage_mode=timeline_storage_mode
+        self.source_archive_sha256=archive_hash
+        self.source_pin=dict(schemaVersion=1,artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+            datasetId=self.dataset_id,datasetVersion=self.version,manifestHash=self.version,
+            rootHash=self.version,archiveSha256=archive_hash,
+            qualificationReceiptSha256=receipt_sha256)
+        probe=self.observed.provider()
+        try:
+            root=probe.describe_v2(self.dataset_id,self.version)['root']
+            self.source_pin['indexContentHash']=root['indexContentHash']
+        finally:probe.close()
         # Technical simulation eligibility is deliberately separate from strict
         # broker/source financial admission and from external data-use rights.
         self.technical_simulation_eligibility='PASS'
         self.execution_eligibility='NOT_GRANTED'
         self.execution_label=profile.wire.get('executionLabel','CONDITIONAL OBSERVED-TICK SIMULATION')
-        self.cache=IndexedTimelineCache(self)
+        self.cache=IndexedTimelineCache(self,timeline_storage_mode=timeline_storage_mode)
 
     def _protected_fingerprint(self):
         require(not self._folder.is_symlink() and not self._archive.is_symlink(),'source','REFUSED_UNPROTECTED_SOURCE')

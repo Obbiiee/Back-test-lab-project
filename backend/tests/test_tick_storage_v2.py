@@ -790,6 +790,82 @@ class TickStorageV2Tests(unittest.TestCase):
 
 
 
+class SharedSourceTimelineTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture=TickStorageV2Tests();self.fixture.setUp()
+
+    def tearDown(self):
+        self.fixture.tearDown()
+
+    def _pin(self, provider):
+        root=provider.describe_v2(provider.dataset_id,provider.dataset_version)['root']
+        return dict(schemaVersion=1,artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+            datasetId=provider.dataset_id,datasetVersion=provider.dataset_version,
+            manifestHash=provider.dataset_version,rootHash=hash_v2(root),
+            indexContentHash=root['indexContentHash'],archiveSha256='a'*64,
+            qualificationReceiptSha256='b'*64)
+
+    def test_shared_source_checkpoint_reconstructs_without_position_blocks(self):
+        _,provider=self.fixture.build()
+        from ticks.timeline_v2 import IndexedTickTimeline
+        pin=self._pin(provider)
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=self.fixture.path/'shared-log',storage_mode='shared-source-v1',source_pin=pin)
+        self.fixture.resources.append(timeline)
+        observed=pump(timeline,400)
+        checkpoint=timeline.checkpoint()
+        self.assertEqual(checkpoint['artifact'],'BTL-TICK-SHARED-SOURCE-CHECKPOINT-1')
+        self.assertIsNotNone(checkpoint['advanceLogHash'])
+        log=sqlite3.connect(self.fixture.path/'shared-log'/'timeline.sqlite')
+        try:
+            blocks=[json.loads(row[0]) for row in log.execute('SELECT CAST(body AS TEXT) FROM blocks')]
+        finally:log.close()
+        self.assertTrue(blocks)
+        self.assertTrue(all(block['artifact']=='BTL-TICK-ADVANCE-LOG-2' for block in blocks))
+        self.assertEqual(timeline.read_revealed('0',4),observed)
+        self.assertEqual(timeline.read_revealed('2',2),observed[2:4])
+        timeline.close()
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.fixture.path/'shared-log',
+            storage_mode='shared-source-v1',source_pin=pin)
+        self.fixture.resources.append(resumed)
+        self.assertEqual(resumed.checkpoint(),checkpoint)
+        self.assertEqual(resumed.read_revealed('0',4),observed)
+        with self.assertRaisesRegex(ValueError,'VERSION_MISMATCH'):
+            IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.fixture.path/'shared-log',
+                storage_mode='shared-source-v1',source_pin={**pin,'archiveSha256':'c'*64})
+
+    def test_shared_source_cold_resume_rejects_missing_advance_commitment(self):
+        _,provider=self.fixture.build()
+        from ticks.timeline_v2 import IndexedTickTimeline
+        pin=self._pin(provider);folder=self.fixture.path/'shared-missing'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v1',source_pin=pin)
+        pump(timeline,400);checkpoint=timeline.checkpoint();timeline.close()
+        log=sqlite3.connect(folder/'timeline.sqlite')
+        try:log.execute('DELETE FROM blocks');log.commit()
+        finally:log.close()
+        with self.assertRaisesRegex(ValueError,'INCOMPLETE_INGESTION'):
+            IndexedTickTimeline.resume(provider,checkpoint,log_folder=folder,
+                storage_mode='shared-source-v1',source_pin=pin)
+
+    def test_shared_source_cold_resume_rejects_corrupted_advance_chain(self):
+        _,provider=self.fixture.build()
+        from ticks.timeline_v2 import IndexedTickTimeline
+        pin=self._pin(provider);folder=self.fixture.path/'shared-corrupt'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v1',source_pin=pin,max_groups_per_advance=1)
+        pump(timeline,400);checkpoint=timeline.checkpoint();timeline.close()
+        log=sqlite3.connect(folder/'timeline.sqlite')
+        try:
+            tip=checkpoint['advanceLogHash'];body=log.execute('SELECT body FROM blocks WHERE hash=?',(tip,)).fetchone()[0]
+            block=json.loads(body);block['records'][0]['targetNs']='399'
+            log.execute('UPDATE blocks SET body=? WHERE hash=?',(json.dumps(block,sort_keys=True,separators=(',',':')),tip));log.commit()
+        finally:log.close()
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            IndexedTickTimeline.resume(provider,checkpoint,log_folder=folder,
+                storage_mode='shared-source-v1',source_pin=pin)
+
+
 class IncrementalCanonicalBudgetTests(unittest.TestCase):
     def test_exact_original_envelope_limits_and_failed_append_recovery(self):
         from ticks.contracts_v2 import CanonicalGroupBudget, canonical_v2_bytes

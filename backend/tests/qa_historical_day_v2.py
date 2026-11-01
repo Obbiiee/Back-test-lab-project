@@ -181,11 +181,20 @@ def command(sid, cid, revision, kind, payload=None):
                 kind=kind, payload=payload or {})
 
 
+def _command_latency_summary(samples_ns):
+    ordered=sorted(int(value) for value in samples_ns)
+    if not ordered:return dict(count=0,p50Ms=None,p95Ms=None)
+    def nearest_rank(percent):return ordered[max(0,(percent*len(ordered)+99)//100-1)]/1_000_000
+    return dict(count=len(ordered),p50Ms=round(nearest_rank(50),3),p95Ms=round(nearest_rank(95),3))
+
+
 def load_source(profile, source_path, proof_path, proof_hash, log_root):
     batch_groups=int(os.environ.get('BTL_QA_HISTORICAL_BATCH_GROUPS','64'))
     if batch_groups not in (64,96,128,256):raise RuntimeError('INVALID_QA_HISTORICAL_BATCH_GROUPS')
+    shared=os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1'
     source=AdmittedObservedSource(source_path, profile, receipt_path=proof_path,
-                                  receipt_sha256=proof_hash, log_root=log_root)
+                                  receipt_sha256=proof_hash, log_root=log_root,
+                                  timeline_storage_mode='shared-source-v1' if shared else 'session-log-v2')
     # This opt-in is confined to the isolated QA runner. Product and manual
     # replay keep IndexedTimelineCache's default of 64 groups.
     source.cache.max_groups_per_advance=batch_groups
@@ -879,6 +888,7 @@ def main():
     os.chmod(root/'memory-trace.jsonl',0o600)
     schedule_config=dict(schemaVersion=1,artifact='BTL-QA-REPLAY-CONFIG-1',batchGroups=batch_groups,
         maximumBatchGroups=256,continuousDays=day_count,orderDecisionBoundarySeconds=3600,
+        timelineStorageMode='shared-source-v1' if os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1' else 'session-log-v2',
         tradeScenario='OBSERVED_HOURLY_GRID_V1_TWO_PRICE_BANDS' if TRADE_GRID_V1 else 'ACCEPTED_CP5_DECISION_SCHEDULE',
         ordersPerHourlyDecision=8 if TRADE_GRID_V1 else 1,
         stopAfterCompletedTrades=STOP_AFTER_COMPLETED_TRADES if TRADE_GRID_V1 else None,
@@ -971,10 +981,12 @@ def main():
             raise RuntimeError('UTC_DAY_BOUNDARY_NOT_REACHED')
         verification_end=int(state['throughNs'])
         final=source=load_source(profile,SOURCE,PROOF,proof_hash,root/'source-logs-independent')
+        source.assert_current()
         with PERF.measured_stage('independent_verification'):
             verification=independent_verify(source,store,scope,session,start,verification_end,
                                             order_retention_policy=order_retention_policy)
             receipt_verification=verify_durable_receipts(dsn,scope.workspace_id,session,state['revision'])
+        source.assert_current()
         source.close()
         memory_sample(root,root/'postgres','independent_verification_complete',state=state,started=started)
         events=_all_events(store,scope,session)
@@ -1039,6 +1051,7 @@ def main():
                                     or qa_cache_stats.get('misses',0)<1):
             raise RuntimeError('QA_ARCHIVE_COLD_STATE_RECONSTRUCTION_NOT_PROVEN')
         phase_metrics=PERF.merge(PERF.snapshot(),worker_phases)
+        command_latency_samples=phase_metrics.pop('_commandLatencySamplesNs',{})
         replay_wall=sum(row.get('wallNs',0) for name,phases in phase_metrics.items()
                         if name=='replay' for key,row in phases.items() if key=='stage.wall')/1e9
         verify_wall=phase_metrics.get('independent_verification',{}).get('stage.wall',{}).get('wallNs',0)/1e9
@@ -1047,6 +1060,12 @@ def main():
         replay_apply=sum(row.get('wallNs',0) for name,phases in phase_metrics.items()
                          if name in ('replay','cold_resume_first_command') for key,row in phases.items() if key=='command.total')/1e9
         with connect(dsn) as db:postgres_db_bytes=int(db.execute('SELECT pg_database_size(current_database())').fetchone()[0])
+        timeline_files=[]
+        for timeline_path in sorted((root/'source-logs').rglob('timeline.sqlite')):
+            stat=timeline_path.stat()
+            timeline_files.append(dict(path=str(timeline_path.relative_to(root)),
+                allocatedBytes=stat.st_blocks*512,logicalBytes=stat.st_size))
+        timeline_allocated=sum(item['allocatedBytes'] for item in timeline_files)
         actual_end_date=datetime.fromtimestamp(verification_end//S,timezone.utc).strftime('%Y-%m-%d')
         actual_days=((verification_end-start)//(86400*S))+1
         summary=dict(status='PASS',classification=profile.wire['executionLabel'],
@@ -1062,6 +1081,8 @@ def main():
             sourceProvenance='PROVIDER_OBSERVATION',datasetId=profile.wire['primary']['datasetId'],
             datasetVersion=profile.wire['primary']['datasetVersion'],qualificationReceiptSha256=proof_hash,
             archiveSha256=proof['snapshotSha256'],period=DAY if actual_days==1 else DAY+'/'+actual_end_date,
+            timelineStorageMode='shared-source-v1' if os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1' else 'session-log-v2',
+            sharedSourceBinding=(source.source_pin if os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1' else None),
             dayStartNs=str(start),dayEndNs=str(verification_end),requestedPeriodEndNs=str(day_end),continuousDays=actual_days,
             firstSourceQuoteNs=verification['firstSourceQuoteNs'],lastSourceQuoteNs=verification['lastSourceQuoteNs'],
             tickCount=verification['independentSourceTicks'],timestampGroupCount=verification['independentTimestampGroups'],
@@ -1103,8 +1124,11 @@ def main():
                     phase_metrics.get('cold_resume_first_command',{}).get('stage.wall',{}).get('wallNs',0)/1e9,3),
                 controllerApplyWallSeconds=round(replay_apply,3),postgresPrepareWallSeconds=round(pg_prepare,3),
                 postgresCommitWallSeconds=round(pg_commit,3),postgresPersistenceWallSeconds=round(pg_prepare+pg_commit,3),
-                independentFullVerificationWallSeconds=round(verify_wall,3)),
+                independentFullVerificationWallSeconds=round(verify_wall,3),
+                commandLatencyMs=dict(replay=_command_latency_summary(command_latency_samples.get('replay',[])),
+                    coldResumeFirstCommand=_command_latency_summary(command_latency_samples.get('cold_resume_first_command',[])))),
             storage=dict(postgresDatabaseBytes=postgres_db_bytes,postgresClusterAllocatedBytes=allocated(root/'postgres'),
+                perSessionTimelineAllocatedBytes=timeline_allocated,perSessionTimelineFiles=timeline_files,
                 totalQaArtifactBytes=allocated(root)),
             measured=dict(elapsedSeconds=round(time.monotonic()-started,3),cpuSeconds=round(resource_sample(root/'postgres')[0]-metrics['cpuStart'],3),
                           peakRamBytes=max(PEAK_RAM,worker_resource.get('peakRamBytes',0),memory_summary['peakCapMethodSampleBytes']),peakArtifactBytes=max(PEAK_ARTIFACT,worker_resource.get('peakArtifactBytes',0),allocated(root)),
@@ -1122,8 +1146,13 @@ def main():
             endingBalance=state['balance'],realizedGross=state['realizedGross'])
         if day_count==1 and not TRADE_GRID_V1:
             expected=decision_fixture['baselineResults']
+            # This runner now reports the partial-exit count explicitly. The
+            # accepted decision schedule has no partial-close probe; require
+            # zero when the older pinned golden omits this measurement.
+            expected_match=all(actual.get(key)==value for key,value in expected.items()) and \
+                actual['partialCloseExitEvents']==expected.get('partialCloseExitEvents',0)
             if (semantic_event_hash!=decision_fixture['baselineSemanticFinancialEventSha256'] or
-                financial_state_hash!=decision_fixture['baselineFinancialStateSha256'] or actual!=expected):
+                financial_state_hash!=decision_fixture['baselineFinancialStateSha256'] or not expected_match):
                 summary['status']='FAIL';summary['acceptanceFailure']='CANONICAL_FINANCIAL_PARITY_MISMATCH'
                 summary['baselineParityExpected']=expected;summary['candidateParityActual']=actual
         else:

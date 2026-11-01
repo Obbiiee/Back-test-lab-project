@@ -54,8 +54,18 @@ def order_limits(policy=None):
 
 
 def _checkpoint(cp, profile):
-    keys(cp, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
-    require(type(cp['schemaVersion']) is int and cp['schemaVersion']==2 and cp['artifact']=='BTL-TICK-CHECKPOINT-2', 'checkpoint')
+    shared=type(cp) is dict and cp.get('artifact')=='BTL-TICK-SHARED-SOURCE-CHECKPOINT-1'
+    if shared:
+        keys(cp,'schemaVersion artifact sourcePin cursor advanceLogHash')
+        pin=cp['sourcePin']
+        keys(pin,'schemaVersion artifact datasetId datasetVersion manifestHash rootHash indexContentHash archiveSha256 qualificationReceiptSha256')
+        require(pin['schemaVersion']==1 and pin['artifact']=='BTL-QA-SHARED-SOURCE-PIN-1',
+                'sourcePin','CORRUPT_RECORD')
+        for key in ('datasetVersion','manifestHash','rootHash','indexContentHash','archiveSha256','qualificationReceiptSha256'):
+            digest(pin[key],key)
+    else:
+        keys(cp, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
+        require(type(cp['schemaVersion']) is int and cp['schemaVersion']==2 and cp['artifact']=='BTL-TICK-CHECKPOINT-2', 'checkpoint')
     cursor=cp['cursor'];keys(cursor, 'schemaVersion artifact '+CURSOR_FIELDS)
     require(type(cursor['schemaVersion']) is int and cursor['schemaVersion']==2 and cursor['artifact']=='BTL-TICK-CURSOR-2'
             and cursor['timelineVersion']==TIMELINE_VERSION and cursor['generation']=='0', 'cursor')
@@ -65,8 +75,15 @@ def _checkpoint(cp, profile):
     require(int(cursor['sessionStartNs'])<=int(cursor['throughNs']), 'time')
     if cursor['pendingTargetNs'] is not None:require(uint(cursor['pendingTargetNs'])>=int(cursor['throughNs']), 'target')
     for h in (cursor['visiblePrefixHash'],):digest(h, 'digest')
-    for h in (cursor['lastGroupId'],cp['advanceLogHash'],cp['positionLogHash']):
+    for h in (cursor['lastGroupId'],cp['advanceLogHash'],None if shared else cp['positionLogHash']):
         if h is not None:digest(h, 'digest')
+    if shared:
+        require(cp['schemaVersion']==2 and pin['datasetId']==p['datasetId'] and
+                pin['datasetVersion']==p['datasetVersion'] and pin['manifestHash']==p['datasetVersion'] and
+                pin['rootHash']==p['datasetVersion'] and
+                ((int(cursor['revision'])==0 and cp['advanceLogHash'] is None) or
+                 (int(cursor['revision'])>0 and cp['advanceLogHash'] is not None)),
+                'sourcePin','REFUSED_OBSERVED_SOURCE_IDENTITY')
     canonical_v2_bytes(cp)
     return cursor
 

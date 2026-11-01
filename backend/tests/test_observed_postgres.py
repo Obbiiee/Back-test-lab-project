@@ -35,7 +35,8 @@ def worker():
     import execution.observed_postgres as storage
     from execution.observed_profile import ObservedExecutionProfile
     data=json.loads(os.environ['BTL_OBSERVED_WORKER']);profile=ObservedExecutionProfile.from_wire(data['profile'])
-    source=AdmittedObservedSource(data['folder'],profile,receipt_path=data['proof'],receipt_sha256=data['proofHash'],log_root=data['logs'])
+    source=AdmittedObservedSource(data['folder'],profile,receipt_path=data['proof'],receipt_sha256=data['proofHash'],
+        log_root=data['logs'],timeline_storage_mode=data.get('timelineStorageMode','session-log-v2'))
     if data['phase']=='before':
         native=storage.connect;calls=[0]
         @contextmanager
@@ -308,6 +309,51 @@ class ObservedPostgresTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'REFUSED_IDEMPOTENCY_CONFLICT'):self.controller().apply(self.scope,changed)
         with self.assertRaisesRegex(ValueError,'RESOURCE_UNAVAILABLE'):self.controller().inspect(TrustedScope('other:workspace','other:actor'),self.sid)
         with self.assertRaises(ValueError):self.controller().inspect({'workspace_id':self.scope.workspace_id},self.sid)
+
+    def test_shared_source_checkpoint_survives_pg_sigkill_after_commit_and_retry(self):
+        from unittest.mock import patch
+        suffix=uuid.uuid4().hex[:10]
+        shared_dsn=isolated_database(DSN,'sharedsrc_'+suffix)
+        shared_scope=TrustedScope('observedqa:shared:'+suffix,'authored:actor')
+        sid='session:shared:'+suffix;logs=self.root/'shared-source-controller-logs'
+        qa_env={'BTL_HISTORICAL_QA_ROOT':str(self.root),'BTL_QA_SHARED_CANONICAL_SOURCE_V1':'1'}
+        with patch.dict(os.environ,qa_env):
+            shared=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
+                receipt_sha256=self.proof_hash,log_root=logs,timeline_storage_mode='shared-source-v1')
+            store=ObservedExecutionStore(shared_dsn)
+            controller=ObservedExecutionController(store,lambda _:shared)
+            seeded=controller.create(shared_scope,sid,self.fx.profile,self.fx.policy,period='1970-01')
+            self.assertEqual(seeded['nextGroupIndex'],'0')
+            self.assertEqual(len(seeded['sourceCheckpointHash']),64)
+            first=controller.apply(shared_scope,command(sid,'shared:quote',0,'ADVANCE',dict(targetNs='0')))
+            self.assertEqual(first['state']['nextGroupIndex'],'1')
+            basis=first['state']['quoteBasis']
+            order_raw=command(sid,'shared:sigkill:open',1,'OPEN',dict(side='LONG',orderType='MARKET',
+                workflow='QUICK',entry=basis['ask'],quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]))
+            shared.close()
+        data=dict(profile=self.fx.profile.wire,folder=str(self.folder),proof=str(self.proof),proofHash=self.proof_hash,
+            logs=str(logs),workspace=shared_scope.workspace_id,actor=shared_scope.actor_ref,session=sid,
+            dsn=shared_dsn,command=order_raw,phase='delta_after_commit',timelineStorageMode='shared-source-v1')
+        env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(data),BTL_TEST_DATABASE_URL=shared_dsn,**qa_env)
+        proc=subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],
+            env=env,capture_output=True,text=True,timeout=90)
+        self.assertEqual(proc.returncode,-signal.SIGKILL,proc.stderr)
+        with patch.dict(os.environ,qa_env):
+            cold_source=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
+                receipt_sha256=self.proof_hash,log_root=logs,timeline_storage_mode='shared-source-v1')
+            cold_store=ObservedExecutionStore(shared_dsn)
+            cold=ObservedExecutionController(cold_store,lambda _:cold_source)
+            committed=cold.inspect(shared_scope,sid)
+            self.assertEqual(committed['state']['revision'],2)
+            retry=cold.apply(shared_scope,order_raw)
+            self.assertEqual(retry['state'],committed['state'])
+            self.assertEqual(retry,cold.apply(shared_scope,order_raw))
+            self.assertEqual(sum(event['kind']=='ORDER_ACCEPTED' for event in cold_store.inspect(shared_scope,sid)['events']),1)
+            advanced=cold.apply(shared_scope,command(sid,'shared:cold:advance',2,'ADVANCE',dict(targetNs=str(2*S))))
+            self.assertEqual(advanced['state']['nextGroupIndex'],'3')
+            self.assertEqual(advanced['state']['balance'],'10000')
+            self.assertEqual(sum(event['kind']=='ENTRY_FILL' for event in cold_store.inspect(shared_scope,sid)['events']),1)
+            cold_source.close()
 
     def test_before_commit_process_death_rolls_back_after_commit_death_retries_once(self):
         raw=command(self.sid,'worker',0,'ADVANCE',dict(targetNs='0'))

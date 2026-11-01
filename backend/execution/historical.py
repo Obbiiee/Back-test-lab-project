@@ -152,8 +152,11 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
 """
     indexed = True
 
-    def __init__(self, source):
+    def __init__(self, source, *, timeline_storage_mode='session-log-v2'):
         self.source = source
+        require(timeline_storage_mode in ('session-log-v2','shared-source-v1'),
+                'timelineStorageMode','INVALID_INPUT')
+        self.timeline_storage_mode=timeline_storage_mode
         self._lock = RLock()
         self._entries = OrderedDict()
         self._creating = {}
@@ -164,15 +167,23 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
         self.max_groups_per_advance = 64
 
     def validate_checkpoint(self, checkpoint):
-        keys(checkpoint, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
-        require(checkpoint['artifact'] == 'BTL-TICK-CHECKPOINT-2', 'checkpoint', 'CORRUPT_RECORD')
+        if type(checkpoint) is dict and checkpoint.get('artifact')=='BTL-TICK-SHARED-SOURCE-CHECKPOINT-1':
+            keys(checkpoint, 'schemaVersion artifact sourcePin cursor advanceLogHash')
+            require(self.timeline_storage_mode=='shared-source-v1' and checkpoint['schemaVersion']==2 and
+                    checkpoint['sourcePin']==self.source.source_pin,
+                    'checkpoint','REFUSED_DATASET_VERSION')
+        else:
+            keys(checkpoint, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
+            require(checkpoint['artifact'] == 'BTL-TICK-CHECKPOINT-2' and
+                    self.timeline_storage_mode=='session-log-v2', 'checkpoint', 'CORRUPT_RECORD')
         canonical_v2_bytes(checkpoint)
         require(checkpoint['cursor']['datasetId'] == self.source.dataset_id and
                 checkpoint['cursor']['datasetVersion'] == self.source.version, 'dataset', 'REFUSED_DATASET_VERSION')
 
     def _folder(self, scope, session):
         name = content_hash(dict(schemaVersion=1, artifact='BTL-PRIVATE-SESSION-LOG-1',
-                                 workspace=scope.workspace_id, session=session, datasetVersion=self.source.version))
+                                 workspace=scope.workspace_id, session=session, datasetVersion=self.source.version,
+                                 timelineStorageMode=self.timeline_storage_mode))
         return self.source.log_root/name
 
     def _key(self, scope, session, checkpoint):
@@ -186,7 +197,9 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
                 timeline = IndexedTickTimeline(provider, self.source.dataset_id, self.source.version, str(start),
                                                log_folder=self._folder(scope, session), allow_threads=True,
                                                log_codec=os.environ.get('BTL_QA_TIMELINE_LOG_CODEC'),
-                                               max_groups_per_advance=self.max_groups_per_advance)
+                                               max_groups_per_advance=self.max_groups_per_advance,
+                                               storage_mode=self.timeline_storage_mode,
+                                               source_pin=self.source.source_pin if self.timeline_storage_mode=='shared-source-v1' else None)
             except BaseException:
                 provider.close(); raise
             self._creating[id(timeline)] = provider
@@ -223,7 +236,9 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             try:
                 timeline = IndexedTickTimeline.resume(provider, checkpoint, log_folder=self._folder(scope, session),
                                                        allow_threads=True,
-                                                       max_groups_per_advance=self.max_groups_per_advance)
+                                                       max_groups_per_advance=self.max_groups_per_advance,
+                                                       storage_mode=self.timeline_storage_mode,
+                                                       source_pin=self.source.source_pin if self.timeline_storage_mode=='shared-source-v1' else None)
             except BaseException:
                 provider.close(); raise
             self._publish(scope, session, timeline, provider)
