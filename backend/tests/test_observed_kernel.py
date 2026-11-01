@@ -9,7 +9,7 @@ import unittest
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.models import MethodPolicy
 from execution.observed_profile import ObservedExecutionProfile, MODEL_V2, historical_technical_profile
-from execution.observed_kernel import (QA_ORDER_RETENTION_V2, QA_ORDER_RETENTION_V3, apply, order_limits, seed_state,
+from execution.observed_kernel import (QA_ORDER_RETENTION_V2, QA_ORDER_RETENTION_V3, QA_ORDER_RETENTION_V4, apply, order_limits, seed_state,
                                        validate_snapshot, validate_state)
 from execution.contracts import validate_state as old_validate_state
 from ticks.compact_v2 import CompactDatasetBuilder
@@ -143,10 +143,14 @@ class ObservedKernelTests(unittest.TestCase):
         self.assertEqual(order_limits(),(128,128))
         self.assertEqual(order_limits(QA_ORDER_RETENTION_V2),(512,128))
         self.assertEqual(order_limits(QA_ORDER_RETENTION_V3),(1024,128))
+        self.assertEqual(order_limits(QA_ORDER_RETENTION_V4),(4096,128))
         changed=deepcopy(QA_ORDER_RETENTION_V2);changed['maxCumulativeOrders']=513
         with self.assertRaisesRegex(ValueError,'REFUSED_POLICY'):
             order_limits(changed)
         changed=deepcopy(QA_ORDER_RETENTION_V3);changed['maxActiveOrders']=129
+        with self.assertRaisesRegex(ValueError,'REFUSED_POLICY'):
+            order_limits(changed)
+        changed=deepcopy(QA_ORDER_RETENTION_V4);changed['maxActiveOrders']=129
         with self.assertRaisesRegex(ValueError,'REFUSED_POLICY'):
             order_limits(changed)
 

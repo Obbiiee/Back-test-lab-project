@@ -27,6 +27,8 @@ QA_ORDER_RETENTION_V2 = dict(schemaVersion=1,artifact='BTL-QA-ORDER-RETENTION-2'
                             maxCumulativeOrders=512,maxActiveOrders=MAX_ACTIVE_ORDERS)
 QA_ORDER_RETENTION_V3 = dict(schemaVersion=1,artifact='BTL-QA-ORDER-RETENTION-3',scope='ISOLATED_QA_ONLY',
                             maxCumulativeOrders=1024,maxActiveOrders=MAX_ACTIVE_ORDERS)
+QA_ORDER_RETENTION_V4 = dict(schemaVersion=1,artifact='BTL-QA-ORDER-RETENTION-4',scope='ISOLATED_QA_ONLY',
+                            maxCumulativeOrders=4096,maxActiveOrders=MAX_ACTIVE_ORDERS)
 STATE_FIELDS = ('sessionId datasetId datasetVersion engineVersion model profile profileHash policy revision '
                 'initialBalance balance realizedGross commission startNs throughNs nextGroupIndex nextEventIndex '
                 'eventHash sourceCheckpointHash sourcePrefixHash sourceCursorRevision lastObservedNs quoteBasis orders unresolved ended financial parent')
@@ -44,7 +46,8 @@ def _tag(raw, artifact, fields):
 def order_limits(policy=None):
     if policy is None:return MAX_ORDERS,MAX_ORDERS
     keys(policy,'schemaVersion artifact scope maxCumulativeOrders maxActiveOrders')
-    require(policy in (QA_ORDER_RETENTION_V2,QA_ORDER_RETENTION_V3) and policy['scope']=='ISOLATED_QA_ONLY',
+    require(policy in (QA_ORDER_RETENTION_V2,QA_ORDER_RETENTION_V3,QA_ORDER_RETENTION_V4)
+            and policy['scope']=='ISOLATED_QA_ONLY',
             'orderRetention','REFUSED_POLICY')
     canonical_bytes(policy)
     return policy['maxCumulativeOrders'],policy['maxActiveOrders']
@@ -95,7 +98,7 @@ def validate_state(state,*,order_retention_policy=None):
         for eid in basis['eventIds']:digest(eid, 'digest')
         require(price(basis['bid'],p)<=price(basis['ask'],p),'basis')
     max_cumulative,max_active=order_limits(order_retention_policy)
-    require(archive_v1 or order_retention_policy!=QA_ORDER_RETENTION_V3,
+    require(archive_v1 or order_retention_policy not in (QA_ORDER_RETENTION_V3,QA_ORDER_RETENTION_V4),
             'orderRetention','REFUSED_POLICY')
     require(type(state['orders']) is dict,'orders','CORRUPT_RECORD')
     if archive_v1:
