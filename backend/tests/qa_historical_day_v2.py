@@ -1161,8 +1161,12 @@ def main():
             events_after=_all_events(store,scope,session)
             counts_after=(event_rows_after,sum(e['kind']=='ENTRY_FILL' for e in events_after),
                           sum(e['kind']=='EXIT_FILL' for e in events_after))
-            if (state_after_retry['revision']!=state['revision'] or counts_after!=counts_before or
-                    opening_retry['state']['revision']!=state['revision']):
+            # The embedded command result carries the revision of the command's
+            # own snapshot (1 for the original opening command), not the current
+            # session revision. Idempotency is established by identical receipts;
+            # session immutability is checked against durable session state and
+            # event/fill counts above.
+            if state_after_retry['revision']!=state['revision'] or counts_after!=counts_before:
                 raise RuntimeError('RESUME_ANNUAL_IDEMPOTENCY_MUTATED_SESSION')
             checkpoint_evidence=dict(status='PASS',sessionId=session,revision=state['revision'],
                 nextGroupIndex=str(state['nextGroupIndex']),throughNs=state['throughNs'],

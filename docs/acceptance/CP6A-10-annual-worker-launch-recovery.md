@@ -1,6 +1,6 @@
 # CP6A-10 Annual Worker Launch and Recovery
 
-**Status:** worker-launch fix and checkpoint recovery validated; annual replay is ready to resume but has not yet restarted.
+**Status:** launcher and recovery gates PASS; annual resume attempt 2 is authorized to start from the verified checkpoint.
 
 ## Root cause
 
@@ -12,17 +12,22 @@ The parent now writes structured worker state to `year/cold-resume-worker.json` 
 
 Financial semantics, market source identity, annual decision schedule, cumulative order limit, rights classification, and execution eligibility are unchanged.
 
+The first guarded resume attempt stopped before creating the worker payload because the added retry assertion compared the opening command response's embedded snapshot revision (`1`) with the annual Session revision (`548`). A direct repeat against the existing database proved both retry responses identical, the Session revision unchanged, the event/fill counts unchanged, and the receipt/checkpoint chains valid. The guard now compares the Session revision and event/fill counts for mutation, while identical retry receipts establish idempotency. No annual progress or finance state was changed by the failed attempt. Resume attempt evidence is isolated under `annual-resume-attempt-2/`.
+
 ## Validation
 
 - Launcher regression: **2/2 PASS**, including exact bounded `E2BIG` reproduction and successful child startup with an 8,784-target file payload; altered payload digest is rejected.
 - Annual schedule regression: **3/3 PASS**.
 - PostgreSQL, financial-kernel, recovery, and delta-v3 scale regressions: **60/60 PASS** under 1 CPU, 1 GiB RAM, zero swap, and single-core affinity. The scale report confirms cold resume, exact retry, post-commit SIGKILL recovery, independent delta reconstruction, receipt and event-chain verification, and rejection of missing, reordered, and corrupted deltas.
 - Existing annual checkpoint reopened and independently verified without advancing or changing it: **PASS**. Revision 548, group index 137708, 548 command receipts and 549 checkpoints; 557 events, 7 entry fills and 7 exit fills before and after the idempotent retry. State event hash and checkpoint chain hash were verified.
+- The first resume attempt's over-strict revision assertion stopped safely before launching a worker; its original report/logs are preserved. The corrected guard is covered by the checkpoint retry probe and is now running through the isolated persistent annual-resume systemd service.
 - Existing week and month reports and annual resource preflight remain **PASS**. The annual replay itself is still incomplete and is not yet a PASS.
 
 ## Evidence
 
 - `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/annual-resume-regressions/targeted-postgres-finance-recovery.log`
+- `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/annual-resume-regressions/targeted-postgres-finance-recovery-fix2.log`
+- `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/annual-resume-regressions/resume-checkpoint-diagnostic-attempt1.json`
 - `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/annual-resume-regressions/delta-v3-scale-report.json`
 - `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/annual-resume-regressions/resume-checkpoint-preflight.json`
 - `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/annual-resource-preflight.json`

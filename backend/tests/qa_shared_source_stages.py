@@ -189,7 +189,7 @@ def _annual_preflight(root, month):
         sourceRights='UNKNOWN', executionEligibility='NOT_GRANTED')
 
 
-def resume_annual(evidence_root):
+def resume_annual(evidence_root, attempt_number):
     evidence_root = Path(evidence_root).resolve(strict=True)
     lock_path = evidence_root/'annual-resume.lock'
     lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
@@ -250,11 +250,11 @@ def resume_annual(evidence_root):
                               if line.startswith('MemAvailable:')))*1024
     if memory_available<2*1024**3:
         raise RuntimeError('ANNUAL_RESUME_HOST_MEMORY_HEADROOM_FAIL')
-    status_path=evidence_root/'annual-resume-state.json'
-    report_path=evidence_root/'annual-resume-report.json'
-    annual_log=evidence_root/'annual-resume-runner.log'
-    if any(path.exists() for path in (status_path,report_path,annual_log)):
-        raise RuntimeError('ANNUAL_RESUME_EVIDENCE_PATH_ALREADY_EXISTS')
+    attempt_root=evidence_root/f'annual-resume-attempt-{attempt_number}'
+    attempt_root.mkdir(mode=0o700)
+    status_path=attempt_root/'state.json'
+    report_path=attempt_root/'report.json'
+    annual_log=attempt_root/'runner.log'
     started_utc=datetime.now(timezone.utc).isoformat()
     preflight_time=datetime.fromisoformat(preflight['checkedUtc'])
     stopped_time=datetime.fromisoformat(old_report['stoppedUtc'])
@@ -366,10 +366,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--evidence-root', required=True, type=Path)
     parser.add_argument('--resume-annual', action='store_true')
+    parser.add_argument('--resume-attempt', type=int, default=1)
     args = parser.parse_args()
     try:
         if args.resume_annual:
-            resume_annual(args.evidence_root)
+            resume_annual(args.evidence_root,args.resume_attempt)
         else:
             run(args.evidence_root)
     except Exception as error:
@@ -380,12 +381,12 @@ def main():
                              errorCode=str(error),stoppedUtc=datetime.now(timezone.utc).isoformat(),
                              evidenceRoot=str(root))
                 if args.resume_annual:
-                    report_path=root/'annual-resume-report.json'
+                    report_path=root/f'annual-resume-attempt-{args.resume_attempt}'/'report.json'
                     existing=json.loads(report_path.read_text()) if report_path.exists() else {}
                     existing.update(stopped)
                     if 'errorCode' not in existing:existing['errorCode']=str(error)
                     _write(report_path,existing)
-                    _write(root/'annual-resume-state.json',existing)
+                    _write(root/f'annual-resume-attempt-{args.resume_attempt}'/'state.json',existing)
                 else:
                     report_path = root / 'stage-runner-report.json'
                     failure = json.loads(report_path.read_text()) if report_path.exists() else {}
