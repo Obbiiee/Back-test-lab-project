@@ -2,6 +2,12 @@
 
 **State:** detailed execution sequence designed now; implementation, VPS benchmarks, migration and frontend coding not authorized merely by merging documentation. Each checkpoint begins only after previous dependency and specific owner authorization. Preserve current main, Alpha state and financial/data source evidence.
 
+## Executable GitHub checkpoint assignments (design-synchronized 2026-11-04)
+
+This plan's Phase 0–11 is the higher-level work graph; **the exact Codex implementation subissues live in** [B00–B12 runbook](16_CODEX_BACKEND_EXECUTION_RUNBOOK.md) and [GitHub Epic #22](https://github.com/Obbiiee/Back-test-lab-project/issues/22) (issues #23–#35). Claude's concrete frontend implementation is [Issue #21](https://github.com/Obbiiee/Back-test-lab-project/issues/21) and frontend runbook [15](15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md). Actual endpoint/mutation/drawing/indicator contracts: [17](17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md). The [current factual status](18_CURRENT_GITHUB_READINESS_20261104.md) prevents treating documentation or open issues as tested code.
+
+**Critical overlap:** Codex B01 must publish real OpenAPI SHA early. After B01, **B08 drawing/indicator preferences APIs run in parallel with B02–B07**; Claude may implement responsive components and indicator calculation against pinned fixtures. Don't require Claude to wait for Parquet benchmark before basic UI. The backend must serve verified bounded causal candles, but **does not reimplement Claude's 50 price-indicator calculators**. No worktree is required or authorized: use actual remote GitHub branches, ordinary checkout/direct GitHub connector, commit/push/PR.
+
 ## Work organization: two parallel tracks, one integration gate
 
 **Codex — Backend/Data:** domain contracts, versioned API, market data adapters, finance/goldens, DB/event store, verification, security, capacity.
