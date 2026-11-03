@@ -1,5 +1,7 @@
 # 04 — Frontend Design, Responsive Workflows and Installable App
 
+**Detailed implementation owners:** [click navigation 10](10_FRONTEND_CLICK_BY_CLICK_JOURNEYS.md), [desktop terminal 11](11_TRADINGVIEW_LIKE_DESKTOP_TERMINAL.md), [mobile/tablet/app 12](12_MOBILE_TABLET_APP_EXACT_SPEC.md), [screen wireframes/component map 13](13_CLAUDE_SCREEN_WIREFRAMES_COMPONENTS.md), [professional tools 14](14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md), [Claude runbook 15](15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md). These explicit interaction specs govern Claude UI handoff without changing canonical server finance.
+
 **Claude owns this UI design and React code. Codex owns authoritative APIs and finance.** The current frontend is React + Vite + Lightweight Charts, NOT the old hypothetical Next.js layout. No new framework, no duplicate financial simulator, no frontend-generated fills.
 
 ## Platform decision
