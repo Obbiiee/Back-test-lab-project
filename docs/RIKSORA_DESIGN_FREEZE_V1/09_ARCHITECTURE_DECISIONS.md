@@ -20,7 +20,7 @@
 | ADR-012 | Versioned API/OpenAPI/fixtures and strict Codex backend vs Claude frontend ownership | undocumented API inference, shared silent edits | contract SHA pins, linked PR and E2E |
 | ADR-013 | Single VPS until evidence proves saturation; cold cached partitions, bounded worker/pool | second VPS or 2TB purchase from guessed catalog footprint | one-VPS/S3 cost gate after real source benchmark |
 | ADR-014 | Off-node encrypted backup, restore rehearsal, reachability-aware dataset/ledger retention | disk-only backup, deleting QA/source by rough GB | RPO/RTO and immutable hash restore evidence |
-| ADR-015 | PWA installable app v1; optional native store wrapper later | rewrite React app separately in native mobile | mobile Safari/Android PWA + permissions QA |
+| ADR-015 | Installable PWA first; **Capacitor Android/iOS shell as the store-app packaging target after PWA parity** | rewrite React/financial logic in separate native mobile apps | mobile web/PWA QA then native lifecycle/deep-link/signing/store QA |
 | ADR-016 | Point-in-time author-observed Opportunity Journal light fields; AI counterfactual later | pretending trade-only records capture every missed setup | no imaginary hypothetical fills |
 
 ## Ownership of physical choices (no rewrite permission)
