@@ -43,6 +43,9 @@ Old high-level blueprint references to a Next.js app are **superseded as an impl
 | [13_CLAUDE_SCREEN_WIREFRAMES_COMPONENTS.md](13_CLAUDE_SCREEN_WIREFRAMES_COMPONENTS.md) | Actual wireframes for all core screens and React component/route ownership | Claude |
 | [14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md](14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md) | Complete 27-tool design target, 22-indicator design catalog, geometry, input and QA | Claude + Codex math validators |
 | [15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md](15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md) | Scoped Claude frontend coding stages F00–F12, tests and API SHA handoff | Claude |
+| [16_CODEX_BACKEND_EXECUTION_RUNBOOK.md](16_CODEX_BACKEND_EXECUTION_RUNBOOK.md) | Codex executable B00–B12, source/Parquet/Session/FX/API/capacity checkpoints; [backend Epic #22](https://github.com/Obbiiee/Back-test-lab-project/issues/22) | Codex |
+| [17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md](17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md) | 19 real/proposed endpoint contracts; drawing/indicator/Session/replay contract and actual SHA handoff | Codex + Claude |
+| [18_CURRENT_GITHUB_READINESS_20261104.md](18_CURRENT_GITHUB_READINESS_20261104.md) | Verified status vs unknown live VPS and next earliest execution gate | Owner + reviewer |
 
 ## Levels of freeze
 
