@@ -37,6 +37,12 @@ Old high-level blueprint references to a Next.js app are **superseded as an impl
 | [07_VERIFICATION_AND_UNKNOWNS.md](07_VERIFICATION_AND_UNKNOWNS.md) | executable acceptance matrix, finite known-unknown decisions, stop gates | QA + Codex |
 | [08_STEP_BY_STEP_EXECUTION.md](08_STEP_BY_STEP_EXECUTION.md) | ordered implementation checkpoints, dependency/rollback/DoD | Codex + Claude |
 | [09_ARCHITECTURE_DECISIONS.md](09_ARCHITECTURE_DECISIONS.md) | ADRs, frozen vs replaceable, migration/version/change control | Owner + reviewer |
+| [10_FRONTEND_CLICK_BY_CLICK_JOURNEYS.md](10_FRONTEND_CLICK_BY_CLICK_JOURNEYS.md) | Click-by-click route/action and user flow navigation matrix | Claude |
+| [11_TRADINGVIEW_LIKE_DESKTOP_TERMINAL.md](11_TRADINGVIEW_LIKE_DESKTOP_TERMINAL.md) | Chart-first laptop terminal, exact 9 drawings + 2 position planners, 7 indicators, trading ticket | Claude |
+| [12_MOBILE_TABLET_APP_EXACT_SPEC.md](12_MOBILE_TABLET_APP_EXACT_SPEC.md) | 320–1024 mobile/tablet layouts, touch gestures, landscape, PWA and app lifecycle | Claude |
+| [13_CLAUDE_SCREEN_WIREFRAMES_COMPONENTS.md](13_CLAUDE_SCREEN_WIREFRAMES_COMPONENTS.md) | Actual wireframes for all core screens and React component/route ownership | Claude |
+| [14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md](14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md) | Complete 27-tool design target, 22-indicator design catalog, geometry, input and QA | Claude + Codex math validators |
+| [15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md](15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md) | Scoped Claude frontend coding stages F00–F12, tests and API SHA handoff | Claude |
 
 ## Levels of freeze
 
