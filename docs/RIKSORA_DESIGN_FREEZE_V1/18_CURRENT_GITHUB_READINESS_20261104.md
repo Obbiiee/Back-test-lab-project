@@ -16,7 +16,7 @@
 
 | Area | Verified facts | Next PASS gate | Status label |
 | --- | --- | --- | --- |
-| Product rules / complete UX design handoff | 16 detailed docs in Draft PR #20, user workflow and Claude tools spec | joint review/approval and no contract contradiction | **DESIGNED / DRAFT_REVIEW** |
+| Product rules / complete UX design handoff | 19 linked docs (README + 01–18) in Draft PR #20, user workflow and Claude tools spec | joint review/approval and no contract contradiction | **DESIGNED / DRAFT_REVIEW** |
 | Backend basic V2 source/engine/Research/API | source modules on main and old test reports | B00 repo/VPS inventory + B01 actual OpenAPI snapshots | **EXISTING_BASELINE**, not finished final backend |
 | Published full-year source 2024 | user discussion and candidate experiment only | B00 hash/rights/integrity and actual host evidence | **UNVERIFIED_LIVE** |
 | Parquet daily/monthly storage and reader | benchmark plan, not production main V2 | B03 real-source benchmark then B04 V2 parity | **PLANNED** |
