@@ -1,0 +1,7 @@
+Open positions: Order Direction Status Lots remaining Entry fill SL / TP Indicative mark USD Net cash change USD Action No open positions. Confirmed intents need an eligible tick before entry.
+Pending orders: Order Direction Status Lots remaining Entry intent SL / TP Indicative mark USD Net cash change USD Action a00a5e82 LONG PENDING 0.66 2000.1 1998.6 / 2001.6 Unavailable 0 Cancel pending
+Closed trades: Order Direction Status Lots Entry fill SL / TP Last exit fill Gross USD Commission USD Net USD Duration MAE USD MFE USD No closed trades. Completed tick-driven exits will appear here.
+---
+Open positions: Order Direction Status Lots remaining Entry fill SL / TP Indicative mark USD Net cash change USD Action a00a5e82 LONG ACTIVE 0.66 2000.15 1998.6 / 2001.6 3.3 0 Close position Partial lots Partial close
+Pending orders: Order Direction Status Lots remaining Entry intent SL / TP Indicative mark USD Net cash change USD Action No pending orders. Review and confirm an intent, then reveal a tick.
+Closed trades: Order Direction Status Lots Entry fill SL / TP Last exit fill Gross USD Commission USD Net USD Duration MAE USD MFE USD No closed trades. Completed tick-driven exits will appear here.

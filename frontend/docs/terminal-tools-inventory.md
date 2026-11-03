@@ -138,9 +138,24 @@ Heap: most of the 482 MB is 16 indicators × ~45k points held by lightweight-cha
 
 Evidence: `docs/qa/issue-21/c08/results.json`, screenshots `docs/qa/issue-21/c08/`.
 
-### C-09
+### C-09 integration — DONE (UI side; finance/API sign-off is Codex's)
 
-Next.
+`tests/qa/order-flow-qa.cjs` drives the real terminal against Codex's **unchanged** local backend (`python -m execution.local_api`, PostgreSQL 16, migrated with `infrastructure.database.migrate`) and the synthetic fixture source (`/?tick-alpha=local`, Vite on 5196 — the backend's CORS allow-list). 12 steps:
+
+1. Normal replay (Session stepped tick by tick to 01:00) vs jump (second Session seeks straight to 01:00): the 60 completed 1m candles are identical and no candle is later than the cursor in either.
+2. Long Position drawn → nothing sent to the server.
+3. Create order → ticket prefilled from the drawing (Buy / Long, SL below / TP above, rounded to the price grid); still nothing sent.
+4. A forbidden order (Buy Limit above Ask) → server review refused (409), no confirm step, nothing committed.
+5. Valid market intent → `POST /reviews` 200 → "Confirm reviewed order" shows server values → nothing committed before Confirm.
+6. Confirm → `POST …/confirm` 200; the order is `PENDING` at the confirm time and fills only on the next revealed quote (e.g. 01:00:00 pending → 01:01:00 filled), shown on the chart and in the terminal.
+7. Drawing Undo removes the planning drawing; the committed order is unchanged and no cancel/close is sent.
+8. Seek with an order on the books → refused by the server (`REFUSED_REWIND_REQUIRES_FORK`), shown to the user, cursor unchanged.
+9. Reload → versioned drawing document (`backtest-drawing-manager-v2`), versioned indicator settings and the server-side position all return.
+10–12. Phone 390×844 with touch: Long and Short Position → Create order → ticket fits the screen; Short gives Sell / Short with SL above and TP below; nothing sent.
+
+Limits: the synthetic fixture covers about 8.5 hours (2,048 ticks × 15 s), so "Jump 72h" was verified as jump-vs-normal over the range the fixture has. A literal 72-hour jump needs the Exness historical store (`BTL_EXNESS_STORE`), which is not in this environment. Long/Short keep their existing settings dialog and SVG layer (working and tested above); moving them onto the shared canvas Properties panel is left as a separate change so this PR does not alter the trading path.
+
+Evidence: `docs/qa/issue-21/c09/` (screenshots, `results.json`, `orders-after-replay.txt`, `ticket-fields.json`).
 
 ## Integration gaps (for Codex, no backend change made here)
 
@@ -148,3 +163,6 @@ Next.
 |---|---|---|
 | Terminal drawings | Server-side drawing storage per account/Session (currently browser localStorage, account-scoped key) | MISSING route; local-only label stays |
 | Volume indicators V01–V12 | Qualified traded-volume source | Quote-only Bid/Ask data: shown as unavailable, never synthesised |
+| Order review refusal | Specific reason codes from `POST /reviews` (today a Buy Limit above Ask returns generic `INVALID_INPUT`) | UI shows the code as given; a specific code would let the ticket explain the fix |
+| Seek refusal copy | `REFUSED_REWIND_REQUIRES_FORK` also blocks a forward seek while an order is open; the UI copy says "replay an earlier time" | Copy follows the existing server mapping; wording can be generalised once Codex confirms the rule |
+| 72h jump evidence | Exness historical store for QA | Not available here; jump verified on the synthetic fixture range |
