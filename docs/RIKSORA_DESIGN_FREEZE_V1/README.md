@@ -8,7 +8,7 @@ RIKSORA is a **Method-first, evidence-grounded trading research laboratory**. Pr
 
 - **Desktop/laptop:** React+Vite chart-first full workspace, keyboard/mouse.
 - **Mobile browser:** same React app with deliberately touch-designed navigation, chart, order ticket and journals.
-- **Installable application V1:** PWA based on the same app, manifest, safe service worker, correct online/auth/logout/resume behavior. Native Android/iOS app-store packaging is **not** claimed as delivered; packaging is a later adapter milestone with its own store/compliance gates and no fork of financial logic.
+- **Installable application V1:** PWA based on the same app, manifest, safe service worker, correct online/auth/logout/resume behavior. Android/iOS **Capacitor native shell is the chosen later store-app delivery path**, with its own signing/store/compliance gates and no fork of financial logic; no app-store release is claimed now.
 - **Backend:** FastAPI modular monolith + single canonical execution reducer + PostgreSQL immutable financial ledger; shared immutable market catalog behind versioned reader port; bounded worker/queues/cache; no mandatory Redis/Kubernetes/microservices/second VPS.
 - **Market target:** EXACT 16 instruments × 5 years (80 instrument-years), not a claim of availability or rights. One active research user on target 6vCPU/16GiB/200GB VPS, subject to measured acceptance. CPU/storage upgrades **only** via evidence.
 
