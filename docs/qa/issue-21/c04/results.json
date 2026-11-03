@@ -1,0 +1,109 @@
+{
+  "results": [
+    {
+      "name": "Pitchfork drawn",
+      "detail": "3 clicks"
+    },
+    {
+      "name": "Schiff Pitchfork drawn",
+      "detail": "3 clicks"
+    },
+    {
+      "name": "Modified Schiff Pitchfork drawn",
+      "detail": "3 clicks"
+    },
+    {
+      "name": "Gann Fan drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Gann Box drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Fib Time Zone drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Trend-Based Fib Time drawn",
+      "detail": "3 clicks"
+    },
+    {
+      "name": "Fib Speed Resistance Fan drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Fib Circles drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Fib Speed Resistance Arcs drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Fib Wedge drawn",
+      "detail": "3 clicks"
+    },
+    {
+      "name": "ABCD Pattern drawn",
+      "detail": "4 clicks"
+    },
+    {
+      "name": "XABCD Pattern drawn",
+      "detail": "5 clicks"
+    },
+    {
+      "name": "Head and Shoulders drawn",
+      "detail": "7 clicks"
+    },
+    {
+      "name": "Triangle Pattern drawn",
+      "detail": "4 clicks"
+    },
+    {
+      "name": "Elliott Impulse Wave drawn",
+      "detail": "6 clicks"
+    },
+    {
+      "name": "Elliott Correction Wave drawn",
+      "detail": "4 clicks"
+    },
+    {
+      "name": "Cyclic Lines drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Date and Price Range drawn",
+      "detail": "2 clicks"
+    },
+    {
+      "name": "Price Label drawn",
+      "detail": "1 clicks"
+    },
+    {
+      "name": "Icon Marker drawn",
+      "detail": "1 clicks"
+    },
+    {
+      "name": "Arrow Marker drawn",
+      "detail": "1 clicks"
+    },
+    {
+      "name": "Icon Marker: star, 32 px",
+      "detail": ""
+    },
+    {
+      "name": "Arrow Marker: direction down",
+      "detail": ""
+    },
+    {
+      "name": "Cyclic Lines: 6 repeats",
+      "detail": ""
+    },
+    {
+      "name": "Reload restores the extended tools and their options",
+      "detail": "5 drawings"
+    }
+  ],
+  "errors": []
+}

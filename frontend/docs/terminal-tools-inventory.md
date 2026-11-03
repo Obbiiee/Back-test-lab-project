@@ -88,9 +88,36 @@ All 16 tools: created with the real mouse/touch flow, full Properties (shared st
 
 Evidence: `tests/c03-professional-drawings.test.mjs`, `tests/qa/drawings-pro-qa.cjs` (25 real-browser steps), screenshots `docs/qa/issue-21/c03/`.
 
-### C-04, C-08, C-09
+### C-04 extended professional tools — DONE (22 tools)
 
-Next. Tracked in the PR description as each batch lands.
+Shapes in `src/drawings/extendedShapes.js`. Every tool has the shared Style/Coordinates/Object tabs; levelled tools have editable level rows; markers have their own controls.
+
+| Tool | Anchors | Geometry | Specific Properties |
+|---|---|---|---|
+| Pitchfork / Schiff / Modified Schiff | 3 (pivot A, B, C) | median from origin through mid(B,C); tines through B and C. Origin: A / (A.time, mid price A–B) / mid(A,B) | extra parallels (0.5, 1.5, 2 × half-width), fill, extend |
+| Fib Time Zone | 2 (time A, B) | verticals at A + (B−A)·{0,1,2,3,5,8,13,21,34,55,89} | level rows, UTC time labels |
+| Trend-Based Fib Time | 3 | verticals at C + (B−A)·r | level rows, time labels |
+| Fib Speed Resistance Fan | 2 | rays from A to (B.x, A + (B−A)·r) | level rows, band fill, labels |
+| Fib Circles | 2 | circles around mid(A,B), radius ½·AB·r | level rows, labels |
+| Fib Speed Resistance Arcs | 2 | half circles around B facing A, radius AB·r | level rows, labels |
+| Fib Wedge | 3 (apex A, B, C) | arcs AB·r inside the smaller A→B / A→C sweep | level rows, fill |
+| Gann Fan | 2 | A→B is 1×1 (user scale); 1×8 … 8×1 rays | level rows (ratio), labels |
+| Gann Box | 2 | grid at 0 · .25 · .382 · .5 · .618 · .75 · 1 both ways, diagonals | level rows, fill |
+| ABCD / XABCD | 4 / 5 | labelled path; leg ratios from canonical prices (BC/AB, CD/BC; plus AB/XA, AD/XA) | fill (XABCD), labels |
+| Head and Shoulders | 7 | labelled path, neckline through both neck pivots | extend neckline |
+| Triangle Pattern | 4 | path + converging A–C / B–D lines | fill, extend right |
+| Elliott Impulse / Correction | 6 (0–5) / 4 (0-A-B-C) | labelled path, labels above highs / below lows | label size |
+| Cyclic Lines | 2 (base, interval) | verticals every A→B | repeats 1–100 |
+| Date and Price Range | 2 | Δ price · % · ticks and bars · duration | fill |
+| Price Label | 1 | price tag at anchor | label size |
+| Icon Marker | 1 | own glyphs: circle, square, diamond, triangles, star, flag, cross | icon, size 8–48 |
+| Arrow Marker | 1 | arrow tip on the anchor, up or down | direction, size |
+
+Pattern tools are manual annotations only: nothing is detected or forecast. Fans, circles, arcs and Gann angles are drawn in the current screen scaling (as on any chart); the stored anchors are always TIME+PRICE. Evidence: `tests/c04-extended-drawings.test.mjs`, `tests/qa/drawings-ext-qa.cjs` (26 browser steps), screenshots `docs/qa/issue-21/c04/`.
+
+### C-08, C-09
+
+Next.
 
 ## Integration gaps (for Codex, no backend change made here)
 

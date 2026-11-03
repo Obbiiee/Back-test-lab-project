@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DRAWING_SPECS, TEXT, HORIZONTAL_LINE, VERTICAL_LINE, MEASURE, ANCHORED_TEXT, PRICE_RANGE, DATE_RANGE, POLYLINE_MAX_NODES } from './DrawingTypes.js';
-import { capabilities, resolvedStyle, COLOR_PRESETS, LINE_STYLES, UI_WIDTH, FONT_SIZE, LEVEL_DEFAULTS, dashFor, displayName } from './drawingStyle.js';
+import { DRAWING_SPECS, TEXT, HORIZONTAL_LINE, VERTICAL_LINE, ANCHORED_TEXT, POLYLINE_MAX_NODES } from './DrawingTypes.js';
+import { capabilities, resolvedStyle, COLOR_PRESETS, LINE_STYLES, UI_WIDTH, FONT_SIZE, LEVEL_DEFAULTS, ICONS, dashFor, displayName } from './drawingStyle.js';
 import { stepPrice, stepBars, parseUtc, formatUtc, formatPrice, decimalsOf } from './drawingEdits.js';
 import './DrawingProperties.css';
 
@@ -84,7 +84,7 @@ export default function DrawingProperties({ tools }) {
   const hasText = Boolean(DRAWING_SPECS[model.type]?.text);
   const isText = model.type === TEXT || model.type === ANCHORED_TEXT; // text-only: no line controls
   const levelDefaults = LEVEL_DEFAULTS[caps.levels] ?? LEVEL_DEFAULTS.fib;
-  const sizeOnly = model.type === MEASURE || model.type === PRICE_RANGE || model.type === DATE_RANGE;
+  const sizeOnly = caps.text === 'size'; // tools whose only text is a computed label: size control only
   const tabs = [['style', 'Style'], ['coordinates', 'Coordinates'],
     ...(hasText || caps.text ? [['text', 'Text']] : []), ...(caps.levels ? [['levels', 'Levels']] : []), ['object', 'Object']];
   const activeTab = tabs.some(([key]) => key === tab) ? tab : 'style';
@@ -125,7 +125,7 @@ export default function DrawingProperties({ tools }) {
       {activeTab === 'style' && <>
         {!isText && <div className="dp-row"><span className="dp-label">Line color</span><ColorField label="Line color" value={style.color} disabled={locked} onChange={color => set({ color }, 'color')} /></div>}
         {isText && <div className="dp-row"><span className="dp-label">Accent color</span><ColorField label="Accent color" value={style.color} disabled={locked} onChange={color => set({ color }, 'color')} /></div>}
-        {!isText && <div className="dp-row"><span className="dp-label">Thickness</span>
+        {!isText && !caps.marker && <div className="dp-row"><span className="dp-label">Thickness</span>
           <Segmented label="Line thickness" disabled={locked} value={Math.min(UI_WIDTH.max, style.lineWidth)} options={[1, 2, 3, 4, 5, 6]} onChange={lineWidth => set({ lineWidth })}
             render={width => <><LinePreview width={width} lineStyle="solid" color="currentColor" /><span className="dp-sr">{width} px</span></>} />
           <span className="dp-value" aria-live="polite">{style.lineWidth}px</span></div>}
@@ -151,6 +151,17 @@ export default function DrawingProperties({ tools }) {
           <NumberField label="Band deviations" disabled={locked} value={style.deviation} onCommit={value => { if (value >= 0 && value <= 5) set({ deviation: value }, 'deviation'); }}
             onArrow={steps => set({ deviation: Math.max(0, Math.min(5, Math.round((style.deviation + steps * 0.5) * 2) / 2)) }, 'deviation')} />
           <span className="dp-value">× residual σ (0 hides bands)</span></div>}
+        {caps.repeats && <div className="dp-row"><span className="dp-label">Repeats</span>
+          <NumberField label="Cycle repeats" inputMode="numeric" disabled={locked} value={style.repeats} onCommit={value => { const n = Math.round(value); if (n >= 1 && n <= 100) set({ repeats: n }, 'repeats'); }}
+            onArrow={steps => set({ repeats: Math.max(1, Math.min(100, style.repeats + steps)) }, 'repeats')} />
+          <span className="dp-value">interval = A → B</span></div>}
+        {caps.icon && <div className="dp-row"><span className="dp-label">Icon</span>
+          <Segmented label="Marker icon" disabled={locked} value={style.icon} options={ICONS} onChange={icon => set({ icon })} render={option => <span title={option}>{({ circle: '●', square: '■', diamond: '◆', 'triangle-up': '▲', 'triangle-down': '▼', star: '★', flag: '⚑', cross: '✚' })[option]}<span className="dp-sr">{option}</span></span>} /></div>}
+        {caps.direction && <div className="dp-row"><span className="dp-label">Direction</span>
+          <Segmented label="Arrow direction" disabled={locked} value={style.direction} options={['up', 'down']} onChange={direction => set({ direction })} render={option => option === 'up' ? '▲ Up' : '▼ Down'} /></div>}
+        {caps.marker && <div className="dp-row"><span className="dp-label">Size</span>
+          <input type="range" aria-label="Marker size" min="8" max="48" step="2" disabled={locked} value={style.markerSize} onChange={event => set({ markerSize: Number(event.target.value) }, 'marker-size')} />
+          <span className="dp-value">{style.markerSize}px</span></div>}
         {caps.middle && <div className="dp-row"><span className="dp-label">Middle</span><Toggle label="Middle line" checked={style.showMiddle} disabled={locked} onChange={showMiddle => set({ showMiddle })} /></div>}
         {caps.reverse && <div className="dp-row"><span className="dp-label">Direction</span><Toggle label="Reverse levels" checked={style.reverse} disabled={locked} onChange={reverse => set({ reverse })} /></div>}
       </>}
@@ -222,7 +233,7 @@ export default function DrawingProperties({ tools }) {
         <table className="dp-levels"><thead><tr><th>Show</th><th>Level</th><th>Color</th><th><span className="dp-sr">Remove</span></th></tr></thead><tbody>
           {levels.map((level, index) => <tr key={index}>
             <td><input type="checkbox" aria-label={`Show level ${level.value}`} disabled={locked} checked={level.visible} onChange={event => setLevels(levels.map((item, i) => i === index ? { ...item, visible: event.target.checked } : item))} /></td>
-            <td><NumberField label={`Level ${index + 1} value`} disabled={locked} value={level.value} onCommit={value => { if (value >= -10 && value <= 10) set({ levels: levels.map((item, i) => i === index ? { ...item, value } : item) }, 'level-value:' + index); }} /></td>
+            <td><NumberField label={`Level ${index + 1} value`} disabled={locked} value={level.value} onCommit={value => { if (value >= -100 && value <= 100) set({ levels: levels.map((item, i) => i === index ? { ...item, value } : item) }, 'level-value:' + index); }} /></td>
             <td><input type="color" aria-label={`Level ${index + 1} color`} disabled={locked} value={level.color ?? style.color} onChange={event => set({ levels: levels.map((item, i) => i === index ? { ...item, color: event.target.value } : item) }, 'level-color:' + index)} /></td>
             <td><button type="button" aria-label={`Remove level ${level.value}`} disabled={locked || levels.length <= 1} onClick={() => setLevels(levels.filter((_, i) => i !== index))}>×</button></td>
           </tr>)}

@@ -213,7 +213,7 @@ assert.ok(capabilities('text').text && !capabilities('trend-line').text);
 for (const [type, spec] of Object.entries(DRAWING_SPECS)) {
   const { manager } = setup();
   const count = typeof spec.points === 'number' ? spec.points : spec.points.min;
-  const points = Array.from({ length: count }, (_, i) => P(2 + i * 3, 2300 + (i % 2 ? 5 : -5)));
+  const points = Array.from({ length: count }, (_, i) => P(2 + i * 2, 2300 + (i % 2 ? 5 : -5)));
   manager.add({ id: type, type, points, ...(spec.text ? { text: 'Label' } : {}), options: { lineWidth: 3, lineStyle: 'dashed', opacity: .8 } });
   const calls = render(manager, type);
   assert.ok(calls.some(call => call.op === 'stroke' || call.op === 'fillText'), type + ' paints');

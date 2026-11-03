@@ -12,6 +12,8 @@ export const DEFAULT_FIB_LEVELS = Object.freeze([0, 0.236, 0.382, 0.5, 0.618, 0.
 // so the Phase 9 default rendering (0…1) is unchanged.
 export const DEFAULT_VISIBLE_FIB = Object.freeze([0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]);
 export const UI_WIDTH = Object.freeze({ min: 1, max: 6 });
+// RIKSORA-drawn marker glyphs (own geometry, no third-party icon assets).
+export const ICONS = Object.freeze(['circle', 'square', 'diamond', 'triangle-up', 'triangle-down', 'star', 'flag', 'cross']);
 export const FONT_SIZE = Object.freeze({ min: 10, max: 32 });
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -49,12 +51,44 @@ export const CAPABILITIES = Object.freeze({
   callout: { ...LINE, text: true },
   'price-range': { ...LINE, fill: true, text: 'size' },
   'date-range': { ...LINE, fill: true, text: 'size' },
+  // C-04 extended tools.
+  pitchfork: { ...LINE, fill: true, levels: 'pitchfork', extend: true },
+  'schiff-pitchfork': { ...LINE, fill: true, levels: 'pitchfork', extend: true },
+  'modified-schiff-pitchfork': { ...LINE, fill: true, levels: 'pitchfork', extend: true },
+  'fib-time-zone': { ...LINE, levels: 'fib-time', timeLabels: true },
+  'trend-fib-time': { ...LINE, levels: 'trend-fib-time', timeLabels: true },
+  'fib-fan': { ...LINE, levels: 'fib-fan', priceLabels: true, fill: true },
+  'fib-circles': { ...LINE, levels: 'fib-circles', priceLabels: true },
+  'fib-arcs': { ...LINE, levels: 'fib-circles', priceLabels: true },
+  'fib-wedge': { ...LINE, levels: 'fib-circles', priceLabels: true, fill: true },
+  'gann-fan': { ...LINE, levels: 'gann-fan', priceLabels: true },
+  'gann-box': { ...LINE, levels: 'gann-box', fill: true, priceLabels: true },
+  'abcd-pattern': { ...LINE, text: 'size', priceLabels: true },
+  'xabcd-pattern': { ...LINE, fill: true, text: 'size', priceLabels: true },
+  'head-shoulders': { ...LINE, text: 'size', extend: true },
+  'triangle-pattern': { ...LINE, fill: true, text: 'size', extend: true },
+  'elliott-impulse': { ...LINE, text: 'size' },
+  'elliott-correction': { ...LINE, text: 'size' },
+  'cyclic-lines': { ...LINE, repeats: true },
+  'date-price-range': { ...LINE, fill: true, text: 'size' },
+  'icon-marker': { opacity: true, icon: true, marker: true },
+  'price-label': { opacity: true, text: 'size' },
+  'arrow-marker': { opacity: true, direction: true, marker: true },
 });
 // Default level rows per levelled tool (value, initially shown).
 export const LEVEL_DEFAULTS = Object.freeze({
   fib: { values: DEFAULT_FIB_LEVELS, visible: DEFAULT_VISIBLE_FIB },
   'fib-extension': { values: [0, 0.382, 0.618, 1, 1.272, 1.618, 2, 2.618], visible: [0, 0.618, 1, 1.618, 2.618] },
   'fib-channel': { values: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618], visible: [0, 0.382, 0.618, 1] },
+  // Pitchfork extra parallels as a fraction of the tine half-width (0 = median, 1 = tines).
+  pitchfork: { values: [0.5, 1, 1.5, 2], visible: [1] },
+  'fib-time': { values: [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89], visible: [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89] },
+  'trend-fib-time': { values: [0, 0.382, 0.5, 0.618, 1, 1.382, 1.618, 2, 2.618, 4.236], visible: [0, 0.382, 0.618, 1, 1.618, 2.618] },
+  'fib-fan': { values: [0.236, 0.382, 0.5, 0.618, 0.786, 1], visible: [0.382, 0.5, 0.618, 1] },
+  'fib-circles': { values: [0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618, 2.618], visible: [0.382, 0.5, 0.618, 1, 1.618] },
+  // Gann fan: value = price units per time unit relative to the A→B 1×1 line (1/8 … 8).
+  'gann-fan': { values: [0.125, 0.25, 1 / 3, 0.5, 1, 2, 3, 4, 8], visible: [0.125, 0.25, 1 / 3, 0.5, 1, 2, 3, 4, 8] },
+  'gann-box': { values: [0, 0.25, 0.382, 0.5, 0.618, 0.75, 1], visible: [0, 0.25, 0.5, 0.75, 1] },
 });
 export function defaultLevels(type) {
   const set = LEVEL_DEFAULTS[capabilities(type).levels] ?? LEVEL_DEFAULTS.fib;
@@ -65,7 +99,7 @@ export function capabilities(type) { return CAPABILITIES[type] ?? { ...LINE }; }
 function validLevels(levels) {
   return Array.isArray(levels) && levels.length >= 1 && levels.length <= 24 && levels.every(level =>
     level && typeof level === 'object' && Object.keys(level).every(key => ['value', 'visible', 'color'].includes(key))
-    && Number.isFinite(level.value) && level.value >= -10 && level.value <= 10 && bool(level.visible)
+    && Number.isFinite(level.value) && level.value >= -100 && level.value <= 100 && bool(level.visible)
     && (level.color === undefined || isHex(level.color)));
 }
 
@@ -93,6 +127,10 @@ const RULES = Object.freeze({
   reverse: bool,
   deviation: value => Number.isFinite(value) && value >= 0 && value <= 5,
   showMiddle: bool,
+  repeats: value => Number.isInteger(value) && value >= 1 && value <= 100,
+  icon: value => ICONS.includes(value),
+  markerSize: value => Number.isInteger(value) && value >= 8 && value <= 48,
+  direction: value => value === 'up' || value === 'down',
 });
 export const STYLE_KEYS = Object.freeze(Object.keys(RULES));
 
@@ -118,7 +156,7 @@ export function resolvedStyle(model) {
     color: o.color, lineWidth: o.lineWidth, lineStyle: o.lineStyle ?? 'solid', opacity: o.opacity ?? 1,
     fillColor: o.fillColor ?? o.color, fillOpacity: o.fillOpacity ?? (model.type === 'rectangle' ? 0 : 0),
     extendLeft: o.extendLeft ?? false, extendRight: o.extendRight ?? false,
-    showPriceLabels: o.showPriceLabels ?? ['fibonacci-retracement', 'fib-extension', 'fib-channel'].includes(model.type),
+    showPriceLabels: o.showPriceLabels ?? ['fibonacci-retracement', 'fib-extension', 'fib-channel', 'fib-fan', 'fib-circles', 'fib-arcs', 'fib-wedge', 'gann-fan', 'abcd-pattern', 'xabcd-pattern'].includes(model.type),
     showTimeLabels: o.showTimeLabels ?? false,
     fontSize: o.fontSize ?? 12, fontFamily: o.fontFamily ?? 'mono', bold: o.bold ?? false, italic: o.italic ?? false,
     textColor: o.textColor ?? o.color, textBackground: o.textBackground ?? '#10141b', textBorder: o.textBorder ?? false,
@@ -126,6 +164,7 @@ export function resolvedStyle(model) {
     reverse: o.reverse ?? false,
     levels: o.levels ?? defaultLevels(model.type),
     deviation: o.deviation ?? 2, showMiddle: o.showMiddle ?? true,
+    repeats: o.repeats ?? 20, icon: o.icon ?? 'circle', markerSize: o.markerSize ?? 16, direction: o.direction ?? 'up',
   };
 }
 

@@ -7,6 +7,7 @@ import {
 import { rayEnd } from './rayGeometry.js';
 import { arrowHead } from './advancedGeometry.js';
 import { withAlpha } from './drawingStyle.js';
+import { extendedShapes } from './extendedShapes.js';
 import { regressionFit, normalOffset, verticalOffset, formatDuration, barsBetween, priceRangeStats } from './professionalGeometry.js';
 
 const shift = (p, dy) => ({ x: p.x, y: p.y + dy });
@@ -139,5 +140,6 @@ export function extraShapes(model, projected, env, { style, text, lines, shapes,
       break;
     }
     default:
+      extendedShapes(model, projected, env, { style, text, lines, shapes, precision });
   }
 }

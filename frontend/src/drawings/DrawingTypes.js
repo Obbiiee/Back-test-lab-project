@@ -62,7 +62,34 @@ export const PROFESSIONAL_DRAWINGS = Object.freeze({
   [PRICE_RANGE]: { name: 'Price Range', points: 2, defaults: { fillOpacity: 0.15 } },
   [DATE_RANGE]: { name: 'Date Range', points: 2, defaults: { fillOpacity: 0.15 } },
 });
-export const DRAWING_SPECS = Object.freeze({ ...CORE_DRAWINGS, ...ADVANCED_DRAWINGS, ...PROFESSIONAL_DRAWINGS });
+
+// Issue #21 C-04: extended professional tools. Pattern tools are manual,
+// labelled pivot sequences — visual annotations, never detected or forecast.
+export const EXTENDED_DRAWINGS = Object.freeze({
+  pitchfork: { name: 'Pitchfork', points: 3 },
+  'schiff-pitchfork': { name: 'Schiff Pitchfork', points: 3 },
+  'modified-schiff-pitchfork': { name: 'Modified Schiff Pitchfork', points: 3 },
+  'fib-time-zone': { name: 'Fib Time Zone', points: 2 },
+  'trend-fib-time': { name: 'Trend-Based Fib Time', points: 3 },
+  'fib-fan': { name: 'Fib Speed Resistance Fan', points: 2 },
+  'fib-circles': { name: 'Fib Circles', points: 2 },
+  'fib-arcs': { name: 'Fib Speed Resistance Arcs', points: 2 },
+  'fib-wedge': { name: 'Fib Wedge', points: 3 },
+  'gann-fan': { name: 'Gann Fan', points: 2 },
+  'gann-box': { name: 'Gann Box', points: 2 },
+  'abcd-pattern': { name: 'ABCD Pattern', points: 4, labels: ['A', 'B', 'C', 'D'] },
+  'xabcd-pattern': { name: 'XABCD Pattern', points: 5, labels: ['X', 'A', 'B', 'C', 'D'], defaults: { fillOpacity: 0.1 } },
+  'head-shoulders': { name: 'Head and Shoulders', points: 7, labels: ['', 'LS', '', 'H', '', 'RS', ''] },
+  'triangle-pattern': { name: 'Triangle Pattern', points: 4, labels: ['A', 'B', 'C', 'D'] },
+  'elliott-impulse': { name: 'Elliott Impulse Wave', points: 6, labels: ['0', '1', '2', '3', '4', '5'] },
+  'elliott-correction': { name: 'Elliott Correction Wave', points: 4, labels: ['0', 'A', 'B', 'C'] },
+  'cyclic-lines': { name: 'Cyclic Lines', points: 2 },
+  'date-price-range': { name: 'Date and Price Range', points: 2, defaults: { fillOpacity: 0.12 } },
+  'icon-marker': { name: 'Icon Marker', points: 1 },
+  'price-label': { name: 'Price Label', points: 1 },
+  'arrow-marker': { name: 'Arrow Marker', points: 1 },
+});
+export const DRAWING_SPECS = Object.freeze({ ...CORE_DRAWINGS, ...ADVANCED_DRAWINGS, ...PROFESSIONAL_DRAWINGS, ...EXTENDED_DRAWINGS });
 
 export function canonicalPoint(point) {
   if (!point || !Number.isFinite(point.time) || !Number.isFinite(point.price)) {

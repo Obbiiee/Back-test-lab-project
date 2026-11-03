@@ -116,12 +116,14 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>
         {[
-          ['Lines',['trend-line','horizontal-line','vertical-line','ray','extended-line','horizontal-ray','cross-line'],'trend'],
-          ['Channels',['parallel-channel','regression-trend'],'pattern'],
+          ['Lines',['trend-line','horizontal-line','vertical-line','ray','extended-line','horizontal-ray','cross-line','cyclic-lines'],'trend'],
+          ['Channels',['parallel-channel','regression-trend','pitchfork','schiff-pitchfork','modified-schiff-pitchfork'],'layers'],
           ['Shapes',['rectangle','arrow','rotated-rectangle','ellipse','polyline'],'rectangle'],
-          ['Fibonacci',['fibonacci-retracement','fib-extension','fib-channel'],'fib'],
+          ['Fibonacci',['fibonacci-retracement','fib-extension','fib-channel','fib-time-zone','trend-fib-time','fib-fan','fib-circles','fib-arcs','fib-wedge'],'fib'],
+          ['Gann',['gann-fan','gann-box'],'hex'],
+          ['Patterns',['abcd-pattern','xabcd-pattern','head-shoulders','triangle-pattern','elliott-impulse','elliott-correction'],'pattern'],
           ['Brushes',['brush','highlighter'],'brush'],
-          ['Annotations',['text','measure','anchored-text','callout','price-range','date-range'],'text'],
+          ['Annotations',['text','measure','anchored-text','callout','price-range','date-range','date-price-range','price-label','icon-marker','arrow-marker'],'text'],
           ['Positions',['long-position','short-position'],'long'],
         ].map(([label,types,icon])=><details className="alpha-drawing-group" key={label} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary').focus();}}}><summary aria-label={`${label} drawing tools`} title={label}><Icon name={icon}/><span className="alpha-group-chevron">›</span></summary><div>{types.map(type=><button key={type} aria-pressed={mode===type} onClick={event=>{setPlayToken(null);setMode(type);event.currentTarget.closest('details').open=false;}}>{DRAWING_SPECS[type]?.name||({'long-position':'Long Position','short-position':'Short Position'})[type]}</button>)}</div></details>)}
       </nav>

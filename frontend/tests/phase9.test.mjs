@@ -69,8 +69,8 @@ for(const source of ['advancedGeometry.js','models/CoreDrawing.js']){const text=
 const mixedBefore = JSON.stringify(manager.getAll());
 manager.setProperties('old-trend',{visible:false});manager.setText(manager.getAll().find(model=>model.type===T).id,'Mixed text edit');manager.remove('old-rectangle');
 const mixedAfter=JSON.stringify(manager.getAll());for(let i=0;i<3;i++)history.undo();assert.equal(JSON.stringify(manager.getAll()),mixedBefore);for(let i=0;i<3;i++)history.redo();assert.equal(JSON.stringify(manager.getAll()),mixedAfter);
-// Issue #21 C-03 registers brush/ellipse/fib-extension; unregistered names still fail closed.
-for(const type of ['fibonacci-extension','pitchfork','gann-fan','indicator'])assert.throws(()=>manager.registry.get(type),/Unknown drawing type/);
+// Issue #21 C-03 and C-04 register brush/ellipse/fib-extension/pitchfork/gann-fan; unregistered names still fail closed.
+for(const type of ['fibonacci-extension','andrews-pitchfork','gann-square','indicator'])assert.throws(()=>manager.registry.get(type),/Unknown drawing type/);
 // Ray extension is selectable in both screen directions, but never behind
 // the origin. Handles always refer to the real two anchors, not the far end.
 for(const [points,inside,outside] of [
