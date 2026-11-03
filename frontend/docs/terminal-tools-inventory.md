@@ -49,9 +49,21 @@ A tool is only ticked when it can be created, has working Properties controls, s
 
 Open for C-02: mobile tap-to-place flow and two-finger cancel for the research tools; move Long/Short onto the shared panel.
 
-### C-03 … C-09
+### C-05 indicator settings — DONE
 
-Tracked in the PR description and Issue #21 comments as each batch lands.
+Inputs / Style / Placement tabs per instance: per-output visible, colour, thickness 1–5, solid/dashed/dotted, opacity, histogram rising/falling colours, reset style; overlay ↔ own pane, move pane up/down, pane height, reference lines; hide, duplicate, remove; search and categories. Persisted sparsely in `backtest-indicators-v1:`. Evidence: `tests/c05-indicator-settings.test.mjs`, `tests/qa/indicators-qa.cjs`, `docs/qa/issue-21/c05/`.
+
+### C-06 core indicators — DONE (50 registered)
+
+43 added to the original 7. Conventions and golden-test method: [terminal-indicators.md](terminal-indicators.md). Evidence: `tests/c06-indicators.test.mjs` (22,573 points against an independent Python reference; causality and degenerate input for all 50).
+
+### C-07 volume — shown as unavailable
+
+V01–V12 listed and disabled with the reason (quote-only data). No synthetic volume.
+
+### C-03, C-04, C-08, C-09
+
+Next. Tracked in the PR description as each batch lands.
 
 ## Integration gaps (for Codex, no backend change made here)
 

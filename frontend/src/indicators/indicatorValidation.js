@@ -1,7 +1,53 @@
+// Issue #21 C-05: per-instance presentation settings. Stored sparsely so
+// configs saved before this schema keep their exact shape.
+export const LINE_STYLE_IDS = Object.freeze({ solid: 0, dotted: 1, dashed: 2 });
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const OUTPUT_STYLE_RULES = Object.freeze({
+  visible: value => typeof value === 'boolean',
+  color: value => typeof value === 'string' && HEX.test(value),
+  lineWidth: value => Number.isInteger(value) && value >= 1 && value <= 5,
+  lineStyle: value => Object.hasOwn(LINE_STYLE_IDS, value),
+  opacity: value => Number.isFinite(value) && value >= 0 && value <= 1,
+  positiveColor: value => typeof value === 'string' && HEX.test(value),
+  negativeColor: value => typeof value === 'string' && HEX.test(value),
+});
+function presentation(spec, value) {
+  const result = {};
+  if (value.style !== undefined) {
+    if (!value.style || Object.getPrototypeOf(value.style) !== Object.prototype) throw Error('Invalid indicator style');
+    const style = {};
+    for (const [key, output] of Object.entries(value.style)) {
+      const owner = spec.outputs.find(item => item.key === key);
+      if (!owner || !output || Object.getPrototypeOf(output) !== Object.prototype) throw Error('Invalid indicator style output');
+      for (const [name, setting] of Object.entries(output)) {
+        if (!OUTPUT_STYLE_RULES[name]?.(setting)) throw Error('Invalid indicator style: ' + key + '.' + name);
+        if ((name === 'positiveColor' || name === 'negativeColor') && owner.outputType !== 'histogram') throw Error('Histogram colours only apply to histograms');
+      }
+      if (Object.keys(output).length) style[key] = Object.freeze({ ...output });
+    }
+    if (Object.keys(style).length) result.style = Object.freeze(style);
+  }
+  if (value.placement !== undefined) {
+    if (!['price', 'pane'].includes(value.placement) || spec.placement === 'pane' && value.placement !== 'pane') throw Error('Invalid indicator placement');
+    if (value.placement !== spec.placement) result.placement = value.placement;
+  }
+  if (value.paneHeight !== undefined) {
+    if (!Number.isFinite(value.paneHeight) || value.paneHeight < 0.1 || value.paneHeight > 1) throw Error('Invalid pane height');
+    result.paneHeight = value.paneHeight;
+  }
+  if (value.references !== undefined) {
+    const refs = value.references;
+    if ((value.placement ?? spec.placement) !== 'pane' || !Array.isArray(refs) || refs.length > 6 || refs.some(price => !Number.isFinite(price)) || new Set(refs).size !== refs.length) throw Error('Invalid reference lines');
+    result.references = Object.freeze([...refs]);
+  }
+  return result;
+}
+export function effectivePlacement(spec, config) { return config.placement ?? spec.placement; }
+
 export function instanceConfig(registry, value) {
   if (!value || typeof value.id !== 'string' || !value.id.trim() || typeof value.type !== 'string'
     || (value.visible !== undefined && typeof value.visible !== 'boolean')
-    || Object.keys(value).some(key => !['id', 'type', 'parameters', 'visible'].includes(key))) throw Error('Invalid indicator instance');
+    || Object.keys(value).some(key => !['id', 'type', 'parameters', 'visible', 'style', 'placement', 'paneHeight', 'references'].includes(key))) throw Error('Invalid indicator instance');
   const spec = registry.get(value.type), supplied = value.parameters === undefined ? {} : value.parameters;
   if (!supplied || Object.getPrototypeOf(supplied) !== Object.prototype
     || Object.keys(supplied).some(key => !Object.hasOwn(spec.parameters, key))) throw Error('Invalid parameters');
@@ -13,7 +59,7 @@ export function instanceConfig(registry, value) {
     parameters[key] = parameter;
   }
   if (spec.validateParameters && !spec.validateParameters(parameters)) throw Error('Invalid parameter combination');
-  return Object.freeze({ id: value.id, type: value.type, parameters: Object.freeze(parameters), visible: value.visible ?? true });
+  return Object.freeze({ id: value.id, type: value.type, parameters: Object.freeze(parameters), visible: value.visible ?? true, ...presentation(spec, value) });
 }
 
 // Copy only public candle fields. Hidden datasets and mutable caller objects never reach a calculator.

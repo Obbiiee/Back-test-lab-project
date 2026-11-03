@@ -46,7 +46,9 @@
     "test:phase18.8": "node tests/phase18-8.test.mjs",
     "test:phase18.9": "node tests/phase18-9.test.mjs",
     "test:regression": "node scripts/regression.mjs",
-    "audit:release": "node scripts/release-audit.mjs"
+    "audit:release": "node scripts/release-audit.mjs",
+    "test:c05-indicator-settings": "node tests/c05-indicator-settings.test.mjs",
+    "test:c06-indicators": "node tests/c06-indicators.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
