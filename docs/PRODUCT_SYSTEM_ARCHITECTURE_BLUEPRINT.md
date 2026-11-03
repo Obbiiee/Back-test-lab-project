@@ -9,6 +9,7 @@
 Related documents:
 - [Research Thesis](BACKTEST_LAB_RESEARCH_THESIS.md)
 - [Master Roadmap](ROADMAP.md)
+- [Single-VPS storage benchmark & infrastructure purchase gate](SINGLE_VPS_STORAGE_BENCHMARK_GATE.md) — owner-requested measurement/Codex work order, not a production readiness claim
 
 ---
 
