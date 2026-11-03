@@ -82,7 +82,7 @@ Every stage has: `input_version/SHA`, scope allowlist, implementation or documen
 
 **P8.3** Implement desktop+touch chart, Planned/Quick ticket, Protocol locked rules, review-confirm steps, 72h Jump progress, terminal/Journal, analytics. Distinct mobile order bottom sheet and fullscreen chart touch modes. **Gate:** click/tap/keyboard no accidental order, real refusal handling, no future candle reveal.
 
-**P8.4** PWA manifest/service-worker safe scope, app install and background-online resume; no financial offline queue. **Gate:** tested mobile Safari/Android Chrome behavior, logout wipes cached private UI, update safe. Native-store wrapper is future gated.
+**P8.4** PWA manifest/service-worker safe scope, app install and background-online resume; no financial offline queue. **Gate:** tested mobile Safari/Android Chrome behavior, logout wipes cached private UI, update safe. **Next packaged-app checkpoint (after PWA acceptance):** Capacitor Android/iOS shells from same React source, safe OAuth/deep-link bridge, background/resume and signed internal-store builds; owner-approved developer-account and real-device/store gates. No new financial engine.
 
 ## Phase 9 — Integration QA (both)
 
