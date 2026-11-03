@@ -2,7 +2,7 @@ import WorkspaceModal from "../workspace/WorkspaceModal.jsx";
 import { useMemo, useRef, useState } from 'react';
 import { productionRegistry } from '../indicators/productionRegistry.js';
 import { instanceConfig, effectivePlacement } from '../indicators/indicatorValidation.js';
-import { outputStyle } from '../indicators/IndicatorSeriesAdapter.js';
+import { outputStyle } from '../indicators/indicatorStyle.js';
 import { CATEGORY_ORDER, UNAVAILABLE_INDICATORS, categoryOf } from './indicatorCatalog.js';
 import './IndicatorControls.css';
 

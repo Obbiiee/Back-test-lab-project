@@ -115,7 +115,30 @@ Shapes in `src/drawings/extendedShapes.js`. Every tool has the shared Style/Coor
 
 Pattern tools are manual annotations only: nothing is detected or forecast. Fans, circles, arcs and Gann angles are drawn in the current screen scaling (as on any chart); the stored anchors are always TIME+PRICE. Evidence: `tests/c04-extended-drawings.test.mjs`, `tests/qa/drawings-ext-qa.cjs` (26 browser steps), screenshots `docs/qa/issue-21/c04/`.
 
-### C-08, C-09
+### C-08 performance & responsive — DONE
+
+Measured with `tests/qa/performance-qa.cjs` (headless Chromium, dev build, Vite on 5179). Load: 512 revealed 1m candles + the previous calendar month via the existing `chart-history` API (served by a Playwright route, 89 pages × 512 = 44,640 past candles, 45,152 total, within the 50k policy), 100 stored drawings of mixed types, 16 indicator instances (SMA, EMA, BB, RSI, MACD, ATR, Stochastic, Supertrend, Ichimoku, Keltner, HMA, ADX, CCI, PSAR, Pivots, Squeeze).
+
+| Metric | Result | Gate |
+| --- | --- | --- |
+| Load (incl. 89 API pages) | 2.4–2.8 s | — |
+| JS heap after forced GC | 482 MB (bare chart: 44 MB) | recorded |
+| Frame time pan/zoom/hover p50 / p95 | 16.7 / 16.8 ms | p95 < 50 ms |
+| Worst single frame | 33–350 ms across runs, 0–1 long tasks | < 500 ms |
+| Hover | 50–59 moves/s | — |
+| Select a drawing among 100 | 0.23–0.25 s incl. 100 ms settle (was 14–16 s) | < 1 s |
+| Viewports 320 / 375 / 390 / 844×390 landscape / 768 / 1024 / 1440 | no horizontal overflow, chart and drawing tools reachable | all |
+
+Fixes found by this run:
+- `AlphaWorkspace` passed `transition={{kind:'forward'}}` — a new object every render — so any UI change (e.g. selecting a drawing) re-ran the candle sync and recomputed all 16 indicators over 45k candles. Now a frozen module constant.
+- Regression Trend fit and Date Range bar count use binary search (`lowerBound`/`upperBound`) instead of scanning all bars.
+- `IndicatorControls` imported `outputStyle` from the series adapter, which pulled lightweight-charts into the entry bundle (entry 113 → 184 kB gzip). The helpers now live in `src/indicators/indicatorStyle.js`; entry is 125 kB gzip vs 113 kB on `main` (+12 kB: indicator catalog/registry, which `FigmaWorkspace` already loads eagerly). Chart chunk 37 kB gzip (main 20 kB) for 47 tools + 50 indicators.
+
+Heap: most of the 482 MB is 16 indicators × ~45k points held by lightweight-charts and the engine. Acceptable on desktop; on low-memory phones a user loading a full month of 1m history with 16 indicators may feel it. A follow-up candidate is computing indicators only over a bounded window — not done here because it changes indicator warm-up semantics.
+
+Evidence: `docs/qa/issue-21/c08/results.json`, screenshots `docs/qa/issue-21/c08/`.
+
+### C-09
 
 Next.
 

@@ -3,19 +3,27 @@
 // math works on transient CSS pixels and never mutates canonical anchors.
 import { logicalForTimestamp } from './timeCoordinates.js';
 
+// First index whose bar time is >= time (bars are ascending). O(log n) so
+// tools stay cheap on the 50k-candle display limit.
+export function lowerBound(bars, time) {
+  let low = 0, high = bars.length;
+  while (low < high) { const mid = (low + high) >>> 1; if (bars[mid].time < time) low = mid + 1; else high = mid; }
+  return low;
+}
+// First index whose bar time is > time.
+export function upperBound(bars, time) {
+  let low = 0, high = bars.length;
+  while (low < high) { const mid = (low + high) >>> 1; if (bars[mid].time <= time) low = mid + 1; else high = mid; }
+  return low;
+}
+
 // Least-squares fit of close over the revealed bars whose time lies between the
 // two anchor times (inclusive). Bars after the last revealed bar do not exist in
 // `bars`, so the fit can never read a future quote.
 export function regressionFit(bars, timeA, timeB) {
   const from = Math.min(timeA, timeB), to = Math.max(timeA, timeB);
-  let first = -1, last = -1;
-  for (let i = 0; i < bars.length; i++) {
-    if (bars[i].time < from) continue;
-    if (bars[i].time > to) break;
-    if (first < 0) first = i;
-    last = i;
-  }
-  const n = first < 0 ? 0 : last - first + 1;
+  const first = lowerBound(bars, from), last = upperBound(bars, to) - 1;
+  const n = last >= first ? last - first + 1 : 0;
   if (n < 2) return null;
   let sx = 0, sy = 0, sxx = 0, sxy = 0;
   for (let k = 0; k < n; k++) { const y = bars[first + k].close; sx += k; sy += y; sxx += k * k; sxy += k * y; }
@@ -52,9 +60,7 @@ export function formatDuration(seconds) {
 // Revealed bars whose open time lies in [from, to].
 export function barsBetween(bars, timeA, timeB) {
   const from = Math.min(timeA, timeB), to = Math.max(timeA, timeB);
-  let count = 0;
-  for (const bar of bars) { if (bar.time > to) break; if (bar.time >= from) count++; }
-  return count;
+  return Math.max(0, upperBound(bars, to) - lowerBound(bars, from));
 }
 
 export function priceRangeStats(a, b, tickSize) {

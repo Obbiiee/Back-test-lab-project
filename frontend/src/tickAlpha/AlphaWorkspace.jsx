@@ -9,6 +9,8 @@ import {displayBars,historyPage,TIMEFRAMES,replayTarget,seekTarget} from './disp
 import {api,sessionPath} from './client.js';
 import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
+// Stable identity: a fresh object per render re-ran the candle/indicator sync on every UI change.
+const FORWARD_TRANSITION=Object.freeze({kind:'forward'});
 
 export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen}){
   const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
@@ -128,7 +130,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
         ].map(([label,types,icon])=><details className="alpha-drawing-group" key={label} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary').focus();}}}><summary aria-label={`${label} drawing tools`} title={label}><Icon name={icon}/><span className="alpha-group-chevron">›</span></summary><div>{types.map(type=><button key={type} aria-pressed={mode===type} onClick={event=>{setPlayToken(null);setMode(type);event.currentTarget.closest('details').open=false;}}>{DRAWING_SPECS[type]?.name||({'long-position':'Long Position','short-position':'Short Position'})[type]}</button>)}</div></details>)}
       </nav>
       <div className="alpha-chart-host">
-        <CandleChart candles={bars} transition={{kind:'forward'}} sessionId={accountStorageKey(`tick-alpha-${view.metadata.id}-${timeframe}`)} viewportKey={accountStorageKey(`${view.metadata.id}:${timeframe}`)}
+        <CandleChart candles={bars} transition={FORWARD_TRANSITION} sessionId={accountStorageKey(`tick-alpha-${view.metadata.id}-${timeframe}`)} viewportKey={accountStorageKey(`${view.metadata.id}:${timeframe}`)}
           drawingWorkspace={workspaceKey} drawingStorageKey={accountTransport()?`backtest-${workspaceKey}`:view.replayStepNs?`backtest-${workspaceKey}`:`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
           tickEvidence={view.analysis} researchOnly
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
