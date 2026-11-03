@@ -7,7 +7,7 @@
 - **Desktop/laptop V1:** same React application; chart-first research terminal, keyboard/precision mouse interaction and dockable panels.
 - **Tablet/mobile web V1:** same route/DTO/component model, separate responsive compositions and TOUCH interaction, not a scaled-down desktop.
 - **App V1:** installable **PWA** using same deployed origin, manifest, icons and shell cache. Core replay, trade confirmation and financial write **online only**; no offline authoritative order queue. Android Chrome and iOS Safari Add to Home Screen tested separately. App background/resume must fetch server Session, not advance an invisible local financial clock.
-- **Later store app:** optional Capacitor-style native shell wrapping the same web app, decided only when app-store/deep platform requirements are evidenced; separate release/signing/privacy/store QA. Do not promise Play Store/App Store submission from PWA alone.
+- **Store-distributed Android/iOS app:** plan a **Capacitor native shell** around the same React UI/client **after** browser/PWA parity and security acceptance. It is a separate packaging/release checkpoint (Android/iOS build toolchains, app identifiers, signing, store/privacy compliance and real-device QA), not a rewritten React app or a current Play/App Store claim.
 
 ## Brand and design tokens — inherit already approved design
 
@@ -64,3 +64,16 @@ Foundation: tokens, typography, numeric/price fields, date+timezone selector, ic
 ## Ownership and handoff
 
 Claude pushes `frontend/` code + UI-specific tests and artifacts to `claude/ui-v1-...` branch. Codex pushes backend/API schema and canonical fixtures to `codex/backend-v1-...` branch. Cross-boundary changes require coordinated PR and canonical contract review. Neither may merge the other's branch or change frozen finance/Market Data/Method/Session product rules silently. Every Claude UI PR lists exact backend DTO version, endpoints consumed, 320/375/768/1440 browser evidence, A11y checklist, mobile/desktop/PWA checks and no backend or source-data mutation.
+
+## Native Android/iOS delivery specification — designed now, implemented later
+
+**Chosen packaging architecture:** React+Vite source → production web bundle → audited Capacitor bridge/shell for Android and iOS. The shell never contains an alternative order simulator or settlement engine. Backend remains the same HTTPS origin, verified session identity and immutable financial ledger. The release milestone is explicit in the project plan, not automatically enabled by app-store setup.
+
+- **Route/deep links:** stable external URL identifies Method/Session/Journal routes without exposing authentication bearer, private market-data URL or financial command. Cold launch, restored background session and pending link after login all reconcile current workspace membership and Session revision on the server.
+- **Authentication:** use system browser OAuth/PKCE and secure app-link return; never put ID/access tokens in link URL, WebView history or logs. Store only the minimum renewable credential using approved secure OS storage if needed; server revocation, logout and account switch wipe local private caches. Google/email identity linking rules are unchanged.
+- **Files/exports:** use platform share sheet or scoped document export for journals/reports only; no unlicensed raw tick distribution by default. Downloads are temporary, revocable where policy applies and explicitly user initiated.
+- **Back/foreground:** pause local animations/requests on suspend, refresh session revision/command receipt on resume, never replay offline as financial authority; interrupting a confirm triggers reconciliation by command ID, never duplicate submit.
+- **Push notifications:** excluded from core backtest V1 unless an actual product use case and privacy permission exist; app must not depend on push for command completion. Network status and pending jobs always recover via server inspection.
+- **Sensitive OS permissions:** request none by default beyond network; all future capabilities (biometric gate, camera, file access, notifications) receive a separate purpose, permission rationale and test.
+- **App-specific checks:** Android emulator and physical touch device; iPhone Safari/PWA and physical iOS wrapper where toolchain available; safe-area, status/nav bars, keyboard, deep links, keyboard escape/back, portrait/landscape chart gesture, install/update rollback, cold/warm resume, token leakage, app-switch/logout and crash-on-confirm. Validate backend/API SHA against shipped app bundle before release.
+- **Distribution:** separate internal test builds before store upload; owner approves Apple/Google developer accounts, fees, privacy disclosures, signing key custody and store publishing. No agent spends money or publishes on its own.
