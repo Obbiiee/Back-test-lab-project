@@ -1,5 +1,7 @@
 # 15 — Claude Frontend Coding Runbook: No-Guess Execution Checkpoints
 
+**Backend coordination updated:** Codex's [B00–B12 epic #22](https://github.com/Obbiiee/Back-test-lab-project/issues/22) and detailed [backend runbook 16](16_CODEX_BACKEND_EXECUTION_RUNBOOK.md) own source and API; [17](17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md) maps exact existing/planned endpoints for Claude's 50 indicators and drawing settings. Claude should pin Codex **B01 OpenAPI SHA (#24)** and requires **B08 cross-device storage API (#31)** for actual cloud sync. **No git worktree**; direct GitHub branch commit/push/PR. Don't claim cross-device persistence if only localStorage exists.
+
 **Operational label:** `FRONTEND_DESIGN_COMPLETE_FOR_REVIEW`, **not** `FRONTEND_IMPLEMENTED`. Owner intends Claude to design **and code** laptop, HP browser and installable app version; Codex implements backend; both push GitHub branches and coordinate through versioned API. This is a direct handoff to Claude after design PR and owner approval. Do **not** treat this file as permission to rewrite backend, deploy, purchase or silently modify financial contracts.
 
 ## Read-first order (must not improvise contrary UX)
