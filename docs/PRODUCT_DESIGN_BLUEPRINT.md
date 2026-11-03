@@ -82,11 +82,11 @@ The desired UX is **an answer and side-by-side baseline vs hypothetical scenario
 
 
 
-## Proposed product design for founder review — 2026-11-04 (DRAFT; not approved)
+## RIKSORA product design — owner-approved direction (2026-11-04)
 
-> **Review status:** This section is an assistant-authored **proposal awaiting owner review**, not an approved or implemented feature list. It translates the remaining product questions into concrete UX and acceptance proposals. The owner's **Protocol decision is already approved** and stays governed by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). It does not replace canonical financial, market-data, security, subscription, architecture or roadmap owners and does not authorize code or infrastructure changes. Only separately approved decisions should be promoted into their authoritative specifications.
+> **Approval status:** The owner approved the product direction on **2026-11-04**, supplying the exact 16-symbol target list below and accepting the remaining UX/research design. This is **approved product intent only**, not evidence of implemented features, admitted market data, commercialization readiness, or authority to change code/production. Protocol constraints remain owned by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). The architecture, frozen execution contracts, market-data/security/subscription rules, roadmap and `AI_CONTEXT/04_CURRENT_PHASE.md` retain their separate authority. Unresolved engineering choices and commercial scope gates below still require evidence and, where needed, explicit owner signoff.
 
-### D1 — User journey and navigation (proposal)
+### D1 — User journey and navigation (approved design direction)
 
 The product is **Method-centered, Session-executed, evidence-driven**. A Method is a named research idea, a Session is its single-instrument historical run/context, and analysis is the lens for observed results.
 
@@ -120,15 +120,32 @@ Landing → Sign in → My Methods
 
 Method detail should display a readable Rules/Assumptions panel and a link to its exact provenance. Confirm and refusal states must explain why an operation is forbidden, not merely hide a button. No silent exception for AI, API or admin paths.
 
-### D3 — 16 instruments × five years: data catalog UX and rollout (proposal)
+### D3 — 16 instruments × five years: data catalog UX and rollout (approved design direction)
 
 - Present a searchable **Instrument Catalog** with 16 targeted slots, not a fake promise of 16 qualified feeds. Show **Available / Partial / QA blocked / Rights blocked / Planned** as factual catalog states derived from dataset/admission evidence.
 - A pair's detail displays earliest/latest **eligible** historical time, provider/feed, Bid/Ask availability, accepted gaps, quality warnings, execution precision/profile, permitted research/redistribution rights and version. Calendar selection must disallow periods not admitted for the selected execution model.
-- **Provisional research shortlist for sourcing discussion only, not fixed contract:** XAUUSD, XAGUSD, EURUSD, GBPUSD, USDJPY, USDCHF, USDCAD, AUDUSD, NZDUSD, EURJPY, GBPJPY, EURGBP, AUDJPY, CADJPY, EURAUD, GBPAUD (two metals + fourteen FX pairs). The final sixteen remain an **owner decision**, and legal/quality/provider feasibility may require replacements. Never present these as all procured, accessible or broker-equivalent.
+- **Owner-approved target instrument catalog (exactly 16 symbols, in founder-supplied order; 15 FX pairs and XAUUSD):**
+  1. `AUDUSD`
+  2. `EURGBP`
+  3. `NZDUSD`
+  4. `USDCHF`
+  5. `AUDJPY`
+  6. `CADJPY`
+  7. `EURUSD`
+  8. `GBPUSD`
+  9. `NZDJPY`
+  10. `USDCAD`
+  11. `CHFJPY`
+  12. `EURJPY`
+  13. `EURNZD`
+  14. `GBPJPY`
+  15. `USDJPY`
+  16. `XAUUSD`
+  No other instrument is implied or substituted, including XAGUSD, EURAUD or GBPAUD from the earlier unapproved shortlist. Each symbol targets five years, subject to per-feed admissibility and hosting/redistribution rights. **Target catalog != available dataset inventory**: never label any of the 16 as acquired, qualified, deployed or commercially licensable without evidence.
 - Backtesting fidelity and eligibility are governed by [Market Data Standard](MARKET_DATA_STANDARD.md); unknown broker tick size/contract size/spread/slippage/time ordering blocks misleading fill and P&L claims. A raw data file is not sufficient for sellable tick replay.
 - The target 80 instrument-years is a **full-product coverage aspiration**; a December 2026 paid launch can only advertise actually qualified, lawful, technically supported data, and requires explicit owner approval if scope differs. Object storage sizing, Parquet physical layout and purchase sequence are architectural decisions measured separately, not UX facts.
 
-### D4 — Workspace and execution presentation (proposal)
+### D4 — Workspace and execution presentation (approved design direction)
 
 - Keep a single chart workspace. Planned Long/Short position drawing: drag **Entry / SL / TP**; on click open a compact order planner with matching numeric fields, permitted order type, risk basis, target RR, derived lot/quantity, currency, estimated cost and assumptions. Every mutation updates the chart and invalidates stale review.
 - Free Style **Quick**: compact Buy (Ask)/Sell (Bid) market ticket, optional supported exit controls; explicit review and Confirm. It may close or partially close manually when canonical rules permit, with each action logged. Free Style Planned uses supported order types according to order validation.
@@ -140,11 +157,11 @@ Method detail should display a readable Rules/Assumptions panel and a link to it
 
 One click, no duration selector, no popup. Advance in chronological tick order toward the **earliest relevant pending trigger or active-position exit** within at most **three days**. If none occurs, reveal **all three days' eligible candles at once**, update the visible replay cursor and leave pending orders **unchanged**. If the qualified dataset ends sooner, stop at the known boundary with a visible message.
 
-**Proposed technical interpretation for owner/engine review:** a rolling **72 elapsed hours in UTC from the current replay cursor**, not "three trading sessions"; weekends/market closures are not filled with synthetic quotes. This interpretation must be confirmed against user expectations before being frozen in the execution contract. It must not silently skip a valid market event when resuming.
+**Owner-approved UX interpretation:** a rolling **72 elapsed hours in UTC from the current replay cursor** (three days, not three completed trading sessions); the trader sees only one Jump button. Weekends/market closures are not filled with synthetic quotes; when data is unavailable, disclose the source boundary. The exact engine clock and event-time semantics still require test vectors under the existing execution contract. Do not skip any valid event when resuming.
 
 For multiple simultaneous orders/positions, process all required intermediate events deterministically. Equal timestamps and source ordering uncertainty must preserve the existing blocked/unresolved acceptance semantics rather than making up a winner. Playback and Jump over equivalent periods must yield the same canonical ledger, balance, position/order state and replay revisions. Engine may index/search hidden future ticks only in an isolated causal controller; future prices and derived future OHLC may not become visible to the user/indicator/strategy ahead of the committed cursor. Server-supported cancellation/timeout for long searches is an engineering requirement, not user-configurable jump logic.
 
-### D6 — Statistics: one method, many sessions, explicit comparability (proposal)
+### D6 — Statistics: one method, many sessions, explicit comparability (approved design direction)
 
 **Hierarchy:** Canonical Trade/Execution Evidence → Session Analytics → Instrument-within-Method Analytics → Method Analytics → Future Research Comparisons.
 
@@ -157,7 +174,7 @@ For multiple simultaneous orders/positions, process all required intermediate ev
 
 **Suggested screen information order:** Method header + Sessions/period/source count → high-signal metrics → performance by instrument (chart/table) → distributions/timing → session comparison → detailed trade ledger → methodology/limitations.
 
-### D7 — Opportunity Journal: prepare for later AI scenarios (proposal)
+### D7 — Opportunity Journal: prepare for later AI scenarios (approved design direction)
 
 A **research opportunity** is not necessarily an order or trade; it represents a setup observed at time `t` with immutable Method/Session context and **only data available by t**. Keep it distinct from the canonical financial ledger.
 
@@ -165,7 +182,7 @@ A **research opportunity** is not necessarily an order or trade; it represents a
 - Preserve references to geometry/identified level **as known at decision time**, so later chart changes do not rewrite why the setup was observed. Useful optional fields: setupId, levelId (when actually defined), rule/checklist observations, would-enter/not-taken/unknown, timestamp, session/method IDs, snapshot provenance, and later disposition only when explicitly evaluated.
 - This data makes the future AI problem more tractable; it **does not** alone give a known counterfactual fill or undiscovered opportunity. Automatic detection and full opportunity enumeration require independently validated point-in-time rule definitions and bounded compute; never silently backfill human observations from full future price history.
 
-### D8 — Future AI hypothesis and scenario research (proposed later release)
+### D8 — Future AI hypothesis and scenario research (approved future vision)
 
 Example user intent: **"Jika sudah tiga kali false breakout di resistance yang sama, jangan entry di resistance itu lagi; tunggu resistance berikutnya. Bagaimana statistiknya dibanding baseline?"**
 
@@ -174,7 +191,7 @@ Example user intent: **"Jika sudah tiga kali false breakout di resistance yang s
 - Output **Baseline vs Hypothesis** with source coverage, trade opportunity counts, exclusions, realized/normalized results where valid, performance changes and uncertainty, plus assumptions and OOS warnings. Label this exploratory if tested on the same observed period; do not claim causation or future profitability.
 - AI is the language/experiment interface; the governed deterministic engines compute statistics. Every scenario and comparison gets a reproducibility passport; no AI authority to edit the canonical ledger, settled trades, frozen Method rules or source data.
 
-### D9 — December commercialization user experience and evidence gates (proposal)
+### D9 — December commercialization user experience and evidence gates (approved design direction)
 
 - **Public home** states actual available historical instruments and versions, not the aspirational 16 × 5. Pricing/entitlements must align with [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md), including identical correctness across Free and Pro; pricing and quotas remain separate owner decisions.
 - **Activation:** Sign in → create Method → start an eligible Session → planned/quick order as appropriate → one valid trade/journal/analysis experience → return/resume and Method Analytics.
@@ -184,7 +201,9 @@ Example user intent: **"Jika sudah tiga kali false breakout di resistance yang s
 
 ### D10 — Review checklist and bounded implementation handoff
 
-**Review items for the founder before promoting this draft:** (1) is the Method-centered dashboard the primary entry point; (2) confirm specific 16-instrument catalog or leave provisional; (3) confirm that "three days" means a UTC rolling 72-hour window; (4) confirm that opportunity marking belongs in initial launch or postlaunch; (5) decide whether Method comparisons need a December MVP or are postlaunch; (6) commercial scope when fewer than 16 × 5 years are admitted. No question here should be treated as already approved.
+**Owner decisions recorded (2026-11-04):** (1) Method-centered dashboard approved; (2) exact 16 instruments approved in D3; (3) one-click UTC rolling 72-hour Jump approved, pending orders unchanged; (4) optional lightweight Opportunity Journal approved as product design, with release sequencing subject to capacity and correctness; (5) Session/Method/instrument analysis approved for core research; **comparison between different Methods** and AI counterfactual remain future enhancements; (6) December 2026 is the business launch target, never proof that all 16 × 5 data are admitted. Full catalog remains the target and any reduced advertised paid-launch coverage requires a separate informed founder decision.
+
+**Still open (not falsely approved by this design acceptance):** commercial data provider rights, actual inventory/admission for all 16, final feed/execution profiles, implementation schedule and release gates, payment/pricing/entitlements, source-quality blockers, and evidence-based allocation of Opportunity Journal to December vs postlaunch. These are operational/feasibility decisions rather than missing product-vision approval.
 
 **Design signoff tests (not execution authorization):**
 1. New user registers, creates Protocol Method → GBPJPY Session; attempts Quick, Market entry, RR edit after lock and manual close after fill are refused; planned pending and qualifying checklist follow the canonical contract.
