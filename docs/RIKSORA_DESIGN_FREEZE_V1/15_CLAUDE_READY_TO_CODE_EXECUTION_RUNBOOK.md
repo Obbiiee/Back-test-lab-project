@@ -81,6 +81,18 @@ Frontend `npm run test:regression`, `npm run lint`, `npm run build`, `npm run au
 
 Real browser screenshots and interaction traces: public/auth, new Method, catalog, Session, chart, drawing, indicator, planned order, confirm, Pending/Closed, Session/Method stats, 72h Jump, logout, offline PWA at **1440, 1024, 768, 390, 375, 320**. Keyboard/a11y, touch, reduced motion, 200% zoom, Android/iOS QA where possible. PR includes device evidence, exact API contract/commit source pins, changed files, observed difference from mock, full console logs and rollback.
 
+### F10 — professional drawing extension (separate bounded PRs; after core drawing parity)
+
+Implement *all sixteen* professional extension types D10–D25 as individual/group-scoped PRs in fixed order: (1) Extended Line, Horizontal Ray, Cross Line; (2) Parallel Channel, Regression Trend; (3) Fib Extension, Fib Channel; (4) Rotated Rectangle, Ellipse/Circle, Polyline/Path; (5) Brush and Highlighter; (6) Anchored Text and Callout; (7) Price Range and Date Range. Each PR adds registry/model/render/serializer/hit-test/touch/undo/persistence and 100-object performance tests before corresponding controls appear live. Copy behavior from [14 catalogue](14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md); update route help; no second chart engine and no financial reducer edits. Feature completion requires actually passing all D10–D25 cases; no blanket "TradingView parity" claim while incomplete.
+
+### F11 — professional indicator extensions (separate bounded PRs)
+
+Implement listed professional I08–I22 in [14](14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md) in batches: (1) non-volume oscillators/overlays with verified math; (2) overlays with causal periods and regression/forward display rules; (3) volume-dependent VWAP, Anchored VWAP, OBV and MFI **only after qualified volume data and Codex source contract exist**. Separate calculator numeric goldens, warmup and no-lookahead tests before enabling each. Missing qualified volume means BLOCKED with explicit reason; never substitute tick counts or fake market volume. Completed UI and mathematics counted independently.
+
+### F12 — optional native Android and iOS store-app delivery, using same React source
+
+After F08 PWA and F09 integration PASS, package the *same* web bundle via Capacitor. Android/iOS shell performs secure browser OAuth return, deep link, safe-area, keyboard, status/nav bar, logout/cache clearing, background refresh and command reconciliation; no new financial simulator and no offline order queue. Build signed/internal test artifacts only under owner-provided legal developer accounts/signing approvals; no app-store publishing or charges without explicit approval. Verify real device and private-data handling, link and financial command parity. PWA remains fully usable without the native shell.
+
 ## Exact contract handoff / blockers with Codex
 
 Claude must **not** invent endpoints just because a UI screen is required. Before F02, Codex supplies `GET catalog`, `Method create/list/read`, `Session create/list/read`, `workspace identity` or marks missing. Before F07 supplies `review`, `confirm`, `command`, `job status`, `analytics/journal`, actual error codes and canonical JSON fixtures. Existing main has only partial routes; new DTOs and My Method/Session aggregation may require Codex changes and tests.
