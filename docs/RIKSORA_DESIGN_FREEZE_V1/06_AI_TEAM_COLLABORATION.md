@@ -1,5 +1,7 @@
 # 06 — Codex & Claude Operating Agreement / GitHub Integration
 
+**Current GitHub assignments:** [Codex backend B00–B12 epic #22](https://github.com/Obbiiee/Back-test-lab-project/issues/22) and [Claude complete frontend #21](https://github.com/Obbiiee/Back-test-lab-project/issues/21), aligned through [17 API acceptance matrix](17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md). **Owner explicitly forbids creating git worktrees:** use a normal independent repository clone/checkout or direct GitHub actions on `codex/` and `claude/` branches; agents do not alter one another's active directory or force-push. Each checkpoint must actually land on the remote branch with test evidence and PR.
+
 **Objective:** one coordinated product, no parallel incompatible assumptions, no unsupervised production modifications. Founder is Product Owner; Codex is Backend/Data/QA implementer; Claude is Frontend/Responsive UX/PWA implementer. Independent reviewer verifies contracts and cross-system tests; nobody can silently override owner-approved Method/Session, finance or release gates.
 
 ## The four sources every AI must read FIRST
