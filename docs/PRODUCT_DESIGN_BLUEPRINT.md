@@ -6,6 +6,81 @@
 > **Purpose:** Menyimpan keputusan UX, product language, information architecture, monetization experience, dan AI Research Assistant agar ide tidak hilang.  
 > **Authority:** Dokumen ini bukan implementation authorization dan tidak menggantikan ROADMAP atau AI_CONTEXT/04_CURRENT_PHASE.md.
 
+
+## RIKSORA product direction — owner decisions (2026-11-04)
+
+> **Status:** Owner-approved product intent and UX requirements from design discussion; **not** an implementation, release, dataset-admission, or performance PASS. Preserve the authoritative [Trading Method & Session specification](TRADING_METHOD_SESSION_SPEC.md), [Market Data Standard](MARKET_DATA_STANDARD.md), architecture/frozen execution contracts, and the separate operational status/authorization in `AI_CONTEXT/04_CURRENT_PHASE.md`. When older research/prototype wording below conflicts, this newer product direction plus the canonical Method/Session contract govern intended UX; do not silently change financial/causal behavior.
+
+### Vision and full-product expectation
+
+**RIKSORA is a reproducible trading research laboratory:** the user defines a method, tests it on historical market data with explicit execution assumptions, saves canonical evidence, and compares what the evidence supports. It is not a signals/guaranteed-profit service. User is the decision-maker; analytics and future AI propose tests rather than changing trades on the user's behalf.
+
+- **Full product data goal:** 16 trading instruments/pairs, each with **five years** of historical data (80 instrument-years). This is an intended coverage target, **not** a statement of existing validated/admitted data, user entitlement, lawful hosted-data rights, or live service capacity. Per-instrument feed, actual dates, Bid/Ask precision, ordering quality, gaps, restrictions and supported quote-currency conversion must be disclosed honestly.
+- **Business timing goal:** publish and pursue a sellable RIKSORA release in **December 2026**, subject to independent engine verification, end-to-end UX/security, source rights, production recovery, capacity and payment acceptance. Do not misrepresent 16 × 5 as available if it has not passed those gates; a smaller truthful release scope requires an explicit owner decision.
+- **Core research loop:** Create Method → Create Session(s) → Replay → Plan/execute → Journal → Session Analytics → Method Analytics → Compare/iterate. Research grows without silently altering prior evidence.
+
+### Method-first onboarding and research hierarchy
+
+- On first use, **the user creates or selects their own Trading Method before creating a Session**. Show a clear method name and select `FREE_STYLE` or `PROTOCOL` only at Method creation; Session inherits that type and must not present another competing mode selector.
+- A Method owns the research definition/identity; **many Sessions may reference the same Method**, each pinned to **one instrument/pair**, one provider/feed and dataset/version, its own start period, initial balance, replay cursor, execution profile and canonical history. Different instruments or non-contiguous tests use separate Sessions, not a reset of existing evidence.
+- Example: one user-defined **Breakout** Method → **GBPJPY / Session A** and **XAUUSD / Session B**, possibly further periods and Sessions. The user may see how the *same* Method performs on each Session and instrument and then view its aggregated research results. Different instrument constraints (tick, pip, contract, quote currency, risk-size rounding, spreads/costs) remain explicit; do not assume broker equivalence.
+- Material rule/RR/risk/checklist changes to an evidence-bearing Protocol define a **new Method** rather than rewriting historical results. Preserve Method/Session IDs and the provenance of which method definition produced each trade. Archive Methods with evidence rather than deleting evidence.
+
+### Statistics UX: Session, instrument-within-Method, and Method
+
+Provide one consistent analytics experience with a **scope selector**:
+
+| Scope | What the trader sees | Identity / aggregation rule |
+| --- | --- | --- |
+| **Session** | Completed trades, net result, win rate, expectancy (cash and R where valid), profit factor, drawdown, realized vs planned RR, streaks, distribution, equity/balance charts, journal, unresolved state | Only the specific Session's canonical trading ledger and pinned profile |
+| **Instrument within a Method** | Compare or pool the Method's eligible Sessions for GBPJPY, XAUUSD and other instruments, with period/source filters and visibly different execution assumptions | Group by Method ID plus instrument/profile; label overlapping periods and repeated studies; never silently claim independent samples |
+| **Method (all Sessions)** | Method-level N, win rate, expectancy in R where valid, average realized R, payoff distribution, sample/period coverage, drawdown caveats, risk/behavior observations, per-instrument contributions and side-by-side Session comparison | Source every figure from deduplicated eligible canonical events with explicit filtering, comparable denominators, exclusions and uncertainty; no simple sum of independent account balances/equity curves |
+
+- The default journey should make both **Session Analytics** and **Method Analytics** easy to discover. From a Method page show its Sessions and their respective instruments; from a Session page link back to the Method.
+- Never naively sum absolute P/L across different quote currencies, account sizes or disconnected research Sessions. Use normalized R/relative metrics when defensible; disclose missing initial risk, incomplete FX conversion and other non-comparable records. A Method-level portfolio equity curve/drawdown is **not** implied by separate Session curves; a combined capital allocation model would be a different, explicitly defined product.
+- Pending/unfilled orders are **not** wins/losses; partial positions, unresolved events, manual changes and gaps stay visibly distinguished. Historical statistics are not evidence of future profitability.
+- A comparison dashboard can later contrast **different Methods** using controlled filters; do not conflate that with pooling the same Method across Sessions.
+
+### Trading workspace: Planned / Quick and Free Style / Protocol
+
+- **Free Style:** both draggable **Planned Long/Short** and **Quick Buy/Sell** are available. Free Style may use supported manual close and other explicitly reviewed discretionary management. Quick must still pass canonical order validation/review/confirmation, not a client-only simulated fill.
+- **Planned UX:** Long/Short position object appears on the chart *as a draft first*; Entry/SL/TP anchors can be moved and a compact popover/ticket shows and edits price, RR, risk, quantity, side, order type and estimated loss/profit. Visual edits ↔ numeric edits stay synchronized, are tick-aligned and invalidate stale reviews. Planning is not execution; every supported order requires explicit review and confirmation before activation.
+- **Protocol:** Planned **pending Limit/Stop only**; locked Method RR and risk, checklist conditions authored with the Method and enforcement ON/OFF as that Method defines. Moving Entry/SL recomputes the dependent TP and lot from locked RR/risk. Checklist OFF removes the execution gate but must preserve actual/not-assessed evidence; it does not unlock RR/risk, Quick/Market entry or manual/partial close. Server/domain validation enforces restrictions even if UI is bypassed.
+- Unsupported order types, execution parameters, manual interventions and data-quality states must show accurate refusal/unresolved behavior; never produce an invented fill.
+
+### Jump to Next Event — fixed three-day UX
+
+- **One-click control, no duration selector or extra modal.** Each click looks forward for trading-relevant events within a **fixed three-day maximum window**. Technical clock boundary (market/calendar conventions, UTC and closure handling) must be specified in the execution contract and tested without changing the simple product UX.
+- If an eligible event occurs first (for example pending-order activation or open-position SL/TP), stop at its **earliest causally valid tick/timestamp group**. With multiple independent orders/positions, apply all preceding events in correct chronology and preserve deterministic same-time handling; never skip intervening financial actions.
+- If no relevant event occurs within the window, **advance directly and reveal the full eligible three-day candle history at once**, without playing the animation. Existing pending orders remain pending and unchanged. The user decides whether to keep, amend where allowed, or cancel them.
+- **Do not add OCO, default auto-cancel, price invalidation, expiration, or selectable one-/seven-day windows** as part of this owner-approved Jump UX. No-event is *not* a failed trade or an automatic order cancellation. If the available/qualified source ends early, stop at the source boundary and disclose the limit.
+- A future-only event search may use sound Bid/Ask index bounds to reject provably irrelevant blocks, but authoritative execution must obey exact sequential event semantics, no look-ahead and the same canonical ledger/state as normal replay for equivalent input/actions. Do not present this design intent as an implemented performance improvement.
+
+### Future AI Research — evidence-grounded counterfactual questions
+
+Future product capability: after completing research, a user may ask in natural language, for example:
+
+> "Bagaimana hasil Method Breakout saya jika setelah **tiga false breakout pada resistance yang sama**, saya tidak mengambil entry lagi di level itu dan baru mencari setup ketika resistance berikutnya terbentuk?"
+
+The desired UX is **an answer and side-by-side baseline vs hypothetical scenario statistics without requiring the user to manually replay and re-enter all trades**. The assistant must not improvise a backtest from aggregate win rate or invented price signals.
+
+- Ask for or disclose precise testable semantics: what constitutes a resistance level/identity and a new level, tolerance by instrument/timeframe, false-break definition, what counts as three occurrences, point-in-time availability, inclusion/exclusion rule, and how the rule resets. The user confirms an explicit scenario definition; do not silently rewrite the Method or stored trades.
+- **Evidence prerequisite:** retain/use the relevant *opportunity-level* research evidence (including qualified setups **not taken**, time/level identity, eligibility and outcomes where actually observable), canonical trade/order/position events, original time-bounded quotes and dataset/execution pins. A trade-only journal and aggregate Session statistics often **cannot** reveal which opportunities would have been skipped or how later fills would change. Missing facts must be called out.
+- **Compute strategy, not magic:** when the stored point-in-time opportunity/effect records suffice and changes only filter already-known independent opportunities, a deterministic scenario evaluator may reaggregate them quickly; when different orders affect later balance/position availability, risk sizing, fills, subsequent signals or market exposure, **recompute the affected causal execution path** against the pinned observed ticks. No manual replay for the user does **not** mean no engine computation. If evidence is insufficient, return **cannot evaluate reliably** or offer a new bounded research run, never a fabricated precise result.
+- Show **Baseline vs Hypothesis** with eligible/removed trade counts, observed opportunity coverage, normalized expectancy/R, win rate, drawdown where actually computable, profit factor, trade distribution and uncertainty, plus dataset/instrument/time-window/filter provenance. Separate observed data, counterfactual estimates, unobserved scenarios and causal assumptions; do not imply that omitted trades have known hypothetical fills.
+- Version and pin every hypothetical rule and generated report; preserve the original Method, Sessions, ledger and Experiment Passport immutable. New rules for actual subsequent trading require a **new Method**, not a silent edit of evidence-bearing history.
+- Guard against in-sample overfitting, repeated hypothesis search, non-independent clustered events and future-leakage. Provide exploratory labeling, validation on holdout/out-of-sample data where feasible and explanation of weak samples. AI proposes and explains the hypothesis; deterministic research/verification computes the numbers. No unsupported guarantee of strategy optimization or profitability.
+- This is a **future Research feature**, **not** a mandatory capability for the December 2026 commercial target unless explicitly rescheduled with evidence and approval.
+
+### Product acceptance examples and release distinction
+
+1. First-time user creates a named Breakout Method, then creates independent GBPJPY and XAUUSD Sessions referencing that Method; Method Analytics presents both Session results with correctly scoped, non-duplicated and comparable aggregations; source/period/FX differences stay visible.
+2. Planned objects stay drafts until server-reviewed confirmation. Free Style Quick/Planned and Protocol Planned-pending-only, locked RR/risk/checklist ON/OFF all meet the [canonical Method/Session contract](TRADING_METHOD_SESSION_SPEC.md).
+3. Jump with a Buy Stop that never triggers reveals three days and preserves the pending order; Jump with a trigger or TP/SL stops at the first valid event; compare outcomes with ordinary tick replay and deterministic restart/resume.
+4. A future three-false-break counterfactual either produces a reproducible, disclosed scenario comparison using sufficient point-in-time evidence, or explicitly reports missing prerequisites; it never invents the skipped outcomes.
+5. The five-year × 16-instrument goal is a **full-product vision**; testable, authorized, legally hostable source coverage and capacity are still release gates. This planning section does not change `ROADMAP.md`, the active phase, payments, deployed VPS, historical datasets or code.
+
+
 ## Alpha screen acceptance (2026-10-10)
 
 This extends the existing design owner under [the Alpha scope amendment](V2_ALPHA_FROZEN_SPEC.md#0a-human-approved-alpha-product-closure-amendment-2026-10-10). The existing `UI_FIGMA_PREVIEW.jpg`, Phase 15 Figma UI and Phase 18.6 design tokens are the visual baseline. Do not substitute a donor demo/dashboard as the product design. The Method/Session contract continues to own product semantics.
