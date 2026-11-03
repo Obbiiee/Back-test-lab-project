@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:terminal-preview": "vite build --config vite.preview.config.js",
     "lint": "eslint .",
     "test:drawings": "node tests/drawings.test.mjs",
     "test:c01-drawing-properties": "node tests/c01-drawing-properties.test.mjs",

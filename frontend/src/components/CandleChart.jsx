@@ -21,7 +21,7 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceStep }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, previewOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceStep }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -533,7 +533,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     <div className="chart-wrap" onContextMenu={handleChartContextMenu} onClick={() => setContextMenu(null)}>
       <div className="chart-tools" aria-label="Chart trading controls">
         <button type="button" disabled={!volumeAvailable} title={volumeAvailable ? 'Volume' : 'Source volume is unavailable; tick count is not exchange volume'} className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>
-        <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pick order price</button>
+        {!previewOnly && <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pick order price</button>}
         <span className="tool-divider" />
         <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>
         <button type="button" onClick={redoDrawing} disabled={!historyState.canRedo} aria-label="Redo drawing" title="Redo (Ctrl+Y)">↷ Redo</button>
