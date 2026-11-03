@@ -1,5 +1,7 @@
 # 05 — API / Frontend Integration Contract (Design-to-OpenAPI Handoff)
 
+**Operational extension:** the detailed 19-endpoint backend ↔ Claude inventory, chart-object/indicator-instance CRUD/CAS, chart candles, error and QA fixtures is [17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md](17_CLAUDE_CODEX_API_ACCEPTANCE_MATRIX.md). Codex executes [B01](https://github.com/Obbiiee/Back-test-lab-project/issues/24) then [B08](https://github.com/Obbiiee/Back-test-lab-project/issues/31); Claude consumes the *actual generated OpenAPI SHA* in [Issue #21](https://github.com/Obbiiee/Back-test-lab-project/issues/21). No proposed endpoint is claimed existing without backend proof.
+
 **Status:** contract blueprint for Codex+Claude. **Not** a generated OpenAPI file or claim that every planned endpoint exists. Existing operational authority and frozen domain/financial contracts control semantics. Codex must extract the real FastAPI OpenAPI from current composition, compare field-for-field, version DTOs and let Claude use exactly that schema.
 
 ## Existing verified route families in main (repo audit 2026-11-04)
