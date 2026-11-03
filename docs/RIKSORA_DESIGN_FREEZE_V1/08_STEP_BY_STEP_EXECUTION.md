@@ -76,7 +76,7 @@ Every stage has: `input_version/SHA`, scope allowlist, implementation or documen
 
 ## Phase 8 — Claude UI design and parallel implementation
 
-**P8.1** Claude audits existing React/Vite/Lightweight Charts, visual assets and active routes; maps every screen U01–U16 against actual implementation and 320/375/390/768/1024/1440 responsive matrix. **Deliver:** wireframes/components/token diff without replacing approved logo.
+**P8.1** Claude audits existing React/Vite/Lightweight Charts, visual assets and active routes; maps every screen U01–U16 against actual implementation and 320/375/390/768/1024/1440 responsive matrix; reads the full [Claude click-map](10_FRONTEND_CLICK_BY_CLICK_JOURNEYS.md), [desktop terminal](11_TRADINGVIEW_LIKE_DESKTOP_TERMINAL.md), [mobile app](12_MOBILE_TABLET_APP_EXACT_SPEC.md), [component wireframes](13_CLAUDE_SCREEN_WIREFRAMES_COMPONENTS.md), [drawing/indicator catalog](14_DRAWING_INDICATOR_PROFESSIONAL_TOOL_CATALOG.md) and [F00–F12 runbook](15_CLAUDE_READY_TO_CODE_EXECUTION_RUNBOOK.md). **Deliver:** tested per-screen component implementation plan and token diff without replacing approved logo.
 
 **P8.2** In `claude/ui-shell-...` branch implement protected routes/auth, first Method, Method overview, catalog/Session setup with pinned typed mock API. **Gate:** unit/visual/a11y tests; no fake datasets or numbers.
 
