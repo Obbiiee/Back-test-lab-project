@@ -1,5 +1,5 @@
 import { projectGeometry } from '../projectGeometry.js';
-import { RECTANGLE, TEXT, HORIZONTAL_LINE, VERTICAL_LINE } from '../DrawingTypes.js';
+import { RECTANGLE, TEXT, HORIZONTAL_LINE, VERTICAL_LINE, DRAWING_SPECS } from '../DrawingTypes.js';
 import { insideLabel } from '../advancedGeometry.js';
 import { drawingShapes } from '../drawingShapes.js';
 import { minimumAnchors } from '../primitives/TrendLinePrimitive.js';
@@ -66,13 +66,13 @@ export function hitDrawing(manager, chart, series, pointer) {
   const ordered = manager.getAll().filter(model => model.visible);
   ordered.sort((a, b) => Number(a.id === manager.selectedId) - Number(b.id === manager.selectedId));
   const env = { width: chart.timeScale().width?.() ?? 0, height: chart.paneSize?.().height ?? 0,
-    priceToY: price => series.priceToCoordinate(price), bars: manager.bars, precision: manager.precision ?? 3 };
+    priceToY: price => series.priceToCoordinate(price), bars: manager.bars, precision: manager.precision ?? 3, tickSize: manager.tickSize ?? 0.001 };
   for (const model of ordered.reverse()) {
     const points = projectGeometry(model, chart, series, manager.bars);
     if (points.length < minimumAnchors(model.type) || points.some(p => !p || !Number.isFinite(p.x + p.y))) continue;
     const selected = model.id === manager.selectedId;
     let type = HIT.NONE, index = null;
-    if (selected && ![HORIZONTAL_LINE, VERTICAL_LINE].includes(model.type)) {
+    if (selected && ![HORIZONTAL_LINE, VERTICAL_LINE].includes(model.type) && !DRAWING_SPECS[model.type]?.freehand) {
       // Handles remain the canonical anchors (plus the two transient rectangle corners).
       const found = points.findIndex(p => Math.hypot(pointer.x - p.x, pointer.y - p.y) <= HANDLE_TOLERANCE);
       if (found >= 0) {

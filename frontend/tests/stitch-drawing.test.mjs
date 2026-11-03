@@ -5,7 +5,7 @@ import {DrawingHistory} from '../src/drawings/DrawingHistory.js';
 import {DrawingPersistence} from '../src/drawings/DrawingPersistence.js';
 import {DrawingInteractionController} from '../src/drawings/interaction/DrawingInteractionController.js';
 import {HIT} from '../src/drawings/interaction/hitTesting.js';
-import {DRAWING_SPECS} from '../src/drawings/DrawingTypes.js';
+import {DRAWING_SPECS, PROFESSIONAL_DRAWINGS} from '../src/drawings/DrawingTypes.js';
 import {performance} from 'node:perf_hooks';
 import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
@@ -27,7 +27,7 @@ const interactions=new DrawingInteractionController(manager,chart,series,history
 const samples=[];
 // Preserve the original eight-candidate comparison; supplemental Ray gates
 // live in phase9 and the separate pinned Alpha fixture.
-const originalSpecs=Object.fromEntries(Object.entries(DRAWING_SPECS).filter(([type])=>type!=='ray'));
+const originalSpecs=Object.fromEntries(Object.entries(DRAWING_SPECS).filter(([type])=>type!=='ray'&&!Object.hasOwn(PROFESSIONAL_DRAWINGS,type)));
 for(const [type,spec] of Object.entries(originalSpecs)){
   const points=[{time:150.25,price:80.125},{time:350.75,price:60.875}].slice(0,spec.points);
   const input={id:type,type,points,...(type==='text'?{text:'Authored Ω'}:{})};

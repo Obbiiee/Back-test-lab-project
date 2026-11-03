@@ -35,7 +35,31 @@ export const CAPABILITIES = Object.freeze({
   'fibonacci-retracement': { ...LINE, levels: 'fib', extend: true, priceLabels: true, reverse: true, fill: true },
   text: { opacity: true, text: true },
   measure: { ...LINE, text: 'size' },
+  // C-03 professional tools.
+  'parallel-channel': { ...LINE, fill: true, extend: true, middle: true },
+  'regression-trend': { ...LINE, fill: true, deviation: true, extend: true },
+  'fib-extension': { ...LINE, levels: 'fib-extension', extend: true, priceLabels: true, fill: true },
+  'fib-channel': { ...LINE, levels: 'fib-channel', extend: true, priceLabels: true, fill: true },
+  'rotated-rectangle': { ...LINE, fill: true },
+  ellipse: { ...LINE, fill: true },
+  polyline: { ...LINE, fill: true, nodes: true },
+  brush: { opacity: true, freehand: true },
+  highlighter: { opacity: true, freehand: true },
+  'anchored-text': { opacity: true, text: true },
+  callout: { ...LINE, text: true },
+  'price-range': { ...LINE, fill: true, text: 'size' },
+  'date-range': { ...LINE, fill: true, text: 'size' },
 });
+// Default level rows per levelled tool (value, initially shown).
+export const LEVEL_DEFAULTS = Object.freeze({
+  fib: { values: DEFAULT_FIB_LEVELS, visible: DEFAULT_VISIBLE_FIB },
+  'fib-extension': { values: [0, 0.382, 0.618, 1, 1.272, 1.618, 2, 2.618], visible: [0, 0.618, 1, 1.618, 2.618] },
+  'fib-channel': { values: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618], visible: [0, 0.382, 0.618, 1] },
+});
+export function defaultLevels(type) {
+  const set = LEVEL_DEFAULTS[capabilities(type).levels] ?? LEVEL_DEFAULTS.fib;
+  return set.values.map(value => ({ value, visible: set.visible.includes(value) }));
+}
 export function capabilities(type) { return CAPABILITIES[type] ?? { ...LINE }; }
 
 function validLevels(levels) {
@@ -67,6 +91,8 @@ const RULES = Object.freeze({
   labelPosition: value => LABEL_POSITION.includes(value),
   levels: validLevels,
   reverse: bool,
+  deviation: value => Number.isFinite(value) && value >= 0 && value <= 5,
+  showMiddle: bool,
 });
 export const STYLE_KEYS = Object.freeze(Object.keys(RULES));
 
@@ -92,13 +118,14 @@ export function resolvedStyle(model) {
     color: o.color, lineWidth: o.lineWidth, lineStyle: o.lineStyle ?? 'solid', opacity: o.opacity ?? 1,
     fillColor: o.fillColor ?? o.color, fillOpacity: o.fillOpacity ?? (model.type === 'rectangle' ? 0 : 0),
     extendLeft: o.extendLeft ?? false, extendRight: o.extendRight ?? false,
-    showPriceLabels: o.showPriceLabels ?? (model.type === 'fibonacci-retracement'),
+    showPriceLabels: o.showPriceLabels ?? ['fibonacci-retracement', 'fib-extension', 'fib-channel'].includes(model.type),
     showTimeLabels: o.showTimeLabels ?? false,
     fontSize: o.fontSize ?? 12, fontFamily: o.fontFamily ?? 'mono', bold: o.bold ?? false, italic: o.italic ?? false,
     textColor: o.textColor ?? o.color, textBackground: o.textBackground ?? '#10141b', textBorder: o.textBorder ?? false,
     textAlign: o.textAlign ?? 'left', labelPosition: o.labelPosition ?? 'center',
     reverse: o.reverse ?? false,
-    levels: o.levels ?? DEFAULT_FIB_LEVELS.map(value => ({ value, visible: DEFAULT_VISIBLE_FIB.includes(value) })),
+    levels: o.levels ?? defaultLevels(model.type),
+    deviation: o.deviation ?? 2, showMiddle: o.showMiddle ?? true,
   };
 }
 

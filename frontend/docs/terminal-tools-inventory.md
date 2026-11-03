@@ -61,7 +61,32 @@ Inputs / Style / Placement tabs per instance: per-output visible, colour, thickn
 
 V01–V12 listed and disabled with the reason (quote-only data). No synthetic volume.
 
-### C-03, C-04, C-08, C-09
+### C-03 professional drawings D10–D25 — DONE
+
+All 16 tools: created with the real mouse/touch flow, full Properties (shared style + tool-specific controls), hit-tested where drawn, undo/redo, Object Tree, persisted in v2 storage and restored on reload. Shared renderer and hit geometry in `src/drawings/professionalShapes.js`; pure math in `src/drawings/professionalGeometry.js`.
+
+| # | Tool | Anchors · input | Calculation / geometry | Tool-specific Properties | Notes |
+|---|---|---|---|---|---|
+| 10 | Extended Line | 2 clicks | segment extended both ways | price labels | |
+| 11 | Horizontal Ray | 1 click | from anchor to right edge | price label | |
+| 12 | Cross Line | 1 click | horizontal + vertical through anchor | price + UTC time labels | |
+| 13 | Parallel Channel | 3 clicks: A, B baseline, C width | parallel through C (price offset at C) | fill, middle line, extend L/R | |
+| 14 | Regression Trend | 2 clicks: start/end time | least squares on **revealed** closes between the times; bands ± k·σ(residual) | band deviation 0–5, fill, extend right | handles snap to the fit; bars not yet revealed are never read |
+| 15 | Fibonacci Extension | 3 clicks: A, B, C | level = C + (B − A)·r; defaults 0 · .382 · .618 · 1 · 1.272 · 1.618 · 2 · 2.618 (0/.618/1/1.618/2.618 shown) | level rows, band fill, labels, extend | |
+| 16 | Fibonacci Channel | 3 clicks: A, B baseline, C width | parallels at r·width; defaults 0 · .236 · .382 · .5 · .618 · .786 · 1 · 1.618 | level rows, band fill, labels, extend | |
+| 17 | Rotated Rectangle | 3 clicks: A, B edge, C height | height = C's perpendicular distance (screen) | fill | |
+| 18 | Ellipse | 2 clicks: bounding corners | inscribed ellipse | fill | |
+| 19 | Polyline | click per node (2–64); Done / Enter / double-click; Backspace removes | path; closed polygon when fill > 0 | insert / remove node | creation bar with Done/Undo node/Cancel |
+| 20 | Brush | press-drag | decimated ≥3 px, ≤512 points | colour, width, opacity | chart pan paused while the tool is active |
+| 21 | Highlighter | press-drag | as Brush; defaults yellow, 10 px, 35 % | colour, width, opacity | |
+| 22 | Anchored Text | 1 click + text | pin + label above anchor | full Text tab | defaults centred, bold |
+| 23 | Callout | 2 clicks (anchor, label) + text | leader line + framed label | full Text tab | leader previewed while typing |
+| 24 | Price Range | 2 clicks | Δ price, ticks on Session tick size, % | fill, label size | |
+| 25 | Date Range | 2 clicks | revealed bars in range, elapsed d/h/m | fill, label size | |
+
+Evidence: `tests/c03-professional-drawings.test.mjs`, `tests/qa/drawings-pro-qa.cjs` (25 real-browser steps), screenshots `docs/qa/issue-21/c03/`.
+
+### C-04, C-08, C-09
 
 Next. Tracked in the PR description as each batch lands.
 

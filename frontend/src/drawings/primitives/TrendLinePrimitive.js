@@ -8,7 +8,7 @@ export function drawingEnv(source) {
     width: source.chart?.timeScale().width?.() ?? 0,
     height: source.chart?.paneSize?.().height ?? 0,
     priceToY: price => source.series?.priceToCoordinate(price),
-    bars: source.bars, precision: source.precision ?? 3,
+    bars: source.bars, precision: source.precision ?? 3, tickSize: source.tickSize ?? 0.001,
   };
 }
 export function minimumAnchors(type) {
@@ -31,7 +31,7 @@ class TrendLinePaneRenderer {
         const width = style.lineWidth + (source.selected ? 1 : 0);
         const dash = source.draft ? [5, 4] : dashFor(style.lineStyle, style.lineWidth);
         context.globalAlpha = style.opacity;
-        context.lineCap = 'round';
+        context.lineCap = 'round'; context.lineJoin = 'round';
         for (const shape of shapes) {
           if (shape.kind === 'text') { this.text(context, shape, source.selected); continue; }
           context.strokeStyle = shape.color ?? style.color;
@@ -53,7 +53,7 @@ class TrendLinePaneRenderer {
         }
         if (source.selected && !source.draft) {
           context.setLineDash([]); context.lineWidth = 1.5; context.fillStyle = '#10141b'; context.strokeStyle = style.color; context.globalAlpha = 1;
-          const handles = [HORIZONTAL_LINE, VERTICAL_LINE].includes(model.type) ? [] : projected;
+          const handles = [HORIZONTAL_LINE, VERTICAL_LINE].includes(model.type) || DRAWING_SPECS[model.type]?.freehand ? [] : projected;
           for (const point of handles) {
             context.beginPath(); context.arc(point.x, point.y, 5, 0, Math.PI * 2);
             context.fill(); context.stroke();
@@ -89,6 +89,7 @@ export class TrendLinePrimitive {
   requestUpdate = null;
   selected = false;
   precision = 3;
+  tickSize = 0.001;
   constructor(model, bars = [], draft = false) {
     this.model = model; this.bars = bars; this.draft = draft;
     this.views = [new TrendLinePaneView(this)];

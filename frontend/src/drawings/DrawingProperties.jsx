@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DRAWING_SPECS, TEXT, HORIZONTAL_LINE, VERTICAL_LINE, MEASURE } from './DrawingTypes.js';
-import { capabilities, resolvedStyle, COLOR_PRESETS, LINE_STYLES, UI_WIDTH, FONT_SIZE, DEFAULT_FIB_LEVELS, DEFAULT_VISIBLE_FIB, dashFor, displayName } from './drawingStyle.js';
+import { DRAWING_SPECS, TEXT, HORIZONTAL_LINE, VERTICAL_LINE, MEASURE, ANCHORED_TEXT, PRICE_RANGE, DATE_RANGE, POLYLINE_MAX_NODES } from './DrawingTypes.js';
+import { capabilities, resolvedStyle, COLOR_PRESETS, LINE_STYLES, UI_WIDTH, FONT_SIZE, LEVEL_DEFAULTS, dashFor, displayName } from './drawingStyle.js';
 import { stepPrice, stepBars, parseUtc, formatUtc, formatPrice, decimalsOf } from './drawingEdits.js';
 import './DrawingProperties.css';
 
@@ -81,9 +81,12 @@ export default function DrawingProperties({ tools }) {
   const priceText = value => { const text = formatPrice(value, tickSize); return Number(text) === value ? text : String(value); };
   const set = (patch, coalesce = null) => tools.setOptions(model.id, patch, coalesce);
   const points = model.points;
-  const isText = model.type === TEXT;
+  const hasText = Boolean(DRAWING_SPECS[model.type]?.text);
+  const isText = model.type === TEXT || model.type === ANCHORED_TEXT; // text-only: no line controls
+  const levelDefaults = LEVEL_DEFAULTS[caps.levels] ?? LEVEL_DEFAULTS.fib;
+  const sizeOnly = model.type === MEASURE || model.type === PRICE_RANGE || model.type === DATE_RANGE;
   const tabs = [['style', 'Style'], ['coordinates', 'Coordinates'],
-    ...(isText || caps.text ? [['text', 'Text']] : []), ...(caps.levels ? [['levels', 'Levels']] : []), ['object', 'Object']];
+    ...(hasText || caps.text ? [['text', 'Text']] : []), ...(caps.levels ? [['levels', 'Levels']] : []), ['object', 'Object']];
   const activeTab = tabs.some(([key]) => key === tab) ? tab : 'style';
   const movePoint = (index, ticks, bars) => {
     const next = points.map((point, i) => (index == null || i === index) ? {
@@ -144,6 +147,11 @@ export default function DrawingProperties({ tools }) {
         {(caps.priceLabels || caps.timeLabels) && <div className="dp-row"><span className="dp-label">Labels</span>
           {caps.priceLabels && <Toggle label="Price labels" checked={style.showPriceLabels} disabled={locked} onChange={showPriceLabels => set({ showPriceLabels })} />}
           {caps.timeLabels && <Toggle label="Time label" checked={style.showTimeLabels} disabled={locked} onChange={showTimeLabels => set({ showTimeLabels })} />}</div>}
+        {caps.deviation && <div className="dp-row"><span className="dp-label">Bands</span>
+          <NumberField label="Band deviations" disabled={locked} value={style.deviation} onCommit={value => { if (value >= 0 && value <= 5) set({ deviation: value }, 'deviation'); }}
+            onArrow={steps => set({ deviation: Math.max(0, Math.min(5, Math.round((style.deviation + steps * 0.5) * 2) / 2)) }, 'deviation')} />
+          <span className="dp-value">× residual σ (0 hides bands)</span></div>}
+        {caps.middle && <div className="dp-row"><span className="dp-label">Middle</span><Toggle label="Middle line" checked={style.showMiddle} disabled={locked} onChange={showMiddle => set({ showMiddle })} /></div>}
         {caps.reverse && <div className="dp-row"><span className="dp-label">Direction</span><Toggle label="Reverse levels" checked={style.reverse} disabled={locked} onChange={reverse => set({ reverse })} /></div>}
       </>}
       {activeTab === 'coordinates' && <>
@@ -153,7 +161,11 @@ export default function DrawingProperties({ tools }) {
           <label>Bars per step<NumberField label="Bars per step" inputMode="numeric" value={barStep} onCommit={value => setBarStep(Math.max(1, Math.min(10000, Math.round(value))))} /></label>
           <span className="dp-value">1 tick = {formatPrice(tickSize, tickSize)}</span>
         </div>
-        {points.map((point, index) => <fieldset key={index} className="dp-anchor" disabled={locked}>
+        {caps.freehand && <p className="dp-hint">{points.length} stroke points. Move the whole stroke below; individual points are not edited.</p>}
+        {caps.nodes && <div className="dp-row"><span className="dp-label">Nodes {points.length}</span>
+          <button type="button" disabled={locked || points.length >= POLYLINE_MAX_NODES} onClick={() => { const a = points.at(-2), b = points.at(-1); tools.setPoints(model.id, [...points.slice(0, -1), { time: (a.time + b.time) / 2, price: (a.price + b.price) / 2 }, b]); }}>+ Insert node</button>
+          <button type="button" disabled={locked || points.length <= 2} onClick={() => tools.setPoints(model.id, points.slice(0, -1))}>− Remove last node</button></div>}
+        {!caps.freehand && points.map((point, index) => <fieldset key={index} className="dp-anchor" disabled={locked}>
           <legend>{anchorLabel(model.type, index, points.length)}</legend>
           {model.type !== HORIZONTAL_LINE && <div className="dp-row">
             <label className="dp-grow">Time (UTC)<input type="datetime-local" step="1" aria-label={`${anchorLabel(model.type, index, points.length)} time UTC`} value={formatUtc(point.time)}
@@ -183,7 +195,7 @@ export default function DrawingProperties({ tools }) {
         </fieldset>}
       </>}
       {activeTab === 'text' && <>
-        {isText && <label className="dp-block">Content<textarea aria-label="Text content" rows={3} maxLength={2000} disabled={locked} defaultValue={model.text} key={model.text}
+        {hasText && <label className="dp-block">Content<textarea aria-label="Text content" rows={3} maxLength={2000} disabled={locked} defaultValue={model.text} key={model.text}
           onBlur={event => { const value = event.target.value.trim(); if (value && value !== model.text) tools.setTextContent?.(model.id, value); else event.target.value = model.text; }} /></label>}
         <div className="dp-row"><span className="dp-label">Font size</span>
           <div className="dp-stepper" role="group" aria-label="Font size">
@@ -193,12 +205,12 @@ export default function DrawingProperties({ tools }) {
             </select>
             <button type="button" aria-label="Increase font size" disabled={locked || style.fontSize >= FONT_SIZE.max} onClick={() => set({ fontSize: Math.min(FONT_SIZE.max, style.fontSize + 1) }, 'font-size')}>A+</button>
           </div></div>
-        {model.type !== MEASURE && <>
+        {!sizeOnly && <>
           <div className="dp-row"><span className="dp-label">Font</span><Segmented label="Font family" disabled={locked} value={style.fontFamily} options={['mono', 'sans']} onChange={fontFamily => set({ fontFamily })} render={option => option === 'mono' ? 'Plex Mono' : 'Inter'} /></div>
           <div className="dp-row"><span className="dp-label">Emphasis</span>
             <button type="button" className={`dp-icon${style.bold ? ' is-active' : ''}`} aria-pressed={style.bold} aria-label="Bold" disabled={locked} onClick={() => set({ bold: !style.bold })}><b>B</b></button>
             <button type="button" className={`dp-icon${style.italic ? ' is-active' : ''}`} aria-pressed={style.italic} aria-label="Italic" disabled={locked} onClick={() => set({ italic: !style.italic })}><i>I</i></button>
-            {isText && <Toggle label="Border" checked={style.textBorder} disabled={locked} onChange={textBorder => set({ textBorder })} />}
+            {hasText && <Toggle label="Border" checked={style.textBorder} disabled={locked} onChange={textBorder => set({ textBorder })} />}
           </div>
           <div className="dp-row"><span className="dp-label">Text color</span><ColorField label="Text color" value={style.textColor} disabled={locked} onChange={textColor => set({ textColor }, 'text-color')} /></div>
           <div className="dp-row"><span className="dp-label">Background</span><ColorField label="Text background" presets={false} allowNone value={style.textBackground} disabled={locked} onChange={textBackground => set({ textBackground }, 'text-bg')} /></div>
@@ -219,7 +231,7 @@ export default function DrawingProperties({ tools }) {
           <button type="button" disabled={locked || levels.length >= 24} onClick={() => setLevels([...levels, { value: Number(((levels.at(-1)?.value ?? 1) + 0.5).toFixed(3)), visible: true }])}>+ Add level</button>
           <button type="button" disabled={locked} onClick={() => set({ levels: undefined })}>Default levels</button>
         </div>
-        <p className="dp-hint">Defaults: {DEFAULT_FIB_LEVELS.join(' · ')} ({DEFAULT_VISIBLE_FIB.length} shown).</p>
+        <p className="dp-hint">Defaults: {levelDefaults.values.join(' · ')} ({levelDefaults.visible.length} shown).</p>
       </>}
       {activeTab === 'object' && <>
         <div className="dp-row"><span className="dp-label">State</span>

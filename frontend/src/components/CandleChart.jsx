@@ -527,7 +527,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   }, [position,pendingOrder,positions,orders,simulatedTrades,trades,candles,tickEvidence]);
 
   const activeSpec = RISK_REWARD_TOOLS[drawingMode];
-  const toolHint = DRAWING_SPECS[drawingMode] ? DRAWING_SPECS[drawingMode].name + " · " + (DRAWING_SPECS[drawingMode].points === 1 ? "Klik chart" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
+  const toolHint = DRAWING_SPECS[drawingMode] ? DRAWING_SPECS[drawingMode].name + " · " + (DRAWING_SPECS[drawingMode].freehand ? "Tekan dan geser" : DRAWING_SPECS[drawingMode].nodes ? "Klik tiap titik, Enter untuk selesai" : DRAWING_SPECS[drawingMode].points === 1 ? "Klik chart" : DRAWING_SPECS[drawingMode].points === 3 ? "Klik titik A, B dan C" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
 
   return (
     <div className="chart-wrap" onContextMenu={handleChartContextMenu} onClick={() => setContextMenu(null)}>

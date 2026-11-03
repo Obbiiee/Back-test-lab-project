@@ -90,3 +90,11 @@ div.drawing-quickbar .qb-sep{width:1px;height:18px;background:var(--rk-navy-line
 .chart-wrap div.primitive-drawing-controls [role=status]{max-width:260px}
 .chart-wrap div.drawing-quickbar{top:40px}
 @media (max-width:760px){.chart-wrap div.primitive-drawing-controls{top:auto;bottom:60px;right:8px}.chart-wrap div.primitive-drawing-controls button{min-height:44px;min-width:44px}.chart-wrap div.drawing-quickbar{top:auto;bottom:8px}}
+/* C-03 creation bar (Polyline nodes, freehand, 3-anchor tools). */
+.chart-wrap div.drawing-create-bar{position:absolute;z-index:66;left:50%;top:8px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;max-width:calc(100% - 24px);padding:4px 6px 4px 12px;border:1px solid var(--rk-navy-line,#1d3560);border-radius:999px;background:var(--rk-navy,#061a3c);color:#e9eef5;font:12px var(--rk-font-ui,sans-serif);box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.chart-wrap div.drawing-create-bar span{flex:1;min-width:0}
+.chart-wrap div.drawing-create-bar button{color:inherit;background:#0c2552;border:1px solid var(--rk-navy-line,#1d3560);border-radius:999px;padding:4px 12px;min-height:28px;cursor:pointer;font:inherit}
+.chart-wrap div.drawing-create-bar button.dcb-primary{background:var(--rk-yellow,#ffce55);border-color:var(--rk-yellow,#ffce55);color:#061a3c;font-weight:600}
+.chart-wrap div.drawing-create-bar button:disabled{opacity:.4;cursor:default}
+.chart-wrap div.drawing-create-bar .dcb-short{display:none}
+@media (max-width:760px){.chart-wrap div.drawing-create-bar{top:6px;left:6px;right:6px;transform:none;max-width:none;border-radius:12px;padding:3px 4px 3px 10px;gap:4px}.chart-wrap div.drawing-create-bar .dcb-long{display:none}.chart-wrap div.drawing-create-bar .dcb-short{display:block;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chart-wrap div.drawing-create-bar button{min-height:44px;padding:6px 12px}}

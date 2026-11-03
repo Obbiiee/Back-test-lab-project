@@ -18,7 +18,7 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
   const [propertiesId, setPropertiesId] = useState(null);
   const tickSizeRef = useRef(tickSize);
   useEffect(() => { tickSizeRef.current = tickSize; }, [tickSize]);
-  useEffect(() => { manager.setPrecision(Math.min(12, decimalsOf(tickSize))); }, [manager, tickSize]);
+  useEffect(() => { manager.setPrecision(Math.min(12, decimalsOf(tickSize))); manager.setTickSize(tickSize); }, [manager, tickSize]);
   const persistenceRef = useRef(null);
   const creationRef = useRef(null);
   const [snapshot, setSnapshot] = useState({ objects: [], draftActive: false });
@@ -45,29 +45,44 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
   }, [manager, candles]);
   useEffect(() => {
     if (!chart || !series || !DRAWING_SPECS[mode]) return;
-    const creation = new TrendLineCreation(manager, chart, series, manager.bars, timeframe, () => onModeChange('none'), mode, point => setTextEditor({ point, text: '', timeframe }));
+    const creation = new TrendLineCreation(manager, chart, series, manager.bars, timeframe, () => onModeChange('none'), mode,
+      (point, points) => setTextEditor({ point, points, type: mode, text: '', timeframe }));
     creationRef.current = creation;
+    const spec = DRAWING_SPECS[mode];
     const keydown = event => {
-      if (event.key === 'Escape') { creation.cancel(); setTextEditor(null); onModeChange('none'); }
+      if (event.key === 'Escape') { creation.cancel(); setTextEditor(null); onModeChange('none'); return; }
+      if (!spec.nodes || event.target?.closest?.('input,textarea,select,[contenteditable]')) return;
+      if (event.key === 'Enter' && creation.nodeCount) { event.preventDefault(); if (!creation.finish()) onModeChange('none'); }
+      if (event.key === 'Backspace' && creation.nodeCount) { event.preventDefault(); event.stopImmediatePropagation(); creation.removeLastNode(); }
     };
-    chart.subscribeClick(creation.click); chart.subscribeCrosshairMove(creation.move);
-    window.addEventListener('keydown', keydown);
+    const unbindFreehand = spec.freehand && container.current ? creation.bindFreehand(container.current) : null;
+    if (!spec.freehand) { chart.subscribeClick(creation.click); chart.subscribeCrosshairMove(creation.move); }
+    window.addEventListener('keydown', keydown, true);
     return () => {
-      chart.unsubscribeClick(creation.click); chart.unsubscribeCrosshairMove(creation.move);
-      window.removeEventListener('keydown', keydown); creation.cancel();
+      if (!spec.freehand) { chart.unsubscribeClick(creation.click); chart.unsubscribeCrosshairMove(creation.move); }
+      unbindFreehand?.();
+      window.removeEventListener('keydown', keydown, true); creation.cancel();
       creationRef.current = null; setTextEditor(null);
     };
-  }, [manager, chart, series, mode, onModeChange, timeframe]);
+  }, [manager, chart, series, mode, onModeChange, timeframe, container]);
   const focusDrawing = () => { manager.setHistoryFocus('drawing'); container.current?.focus({ preventScroll: true }); };
   const cancelText = () => { setTextEditor(null); creationRef.current?.cancel(); onModeChange('none'); focusDrawing(); };
   const saveText = text => {
     if (!textEditor || !text.trim()) return;
     if (textEditor.id) manager.setText(textEditor.id, text.trim());
-    else manager.add({ id: crypto.randomUUID(), type: TEXT, points: [textEditor.point], text: text.trim(), metadata: { createdOnTimeframe: textEditor.timeframe } });
+    else {
+      const type = textEditor.type ?? TEXT, defaults = DRAWING_SPECS[type]?.defaults;
+      manager.add({ id: crypto.randomUUID(), type, points: textEditor.points ?? [textEditor.point], text: text.trim(), metadata: { createdOnTimeframe: textEditor.timeframe }, ...(defaults ? { options: { ...defaults } } : {}) });
+    }
     cancelText();
   };
   const properties = propertiesId && snapshot.objects.some(object => object.id === propertiesId) ? propertiesId : null;
+  const creationSpec = DRAWING_SPECS[mode];
   return { ...snapshot, textEditor, cancelText, saveText, tickSize, bars: candles, propertiesId: properties,
+    creating: creationSpec ? { type: mode, name: creationSpec.name, nodes: Boolean(creationSpec.nodes), freehand: Boolean(creationSpec.freehand), anchors: typeof creationSpec.points === 'number' ? creationSpec.points : null } : null,
+    finishPath: () => { const done = creationRef.current?.finish(); if (!done) onModeChange('none'); },
+    undoNode: () => creationRef.current?.removeLastNode(),
+    cancelCreation: () => { creationRef.current?.cancel(); setTextEditor(null); onModeChange('none'); },
     openProperties: id => { if (manager.get(id)) { manager.select(id); setPropertiesId(id); } },
     closeProperties: () => { setPropertiesId(null); focusDrawing(); },
     setOptions: (id, patch, coalesce) => manager.setOptions(id, patch, coalesce),
@@ -83,7 +98,7 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
       return copy;
     }, clearSelection: () => { manager.select(null); manager.setHistoryFocus('trading'); }, select: id => { focusDrawing(); manager.select(id); }, remove: id => { focusDrawing(); manager.remove(id); }, editText: id => {
     const model = manager.get(id);
-    if (!model || model.type !== TEXT || model.locked) return;
+    if (!model || !DRAWING_SPECS[model.type]?.text || model.locked) return;
     focusDrawing(); setTextEditor({ id, text: model.text });
   }, undo: () => { focusDrawing(); setTextEditor(null); creationRef.current?.cancel(); onModeChange('none'); history.undo(); }, redo: () => { focusDrawing(); setTextEditor(null); creationRef.current?.cancel(); onModeChange('none'); history.redo(); }, setProperties: (id, properties) => { focusDrawing(); manager.setProperties(id, properties); }, showHidden: () => {
     focusDrawing();

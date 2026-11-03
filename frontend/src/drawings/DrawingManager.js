@@ -28,6 +28,13 @@ export class DrawingManager {
     return true;
   }
   precision = 3;
+  tickSize = 0.001;
+  // Session tick size: Price Range counts ticks on this grid.
+  setTickSize(tickSize) {
+    if (!Number.isFinite(tickSize) || tickSize <= 0 || tickSize === this.tickSize) return;
+    this.tickSize = tickSize;
+    for (const primitive of [...this.primitives.values(), this.draft].filter(Boolean)) { primitive.tickSize = tickSize; primitive.requestUpdate?.(); }
+  }
   setPrecision(precision) {
     if (!Number.isInteger(precision) || precision < 0 || precision > 12 || precision === this.precision) return;
     this.precision = precision;
@@ -84,7 +91,7 @@ export class DrawingManager {
     const model = definition.model(input);
     if (this.objects.has(model.id)) throw new Error('Duplicate drawing id: ' + model.id);
     const primitive = definition.primitive(model, this.bars, false);
-    primitive.precision = this.precision;
+    primitive.precision = this.precision; primitive.tickSize = this.tickSize;
     if (this.series) this.series.attachPrimitive(primitive);
     this.objects.set(model.id, model); this.primitives.set(model.id, primitive);
     this.commit(); this.notify(); return model;
@@ -136,7 +143,7 @@ export class DrawingManager {
     this.objects.clear(); this.primitives.clear();
     for (const model of models) {
       const primitive = this.registry.get(model.type).primitive(model, this.bars, false);
-      primitive.precision = this.precision;
+      primitive.precision = this.precision; primitive.tickSize = this.tickSize; primitive.tickSize = this.tickSize;
       this.objects.set(model.id, model); this.primitives.set(model.id, primitive);
       this.series?.attachPrimitive(primitive);
     }
@@ -164,7 +171,7 @@ export class DrawingManager {
     this.cancelDraft();
     const definition = this.registry.get(input.type);
     this.draft = definition.primitive(definition.model(input), this.bars, true);
-    this.draft.precision = this.precision;
+    this.draft.precision = this.precision; this.draft.tickSize = this.tickSize;
     if (this.series) this.series.attachPrimitive(this.draft);
     this.notify();
   }

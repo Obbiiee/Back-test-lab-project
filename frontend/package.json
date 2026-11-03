@@ -48,7 +48,8 @@
     "test:regression": "node scripts/regression.mjs",
     "audit:release": "node scripts/release-audit.mjs",
     "test:c05-indicator-settings": "node tests/c05-indicator-settings.test.mjs",
-    "test:c06-indicators": "node tests/c06-indicators.test.mjs"
+    "test:c06-indicators": "node tests/c06-indicators.test.mjs",
+    "test:c03-professional-drawings": "node tests/c03-professional-drawings.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
