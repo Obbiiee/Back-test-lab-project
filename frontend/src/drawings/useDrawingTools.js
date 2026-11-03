@@ -56,11 +56,12 @@ export default function useDrawingTools({ chart, series, candles, mode, onModeCh
       if (event.key === 'Backspace' && creation.nodeCount) { event.preventDefault(); event.stopImmediatePropagation(); creation.removeLastNode(); }
     };
     const unbindFreehand = spec.freehand && container.current ? creation.bindFreehand(container.current) : null;
+    const unbindTouch = !spec.freehand && container.current ? creation.bindTouchGuard(container.current) : null;
     if (!spec.freehand) { chart.subscribeClick(creation.click); chart.subscribeCrosshairMove(creation.move); }
     window.addEventListener('keydown', keydown, true);
     return () => {
       if (!spec.freehand) { chart.unsubscribeClick(creation.click); chart.unsubscribeCrosshairMove(creation.move); }
-      unbindFreehand?.();
+      unbindFreehand?.(); unbindTouch?.();
       window.removeEventListener('keydown', keydown, true); creation.cancel();
       creationRef.current = null; setTextEditor(null);
     };

@@ -197,6 +197,19 @@ const click = i => ({ point: { x: x(bars[i].time), y: series.priceToCoordinate(2
   assert.equal(decimateStroke([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 5, y: 0 }], 3, 10).length, 2);
 }
 
+{ // Two-finger gesture: anchors placed during it are rolled back; clicks ignored until fingers lift.
+  const m = setup(); const handlers = {};
+  const root = { addEventListener: (k, fn) => { handlers[k] = fn; }, removeEventListener: k => { delete handlers[k]; } };
+  const c = new TrendLineCreation(m, chart, series, bars, '1m', () => {}, 'trend-line');
+  const unbind = c.bindTouchGuard({ parentElement: root });
+  handlers.touchstart({ touches: [1] }); c.click(click(5)); assert.equal(c.anchors.length, 1, 'first finger alone may still be a tap');
+  handlers.touchstart({ touches: [1, 2] }); assert.equal(c.anchors.length, 0, 'second finger rolls back the anchor'); assert.equal(m.draft, null);
+  c.click(click(6)); assert.equal(c.anchors.length, 0, 'ignored during the gesture');
+  handlers.touchend({ touches: [] }); c.click(click(7)); assert.equal(c.anchors.length, 0, 'synthetic click right after the pinch ignored');
+  c.suppressedUntil = 0; c.click(click(8)); assert.equal(c.anchors.length, 1, 'normal taps resume');
+  unbind(); assert.equal(Object.keys(handlers).length, 0);
+}
+
 // --- options & properties --------------------------------------------------
 assert.equal(normalizeOptions({ deviation: 1.5, showMiddle: false }).deviation, 1.5);
 for (const bad of [{ deviation: -1 }, { deviation: 6 }, { showMiddle: 'yes' }]) assert.throws(() => normalizeOptions(bad));

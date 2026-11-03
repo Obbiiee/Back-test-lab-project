@@ -47,7 +47,9 @@ A tool is only ticked when it can be created, has working Properties controls, s
 | 9 | Measure | style, label size | ✓ |
 | 26/27 | Long / Short Position | existing R:R settings form (legacy system) | existing `test:stitch-trading`, `test:trading-separation` |
 
-Open for C-02: mobile tap-to-place flow and two-finger cancel for the research tools; move Long/Short onto the shared panel.
+Mobile flow (done): tap tool → tap anchors → tap select → finger-drag handles → bottom-sheet stepper. Two fixes: (1) a two-finger pinch with a tool armed used to place anchor A; anchors placed during a multi-touch gesture are now rolled back and the synthetic click after it is ignored; (2) a finger drag on a handle was cancelled by the browser's pan gesture; while a drawing is selected the chart sets `touch-action: none`, restored when nothing is selected. Evidence: `tests/qa/mobile-touch-qa.cjs` (6 steps on a 390×844 touch profile), `tests/c03-professional-drawings.test.mjs` (touch guard), screenshots `docs/qa/issue-21/c02/`.
+
+Still open for C-02: Long/Short keep their dedicated Entry/SL/TP form (legacy system that feeds the server review/confirm flow); moving them onto the shared panel is scheduled with C-09 so the trading path is changed once and tested end to end.
 
 ### C-05 indicator settings — DONE
 

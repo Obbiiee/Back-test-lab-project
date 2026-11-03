@@ -40,9 +40,10 @@ export class TrendLineCreation {
     this.cancel(); this.onComplete?.(object);
     return object;
   }
+  suppressedUntil = 0;
   click = param => {
     const spec = this.spec;
-    if (spec.freehand || this.textPending) return;
+    if (spec.freehand || this.textPending || this.gesture?.multi || Date.now() < this.suppressedUntil) return;
     const point = pointFromPointer(this.chart, this.series, param, this.bars);
     if (!point) return;
     if (spec.nodes) {
@@ -86,12 +87,44 @@ export class TrendLineCreation {
     this.#draft([...this.anchors, this.anchors.at(-1)]);
   }
   get nodeCount() { return this.spec.nodes ? this.anchors.length : 0; }
+  // Two-finger pinch/pan must never place anchors: any anchor added since the
+  // gesture's first finger is rolled back and clicks stay ignored until all
+  // fingers lift (plus a short settle time for the synthetic click).
+  bindTouchGuard(element) {
+    const root = element.parentElement;
+    const start = event => {
+      if (!this.gesture) this.gesture = { anchors: this.anchors.length, multi: false };
+      if (event.touches.length > 1 && !this.gesture.multi) {
+        this.gesture.multi = true;
+        if (this.anchors.length > this.gesture.anchors) {
+          this.anchors = this.anchors.slice(0, this.gesture.anchors); this.pixels = this.pixels.slice(0, this.gesture.anchors);
+          if (!this.anchors.length) this.manager.cancelDraft();
+        }
+      }
+    };
+    const end = event => {
+      if (event.touches.length) return;
+      if (this.gesture?.multi) this.suppressedUntil = Date.now() + 400;
+      this.gesture = null;
+    };
+    root.addEventListener('touchstart', start, { capture: true, passive: true });
+    root.addEventListener('touchend', end, { capture: true, passive: true });
+    root.addEventListener('touchcancel', end, { capture: true, passive: true });
+    return () => {
+      root.removeEventListener('touchstart', start, { capture: true });
+      root.removeEventListener('touchend', end, { capture: true });
+      root.removeEventListener('touchcancel', end, { capture: true });
+      this.gesture = null;
+    };
+  }
   // Freehand strokes are bound to raw pointer events for one continuous drag.
   // Chart panning/zoom is paused while the tool is active and restored after.
   bindFreehand(element) {
     const root = element.parentElement, chart = this.chart;
     const saved = { handleScroll: chart.options?.().handleScroll, handleScale: chart.options?.().handleScale };
     chart.applyOptions?.({ handleScroll: false, handleScale: false });
+    const touchAction = root.style?.touchAction ?? '';
+    if (root.style) root.style.touchAction = 'none'; // a finger drag draws instead of scrolling
     let stroke = null;
     const local = event => { const rect = element.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
     const inside = p => p.x >= 0 && p.y >= 0 && p.x <= chart.timeScale().width() && p.y <= chart.paneSize().height;
@@ -130,6 +163,7 @@ export class TrendLineCreation {
       cancel();
       root.removeEventListener('pointerdown', down, true); root.removeEventListener('pointermove', move, true);
       root.removeEventListener('pointerup', up, true); root.removeEventListener('pointercancel', cancel, true);
+      if (root.style) root.style.touchAction = touchAction;
       chart.applyOptions?.({ ...(saved.handleScroll !== undefined ? { handleScroll: saved.handleScroll } : {}), ...(saved.handleScale !== undefined ? { handleScale: saved.handleScale } : {}) });
     };
   }

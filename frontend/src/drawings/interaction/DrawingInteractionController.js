@@ -117,6 +117,11 @@ export class DrawingInteractionController {
       const hit = this.hit(point);
       if (hit.id) { event.preventDefault(); event.stopPropagation(); this.manager.select(hit.id); this.options.onOpen?.(hit.id); }
     };
+    // Touch: while a drawing is selected the browser must not claim the gesture
+    // for panning, or it cancels the handle drag (pointercancel). Page and chart
+    // panning return as soon as nothing is selected.
+    const syncTouch = () => { if (root.style) root.style.touchAction = this.manager.selectedId ? 'none' : ''; };
+    const unsubscribeTouch = this.manager.subscribe?.(syncTouch); syncTouch();
     root.addEventListener('dblclick', dblclick, true);
     root.addEventListener('pointerdown', down, true); root.addEventListener('pointermove', move, true);
     root.addEventListener('pointerup', up, true); root.addEventListener('pointercancel', cancel, true);
@@ -128,6 +133,7 @@ export class DrawingInteractionController {
       root.removeEventListener('pointerup', up, true); root.removeEventListener('pointercancel', cancel, true);
       root.removeEventListener('lostpointercapture', cancel, true);
       root.removeEventListener('dblclick', dblclick, true);
+      unsubscribeTouch?.(); if (root.style) root.style.touchAction = '';
       window.removeEventListener('keydown', key, true); window.removeEventListener('blur', cancel);
     };
   }
