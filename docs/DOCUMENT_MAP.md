@@ -6,6 +6,7 @@
 |---|---|
 | Why does Backtest Lab exist? What is the scientific thesis? | `BACKTEST_LAB_RESEARCH_THESIS.md` |
 | What should users see and how should the product feel/work? | `PRODUCT_DESIGN_BLUEPRINT.md` |
+| Where is the cross-team Codex–Claude desktop/mobile/PWA + backend/storage/API design handoff and step-by-step project plan? | [RIKSORA Integrated Design Freeze V1.0 — proposed owner-review handoff](RIKSORA_DESIGN_FREEZE_V1/README.md); it does **not** supersede frozen product/financial/phase authority or certify deployment |
 | How should the software/system be structured? | `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` |
 | What is the planned backend contract and guarded integration path? | [Same system blueprint — Phase 19 planning handoff](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff) |
 | What Application/API intake is implemented, and what remains deferred? | [Same system blueprint — intake evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#389-applicationapi-intake--implementation-evidence) and [Phase 19 completion audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#3810-phase-19-completion-audit) |
