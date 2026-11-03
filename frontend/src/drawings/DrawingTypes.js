@@ -18,7 +18,7 @@ export const ADVANCED_DRAWINGS = Object.freeze({
   [RAY]: { name: 'Ray', points: 2 },
   [FIBONACCI]: { name: 'Fibonacci Retracement', points: 2 },
   [ARROW]: { name: 'Arrow', points: 2 },
-  [TEXT]: { name: 'Text', points: 1 },
+  [TEXT]: { name: 'Text', points: 1, text: true },
   [MEASURE]: { name: 'Measure', points: 2 },
 });
 export const DRAWING_SPECS = Object.freeze({ ...CORE_DRAWINGS, ...ADVANCED_DRAWINGS });

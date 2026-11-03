@@ -1,0 +1,92 @@
+/* Issue #21 shared drawing Properties panel. RIKSORA navy surface, electric
+   blue focus, yellow only for the active choice. Desktop: floating card over
+   the chart's right edge. Phone/tablet portrait: bottom sheet, 44px targets. */
+section.drawing-properties{position:absolute;z-index:80;top:44px;right:12px;width:340px;max-height:calc(100% - 56px);display:flex;flex-direction:column;
+  background:var(--rk-navy,#061a3c);color:#e9eef5;border:1px solid var(--rk-navy-line,#1d3560);border-radius:16px;box-shadow:0 18px 40px #0009;
+  font:13px/1.4 var(--rk-font-ui,system-ui,sans-serif);overflow:hidden}
+section.drawing-properties button,section.drawing-properties input,section.drawing-properties select,section.drawing-properties textarea{font:inherit;color:inherit}
+section.drawing-properties button{min-height:32px;padding:4px 10px;border-radius:999px;border:1px solid var(--rk-navy-line,#1d3560);background:#0c2552;cursor:pointer}
+section.drawing-properties button:hover:not(:disabled){border-color:var(--rk-blue-on-dark,#5a9df8)}
+section.drawing-properties button:disabled{opacity:.45;cursor:not-allowed}
+section.drawing-properties :focus-visible{outline:2px solid var(--rk-blue-on-dark,#5a9df8);outline-offset:2px}
+section.drawing-properties input[type=text],section.drawing-properties input:not([type]),section.drawing-properties input[type=datetime-local],section.drawing-properties select,section.drawing-properties textarea{
+  min-height:32px;box-sizing:border-box;padding:4px 8px;border-radius:10px;border:1px solid var(--rk-navy-line,#1d3560);background:#031230;font-family:var(--rk-font-data,monospace)}
+section.drawing-properties input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--rk-navy-line,#1d3560);border-radius:8px;background:none}
+section.drawing-properties input[type=range]{flex:1;min-width:90px;accent-color:var(--rk-yellow,#ffce55)}
+.dp-header{display:flex;align-items:center;gap:8px;padding:12px 12px 8px}
+.dp-title{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.dp-kind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--rk-ice,#d9eafe);opacity:.8}
+section.drawing-properties input.dp-name{width:100%;font-family:var(--rk-font-ui,sans-serif);font-weight:600;background:transparent;border-color:transparent;padding-left:0}
+section.drawing-properties input.dp-name:hover,section.drawing-properties input.dp-name:focus{border-color:var(--rk-navy-line,#1d3560);background:#031230;padding-left:8px}
+section.drawing-properties .dp-close{width:32px;padding:0;font-size:18px}
+.dp-locked{margin:0 12px 6px;padding:6px 10px;border-radius:10px;background:#3a2a05;color:var(--rk-yellow,#ffce55);font-size:12px}
+.dp-locked button{margin-left:6px;min-height:26px}
+.dp-tabs{display:flex;gap:4px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none}
+section.drawing-properties .dp-tabs button{flex:0 0 auto;background:transparent;border-color:transparent;color:var(--rk-ice,#d9eafe)}
+section.drawing-properties .dp-tabs button[aria-selected=true]{background:var(--rk-blue-strong,#0f67d8);color:#fff}
+.dp-body{flex:1;overflow:auto;padding:4px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.dp-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.dp-label{flex:0 0 100%;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--rk-ice,#d9eafe)}
+.dp-value{font:12px var(--rk-font-data,monospace);color:#bac5d5;min-width:36px}
+.dp-hint{margin:0;font-size:11px;color:#9fb0c8}
+.dp-segmented{display:inline-flex;flex-wrap:wrap;gap:4px}
+section.drawing-properties .dp-segmented button{min-width:44px;padding:4px 6px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+section.drawing-properties .dp-segmented button.is-active,section.drawing-properties .dp-icon.is-active,section.drawing-properties .dp-color button.is-active{background:var(--rk-yellow,#ffce55);color:#061a3c;border-color:var(--rk-yellow,#ffce55)}
+.dp-preview{width:30px;height:12px;display:block}
+.dp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dp-color{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex:1}
+section.drawing-properties .dp-swatch{width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;border:2px solid #0000}
+section.drawing-properties .dp-swatch.is-active{outline:2px solid var(--rk-yellow,#ffce55);outline-offset:1px}
+section.drawing-properties .dp-hex{width:82px}
+section.drawing-properties .dp-toggle{display:inline-flex;flex-direction:row;align-items:center;gap:6px;min-height:32px;padding:0 8px 0 4px;margin:0;cursor:pointer;font-size:12px;color:#e9eef5}
+.dp-toggle input{width:16px;height:16px;accent-color:var(--rk-yellow,#ffce55)}
+.dp-icon{width:36px}
+.dp-anchor{border:1px solid var(--rk-navy-line,#1d3560);border-radius:12px;padding:8px 10px 10px;margin:0;display:flex;flex-direction:column;gap:6px}
+.dp-anchor legend{padding:0 4px;font-size:12px;font-weight:600;color:var(--rk-yellow,#ffce55)}
+.dp-anchor label,.dp-steps label,.dp-block{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#9fb0c8}
+.dp-grow{flex:1;min-width:150px}
+.dp-steps label{width:96px}
+.dp-stepper{display:inline-flex;gap:4px;align-self:flex-end}
+section.drawing-properties .dp-stepper button{min-width:36px;padding:4px 8px}
+.dp-stepper-wide{flex-wrap:wrap;align-self:auto}
+.dp-levels{width:100%;border-collapse:collapse;font-size:12px}
+.dp-levels th{text-align:left;font-weight:500;color:#9fb0c8;padding:2px 4px}
+.dp-levels td{padding:2px 4px}
+section.drawing-properties .dp-levels input[type=text]{width:84px}
+.dp-footer{display:flex;justify-content:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--rk-navy-line,#1d3560)}
+section.drawing-properties .dp-primary{background:var(--rk-blue-strong,#0f67d8);border-color:var(--rk-blue-strong,#0f67d8);color:#fff;font-weight:600}
+section.drawing-properties .dp-danger{border-color:#7a2730;color:var(--rk-coral,#ff7373)}
+.dp-block textarea{min-height:64px;resize:vertical}
+
+/* Quick floating toolbar for the selected drawing. */
+div.drawing-quickbar{position:absolute;z-index:70;top:8px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px 6px;
+  background:var(--rk-navy,#061a3c);border:1px solid var(--rk-navy-line,#1d3560);border-radius:999px;box-shadow:0 8px 24px #0008;color:#e9eef5;font:12px var(--rk-font-ui,sans-serif);max-width:calc(100% - 16px);overflow-x:auto}
+div.drawing-quickbar button,div.drawing-quickbar select{min-height:30px;min-width:30px;padding:2px 8px;border-radius:999px;border:1px solid transparent;background:transparent;color:inherit;font:inherit;cursor:pointer}
+div.drawing-quickbar button:hover:not(:disabled){border-color:var(--rk-blue-on-dark,#5a9df8)}
+div.drawing-quickbar button[aria-pressed=true]{background:var(--rk-yellow,#ffce55);color:#061a3c}
+div.drawing-quickbar input[type=color]{width:28px;height:24px;padding:0;border:0;border-radius:6px;background:none}
+div.drawing-quickbar select{background:#031230;border-color:var(--rk-navy-line,#1d3560)}
+div.drawing-quickbar .qb-sep{width:1px;height:18px;background:var(--rk-navy-line,#1d3560)}
+
+@media (max-width:760px),(pointer:coarse) and (max-width:1024px){
+  section.drawing-properties{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-height:72vh;border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  section.drawing-properties::before{content:"";display:block;width:44px;height:4px;margin:8px auto 0;border-radius:2px;background:var(--rk-navy-line,#1d3560)}
+  section.drawing-properties button,section.drawing-properties input[type=text],section.drawing-properties input:not([type]),section.drawing-properties input[type=datetime-local],section.drawing-properties select{min-height:44px}
+  section.drawing-properties .dp-swatch{width:32px;height:32px;min-height:32px}
+  section.drawing-properties input[type=color]{width:44px;height:44px}
+  .dp-toggle{min-height:44px}
+  .dp-toggle input{width:22px;height:22px}
+  section.drawing-properties .dp-stepper button{min-width:48px}
+  div.drawing-quickbar{top:auto;bottom:8px}
+  div.drawing-quickbar button,div.drawing-quickbar select{min-height:44px;min-width:44px}
+}
+
+/* Undo/redo/lock strip for research drawings: overlay, never in document
+   flow, so the chart does not jump when the first drawing appears. */
+.chart-wrap{position:relative}
+.chart-wrap div.primitive-drawing-controls{position:absolute;z-index:65;right:76px;top:40px;display:flex;gap:4px;align-items:center;padding:3px;border:1px solid var(--rk-navy-line,#1d3560);border-radius:999px;background:var(--rk-navy,#061a3c);font:11px var(--rk-font-ui,sans-serif);color:#e9eef5}
+.chart-wrap div.primitive-drawing-controls button{color:inherit;background:transparent;border:0;border-radius:999px;padding:4px 8px;min-height:26px;cursor:pointer}
+.chart-wrap div.primitive-drawing-controls button:disabled{opacity:.35;cursor:default}
+.chart-wrap div.primitive-drawing-controls [role=status]{max-width:260px}
+.chart-wrap div.drawing-quickbar{top:40px}
+@media (max-width:760px){.chart-wrap div.primitive-drawing-controls{top:auto;bottom:60px;right:8px}.chart-wrap div.primitive-drawing-controls button{min-height:44px;min-width:44px}.chart-wrap div.drawing-quickbar{top:auto;bottom:8px}}

@@ -291,3 +291,11 @@
 .tick-alpha :focus-visible{outline:3px solid #ffce55;outline-offset:3px}
 @media(max-width:600px){.tick-alpha>header{padding:14px 16px;border-radius:0 0 20px 20px}.alpha-hub{padding:20px 14px}.alpha-hub-head{padding:24px 20px;border-radius:24px}.alpha-hub-actions{width:100%}.alpha-hub-grid{grid-template-columns:minmax(0,1fr)}.alpha-hub-card{min-width:0}.alpha-hub-steps li{padding:20px}.tick-alpha>header nav a{padding:8px 12px}}
 @media(prefers-reduced-motion:reduce){.tick-alpha .alpha-hub .alpha-primary-action{transition:none}.tick-alpha .alpha-hub .alpha-primary-action:hover:not(:disabled){transform:none}}
+/* Issue #21 object tree */
+.alpha-object-tree{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.alpha-object-tree li{border:1px solid var(--lab-border);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px}
+.alpha-object-tree li.is-selected{border-color:var(--rk-yellow,#ffce55)}
+.alpha-object-tree .alpha-object-name{text-align:left;font-weight:600;background:transparent;border:0;padding:2px 4px}
+.alpha-object-actions{display:flex;flex-wrap:wrap;gap:4px}
+.alpha-object-actions button{min-height:28px;min-width:28px;padding:2px 6px;font-size:11px}
+@media(max-width:760px){.alpha-object-actions button{min-height:44px;min-width:44px}}

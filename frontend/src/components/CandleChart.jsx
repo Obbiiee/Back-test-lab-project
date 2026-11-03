@@ -21,7 +21,7 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceStep }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -58,7 +58,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     update(); scale.subscribeVisibleLogicalRangeChange(update); chartForOverlay.subscribeClick(select);
     return () => { scale.unsubscribeVisibleLogicalRangeChange(update); chartForOverlay.unsubscribeClick(select); };
   }, [news, newsPrimitive, chartForOverlay, seriesForOverlay, candles, drawingMode]);
-  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: drawingWorkspace });
+  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: drawingWorkspace, tickSize: Number(priceStep) > 0 ? Number(priceStep) : 0.001 });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
@@ -273,7 +273,9 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
           if(operation==='delete')primitiveDrawings.remove(id);
           if(operation==='hide')primitiveDrawings.setProperties(id,{visible:!native.visible});
           if(operation==='lock')primitiveDrawings.setProperties(id,{locked:!native.locked});
-          if(operation==='edit'){primitiveDrawings.select(id);if(native.type==='text')primitiveDrawings.editText(id);}
+          if(operation==='edit'||operation==='properties'){primitiveDrawings.select(id);primitiveDrawings.openProperties(id);}
+          if(operation==='duplicate')primitiveDrawings.duplicate(id);
+          if(['front','forward','backward','back'].includes(operation))primitiveDrawings.reorder(id,operation);
           return;
         }
         if(researchOnly&&(operation==='select'||operation==='edit'))primitiveDrawings.clearSelection();

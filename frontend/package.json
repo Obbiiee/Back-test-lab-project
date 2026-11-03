@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:drawings": "node tests/drawings.test.mjs",
+    "test:c01-drawing-properties": "node tests/c01-drawing-properties.test.mjs",
     "test:stitch-drawing": "node tests/stitch-drawing.test.mjs",
     "test:stitch-indicators": "node tests/stitch-indicators.test.mjs",
     "test:stitch-trading": "node tests/stitch-trading.test.mjs",
