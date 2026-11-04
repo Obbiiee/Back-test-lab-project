@@ -585,3 +585,54 @@
   .tick-alpha .alpha-replay-controls.is-docked{display:flex;flex-wrap:nowrap;margin:0;position:absolute;top:auto;left:50%;bottom:30px;height:auto;transform:translateX(-50%);z-index:7;width:max-content;background:#0e1a33;border:2px solid #2b4878;border-radius:28px;padding:4px 8px;gap:6px}
   .tick-alpha .alpha-replay-controls .alpha-replay-grip,.tick-alpha .alpha-replay-controls>button:nth-of-type(2),.tick-alpha .alpha-replay-controls .alpha-step-target,.tick-alpha .alpha-replay-controls label{display:none}
 }
+/* C-12 · audit fixes (AccessLint, Vercel WIG) + remaining canvas parts (Plan order tabs, R:R bar, Lots, phone two-line header) */
+.alpha-status-line{margin:0}
+.tick-alpha .alpha-segmented{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border-radius:999px;background:#e3edfb;margin:4px 0 10px}
+.tick-alpha .alpha-segmented button{min-height:36px;border-radius:999px;border:0;background:transparent;color:#2c3e5c;font:700 13px var(--rk-font-ui);cursor:pointer}
+.tick-alpha .alpha-segmented button[aria-checked=true]{background:#fff;color:var(--rk-navy);box-shadow:0 2px 0 #1378f5}
+.tick-alpha .alpha-segmented button:disabled{cursor:not-allowed;color:#4a5b75}
+.tick-alpha .alpha-segmented button:disabled[aria-checked=true]{color:var(--rk-navy)}
+.tick-alpha .alpha-ticket-tabs{background:var(--rk-navy)}
+.tick-alpha .alpha-ticket-tabs button{color:#c3d6f2}
+.tick-alpha .alpha-ticket-tabs button[aria-checked=true]{background:var(--rk-yellow,#ffd23f);color:var(--rk-navy);box-shadow:none}
+.tick-alpha .alpha-ticket-tabs button:disabled{color:#c3d6f2}
+.tick-alpha .alpha-rr-bar{display:flex;height:22px;border-radius:999px;overflow:hidden;margin:10px 0 4px;font:800 11px var(--rk-font-data)}
+.tick-alpha .alpha-rr-bar span{display:flex;align-items:center;justify-content:center;min-width:34px;flex-basis:0}
+.tick-alpha .alpha-rr-loss{background:#ffd9dc;color:#8a1f29}
+.tick-alpha .alpha-rr-profit{background:#c9f2dc;color:#0d5a33}
+.tick-alpha .alpha-bar-lots{display:inline-flex;align-items:center;gap:6px;margin:0;font:700 11px var(--rk-font-ui);color:#c3d6f2}
+.tick-alpha .alpha-bar-lots input{width:64px;min-height:36px;box-sizing:border-box;border-radius:999px;border:2px solid #1d3560;background:#061a3c;color:#fff;text-align:center;font:600 13px var(--rk-font-data);font-variant-numeric:tabular-nums}
+.tick-alpha .alpha-bar-lots input:disabled{color:#c3d6f2;border-style:dashed}
+.tick-alpha .alpha-bar-lots input::placeholder{color:#a9bddb}
+.tick-alpha .alpha-ws-phone-title{display:none}
+/* contrast (AccessLint, ≥4.5:1) */
+.tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts=Space]{color:#fff}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek label{color:var(--rk-navy)}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek[open] button{background:#0f67d8;color:#fff;border:0}
+.tick-alpha.has-workspace .alpha-terminal th{color:#4a5b75}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{color:#3d4f68}
+section.overlay-indicator-dialog.indicator-studio .ind-blocked{opacity:1}
+section.overlay-indicator-dialog.indicator-studio .ind-blocked small{color:#44546b}
+/* Vercel WIG: sheets keep scroll inside, focus stays visible, motion respects the user */
+.tick-alpha .alpha-draw-sheet,.tick-alpha .alpha-object-panel,.tick-alpha .alpha-table-scroll{overscroll-behavior:contain}
+.tick-alpha .alpha-table-scroll:focus-visible{outline:2px solid #1378f5;outline-offset:2px}
+section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px solid var(--rk-blue,#1378f5);outline-offset:1px}
+@media(prefers-reduced-motion:reduce){.tick-alpha *,.tick-alpha *::before,.tick-alpha *::after{transition-duration:0s!important;animation-duration:0s!important;scroll-behavior:auto!important}}
+@media(hover:none){.tick-alpha .alpha-chart-header button:hover,.tick-alpha .alpha-replay-controls button:hover,.tick-alpha .alpha-context button:hover{background:inherit}}
+@media(max-width:760px){
+  .tick-alpha.has-workspace .alpha-symbol-chip{display:none!important}
+  .tick-alpha.has-workspace .alpha-ws-phone-title{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+  .tick-alpha.has-workspace .alpha-ws-phone-title strong{font:800 15px var(--rk-font-ui);color:#fff;white-space:nowrap}
+  .tick-alpha.has-workspace .alpha-ws-phone-title small{font:500 11px var(--rk-font-data);color:#c3d6f2;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-new-order{display:none}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-bar-lots{order:2;flex-direction:column;gap:2px;justify-content:center}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-bar-lots>span{font-size:10px}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-bar-lots input{width:100%;min-width:64px;min-height:44px}
+}
+.tick-alpha .alpha-order-bar .alpha-bar-lots{flex-direction:row}
+.tick-alpha.has-workspace .alpha-terminal th{color:#c3d6f2}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek>div{background:#fff;color:var(--rk-navy)}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek>div button{background:#0f67d8;color:#fff;border:0}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button[aria-pressed=true] small{color:inherit}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-buy[aria-pressed=true]{background:#0f67d8;border-color:#0f67d8}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{opacity:1}

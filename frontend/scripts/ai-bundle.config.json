@@ -49,6 +49,7 @@
     "frontend/src/tickAlpha/riksoraBrand.css",
     "frontend/src/tickAlpha/AlphaSessions.jsx",
     "frontend/src/tickAlpha/AlphaTicketEstimate.jsx",
+    "frontend/src/tickAlpha/AlphaSegmented.jsx",
     "frontend/src/tickAlpha/orderEstimate.js",
     "frontend/src/tickAlpha/AlphaEquityChart.jsx",
     "frontend/src/assets/riksora-mark.png",

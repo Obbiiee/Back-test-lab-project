@@ -106,3 +106,12 @@ div.drawing-quickbar .qb-sep{width:1px;height:18px;background:var(--rk-navy-line
 .chart-wrap div.drawing-create-bar button:disabled{opacity:.4;cursor:default}
 .chart-wrap div.drawing-create-bar .dcb-short{display:none}
 @media (max-width:760px){.chart-wrap div.drawing-create-bar{top:6px;left:6px;right:6px;transform:none;max-width:none;border-radius:12px;padding:3px 4px 3px 10px;gap:4px}.chart-wrap div.drawing-create-bar .dcb-long{display:none}.chart-wrap div.drawing-create-bar .dcb-short{display:block;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chart-wrap div.drawing-create-bar button{min-height:44px;padding:6px 12px}}
+/* C-12 · canvas: white quick bar with blue drop shadow (like the replay pill); phone floats sit above the chart so they never cover the replay pill */
+.chart-wrap div.drawing-quickbar{background:#fff;color:#061a3c;border:0;box-shadow:0 4px 0 #1378f5,0 10px 24px #0004}
+.chart-wrap div.drawing-quickbar button:hover:not(:disabled){background:#eaf2fd}
+.chart-wrap div.drawing-quickbar select{background:#eaf2fd;color:#061a3c;border:0}
+.chart-wrap div.drawing-quickbar .qb-sep{background:#d9eafe}
+@media (max-width:760px){
+  .chart-wrap div.primitive-drawing-controls{top:8px;bottom:auto;right:76px}
+  .chart-wrap div.drawing-quickbar{top:64px;bottom:auto;max-width:calc(100% - 90px);overflow-x:auto}
+}

@@ -185,3 +185,12 @@ navy ground with rounded cards and 8px gaps; one pill header (back + mark, yello
 | Order review refusal | Specific reason codes from `POST /reviews` (today a Buy Limit above Ask returns generic `INVALID_INPUT`) | UI shows the code as given; a specific code would let the ticket explain the fix |
 | Seek refusal copy | `REFUSED_REWIND_REQUIRES_FORK` also blocks a forward seek while an order is open; the UI copy says "replay an earlier time" | Copy follows the existing server mapping; wording can be generalised once Codex confirms the rule |
 | 72h jump evidence | Exness historical store for QA | Not available here; jump verified on the synthetic fixture range |
+
+## C-12 · UI/UX audit (8 skills) + remaining canvas parts
+
+Audit sources: Anthropic frontend-design, Vercel web-design-guidelines / react-best-practices / composition-patterns, UI/UX Pro Max, Bencium controlled UX designer, AccessLint, React Native skills (not applicable: web/PWA).
+
+- AccessLint, 7 states (home, laptop, laptop ticket, laptop indicators, phone, phone ticket, phone draw sheet): 0 violations after fixes (before: contrast, `aria-valuetext` on separator, label/content mismatch on the symbol chip, keyboard-inaccessible scroll region, duplicate landmark, `role=status` on footer).
+- Vercel WIG: reduced-motion for the whole workspace, touch devices drop sticky hover, sheets/tables use `overscroll-behavior:contain`, Properties inputs keep a visible focus ring.
+- Canvas: Plan order uses a `Quick | Plan · R:R` segmented radiogroup and `Market | Limit | Stop` segmented control (new `AlphaSegmented.jsx`, arrow-key roving focus); the estimate shows a 1R : nR loss/profit bar; the order bar has a draft Lots input (phone: SELL · Lots · BUY); phone header is two lines (`XAUUSD · tf` + replay time UTC); the drawing quick bar is white with the blue drop shadow; phone undo/redo float moved to the top so it never covers the replay pill.
+- Workflow unchanged: Lots only edits the draft; every order still goes Draft → server Review (exact values) → Confirm.

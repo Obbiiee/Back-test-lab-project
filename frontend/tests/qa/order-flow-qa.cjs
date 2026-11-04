@@ -128,7 +128,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.screenshot({ path: `${out}/04a-review-refused.png` });
 
   // 4b. Valid market intent with protective levels → server review (no state change) → confirm.
-  await ticket.getByLabel('Order type', { exact: true }).selectOption('MARKET'); await sleep(200);
+  await ticket.getByRole('radiogroup', { name: 'Order type' }).getByRole('radio', { name: 'Market' }).click(); await sleep(200);
   await setLevels(ask, ask - 1.5, ask + 1.5);
   await page.getByRole('button', { name: 'Review order' }).click(); await sleep(1200);
   const reviewCall = calls(/\/reviews$/).at(-1);
