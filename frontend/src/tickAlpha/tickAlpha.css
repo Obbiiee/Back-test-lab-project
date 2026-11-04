@@ -299,3 +299,40 @@
 .alpha-object-actions{display:flex;flex-wrap:wrap;gap:4px}
 .alpha-object-actions button{min-height:28px;min-width:28px;padding:2px 6px;font-size:11px}
 @media(max-width:760px){.alpha-object-actions button{min-height:44px;min-width:44px}}
+
+/* Issue #21 · phone order ticket as a bottom sheet, following the design canvas
+   "Trading on a phone" artboard (white sheet, ice inputs, filled side, yellow risk
+   choice, navy review button with blue press shadow). Layout/flow unchanged. */
+@media(max-width:760px){
+  .tick-alpha .alpha-movable-modal:has(.alpha-ticket){align-items:flex-end;justify-content:stretch;background:#061a3ccc}
+  .tick-alpha .alpha-panel-surface:has(>.alpha-ticket),.tick-alpha .alpha-panel-surface:has(.alpha-ticket){width:100vw;max-height:92dvh;margin-top:auto;border-radius:32px 32px 0 0;background:#fff;box-shadow:0 -12px 40px #0007;overflow:hidden}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-panel-handle{background:#fff;color:var(--rk-navy);border:0;justify-content:center;position:relative;padding-top:14px}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-panel-handle::before{content:"";position:absolute;top:6px;left:50%;width:44px;height:5px;margin-left:-22px;border-radius:999px;background:var(--rk-ice)}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-panel-handle :is(span,strong,button){color:var(--rk-navy)}
+  .tick-alpha .alpha-panel-surface .alpha-ticket.alpha-dialog{background:#fff;color:var(--rk-navy);padding:8px 18px max(22px,env(safe-area-inset-bottom));font-family:var(--rk-font-ui)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-terminal-heading h2{font-size:22px;font-weight:900;color:var(--rk-navy)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-terminal-heading button{border-radius:999px;border:0;background:#eaf2fd;color:var(--rk-navy);font-weight:800}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-guide{background:var(--rk-ice-soft);border:0;border-radius:16px;color:var(--rk-muted);font-weight:600}
+  .tick-alpha .alpha-ticket.alpha-dialog label{color:var(--rk-navy);font-size:12px;font-weight:700}
+  .tick-alpha .alpha-ticket.alpha-dialog :is(input,select){background:var(--rk-ice-soft);color:var(--rk-navy);border:2px solid var(--rk-ice);border-radius:14px;min-height:46px;font:500 15px var(--rk-font-data)}
+  .tick-alpha .alpha-ticket.alpha-dialog select{font-family:var(--rk-font-ui);font-weight:600;border-radius:999px}
+  .tick-alpha .alpha-ticket.alpha-dialog :is(input,select):focus{border-color:var(--rk-blue);background:#fff;outline:3px solid var(--rk-yellow);outline-offset:1px}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button{border-radius:18px;min-height:64px;background:#fff;color:var(--rk-navy);border:2px solid var(--rk-ice)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell{border-color:#ffd0d0}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell span{color:#9e2b33}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-buy[aria-pressed=true]{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff;box-shadow:0 4px 0 #0b3f8a}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell[aria-pressed=true]{background:#c9474f;border-color:#c9474f;color:#fff;box-shadow:0 4px 0 #8a2a31}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button[aria-pressed=true] span{color:#fff}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{color:inherit;opacity:.8}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-chips button{min-height:38px;border-radius:999px;border:2px solid var(--rk-ice);background:#fff;color:var(--rk-navy);font:700 12px var(--rk-font-data)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-chips button[aria-pressed=true]{background:var(--rk-yellow);border-color:var(--rk-yellow);color:var(--rk-navy);font-weight:800}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-risk{border:0;padding:0}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-risk legend{color:var(--rk-muted);font-weight:700}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate{background:var(--rk-navy);color:#fff;border:0;border-radius:20px}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate dt{color:#a9bddb}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate .alpha-estimate-loss dd{color:#ff9a9a}
+  .tick-alpha .alpha-ticket.alpha-dialog>button{min-height:56px;border-radius:999px!important;background:var(--rk-navy)!important;border-color:var(--rk-navy)!important;color:#fff!important;font:800 16px var(--rk-font-ui);box-shadow:0 5px 0 var(--rk-blue);width:100%}
+  .tick-alpha .alpha-ticket.alpha-dialog>button:disabled{background:#2b4878!important;border-color:#2b4878!important;color:#a9bddb!important;box-shadow:none}
+  .tick-alpha .alpha-ticket.alpha-dialog>p:last-child,.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-hint{color:var(--rk-muted)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-notice{border-radius:16px;border-color:#ffd0d0;background:#fff4f4;color:#9e2b33}
+}

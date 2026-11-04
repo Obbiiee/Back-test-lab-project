@@ -22,7 +22,7 @@
     },
     {
       "name": "Confirm accepted by the server",
-      "detail": "POST /sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/confirm 200"
+      "detail": "POST /sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/confirm 200"
     },
     {
       "name": "Pending until a later quote; then filled by the server",
@@ -38,7 +38,7 @@
     },
     {
       "name": "Reload keeps versioned drawings/indicators and the server-side order",
-      "detail": "1 drawings, 1 indicator(s), keys: backtest-drawing-manager-v2, backtest-indicators-v1"
+      "detail": "1 drawings, 1 indicator(s), keys: backtest-indicators-v1, backtest-drawing-manager-v2"
     },
     {
       "name": "Phone 390×844: tap Long Position → Create order → ticket fits, nothing sent",
@@ -62,87 +62,87 @@
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/commands",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3Af2b961d6-e0c4-475a-8340-882ab71dfb94/view",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
       "status": 200
     },
     {
@@ -152,17 +152,17 @@
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/view",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/commands",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/view",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
       "status": 200
     },
     {
@@ -177,32 +177,32 @@
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/confirm",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/confirm",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/view",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/commands",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/commands",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/view",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
       "status": 200
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/commands",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/commands",
       "status": 409
     },
     {
       "method": "POST",
-      "path": "/sessions/session%3A8ceb0b55-be7e-488c-9939-b1f32f63ec6e/view",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
       "status": 200
     }
   ],
