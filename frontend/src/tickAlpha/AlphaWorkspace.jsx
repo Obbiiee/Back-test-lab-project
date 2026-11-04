@@ -11,8 +11,21 @@ import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
 // Stable identity: a fresh object per render re-ran the candle/indicator sync on every UI change.
 const FORWARD_TRANSITION=Object.freeze({kind:'forward'});
+const DRAWING_GROUPS=[
+  ['Lines',['trend-line','horizontal-line','vertical-line','ray','extended-line','horizontal-ray','cross-line','cyclic-lines'],'trend'],
+  ['Channels',['parallel-channel','regression-trend','pitchfork','schiff-pitchfork','modified-schiff-pitchfork'],'layers'],
+  ['Shapes',['rectangle','arrow','rotated-rectangle','ellipse','polyline'],'rectangle'],
+  ['Fibonacci',['fibonacci-retracement','fib-extension','fib-channel','fib-time-zone','trend-fib-time','fib-fan','fib-circles','fib-arcs','fib-wedge'],'fib'],
+  ['Gann',['gann-fan','gann-box'],'hex'],
+  ['Patterns',['abcd-pattern','xabcd-pattern','head-shoulders','triangle-pattern','elliott-impulse','elliott-correction'],'pattern'],
+  ['Brushes',['brush','highlighter'],'brush'],
+  ['Annotations',['text','measure','anchored-text','callout','price-range','date-range','date-price-range','price-label','icon-marker','arrow-marker'],'text'],
+  ['Positions',['long-position','short-position'],'long'],
+];
+const POSITION_TYPES=new Set(['long-position','short-position']);
+const toolName=type=>DRAWING_SPECS[type]?.name||({'long-position':'Long Position','short-position':'Short Position'})[type]||type.replaceAll('-',' ');
 
-export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen}){
+export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen,onToggleObjects}){
   const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
   const [savedIndicators]=useState(()=>{
     const store=new IndicatorPreferences(()=>globalThis.localStorage,workspaceKey,productionRegistry);
@@ -25,6 +38,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const [floating,setFloating]=useState(false),[replayOffset,setReplayOffset]=useState({x:0,y:0});
   const playing=playToken===pauseToken;
   const [chartCommand,setChartCommand]=useState(null);
+  const [drawSheet,setDrawSheet]=useState(null),[fullscreen,setFullscreen]=useState(false);
   const [drawingState,setDrawingState]=useState({drawings:[],selectedId:null});
   const [past,setPast]=useState({key:'',bars:[],status:''}),[historyRetry,setHistoryRetry]=useState(0);
   const historyKey=`${view.metadata.id}:${timeframe}`;
@@ -93,6 +107,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     };
     window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
   },[]);
+  const openOrders=(view.analysis?.orders??[]).filter(order=>['PENDING','ACTIVE','UNRESOLVED'].includes(order.status));
   const bars=useMemo(()=>[...(past.key===historyKey?past.bars:[]),...displayBars(view)],[view,past,historyKey]);
   const indicatorError=useCallback(error=>onNotice(error.message),[onNotice]);
   const changeInstances=value=>{
@@ -104,10 +119,13 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     setPlayToken(null);
     try{onReplay('SEEK',seekTarget(seekInput.current.value));}catch(error){onNotice(error.message);}
   };
-  return <section className="alpha-chart-workspace" aria-label="Tick replay workspace">
+  return <section className={`alpha-chart-workspace${fullscreen?' is-fullscreen':''}`} aria-label="Tick replay workspace">
     <div className="alpha-chart-header">
       <label>Timeframe<select aria-label="Chart timeframe" disabled={busy||playing} value={timeframe} onChange={e=>onTimeframe(e.target.value)}>{TIMEFRAMES.map(tf=><option key={tf}>{tf}</option>)}</select></label>
       <IndicatorControls instances={instances} onChange={changeInstances} onOpen={()=>setPlayToken(null)}/>
+      <button className="alpha-touch-only" aria-haspopup="dialog" aria-expanded={drawSheet!==null} onClick={()=>{setPlayToken(null);setDrawSheet(DRAWING_GROUPS.find(([,types])=>types.includes(mode))?.[0]||'Lines');}}><Icon name="brush"/> Draw</button>
+      {onToggleObjects&&<button className="alpha-touch-only" aria-expanded={objectsOpen} onClick={onToggleObjects}><Icon name="layers"/> Objects</button>}
+      <button className="alpha-touch-only alpha-fullscreen-toggle" aria-pressed={fullscreen} onClick={()=>setFullscreen(value=>!value)}><Icon name="expand"/> {fullscreen?'Exit full screen':'Full screen'}</button>
       <button onClick={()=>setChartCommand({action:'fit',id:crypto.randomUUID()})}>Fit chart</button>
       <label><input type="checkbox" checked={preferences.showGrid} onChange={e=>setPreferences(p=>({...p,showGrid:e.target.checked}))}/>Grid</label>
       <span>Mid-price display · volume unavailable</span>
@@ -117,26 +135,17 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     <div className="alpha-chart-body">
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>
-        {[
-          ['Lines',['trend-line','horizontal-line','vertical-line','ray','extended-line','horizontal-ray','cross-line','cyclic-lines'],'trend'],
-          ['Channels',['parallel-channel','regression-trend','pitchfork','schiff-pitchfork','modified-schiff-pitchfork'],'layers'],
-          ['Shapes',['rectangle','arrow','rotated-rectangle','ellipse','polyline'],'rectangle'],
-          ['Fibonacci',['fibonacci-retracement','fib-extension','fib-channel','fib-time-zone','trend-fib-time','fib-fan','fib-circles','fib-arcs','fib-wedge'],'fib'],
-          ['Gann',['gann-fan','gann-box'],'hex'],
-          ['Patterns',['abcd-pattern','xabcd-pattern','head-shoulders','triangle-pattern','elliott-impulse','elliott-correction'],'pattern'],
-          ['Brushes',['brush','highlighter'],'brush'],
-          ['Annotations',['text','measure','anchored-text','callout','price-range','date-range','date-price-range','price-label','icon-marker','arrow-marker'],'text'],
-          ['Positions',['long-position','short-position'],'long'],
-        ].map(([label,types,icon])=><details className="alpha-drawing-group" key={label} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary').focus();}}}><summary aria-label={`${label} drawing tools`} title={label}><Icon name={icon}/><span className="alpha-group-chevron">›</span></summary><div>{types.map(type=><button key={type} aria-pressed={mode===type} onClick={event=>{setPlayToken(null);setMode(type);event.currentTarget.closest('details').open=false;}}>{DRAWING_SPECS[type]?.name||({'long-position':'Long Position','short-position':'Short Position'})[type]}</button>)}</div></details>)}
+        {DRAWING_GROUPS.map(([label,types,icon])=><details className="alpha-drawing-group" key={label} onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary').focus();}}}><summary aria-label={`${label} drawing tools`} title={label}><Icon name={icon}/><span className="alpha-group-chevron">›</span></summary><div>{types.map(type=><button key={type} aria-pressed={mode===type} onClick={event=>{setPlayToken(null);setMode(type);event.currentTarget.closest('details').open=false;}}>{toolName(type)}</button>)}</div></details>)}
       </nav>
       <div className="alpha-chart-host">
+        {mode!=='none'&&<div className="alpha-mode-badge" role="status"><span>{POSITION_TYPES.has(mode)?'Plan':'Draw'}: {toolName(mode)}</span><button onClick={()=>setMode('none')}>Cancel</button></div>}
         <CandleChart candles={bars} transition={FORWARD_TRANSITION} sessionId={accountStorageKey(`tick-alpha-${view.metadata.id}-${timeframe}`)} viewportKey={accountStorageKey(`${view.metadata.id}:${timeframe}`)}
           drawingWorkspace={workspaceKey} drawingStorageKey={accountTransport()?`backtest-${workspaceKey}`:view.replayStepNs?`backtest-${workspaceKey}`:`backtest-tick-alpha-planning:${encodeURIComponent(view.metadata.id)}`} volumeAvailable={false}
           tickEvidence={view.analysis} researchOnly
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
           command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing} priceStep={view.state.profile?.tickSize}/>
       </div>
-      {objectsOpen&&<aside className="alpha-object-panel" aria-label="Drawing objects"><h2>Object tree</h2><p>Top layer first. Double-click a drawing on the chart to open its properties.</p>{!drawingState.drawings.length&&<p>No drawings yet.</p>}<ol className="alpha-object-tree">{drawingState.drawings.map((item,index)=>({item,index})).reverse().map(({item,index})=>{const run=action=>setChartCommand({action:`object:${action}:${item.id}`,id:crypto.randomUUID()});const label=item.name||DRAWING_SPECS[item.type]?.name||item.type.replaceAll('-',' ');return <li key={item.id} className={drawingState.selectedId===item.id?'is-selected':''}><button className="alpha-object-name" onClick={()=>run('select')}>{index+1}. {label}{item.hidden?' (hidden)':''}{item.locked?' 🔒':''}</button><div className="alpha-object-actions">{(item.native?['properties','hide','lock','forward','backward','duplicate','delete']:['edit','hide','lock','delete']).map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} title={action} onClick={()=>run(action)}>{({properties:'⚙',edit:'⚙',hide:item.hidden?'Show':'Hide',lock:item.locked?'Unlock':'Lock',forward:'↑',backward:'↓',duplicate:'⧉',delete:'🗑'})[action]}</button>)}</div></li>;})}</ol></aside>}
+      {objectsOpen&&<aside className="alpha-object-panel" aria-label="Drawing objects"><div className="alpha-object-head"><h2>Object tree</h2>{onToggleObjects&&<button className="alpha-object-close" aria-label="Close object tree" onClick={onToggleObjects}>Close</button>}</div><p>Top layer first. Double-click a drawing on the chart to open its properties.</p>{[['drawings','Drawings'],['plans','Position plans']].map(([group,title])=>{const count=drawingState.drawings.filter(item=>group==='plans'?POSITION_TYPES.has(item.type):!POSITION_TYPES.has(item.type)).length;return <section key={group} className="alpha-object-group" aria-label={title}><h3>{title} ({count})</h3>{!count&&<p>{group==='plans'?'No Long or Short plans.':'No drawings yet.'}</p>}<ol className="alpha-object-tree">{drawingState.drawings.map((item,index)=>({item,index})).filter(({item})=>group==='plans'?POSITION_TYPES.has(item.type):!POSITION_TYPES.has(item.type)).reverse().map(({item,index})=>{const run=action=>setChartCommand({action:`object:${action}:${item.id}`,id:crypto.randomUUID()});const label=item.name||toolName(item.type);return <li key={item.id} className={drawingState.selectedId===item.id?'is-selected':''}><button className="alpha-object-name" onClick={()=>run('select')}>{index+1}. {label}{item.hidden?' (hidden)':''}{item.locked?' 🔒':''}</button><div className="alpha-object-actions">{(item.native?['properties','hide','lock','forward','backward','duplicate','delete']:['edit','hide','lock','delete']).map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} title={action} onClick={()=>run(action)}>{({properties:'⚙',edit:'⚙',hide:item.hidden?'Show':'Hide',lock:item.locked?'Unlock':'Lock',forward:'↑',backward:'↓',duplicate:'⧉',delete:'🗑'})[action]}</button>)}</div></li>;})}</ol></section>;})}<section className="alpha-object-group" aria-label="Indicators"><h3>Indicators ({instances.length})</h3>{!instances.length&&<p>No indicators.</p>}<ol className="alpha-object-tree">{instances.map((item,index)=><li key={item.id}><span className="alpha-object-name">{productionRegistry.get(item.type).name}{item.visible===false?' (hidden)':''}</span><div className="alpha-object-actions"><button aria-label={`${item.visible===false?'Show':'Hide'} indicator ${index+1}`} onClick={()=>changeInstances(instances.map(entry=>entry.id===item.id?{...entry,visible:entry.visible===false}:entry))}>{item.visible===false?'Show':'Hide'}</button><button aria-label={`Remove indicator ${index+1}`} title="Remove" onClick={()=>changeInstances(instances.filter(entry=>entry.id!==item.id))}>🗑</button></div></li>)}</ol></section><section className="alpha-object-group" aria-label="Orders"><h3>Orders ({openOrders.length}) · read-only</h3><p>Server records. Drawing Undo never changes them; manage them in the trading terminal.</p><ol className="alpha-object-tree">{openOrders.map(order=><li key={order.id}><span className="alpha-object-name">{order.side} · {order.status} · {order.status==='PENDING'?order.entry:order.entryPrice??order.entry}</span></li>)}</ol></section></aside>}
     </div>
     <div className={`alpha-replay-controls ${floating?'is-floating':'is-docked'}`} style={floating?{translate:`${replayOffset.x}px ${replayOffset.y}px`}:undefined} aria-label="Tick replay controls">
       <button className="alpha-replay-grip" aria-label="Move replay controls" disabled={!floating} title="Drag or use arrow keys" onKeyDown={event=>{const delta={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,-10],ArrowDown:[0,10]}[event.key];if(delta){event.preventDefault();const rect=event.currentTarget.parentElement.getBoundingClientRect();setReplayOffset(current=>({x:current.x+Math.max(8-rect.left,Math.min(innerWidth-8-rect.right,delta[0])),y:current.y+Math.max(8-rect.top,Math.min(innerHeight-8-rect.bottom,delta[1]))}));}}} onPointerDown={event=>{if(event.button!==0)return;const target=event.currentTarget;let x=event.clientX,y=event.clientY;target.setPointerCapture(event.pointerId);target.onpointermove=next=>{const rect=target.parentElement.getBoundingClientRect();const dx=Math.max(8-rect.left,Math.min(innerWidth-rect.right-8,next.clientX-x));const dy=Math.max(8-rect.top,Math.min(innerHeight-rect.bottom-8,next.clientY-y));x=next.clientX;y=next.clientY;setReplayOffset(current=>({x:current.x+dx,y:current.y+dy}));};target.onpointerup=target.onpointercancel=()=>{target.onpointermove=null;target.onpointerup=null;target.onpointercancel=null;};}}>⠿</button>
@@ -149,5 +158,11 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     </div>
     <div className="alpha-chart-disclosures"><details className="alpha-display-details alpha-replay-evidence"><summary>Replay time (UTC): {new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().replace("T"," ").replace(".000Z"," UTC")} · {view.chart.candles.at(-1)?.incomplete?"forming candle":"complete candle"}</summary><p className="alpha-chart-note">Acknowledged cursor: {new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString()} · {view.chart.candles.length} revealed bars · latest bucket {view.chart.candles.at(-1)?.incomplete?'incomplete':'complete'}. Bid {view.quote?.bid??'unavailable'} / Ask {view.quote?.ask??'unavailable'}.</p></details>
     <details className="alpha-display-details"><summary>Chart and replay limitations</summary><p className="alpha-chart-note">Drawings and indicators are research aids; position drawings are planning estimates. Execution uses observed Bid/Ask ticks. {view.replayStepNs?'Historical candles use recorded row order for research display; order within a timestamp remains unverified. ':''}{view.chart.windowStartGroup!=='0'?'The bounded chart window may start inside a bucket. ':''}Committed financial history cannot be rewound; create a separate Session for another experiment.</p></details></div>
+    {drawSheet!==null&&<div className="alpha-sheet-backdrop" onClick={event=>{if(event.target===event.currentTarget)setDrawSheet(null);}}><div className="alpha-draw-sheet" role="dialog" aria-modal="true" aria-label="Drawing tools" onKeyDown={event=>{if(event.key==='Escape')setDrawSheet(null);}}>
+      <span className="alpha-sheet-handle" aria-hidden="true"/>
+      <div className="alpha-sheet-head"><h2>Draw</h2><button aria-label="Close drawing tools" onClick={()=>setDrawSheet(null)}>Close</button></div>
+      <div className="alpha-sheet-tabs" role="tablist" aria-label="Tool groups">{DRAWING_GROUPS.map(([label])=><button key={label} role="tab" aria-selected={drawSheet===label} onClick={()=>setDrawSheet(label)}>{label}</button>)}</div>
+      <div className="alpha-sheet-tools" role="tabpanel" aria-label={`${drawSheet} tools`}><button aria-pressed={mode==='none'} onClick={()=>{setMode('none');setDrawSheet(null);}}><Icon name="cursor"/> Cursor</button>{DRAWING_GROUPS.find(([label])=>label===drawSheet)?.[1].map(type=><button key={type} aria-pressed={mode===type} onClick={()=>{setPlayToken(null);setMode(type);setDrawSheet(null);}}>{toolName(type)}</button>)}</div>
+    </div></div>}
   </section>;
 }

@@ -1,3 +1,4 @@
+import {clearShellCache} from '../pwa.js';
 // Existing same-origin HTTPS identity. Bearer tokens live only in this closure.
 export function createAccountClient({fetcher=fetch,secure=()=>window.location.protocol==='https:'}={}){
   let token=null,subject=null,generation=0;
@@ -32,7 +33,7 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
       if(!validUuid(me?.id)||me.is_verified!==true||me.is_active!==true){token=null;throw Error('Verified account required.');}
       subject=me.id;return me;
     },
-    async logout(all=false){try{await request(all?'/api/v1/auth/logout-all':'/api/v1/auth/logout',{method:'POST'});}finally{token=null;subject=null;generation++;}},
+    async logout(all=false){try{await request(all?'/api/v1/auth/logout-all':'/api/v1/auth/logout',{method:'POST'});}finally{token=null;subject=null;generation++;clearShellCache();}},
     clear(){token=null;subject=null;generation++;},
     hasSession(){return token!==null;},
     subject(){return subject;},

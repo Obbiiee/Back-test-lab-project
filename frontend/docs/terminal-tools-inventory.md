@@ -157,6 +157,20 @@ Limits: the synthetic fixture covers about 8.5 hours (2,048 ticks × 15 s), so "
 
 Evidence: `docs/qa/issue-21/c09/` (screenshots, `results.json`, `orders-after-replay.txt`, `ticket-fields.json`).
 
+### C-10 phone layout, grouped objects, PWA — DONE (spec 12 / runbook F06+F08, look from canvas "20 · Mobile trading")
+
+Found by the 2026-11-04 audit against Codex spec docs 11–18 and the design canvas, then built:
+
+- **Phone ≤760px:** left drawing rail and right icon rail hidden; chart command row `TF · Indicators · Draw · Objects · Full screen` (navy pills, yellow when open); chart ~58dvh; floating replay pill (play/step icon buttons, speed, Go to time); big SELL / BUY bar that only opens the ticket; five-section bottom nav `Methods · Sessions · Replay · Analysis · Account` with safe-area padding (Analysis opens the terminal Analysis tab).
+- **Draw sheet:** white bottom sheet with tool-group tabs (same catalog as the rail); choosing a tool closes it and shows a yellow mode badge `Draw: Trend Line` / `Plan: Long Position` with Cancel.
+- **Objects:** grouped on every size into `Drawings (n)`, `Position plans (n)`, `Indicators (n)` (hide/remove) and `Orders (n) · read-only` (server records; drawing Undo never touches them). On phones it is a navy bottom sheet with 44px actions.
+- **Full screen chart:** layout toggle (not an orientation lock), bottom nav hidden while on; phone landscape (height ≤500px) is chart-first automatically with the header hidden.
+- **PWA:** `public/manifest.webmanifest`, RIKSORA icons (192/512/maskable/apple), `public/sw.js` caching only the HTML shell and hashed `/assets/` (never API, auth, market or ledger responses; navigation is network-first; cache cleared on sign-out). Registered only for production builds on HTTPS (`src/pwa.js`), so local dev/QA never get a worker. Test: `npm run test:f08-pwa`.
+- **Bug:** Drawing Properties tab labels were clipped on laptop (header/tabs shrank inside the flex panel) → `flex:none`.
+- QA helper `tests/qa/pick-tool.cjs` picks tools from the rail or the Draw sheet, so phone QA uses the real phone path.
+
+Still open (not frontend-only): REVIEW_EXACT / COMMIT_PENDING reconciliation screens and the Pick-from-chart mini-ticket as dedicated phone states; Jump 72h (B07) and cross-device sync (B08) wait for Codex.
+
 ## Integration gaps (for Codex, no backend change made here)
 
 | Screen | Need | Status |

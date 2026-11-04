@@ -15,7 +15,7 @@ section.drawing-properties select{border-radius:999px;font-family:var(--rk-font-
 section.drawing-properties :is(input,select,textarea):focus{border-color:var(--rk-blue,#1378f5);outline:none}
 section.drawing-properties input[type=color]{width:36px;height:32px;padding:0;border:2px solid #2b4878;border-radius:10px;background:none}
 section.drawing-properties input[type=range]{flex:1;min-width:90px;accent-color:var(--rk-yellow,#ffce55)}
-.dp-header{display:flex;align-items:center;gap:8px;padding:16px 16px 10px}
+.dp-header{flex:none;display:flex;align-items:center;gap:8px;padding:16px 16px 10px}
 .dp-title{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
 .dp-kind{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#a9bddb}
 section.drawing-properties input.dp-name{color:#fff;width:100%;font:900 20px/1.2 var(--rk-font-ui,sans-serif);letter-spacing:-.01em;background:transparent;border-color:transparent;padding-left:0;min-height:30px}
@@ -24,7 +24,7 @@ section.drawing-properties input.dp-name:hover,section.drawing-properties input.
 section.drawing-properties .dp-close{width:34px;height:34px;min-height:34px;padding:0;border:0;border-radius:50%;background:var(--rk-panel,#0c2655);font-size:18px;font-weight:900}
 .dp-locked{margin:0 16px 8px;padding:8px 12px;border-radius:16px;background:var(--rk-yellow,#ffce55);color:var(--rk-navy,#061a3c);font-size:12px;font-weight:700}
 section.drawing-properties .dp-locked button{margin-left:6px;min-height:28px;border-color:var(--rk-navy,#061a3c)}
-.dp-tabs{display:flex;gap:2px;margin:0 16px 10px;padding:4px;background:var(--rk-navy,#061a3c);border:2px solid var(--rk-navy-line,#1d3560);border-radius:999px;overflow-x:auto;scrollbar-width:none}
+.dp-tabs{flex:none;display:flex;gap:2px;margin:0 16px 10px;padding:4px;background:var(--rk-navy,#061a3c);border:2px solid var(--rk-navy-line,#1d3560);border-radius:999px;overflow-x:auto;scrollbar-width:none}
 section.drawing-properties .dp-tabs button{flex:1 0 auto;min-height:32px;background:transparent;border:0;color:var(--rk-ice,#d9eafe)}
 section.drawing-properties .dp-tabs button[aria-selected=true]{background:#fff;color:var(--rk-navy,#061a3c);font-weight:800}
 .dp-body{flex:1;overflow:auto;padding:4px 16px 16px;display:flex;flex-direction:column;gap:12px}

@@ -4,6 +4,7 @@
 // Usage: start `npx vite --port 5179` in frontend/, then
 //   node tests/qa/mobile-touch-qa.cjs <outDir> [baseUrl]
 const { chromium } = require('playwright');
+const pickTool = require('./pick-tool.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const out = process.argv[2] || 'qa-out', base = process.argv[3] || 'http://localhost:5179';
@@ -34,8 +35,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   step('Single tap in cursor mode: no drawing, no order dialog');
 
   // Tap-to-place: tap tool, tap A, tap B.
-  await page.getByLabel('Lines drawing tools').tap();
-  await page.getByRole('button', { name: 'Trend Line', exact: true }).tap(); await sleep(300);
+  await pickTool(page, 'Lines', 'Trend Line'); await sleep(300);
   await page.touchscreen.tap(...at(80, 200)); await sleep(700);
   assert.equal((await models()).length, 0, 'First tap is anchor A only');
   await page.touchscreen.tap(...at(220, 100)); await sleep(700);
@@ -70,8 +70,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.touchscreen.tap(...at(30, 30)); await sleep(300);
 
   // Pinch while a tool is armed zooms the chart but places no anchor.
-  await page.getByLabel('Lines drawing tools').tap();
-  await page.getByRole('button', { name: 'Trend Line', exact: true }).tap(); await sleep(300);
+  await pickTool(page, 'Lines', 'Trend Line'); await sleep(300);
   const countBefore = (await models()).length;
   await touch('touchStart', [at(100, 150), at(200, 150)]);
   for (let i = 1; i < 8; i++) { await touch('touchMove', [at(100 - i * 5, 150), at(200 + i * 5, 150)]); await sleep(30); }
@@ -83,8 +82,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   step('Two-finger pinch places no anchor; the next two taps draw normally');
 
   // Finger brush.
-  await page.getByLabel('Brushes drawing tools').tap();
-  await page.getByRole('button', { name: 'Brush', exact: true }).tap(); await sleep(300);
+  await pickTool(page, 'Brushes', 'Brush'); await sleep(300);
   await touch('touchStart', [at(60, 250)]);
   for (let i = 1; i <= 30; i++) { await touch('touchMove', [at(60 + i * 6, 250 + Math.sin(i / 4) * 20)]); await sleep(15); }
   await touch('touchEnd', []); await sleep(500);

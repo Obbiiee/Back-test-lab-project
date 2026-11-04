@@ -123,7 +123,8 @@ const COUNTS = { 'parallel-channel': 3, 'fib-extension': 3, pitchfork: 3, 'xabcd
     await p.goto(base + '/tests/qa/terminal.html?objects=0'); await sleep(1500);
     const overflow = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     const chart = await p.locator('.candle-chart canvas').first().boundingBox();
-    const tools = await p.getByLabel('Lines drawing tools').boundingBox();
+    const rail = p.getByLabel('Lines drawing tools');
+    const tools = await ((await rail.isVisible()) ? rail : p.getByRole('button', { name: 'Draw', exact: true })).boundingBox();
     assert.ok(overflow <= 0, `${name}: horizontal overflow ${overflow}px`);
     assert.ok(chart && chart.width > 150 && chart.height > 120, `${name}: chart visible`);
     assert.ok(tools && tools.x >= 0 && tools.x + tools.width <= viewport.width, `${name}: drawing tools reachable`);

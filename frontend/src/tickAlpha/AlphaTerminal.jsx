@@ -11,19 +11,24 @@ import {accountStorageKey} from './accountClient.js';
 
 const shown=value=>value??'Unavailable';
 
-export default function AlphaTerminal({view,busy,onAction,onFeedback}){
+export default function AlphaTerminal({view,busy,onAction,onFeedback,request}){
   const [tab,setTab]=useState('Open positions'),[quantities,setQuantities]=useState({});
+  const root=useRef(null);
+  // Phone bottom navigation asks for a tab (e.g. Analysis); show it and bring the terminal into view.
+  const [seenRequest,setSeenRequest]=useState(request);
+  if(request!==seenRequest){setSeenRequest(request);if(request)setTab(request.tab);}
+  useEffect(()=>{if(request)root.current?.scrollIntoView({block:'start',behavior:'smooth'});},[request]);
   const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   const evidence=view.analysis;
-  if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
+  if(!evidence||evidence.status!=='COMPLETE')return <section ref={root} className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
   const {account,metrics,provenance}=evidence;
   const closed=tab==='Closed trades';
   const rows=tab==='Pending orders'?evidence.orders.filter(o=>o.status==='PENDING'):closed?evidence.completed:evidence.orders.filter(o=>['ACTIVE','UNRESOLVED'].includes(o.status));
-  return <section className="alpha-terminal" aria-label="Trading and Analysis" data-event-head={provenance.eventHead} data-revision={provenance.revision} data-terminal-state={panel.state} style={{height:panel.height}}>
+  return <section ref={root} className="alpha-terminal" aria-label="Trading and Analysis" data-event-head={provenance.eventHead} data-revision={provenance.revision} data-terminal-state={panel.state} style={{height:panel.height}}>
     <div ref={grip} className="alpha-terminal-resize" role="separator" aria-label="Resize trading terminal" aria-orientation="horizontal" aria-valuemin={panel.min} aria-valuemax={panel.max} aria-valuenow={panel.height} aria-valuetext={`${panel.state.toLowerCase()}, ${panel.height} pixels`} tabIndex={0} onPointerDown={panel.start} onKeyDown={panel.keyDown} onDoubleClick={panel.restore} title="Drag six dots; arrows resize, Home collapses, Enter restores"><span aria-hidden="true">⠿</span><span>Trading terminal · {panel.state==='COLLAPSED'?'Enter to restore':'drag or use arrow keys'}</span></div>
     {panel.state==='COLLAPSED'&&<button className="alpha-terminal-restore" aria-label="Restore trading terminal" onClick={panel.restore}>Restore</button>}
     <div className="alpha-terminal-content" hidden={panel.state==='COLLAPSED'}>

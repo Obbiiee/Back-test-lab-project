@@ -24,7 +24,7 @@ const initialPlan=view=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:
 
 export default function TickAlpha(){
   const [catalog,setCatalog]=useState(null),[view,setView]=useState(null),[busy,setBusy]=useState(false);
-  const [objectsOpen,setObjectsOpen]=useState(false);
+  const [objectsOpen,setObjectsOpen]=useState(false),[terminalRequest,setTerminalRequest]=useState(null);
   const [notice,setNotice]=useState(''),[dialog,setDialog]=useState(null),[review,setReview]=useState(null);
   const [kind,setKind]=useState('FREE_STYLE'),[plan,setPlan]=useState(initialPlan),[planRevision,setPlanRevision]=useState(0);
   const flight=useRef(false),returnFocus=useRef(null);
@@ -131,7 +131,7 @@ export default function TickAlpha(){
         setConnecting(true);try{const result=await loadResearchContext(new URL(window.location.href).searchParams.get('session'),{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>XAUUSD</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
-      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
+      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         onReplay={(kind,targetNs)=>run(async()=>{
           await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
@@ -148,8 +148,15 @@ export default function TickAlpha(){
         }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button aria-label="Drawing objects" aria-expanded={objectsOpen} title="Drawing objects" onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Objects</span></button><button disabled={busy||view.state.unresolved} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/><span>Order</span></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/><span>News</span></button><button aria-label="Open journal panel" title="Journal" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog("journal");}}><Icon name="journal"/><span>Journal</span></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/><span>Source</span></button></aside>
       </div>
       <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><button disabled={busy||view.state.unresolved} onClick={event=>openTicket(event)}>New order</button><span>{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span></div>
-      <AlphaTerminal key={view.metadata.id} view={view} busy={busy} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
+      <AlphaTerminal key={view.metadata.id} request={terminalRequest} view={view} busy={busy} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
     </>}
+    <nav className="alpha-bottom-nav" aria-label="App sections">
+      <a href={pagePath('home')}><Icon name="layers"/><span>Methods</span></a>
+      <a href={sessionsPath()} aria-current={!view?'page':undefined}><Icon name="calendar"/><span>Sessions</span></a>
+      <button disabled={!view} aria-current={view?'page':undefined} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}><Icon name="candles"/><span>Replay</span></button>
+      <button disabled={!view} onClick={()=>setTerminalRequest({tab:'Analysis',id:Date.now()})}><Icon name="analytics"/><span>Analysis</span></button>
+      <a href="/?page=account"><Icon name="smile"/><span>Account</span></a>
+    </nav>
     <footer role="status" aria-live="polite">{noticeText(notice)||(busy?'Processing your request… Replay and order controls will unlock when it finishes.':catalog?`${isAccountPage()?'Verified workspace research':'Private local research'} · source limitations available in Data source`:'Service required. No fallback market feed.')}</footer>
     {dialog==='feedback'&&<WorkspaceModal returnFocusRef={returnFocus} label="Optional research feedback" onClose={()=>setDialog(null)}><AlphaFeedback onClose={()=>setDialog(null)}/></WorkspaceModal>}
     {dialog==='source'&&<WorkspaceModal returnFocusRef={returnFocus} label="Data source" onClose={()=>setDialog(null)}><AlphaSourceDetails historical={sourceContext()==='historical'} account={isAccountPage()} catalog={catalog} view={view} onClose={()=>setDialog(null)}/></WorkspaceModal>}

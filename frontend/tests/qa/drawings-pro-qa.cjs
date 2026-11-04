@@ -3,6 +3,7 @@
 // Usage: start `npx vite --port 5179` in frontend/, then
 //   node tests/qa/drawings-pro-qa.cjs <outDir> [baseUrl]
 const { chromium } = require('playwright');
+const pickTool = require('./pick-tool.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const out = process.argv[2] || 'qa-out', base = process.argv[3] || 'http://localhost:5179';
@@ -129,8 +130,7 @@ const TOOLS = [
   const phone = await (await browser.newContext({ storageState, viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true })).newPage();
   phone.on('pageerror', e => errors.push('phone: ' + e.message));
   await phone.goto(base + '/tests/qa/terminal.html?objects=0'); await sleep(1800);
-  await phone.getByLabel('Shapes drawing tools').click();
-  await phone.getByRole('button', { name: 'Polyline', exact: true }).click(); await sleep(300);
+  await pickTool(phone, 'Shapes', 'Polyline'); await sleep(300);
   const bar = await phone.getByRole('status', { name: 'Polyline creation' }).boundingBox();
   assert.ok(bar && bar.width <= 390, 'creation bar fits the phone');
   const done = await phone.getByRole('button', { name: 'Done', exact: true }).boundingBox();
