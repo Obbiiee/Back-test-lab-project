@@ -538,9 +538,9 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
         <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>
         <button type="button" onClick={redoDrawing} disabled={!historyState.canRedo} aria-label="Redo drawing" title="Redo (Ctrl+Y)">↷ Redo</button>
         {selectedDrawingId && <>
-          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, locked: !drawing.locked } : drawing))} aria-label="Kunci drawing" title="Kunci / buka drawing">{drawings.find((drawing) => drawing.id === selectedDrawingId)?.locked ? "🔒" : "🔓"}</button>
-          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, hidden: !drawing.hidden } : drawing))} aria-label="Sembunyikan drawing" title="Tampilkan / sembunyikan">◉</button>
-          <button type="button" className="clear-drawings" onClick={deleteSelectedDrawing} aria-label="Hapus drawing terpilih" title="Hapus drawing terpilih">Hapus</button>
+          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, locked: !drawing.locked } : drawing))} aria-label="Lock drawing" title="Lock / unlock drawing">{drawings.find((drawing) => drawing.id === selectedDrawingId)?.locked ? "🔒" : "🔓"}</button>
+          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, hidden: !drawing.hidden } : drawing))} aria-label="Hide drawing" title="Show / hide drawing">◉</button>
+          <button type="button" className="clear-drawings" onClick={deleteSelectedDrawing} aria-label="Delete selected drawing" title="Delete selected drawing">Delete</button>
         </>}
       </div>
       {toolHint && <div className="chart-action-hint" role="status">{toolHint}</div>}

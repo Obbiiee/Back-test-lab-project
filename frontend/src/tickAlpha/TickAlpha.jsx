@@ -4,7 +4,7 @@ import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
-import AlphaBrand from './AlphaBrand.jsx';
+import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
 import AlphaSessions from './AlphaSessions.jsx';
 import AlphaTicketEstimate from './AlphaTicketEstimate.jsx';
 import {targetForRR} from './orderEstimate.js';
@@ -119,23 +119,25 @@ export default function TickAlpha(){
     creationId.current=id(type);if(type==='method')setKind('FREE_STYLE');
     setDialog(type==='method'?'method':'session');
   };
-  return <main ref={mainRef} className="tick-alpha" onClickCapture={event=>{
-    if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
-    if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
-  }}>
-    <header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation">{view&&<a href={sessionsPath()}>All Sessions</a>}<a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav><details className="alpha-session-menu"><summary>Session settings</summary>    <section className="alpha-context" aria-label="Method and Session">
+  const sessionMenu=<details className="alpha-session-menu"><summary>Session settings</summary>    <section className="alpha-context" aria-label="Method and Session">
       <button disabled={busy||!catalog} onClick={event=>openCreation('method',event)}>New strategy</button>
       <button disabled={busy||!catalog?.methods.length} onClick={event=>openCreation('session',event)}>Create Session</button>
       <label>Reopen Session<select aria-label="Reopen Session" disabled={busy||!catalog} value={view?.metadata.id||''} onChange={e=>{if(e.target.value)run(()=>reopen(e.target.value));}}>
         <option value="">Choose saved Session</option>{catalog?.sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       {view&&<><span>{view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}</span><button disabled={busy} onClick={()=>run(()=>reopen(view.metadata.id))}>Reload saved Session</button></>}
     </section>
-</details></header>
+</details>;
+  return <main ref={mainRef} className={`tick-alpha${view?' has-workspace':''}`} onClickCapture={event=>{
+    if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
+    if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
+  }}>
+    <header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation">{view&&<a href={sessionsPath()}>All Sessions</a>}<a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav>{sessionMenu}</header>
     {!catalog?<section className="alpha-empty"><h1>{isAccountPage()?'Connect your workspace':'Connect your local workspace'}</h1><p>{isAccountPage()?'An authorized account connection is required to create or reopen a Session.':'Start the local alpha service and database to create or reopen a Session.'}</p><p>{connecting?'Connecting to the saved workspace…':isAccountPage()?'The account service is unavailable. Retry, or sign out and sign in again.':'Your local service is unavailable. Start it, then retry the connection.'}</p><button disabled={busy||connecting} onClick={()=>run(async()=>{
         setConnecting(true);try{const result=await loadResearchContext(new URL(window.location.href).searchParams.get('session'),{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>XAUUSD</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
-      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
+      <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" href={sessionsPath()} aria-label="Back to Sessions"><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label="Data source" title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">Au</span>XAUUSD</button></>}
+        trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         onReplay={(kind,targetNs)=>run(async()=>{
           await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
@@ -151,7 +153,7 @@ export default function TickAlpha(){
           catch(error){setNotice(error.message);}
         }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button aria-label="Drawing objects" aria-expanded={objectsOpen} title="Drawing objects" onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Objects</span></button><button disabled={busy||view.state.unresolved} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/><span>Order</span></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/><span>News</span></button><button aria-label="Open journal panel" title="Journal" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog("journal");}}><Icon name="journal"/><span>Journal</span></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/><span>Source</span></button></aside>
       </div>
-      <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><button disabled={busy||view.state.unresolved} onClick={event=>openTicket(event)}>New order</button><span>{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span></div>
+      <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><button disabled={busy||view.state.unresolved} onClick={event=>openTicket(event)}>New order</button><span className="alpha-order-hint">{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span><span className="alpha-balance-pill" aria-label={`Saved balance ${view.state.balance} USD`}>${view.state.balance}</span></div>
       <AlphaTerminal key={view.metadata.id} request={terminalRequest} view={view} busy={busy} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
     </>}
     <nav className="alpha-bottom-nav" aria-label="App sections">

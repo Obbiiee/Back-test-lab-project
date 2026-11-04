@@ -171,6 +171,11 @@ Found by the 2026-11-04 audit against Codex spec docs 11–18 and the design can
 
 Still open (not frontend-only): REVIEW_EXACT / COMMIT_PENDING reconciliation screens and the Pick-from-chart mini-ticket as dedicated phone states; Jump 72h (B07) and cross-device sync (B08) wait for Codex.
 
+### C-11 workspace shell matches the design canvas — DONE ("10 · Trading workspace", "20 · Mobile trading")
+
+Owner review (2026-11-04): panels matched the canvas but the workspace shell did not. Rebuilt the look only, no behaviour change:
+navy ground with rounded cards and 8px gaps; one pill header (back + mark, yellow XAUUSD chip that opens Data source, interval pill, Indicators, session title, Session settings) replacing the brand bar + session line; drawing rail and right tool rail as navy cards; chart in a rounded card; replay as a white floating pill inside the chart (play/step icon buttons, speed, Go to time); QUICK row with SELL/BUY pills and a balance pill; terminal as a card with pill tabs; the order ticket as the white docked "Plan order" panel on desktop. Phone: SELL · New order · BUY row like the artboard. Copy: technical "Mid-price display · volume unavailable" moved into Chart limitations; Indonesian leftovers (Hapus/Kunci/Sembunyikan) and emoji icons replaced.
+
 ## Integration gaps (for Codex, no backend change made here)
 
 | Screen | Need | Status |
