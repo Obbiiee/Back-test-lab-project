@@ -34,6 +34,10 @@ export default function TickAlpha(){
   const [orderAction,setOrderAction]=useState(null);
   const [selectedMethod,setSelectedMethod]=useState('');
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
+  // Opening a Session starts at the chart, not wherever the Sessions list was scrolled to.
+  const openedSession=view?.metadata.id;
+  const mainRef=useRef(null);
+  useEffect(()=>{if(!openedSession)return;globalThis.scrollTo?.(0,0);mainRef.current?.scrollTo?.(0,0);},[openedSession]);
   useEffect(()=>{
     let mounted=true;
     (async()=>{try{
@@ -115,7 +119,7 @@ export default function TickAlpha(){
     creationId.current=id(type);if(type==='method')setKind('FREE_STYLE');
     setDialog(type==='method'?'method':'session');
   };
-  return <main className="tick-alpha" onClickCapture={event=>{
+  return <main ref={mainRef} className="tick-alpha" onClickCapture={event=>{
     if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
     if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
   }}>
@@ -153,7 +157,7 @@ export default function TickAlpha(){
     <nav className="alpha-bottom-nav" aria-label="App sections">
       <a href={pagePath('home')}><Icon name="layers"/><span>Methods</span></a>
       <a href={sessionsPath()} aria-current={!view?'page':undefined}><Icon name="calendar"/><span>Sessions</span></a>
-      <button disabled={!view} aria-current={view?'page':undefined} onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}><Icon name="candles"/><span>Replay</span></button>
+      <button disabled={!view} aria-current={view?'page':undefined} onClick={()=>{globalThis.scrollTo?.({top:0,behavior:'smooth'});mainRef.current?.scrollTo?.({top:0,behavior:'smooth'});}}><Icon name="candles"/><span>Replay</span></button>
       <button disabled={!view} onClick={()=>setTerminalRequest({tab:'Analysis',id:Date.now()})}><Icon name="analytics"/><span>Analysis</span></button>
       <a href="/?page=account"><Icon name="smile"/><span>Account</span></a>
     </nav>
