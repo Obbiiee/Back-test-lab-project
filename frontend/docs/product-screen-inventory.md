@@ -88,3 +88,22 @@ Cross-cutting shell pieces (all status **missing** today):
 Each checkpoint ships: lint, the registered unit/regression tests, browser QA at 1440/1280/1024×768/768/390/375/320 and landscape, AccessLint scan, screenshots that match the commit SHA, a commit and push, and a PR update. Design done is not the same as backend done, deployed, or release PASS.
 
 Rollback: the branch is stacked on PR #36. Reverting the CP merge restores the C-12 shell. No storage keys change, and existing `?session=`/`?page=account` links keep working.
+
+## Checkpoint 1 status (frontend only, not deployed)
+
+Routes actually shipped use `?screen=` (not `?page=`, which stays the account/home transport selector): `screen=methods|method|method-new|sessions|analytics|journal|catalog|help|replay|account`, plus `method=`, `tab=overview|sessions|analytics|rules`, `of=<sessionId>`. Old `?session=<id>` links still open replay.
+
+| Screen | CP1 result | Data used | Still needs Codex |
+|---|---|---|---|
+| U02 Sign in / register / verify / forgot / reset | Canvas split card, one card per job, generic notices, password reveal, "Signed out for safety" after a 401, deep link restored after sign-in | existing `/auth/*` routes | Google OAuth (button disabled with reason) |
+| U03 My Methods | Method-first list, search, type filter, sort, filtered-empty, Continue card (last Session opened on this device + one `GET /sessions/{id}`), latest Sessions table | catalog + `GET /sessions/{id}` | session list with cursor/counts, `lastUsedAtUtc` |
+| U04 Method create | Full page: name, type chosen once, Protocol risk/RR + conditions, checklist switch, preview aside | `POST /methods` | edit/archive (`PATCH /methods/{id}`) |
+| U05 Method overview | Tabs Overview / Sessions / Analytics / Rules as links, unavailable state for unknown Method | catalog | session counts per Method |
+| U12 Session analytics page | Method + Session pickers, scope list, primary metrics, committed equity, balance table | `POST /sessions/{id}/view` analysis | none for single Session |
+| U13 Method analytics | Honest unavailable state + per-Session links; no averaged win rate, no stitched equity | none | `GET /methods/{id}/analytics` |
+| U14 Account | Identity, "Plans are not live yet", workspaces, sign out, sign out on all devices | existing auth/workspace routes | entitlements/billing |
+| Shell | Desktop sidebar (My Methods, Sessions, Data Catalog, Journal, Analytics; Account/Help at the bottom), icon rail ≤1100px, 5-tab bar ≤760px | none | none |
+
+Fixture-only: `tests/qa/product-qa.cjs` mocks `/auth/*` and `/workspaces` in the browser (labelled in the file) and forwards research calls to the local synthetic API. The app itself ships no fixtures.
+
+Rollback: revert the CP1 commit on `claude/product-frontend-v1`; no backend, dataset or deployment changes are involved.

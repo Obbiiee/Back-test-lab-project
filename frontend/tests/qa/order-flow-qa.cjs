@@ -30,12 +30,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const dump = () => page.locator('footer').innerText();
   await page.goto(base + '/?tick-alpha=local'); await sleep(1500);
 
-  // 1. Strategy + Sessions through the real UI.
+  // 1. Method + Sessions through the real UI (Method-first flow: My Methods → New Method → Save Method).
   const tag = 'C09-' + Date.now().toString(36);
-  await page.getByRole('button', { name: /^(Create a strategy|New strategy)$/ }).first().click();
-  await page.locator('input[name=name]').fill(tag); await page.getByRole('button', { name: 'Save strategy' }).click(); await sleep(1200);
+  await page.getByRole('link', { name: /^(New Method|Create your first Method)$/ }).first().click(); await sleep(400);
+  await page.getByLabel('Method name').fill(tag); await page.getByRole('button', { name: 'Save Method' }).click(); await sleep(1200);
   const newSession = async name => {
-    if (await page.locator('.candle-chart').count()) { await page.goto(base + '/?tick-alpha=local'); await sleep(1500); }
+    await page.goto(base + '/?tick-alpha=local&screen=sessions'); await sleep(1500);
     await page.getByRole('button', { name: 'New Session' }).first().click();
     const methodOption = await page.locator('select[name=method] option', { hasText: tag }).getAttribute('value');
     await page.locator('select[name=method]').selectOption(methodOption);
@@ -210,7 +210,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   // 9. Phone (390×844, touch): Long Position → Create order → ticket usable on screen.
   const phone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })).newPage();
   phone.on('pageerror', e => errors.push('phone: ' + e.message));
-  await phone.goto(base + '/?tick-alpha=local'); await sleep(1500);
+  await phone.goto(base + '/?tick-alpha=local&screen=sessions'); await sleep(1500);
   await phone.getByRole('button', { name: `Open ${tag} normal` }).tap();
   await phone.waitForSelector('.candle-chart canvas'); await sleep(1500);
   await pickTool(phone, 'Positions', 'Long Position');

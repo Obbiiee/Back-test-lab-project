@@ -1,6 +1,6 @@
 import {clearShellCache} from '../pwa.js';
 // Existing same-origin HTTPS identity. Bearer tokens live only in this closure.
-export function createAccountClient({fetcher=fetch,secure=()=>window.location.protocol==='https:'}={}){
+export function createAccountClient({fetcher=fetch,secure=()=>window.location.protocol==='https:',onExpired=()=>{}}={}){
   let token=null,subject=null,generation=0;
   async function request(path,{method='GET',body,form=false,authenticated=true,signal,jobId}={}){
     if(!secure())throw Error('Account access requires HTTPS. The private local workspace remains separate.');
@@ -14,7 +14,7 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
       ...(body===undefined?{}:{body:form?new URLSearchParams(body).toString():JSON.stringify(body)})});
     if(current!==generation)throw Error('Account changed; this response was discarded.');
     if(!response.ok){
-      if(response.status===401){token=null;subject=null;generation++;}
+      if(response.status===401){const had=token!==null;token=null;subject=null;generation++;if(had&&authenticated)onExpired();}
       // Never surface rejected payloads/passwords/tokens or raw server errors.
       throw Error(({400:'The request was refused. Check your details and verification.',401:'Sign in again.',403:'This action is not permitted.',404:'This workspace or record is unavailable.',409:'The saved record changed. Reload before retrying.',422:'Check the supplied fields.',426:'Account access requires HTTPS.',429:'The service is busy. Wait and retry.'})[response.status]||'Account service unavailable.');
     }
