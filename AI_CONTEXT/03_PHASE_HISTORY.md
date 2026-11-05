@@ -576,3 +576,6 @@ Native Odoo8073 and customer5449 previews were resumed from the same QA DB/files
 
 
 2026-10-26 — Controller-only pinned observation replay source: immutable dataset/provider/feed/instrument/symbol pin, closed-readonly reader, exact UTC-month indexed selection with unavailable-month refusal, separate log root and no synthesized financial profile. Eight focused cases and actual compact native-day128tick/cold-cache proof pass; full exclusive backend563tests/zero skips376.062s passes and cleans its own cluster. No Session/API/production mount or source/model admission; earlier compact/data proofs reused.
+
+
+2026-11-05 — One-day QA Parquet/DuckDB reader benchmark: five isolated sequential cases PASS for137,108groups/86completed simulated trades, with exact canonical/financial/event/receipt/final/resume parity and cold recovery/idempotency. Optional reader adapters preserve source positions and use the existing engine; independent finance uses canonical SQLite. One launcher-only repair and failed attempt retained. All services/timers stop after day1. Annual acceptance report unchanged; source rights UNKNOWN and execution eligibility NOT_GRANTED. No production format decision, multiworker, longer-range benchmark or public Beta. Report: docs/acceptance/CP6A-10-one-day-parquet-duckdb-report.md.

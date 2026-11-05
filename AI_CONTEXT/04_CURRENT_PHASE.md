@@ -1,4 +1,26 @@
-# Annual replay storage checkpoint — QA codec qualified, product budget BLOCKED (2026-10-30)
+# One-day Parquet/DuckDB benchmark — COMPLETE_PENDING_OWNER_REVIEW (2026-11-05)
+
+Latest bounded checkpoint: SQLite, PyArrow Single/Daily and DuckDB Single/Daily all PASS for137,108 XAUUSD groups on2024-01-02UTC, with86 completed simulated trades and identical canonical/financial/event/receipt/final/resume hashes. See `docs/acceptance/CP6A-10-one-day-parquet-duckdb-report.md` and evidence JSON. CP6A-10 annual independent recovery also PASS; its report SHA256 remains `cdc65e4c7fd7e65e85fac38726472c2ad92925c502afc2f08482a01b897fc831`. The original annual OOM incident and failed verifier attempts remain preserved.
+
+All one-day services/timers stopped after completion. No seven-day/month/year/concurrency benchmark is authorized. STOP pending new owner gate. Production, source and accepted financial standards unchanged. Source rights UNKNOWN; execution eligibility NOT_GRANTED. Parquet readers are QA-only projections with original position wires; canonical SQLite still supplies admission metadata and independent verification. No production format decision or Beta readiness claim.
+
+A bounded DuckDB launcher repair fixed optional dependency propagation to the cold child; failed attempt evidence is retained separately. Resource envelope1CPU/1GiB/swap0; minimum free disk~35.998GiB above32GiB threshold. Updated longer-range projections remain unmeasured and annual capacity/runtime NO-GO pending fresh preflight. Preserve the two intentionally untracked CP6A-8 reports and prior evidence.
+
+The chronological entries below are preserved historical observations; newer actual acceptance reports supersede stale runtime statements.
+
+---
+
+# CP6A-10 — shared-source week/month acceptance and annual preflight (2026-11-01)
+
+Latest accepted baseline is CP6A-9 at `de06464d725906d857afa628f688622fc21e5b34`; see `docs/acceptance/CP6A-9-shared-source-report.md` and evidence JSON. It passed one-day paired financial/source parity, 99.486% per-session timeline reduction, 52.363% paired QA artifact reduction, PostgreSQL 13/13, and additional regressions 80/80. Its ~5.56 GB annual estimate remains projection only. Source rights UNKNOWN; execution eligibility NOT_GRANTED.
+
+The owner's 2026-11-01 instruction authorizes the bounded week/month stages, then a fresh annual resource/source preflight and a full-year 2024 replay only if all prior gates pass. This supersedes the older annual-deferred scope below for this staged checkpoint alone; it does not waive any frozen source, causal, financial, or admission requirements. Preserve the untracked CP6A-8 inventory/report and all existing evidence.
+
+The defined QA-only annual schedule is `docs/acceptance/CP6A-10-annual-order-schedule.json`: decision slots 00/06/12/18 UTC, each based only on the current revealed quote, with stale/missing bases skipped; every timestamp group is still processed. The upper bound is 1,469 accepted orders for leap-year 2024, below the unchanged isolated QA 4,096 cumulative/128 active limits. Week and month bounds are 33 and 125. The runner implementation and durable staged supervisor are `backend/tests/qa_historical_day_v2.py` and `backend/tests/qa_shared_source_stages.py`.
+
+At status reconciliation, local and origin were equal at CP6A-9; only the two intentionally preserved untracked CP6A-8 files were present, and no QA replay process was active. The stage runner is now demonstrated active in transient user service `riksora-cp6a10-shared-source-20261101.service`, MainPID 3007737, with user linger `yes`, systemd parentage and CPUQuota=100%/MemoryMax=1GiB/MemorySwapMax=0/Restart=no/KillMode=control-group. Six schedule/shared-source integrity tests PASS. Current stage is the 7-day shared-source replay; no week result yet. Evidence root `/home/riksora/riksora-qa-evidence/cp6a10-shared-source-stages-20261101/`; `runner-state.json` records progress. Full-year resource gates: retain ≥30 GiB free disk, ≤1 CPU equivalent, ≤1 GiB RAM, ≤8 GiB QA artifacts, ≤72 hours; refresh the full source archive hash after week/month PASS. Month and year remain pending; year will not start unless the fresh preflight passes.
+
+# Historical: annual replay storage checkpoint — QA codec qualified, product budget BLOCKED (2026-10-30)
 
 Owner authorizes storage audit/compatible optimization and repeat10m→1h only; NO full-year run. Baseline389732b equals actual GitHub codex/beta-integration-20261028, clean0/0 before changes. Preserve canonical source, original logs, mandatory records, immutable logical identities and all financial/causal/admission contracts. Reserve remains30GiB. Product targets1vCPU-equivalent/1GiB additional RAM/500,000,000persistent bytes per user are acceptance targets, not falsely implemented production quotas.
 
