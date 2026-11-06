@@ -230,8 +230,24 @@ def work_one(dsn, runner):
             return False
         _reap_expired_leases(db)
         _expire_queued(db)
-        # Oldest head per actor first: one actor cannot consume both slots.
-        row = db.execute("SELECT * FROM btl.research_jobs j WHERE state='QUEUED' AND NOT EXISTS (SELECT 1 FROM btl.research_jobs p WHERE p.actor_id=j.actor_id AND p.state='QUEUED' AND (p.created_at,p.id)<(j.created_at,j.id)) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED").fetchone()
+        # Serve the least recently claimed actor's oldest queued job. Keep one
+        # visible queue head per actor so a busy user cannot jump its own turn.
+        row = db.execute("""
+            SELECT j.* FROM btl.research_jobs j
+            LEFT JOIN btl.research_queue_actor_turns t ON t.actor_id=j.actor_id
+            WHERE j.state='QUEUED'
+              AND NOT EXISTS (
+                  SELECT 1 FROM btl.research_jobs p
+                  WHERE p.actor_id=j.actor_id AND p.state='QUEUED'
+                    AND (p.created_at,p.id)<(j.created_at,j.id)
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM btl.research_jobs r
+                  WHERE r.actor_id=j.actor_id AND r.state='RUNNING'
+              )
+            ORDER BY t.last_claimed_at NULLS FIRST,j.created_at,j.id
+            LIMIT 1 FOR UPDATE OF j SKIP LOCKED
+        """).fetchone()
         if row is None:
             return False
         if not db.execute('SELECT clock_timestamp()<%s AS valid', (row['expires_at'],)).fetchone()['valid']:
@@ -247,6 +263,11 @@ def work_one(dsn, runner):
             WHERE id=%s AND state='QUEUED' RETURNING *
         """, (lease_owner, LEASE_SECONDS, row['id'])).fetchone()
         require(row is not None, 'jobClaim', 'RESOURCE_UNAVAILABLE')
+        db.execute("""
+            INSERT INTO btl.research_queue_actor_turns(actor_id,last_claimed_at)
+            VALUES (%s,clock_timestamp())
+            ON CONFLICT(actor_id) DO UPDATE SET last_claimed_at=EXCLUDED.last_claimed_at
+        """, (row['actor_id'],))
         if row['attempts'] == 1:
             queue_metrics_raw, queue_metrics_hash = _queue_wait_measurements(row['created_at'], row['heartbeat_at'])
             if queue_metrics_raw is not None:

@@ -78,6 +78,38 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'],cancel=True)['state'], 'CANCELLED')
         self.assertEqual(self.submit()['state'], 'QUEUED')
 
+    def test_claims_rotate_between_users_before_revisiting_backlog(self):
+        first = self.submit(args=('session:fair-a1', {'timeframe': '1m'}))
+        second = self.submit(args=('session:fair-a2', {'timeframe': '1m'}))
+
+        actor_b, headers_b = self.fixture.account()
+        workspace_b = self.fixture.client.post('/api/v1/workspaces', headers=headers_b,
+                                               json={'name': 'Fair queue QA'}).json()['id']
+        third_id = uuid.uuid4()
+        third = queue.submit(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b), third_id,
+                             'workspace', ('session:fair-b1', {'timeframe': '1m'}))
+
+        claimed = []
+
+        def runner(_dsn, actor_id, _workspace_id, _operation, args, **_options):
+            claimed.append((str(actor_id), args[0]))
+            return {'sessionId': args[0]}
+
+        for _ in range(3):
+            self.assertTrue(queue.work_one(self.dsn, runner))
+
+        self.assertEqual(claimed, [
+            (str(self.actor), 'session:fair-a1'),
+            (str(uuid.UUID(actor_b)), 'session:fair-b1'),
+            (str(self.actor), 'session:fair-a2'),
+        ])
+        self.assertEqual(queue.inspect(self.dsn, self.actor, self.workspace, first['jobId'])['state'],
+                         'SUCCEEDED')
+        self.assertEqual(queue.inspect(self.dsn, self.actor, self.workspace, second['jobId'])['state'],
+                         'SUCCEEDED')
+        self.assertEqual(queue.inspect(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b),
+                                       third['jobId'])['state'], 'SUCCEEDED')
+
     def test_worker_rollback_then_exact_result_recovery(self):
         job = self.submit()
         def crash(*args):
