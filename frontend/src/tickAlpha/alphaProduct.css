@@ -299,6 +299,9 @@
 .tick-alpha .rk-combo-backdrop{display:none}
 .tick-alpha .rk-combo-panel{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;min-width:260px;max-height:min(360px,60vh);display:flex;flex-direction:column;background:#fff;color:var(--rk-ink);border:2px solid #d9eafe;border-radius:20px;box-shadow:0 6px 0 #1378f5;overflow:hidden;animation:rk-pop var(--rk-mid) var(--rk-ease)}
 .tick-alpha .rk-combo-handle{display:none}
+.tick-alpha .rk-combo-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 12px 4px 18px;font-size:16px}
+.tick-alpha .rk-shell .rk-combo-close{min-height:44px;padding:0 16px;border-radius:999px;border:0;background:#eaf2fd;color:var(--rk-ink);font:800 14px var(--rk-font-ui,Inter,sans-serif);cursor:pointer}
+.tick-alpha .rk-combo-opt-text strong{overflow-wrap:anywhere}
 .tick-alpha .rk-combo-search{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:2px solid #eaf2fd;color:#5f6f87;font-size:18px}
 .tick-alpha .rk-shell .rk-combo-search input{flex:1;min-width:0;min-height:40px;border:0;background:transparent;color:var(--rk-ink);font:600 15px var(--rk-font-ui,Inter,sans-serif);outline:none;padding:0}
 .tick-alpha .rk-combo-search:focus-within{box-shadow:inset 0 -3px 0 #ffce55}
