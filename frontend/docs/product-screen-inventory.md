@@ -69,6 +69,9 @@ Cross-cutting shell pieces (all status **missing** today):
 | U13 | Method analytics | `GET /methods/{id}/analytics?instrument=&from=&to=` with pooled eligible N, wins, expectancyR, profitFactor, included/excluded Sessions with reasons | MISSING | none (no invented numbers) | "Method analytics is not published yet" plus per-Session links | No client averaging of win rates; no stitched equity |
 | U02 | Google sign-in and linking | OAuth provider routes + link-with-proof | MISSING on this branch | none | Google button disabled with reason | Never merge by email |
 | U14 | Plan / usage / checkout | entitlement + billing status | MISSING | none | "Plans are not live yet" | No payment form |
+| U07 | Exact start months per instrument (REQ-01) | `catalog.availability` {schemaVersion 1, instruments[{instrumentId,status,periods[{period,status,reason}]}]} | MISSING (only `startPeriod`) | browser fixture in `tests/qa/wizard-period-qa.cjs` only | "Earliest observed" or "Another month, checked by the server on Create"; no guessed maximum | Only listed AVAILABLE months selectable; see `docs/codex-api-requests.md` |
+| U07 | Instrument in POST /sessions | versioned `instrumentId` field + refusal code | MISSING (server pins the workspace profile) | none | Review says "pinned from this workspace's server profile" | Needed before a second instrument is offered |
+| U09 | Drawings/indicators on other devices (B08) | server storage + compare-and-swap contract | MISSING | none | "Saved in this browser only" in object tree, Draw sheet, indicator studio | Revision-checked save, conflict state |
 
 ## 4. Checkpoint order
 
@@ -107,3 +110,17 @@ Routes actually shipped use `?screen=` (not `?page=`, which stays the account/ho
 Fixture-only: `tests/qa/product-qa.cjs` mocks `/auth/*` and `/workspaces` in the browser (labelled in the file) and forwards research calls to the local synthetic API. The app itself ships no fixtures.
 
 Rollback: revert the CP1 commit on `claude/product-frontend-v1`; no backend, dataset or deployment changes are involved.
+
+
+## Remediation status (founder instructions 2026-11-06)
+
+| Screen | Now | Commit |
+|---|---|---|
+| U01 Landing | "What works today" (Available / Not yet), hero says start month, no "months in an evening" claim. Terms/Privacy pages still missing. | efd3dbe |
+| U06 Data Catalog | Server-confirmed instrument only; unchanged | dc29979 |
+| U07 New Session wizard | Start months never guessed from a range; refusal returns to Period; 409 keeps choices and the creation id | cc67d19 |
+| U10 Draft → Review → Confirm | Phone confirm sheet (REVIEW_EXACT, COMMIT_PENDING lock, stale, refused), Pick-from-chart mini ticket | 870bd20 (#36), merged fd9a5ce |
+| U11 Journal page | Drafts kept per tab, leave guard (picker, sidebar, Back, tab close), stale-revision compare and explicit replace | e25a691 |
+| U14 Account | Local Account page from the catalog; account panel lists sign-in methods (email + password only) | efd3dbe |
+| U15 Help / status | Getting started, Service status (connection + data label), capability list | efd3dbe |
+| Shared | SearchableSelect skips disabled options, modal phone sheet; one semantic token layer with a terminal bridge | 5138b35, 6985334 |
