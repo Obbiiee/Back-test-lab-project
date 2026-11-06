@@ -648,3 +648,71 @@ Synchronization should be idempotent, auditable, retryable and tolerant of tempo
 **Payment collects money. Billing records commerce. Entitlements control product access. Odoo operates the back office. Backtest Lab research engines produce evidence.**
 
 Use Odoo aggressively where it saves commodity business-development work, but preserve replaceable integration boundaries around the unique Backtest Lab product.
+
+
+## 21. RIKSORA Lean Execution & Unit-Economics Architecture — 2026-11-06
+
+> **Status:** Owner-selected **planning direction** for a complete low-cost execution platform, consolidated here instead of creating a competing architecture file. **Not a production freeze, merge, deploy, schema migration, source license, or benchmark authorization.** \`AGENTS.md\`, frozen decisions, current-phase gates and the financial/data source contracts remain superior. Reviews of [Claude's PR #42](https://github.com/Obbiiee/Back-test-lab-project/pull/42) and Codex CP6A evidence inform this section. Items marked **RESEARCH/HOLD** are NOT adopted implementations.
+
+### 21.1 Product architecture to build as one coherent backend
+
+\`\`\`text
+Authenticated trader -> FastAPI modular API
+   -> cheap read path (Session, chart, journal, job status)
+   -> per-workspace admission -> PostgreSQL bounded durable research_jobs queue
+   -> one replaceable QA worker initially (lease/heartbeat/recovery, per-Session ordering)
+   -> immutable version-pinned Monthly Parquet market-data provider
+      -> selectable DuckDB range/analytics and PyArrow bounded-batch adapters
+      -> optional Arrow/NumPy trigger scanner [RESEARCH; exactness not assumed]
+      -> existing causal controller + exact deterministic reducer [SOLE FINANCIAL AUTHORITY]
+   -> atomic PostgreSQL command/receipt/event/current-state/checkpoint commit
+   -> paginated journal/trade read models, observable job/usage meters
+\`\`\`
+
+- **Keep:** existing React/Vite/Lightweight Charts, FastAPI, PostgreSQL, exact tick-native reducer and Bid/Ask, atomic timestamp groups, no look-ahead, quality/gap/UNRESOLVED gates, immutable ledger and identical idempotent confirm outcomes. Avoid replacing engine or adding Redis/Celery/Kubernetes/Rust/extra databases without demonstrated need.
+- **Reuse:** existing \`btl.research_jobs\` and migration 008/009 queue schema as starting point; do not create a second incompatible queue. Lease/claim, bounded backlog, expiration, per-tenant fairness, progress/status, safe cancel and recovery must be added/validated. Financial effects are committed exactly once by durable dedup, despite at-least-once job delivery. Read-only journal/status requests do not wait for heavy replay jobs.
+- **One source, multiple readers:** immutable **Monthly Parquet** under provider/feed/instrument/version/year/month is the owner-selected experiment layout, **not a production-performance winner**. The owner's requested DuckDB monthly read path can coexist with PyArrow/NumPy on the SAME Parquet files, without duplicated market data. Choose the operator based on workload and measurements, not library labels. No new history download/convert/publish for a source without the required rights/admission.
+- **Parquet correctness contract:** preserve full precision, quality/diagnostics, source ordinal and original ordering TRUST; do not sort an untrusted provider order into a trusted one. Version manifest binds source, coverage, rights, file hashes, row-group bounds, encoding, schema, timezone and price scale. Stable tick identity and forensic proofs remain compatible with frozen canonical event IDs until an independently accepted migration. A row-group hash alone is NOT proven a drop-in replacement for per-event semantics.
+- **Parquet performance candidate:** start with ZSTD and integer bid/ask/ts plus validated group statistics; ~128k row-group records is an *initial hypothesis*, not a universal optimum. Read bounded ranges with explicit timestamp + ordinal ordering, preserve equal-time groups across batch/month boundaries, never materialize a whole month per Session.
+- **Vectorized fast path [RESEARCH/HOLD]:** index first potentially state-changing trigger, source-quality issue, gap, diagnostic or ambiguous tie; preserve all mandatory chain/evidence effects. Process every candidate boundary via existing controller/reducer, fall back to normal chronological evaluation whenever the no-change proof is incomplete. No fast path may skip events solely because prices do not touch SL/TP. Identical canonical events, receipts, finance, cursor and cold recovery are acceptance requirements; 0.04 s synthetic scanner or any thousands-fold speedup is NOT a RIKSORA SLA.
+- **Data for chart:** derive shared candle tiles once per pinned dataset; serve only the Session-authorized revealed prefix. Do not publish future candles, raw quotes, complete historical day files or unrestricted CDN URLs simply because the date is in the past. Check data redistribution/display rights independently.
+- **Storage:** keep immutable command+event identity, existing durable financial commits and source pins. Pursue **versioned compact receipts/deltas + indexed recovery checkpoints + current projection**, reusing CP6A-5 QA-v3 evidence; retain exact retry response, reconstructible fork-at-revision, corruption detection, bounded cold recovery, and dual-read legacy compatibility. No arbitrary deletion of old checkpoints or fixed every-50-command policy without proof. Journal/trades become paginated derived read models (never an alternative financial authority); remove 32-order/128-order product caps only through a bounded compatibility design.
+- **One product backend candidate:** reconcile PR #41 and Claude PR #39 contracts and the appropriate existing beta candidate by pinned diff and dependency plan, rather than merging incompatible branches blindly. Add minimal CI and reproducible deploy process. Frontend Claude owns UI; backend Codex owns finance/data/queue/runtime. Source licenses remain an independent release gate.
+
+### 21.2 Build complete pipeline first, measure real economics afterward
+
+Build through small reversible code commits with local checks and relevant golden regression tests, **not** a giant untested code drop. Defer exhaustive reader sweeps and user-capacity benchmarking until the complete synthetic QA pipeline is integrated. No new heavy benchmark on the current development host until its resource preflight passes.
+
+Record cost units during normal operations:
+- CPU seconds, wall time, number of source groups, worker busy/idle, actual RAM peak and cache residency;
+- read bytes versus disk-device I/O, row groups touched, temporary spill, per-Session queue waiting p50/p95/p99 and cancellation;
+- PostgreSQL command bytes, event bytes, receipt bytes, checkpoint and WAL/index delta, journal/trade incremental bytes, backup/restore overhead;
+- admitted, queued, running and completed virtual traders **separately**. Scenario mixes (light/medium/heavy) are assumptions until measured.
+
+**Hardware normalization (owner-selected):** 6 vCPU : 16 GB RAM : 200 GB SSD nominal; 1-vCPU proportional planning slice = 2.667 GB nominal RAM and 33.333 GB nominal SSD, not a physical per-worker reservation. Actual GiB, OS/DB overhead and measured p95 latency constrain usable capacity. Prefer one isolated worker for the first complete-system experiment; subsequent 2/4/6-worker tests require distinct resource and correctness gates. Do not infer 100 concurrently computing users from 100 accepted queue entries.
+
+**Observed RIKSORA evidence, not extrapolated benchmarks:**
+- CP6A-10: 298,662 groups and 108 completed trades, five candidates PASS; PyArrow Single 1,330.3 s wall versus DuckDB Single 1,502.7 s and DuckDB Daily 1,548.4 s in this **two-day** run. Monthly has not been tested.
+- CP6A-9: shared canonical source reduced per-Session timeline allocation 84,520,960 -> 434,176 bytes (~99.49%) on the bounded one-day workload; exact limitations and parity are in its report.
+- CP6A-5: isolated compact QA-v3 PostgreSQL growth 7,741,440 -> 3,858,432 bytes (~50.16%) on a 513-command/256-order scenario, with recovery and relevant financial regressions. This does NOT certify a production schema.
+- HFTBacktest public *Accelerated Backtesting* documents ~109 s full versus 0.416 s accelerated, but acknowledges changed fill/latency semantics. It **cannot** establish exact-event parity for RIKSORA.
+- DuckDB's public Parquet row-group microbenchmark reports 8.77 s at row-group 960 versus 0.87 s at 122,880 on an aggregation workload. It is a size-selection clue, not a monthly tick replay benchmark.
+
+### 21.3 Review decisions still required — do not silently adopt
+
+1. **Canonical identity:** replacing the existing per-event canonical commitment with only \`(file, row)\` + hash of a row group is **NEEDS-CHANGE** pending a proof of unchanged semantic identities, original ordinal/trust, auditability, cold/fork/recovery and data migration. Keep canonical identity unless independently proved equivalent and owner-approved.
+2. **Fast path:** large performance wins are plausible, but hftbacktest's accelerated example loses some fidelity. Adopt only an *optional exactly-equivalent proof-gated* scanner with fallback until representative RIKSORA parity and end-to-end CPU gains are measured; do not market 260×/40,000× as measured RIKSORA performance.
+3. **Storage policy:** compact QA-v3 is promising; neither checkpoint pruning nor short command receipts may alter immutable recoverability or identical durable retry responses. Select cadence and delta/index policy by bounded restore/fork measurements, not a fixed N.
+4. **Rights/public distribution:** commercial and even free beta access to data is separate from an internal owner decision. Keep \`UNKNOWN/NOT_GRANTED\` until a sufficient data-source agreement/rights review supports the actual uses; do not make unlicensed files globally cacheable. Public price assets require a deliberate legal/repository cleanup plan, not automatic history rewrite.
+5. **Scaling/claims:** one-core/100-user synthetic acceptance and RAM <85% do not alone prove comfortable SaaS capacity. Set queue depth, per-user fairness, p95 request and queue-wait targets, recovery and error budgets and then measure the entire pipeline.
+
+**Review references:**
+- [Claude architecture/cost audit PR #42](https://github.com/Obbiiee/Back-test-lab-project/pull/42)
+- [Compact storage QA CP6A-5](https://github.com/Obbiiee/Back-test-lab-project/blob/codex/parquet-one-day-duckdb-20261105/docs/CP6A5_COMPACT_STORAGE_PERFORMANCE_2026-10-31.md)
+- [Shared-source QA CP6A-9](https://github.com/Obbiiee/Back-test-lab-project/blob/codex/parquet-one-day-duckdb-20261105/docs/acceptance/CP6A-9-shared-source-report.md)
+- [DuckDB Parquet performance/row-group benchmark](https://duckdb.org/docs/current/guides/performance/file_formats)
+- [HFTBacktest accelerated versus full comparison](https://hftbacktest.readthedocs.io/en/latest/tutorials/Accelerated%20Backtesting.html)
+- [Parquet on-disk checksums/specification](https://github.com/apache/parquet-format)
+- [RFC 6962 Merkle inclusion and consistency proofs](https://www.rfc-editor.org/rfc/rfc6962)
+- [PostgreSQL \`SKIP LOCKED\` queue semantics](https://www.postgresql.org/docs/current/sql-select.html)
+- [Dukascopy terms of use](https://www.dukascopy.com/swiss/english/legal-pages/terms-of-use/)
