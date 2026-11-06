@@ -52,6 +52,8 @@ This verifies the synthetic in-process API worker lifecycle and bounded child cl
 
 The full `tests.test_research_queue` PostgreSQL suite was then rerun on its own temporary PostgreSQL 16 cluster and passed 18/18 in 104.567 s. This includes worker lease/heartbeat and cancellation, actor fairness, bounded admission, process-death recovery, replay receipt idempotency, both two-tenant and actual-lifespan Monthly Parquet journeys, and the new source-pinned lifespan journey. The cluster was stopped and removed. `tests.test_worker_deadline` separately passed 17/17 in 4.788 s.
 
+The following PostgreSQL-backed component regressions then passed together, 38/38 in 21.094 s on a separate temporary PostgreSQL 16 cluster: compact/recovery storage, canonical Journal cursor pagination, bounded per-Session storage metering, Google identity and workspace authorization fixtures, and the P0 availability/receipt-confirm integration. The Google OIDC tests use signed/authored fixtures and mocked provider traffic; they do not prove live Google credentials, SMTP delivery, or hosted-provider operations. The cluster was stopped and removed.
+
 This demonstrates a connected synthetic service path. It does not prove historical source eligibility, source rights, production deployment, VPS reboot recovery, or concurrency capacity.
 
 ## Interpretation and limits
