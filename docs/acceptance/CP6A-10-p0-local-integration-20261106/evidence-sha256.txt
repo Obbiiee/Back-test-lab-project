@@ -1,0 +1,6 @@
+7b153d856c6d4461c88e7af0e6ed5e6b18cbf73dc885340e47c4e255358f051c  screenshots/a-saved-refresh-failed-390.png
+033dfc9210d88c748d3b429ab3f727a767d564a2ea102044302e3a2b096343fe  screenshots/c-refused-409-1280.png
+f365ba3226ec9005f111c6caab4f1227ac0ae753248eca6a03e1d1090f918a9b  screenshots/d-banner-390.png
+a13d7ffd948ca86a070c90909de37fe67fe75a1bbfd023d8033e7e6524fdc3c2  screenshots/d-unknown-390.png
+3b95053b9f6cdd45a8c69143aefbb7dcbbd4613e77ebc95cb5f0be8d43db545d  screenshots/g-reconciled-refused-1280.png
+b27c4e318af3ea7e94a35185654c5c2f2cb0f039b744080d5c3583591c33392c  screenshots/h-planned-trade-journal-1280.png

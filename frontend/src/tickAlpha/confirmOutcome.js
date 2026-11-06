@@ -7,13 +7,13 @@
 //   STALE      a definitive refusal because the Session or review changed.
 //   UNKNOWN    anything else: lost response, timeout, 5xx, unreadable body, an
 //              unexpected 200 body. The order may or may not be saved.
-// UNKNOWN is resolved only by reading the saved Session (read-only GET), never by
-// sending the confirmation again or creating a new review on the user's behalf.
+// UNKNOWN is resolved only by reading the durable command result (read-only GET),
+// never by sending the confirmation again or creating a new review on the user's behalf.
 //
-// HOLD: CODEX RECEIPT INSPECTION. There is no receipt endpoint. reconcile() reads
-// GET /sessions/{id} and relies on current backend behaviour (order id = commandId,
-// engine.py; commands apply only at their expectedRevision, postgres.py). See
-// docs/codex-api-requests.md REQ-02.
+// The local API publishes GET /sessions/{id}/commands/{commandId}. The backend
+// returns COMMITTED only from the immutable transactional command receipt,
+// NOT_COMMITTED only after the reviewed expected revision has been superseded,
+// and UNKNOWN while neither fact is durable.
 
 // Statuses the services return after a decision, never for a half-applied command:
 // 400/422 validation, 401/403 auth, 404 missing review/session, 409 contract refusal
@@ -23,7 +23,7 @@ const DEFINITIVE=new Set([400,401,403,404,409,413,415,422]);
 const NOT_ADMITTED=/^(LOCAL_BUSY|RATE_LIMITED)$/;
 const STALE=/STALE|REVISION|REVIEW_EXPIRED|REFUSED_REVIEW|saved record changed/i;
 
-export const UNKNOWN_TEXT='Could not verify whether the order was saved; checking Session status.';
+export const UNKNOWN_TEXT='Could not verify whether the order was saved; checking its durable command receipt.';
 
 export function classifyConfirmError(error){
   const code=String(error?.message??'');
@@ -38,14 +38,24 @@ export function committedReceipt(result,commandId){
   return result?.artifact==='BTL-TICK-EXECUTION-RESULT-1'&&result.commandId===commandId&&result.durable===true;
 }
 
-// Read-only check of a saved Session for an unverified confirmation.
-//   COMMITTED  the order exists (its id is the reviewed commandId).
-//   REFUSED    absent and the Session moved past the reviewed revision, so this
-//              command can no longer apply.
-//   UNKNOWN    absent at the same revision: it may still be in flight.
-export function reconcile(saved,{commandId,expectedRevision}){
-  const state=saved?.state;
-  if(!state||typeof state.revision!=='number'||typeof state.orders!=='object'||state.orders===null)return 'UNKNOWN';
-  if(Object.hasOwn(state.orders,commandId))return 'COMMITTED';
-  return state.revision>expectedRevision?'REFUSED':'UNKNOWN';
+// A status response is trusted only when it names this exact Session, command,
+// and review. An absent receipt without revision proof remains UNKNOWN.
+export function classifyCommandResult(result,pending){
+  if(result?.schemaVersion!==1||result?.artifact!=='BTL-TICK-COMMAND-STATUS-1'||
+     result.sessionId!==pending.sessionId||result.commandId!==pending.commandId||
+     result.reviewHash!==pending.reviewHash)return {outcome:'UNKNOWN',code:'UNBOUND_COMMAND_STATUS'};
+  if(result.status==='COMMITTED'){
+    const receipt=result.receipt;
+    if(committedReceipt(receipt,pending.commandId)&&/^[0-9a-f]{64}$/.test(receipt.commandHash||'')&&
+       receipt.state?.sessionId===pending.sessionId&&receipt.state.revision===pending.expectedRevision+1&&
+       Number.isInteger(result.currentRevision)&&receipt.state.revision<=result.currentRevision)
+      return {outcome:'COMMITTED',code:'DURABLE_RECEIPT'};
+    return {outcome:'UNKNOWN',code:'INVALID_DURABLE_RECEIPT'};
+  }
+  if(result.status==='NOT_COMMITTED'&&result.reason==='SESSION_REVISION_ADVANCED'&&
+     result.expectedRevision===pending.expectedRevision&&Number.isInteger(result.currentRevision)&&
+     result.currentRevision>pending.expectedRevision)
+    return {outcome:'REFUSED',code:'SESSION_REVISION_ADVANCED'};
+  if(result.status==='UNKNOWN')return {outcome:'UNKNOWN',code:result.reason||'UNRESOLVED'};
+  return {outcome:'UNKNOWN',code:'UNKNOWN_COMMAND_STATUS'};
 }
