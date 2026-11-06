@@ -24,6 +24,7 @@ from application.models import TrustedScope
 from execution.research_fixture import research_provider
 from market_data.monthly_parquet import write_monthly_parquet
 from contracts.canonical import content_hash
+from infrastructure.postgres_metrics import collect_job_metrics
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
@@ -275,14 +276,19 @@ class QueueTests(unittest.TestCase):
                     self.assertEqual(created.status_code, 200, created.text)
                     self.assertEqual(created.json()['state'], 'SUCCEEDED')
                     with connect(self.dsn) as db:
-                        row = db.execute('SELECT worker_metrics,worker_metrics_hash FROM btl.research_jobs WHERE id=%s',
+                        row = db.execute('SELECT queue_metrics,queue_metrics_hash,worker_metrics,worker_metrics_hash FROM btl.research_jobs WHERE id=%s',
                                          (uuid.UUID(create_job),)).fetchone()
-                    measurements = json.loads(bytes(row[0]))
-                    self.assertEqual(content_hash(measurements), row[1])
+                    queue_measurements = json.loads(bytes(row[0]))
+                    self.assertEqual(content_hash(queue_measurements), row[1])
+                    measurements = json.loads(bytes(row[2]))
+                    self.assertEqual(content_hash(measurements), row[3])
                     self.assertEqual(measurements['artifact'], 'BTL-NATIVE-WORKER-METRICS-1')
                     self.assertGreater(measurements['wallNs'], 0)
                     self.assertGreater(measurements['cpuNs'], 0)
                     self.assertGreater(measurements['processPeakRssBytes'], 0)
+                    distributions = collect_job_metrics(self.dsn)
+                    self.assertGreaterEqual(distributions['queueWaitMicroseconds']['sampleCount'], 1)
+                    self.assertGreaterEqual(distributions['worker']['cpuNs']['sampleCount'], 1)
                     view = self.fixture.client.get(path + '/sessions/' + session_id,
                         headers=self.fixture.headers)
                     self.assertEqual(view.status_code, 200, view.text)

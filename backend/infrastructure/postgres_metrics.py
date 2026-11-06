@@ -4,15 +4,19 @@ Database/relation allocation is scoped to the current database; WAL counters
 are server-global. Neither is per-Session storage or per-job WAL attribution.
 """
 from datetime import datetime, timezone
+import json
+from math import ceil
 
 from psycopg import Error as PsycopgError
 from psycopg.rows import dict_row
 
+from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require
 from .database import connect
 
 
 ARTIFACT = "BTL-POSTGRES-CAPACITY-METRICS-1"
+JOB_METRICS_ARTIFACT = "BTL-OPERATIONAL-JOB-METRICS-1"
 
 
 def _timestamp(value):
@@ -80,6 +84,114 @@ def collect(dsn):
         "allocationNote": "databaseBytes covers the current database; relation sizes cover PostgreSQL table/TOAST/index allocation for each btl relation",
         "walNote": "wal_generated_bytes is a cumulative server counter since stats reset, not retained pg_wal disk allocation or per-job attribution",
     }
+
+
+def _decode_job_metric(raw, digest, artifact):
+    if raw is None:
+        require(digest is None, "jobMetrics", "CORRUPT_RECORD")
+        return None
+    require(digest is not None, "jobMetrics", "CORRUPT_RECORD")
+    try:
+        payload = json.loads(bytes(raw))
+    except (TypeError, ValueError, UnicodeError):
+        require(False, "jobMetrics", "CORRUPT_RECORD")
+    require(type(payload) is dict and payload.get("artifact") == artifact and
+            canonical_bytes(payload) == bytes(raw) and content_hash(payload) == digest,
+            "jobMetrics", "CORRUPT_RECORD")
+    return payload
+
+
+def _distribution(values):
+    if not values:
+        return {"sampleCount": 0, "percentileMethod": "NEAREST_RANK",
+                "minimum": None, "p50": None, "p95": None, "maximum": None}
+    ordered = sorted(values)
+    percentile = lambda fraction: ordered[max(0, ceil(fraction * len(ordered)) - 1)]
+    return {
+        "sampleCount": len(ordered),
+        "percentileMethod": "NEAREST_RANK",
+        "minimum": ordered[0],
+        "p50": percentile(.50),
+        "p95": percentile(.95),
+        "maximum": ordered[-1],
+    }
+
+
+def summarize_job_metric_rows(rows, sample_limit):
+    """Verify and summarize a bounded row set; omit all actor/session identity."""
+    require(type(sample_limit) is int and 1 <= sample_limit <= 1000 and
+            type(rows) is list and len(rows) <= sample_limit, "jobMetrics", "CORRUPT_RECORD")
+    queue_waits = []
+    worker_fields = {
+        "wallNs": [], "cpuNs": [], "processPeakRssBytes": [],
+        "readBytesDelta": [], "writeBytesDelta": [],
+        "readSyscallsDelta": [], "writeSyscallsDelta": [],
+    }
+    states = {}
+    for row in rows:
+        require(type(row) is dict and set(row) == {
+            "state", "queue_metrics", "queue_metrics_hash", "worker_metrics", "worker_metrics_hash"
+        }, "jobMetrics", "CORRUPT_RECORD")
+        states[row["state"]] = states.get(row["state"], 0) + 1
+        queue_metric = _decode_job_metric(row["queue_metrics"], row["queue_metrics_hash"],
+                                          "BTL-QUEUE-WAIT-METRICS-1")
+        if queue_metric is not None:
+            require(set(queue_metric) == {"schemaVersion", "artifact", "measurementScope", "clock",
+                                          "waitMicroseconds"} and queue_metric["schemaVersion"] == 1 and
+                    queue_metric["measurementScope"] == "FIRST_DURABLE_ADMISSION_TO_FIRST_WORKER_CLAIM" and
+                    queue_metric["clock"] == "POSTGRESQL_CLOCK_TIMESTAMP_MICROSECOND" and
+                    type(queue_metric["waitMicroseconds"]) is int and queue_metric["waitMicroseconds"] >= 0,
+                    "jobMetrics", "CORRUPT_RECORD")
+            queue_waits.append(queue_metric["waitMicroseconds"])
+
+        worker_metric = _decode_job_metric(row["worker_metrics"], row["worker_metrics_hash"],
+                                           "BTL-NATIVE-WORKER-METRICS-1")
+        if worker_metric is not None:
+            expected = {"schemaVersion", "artifact", "measurementScope", *worker_fields}
+            require(set(worker_metric) == expected and worker_metric["schemaVersion"] == 1 and
+                    worker_metric["measurementScope"] == "ONE_JOB_CPU_IO_PROCESS_LIFETIME_RSS_HIGH_WATER",
+                    "jobMetrics", "CORRUPT_RECORD")
+            require(all(type(worker_metric[name]) is int and worker_metric[name] >= 0
+                        for name in ("wallNs", "cpuNs")), "jobMetrics", "CORRUPT_RECORD")
+            for name, values in worker_fields.items():
+                value = worker_metric[name]
+                require(value is None or (type(value) is int and value >= 0),
+                        "jobMetrics", "CORRUPT_RECORD")
+                if value is not None:
+                    values.append(value)
+
+    return {
+        "schemaVersion": 1,
+        "artifact": JOB_METRICS_ARTIFACT,
+        "measurementScope": "RECENT_RETAINED_OPERATIONAL_JOBS",
+        "sampleLimit": sample_limit,
+        "sampledJobs": len(rows),
+        "sampledJobStates": states,
+        "queueWaitMicroseconds": _distribution(queue_waits),
+        "worker": {name: _distribution(values) for name, values in worker_fields.items()},
+        "attribution": "PER_JOB_PROCESS_METRICS_AND_FIRST_CLAIM_WAIT_ONLY",
+        "postgresProcessCpuAndWAL": "NOT_ATTRIBUTED_TO_JOBS",
+    }
+
+
+def collect_job_metrics(dsn, sample_limit=128):
+    """Read and verify recent stored job metrics using a hard SQL row limit."""
+    require(type(sample_limit) is int and 1 <= sample_limit <= 1000,
+            "jobMetrics", "INVALID_INPUT")
+    with connect(dsn) as db:
+        db.row_factory = dict_row
+        db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        measured_at = db.execute("SELECT clock_timestamp()").fetchone()["clock_timestamp"]
+        rows = db.execute("""
+            SELECT state,queue_metrics,queue_metrics_hash,worker_metrics,worker_metrics_hash
+            FROM btl.research_jobs
+            WHERE queue_metrics IS NOT NULL OR worker_metrics IS NOT NULL
+            ORDER BY created_at DESC,id DESC
+            LIMIT %s
+        """, (sample_limit,)).fetchall()
+    report = summarize_job_metric_rows(rows, sample_limit)
+    report["measuredAt"] = _timestamp(measured_at)
+    return report
 
 
 def compare(before, after):
@@ -165,4 +277,5 @@ def compare(before, after):
         "retainedWalFileBytesDelta": None,
         "perSessionWalBytesDelta": None,
         "attribution": "CURRENT_DATABASE_AND_SERVER_WAL_GLOBAL_ONLY",
+        "currentOperationalJobMetrics": after.get("operationalJobMetrics"),
     }
