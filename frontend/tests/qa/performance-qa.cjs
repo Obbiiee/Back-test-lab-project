@@ -133,6 +133,29 @@ const COUNTS = { 'parallel-channel': 3, 'fib-extension': 3, pitchfork: 3, 'xabcd
     await p.context().close();
   }
 
+  // C-14 mobile gate (record only, no pass threshold): the same 45k candles + 100 drawings +
+  // 16 indicators reloaded at 390×844 with 4× CPU throttling. JS heap is measured after a
+  // forced GC through CDP; there is no real low-memory device in this container.
+  if (process.env.PERF_PHONE) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const phoneStart = Date.now();
+    await page.reload(); await contextLoaded(); await sleep(1500);
+    metrics.phoneLoadMs = Date.now() - phoneStart;
+    metrics.phoneHeapAfterLoadMB = Number((await heap()).toFixed(1));
+    const pbox = await page.locator('.candle-chart canvas').first().boundingBox();
+    await page.evaluate(() => { window.__frames = []; let last = performance.now(); const tick = now => { window.__frames.push(now - last); last = now; window.__raf = requestAnimationFrame(tick); }; window.__raf = requestAnimationFrame(tick); });
+    await page.mouse.move(pbox.x + pbox.width * .6, pbox.y + pbox.height * .5); await page.mouse.down();
+    for (let i = 0; i < 30; i++) await page.mouse.move(pbox.x + pbox.width * .6 - i * 5, pbox.y + pbox.height * .5);
+    await page.mouse.up(); await sleep(300);
+    const pt = await page.evaluate(() => { cancelAnimationFrame(window.__raf); const f = window.__frames.slice(2).sort((a, b) => a - b); return { p50: f[Math.floor(f.length * .5)], p95: f[Math.floor(f.length * .95)], max: f.at(-1) }; });
+    Object.assign(metrics, { phoneFrameP50ms: Number(pt.p50.toFixed(1)), phoneFrameP95ms: Number(pt.p95.toFixed(1)), phoneFrameMaxMs: Number(pt.max.toFixed(1)) });
+    metrics.phoneHeapAfterPanMB = Number((await heap()).toFixed(1));
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await page.screenshot({ path: `${out}/03-phone-390-cpu4x.png` });
+    step('Phone 390×844 at 4× CPU (record only)', `load ${metrics.phoneLoadMs} ms · heap ${metrics.phoneHeapAfterLoadMB} → ${metrics.phoneHeapAfterPanMB} MB · pan frame p50 ${metrics.phoneFrameP50ms} / p95 ${metrics.phoneFrameP95ms} / max ${metrics.phoneFrameMaxMs} ms`);
+  }
+
   assert.deepEqual(errors, [], 'No page errors');
   fs.writeFileSync(`${out}/results.json`, JSON.stringify({ metrics, results, errors }, null, 2));
   await browser.close();

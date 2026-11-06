@@ -63,6 +63,8 @@
     "frontend/src/tickAlpha/AlphaHelp.jsx",
     "frontend/src/tickAlpha/AlphaSessionPages.jsx",
     "frontend/src/tickAlpha/AlphaJournalPage.jsx",
+    "frontend/src/tickAlpha/AlphaReviewSheet.jsx",
+    "frontend/src/tickAlpha/AlphaPickTicket.jsx",
     "frontend/src/tickAlpha/orderEstimate.js",
     "frontend/src/tickAlpha/AlphaEquityChart.jsx",
     "frontend/src/assets/riksora-mark.png",
