@@ -1,0 +1,59 @@
+{
+  "metrics": {
+    "candles": 45152,
+    "historyPages": 89,
+    "loadMs": 2378,
+    "heapAfterLoadMB": 482.2,
+    "hoverMovesPerSec": 50,
+    "frameP50ms": 16.7,
+    "frameP95ms": 16.8,
+    "frameMaxMs": 349.9,
+    "longTasks": 0,
+    "longTaskMaxMs": 0,
+    "heapAfterInteractionMB": 483,
+    "selectMs": 253
+  },
+  "results": [
+    {
+      "name": "45152 candles + 100 drawings + 16 indicators loaded",
+      "detail": "2378 ms incl. 89 API pages, heap 482.2 MB"
+    },
+    {
+      "name": "Pan, zoom and hover stay responsive",
+      "detail": "frame p50 16.7 ms · p95 16.8 ms · max 349.9 ms · long tasks 0 (max 0 ms) · hover 50 moves/s"
+    },
+    {
+      "name": "Select among 100 drawings",
+      "detail": "253 ms incl. 100 ms settle"
+    },
+    {
+      "name": "Viewport 320: no overflow, chart 198×290, tools reachable",
+      "detail": ""
+    },
+    {
+      "name": "Viewport 375: no overflow, chart 252×290, tools reachable",
+      "detail": ""
+    },
+    {
+      "name": "Viewport 390: no overflow, chart 268×290, tools reachable",
+      "detail": ""
+    },
+    {
+      "name": "Viewport 390-landscape: no overflow, chart 718×158, tools reachable",
+      "detail": ""
+    },
+    {
+      "name": "Viewport 768: no overflow, chart 642×758, tools reachable",
+      "detail": ""
+    },
+    {
+      "name": "Viewport 1024: no overflow, chart 898×534, tools reachable",
+      "detail": ""
+    },
+    {
+      "name": "Viewport 1440: no overflow, chart 1314×666, tools reachable",
+      "detail": ""
+    }
+  ],
+  "errors": []
+}

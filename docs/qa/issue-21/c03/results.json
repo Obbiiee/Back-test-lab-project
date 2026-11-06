@@ -1,0 +1,105 @@
+{
+  "results": [
+    {
+      "name": "Extended Line drawn",
+      "detail": "2 anchors"
+    },
+    {
+      "name": "Horizontal Ray drawn",
+      "detail": "1 anchors"
+    },
+    {
+      "name": "Cross Line drawn",
+      "detail": "1 anchors"
+    },
+    {
+      "name": "Parallel Channel drawn",
+      "detail": "3 anchors"
+    },
+    {
+      "name": "Regression Trend drawn",
+      "detail": "2 anchors"
+    },
+    {
+      "name": "Fibonacci Extension drawn",
+      "detail": "3 anchors"
+    },
+    {
+      "name": "Fibonacci Channel drawn",
+      "detail": "3 anchors"
+    },
+    {
+      "name": "Rotated Rectangle drawn",
+      "detail": "3 anchors"
+    },
+    {
+      "name": "Ellipse drawn",
+      "detail": "2 anchors"
+    },
+    {
+      "name": "Polyline drawn",
+      "detail": "4 anchors"
+    },
+    {
+      "name": "Brush drawn",
+      "detail": "26 anchors"
+    },
+    {
+      "name": "Highlighter drawn",
+      "detail": "26 anchors"
+    },
+    {
+      "name": "Anchored Text drawn",
+      "detail": "1 anchors"
+    },
+    {
+      "name": "Callout drawn",
+      "detail": "2 anchors"
+    },
+    {
+      "name": "Price Range drawn",
+      "detail": "2 anchors"
+    },
+    {
+      "name": "Date Range drawn",
+      "detail": "2 anchors"
+    },
+    {
+      "name": "All 16 professional tools on one chart",
+      "detail": ""
+    },
+    {
+      "name": "Regression Trend: band deviation and fill applied",
+      "detail": ""
+    },
+    {
+      "name": "Fibonacci Extension: level 1.272 shown",
+      "detail": ""
+    },
+    {
+      "name": "Polyline: node inserted from Properties",
+      "detail": ""
+    },
+    {
+      "name": "Callout: bold + 16 px",
+      "detail": ""
+    },
+    {
+      "name": "Polyline keyboard: Backspace removes node, Enter finishes",
+      "detail": ""
+    },
+    {
+      "name": "Escape cancels an unfinished channel",
+      "detail": ""
+    },
+    {
+      "name": "Reload restores all professional drawings",
+      "detail": "17 drawings"
+    },
+    {
+      "name": "Phone 390: creation bar with 44 px Done/Cancel",
+      "detail": ""
+    }
+  ],
+  "errors": []
+}

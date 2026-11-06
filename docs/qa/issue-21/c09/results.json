@@ -1,0 +1,210 @@
+{
+  "results": [
+    {
+      "name": "Jump vs normal replay: identical completed candles, none after the cursor",
+      "detail": "60 completed 1m candles compared up to 2020-01-01T01:00:00.000Z"
+    },
+    {
+      "name": "Long Position drawn; nothing sent to the server",
+      "detail": "Create order offered, 0 review/confirm calls"
+    },
+    {
+      "name": "Create order copies the planned levels into the ticket draft",
+      "detail": "{\"Workflow\":\"PLANNED\",\"Order type\":\"LIMIT\",\"Entry\":\"2003.91\",\"Stop Loss\":\"2002.85\",\"Take Profit\":\"2004.97\",\"Risk %\":\"1\"}"
+    },
+    {
+      "name": "Server refuses a forbidden order (Buy Limit above Ask); nothing committed",
+      "detail": "Ask 2000.1, refusal: INVALID_INPUT"
+    },
+    {
+      "name": "Server review returned; nothing committed before Confirm",
+      "detail": "POST /reviews 200"
+    },
+    {
+      "name": "Confirm accepted by the server",
+      "detail": "POST /sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/confirm 200"
+    },
+    {
+      "name": "Pending until a later quote; then filled by the server",
+      "detail": "01:00:00 pending → 01:01:00 filled"
+    },
+    {
+      "name": "Drawing Undo removes the plan but leaves the committed order untouched",
+      "detail": "objects 1 → 0, orders unchanged, 0 cancel/close calls"
+    },
+    {
+      "name": "Seek after an order is refused by the server and shown to the user",
+      "detail": "This Session already has financial history. Create a separate Session to replay an earlier time. (REFUSED_REWIND_REQUIRE"
+    },
+    {
+      "name": "Reload keeps versioned drawings/indicators and the server-side order",
+      "detail": "1 drawings, 1 indicator(s), keys: backtest-indicators-v1, backtest-drawing-manager-v2"
+    },
+    {
+      "name": "Phone 390×844: tap Long Position → Create order → ticket fits, nothing sent",
+      "detail": "ticket 390px wide"
+    },
+    {
+      "name": "Phone: Short Position → Create order → Sell / Short with SL above and TP below",
+      "detail": "entry 2001.99 · SL 2002.8 · TP 2001.18"
+    }
+  ],
+  "api": [
+    {
+      "method": "POST",
+      "path": "/methods",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A7eed747d-6a3c-483a-b1b0-39dde951a122/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/reviews",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "path": "/reviews",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/confirm",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/commands",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/commands",
+      "status": 409
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/session%3A0ea4d545-1818-4d4f-9584-0f022a01ce0f/view",
+      "status": 200
+    }
+  ],
+  "errors": []
+}

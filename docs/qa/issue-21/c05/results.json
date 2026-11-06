@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "name": "Catalog lists 50 indicators by category; volume tools disabled",
+      "detail": "12 unavailable (quote-only data)"
+    },
+    {
+      "name": "Search + add",
+      "detail": "SUPERTREND, RSI, MACD, ICHIMOKU"
+    },
+    {
+      "name": "Inputs: MACD fast period 12 → 8 applied",
+      "detail": ""
+    },
+    {
+      "name": "Style: width 4, dashed, colour, opacity 50 %, histogram rising colour",
+      "detail": "{\"macd\":{\"lineWidth\":4,\"lineStyle\":\"dashed\",\"color\":\"#ff9800\"},\"signal\":{\"opacity\":0.5},\"histogram\":{\"positiveColor\":\"#00e676\"}}"
+    },
+    {
+      "name": "Placement: MACD pane moved above RSI, height 60 %",
+      "detail": ""
+    },
+    {
+      "name": "Placement: Supertrend overlay → own pane → overlay",
+      "detail": ""
+    },
+    {
+      "name": "Hide and duplicate",
+      "detail": "SUPERTREND, MACD, RSI, RSI, ICHIMOKU(hidden)"
+    },
+    {
+      "name": "Reload keeps parameters, style, pane order, height and visibility",
+      "detail": ""
+    },
+    {
+      "name": "tablet-768: settings usable",
+      "detail": "dialog 768×1024"
+    },
+    {
+      "name": "phone-390: settings usable",
+      "detail": "dialog 390×844"
+    }
+  ],
+  "errors": []
+}

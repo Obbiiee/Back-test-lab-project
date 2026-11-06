@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "name": "Double-click opens Properties",
+      "detail": ""
+    },
+    {
+      "name": "Style width 1→5, dashed, colour, opacity written to model",
+      "detail": "{\"color\":\"#ff6b6b\",\"lineWidth\":5,\"lineStyle\":\"dashed\",\"opacity\":0.6}"
+    },
+    {
+      "name": "Coordinates: down 3 ticks = 0.003, right 1 bar = 900 s, exact price, keyboard ticks",
+      "detail": "2714.295399828031 → 2714.292399828031"
+    },
+    {
+      "name": "Extend right toggles geometry",
+      "detail": ""
+    },
+    {
+      "name": "Text: Bold → font-weight 700, size 20, centre",
+      "detail": "{\"color\":\"#58a6ff\",\"lineWidth\":2,\"bold\":true,\"fontSize\":20,\"textAlign\":\"center\"}"
+    },
+    {
+      "name": "Layer: send to back / bring to front reorders paint stack",
+      "detail": "trend-line < text < rectangle"
+    },
+    {
+      "name": "Fib levels: per-row show/hide",
+      "detail": ""
+    },
+    {
+      "name": "Reload retains styles, anchors, text, levels and layer order",
+      "detail": "4 drawings"
+    },
+    {
+      "name": "Phone 390: bottom sheet, 44px targets, no horizontal overflow",
+      "detail": ""
+    },
+    {
+      "name": "Tablet 768 renders",
+      "detail": ""
+    }
+  ],
+  "errors": []
+}

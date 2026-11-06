@@ -291,3 +291,444 @@
 .tick-alpha :focus-visible{outline:3px solid #ffce55;outline-offset:3px}
 @media(max-width:600px){.tick-alpha>header{padding:14px 16px;border-radius:0 0 20px 20px}.alpha-hub{padding:20px 14px}.alpha-hub-head{padding:24px 20px;border-radius:24px}.alpha-hub-actions{width:100%}.alpha-hub-grid{grid-template-columns:minmax(0,1fr)}.alpha-hub-card{min-width:0}.alpha-hub-steps li{padding:20px}.tick-alpha>header nav a{padding:8px 12px}}
 @media(prefers-reduced-motion:reduce){.tick-alpha .alpha-hub .alpha-primary-action{transition:none}.tick-alpha .alpha-hub .alpha-primary-action:hover:not(:disabled){transform:none}}
+/* Issue #21 object tree */
+.alpha-object-tree{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.alpha-object-tree li{border:1px solid var(--lab-border);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px}
+.alpha-object-tree li.is-selected{border-color:var(--rk-yellow,#ffce55)}
+.alpha-object-tree .alpha-object-name{text-align:left;font-weight:600;background:transparent;border:0;padding:2px 4px}
+.alpha-object-actions{display:flex;flex-wrap:wrap;gap:4px}
+.alpha-object-actions button{min-height:28px;min-width:28px;padding:2px 6px;font-size:11px}
+@media(max-width:760px){.alpha-object-actions button{min-height:44px;min-width:44px}}
+
+
+/* ===== Issue #21 C-11 · workspace shell from the design canvas "10 · Trading workspace" =====
+   Navy ground, every region a rounded card with 8px gaps, one pill header, white floating
+   replay pill, QUICK SELL/BUY row, white docked "Plan order" panel. Behaviour unchanged. */
+.tick-alpha .alpha-panel-surface .alpha-ticket.alpha-dialog{background:#fff;color:var(--rk-navy);padding:8px 18px max(22px,env(safe-area-inset-bottom));font-family:var(--rk-font-ui)}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-terminal-heading h2{font-size:22px;font-weight:900;color:var(--rk-navy)}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-terminal-heading button{border-radius:999px;border:0;background:#eaf2fd;color:var(--rk-navy);font-weight:800}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-guide{background:var(--rk-ice-soft);border:0;border-radius:16px;color:var(--rk-muted);font-weight:600}
+.tick-alpha .alpha-ticket.alpha-dialog label{color:var(--rk-navy);font-size:12px;font-weight:700}
+.tick-alpha .alpha-ticket.alpha-dialog :is(input,select){background:var(--rk-ice-soft);color:var(--rk-navy);border:2px solid var(--rk-ice);border-radius:14px;min-height:46px;font:500 15px var(--rk-font-data)}
+.tick-alpha .alpha-ticket.alpha-dialog select{font-family:var(--rk-font-ui);font-weight:600;border-radius:999px}
+.tick-alpha .alpha-ticket.alpha-dialog :is(input,select):focus{border-color:var(--rk-blue);background:#fff;outline:3px solid var(--rk-yellow);outline-offset:1px}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button{border-radius:18px;min-height:64px;background:#fff;color:var(--rk-navy);border:2px solid var(--rk-ice)}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell{border-color:#ffd0d0}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell span{color:#9e2b33}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-buy[aria-pressed=true]{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff;box-shadow:0 4px 0 #0b3f8a}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell[aria-pressed=true]{background:#c9474f;border-color:#c9474f;color:#fff;box-shadow:0 4px 0 #8a2a31}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button[aria-pressed=true] span{color:#fff}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{color:inherit;opacity:.8}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-chips button{min-height:38px;border-radius:999px;border:2px solid var(--rk-ice);background:#fff;color:var(--rk-navy);font:700 12px var(--rk-font-data)}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-chips button[aria-pressed=true]{background:var(--rk-yellow);border-color:var(--rk-yellow);color:var(--rk-navy);font-weight:800}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-risk{border:0;padding:0}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-risk legend{color:var(--rk-muted);font-weight:700}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate{background:var(--rk-navy);color:#fff;border:0;border-radius:20px}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate dt{color:#a9bddb}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate .alpha-estimate-loss dd{color:#ff9a9a}
+.tick-alpha .alpha-ticket.alpha-dialog>button{min-height:56px;border-radius:999px!important;background:var(--rk-navy)!important;border-color:var(--rk-navy)!important;color:#fff!important;font:800 16px var(--rk-font-ui);box-shadow:0 5px 0 var(--rk-blue);width:100%}
+.tick-alpha .alpha-ticket.alpha-dialog>button:disabled{background:#2b4878!important;border-color:#2b4878!important;color:#a9bddb!important;box-shadow:none}
+.tick-alpha .alpha-ticket.alpha-dialog>p:last-child,.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-hint{color:var(--rk-muted)}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-notice{border-radius:16px;border-color:#ffd0d0;background:#fff4f4;color:#9e2b33}
+.tick-alpha.has-workspace{background:#061a3c;color:#e6edf7}
+.tick-alpha.has-workspace>header,.tick-alpha.has-workspace>.alpha-session{display:none}
+.tick-alpha .alpha-ws-back{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 10px;border-radius:999px;background:#061a3c;color:#a9bddb;text-decoration:none;font-weight:900}
+.tick-alpha .alpha-chart-header .alpha-symbol-chip{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 14px 0 8px;border-radius:999px;border:0;background:var(--rk-yellow);color:var(--rk-navy);font:500 13px var(--rk-font-data);cursor:pointer}
+.tick-alpha .alpha-symbol-chip span{width:20px;height:20px;border-radius:7px;background:var(--rk-navy);color:var(--rk-yellow);font:800 10px var(--rk-font-ui);display:flex;align-items:center;justify-content:center}
+.tick-alpha .alpha-order-bar>.alpha-balance-pill,.tick-alpha .alpha-balance-pill{display:inline-flex;margin-left:0;align-items:center;min-height:40px;padding:0 16px;border-radius:999px;background:#f3f8ff;color:var(--rk-navy);font:500 12px var(--rk-font-data);box-shadow:0 4px 0 #1378f5}
+@media(min-width:761px){
+  .tick-alpha.has-workspace{padding:8px;gap:8px;box-sizing:border-box}
+  .tick-alpha.has-workspace{background:#061a3c;color:#e6edf7;padding:8px;gap:8px;box-sizing:border-box}
+  .tick-alpha.has-workspace>header,.tick-alpha.has-workspace>.alpha-session{display:none}
+  .tick-alpha.has-workspace .alpha-workspace{margin:0;gap:8px;min-height:0}
+  .tick-alpha.has-workspace .alpha-chart-workspace{position:relative;background:transparent;border:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0;flex:1}
+  /* header pill */
+  .tick-alpha.has-workspace .alpha-chart-header{display:flex;align-items:center;gap:6px;min-height:52px;padding:6px 8px;border-radius:20px;background:#0c2655;border:2px solid #1d3560;box-sizing:border-box;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0}
+  .tick-alpha.has-workspace .alpha-chart-header>*{flex:none}
+  .tick-alpha.has-workspace .alpha-header-spacer{flex:1 1 0;min-width:8px}
+  .tick-alpha .alpha-ws-back{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 10px;border-radius:999px;background:#061a3c;color:#a9bddb;text-decoration:none;font-weight:900}
+  .tick-alpha .alpha-chart-header .alpha-symbol-chip{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 14px 0 8px;border-radius:999px;border:0;background:var(--rk-yellow);color:var(--rk-navy);font:500 13px var(--rk-font-data);cursor:pointer}
+  .tick-alpha .alpha-symbol-chip span{width:20px;height:20px;border-radius:7px;background:var(--rk-navy);color:var(--rk-yellow);font:800 10px var(--rk-font-ui);display:flex;align-items:center;justify-content:center}
+  .tick-alpha.has-workspace .alpha-chart-header label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#a9bddb}
+  .tick-alpha.has-workspace .alpha-chart-header label:has(select){font-size:0;gap:0;background:#061a3c;border-radius:999px;padding:3px}
+  .tick-alpha.has-workspace .alpha-chart-header select{min-height:32px;border-radius:999px;border:0;background:#fff;color:var(--rk-navy);font:500 12px var(--rk-font-data);padding:0 10px}
+  .tick-alpha.has-workspace .alpha-chart-header>button,.tick-alpha.has-workspace .alpha-chart-header .overlay-indicator-trigger,.tick-alpha.has-workspace .alpha-chart-header>div>button:first-child{min-height:36px;padding:0 14px;border-radius:999px;border:2px solid #2b4878;background:transparent;color:#e6edf7;font:700 13px var(--rk-font-ui);cursor:pointer}
+  .tick-alpha.has-workspace .alpha-chart-header>button:hover{border-color:#5a9df8}
+  .tick-alpha.has-workspace .alpha-chart-header>button:is([aria-expanded=true],[aria-pressed=true]){background:var(--rk-yellow);border-color:var(--rk-yellow);color:var(--rk-navy)}
+  .tick-alpha .alpha-ws-title{font-size:14px;font-weight:800;color:#fff;white-space:nowrap;max-width:36vw;overflow:hidden;text-overflow:ellipsis}
+  .tick-alpha .alpha-ws-title span{color:#a9bddb;font-weight:600}
+  .tick-alpha.has-workspace .alpha-chart-header .alpha-session-menu{position:relative}
+  .tick-alpha.has-workspace .alpha-chart-header .alpha-session-menu>summary{list-style:none;min-height:36px;display:flex;align-items:center;padding:0 14px;border-radius:999px;border:2px solid #2b4878;color:#e6edf7;font:700 13px var(--rk-font-ui);cursor:pointer}
+  .tick-alpha.has-workspace .alpha-chart-header .alpha-session-menu>summary::-webkit-details-marker{display:none}
+  .tick-alpha.has-workspace .alpha-chart-header .alpha-session-menu[open]>section{position:fixed;right:16px;top:68px;z-index:60;background:#fff;color:var(--rk-navy);border-radius:24px;padding:14px;box-shadow:0 6px 0 #1378f5,0 20px 40px #0008;display:grid;gap:8px;min-width:260px}
+  /* drawing rail + chart card */
+  .tick-alpha.has-workspace .alpha-chart-body{gap:8px;min-height:0}
+  .tick-alpha.has-workspace .alpha-drawing-tools{width:48px;flex:none;border-radius:20px;background:#0c2655;border:2px solid #1d3560;padding:6px 0;box-sizing:border-box;align-items:center;gap:2px}
+  .tick-alpha.has-workspace .alpha-drawing-tools>button,.tick-alpha.has-workspace .alpha-drawing-group>summary{width:34px;height:34px;min-height:34px;border-radius:12px;border:0;background:transparent;color:#e6edf7;display:flex;align-items:center;justify-content:center;padding:0;margin:0 auto}
+  .tick-alpha.has-workspace .alpha-drawing-tools>button[aria-pressed=true],.tick-alpha.has-workspace .alpha-drawing-group[open]>summary,.tick-alpha.has-workspace .alpha-drawing-group:has(button[aria-pressed=true])>summary{background:#0f67d8;color:#fff}
+  .tick-alpha.has-workspace .alpha-group-chevron{display:none}
+  .tick-alpha.has-workspace .alpha-drawing-group>div{background:#fff;border-radius:20px;padding:8px;box-shadow:0 6px 0 #1378f5,0 16px 40px #0008;border:0}
+  .tick-alpha.has-workspace .alpha-drawing-group>div button{border-radius:12px;border:0;background:transparent;color:var(--rk-navy);font:600 13px var(--rk-font-ui);text-align:left;min-height:34px}
+  .tick-alpha.has-workspace .alpha-drawing-group>div button:hover{background:#eaf2fd}
+  .tick-alpha.has-workspace .alpha-drawing-group>div button[aria-pressed=true]{background:var(--rk-yellow);font-weight:800}
+  .tick-alpha.has-workspace .alpha-chart-host{border-radius:24px;border:2px solid #1e2633;overflow:hidden;background:#0b0f17}
+  .tick-alpha.has-workspace .alpha-chart-host .chart-tools{background:transparent;padding:6px 10px;gap:4px;border:0}
+  .tick-alpha.has-workspace .alpha-chart-host .chart-tools button{min-height:28px;border-radius:999px;border:2px solid #1e2633;background:#0e131c;color:#a9bddb;font:700 11px var(--rk-font-ui);padding:0 10px}
+  .tick-alpha.has-workspace .alpha-chart-host .chart-tools button[aria-pressed=true]{background:var(--rk-yellow);color:var(--rk-navy);border-color:var(--rk-yellow)}
+  .tick-alpha.has-workspace .alpha-chart-host .tool-divider{display:none}
+  /* replay pill */
+  .tick-alpha.has-workspace .alpha-replay-controls.is-docked{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:max-content;max-width:calc(100% - 140px);margin:0;position:absolute;top:auto;left:50%;right:auto;bottom:34px;height:auto;transform:translateX(-50%);z-index:7;background:#fff;color:var(--rk-navy);border:0;border-radius:999px;padding:6px 10px;box-shadow:0 6px 0 #1378f5;box-sizing:border-box}
+  .tick-alpha.has-workspace .alpha-replay-controls button{min-height:36px;border-radius:999px;border:2px solid #d9eafe;background:transparent;color:var(--rk-navy);font:700 12px var(--rk-font-ui);padding:0 12px}
+  .tick-alpha.has-workspace .alpha-replay-controls .alpha-replay-grip{border:0;color:#9fb3cf;padding:0 4px;min-width:20px}
+  .tick-alpha.has-workspace .alpha-replay-controls button:is([aria-keyshortcuts=Space],[aria-keyshortcuts="Shift+ArrowRight"]){font-size:0;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+  .tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts=Space]{width:44px;min-width:44px;height:44px;border:0;background:#0f67d8;box-shadow:0 4px 0 #0b3f8a}
+  .tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts=Space]::before{content:"";width:0;height:0;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:4px}
+  .tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts=Space][aria-pressed=true]::before{width:12px;height:16px;border:0;margin:0;background:linear-gradient(90deg,#fff 0 35%,transparent 35% 65%,#fff 65%)}
+  .tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts="Shift+ArrowRight"]{width:36px;min-width:36px;height:36px}
+  .tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts="Shift+ArrowRight"]::before{content:"";width:0;height:0;border-left:10px solid var(--rk-navy);border-top:6px solid transparent;border-bottom:6px solid transparent}
+  .tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts="Shift+ArrowRight"]::after{content:"";width:3px;height:12px;background:var(--rk-navy);margin-left:2px}
+  .tick-alpha.has-workspace .alpha-replay-controls .alpha-step-target{display:none}
+  .tick-alpha.has-workspace .alpha-replay-controls label{font-size:11px;font-weight:700;color:var(--rk-muted);display:flex;align-items:center;gap:6px}
+  .tick-alpha.has-workspace .alpha-replay-controls select{max-width:150px;min-height:32px;border-radius:999px;border:0;background:#eaf2fd;color:var(--rk-navy);font:500 11px var(--rk-font-data);padding:0 8px}
+  .tick-alpha.has-workspace .alpha-replay-controls .alpha-seek>summary{color:#0f67d8;font:800 12px var(--rk-font-ui);cursor:pointer;padding:0 6px;list-style:none}
+  .tick-alpha.has-workspace .alpha-replay-controls .alpha-seek[open]>div{position:absolute;bottom:56px;right:0;background:#fff;border-radius:20px;padding:12px;box-shadow:0 6px 0 #1378f5,0 16px 40px #0006;display:grid;gap:8px}
+  .tick-alpha.has-workspace .alpha-replay-controls.is-floating{background:#fff;color:var(--rk-navy);border-radius:999px;box-shadow:0 6px 0 #1378f5}
+  .tick-alpha.has-workspace .alpha-chart-disclosures{display:flex;gap:16px;flex-wrap:wrap;padding:0 8px;font-size:11px;color:#a9bddb}
+  .tick-alpha.has-workspace .alpha-chart-disclosures summary{color:#a9bddb}
+  /* right tool rail as a card */
+  .tick-alpha.has-workspace .alpha-action-rail{width:48px;flex:none;border-radius:20px;background:#0c2655;border:2px solid #1d3560;padding:6px 0;gap:4px;align-self:stretch}
+  .tick-alpha.has-workspace .alpha-action-rail button{width:34px;min-width:34px;height:34px;min-height:34px;border-radius:12px;border:0;background:transparent;color:#e6edf7;padding:0}
+  .tick-alpha.has-workspace .alpha-action-rail button:hover,.tick-alpha.has-workspace .alpha-action-rail button[aria-expanded=true]{background:#0f67d8;color:#fff}
+  .tick-alpha.has-workspace .alpha-object-panel{border-radius:20px;background:#0c2655;border:2px solid #1d3560;color:#e6edf7}
+  /* QUICK row */
+  .tick-alpha.has-workspace .alpha-order-bar{background:transparent;border:0;padding:0 4px;gap:8px;align-items:center}
+  .tick-alpha.has-workspace .alpha-order-bar::before{content:"QUICK";font:900 10px var(--rk-font-ui);letter-spacing:.08em;color:var(--rk-navy);background:var(--rk-yellow);border-radius:999px;padding:4px 10px}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-quick-side{min-height:42px;min-width:104px;border-radius:999px;border:0;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;font:900 12px var(--rk-font-ui);letter-spacing:.04em;text-transform:uppercase}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-quick-side strong{font:500 11px var(--rk-font-data);color:#fff;letter-spacing:0}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-quick-sell{background:#c9474f;box-shadow:0 4px 0 #7a2a30}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-quick-buy{background:#0f67d8;box-shadow:0 4px 0 #0b3f8a}
+  .tick-alpha.has-workspace .alpha-order-bar>button:not(.alpha-quick-side){min-height:40px;min-width:0;border-radius:999px;border:2px solid #2b4878;background:transparent;color:#e6edf7;font:800 13px var(--rk-font-ui);padding:0 16px}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-order-hint{flex:1;color:#a9bddb;font-size:12px;margin:0}
+  .tick-alpha .alpha-order-bar>.alpha-balance-pill,.tick-alpha .alpha-balance-pill{display:inline-flex;margin-left:0;align-items:center;min-height:40px;padding:0 16px;border-radius:999px;background:#f3f8ff;color:var(--rk-navy);font:500 12px var(--rk-font-data);box-shadow:0 4px 0 #1378f5}
+  /* terminal card */
+  .tick-alpha.has-workspace .alpha-terminal{border-radius:20px;background:#0c2655;border:2px solid #1d3560;color:#e6edf7;margin:0}
+  .tick-alpha.has-workspace .alpha-terminal-tabs button{min-height:32px;padding:0 14px;border-radius:999px;border:0;background:transparent;color:#a9bddb;font:700 12px var(--rk-font-ui)}
+  .tick-alpha.has-workspace .alpha-terminal-tabs [aria-pressed=true]{background:#fff;color:var(--rk-navy);font-weight:800}
+  .tick-alpha.has-workspace .alpha-terminal th{color:#6b7a90;font-weight:700}
+  .tick-alpha.has-workspace .alpha-terminal :is(table,td,th){border-color:#1d3560}
+  .tick-alpha.has-workspace>footer{background:transparent;border:0;color:#a9bddb;font-size:12px;padding:0 8px}
+
+}
+/* docked white Plan order panel (desktop) */
+@media(min-width:761px){
+  .tick-alpha .alpha-movable-modal:has(.alpha-ticket){background:#061a3c55}
+  .tick-alpha .alpha-movable-modal .alpha-panel-surface.is-docked:has(.alpha-ticket){width:340px;margin:8px;height:calc(100% - 16px);border-radius:24px;background:#f3f8ff;box-shadow:0 6px 0 #1378f5;overflow:hidden;border:0}
+  .tick-alpha .alpha-panel-surface.is-docked:has(.alpha-ticket) .alpha-panel-handle{display:none}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-ticket.alpha-dialog{background:#f3f8ff;height:100%;overflow:auto;box-sizing:border-box;padding:14px 16px 18px;width:auto}
+}
+/* Issue #21 · phone order ticket as a bottom sheet, following the design canvas
+   "Trading on a phone" artboard (white sheet, ice inputs, filled side, yellow risk
+   choice, navy review button with blue press shadow). Layout/flow unchanged. */
+@media(max-width:760px){
+  .tick-alpha .alpha-movable-modal:has(.alpha-ticket){align-items:flex-end;justify-content:stretch;background:#061a3ccc}
+  .tick-alpha .alpha-panel-surface:has(>.alpha-ticket),.tick-alpha .alpha-panel-surface:has(.alpha-ticket){width:100vw;max-height:92dvh;margin-top:auto;border-radius:32px 32px 0 0;background:#fff;box-shadow:0 -12px 40px #0007;overflow:hidden}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-panel-handle{background:#fff;color:var(--rk-navy);border:0;justify-content:center;position:relative;padding-top:14px}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-panel-handle::before{content:"";position:absolute;top:6px;left:50%;width:44px;height:5px;margin-left:-22px;border-radius:999px;background:var(--rk-ice)}
+  .tick-alpha .alpha-panel-surface:has(.alpha-ticket) .alpha-panel-handle :is(span,strong,button){color:var(--rk-navy)}
+  .tick-alpha .alpha-panel-surface .alpha-ticket.alpha-dialog{background:#fff;color:var(--rk-navy);padding:8px 18px max(22px,env(safe-area-inset-bottom));font-family:var(--rk-font-ui)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-terminal-heading h2{font-size:22px;font-weight:900;color:var(--rk-navy)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-terminal-heading button{border-radius:999px;border:0;background:#eaf2fd;color:var(--rk-navy);font-weight:800}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-guide{background:var(--rk-ice-soft);border:0;border-radius:16px;color:var(--rk-muted);font-weight:600}
+  .tick-alpha .alpha-ticket.alpha-dialog label{color:var(--rk-navy);font-size:12px;font-weight:700}
+  .tick-alpha .alpha-ticket.alpha-dialog :is(input,select){background:var(--rk-ice-soft);color:var(--rk-navy);border:2px solid var(--rk-ice);border-radius:14px;min-height:46px;font:500 15px var(--rk-font-data)}
+  .tick-alpha .alpha-ticket.alpha-dialog select{font-family:var(--rk-font-ui);font-weight:600;border-radius:999px}
+  .tick-alpha .alpha-ticket.alpha-dialog :is(input,select):focus{border-color:var(--rk-blue);background:#fff;outline:3px solid var(--rk-yellow);outline-offset:1px}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button{border-radius:18px;min-height:64px;background:#fff;color:var(--rk-navy);border:2px solid var(--rk-ice)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell{border-color:#ffd0d0}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell span{color:#9e2b33}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-buy[aria-pressed=true]{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff;box-shadow:0 4px 0 #0b3f8a}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-sell[aria-pressed=true]{background:#c9474f;border-color:#c9474f;color:#fff;box-shadow:0 4px 0 #8a2a31}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button[aria-pressed=true] span{color:#fff}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{color:inherit;opacity:.8}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-chips button{min-height:38px;border-radius:999px;border:2px solid var(--rk-ice);background:#fff;color:var(--rk-navy);font:700 12px var(--rk-font-data)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-chips button[aria-pressed=true]{background:var(--rk-yellow);border-color:var(--rk-yellow);color:var(--rk-navy);font-weight:800}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-risk{border:0;padding:0}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-risk legend{color:var(--rk-muted);font-weight:700}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate{background:var(--rk-navy);color:#fff;border:0;border-radius:20px}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate dt{color:#a9bddb}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-estimate .alpha-estimate-loss dd{color:#ff9a9a}
+  .tick-alpha .alpha-ticket.alpha-dialog>button{min-height:56px;border-radius:999px!important;background:var(--rk-navy)!important;border-color:var(--rk-navy)!important;color:#fff!important;font:800 16px var(--rk-font-ui);box-shadow:0 5px 0 var(--rk-blue);width:100%}
+  .tick-alpha .alpha-ticket.alpha-dialog>button:disabled{background:#2b4878!important;border-color:#2b4878!important;color:#a9bddb!important;box-shadow:none}
+  .tick-alpha .alpha-ticket.alpha-dialog>p:last-child,.tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-hint{color:var(--rk-muted)}
+  .tick-alpha .alpha-ticket.alpha-dialog .alpha-ticket-notice{border-radius:16px;border-color:#ffd0d0;background:#fff4f4;color:#9e2b33}
+}
+/* Issue #21 F06 — touch-first phone layout. Look: design canvas "20 · Mobile trading" artboard
+   (navy chrome, floating replay pill, big SELL / BUY bar, white sheets, yellow selection).
+   Structure and behaviour: Codex spec 12 (Draw sheet with tool tabs, mode badge, grouped Objects,
+   5-section bottom nav, full-screen chart toggle, landscape chart-first). */
+.alpha-touch-only,.alpha-bottom-nav,.alpha-mode-badge{display:none}
+.tick-alpha .alpha-object-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0;border:0}
+.tick-alpha .alpha-object-group{display:grid;gap:4px;padding:8px 0;border-top:1px solid var(--lab-border)}
+.tick-alpha .alpha-object-group h3{margin:0;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--lab-text-secondary)}
+.tick-alpha .alpha-object-group p{margin:0}
+.tick-alpha .alpha-object-group .alpha-object-tree{margin:0}
+.tick-alpha span.alpha-object-name{display:block;font-size:12px;font-weight:700;padding:4px 0}
+/* Draw sheet (white bottom sheet, canvas style) */
+.alpha-sheet-backdrop{position:fixed;inset:0;z-index:80;background:#061a3ccc;display:flex;align-items:flex-end;justify-content:center}
+.tick-alpha .alpha-draw-sheet{width:min(560px,100vw);max-height:80dvh;overflow:auto;background:#fff;color:var(--rk-navy);border-radius:32px 32px 0 0;padding:12px 18px max(22px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;box-sizing:border-box;font-family:var(--rk-font-ui)}
+.alpha-sheet-handle{align-self:center;width:44px;height:5px;border-radius:999px;background:var(--rk-ice)}
+.alpha-sheet-head{display:flex;align-items:center;justify-content:space-between}
+.alpha-sheet-head h2{margin:0;font-size:22px;font-weight:900;color:var(--rk-navy)}
+.tick-alpha .alpha-draw-sheet button{min-height:44px;border-radius:999px;border:2px solid var(--rk-ice);background:#fff;color:var(--rk-navy);font:700 13px var(--rk-font-ui);padding:0 14px;cursor:pointer}
+.tick-alpha .alpha-sheet-head button{border:0;background:#eaf2fd;font-weight:800}
+.alpha-sheet-tabs{display:flex;gap:2px;padding:3px;background:#eaf2fd;border-radius:999px;overflow-x:auto;scrollbar-width:none;flex:none}
+.tick-alpha .alpha-sheet-tabs button{flex:none;border:0;background:transparent;color:var(--rk-muted)}
+.tick-alpha .alpha-sheet-tabs button[aria-selected=true]{background:var(--rk-navy);color:#fff;font-weight:800}
+.alpha-sheet-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tick-alpha .alpha-sheet-tools button{display:flex;align-items:center;gap:6px;justify-content:flex-start;text-align:left;border-radius:18px;min-height:52px}
+.tick-alpha .alpha-sheet-tools button[aria-pressed=true]{background:var(--rk-yellow);border-color:var(--rk-yellow);font-weight:800}
+.tick-alpha .alpha-draw-sheet :focus-visible{outline:3px solid var(--rk-blue);outline-offset:2px}
+/* Full-screen chart: a layout toggle, never an orientation lock */
+.tick-alpha .alpha-chart-workspace.is-fullscreen{position:fixed;inset:0;z-index:70;margin:0;display:flex;flex-direction:column;background:#0b0f17;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box}
+.tick-alpha .is-fullscreen .alpha-chart-body{flex:1 1 auto;min-height:0}
+.tick-alpha .is-fullscreen .alpha-chart-host{height:auto;min-height:0;flex:1}
+.tick-alpha .is-fullscreen .alpha-chart-disclosures,.tick-alpha .is-fullscreen .alpha-object-panel{display:none}
+.tick-alpha .is-fullscreen .alpha-fullscreen-toggle{display:inline-flex;background:var(--rk-yellow);color:var(--rk-navy);border-color:var(--rk-yellow);font-weight:800}
+@media(max-width:1000px){
+  .tick-alpha .alpha-touch-only{display:inline-flex;align-items:center;gap:6px}
+}
+@media(max-width:760px){
+  .tick-alpha{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  .tick-alpha>header{padding:10px 12px;gap:8px;flex-wrap:nowrap}
+  .tick-alpha>header nav[aria-label="Workspace navigation"]{display:none}
+  .tick-alpha .alpha-badge{display:none}
+  .tick-alpha .alpha-session{padding:8px 12px}
+  .tick-alpha .alpha-session h1{font-size:15px;margin:0}
+  .tick-alpha .alpha-session p{margin:2px 0 0;font-size:12px}
+  .tick-alpha .alpha-workspace{margin:0;gap:0}
+  .tick-alpha .alpha-action-rail{display:none}
+  .tick-alpha .alpha-drawing-tools{display:none}
+  .tick-alpha .alpha-chart-workspace{padding:0;border-radius:0;border-left:0;border-right:0}
+  .tick-alpha .alpha-chart-header{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 10px;scrollbar-width:none;background:var(--rk-navy)}
+  .tick-alpha .alpha-chart-header>*{flex:none}
+  .tick-alpha .alpha-chart-header>span,.tick-alpha .alpha-chart-header>label:has(input[type=checkbox]){display:none}
+  .tick-alpha .alpha-chart-header label{font-size:0;gap:0}
+  .tick-alpha .alpha-chart-header select{font:500 13px var(--rk-font-data);min-height:40px;border-radius:999px;padding:0 10px}
+  .tick-alpha .alpha-chart-header button{min-height:40px;border-radius:999px;padding:0 14px;background:#0c2655;border:0;color:#fff;font-weight:700}
+  .tick-alpha .alpha-chart-header button[aria-expanded=true],.tick-alpha .alpha-chart-header button[aria-pressed=true]{background:var(--rk-yellow);color:var(--rk-navy)}
+  .tick-alpha .alpha-chart-body{display:block;min-height:0;height:auto;max-height:none;flex:none}
+  .tick-alpha .alpha-chart-host{height:min(58dvh,520px);min-height:300px}
+  .tick-alpha .alpha-mode-badge{display:flex;position:absolute;z-index:6;left:10px;top:50px;align-items:center;gap:8px;background:var(--rk-yellow);color:var(--rk-navy);border-radius:999px;padding:4px 4px 4px 12px;font:800 12px var(--rk-font-ui);box-shadow:0 4px 0 #c99a1e}
+  .tick-alpha .alpha-mode-badge button{min-height:32px;border-radius:999px;border:0;background:var(--rk-navy);color:#fff;font:800 12px var(--rk-font-ui);padding:0 12px}
+  /* Objects: full-screen sheet with grouped lists */
+  .tick-alpha .alpha-object-panel{position:fixed;inset:auto 0 0 0;z-index:75;width:auto;max-height:85dvh;border:0;border-radius:32px 32px 0 0;background:#0e1a33;color:#fff;padding:16px 18px max(22px,env(safe-area-inset-bottom));box-shadow:0 -12px 40px #0008}
+  .tick-alpha .alpha-object-panel h2{font-size:20px;font-weight:900;margin:0}
+  .tick-alpha .alpha-object-close{min-height:44px;border-radius:999px;border:0;background:#0c2655;color:#fff;padding:0 16px;font-weight:800}
+  .tick-alpha .alpha-object-panel .alpha-object-actions button{min-height:44px;min-width:44px}
+  /* Replay: floating pill over the chart bottom, like the canvas */
+  .tick-alpha .alpha-replay-controls.is-docked{display:flex;flex-wrap:nowrap;justify-content:center;align-items:center;gap:6px;margin:0;position:absolute;top:auto;left:50%;bottom:34px;height:auto;transform:translateX(-50%);z-index:7;width:max-content;max-width:calc(100% - 20px);background:#0e1a33;border:2px solid #2b4878;border-radius:28px;padding:6px 8px;box-sizing:border-box}
+  .tick-alpha .alpha-replay-controls .alpha-replay-grip,.tick-alpha .alpha-replay-controls>button:nth-of-type(2),.tick-alpha .alpha-replay-controls .alpha-step-target{display:none}
+  .tick-alpha .alpha-replay-controls button{min-height:44px;border-radius:999px;border:0;background:#0c2655;color:#fff;font:700 13px var(--rk-font-ui);padding:0 14px}
+  .tick-alpha .alpha-replay-controls button[aria-keyshortcuts=Space]{background:var(--rk-blue-strong);box-shadow:0 4px 0 #0b3f8a}
+  /* Icon buttons like the canvas pill; the visible text stays as the accessible name. */
+  .tick-alpha .alpha-replay-controls button:is([aria-keyshortcuts=Space],[aria-keyshortcuts="Shift+ArrowRight"]){font-size:0;width:46px;min-width:46px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+  .tick-alpha .alpha-replay-controls button[aria-keyshortcuts=Space]::before{content:"";width:0;height:0;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:4px}
+  .tick-alpha .alpha-replay-controls button[aria-keyshortcuts=Space][aria-pressed=true]::before{width:12px;height:16px;border:0;margin:0;background:linear-gradient(90deg,#fff 0 35%,transparent 35% 65%,#fff 65%)}
+  .tick-alpha .alpha-replay-controls button[aria-keyshortcuts="Shift+ArrowRight"]{width:42px;min-width:42px}
+  .tick-alpha .alpha-replay-controls button[aria-keyshortcuts="Shift+ArrowRight"]::before{content:"";width:0;height:0;border-left:11px solid #fff;border-top:7px solid transparent;border-bottom:7px solid transparent}
+  .tick-alpha .alpha-replay-controls button[aria-keyshortcuts="Shift+ArrowRight"]::after{content:"";width:3px;height:14px;background:#fff;margin-left:2px}
+  .tick-alpha .alpha-replay-controls select{max-width:92px}
+  .tick-alpha .alpha-replay-controls label{font-size:0}
+  .tick-alpha .alpha-replay-controls select{min-height:44px;border-radius:999px;font:500 12px var(--rk-font-data);max-width:120px}
+  .tick-alpha .alpha-replay-controls .alpha-seek summary{min-height:44px;display:flex;align-items:center;padding:0 10px;font-size:12px}
+  .tick-alpha .alpha-chart-disclosures{padding:4px 12px}
+  /* SELL / BUY bar (canvas): opens the ticket, never submits */
+  .tick-alpha .alpha-order-bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;background:var(--rk-navy);margin:0}
+  .tick-alpha .alpha-order-bar>span{grid-column:1/-1;text-align:center;font-size:11px;color:#a9bddb}
+  .tick-alpha .alpha-order-bar>button:not(.alpha-quick-side){grid-column:1/-1;min-height:44px;border-radius:999px}
+  .tick-alpha .alpha-order-bar .alpha-quick-side{min-height:56px;border-radius:20px;border:0;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font:800 14px var(--rk-font-ui);text-transform:uppercase}
+  .tick-alpha .alpha-order-bar .alpha-quick-side strong{font:500 13px var(--rk-font-data);color:#fff}
+  .tick-alpha .alpha-order-bar .alpha-quick-sell{background:#c9474f}
+  .tick-alpha .alpha-order-bar .alpha-quick-buy{background:var(--rk-blue-strong);box-shadow:0 4px 0 #0b3f8a}
+  /* Five-section bottom nav */
+  .tick-alpha .alpha-bottom-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--rk-navy);border-top:2px solid var(--rk-navy-line);padding:6px max(6px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
+  .tick-alpha .alpha-bottom-nav :is(a,button){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;border:0;border-radius:16px;background:transparent;color:#c3d6f2;font:700 11px var(--rk-font-ui);text-decoration:none;padding:4px 0}
+  .tick-alpha .alpha-bottom-nav [aria-current=page]{background:#0c2655;color:var(--rk-yellow)}
+  .tick-alpha .alpha-bottom-nav button:disabled{opacity:.45}
+  .tick-alpha .alpha-bottom-nav svg{width:20px;height:20px}
+  .tick-alpha footer{margin-bottom:0}
+  .tick-alpha:has(.is-fullscreen) .alpha-bottom-nav{display:none}
+  .tick-alpha .alpha-ws-title{display:none}
+  .tick-alpha.has-workspace{overflow-y:auto}
+  .tick-alpha.has-workspace>*{flex-shrink:0}
+  .tick-alpha .alpha-header-spacer{display:none}
+  .tick-alpha .alpha-chart-header .alpha-session-menu>summary{list-style:none;min-height:40px;display:flex;align-items:center;padding:0 14px;border-radius:999px;background:#0c2655;color:#fff;font-weight:700}
+  .tick-alpha .alpha-chart-header .alpha-session-menu[open]>section{position:fixed;left:12px;right:12px;top:64px;z-index:60;background:#fff;color:var(--rk-navy);border-radius:24px;padding:14px;box-shadow:0 6px 0 #1378f5;display:grid;gap:8px}
+  .tick-alpha .alpha-order-bar{grid-template-columns:1fr auto 1fr;align-items:center}
+  .tick-alpha .alpha-order-bar .alpha-quick-sell{order:1}
+  .tick-alpha .alpha-order-bar>button:not(.alpha-quick-side){order:2;grid-column:auto;min-height:44px;padding:0 12px;border-radius:14px;background:#0c2655;border:0;color:#fff;font:700 12px var(--rk-font-ui)}
+  .tick-alpha .alpha-order-bar .alpha-quick-buy{order:3}
+  .tick-alpha .alpha-order-bar>.alpha-order-hint,.tick-alpha .alpha-order-bar>.alpha-balance-pill{display:none}
+}
+/* Phone landscape (height-limited): chart first, nav hidden, floating controls */
+@media(max-height:500px) and (orientation:landscape) and (max-width:1000px){
+  .tick-alpha .alpha-bottom-nav{display:none}
+  .tick-alpha{padding-bottom:0}
+  .tick-alpha:has(.alpha-chart-workspace)>header,.tick-alpha .alpha-session{display:none}
+  .tick-alpha .alpha-workspace{margin:0}
+  .tick-alpha .alpha-chart-workspace{padding:0}
+  .tick-alpha .alpha-chart-header{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:6px max(10px,env(safe-area-inset-left));scrollbar-width:none}
+  .tick-alpha .alpha-chart-header>*{flex:none}
+  .tick-alpha .alpha-chart-header>span,.tick-alpha .alpha-chart-header>label:has(input[type=checkbox]){display:none}
+  .tick-alpha .alpha-chart-host{height:calc(100dvh - 56px);min-height:220px}
+  .tick-alpha .alpha-drawing-tools,.tick-alpha .alpha-action-rail{display:none}
+  .tick-alpha .alpha-replay-controls.is-docked{display:flex;flex-wrap:nowrap;margin:0;position:absolute;top:auto;left:50%;bottom:30px;height:auto;transform:translateX(-50%);z-index:7;width:max-content;background:#0e1a33;border:2px solid #2b4878;border-radius:28px;padding:4px 8px;gap:6px}
+  .tick-alpha .alpha-replay-controls .alpha-replay-grip,.tick-alpha .alpha-replay-controls>button:nth-of-type(2),.tick-alpha .alpha-replay-controls .alpha-step-target,.tick-alpha .alpha-replay-controls label{display:none}
+}
+/* C-12 · audit fixes (AccessLint, Vercel WIG) + remaining canvas parts (Plan order tabs, R:R bar, Lots, phone two-line header) */
+.alpha-status-line{margin:0}
+.tick-alpha .alpha-segmented{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border-radius:999px;background:#e3edfb;margin:4px 0 10px}
+.tick-alpha .alpha-segmented button{min-height:36px;border-radius:999px;border:0;background:transparent;color:#2c3e5c;font:700 13px var(--rk-font-ui);cursor:pointer}
+.tick-alpha .alpha-segmented button[aria-checked=true]{background:#fff;color:var(--rk-navy);box-shadow:0 2px 0 #1378f5}
+.tick-alpha .alpha-segmented button:disabled{cursor:not-allowed;color:#4a5b75}
+.tick-alpha .alpha-segmented button:disabled[aria-checked=true]{color:var(--rk-navy)}
+.tick-alpha .alpha-ticket-tabs{background:var(--rk-navy)}
+.tick-alpha .alpha-ticket-tabs button{color:#c3d6f2}
+.tick-alpha .alpha-ticket-tabs button[aria-checked=true]{background:var(--rk-yellow,#ffd23f);color:var(--rk-navy);box-shadow:none}
+.tick-alpha .alpha-ticket-tabs button:disabled{color:#c3d6f2}
+.tick-alpha .alpha-rr-bar{display:flex;height:22px;border-radius:999px;overflow:hidden;margin:10px 0 4px;font:800 11px var(--rk-font-data)}
+.tick-alpha .alpha-rr-bar span{display:flex;align-items:center;justify-content:center;min-width:34px;flex-basis:0}
+.tick-alpha .alpha-rr-loss{background:#ffd9dc;color:#8a1f29}
+.tick-alpha .alpha-rr-profit{background:#c9f2dc;color:#0d5a33}
+.tick-alpha .alpha-bar-lots{display:inline-flex;align-items:center;gap:6px;margin:0;font:700 11px var(--rk-font-ui);color:#c3d6f2}
+.tick-alpha .alpha-bar-lots input{width:64px;min-height:36px;box-sizing:border-box;border-radius:999px;border:2px solid #1d3560;background:#061a3c;color:#fff;text-align:center;font:600 13px var(--rk-font-data);font-variant-numeric:tabular-nums}
+.tick-alpha .alpha-bar-lots input:disabled{color:#c3d6f2;border-style:dashed}
+.tick-alpha .alpha-bar-lots input::placeholder{color:#a9bddb}
+.tick-alpha .alpha-ws-phone-title{display:none}
+/* contrast (AccessLint, ≥4.5:1) */
+.tick-alpha.has-workspace .alpha-replay-controls button[aria-keyshortcuts=Space]{color:#fff}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek label{color:var(--rk-navy)}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek[open] button{background:#0f67d8;color:#fff;border:0}
+.tick-alpha.has-workspace .alpha-terminal th{color:#4a5b75}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{color:#3d4f68}
+section.overlay-indicator-dialog.indicator-studio .ind-blocked{opacity:1}
+section.overlay-indicator-dialog.indicator-studio .ind-blocked small{color:#44546b}
+/* Vercel WIG: sheets keep scroll inside, focus stays visible, motion respects the user */
+.tick-alpha .alpha-draw-sheet,.tick-alpha .alpha-object-panel,.tick-alpha .alpha-table-scroll{overscroll-behavior:contain}
+.tick-alpha .alpha-table-scroll:focus-visible{outline:2px solid #1378f5;outline-offset:2px}
+section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px solid var(--rk-blue,#1378f5);outline-offset:1px}
+@media(prefers-reduced-motion:reduce){.tick-alpha *,.tick-alpha *::before,.tick-alpha *::after{transition-duration:0s!important;animation-duration:0s!important;scroll-behavior:auto!important}}
+@media(hover:none){.tick-alpha .alpha-chart-header button:hover,.tick-alpha .alpha-replay-controls button:hover,.tick-alpha .alpha-context button:hover{background:inherit}}
+@media(max-width:760px){
+  .tick-alpha.has-workspace .alpha-symbol-chip{display:none!important}
+  .tick-alpha.has-workspace .alpha-ws-phone-title{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+  .tick-alpha.has-workspace .alpha-ws-phone-title strong{font:800 15px var(--rk-font-ui);color:#fff;white-space:nowrap}
+  .tick-alpha.has-workspace .alpha-ws-phone-title small{font:500 11px var(--rk-font-data);color:#c3d6f2;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-new-order{display:none}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-bar-lots{order:2;flex-direction:column;gap:2px;justify-content:center}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-bar-lots>span{font-size:10px}
+  .tick-alpha.has-workspace .alpha-order-bar .alpha-bar-lots input{width:100%;min-width:64px;min-height:44px}
+}
+.tick-alpha .alpha-order-bar .alpha-bar-lots{flex-direction:row}
+.tick-alpha.has-workspace .alpha-terminal th{color:#c3d6f2}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek>div{background:#fff;color:var(--rk-navy)}
+.tick-alpha.has-workspace .alpha-replay-controls .alpha-seek>div button{background:#0f67d8;color:#fff;border:0}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button[aria-pressed=true] small{color:inherit}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-buy[aria-pressed=true]{background:#0f67d8;border-color:#0f67d8}
+.tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{opacity:1}
+/* Chart settings popover (progressive disclosure: Fit, Grid, Crosshair, Volume, Full screen) */
+.tick-alpha .alpha-chart-settings{position:relative;display:inline-flex}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-trigger{display:inline-flex;align-items:center;gap:6px}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-trigger[aria-expanded=true]{background:var(--rk-yellow);color:var(--rk-navy);border-color:var(--rk-yellow)}
+.tick-alpha .alpha-chart-settings-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:60;min-width:240px;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:20px;background:var(--rk-white,#fff);color:var(--rk-navy,#061a3c);border:2px solid var(--rk-ice,#d9eafe);box-shadow:0 6px 0 var(--rk-blue,#1378f5);animation:alpha-pop .16s ease-out;font-family:var(--rk-font-ui,Inter,sans-serif)}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-panel .alpha-settings-row,.tick-alpha .alpha-chart-settings-panel .alpha-settings-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;border:0;background:transparent;color:var(--rk-navy,#061a3c);font:700 14px var(--rk-font-ui,Inter,sans-serif);text-align:left;cursor:pointer;margin:0}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-panel .alpha-settings-row{justify-content:flex-start}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-panel .alpha-settings-row:hover,.tick-alpha .alpha-chart-settings-panel .alpha-settings-switch:hover{background:var(--rk-ice-soft,#f3f8ff)}
+.tick-alpha .alpha-chart-settings-panel .alpha-settings-switch span{display:flex;flex-direction:column;line-height:1.25}
+.tick-alpha .alpha-chart-settings-panel small{font-size:11px;font-weight:600;color:#52627a}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]{appearance:none;-webkit-appearance:none;flex:none;width:40px;height:24px;margin:0;border-radius:999px;background:#c9d6ea;position:relative;cursor:pointer;transition:background .18s ease}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .18s ease}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]:checked{background:var(--rk-blue-strong,#0f67d8)}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]:checked::after{transform:translateX(16px)}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]:disabled{opacity:.45;cursor:not-allowed}
+.tick-alpha .alpha-chart-settings-panel :focus-visible{outline:3px solid var(--rk-yellow,#ffce55);outline-offset:2px}
+@keyframes alpha-pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@media(max-width:760px){
+  .tick-alpha .alpha-chart-header .alpha-btn-label,.tick-alpha .alpha-chart-settings-trigger span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .tick-alpha .alpha-chart-settings-panel{position:fixed;left:12px;right:12px;top:auto;bottom:calc(84px + env(safe-area-inset-bottom));min-width:0;border-radius:24px}
+}
+@media(prefers-reduced-motion:reduce){.tick-alpha .alpha-chart-settings-panel{animation:none}}
+/* Phone: two-row chart header so nothing scrolls sideways. Row 1 = back, title, Session menu; row 2 = chart tools. */
+@media(max-width:760px){
+  .tick-alpha.has-workspace .alpha-chart-header{flex-wrap:wrap;overflow:visible;row-gap:6px}
+  .tick-alpha.has-workspace .alpha-chart-header>*{order:2}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-back,.tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title,.tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{order:1}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex:1 1 0;min-width:0}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{margin-left:auto}
+}
+@media(max-width:760px){
+  .tick-alpha.has-workspace .alpha-chart-header::after{content:"";order:1;flex-basis:100%;height:0}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex:1 1 120px}
+}
+@media(max-width:400px){
+  .tick-alpha.has-workspace .alpha-chart-header{gap:5px;padding-inline:6px}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex-basis:80px}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu>summary{padding-inline:10px;font-size:12px}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-touch-only,.tick-alpha.has-workspace .alpha-chart-settings-trigger{min-width:40px;width:40px;padding:0;justify-content:center}
+  .tick-alpha.has-workspace .alpha-chart-header .nav-action{padding-inline:10px}
+}
+/* C-14 (2026-11-06): confirm sheet (REVIEW_EXACT / COMMIT_PENDING / STALE / REFUSED) and Pick-from-chart mini ticket. */
+.alpha-review-sheet{display:flex;flex-direction:column;gap:12px;width:min(520px,calc(100vw - 32px))}
+.alpha-review-sheet-head h2{margin:2px 0 0;font-size:20px}
+.alpha-review-step{font:600 12px var(--rk-font-data,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--lab-text-secondary)}
+.alpha-review-sheet-body{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto}
+.alpha-review-sheet .alpha-reviewed-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
+.alpha-review-sheet .alpha-reviewed-values>div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--lab-border);border-radius:10px}
+.alpha-review-sheet .alpha-reviewed-values dt{font-size:12px;color:var(--lab-text-secondary)}
+.alpha-review-sheet .alpha-reviewed-values dd{margin:0;font:600 18px var(--rk-font-data,monospace);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.alpha-review-rr{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0;padding:10px 12px;border-radius:10px;background:var(--lab-surface-workspace)}
+.alpha-review-rr span{font-size:12px;color:var(--lab-text-secondary)}.alpha-review-rr strong{font:600 18px var(--rk-font-data,monospace)}
+.alpha-review-protocol,.alpha-review-note{margin:0;font-size:13px;color:var(--lab-text-secondary)}
+.alpha-review-conditions{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.alpha-review-conditions li{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.alpha-review-refusal{padding:12px;border-radius:10px;border:2px solid var(--lab-error);background:#3a1a22}
+.tick-alpha .alpha-review-refusal[role=alert]{color:var(--lab-text-primary)}
+.alpha-review-refusal p{margin:4px 0 0}
+.alpha-review-pending{display:flex;align-items:center;gap:10px;margin:0;font-weight:600}
+.alpha-review-spinner{width:16px;height:16px;border-radius:50%;border:3px solid var(--lab-border);border-top-color:var(--rk-yellow,#ffce55);animation:alpha-spin .8s linear infinite}
+@keyframes alpha-spin{to{transform:rotate(360deg)}}
+.alpha-review-actions{display:flex;gap:10px;justify-content:space-between;padding-top:4px}
+.tick-alpha .alpha-review-actions button{flex:1;min-height:48px;margin:0;border-radius:999px;font-weight:800}
+.tick-alpha .alpha-review-actions .alpha-review-primary{flex:1.4;background:var(--rk-blue-strong,#0f67d8);border-color:var(--rk-blue-strong,#0f67d8);color:#fff}
+.tick-alpha .alpha-review-actions .alpha-review-primary:disabled{opacity:.55}
+@media(max-width:760px){
+  .tick-alpha .dialog-backdrop:has(>.alpha-review-sheet){align-items:flex-end}
+  .tick-alpha .alpha-review-sheet{width:100%;max-height:92dvh;border-radius:24px 24px 0 0;border-bottom:0;padding:18px 16px max(16px,env(safe-area-inset-bottom));animation:alpha-sheet-up .22s cubic-bezier(.2,.8,.2,1)}
+  .alpha-review-actions{position:sticky;bottom:0;background:inherit}
+}
+@keyframes alpha-sheet-up{from{transform:translateY(24px);opacity:.6}}
+.alpha-pick-ticket{position:fixed;z-index:60;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));translate:-50% 0;width:min(440px,calc(100vw - 24px));box-sizing:border-box;display:grid;gap:8px;padding:14px 16px;border-radius:20px;background:var(--rk-white,#fff);color:var(--rk-navy,#061a3c);box-shadow:0 6px 0 var(--rk-blue,#1378f5),0 18px 40px #0007;animation:alpha-sheet-up .2s cubic-bezier(.2,.8,.2,1)}
+.alpha-pick-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.alpha-pick-head span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--rk-muted,#52627a)}
+.alpha-pick-price{font:600 22px var(--rk-font-data,monospace);font-variant-numeric:tabular-nums}
+.alpha-pick-help{margin:0;font-size:13px;color:var(--rk-muted,#52627a)}
+.alpha-pick-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tick-alpha .alpha-pick-actions button{min-height:44px;margin:0;padding:0 6px;border-radius:999px;border:2px solid var(--rk-ice,#d9eafe);background:#eaf2fd;color:var(--rk-navy,#061a3c);font-weight:800;font-size:13px}
+.tick-alpha .alpha-pick-actions button:disabled{opacity:.45}
+.tick-alpha .alpha-pick-actions .alpha-pick-cancel{background:#fff}
+.alpha-pick-reasons{margin:0;padding-left:18px;font-size:12px;color:var(--rk-muted,#52627a);display:grid;gap:2px}
+@media(max-width:400px){.alpha-pick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){.tick-alpha .alpha-review-sheet,.alpha-pick-ticket{animation:none}.alpha-review-spinner{animation-duration:2.4s}}
+.alpha-sheet-search{display:block;margin:4px 0 8px}.tick-alpha .alpha-sheet-search input{width:100%;box-sizing:border-box;min-height:44px;border-radius:999px;padding:0 16px}
+.alpha-sheet-empty{margin:8px 0;color:var(--lab-text-secondary)}
+.alpha-local-only{margin:8px 0 0;font-size:12px;color:var(--lab-text-secondary)}
+/* C-14: phone landscape keeps the single-row, chart-first header (the C-13 two-row phone header is portrait only). */
+@media(max-height:500px) and (orientation:landscape) and (max-width:1000px){
+  .tick-alpha.has-workspace .alpha-chart-header{flex-wrap:nowrap;overflow-x:auto;row-gap:0}
+  .tick-alpha.has-workspace .alpha-chart-header::after{display:none}
+  .tick-alpha.has-workspace .alpha-chart-header>*{order:0}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-back,.tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{order:-1}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex:0 1 auto;min-width:0;overflow:hidden}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title *{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{margin-left:auto;order:1}
+}

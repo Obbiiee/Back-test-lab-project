@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "name": "Single tap in cursor mode: no drawing, no order dialog",
+      "detail": ""
+    },
+    {
+      "name": "Tap tool, tap A, tap B creates the line",
+      "detail": ""
+    },
+    {
+      "name": "Finger drag on a handle edits the anchor",
+      "detail": "2735.165 → 2732.783"
+    },
+    {
+      "name": "Bottom-sheet stepper moves exactly one tick",
+      "detail": "2731.1944752475247 → 2731.195475247525"
+    },
+    {
+      "name": "Two-finger pinch places no anchor; the next two taps draw normally",
+      "detail": ""
+    },
+    {
+      "name": "Finger brush stroke stored",
+      "detail": "31 points"
+    }
+  ],
+  "errors": []
+}

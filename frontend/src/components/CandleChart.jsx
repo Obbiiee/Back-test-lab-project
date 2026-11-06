@@ -21,7 +21,7 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, previewOnly = false, compactTools = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news, priceStep }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -58,7 +58,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     update(); scale.subscribeVisibleLogicalRangeChange(update); chartForOverlay.subscribeClick(select);
     return () => { scale.unsubscribeVisibleLogicalRangeChange(update); chartForOverlay.unsubscribeClick(select); };
   }, [news, newsPrimitive, chartForOverlay, seriesForOverlay, candles, drawingMode]);
-  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: drawingWorkspace });
+  const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: drawingWorkspace, tickSize: Number(priceStep) > 0 ? Number(priceStep) : 0.001 });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
@@ -273,7 +273,9 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
           if(operation==='delete')primitiveDrawings.remove(id);
           if(operation==='hide')primitiveDrawings.setProperties(id,{visible:!native.visible});
           if(operation==='lock')primitiveDrawings.setProperties(id,{locked:!native.locked});
-          if(operation==='edit'){primitiveDrawings.select(id);if(native.type==='text')primitiveDrawings.editText(id);}
+          if(operation==='edit'||operation==='properties'){primitiveDrawings.select(id);primitiveDrawings.openProperties(id);}
+          if(operation==='duplicate')primitiveDrawings.duplicate(id);
+          if(['front','forward','backward','back'].includes(operation))primitiveDrawings.reorder(id,operation);
           return;
         }
         if(researchOnly&&(operation==='select'||operation==='edit'))primitiveDrawings.clearSelection();
@@ -525,20 +527,24 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   }, [position,pendingOrder,positions,orders,simulatedTrades,trades,candles,tickEvidence]);
 
   const activeSpec = RISK_REWARD_TOOLS[drawingMode];
-  const toolHint = DRAWING_SPECS[drawingMode] ? DRAWING_SPECS[drawingMode].name + " · " + (DRAWING_SPECS[drawingMode].points === 1 ? "Klik chart" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
+  const toolHint = DRAWING_SPECS[drawingMode] ? DRAWING_SPECS[drawingMode].name + " · " + (DRAWING_SPECS[drawingMode].freehand ? "Tekan dan geser" : DRAWING_SPECS[drawingMode].nodes ? "Klik tiap titik, Enter untuk selesai" : DRAWING_SPECS[drawingMode].points === 1 ? "Klik chart" : DRAWING_SPECS[drawingMode].points === 3 ? "Klik titik A, B dan C" : "Klik titik A dan B") + " · Esc untuk batal" : activeSpec ? activeSpec.name + " · Klik chart" + (keepDrawing ? " · Keep drawing aktif" : "") : null;
 
   return (
     <div className="chart-wrap" onContextMenu={handleChartContextMenu} onClick={() => setContextMenu(null)}>
       <div className="chart-tools" aria-label="Chart trading controls">
-        <button type="button" disabled={!volumeAvailable} title={volumeAvailable ? 'Volume' : 'Source volume is unavailable; tick count is not exchange volume'} className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>
-        <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pick order price</button>
-        <span className="tool-divider" />
-        <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>
-        <button type="button" onClick={redoDrawing} disabled={!historyState.canRedo} aria-label="Redo drawing" title="Redo (Ctrl+Y)">↷ Redo</button>
+        {/* compactTools: the host shows Volume inside its Chart settings popover. previewOnly: design preview (PR #38) has no order path. */}
+        {!compactTools && <button type="button" disabled={!volumeAvailable} title={volumeAvailable ? 'Volume' : 'Source volume is unavailable; tick count is not exchange volume'} className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>}
+        {!previewOnly && <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pick order price</button>}
+        {/* Contextual: Undo/Redo appear once there is drawing history (Ctrl+Z / Ctrl+Y and the chart menu always work). */}
+        {(historyState.canUndo || historyState.canRedo) && <>
+          <span className="tool-divider" />
+          <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>
+          <button type="button" onClick={redoDrawing} disabled={!historyState.canRedo} aria-label="Redo drawing" title="Redo (Ctrl+Y)">↷ Redo</button>
+        </>}
         {selectedDrawingId && <>
-          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, locked: !drawing.locked } : drawing))} aria-label="Kunci drawing" title="Kunci / buka drawing">{drawings.find((drawing) => drawing.id === selectedDrawingId)?.locked ? "🔒" : "🔓"}</button>
-          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, hidden: !drawing.hidden } : drawing))} aria-label="Sembunyikan drawing" title="Tampilkan / sembunyikan">◉</button>
-          <button type="button" className="clear-drawings" onClick={deleteSelectedDrawing} aria-label="Hapus drawing terpilih" title="Hapus drawing terpilih">Hapus</button>
+          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, locked: !drawing.locked } : drawing))} aria-label="Lock drawing" title="Lock / unlock drawing">{drawings.find((drawing) => drawing.id === selectedDrawingId)?.locked ? "🔒" : "🔓"}</button>
+          <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, hidden: !drawing.hidden } : drawing))} aria-label="Hide drawing" title="Show / hide drawing">◉</button>
+          <button type="button" className="clear-drawings" onClick={deleteSelectedDrawing} aria-label="Delete selected drawing" title="Delete selected drawing">Delete</button>
         </>}
       </div>
       {toolHint && <div className="chart-action-hint" role="status">{toolHint}</div>}

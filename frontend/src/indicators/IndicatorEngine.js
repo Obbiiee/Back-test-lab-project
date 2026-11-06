@@ -1,5 +1,5 @@
 import { defaultIndicatorRegistry } from './IndicatorRegistry.js';
-import { instanceConfig, revealedInput, normalizedIndicatorOutput, emptyIndicatorOutput } from './indicatorValidation.js';
+import { instanceConfig, revealedInput, normalizedIndicatorOutput, emptyIndicatorOutput, effectivePlacement } from './indicatorValidation.js';
 import { IndicatorSeriesAdapter } from './IndicatorSeriesAdapter.js';
 
 export class IndicatorEngine {
@@ -31,8 +31,9 @@ export class IndicatorEngine {
   }
   update(id, patch) {
     this.#active(); const current = this.#instances.get(id);
-    if (!current || !patch || Object.keys(patch).some(key => !['parameters', 'visible'].includes(key))) throw Error('Invalid instance update');
+    if (!current || !patch || Object.keys(patch).some(key => !['parameters', 'visible', 'style', 'placement', 'paneHeight', 'references'].includes(key))) throw Error('Invalid instance update');
     const config = instanceConfig(this.#registry, { ...current, ...patch });
+    if (effectivePlacement(this.#registry.get(config.type), config) !== effectivePlacement(this.#registry.get(current.type), current)) this.#adapter.remove(id);
     this.#instances.set(id, config); this.#run(config); return config;
   }
   replaceInstances(values) {
@@ -40,17 +41,24 @@ export class IndicatorEngine {
     const configs = values.map(value => instanceConfig(this.#registry, value));
     if (new Set(configs.map(config => config.id)).size !== configs.length) throw Error('Duplicate indicator ID');
     for (const id of this.#instances.keys()) if (!configs.some(config => config.id === id)) this.remove(id);
+    const next = new Map();
     for (const config of configs) {
       const previous = this.#instances.get(config.id);
-      if (previous && previous.type !== config.type) this.#adapter.remove(config.id);
-      this.#instances.set(config.id, config); this.#run(config);
+      if (previous && (previous.type !== config.type
+        || effectivePlacement(this.#registry.get(previous.type), previous) !== effectivePlacement(this.#registry.get(config.type), config))) this.#adapter.remove(config.id);
+      next.set(config.id, config);
     }
+    // Array order is pane order (move pane up/down reorders the array).
+    this.#instances = next;
+    for (const config of configs) this.#run(config);
+    this.#adapter.order?.(configs.map(config => config.id));
   }
   setCandles(candles) {
     this.#active(); const input = revealedInput(candles); this.#candles = input;
     for (const config of this.#instances.values()) this.#run(config);
+    this.#adapter.order?.([...this.#instances.keys()]);
   }
-  attach(chart) { this.#active(); this.#adapter.attach(chart); for (const config of this.#instances.values()) this.#run(config); }
+  attach(chart) { this.#active(); this.#adapter.attach(chart); for (const config of this.#instances.values()) this.#run(config); this.#adapter.order?.([...this.#instances.keys()]); }
   detach() { this.#adapter.detach(); }
   remove(id) { this.#active(); this.#adapter.remove(id); this.#instances.delete(id); this.#outputs.delete(id); this.#errors.delete(id); }
   snapshot() { return Object.freeze([...this.#instances.values()]); }

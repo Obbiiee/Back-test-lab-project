@@ -8,6 +8,8 @@ import TickReviewEntry from './tickReview/TickReviewEntry.jsx';
 import {isLocalReview} from './tickReview/LocalOrigin.js';
 import TickAlphaEntry from './tickAlpha/TickAlphaEntry.jsx';
 import AlphaAccount from './tickAlpha/AlphaAccount.jsx';
+import {registerShellWorker} from './pwa.js';
+registerShellWorker();
 const account=new URLSearchParams(window.location.search).get('page')==='account';
 const tickAlpha=new URLSearchParams(window.location.search).get('tick-alpha')==='local'||new URLSearchParams(window.location.search).get('tick-alpha')==='exness';
 const prototype=new URLSearchParams(window.location.search).get('trading-ux')==='prototype';
