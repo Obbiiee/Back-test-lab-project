@@ -360,3 +360,21 @@
 }
 @media(prefers-reduced-motion:reduce){.tick-alpha .rk-combo-panel,.tick-alpha .rk-wizard-step{animation:none}.tick-alpha .rk-shell .rk-btn,.tick-alpha .rk-combo-chevron{transition:none}}
 .tick-alpha .rk-card a:not(.rk-btn){color:#0b55b8;font-weight:800}
+/* ---------- Journal page ---------- */
+.tick-alpha .rk-toolbar-combo-wide{flex:1 1 360px;max-width:520px}
+.tick-alpha .rk-journal{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.tick-alpha .rk-journal-item{display:flex;flex-direction:column;gap:12px}
+.tick-alpha .rk-journal-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tick-alpha .rk-journal-time{margin-left:auto;font-size:13px;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-side{border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800}
+.tick-alpha .rk-side-buy{background:#d9eafe;color:#0b55b8}
+.tick-alpha .rk-side-sell{background:#ffe1e1;color:#9e2b33}
+.tick-alpha .rk-journal-facts{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));padding:12px 14px;border-radius:16px;background:var(--rk-soft)}
+.tick-alpha .rk-note-view{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.tick-alpha .rk-note-text{margin:0;white-space:pre-wrap;font-size:14px;line-height:1.5}
+.tick-alpha .rk-tag-list{list-style:none;margin:0;padding:0;display:flex;gap:6px;flex-wrap:wrap}
+.tick-alpha .rk-tag-list li{border-radius:999px;padding:3px 10px;background:#eaf2fd;color:#0b55b8;font-size:12px;font-weight:800}
+.tick-alpha .rk-shell .rk-note-form textarea{min-height:96px;border-radius:16px;border:2px solid #d9eafe;background:var(--rk-soft);color:var(--rk-ink);padding:10px 14px;font:500 15px/1.5 var(--rk-font-ui,Inter,sans-serif);resize:vertical;box-sizing:border-box;width:100%}
+.tick-alpha .rk-shell .rk-note-form textarea:focus{border-color:#1378f5;outline:3px solid #ffce55}
+.tick-alpha .rk-note-form>label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:800}
+.tick-alpha .rk-note-form>label small{font-size:12px;font-weight:600;color:var(--rk-muted-on-white)}

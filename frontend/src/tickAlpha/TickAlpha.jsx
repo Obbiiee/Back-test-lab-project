@@ -6,6 +6,7 @@ import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
 import AlphaSessionWizard from './AlphaSessionWizard.jsx';
+import AlphaJournalPage from './AlphaJournalPage.jsx';
 import {SessionsPage,SessionOverview,CatalogPage} from './AlphaSessionPages.jsx';
 import AlphaTicketEstimate from './AlphaTicketEstimate.jsx';
 import {targetForRR} from './orderEstimate.js';
@@ -152,6 +153,7 @@ export default function TickAlpha(){
       :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
       :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>
+      :route.screen==='journal'?<AlphaJournalPage catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='analytics'?<Analytics catalog={catalog} route={route}/>
       :route.screen==='replay'&&route.session?(busy||!notice?<StatePanel level={1} kind="loading" title="Opening Session…"/>:<StatePanel level={1} kind="unavailable" title="This Session could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
       :<Placeholder screen={route.screen} catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>}

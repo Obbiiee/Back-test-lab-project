@@ -254,8 +254,6 @@ export function Placeholder({screen,catalog,onOpen,onSource,onFeedback}){
     <StatePanel kind="unavailable" title="No account in local mode" action={<a className="rk-btn rk-btn-primary" href="/?page=account">Open account page</a>}><p>The account page needs the https:// address. Local Sessions stay on this computer.</p></StatePanel></>;
   if(screen==='replay')return <><PageHead eyebrow="Replay" title="Replay needs a Session" lead="Pick a Session to continue from its saved replay time, or open a Method to start a new one."/>
     {catalog.sessions.length?<SessionTable sessions={catalog.sessions.slice().reverse()} catalog={catalog} onOpen={onOpen} caption="Sessions you can replay"/>:<StatePanel kind="empty" title="No Sessions yet" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Create a Method, then a Session inside it.</p></StatePanel>}</>;
-  if(screen==='journal')return <><PageHead eyebrow="Journal" title="Journal" lead="Each Session keeps its own journal next to the chart. A journal across Sessions needs a server list that is not published yet."/>
-    {catalog.sessions.length?<SessionTable sessions={catalog.sessions.slice().reverse()} catalog={catalog} onOpen={onOpen} caption="Sessions with a journal"/>:<StatePanel kind="empty" title="Nothing journaled yet"><p>Journals start when you create a Session.</p></StatePanel>}</>;
   return <><PageHead eyebrow="Help" title="Help" lead="Short answers about how RIKSORA research works."/>
     <div className="rk-grid-2">
       <section className="rk-card"><h2>How replay works</h2><p>History is revealed step by step from the Session’s saved time. Orders fill on later observed Bid/Ask quotes only, never on prices that were not yet visible.</p></section>

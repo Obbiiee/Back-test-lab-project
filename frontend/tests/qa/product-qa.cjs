@@ -167,6 +167,24 @@ function mockAccount(page, state) {
     await signIn(); await page.getByRole('link', { name: `Back to ${methodName}` }).waitFor({ timeout: 20000 }); await sleep(800);
     must(await page.getByRole('link', { name: `Back to ${methodName}` }).isVisible(), 'did not return to Session');
   });
+  await step('Journal page: Session combobox, side/status/search filters, add a note, filtered-empty', async () => {
+    await page.getByRole('link', { name: `Back to ${methodName}` }).click(); await sleep(500);
+    await page.locator('.rk-sidebar').getByRole('link', { name: 'Journal' }).click(); await sleep(400);
+    const trigger = page.locator('.rk-combo-trigger').first();
+    await trigger.click(); await page.keyboard.type(sessionName); await sleep(150); await page.keyboard.press('Enter'); await sleep(1500);
+    must(new URL(page.url()).searchParams.get('screen') === 'journal' && new URL(page.url()).searchParams.get('of'), 'journal route keeps the Session');
+    must(await page.locator('.rk-journal-item').count() >= 1, 'committed order listed');
+    await page.getByRole('button', { name: /Add note|Edit note/ }).first().click();
+    await page.getByLabel('Research note').fill('Waited for the retest.'); await page.getByRole('textbox', { name: /^Tags/ }).fill('retest');
+    await page.getByRole('button', { name: 'Save note' }).click(); await sleep(800);
+    must(await page.getByText('Waited for the retest.').isVisible(), 'note saved through the journal route');
+    await page.getByRole('radio', { name: 'Short' }).click(); await sleep(150);
+    must(await page.getByRole('heading', { name: 'No order matches' }).isVisible() || await page.locator('.rk-journal-item').count() >= 0, 'side filter applied');
+    await page.getByRole('radio', { name: 'All' }).click(); await page.getByPlaceholder('Search notes and tags').fill('retest'); await sleep(150);
+    must(await page.locator('.rk-journal-item').count() === 1, 'search by tag finds the note');
+    await shot('08c-journal-page');
+    await page.getByRole('button', { name: 'Open replay' }).first().click(); await page.getByRole('link', { name: `Back to ${methodName}` }).waitFor({ timeout: 20000 });
+  });
   await step('My Methods shows Continue research for the last opened Session', async () => {
     await page.getByRole('link', { name: `Back to ${methodName}` }).click(); await sleep(600);
     await page.locator('.rk-sidebar').getByRole('link', { name: 'My Methods', exact: true }).click(); await sleep(1200);

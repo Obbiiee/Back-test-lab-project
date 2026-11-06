@@ -20,7 +20,7 @@ function previewCandles(){
 }
 const candles=previewCandles();
 const steps=[
-  ['Pick a moment','Write your strategy, choose a start month and a starting balance. The chart stops right there.'],
+  ['Write a Method, start a Session','Write the rules once, then pick the instrument, start month and balance. The chart stops right there.'],
   ['Press Play and trade','Candles form one by one. Buy, Sell, or plan a trade with stop and target when your setup shows up.'],
   ['Learn from the results','Every trade lands in the journal and Analysis: win rate, profit factor, drawdown and the balance line.'],
 ];
