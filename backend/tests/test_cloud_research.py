@@ -58,6 +58,15 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(response.headers['cache-control'],'no-store')
         self.assertNotIn('controller',response.json())
         self.assertNotIn('quote',response.json())
+        capabilities = self.client.get('/api/v1/workspaces/' + self.workspace + '/capabilities',
+                                       headers=self.headers)
+        self.assertEqual(capabilities.status_code, 200, capabilities.text)
+        capability = capabilities.json()
+        self.assertEqual(capability['artifact'], 'BTL-WORKSPACE-CAPABILITIES-1')
+        self.assertEqual(capability['role'], 'OWNER')
+        self.assertTrue(capability['capabilities']['createSession'])
+        self.assertEqual(capability['entitlement']['status'], 'NOT_CONFIGURED')
+        self.assertFalse(capability['entitlement']['productionEntitlement'])
         self.assertEqual(self.client.get(path).status_code,401)
         foreign_actor,foreign_headers=self.account()
         self.assertNotEqual(foreign_actor,self.actor)
@@ -350,6 +359,10 @@ class CloudResearchTests(unittest.TestCase):
         target = '/api/v1/workspaces/' + self.workspace + '/members'
         self.assertEqual(self.client.post(target, headers=self.headers, json={'userId': member}).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=header).status_code, 200)
+        member_capability = self.client.get('/api/v1/workspaces/' + self.workspace + '/capabilities', headers=header)
+        self.assertEqual(member_capability.status_code, 200, member_capability.text)
+        self.assertEqual(member_capability.json()['role'], 'MEMBER')
+        self.assertFalse(member_capability.json()['capabilities']['createSession'])
         self.assertEqual(self.client.post(self.root + '/methods', headers=header, json=method()).status_code, 403)
         self.assertEqual(self.client.get(self.root + '/sessions/' + session_id + '/metering/storage',
                                          headers=header).status_code, 403)
