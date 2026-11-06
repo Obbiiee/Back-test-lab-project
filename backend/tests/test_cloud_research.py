@@ -64,6 +64,28 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(self.client.get(foreign_path,headers=foreign_headers).status_code,404)
         app.close()
 
+    def test_paginated_journal_route_keeps_workspace_authority_and_financial_projection(self):
+        app=ResearchApplication(DSN,TrustedScope(self.workspace,self.actor))
+        record=method();app.create_method(record)
+        session='session:'+uuid.uuid4().hex
+        created=app.create_session(dict(id=session,name='Paged Journal QA',methodId=record['id'],
+                                         initialBalance='10000',startPeriod='2020-01'))
+        review=review_request(created);approved=app.review(review)
+        app.confirm(session,dict(reviewId=review['requestId'],reviewHash=approved['reviewHash']))
+        path=self.root+'/sessions/'+session+'/journal/pages?limit=1'
+        response=self.client.get(path,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        page=response.json()
+        self.assertEqual(page['artifact'],'BTL-TICK-JOURNAL-PAGE-1')
+        self.assertEqual(page['totalOrders'],1)
+        self.assertEqual([order['id'] for order in page['orders']],[review['requestId']])
+        self.assertTrue(page['complete']);self.assertIsNone(page['nextCursor'])
+        self.assertEqual(page['financialAuthority'],'COMMITTED_EVENTS_ONLY')
+        self.assertEqual(self.client.get(path).status_code,401)
+        _foreign_actor,foreign_headers=self.account()
+        self.assertEqual(self.client.get(path,headers=foreign_headers).status_code,404)
+        app.close()
+
     def test_verified_scope_canonical_session_and_hostile_tenant(self):
         m = method()
         created = self.client.post(self.root + '/methods', headers=self.headers, json=m)

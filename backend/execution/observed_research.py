@@ -313,6 +313,50 @@ class ObservedResearchApplication:
         return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',provenance=analysis['provenance'],orders=orders,notes=notes,
                     financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
 
+    def journal_page(self, session_id, raw):
+        from .journal import (MAX_JOURNAL_PAGE_SIZE, MAX_JOURNAL_READ_ORDERS,
+                              encode_cursor, decode_cursor, validate_note)
+        keys(raw, 'limit cursor')
+        limit=raw['limit']
+        require(type(limit) is int and 1<=limit<=MAX_JOURNAL_PAGE_SIZE,'limit','INVALID_INPUT')
+        cursor=raw['cursor']
+        require(cursor is None or type(cursor) is str,'cursor','INVALID_CURSOR')
+        requested_revision,after_order_id=(None,None) if cursor is None else decode_cursor(cursor,session_id)
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            state=self._session(db,session_id)[2]
+        if requested_revision is not None:
+            require(requested_revision==state['revision'],'cursor','STALE_REVISION')
+        projection=self._complete_statistics(session_id,state)
+        require(self._same_projection(projection,state),'journal','REFUSED_STALE_REVISION')
+        analysis=self._view_analysis(state,projection)
+        require(analysis['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
+        by_id={row['id']:row for row in analysis['orders']}
+        for row in analysis['completed']:
+            by_id[row['id']]=row
+        all_orders=sorted(by_id.values(),key=lambda row:row['id'])
+        require(len(all_orders)<=MAX_JOURNAL_READ_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+        orders=[row for row in all_orders if after_order_id is None or row['id']>after_order_id]
+        page=orders[:limit];more=len(orders)>len(page);indexed={row['id']:row for row in page};notes=[]
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            live=self._session(db,session_id)[2]
+            require(live['revision']==state['revision'] and live['eventHash']==state['eventHash'],
+                    'journal','REFUSED_STALE_REVISION')
+            if page:
+                ids=[row['id'] for row in page]
+                saved=db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s AND order_id=ANY(%s) ORDER BY order_id LIMIT %s',(self.scope.workspace_id,session_id,ids,limit+1)).fetchall()
+                require(len(saved)<=limit,'journalNotes','CORRUPT_RECORD')
+                for blob,sha,note_revision,order_id in saved:
+                    value=validate_note(unpack(blob,sha),state,indexed)
+                    require((value['orderId'],value['noteRevision'])==(order_id,note_revision),'journalNote','CORRUPT_RECORD')
+                    notes.append(value)
+        next_cursor=encode_cursor(session_id,state['revision'],page[-1]['id']) if more and page else None
+        return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-PAGE-1',sessionId=session_id,
+                    revision=state['revision'],totalOrders=len(all_orders),orders=page,notes=notes,
+                    nextCursor=next_cursor,complete=next_cursor is None,provenance=analysis['provenance'],
+                    financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
     def save_note(self,session_id,raw):
         journal_request(raw)
         with connect(self.dsn) as db:

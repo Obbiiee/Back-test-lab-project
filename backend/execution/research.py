@@ -12,13 +12,15 @@ from contracts.primitives import require, identifier, revision, digest
 from ticks.contracts import keys, tag, TickManifest
 from ticks.timeline import TickTimeline
 from infrastructure.database import connect
-from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity
+from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity, MAX_ORDERS
 from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
 from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
-from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
+from .journal import (validate_note, request as journal_request, MAX_JOURNAL_ORDERS,
+                      MAX_JOURNAL_PAGE_SIZE, MAX_JOURNAL_READ_ORDERS,
+                      encode_cursor, decode_cursor)
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 from .availability import catalog_availability, eligible_start_month
 
@@ -387,11 +389,11 @@ class ResearchApplication:
         result['provenance']=analysis['provenance']
         return result
 
-    def _journal_projection(self, db, state, checkpoint):
+    def _journal_projection(self, db, state, checkpoint, max_orders=MAX_JOURNAL_ORDERS):
         require(state['nextEventIndex'] <= MAX_ANALYSIS_EVENTS, 'journal', 'REFUSED_ANALYSIS_LIMIT')
         analysis = self._committed_analysis(db,state,self._quote(state,checkpoint))
         self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
-        require(len(analysis['orders']) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+        require(len(analysis['orders']) <= max_orders,'journal','REFUSED_JOURNAL_LIMIT')
         return analysis
 
     def journal(self, session_id):
@@ -410,6 +412,47 @@ class ResearchApplication:
                 notes.append(value)
             return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',provenance=analysis['provenance'],orders=analysis['orders'],notes=notes,
                         financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
+    def journal_page(self, session_id, raw):
+        keys(raw, 'limit cursor')
+        limit = raw['limit']
+        require(type(limit) is int and 1 <= limit <= MAX_JOURNAL_PAGE_SIZE,
+                'limit', 'INVALID_INPUT')
+        cursor = raw['cursor']
+        require(cursor is None or type(cursor) is str, 'cursor', 'INVALID_CURSOR')
+        requested_revision, after_order_id = (None, None) if cursor is None else decode_cursor(cursor, session_id)
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            _meta, _method, state, checkpoint = self._session(db, session_id)
+            if requested_revision is not None:
+                require(requested_revision == state['revision'], 'cursor', 'STALE_REVISION')
+            analysis = self._journal_projection(db, state, checkpoint, MAX_ORDERS)
+            orders = sorted(analysis['orders'], key=lambda row: row['id'])
+            require(len(orders) <= MAX_JOURNAL_READ_ORDERS, 'journal', 'REFUSED_JOURNAL_LIMIT')
+            if after_order_id is not None:
+                orders = [row for row in orders if row['id'] > after_order_id]
+            page = orders[:limit]
+            more = len(orders) > len(page)
+            order_ids = [row['id'] for row in page]
+            indexed = {row['id']: row for row in page}
+            notes = []
+            if order_ids:
+                saved = db.execute(
+                    'SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes '
+                    'WHERE workspace_id=%s AND session_id=%s AND order_id=ANY(%s) ORDER BY order_id LIMIT %s',
+                    (self.scope.workspace_id, session_id, order_ids, limit + 1)).fetchall()
+                require(len(saved) <= limit, 'journalNotes', 'CORRUPT_RECORD')
+                for blob, sha, note_revision, order_id in saved:
+                    value = validate_note(unpack(blob, sha), state, indexed)
+                    require((value['orderId'], value['noteRevision']) == (order_id, note_revision),
+                            'journalNote', 'CORRUPT_RECORD')
+                    notes.append(value)
+            next_cursor = encode_cursor(session_id, state['revision'], page[-1]['id']) if more and page else None
+            return dict(schemaVersion=1, artifact='BTL-TICK-JOURNAL-PAGE-1', sessionId=session_id,
+                        revision=state['revision'], totalOrders=len(analysis['orders']), orders=page,
+                        notes=notes, nextCursor=next_cursor, complete=next_cursor is None,
+                        provenance=analysis['provenance'], financialAuthority='COMMITTED_EVENTS_ONLY',
+                        notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
 
     def save_note(self, session_id, raw):
         journal_request(raw)

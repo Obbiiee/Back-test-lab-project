@@ -126,9 +126,9 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             elif operation=='replay_to':
                 session_id=args[0] if args else None
                 observed=True
-            elif operation in ('summary','inspect','journal','save_note','confirm','apply','bootstrap','workspace','chart_history','review','command_result'):
+            elif operation in ('summary','inspect','journal','journal_page','save_note','confirm','apply','bootstrap','workspace','chart_history','review','command_result'):
                 if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
-                elif operation in ('confirm','apply','workspace','chart_history','bootstrap','inspect','summary','journal','save_note','command_result') and args:session_id=args[0]
+                elif operation in ('confirm','apply','workspace','chart_history','bootstrap','inspect','summary','journal','journal_page','save_note','command_result') and args:session_id=args[0]
                 if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
                 if type(session_id) is str:
                     row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
@@ -263,6 +263,12 @@ def install(app):
     @app.get(prefix + '/sessions/{session_id}/journal')
     async def journal(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'journal', session_id)
+
+    @app.get(prefix + '/sessions/{session_id}/journal/pages')
+    async def journal_page(workspace_id: uuid.UUID, session_id: str, limit: int = 32,
+                           cursor: str | None = None, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'journal_page', session_id,
+                             {'limit': limit, 'cursor': cursor})
 
     @app.post(prefix + '/sessions/{session_id}/replay-to')
     async def replay_to(workspace_id: uuid.UUID, session_id: str, request: Request,

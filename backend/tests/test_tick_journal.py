@@ -1,5 +1,6 @@
 """Real PostgreSQL notes, canonical identity, concurrent edits and unchanged money."""
 from copy import deepcopy
+import base64
 from concurrent.futures import ThreadPoolExecutor
 import os
 import unittest
@@ -11,7 +12,8 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 from infrastructure.database import connect,migrate
 from execution.research import ResearchApplication
-from execution.journal import note_text,note_tags,MAX_JOURNAL_ORDERS
+from execution.journal import (note_text,note_tags,MAX_JOURNAL_ORDERS,encode_cursor,
+                               decode_cursor)
 from tests import test_research_sessions as sessions
 
 DSN=os.getenv('BTL_TEST_DATABASE_URL')
@@ -24,6 +26,13 @@ class JournalInputTests(unittest.TestCase):
             with self.assertRaises(ContractError):note_text(value)
         for value in (['a','a'],['a']*9,[' x'],['x'*33],['\n'],{}):
             with self.assertRaises(ContractError):note_tags(value)
+
+    def test_journal_cursor_is_canonical_session_and_revision_bound(self):
+        token=encode_cursor('session:cursor',7,'order:after')
+        self.assertEqual(decode_cursor(token,'session:cursor'),(7,'order:after'))
+        bad_json=base64.urlsafe_b64encode(b'{"schemaVersion":1,"artifact":"BTL-TICK-JOURNAL-CURSOR-1","sessionId":"session:cursor","revision":7,"afterOrderId":"order:after","extra":NaN}').decode().rstrip('=')
+        for value,session in ((token,'session:other'),(token+'!','session:cursor'),('@@','session:cursor'),(bad_json,'session:cursor')):
+            with self.assertRaises(ContractError):decode_cursor(value,session)
 
 
 @unittest.skipUnless(DSN,'Real isolated PostgreSQL required; skips are not PASS')
@@ -57,6 +66,31 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(before,canonical_bytes(fresh.inspect(self.session)))
         self.app.save_note(self.session,dict(self.raw,expectedNoteRevision=1,text='',tags=[]))
         self.assertEqual(fresh.journal(self.session)['notes'][0]['noteRevision'],2)
+
+    def test_revision_pinned_journal_pages_and_note_projection(self):
+        view=self.app.inspect(self.session)
+        second=sessions.review_request(view)
+        reviewed=self.app.review(second)
+        self.app.confirm(self.session,dict(reviewId=second['requestId'],reviewHash=reviewed['reviewHash']))
+        first_page=self.app.journal_page(self.session,dict(limit=1,cursor=None))
+        self.assertEqual(first_page['artifact'],'BTL-TICK-JOURNAL-PAGE-1')
+        self.assertEqual(first_page['totalOrders'],2)
+        self.assertEqual(len(first_page['orders']),1)
+        self.assertIsNotNone(first_page['nextCursor'])
+        self.assertEqual(first_page['complete'],False)
+        order_id=first_page['orders'][0]['id']
+        note=self.app.save_note(self.session,dict(orderId=order_id,expectedNoteRevision=0,
+            text='page-bound note',tags=['qa']))
+        first_page=self.app.journal_page(self.session,dict(limit=1,cursor=None))
+        self.assertEqual(first_page['notes'],[note])
+        second_page=self.app.journal_page(self.session,dict(limit=1,cursor=first_page['nextCursor']))
+        self.assertEqual(second_page['totalOrders'],2)
+        self.assertEqual(len(second_page['orders']),1)
+        self.assertEqual(second_page['complete'],True)
+        self.assertNotEqual(first_page['orders'][0]['id'],second_page['orders'][0]['id'])
+        self.advance(self.app.inspect(self.session))
+        with self.assertRaisesRegex(ContractError,'STALE_REVISION'):
+            self.app.journal_page(self.session,dict(limit=1,cursor=first_page['nextCursor']))
 
     def test_scoped_foreign_unknown_extra_and_stale_refusal(self):
         self.app.save_note(self.session,self.raw)

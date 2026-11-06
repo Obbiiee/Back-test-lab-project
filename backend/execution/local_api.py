@@ -178,6 +178,12 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
     async def journal(session_id: str,request: Request):
         return await execute(application(request).journal,session_id)
 
+    @app.get('/api/v1/tick-alpha/sessions/{session_id}/journal/pages')
+    async def journal_page(session_id: str, request: Request, limit: int = 32,
+                           cursor: str | None = None):
+        return await execute(application(request).journal_page,session_id,
+                             {'limit':limit,'cursor':cursor})
+
     @app.post('/api/v1/tick-alpha/sessions/{session_id}/journal')
     async def note(session_id: str,request: Request):
         return await execute(application(request).save_note,session_id,await body(request))

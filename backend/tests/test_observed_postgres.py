@@ -693,6 +693,11 @@ class ObservedPostgresTests(unittest.TestCase):
             self.assertEqual(saved['noteRevision'],1)
             with patch.object(catalog,'resolve',side_effect=AssertionError('Journal must not admit market archives')):
                 self.assertEqual(app.journal(app_sid)['notes'][0]['text'],'Observed app acceptance')
+                page=app.journal_page(app_sid,dict(limit=1,cursor=None))
+                self.assertEqual(page['artifact'],'BTL-TICK-JOURNAL-PAGE-1')
+                self.assertEqual(page['totalOrders'],1)
+                self.assertEqual(page['orders'][0]['id'],'app:order')
+                self.assertEqual(page['notes'][0]['text'],'Observed app acceptance')
 
 
 if __name__=='__main__' and '--worker' in sys.argv:worker()

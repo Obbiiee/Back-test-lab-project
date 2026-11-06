@@ -1,8 +1,43 @@
 """Bounded mutable notes over verified canonical order identities, no settlement."""
+import base64
+import json
+import re
+
+from contracts.canonical import canonical_bytes
 from contracts.primitives import require, identifier, revision
 from ticks.contracts import keys, tag
 
 MAX_JOURNAL_ORDERS = 32  # Complete JSON snapshot stays below the transport's 1MiB budget.
+MAX_JOURNAL_PAGE_SIZE = 32
+MAX_JOURNAL_READ_ORDERS = 4096
+
+
+def encode_cursor(session_id, session_revision, after_order_id):
+    identifier(session_id, 'sessionId'); revision(session_revision)
+    identifier(after_order_id, 'afterOrderId')
+    value = dict(schemaVersion=1, artifact='BTL-TICK-JOURNAL-CURSOR-1',
+                 sessionId=session_id, revision=session_revision, afterOrderId=after_order_id)
+    return base64.urlsafe_b64encode(canonical_bytes(value)).decode('ascii').rstrip('=')
+
+
+def decode_cursor(token, session_id):
+    require(type(token) is str and 1 <= len(token) <= 2048 and
+            re.fullmatch(r'[A-Za-z0-9_-]+', token) is not None,
+            'cursor', 'INVALID_CURSOR')
+    try:
+        raw = base64.urlsafe_b64decode(token + '=' * (-len(token) % 4))
+        value = json.loads(raw)
+    except (ValueError, UnicodeError):
+        require(False, 'cursor', 'INVALID_CURSOR')
+    try:
+        valid = type(value) is dict and canonical_bytes(value) == raw
+    except (TypeError, ValueError):
+        valid = False
+    require(valid, 'cursor', 'INVALID_CURSOR')
+    tag(value, 'BTL-TICK-JOURNAL-CURSOR-1', 'sessionId revision afterOrderId')
+    require(value['sessionId'] == session_id, 'cursor', 'INVALID_CURSOR')
+    revision(value['revision']); identifier(value['afterOrderId'], 'afterOrderId')
+    return value['revision'], value['afterOrderId']
 
 
 def note_text(value):
