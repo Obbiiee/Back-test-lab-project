@@ -117,6 +117,11 @@ class QueueTests(unittest.TestCase):
             'id':session,'name':'Queue read QA','methodId':m['id'],'initialBalance':'10000','startPeriod':'2020-01'})
         self.assertEqual(created.status_code,200,created.text)
         path=self.fixture.root+'/sessions/'+session
+        command_id='command:'+uuid.uuid4().hex
+        receipt_status=self.fixture.client.get(path+'/commands/'+command_id,headers=self.fixture.headers)
+        self.assertEqual(receipt_status.status_code,200,receipt_status.text)
+        self.assertEqual((receipt_status.json()['status'],receipt_status.json()['sessionId'],
+                          receipt_status.json()['commandId']),('UNKNOWN',session,command_id))
         before=self.fixture.client.get(path,headers=self.fixture.headers).content
         job=str(uuid.uuid4())
         headers={**self.fixture.headers,'X-BTL-Job':job}

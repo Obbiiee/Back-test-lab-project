@@ -220,7 +220,7 @@ def invoke(dsn, payload, *, deadline=DEADLINE):
 
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
-    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to'), 'workerOperation')
+    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'command_result'), 'workerOperation')
     return pooled_invoke(dsn, dict(schemaVersion=1, actor=str(actor_id), workspace=str(workspace_id),
                             operation=operation, args=list(args), write=write))
 
@@ -231,7 +231,7 @@ def _execute(raw):
         require(len(raw) <= 32768, 'workerInput')
         request = json.loads(raw)
         require(request.get('schemaVersion') == 1 and
-                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to'), 'workerInput')
+                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'command_result'), 'workerInput')
         from .research import run as authorized_run
         result = authorized_run(os.environ['BTL_WORKER_DATABASE'], uuid.UUID(request['actor']),
                                 uuid.UUID(request['workspace']), request['operation'],
