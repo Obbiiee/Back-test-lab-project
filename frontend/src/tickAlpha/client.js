@@ -85,8 +85,9 @@ export function command(view,kind,payload){
 
 // Reads only; an obsolete StrictMode mount must not start another workspace read.
 async function collectProductPage(path,artifact,project=value=>value){
-  const items=[];let after=null;const cursors=new Set();
+  const items=[];let after=null;let pages=0;const cursors=new Set();
   for(;;){
+    if(++pages>3)throw Error('Workspace pagination exceeded its published page bound.');
     const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
     const page=await api(`${path}?${query}`);
     if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')

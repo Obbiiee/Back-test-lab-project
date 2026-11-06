@@ -33,4 +33,15 @@ try{
   assert.ok(calls.some(path=>path.includes('/methods?limit=50&after=')));
   assert.ok(calls.some(path=>path.includes('/sessions?limit=50')));
 }finally{clearAccountTransport();}
+
+let methodPage=0;
+const nonAdvancingClient={subject:()=>subject,request:async path=>{
+  if(path.endsWith('/catalog'))return {schemaVersion:1,artifact:'BTL-LOCAL-CATALOG-1',methods:[],sessions:[],profile:{instrumentId:'XAUUSD'}};
+  if(path.includes('/methods?limit=50'))return {schemaVersion:1,artifact:'BTL-METHOD-PAGE-1',items:[],complete:false,nextCursor:`method:${++methodPage}`};
+  if(path.includes('/sessions?limit=50'))return {schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',items:[],complete:true,nextCursor:null};
+  throw new Error(`Unexpected path ${path}`);
+}};
+setAccountTransport(nonAdvancingClient,workspace);
+try{await assert.rejects(loadProductCatalog(),/page bound/);}
+finally{clearAccountTransport();}
 console.log('hosted product pagination: ok');
