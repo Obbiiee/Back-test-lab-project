@@ -411,3 +411,21 @@
 .tick-alpha .rk-help-faq{display:grid;gap:12px;align-content:start}
 .tick-alpha .rk-help-faq .rk-disclosure p{margin:8px 0}
 @media(max-width:520px){.tick-alpha .rk-status-list li{grid-template-columns:1fr;gap:6px}}
+
+/* UX pass (round 2): Session lists read as cards on phones instead of a sideways
+   table; Method and Sort share one row. Table semantics stay for screen readers. */
+@media(max-width:760px){
+  .tick-alpha .rk-toolbar .rk-toolbar-combo,.tick-alpha .rk-toolbar .rk-select{flex:1 1 calc(50% - 6px);min-width:0}
+  .tick-alpha .rk-toolbar .rk-count{flex-basis:100%}
+  .tick-alpha .rk-table-cards-wrap{background:none;overflow:visible;border:0!important}
+  .tick-alpha .rk-table-cards{min-width:0;display:block}
+  .tick-alpha .rk-table-cards thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .tick-alpha .rk-table-cards tbody{display:grid;gap:10px}
+  .tick-alpha .rk-table-cards tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;padding:14px 16px;border-radius:18px;background:#fff}
+  .tick-alpha .rk-table-cards th,.tick-alpha .rk-table-cards td{display:block;padding:0;border:0}
+  .tick-alpha .rk-table-cards tbody th{flex-basis:100%;font-size:16px}
+  .tick-alpha .rk-table-cards td[data-label]{font-size:13px;color:var(--rk-muted-on-white)}
+  .tick-alpha .rk-table-cards td[data-label]::before{content:attr(data-label) " ";font:700 13px var(--rk-font-ui,Inter,sans-serif)}
+  .tick-alpha .rk-table-cards .rk-row-actions{flex-basis:100%;display:flex;gap:8px;margin-top:6px}
+  .tick-alpha .rk-table-cards .rk-row-actions .rk-btn{flex:1;min-height:44px}
+}

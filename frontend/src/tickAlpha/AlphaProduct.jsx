@@ -19,13 +19,14 @@ function sourceLine(catalog){
 function SessionRow({session,catalog,onOpen}){
   return <tr>
     <th scope="row"><a {...linkTo({screen:'session',of:session.id})}>{session.name}</a></th>
-    <td>{catalog.profile.instrumentId}</td><td className="rk-num">{session.startPeriod}</td><td className="rk-num">{money(session.initialBalance)}</td>
+    <td data-label="Instrument">{catalog.profile.instrumentId}</td><td className="rk-num" data-label="Start">{session.startPeriod}</td><td className="rk-num" data-label="Balance">{money(session.initialBalance)}</td>
     <td className="rk-row-actions"><button type="button" className="rk-btn rk-btn-small" onClick={()=>onOpen(session.id)} aria-label={`Open replay for ${session.name}`}>Open replay</button><a className="rk-btn rk-btn-small rk-btn-quiet" {...linkTo({screen:'analytics',of:session.id})} aria-label={`Analytics for ${session.name}`}>Analytics</a></td>
   </tr>;
 }
 
 export function SessionTable({sessions,catalog,onOpen,caption}){
-  return <div className="rk-table-scroll" tabIndex={0} role="region" aria-label={`${caption}, scrolls sideways`}><table className="rk-table">
+  // At phone width the rows become cards (CSS), so nothing scrolls sideways there.
+  return <div className="rk-table-scroll rk-table-cards-wrap" tabIndex={0} role="region" aria-label={caption}><table className="rk-table rk-table-cards">
     <caption className="alpha-sr-only">{caption}</caption>
     <thead><tr><th scope="col">Session</th><th scope="col">Instrument</th><th scope="col">Start month</th><th scope="col">Starting balance</th><th scope="col"><span className="alpha-sr-only">Actions</span></th></tr></thead>
     <tbody>{sessions.map(s=><SessionRow key={s.id} session={s} catalog={catalog} onOpen={onOpen}/>)}</tbody>
