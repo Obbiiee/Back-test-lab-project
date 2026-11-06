@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const memory=new Map();
+globalThis.sessionStorage={getItem:k=>memory.has(k)?memory.get(k):null,setItem:(k,v)=>memory.set(k,String(v)),removeItem:k=>memory.delete(k)};
+const {readDraft,writeDraft,clearDraft,isDirty,tagList}=await import('../src/tickAlpha/noteDrafts.js');
+
+assert.equal(readDraft('s','o'),null);
+assert.equal(writeDraft('s','o',{text:'hello',tags:'a, b',baseRevision:2,price:'1.23'}),true);
+assert.deepEqual(readDraft('s','o'),{text:'hello',tags:'a, b',baseRevision:2});
+assert.ok(![...memory.values()].some(v=>v.includes('price')),'only text, tags and revision are stored');
+assert.equal(readDraft('s','other'),null,'scoped per order');
+memory.set([...memory.keys()][0],'{"text":1}');assert.equal(readDraft('s','o'),null,'malformed draft ignored');
+clearDraft('s','o');assert.equal(memory.size,0);
+assert.deepEqual(tagList(' a, ,b ,'),['a','b']);
+assert.equal(isDirty(null,{text:'x'}),false);
+assert.equal(isDirty({text:'x',tags:'a,b'},{text:'x',tags:['a','b']}),false);
+assert.equal(isDirty({text:'x',tags:''},{text:'y',tags:[]}),true);
+assert.equal(isDirty({text:'',tags:''},undefined),false);
+globalThis.sessionStorage={getItem(){throw Error('blocked');},setItem(){throw Error('blocked');},removeItem(){throw Error('blocked');}};
+assert.equal(writeDraft('s','o',{text:'',tags:'',baseRevision:0}),false,'blocked storage reported, not thrown');
+assert.equal(readDraft('s','o'),null);
+const page=readFileSync(new URL('../src/tickAlpha/AlphaJournalPage.jsx',import.meta.url),'utf8');
+assert.match(page,/expectedNoteRevision:baseRevision/,'save sends the revision the draft started from');
+assert.doesNotMatch(page,/localStorage/,'drafts never go to persistent storage');
+console.log('note drafts: ok');

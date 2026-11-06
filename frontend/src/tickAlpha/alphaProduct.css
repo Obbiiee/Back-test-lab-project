@@ -383,3 +383,16 @@
 .tick-alpha .rk-shell .rk-note-form textarea:focus{border-color:#1378f5;outline:3px solid #ffce55}
 .tick-alpha .rk-note-form>label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:800}
 .tick-alpha .rk-note-form>label small{font-size:12px;font-weight:600;color:var(--rk-muted-on-white)}
+
+/* ---------- Journal draft safety ---------- */
+.tick-alpha .rk-shell .rk-btn-danger{background:#9e2b33;color:#fff}
+.tick-alpha .rk-draft-flag{margin:0;font-size:13px;font-weight:700}
+.tick-alpha .rk-conflict{display:grid;gap:8px;padding:12px 14px;border-radius:16px;border:2px solid #ffce55;background:#fff8e1;color:var(--rk-ink)}
+.tick-alpha .rk-conflict p{margin:0}
+.tick-alpha .rk-conflict-server{margin:0;padding:10px 12px;border-left:4px solid #1378f5;border-radius:10px;background:#fff;display:grid;gap:4px}
+.tick-alpha .rk-conflict-server>span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-conflict-server p{white-space:pre-wrap}
+.tick-alpha .rk-leave{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:16px;background:rgba(6,26,60,.6)}
+.tick-alpha .rk-leave-card{max-width:440px;width:100%;display:grid;gap:12px;animation:rk-pop var(--rk-mid) var(--rk-ease)}
+.tick-alpha .rk-leave-card h2,.tick-alpha .rk-leave-card p{margin:0}
+@media(prefers-reduced-motion:reduce){.tick-alpha .rk-leave-card{animation:none}}

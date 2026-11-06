@@ -30,8 +30,20 @@ export function routeHref(next,href=typeof window==='undefined'?'http://localhos
   return url.pathname+url.search;
 }
 
-export function navigate(next,{replace=false}={}){
+// One page at a time may hold unsaved work (Journal note drafts). Its guard
+// receives `proceed` and returns true to let the route change happen now, or
+// false to hold it and call proceed() later (after the person confirms).
+let leaveGuard=null;
+export function setLeaveGuard(guard){
+  leaveGuard=guard;
+  return()=>{if(leaveGuard===guard)leaveGuard=null;};
+}
+const here=()=>typeof window==='undefined'?'':window.location.pathname+window.location.search;
+let shown=here();
+
+export function navigate(next,{replace=false,force=false}={}){
   const href=routeHref(next);
+  if(!force&&leaveGuard&&href!==here()&&!leaveGuard(()=>navigate(next,{replace,force:true})))return;
   window.history[replace?'replaceState':'pushState'](null,'',href);
   window.dispatchEvent(new Event(EVENT));
 }
@@ -39,7 +51,18 @@ export function navigate(next,{replace=false}={}){
 export function useRoute(){
   const [route,setRoute]=useState(()=>readRoute());
   useEffect(()=>{
-    const sync=()=>setRoute(readRoute());
+    const sync=event=>{
+      // Browser Back/Forward cannot be cancelled: put the guarded page back and
+      // replay the move once the person confirms.
+      if(event?.type==='popstate'&&leaveGuard&&here()!==shown){
+        const target=here();
+        const proceed=()=>{window.history.pushState(null,'',target);shown=target;setRoute(readRoute());};
+        window.history.pushState(null,'',shown);
+        if(leaveGuard(proceed))proceed();
+        return;
+      }
+      shown=here();setRoute(readRoute());
+    };
     window.addEventListener('popstate',sync);window.addEventListener(EVENT,sync);
     return()=>{window.removeEventListener('popstate',sync);window.removeEventListener(EVENT,sync);};
   },[]);
