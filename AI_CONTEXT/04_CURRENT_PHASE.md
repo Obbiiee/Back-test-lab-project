@@ -14,6 +14,8 @@ Parquet range accelerator update (2026-11-06): after verifying each row-group ca
 
 Hosted receipt lookup update (2026-11-06): added an authenticated workspace-scoped GET for command status in the cloud research API. It calls the existing durable receipt verifier through the worker's bounded request path; an absent result remains UNKNOWN. The synthetic hosted test now requests a missing command result and verifies an authenticated UNKNOWN response. Observed/historical sessions are explicitly refused until their own authoritative receipt verifier exists. Queue/hosted-route PostgreSQL suite remains 13/13 PASS. No authentication configuration or production services changed.
 
+Operational metering update (2026-11-06): the existing bounded process-local snapshot now reads process RSS, process I/O counters, CPU utilization in core-equivalents, and available cgroup memory/peak/CPU/I/O values from Linux pseudo-files. Unsupported measurements remain `null`; route/tenant labels or market data are not retained. Focused observation test passes. These are host-process observations only, not per-job/per-Session attribution, PG/WAL growth accounting, hosted capacity proof, or economic unit costs.
+
 Build policy: compile/lint and relevant unit/golden/transaction-integrity checks only during implementation. Defer multi-day replay, all-engine sweep, profiling, load/scaling, and economics until the integrated synthetic pipeline is ready and resource preflight permits them. Initial worker target is one worker with a proportional one-vCPU budget; hardware is nominal 6 vCPU / 16 GiB / 200 GB, not a production capacity claim.
 
 Preserve the two intentionally untracked CP6A-8 files and do not modify agent branches or worktrees.

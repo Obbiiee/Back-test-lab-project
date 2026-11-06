@@ -31,6 +31,11 @@ class OperationalObservationTests(unittest.TestCase):
         self.assertEqual(set(result['routeCounts']),set(OPERATIONS))
         self.assertEqual((result['active'],result['admitted'],result['statusCounts']['refused']),(0,300,300))
         self.assertNotIn('secret-user',json.dumps(result))
+        self.assertGreater(float(result['processCpuUtilizationCores']),0)
+        self.assertIsInstance(result['cgroup'],dict)
+        self.assertTrue(result['processRssBytes'] is None or type(result['processRssBytes']) is int)
+        self.assertTrue(result['processIoBytes'] is None or type(result['processIoBytes']) is dict)
+        self.assertIn('per-Session attribution',result['interpretation'])
         self.assertIsNone(OperationalMetrics(enabled=False).snapshot()['latencySeconds']['p50'])
         metrics.lock.acquire()
         try:
