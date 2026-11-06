@@ -1,6 +1,7 @@
 """Explicit PostgreSQL lifecycle operations; never automatic on API startup."""
 import argparse
 from contextlib import contextmanager
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -110,8 +111,9 @@ def restore(dsn, source, expected_hash, bin_directory=""):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=["migrate", "backup", "restore"])
+    parser.add_argument("operation", choices=["migrate", "backup", "restore", "metrics"])
     parser.add_argument("--file")
+    parser.add_argument("--baseline")
     parser.add_argument("--hash")
     parser.add_argument("--runtime-role")
     parser.add_argument("--identity-role")
@@ -128,8 +130,16 @@ def main():
             grant_workspace_runtime(dsn, args.workspace_role)
     elif args.operation == "backup":
         print(backup(dsn, args.file, os.getenv("BTL_PG_BIN", "")))
-    else:
+    elif args.operation == "restore":
         restore(dsn, args.file, args.hash, os.getenv("BTL_PG_BIN", ""))
+    else:
+        from .postgres_metrics import collect, compare
+        current = collect(dsn)
+        report = current
+        if args.baseline:
+            baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+            report = compare(baseline, current)
+        print(json.dumps(report, sort_keys=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":
