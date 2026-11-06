@@ -6,9 +6,13 @@ export class DrawingHistory {
   constructor(manager, limit = 100) {
     if (!Number.isInteger(limit) || limit < 1) throw new Error('Invalid history limit');
     this.manager = manager; this.limit = limit;
-    this.unsubscribe = manager.subscribeCommitted((before, after) => {
+    this.unsubscribe = manager.subscribeCommitted((before, after, coalesce) => {
       if (this.applying) return;
-      this.undoStack.push({ before, after });
+      const last = this.undoStack.at(-1), now = Date.now();
+      if (coalesce && last?.coalesce === coalesce && now - last.at < 1500 && !this.redoStack.length) {
+        last.after = after; last.at = now; return;
+      }
+      this.undoStack.push({ before, after, ...(coalesce ? { coalesce, at: now } : {}) });
       if (this.undoStack.length > this.limit) this.undoStack.shift();
       this.redoStack = [];
     });

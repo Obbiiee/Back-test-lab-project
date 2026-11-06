@@ -1,4 +1,3 @@
-import {isLocalReview} from '../tickReview/LocalOrigin.js';
 // Local transport only. Financial values stay exact strings; no browser settlement.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 import {accountTransport,isAccountPage} from './accountClient.js';
@@ -10,9 +9,8 @@ export function sourceContext(){
 export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
-    const replay=(/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind))
-      ||/\/sessions\/[^/]+\/replay-to$/.test(path);
-    const queued=replay||(path==='/sessions'&&body!==undefined)||/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
+    const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
+    const queued=replay||/\/sessions\/[^/]+\/(view|bootstrap)$/.test(path);
     const jobId=queued?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
     const uncertainReplay=()=>Error('Replay outcome requires reconciliation. Reload committed Session evidence before retrying.');
@@ -54,7 +52,8 @@ export async function api(path,body,{signal}={}){
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
     ...(body===undefined?{}:{body:JSON.stringify(body)}),signal:signal??AbortSignal.timeout(30000)});
   const value=await response.json();
-  if(!response.ok)throw new Error(value.detail||'Local service unavailable');
+  // `status` lets callers tell a definitive refusal from an unknown outcome (confirmOutcome.js).
+  if(!response.ok)throw Object.assign(new Error(value.detail||'Local service unavailable'),{status:response.status});
   if(value.schemaVersion!==1)throw new Error('Unsupported local response; no state was imported.');
   return value;
 }
@@ -80,9 +79,7 @@ export function selectSessionUrl(session){
   window.history.replaceState(null,'',url);
 }
 export function command(view,kind,payload){
-  const artifact=view.metadata.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION'||view.state.model==='CONDITIONAL_OBSERVED_TICK_SIMULATION'
-    ?'BTL-OBSERVED-EXECUTION-COMMAND-1':'BTL-TICK-EXECUTION-COMMAND-1';
-  return {schemaVersion:1,artifact,sessionId:view.metadata.id,
+  return {schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-1',sessionId:view.metadata.id,
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
@@ -106,13 +103,4 @@ export function noticeText(message){
     REFUSED_ANALYSIS_LIMIT:'Analysis exceeded its bounded event budget. No partial result is shown.',
   };
   return explanations[message]?`${explanations[message]} (${message})`:message;
-}
-
-// Public/HTTPS landing enters verified account access, never the private HTTP feed.
-export function landingWorkspacePath(href=window.location.href){
-  const url=new URL(href);
-  if(url.protocol==='http:'&&isLocalReview(url.hostname)){
-    url.searchParams.delete('page');return url.pathname+url.search;
-  }
-  return '/?page=account';
 }

@@ -53,3 +53,66 @@ export class DrawingPersistence {
     } catch { this.status = 'Drawing save failed; changes remain in memory.'; return false; }
   }
 }
+
+// Issue #21 versioned document. Version 2 lives under its own key so version 1
+// bytes are never rewritten: a v1 document is read once as the upgrade source,
+// and every later save goes to the v2 key. Records keep a stable UUID, type,
+// anchors, sparse style options, optional name and their layer (array) order.
+export const DRAWING_STORAGE_PREFIX_V2 = 'backtest-drawing-manager-v2:';
+const V2_RECORD_KEYS = ['id', 'type', 'points', 'options', 'visible', 'locked', 'metadata', 'text', 'name'];
+export class DrawingDocumentStore {
+  writable = false;
+  status = '';
+  upgradedFrom = null;
+  constructor(storage, workspace) {
+    this.storage = storage; this.workspace = workspace;
+    this.key = DRAWING_STORAGE_PREFIX_V2 + encodeURIComponent(workspace);
+    this.legacy = new DrawingPersistence(storage, workspace);
+  }
+  access() { return typeof this.storage === 'function' ? this.storage() : this.storage; }
+  load(registry) {
+    this.registry = registry; this.writable = false; this.status = ''; this.upgradedFrom = null;
+    try {
+      this.raw = this.access().getItem(this.key);
+      if (this.raw == null) {
+        const models = this.legacy.load(registry);
+        this.writable = this.legacy.writable; this.status = this.legacy.status;
+        if (models.length) this.upgradedFrom = 1;
+        return models;
+      }
+      if (typeof this.raw !== 'string' || this.raw.length > 4_000_000) throw new Error('Drawing document size');
+      const parsed = JSON.parse(this.raw);
+      if (!allowedKeys(parsed, ['version', 'workspace', 'drawings']) || parsed.version !== 2 || parsed.workspace !== this.workspace || !Array.isArray(parsed.drawings)) throw new Error('Unsupported drawing document');
+      const models = [], ids = new Set(); let damaged = false;
+      for (const record of parsed.drawings) {
+        try {
+          if (!allowedKeys(record, V2_RECORD_KEYS) || !allowedKeys(record.metadata ?? {}, ['createdOnTimeframe'])
+            || !Array.isArray(record.points) || !record.points.every(point => allowedKeys(point, ['time', 'price']))) throw new Error('Unknown or malformed fields');
+          const model = registry.get(record.type).model(record);
+          if (ids.has(model.id)) throw new Error('Duplicate id');
+          ids.add(model.id); models.push(model);
+        } catch { damaged = true; }
+      }
+      this.writable = !damaged;
+      if (damaged) this.status = 'Drawing storage contains unsupported records; valid drawings restored. Changes remain in memory to preserve the original data.';
+      return models;
+    } catch {
+      this.status = 'Drawing storage unavailable or invalid; changes remain in memory. Original data preserved.';
+      return [];
+    }
+  }
+  save(models) {
+    if (!this.writable) return false;
+    try {
+      const canonical = models.map(model => this.registry.get(model.type).model(model));
+      const next = JSON.stringify({ version: 2, workspace: this.workspace, drawings: canonical });
+      if (this.access().getItem(this.key) !== this.raw) {
+        this.writable = false;
+        this.status = 'Drawings changed in another tab. Original data is preserved; reload to use that version.';
+        return false;
+      }
+      this.access().setItem(this.key, next); this.raw = next;
+      this.status = ''; return true;
+    } catch { this.status = 'Drawing save failed; changes remain in memory.'; return false; }
+  }
+}
