@@ -51,3 +51,14 @@ export function seekTarget(value){
   if(canonical!==(value.length===16?value+':00':value))throw Error('Enter a valid UTC date and time');
   return String(BigInt(milliseconds)*1000000n);
 }
+
+// Instrument shown for a Session, read from its pinned server profile. Returns null
+// when the profile does not state it, so callers fail closed instead of naming one.
+const SYMBOL=/^[A-Z0-9._-]{2,24}$/;
+export function sessionInstrument(view){
+  const profile=view?.state?.profile;
+  if(!profile||!SYMBOL.test(profile.instrumentId??''))return null;
+  return {symbol:profile.instrumentId,quote:typeof profile.quoteCurrency==='string'?profile.quoteCurrency:null,
+    feed:typeof profile.feedInstrumentId==='string'&&profile.feedInstrumentId!==profile.instrumentId?profile.feedInstrumentId:null,
+    provider:typeof profile.providerId==='string'?profile.providerId:null};
+}

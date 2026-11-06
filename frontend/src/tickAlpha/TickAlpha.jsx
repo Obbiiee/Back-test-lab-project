@@ -5,6 +5,7 @@ import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
+import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
 import AlphaSessionWizard from './AlphaSessionWizard.jsx';
@@ -159,7 +160,11 @@ export default function TickAlpha(){
     const found=reconcile(view,unverified);
     if(found!=='UNKNOWN'){setUnverified(null);setNotice(found==='COMMITTED'?'The earlier order was saved.':'The earlier confirmation was not saved: the Session moved on without it.');}
   }
-  const orderLocked=busy||Boolean(view?.state.unresolved)||Boolean(unverified);
+  // Instrument comes from the Session's pinned profile; without it, orders stay locked.
+  const instrument=sessionInstrument(view);
+  const symbolText=instrument?.symbol??'Instrument not stated';
+  const symbolGlyph=instrument?(instrument.symbol.startsWith('XAU')?'Au':instrument.symbol.slice(0,2)):'?';
+  const orderLocked=busy||Boolean(view?.state.unresolved)||Boolean(unverified)||Boolean(view&&!instrument);
   const requestAction=(order,kind,quantity=null)=>{
     returnFocus.current=document.activeElement;setNotice('');
     const payload={orderId:order.id,...(kind==='CLOSE'?{quantity}:{})};
@@ -223,8 +228,8 @@ export default function TickAlpha(){
       :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
       :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
     </AlphaShell>:<>
-      <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>XAUUSD</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
-      <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label="XAUUSD data source" title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">Au</span>XAUUSD</button><span className="alpha-ws-phone-title"><strong>XAUUSD · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
+      <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
+      <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
         trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         onReplay={(kind,targetNs)=>run(async()=>{
