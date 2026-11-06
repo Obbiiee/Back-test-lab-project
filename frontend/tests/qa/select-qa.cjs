@@ -71,9 +71,14 @@ const CATALOG = {
     await page.keyboard.press('ArrowDown'); must((await activeText(page) || '').startsWith('January 2025'), 'ArrowDown did not skip the gap');
     await page.keyboard.press('ArrowDown'); must((await activeText(page) || '').startsWith('November 2024'), 'ArrowDown did not wrap past disabled tail');
     await page.keyboard.press('ArrowUp'); must((await activeText(page) || '').startsWith('January 2025'), 'ArrowUp wrap');
+    const aria = await trigger.evaluate(el => ({ popup: el.getAttribute('aria-haspopup'), controls: el.getAttribute('aria-controls'), expanded: el.getAttribute('aria-expanded') }));
+    const panel = page.locator('.rk-combo-panel');
+    must(aria.popup === 'dialog' && aria.expanded === 'true' && aria.controls === await panel.getAttribute('id') && await panel.getAttribute('role') === 'dialog', 'trigger/panel ARIA mismatch ' + JSON.stringify(aria));
+    must(await page.locator('.rk-combo-search input').getAttribute('aria-controls') === await page.getByRole('listbox').getAttribute('id'), 'combobox does not control the listbox');
     await page.keyboard.press('Escape'); await sleep(100);
     must(!(await page.locator('.rk-combo-panel').count()), 'Escape did not close');
     must(await trigger.evaluate(el => el === document.activeElement), 'focus not returned to trigger');
+    must(await trigger.getAttribute('aria-expanded') === 'false' && await trigger.getAttribute('aria-controls') === null, 'closed trigger still claims a panel');
     await trigger.press('ArrowDown'); await sleep(100); must(await page.locator('.rk-combo-panel').isVisible(), 'ArrowDown on trigger did not open');
     await page.keyboard.press('Tab'); await sleep(100);
     must(!(await page.locator('.rk-combo-panel').count()), 'Tab did not close the desktop popover');

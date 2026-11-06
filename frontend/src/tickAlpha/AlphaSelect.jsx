@@ -77,11 +77,13 @@ export function SearchableSelect({label,options,value,onChange,placeholder='Sele
       (document.activeElement===search.current?closer.current:search.current)?.focus();
     }
   };
-  const listId=`${id}-list`,labelId=`${id}-label`;
+  // The trigger opens a dialog (popover or phone sheet) that holds a search combobox
+  // and its listbox, so the trigger announces a dialog, not a listbox.
+  const listId=`${id}-list`,labelId=`${id}-label`,panelId=`${id}-panel`;
   return <div className={`rk-combo${open?' is-open':''}`} ref={wrap}>
     <span className="rk-combo-label" id={labelId}>{label}</span>
     <div className="rk-combo-field">
-      <button ref={trigger} type="button" id={id} className="rk-combo-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${labelId} ${id}`} disabled={disabled}
+      <button ref={trigger} type="button" id={id} className="rk-combo-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={open?panelId:undefined} aria-labelledby={`${labelId} ${id}`} disabled={disabled}
         onClick={()=>open?close():show()} onKeyDown={event=>{if(!open&&(event.key==='ArrowDown'||event.key==='ArrowUp')){event.preventDefault();show();}}}>
         {selected?<span className="rk-combo-value"><strong>{selected.label}</strong>{selected.description&&<small>{selected.description}</small>}</span>:<span className="rk-combo-placeholder">{loading?'Loading…':placeholder}</span>}
         <span className="rk-combo-chevron" aria-hidden="true">▾</span>
@@ -91,7 +93,7 @@ export function SearchableSelect({label,options,value,onChange,placeholder='Sele
     {hint&&<span className="rk-combo-hint">{hint}</span>}
     {open&&<>
       <div className="rk-combo-backdrop" aria-hidden="true" onClick={()=>close()}/>
-      <div className={`rk-combo-panel${sheet?' is-sheet':''}`} role="dialog" aria-label={label} aria-modal={sheet||undefined} onKeyDown={onPanelKey}>
+      <div id={panelId} className={`rk-combo-panel${sheet?' is-sheet':''}`} role="dialog" aria-label={label} aria-modal={sheet||undefined} onKeyDown={onPanelKey}>
         <span className="rk-combo-handle" aria-hidden="true"/>
         {sheet&&<div className="rk-combo-sheet-head"><strong>{label}</strong><button ref={closer} type="button" className="rk-combo-close" onClick={()=>close()}>Close</button></div>}
         <div className="rk-combo-search"><span aria-hidden="true">⌕</span>
