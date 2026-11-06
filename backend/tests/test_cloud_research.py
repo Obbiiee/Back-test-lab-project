@@ -81,9 +81,15 @@ class CloudResearchTests(unittest.TestCase):
         result = self.client.post(path + '/confirm', headers=self.headers, json=pin)
         self.assertEqual(result.status_code, 200, result.text)
         self.assertTrue(result.json()['durable'])
+        status = self.client.get(path + '/commands/' + review_body['requestId'], headers=self.headers)
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(status.json()['status'], 'COMMITTED')
+        self.assertTrue(status.json()['receipt']['durable'])
         before = self.client.get(path, headers=self.headers).content
         _, other = self.account()
-        for verb, target, body in [('GET', path, None), ('POST', path + '/confirm', pin),
+        for verb, target, body in [('GET', path, None),
+                                   ('GET', path + '/commands/' + review_body['requestId'], None),
+                                   ('POST', path + '/confirm', pin),
                                    ('GET', self.root + '/catalog', None)]:
             refused = self.client.request(verb, target, headers=other, json=body)
             self.assertEqual(refused.status_code, 404, refused.text)
