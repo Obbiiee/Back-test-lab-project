@@ -9,7 +9,13 @@ import sys
 import sysconfig
 from threading import Lock
 from time import monotonic
+from time import monotonic_ns, process_time_ns
 import uuid
+
+try:
+    import resource
+except ImportError:  # Windows controller tests expose unsupported RSS as null.
+    resource = None
 
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError, require
@@ -25,6 +31,45 @@ SERVE_ENTRY = 'import sys; sys.path[:0]=sys.argv[1:]; from cloud.worker import s
 MAX_JOBS = 4096
 WARM_REQUEST = b'{"control":"WARM_OPERATOR_SOURCES","schemaVersion":1}\n'
 _exchanges = ThreadPoolExecutor(max_workers=2, thread_name_prefix='btl-native-exchange')
+
+
+class _MeasuredResult(dict):
+    def __init__(self, result, worker_metrics):
+        super().__init__(result)
+        self.worker_metrics = worker_metrics
+
+
+def _io_counters():
+    try:
+        values = {}
+        with open('/proc/self/io', encoding='ascii') as stream:
+            for line in stream:
+                key, value = line.split(':', 1)
+                if key in ('read_bytes', 'write_bytes', 'syscr', 'syscw'):
+                    values[key] = int(value.strip())
+        return values if len(values) == 4 else None
+    except (OSError, ValueError):
+        return None
+
+
+def _measurement(start_wall_ns, start_cpu_ns, start_io):
+    end_io = _io_counters()
+    def delta(name):
+        return (max(0, end_io[name] - start_io[name])
+                if start_io is not None and end_io is not None else None)
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource is not None else -1
+    return {
+        'schemaVersion': 1,
+        'artifact': 'BTL-NATIVE-WORKER-METRICS-1',
+        'measurementScope': 'ONE_JOB_CPU_IO_PROCESS_LIFETIME_RSS_HIGH_WATER',
+        'wallNs': max(0, monotonic_ns() - start_wall_ns),
+        'cpuNs': max(0, process_time_ns() - start_cpu_ns),
+        'processPeakRssBytes': int(peak * 1024) if peak >= 0 else None,
+        'readBytesDelta': delta('read_bytes'),
+        'writeBytesDelta': delta('write_bytes'),
+        'readSyscallsDelta': delta('syscr'),
+        'writeSyscallsDelta': delta('syscw'),
+    }
 
 
 class _Slot:
@@ -155,13 +200,36 @@ def _result(raw):
     except (ValueError, UnicodeError):
         raise RuntimeError('Worker result unavailable') from None
     require(type(value) is dict, 'workerResult', 'CORRUPT_RECORD')
+    require(value.get('schemaVersion') == 1, 'workerResult', 'CORRUPT_RECORD')
+    metrics = _validate_metrics(value.get('workerMetrics'))
     if value.get('infrastructureFailure'):
-        raise RuntimeError('Worker infrastructure unavailable')
+        error = RuntimeError('Worker infrastructure unavailable')
+        error.worker_metrics = metrics
+        raise error
     if value.get('error'):
-        raise ContractError(value['error'], 'worker')
-    require(value.get('schemaVersion') == 1 and type(value.get('result')) is dict,
-            'workerResult', 'CORRUPT_RECORD')
-    return value['result']
+        error = ContractError(value['error'], 'worker')
+        error.worker_metrics = metrics
+        raise error
+    require(type(value.get('result')) is dict, 'workerResult', 'CORRUPT_RECORD')
+    if metrics is None:
+        return value['result']
+    return _MeasuredResult(value['result'], metrics)
+
+
+def _validate_metrics(metrics):
+    if metrics is None:
+        return None
+    fields = {'schemaVersion', 'artifact', 'measurementScope', 'wallNs', 'cpuNs',
+              'processPeakRssBytes', 'readBytesDelta', 'writeBytesDelta',
+              'readSyscallsDelta', 'writeSyscallsDelta'}
+    require(type(metrics) is dict and set(metrics) == fields and metrics.get('schemaVersion') == 1 and
+            metrics.get('artifact') == 'BTL-NATIVE-WORKER-METRICS-1' and
+            metrics.get('measurementScope') == 'ONE_JOB_CPU_IO_PROCESS_LIFETIME_RSS_HIGH_WATER' and
+            all(type(metrics[name]) is int and metrics[name] >= 0 for name in ('wallNs', 'cpuNs')) and
+            all(metrics[name] is None or (type(metrics[name]) is int and metrics[name] >= 0)
+                for name in fields - {'schemaVersion', 'artifact', 'measurementScope', 'wallNs', 'cpuNs'}),
+            'workerMetrics', 'CORRUPT_RECORD')
+    return metrics
 
 
 def pooled_invoke(dsn, payload, *, deadline=DEADLINE):
@@ -251,6 +319,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
 
 def _execute(raw):
     """Trusted process entry; scope and canonical validation remain in runner."""
+    started_wall, started_cpu, started_io = monotonic_ns(), process_time_ns(), _io_counters()
     try:
         require(len(raw) <= 32768, 'workerInput')
         request = json.loads(raw)
@@ -260,12 +329,15 @@ def _execute(raw):
         result = authorized_run(os.environ['BTL_WORKER_DATABASE'], uuid.UUID(request['actor']),
                                 uuid.UUID(request['workspace']), request['operation'],
                                 tuple(request['args']), write=request['write'])
-        output = canonical_bytes(dict(schemaVersion=1, result=result))
+        output = canonical_bytes(dict(schemaVersion=1, result=result,
+                                      workerMetrics=_measurement(started_wall, started_cpu, started_io)))
         require(len(output) <= MAX_RESULT, 'result', 'REFUSED_RESPONSE_LIMIT')
     except ContractError as error:
-        output = canonical_bytes(dict(schemaVersion=1, error=error.code))
+        output = canonical_bytes(dict(schemaVersion=1, error=error.code,
+                                      workerMetrics=_measurement(started_wall, started_cpu, started_io)))
     except Exception:
-        output = canonical_bytes(dict(schemaVersion=1, infrastructureFailure=True))
+        output = canonical_bytes(dict(schemaVersion=1, infrastructureFailure=True,
+                                      workerMetrics=_measurement(started_wall, started_cpu, started_io)))
     return output
 
 

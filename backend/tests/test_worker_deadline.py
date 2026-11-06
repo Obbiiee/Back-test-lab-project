@@ -193,4 +193,24 @@ worker.serve()
         expected={'schemaVersion':1,'artifact':'BTL-OBSERVED-REFERENCE-OHLC-1','candles':[]}
         with patch.dict(os.environ,{'BTL_WORKER_DATABASE':'authored-qa'}),patch.object(research,'run',return_value=expected):
             result=json.loads(worker._execute(json.dumps(payload).encode()))
-        self.assertEqual(result,{'schemaVersion':1,'result':expected})
+        self.assertEqual(result['schemaVersion'], 1)
+        self.assertEqual(result['result'], expected)
+        self.assertEqual(result['workerMetrics']['artifact'], 'BTL-NATIVE-WORKER-METRICS-1')
+        self.assertGreater(result['workerMetrics']['wallNs'], 0)
+
+    def test_native_contract_refusal_keeps_measurements_outside_financial_result(self):
+        import json
+        from cloud import research
+        actor='11111111-1111-4111-8111-111111111111';workspace='22222222-2222-4222-8222-222222222222'
+        payload={'schemaVersion':1,'actor':actor,'workspace':workspace,'operation':'workspace',
+                 'args':['session:qa',{'timeframe':'1m'}],'write':False}
+        with patch.dict(os.environ,{'BTL_WORKER_DATABASE':'authored-qa'}), \
+                patch.object(research,'run',side_effect=ContractError('UNAUTHORIZED','scope')):
+            result=json.loads(worker._execute(json.dumps(payload).encode()))
+        self.assertEqual(result['error'], 'UNAUTHORIZED')
+        self.assertEqual(result['workerMetrics']['artifact'], 'BTL-NATIVE-WORKER-METRICS-1')
+        self.assertNotIn('workerMetrics', result.get('result', {}))
+        with self.assertRaises(ContractError) as refused:
+            worker._result(json.dumps(result).encode())
+        self.assertEqual(refused.exception.code, 'UNAUTHORIZED')
+        self.assertGreater(refused.exception.worker_metrics['wallNs'], 0)

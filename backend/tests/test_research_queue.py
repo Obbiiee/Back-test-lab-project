@@ -1,5 +1,6 @@
 """Actual PostgreSQL queue pressure, scope, ownership, rollback and cancellation."""
 import os
+import json
 import uuid
 import unittest
 import subprocess
@@ -22,6 +23,7 @@ from execution.research import ResearchApplication
 from application.models import TrustedScope
 from execution.research_fixture import research_provider
 from market_data.monthly_parquet import write_monthly_parquet
+from contracts.canonical import content_hash
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
@@ -224,6 +226,15 @@ class QueueTests(unittest.TestCase):
                         headers=self.fixture.headers)
                     self.assertEqual(created.status_code, 200, created.text)
                     self.assertEqual(created.json()['state'], 'SUCCEEDED')
+                    with connect(self.dsn) as db:
+                        row = db.execute('SELECT worker_metrics,worker_metrics_hash FROM btl.research_jobs WHERE id=%s',
+                                         (uuid.UUID(create_job),)).fetchone()
+                    measurements = json.loads(bytes(row[0]))
+                    self.assertEqual(content_hash(measurements), row[1])
+                    self.assertEqual(measurements['artifact'], 'BTL-NATIVE-WORKER-METRICS-1')
+                    self.assertGreater(measurements['wallNs'], 0)
+                    self.assertGreater(measurements['cpuNs'], 0)
+                    self.assertGreater(measurements['processPeakRssBytes'], 0)
                     view = self.fixture.client.get(path + '/sessions/' + session_id,
                         headers=self.fixture.headers)
                     self.assertEqual(view.status_code, 200, view.text)
@@ -286,6 +297,20 @@ class QueueTests(unittest.TestCase):
                         headers=self.fixture.headers)
                     self.assertEqual(journal.json()['notes'][0]['text'], note['text'])
                     self.assertEqual(len(journal.json()['orders']), 1)
+
+                    failed = self.submit(operation='workspace',
+                                         args=(session_id, {'timeframe': 'invalid'}))
+                    self.assertTrue(queue.work_one(self.dsn, worker.run))
+                    failed_status = queue.inspect(self.dsn, self.actor, self.workspace,
+                                                  failed['jobId'])
+                    self.assertEqual(failed_status['state'], 'FAILED')
+                    with connect(self.dsn) as db:
+                        failed_metrics = db.execute(
+                            'SELECT worker_metrics,worker_metrics_hash FROM btl.research_jobs WHERE id=%s',
+                            (uuid.UUID(failed['jobId']),)).fetchone()
+                    error_measurements = json.loads(bytes(failed_metrics[0]))
+                    self.assertEqual(content_hash(error_measurements), failed_metrics[1])
+                    self.assertGreater(error_measurements['wallNs'], 0)
                 finally:
                     worker.close()
 

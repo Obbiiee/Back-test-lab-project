@@ -112,6 +112,26 @@ def replay_to_request(raw, session_id):
     return raw
 
 
+def _worker_measurements(result):
+    """Bound and persist optional worker telemetry without changing job truth."""
+    value = getattr(result, 'worker_metrics', None)
+    if value is None:
+        return None, None
+    try:
+        require(type(value) is dict and value.get('schemaVersion') == 1 and
+                value.get('artifact') == 'BTL-NATIVE-WORKER-METRICS-1',
+                'workerMetrics', 'CORRUPT_RECORD')
+        raw = canonical_bytes(value)
+        require(len(raw) <= 4096, 'workerMetrics', 'ARTIFACT_LIMIT')
+        return raw, content_hash(value)
+    except Exception as error:
+        # Operational telemetry is auxiliary: a telemetry encoding problem
+        # must never convert a committed financial command into a failed job.
+        logging.getLogger(__name__).warning(
+            'research_job_metrics_omitted error_type=%s', type(error).__name__)
+        return None, None
+
+
 def submit(dsn, actor_id, workspace_id, job_id, operation, args):
     job_id = uuid.UUID(str(job_id))
     require(operation in OPERATIONS and type(args) in (tuple, list)
@@ -228,6 +248,7 @@ def work_one(dsn, runner):
 
         heartbeat_thread = Thread(target=heartbeat, name=f"btl-job-heartbeat-{row['id']}", daemon=True)
         heartbeat_thread.start()
+        worker_metrics_raw = worker_metrics_hash = None
         try:
             try:
                 payload = json.loads(bytes(row['input']))
@@ -252,11 +273,13 @@ def work_one(dsn, runner):
                 require(monotonic()-started <= 30, 'deadline', 'EXPIRED')
             raw = canonical_bytes({'schemaVersion': 1, **result})
             require(len(raw) <= 8388608, 'result', 'REFUSED_RESPONSE_LIMIT')
+            worker_metrics_raw, worker_metrics_hash = _worker_measurements(result)
             state = 'SUCCEEDED'
         except ContractError as error:
             logging.getLogger(__name__).warning(
                 'research_job_failed job_id=%s operation=%s error_code=%s',
                 row['id'], row['operation'], error.code)
+            worker_metrics_raw, worker_metrics_hash = _worker_measurements(error)
             raw = None
             state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
         except BaseException:
@@ -277,10 +300,11 @@ def work_one(dsn, runner):
         elif cancelled and state != 'SUCCEEDED':
             state, raw = 'RECONCILE_REQUIRED', None
         db.execute("""
-            UPDATE btl.research_jobs SET state=%s,result=%s,finished_at=clock_timestamp(),
+            UPDATE btl.research_jobs SET state=%s,result=%s,worker_metrics=%s,worker_metrics_hash=%s,
+                finished_at=clock_timestamp(),
                 lease_owner=NULL,lease_until=NULL,heartbeat_at=NULL
             WHERE id=%s AND state='RUNNING' AND lease_owner=%s
-        """, (state, raw, row['id'], lease_owner))
+        """, (state, raw, worker_metrics_raw, worker_metrics_hash, row['id'], lease_owner))
         return True
 
 
