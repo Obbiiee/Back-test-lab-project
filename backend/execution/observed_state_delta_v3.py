@@ -87,7 +87,9 @@ def encode_compact_delta(previous,state,previous_hash):
 def reconstruct(base,deltas,*,state_callback=None):
     require(base.get('schemaVersion')==1 and
             ((base.get('formatVersion')==3 and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3')) or
-             (base.get('formatVersion')==1 and base.get('artifact') in (COMPACT_BASE,'BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1'))),
+             (base.get('formatVersion')==1 and base.get('artifact') in (
+                 COMPACT_BASE,'BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1',
+                 'BTL-TICK-EXECUTION-COMPACT-BASE-1'))),
             'base','CORRUPT_RECORD')
     state=deepcopy(base['state']);prev=base['stateHash']
     require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')

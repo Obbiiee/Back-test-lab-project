@@ -149,7 +149,8 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
         else:
             research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),
-                                         synthetic_provider=monthly)
+                synthetic_provider=monthly,
+                state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
         try:
             return research.catalog_view() if observed and operation=='catalog' else getattr(research,operation)(*args)
         finally:

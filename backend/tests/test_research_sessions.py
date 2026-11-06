@@ -151,7 +151,8 @@ class ResearchSessionTests(unittest.TestCase):
             monthly=MonthlyParquetProvider(root,expected_dataset_id=source.dataset_id,
                 expected_dataset_version=source.dataset_version,expected_manifest_hash=manifest['manifestHash'])
             monthly_scope=TrustedScope('researchqa:'+uuid.uuid4().hex,'fixture:operator')
-            monthly_app=ResearchApplication(DSN,monthly_scope,synthetic_provider=monthly)
+            monthly_app=ResearchApplication(DSN,monthly_scope,synthetic_provider=monthly,
+                                            state_storage_format='compact-v1')
             try:
                 record=method();self.app.create_method(record);monthly_app.create_method(record)
                 session='session:'+uuid.uuid4().hex
@@ -167,6 +168,9 @@ class ResearchSessionTests(unittest.TestCase):
                 candidate_confirmed=monthly_app.confirm(session,dict(reviewId=review['requestId'],
                     reviewHash=candidate_approved['reviewHash']))
                 self.assertEqual(baseline_confirmed,candidate_confirmed)
+                candidate_status=monthly_app.command_result(session,review['requestId'])
+                self.assertEqual(candidate_status['status'],'COMMITTED')
+                self.assertEqual(candidate_status['receipt'],candidate_confirmed)
                 state=self.app.inspect(session)['state']
                 command=dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',sessionId=session,
                     commandId='command:'+uuid.uuid4().hex,expectedRevision=state['revision'],kind='ADVANCE',

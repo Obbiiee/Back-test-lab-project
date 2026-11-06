@@ -204,6 +204,7 @@ class QueueTests(unittest.TestCase):
                 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': source.dataset_id,
                 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': source.dataset_version,
                 'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': manifest['manifestHash'],
+                'BTL_TICK_SESSION_STORAGE_FORMAT': 'compact-v1',
             }
             with patch.dict(os.environ, pin):
                 try:

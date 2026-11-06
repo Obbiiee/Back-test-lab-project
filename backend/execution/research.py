@@ -45,7 +45,8 @@ def method_policy(record):
 
 class ResearchApplication:
     """Single-user local operator; no public identity/tenant composition."""
-    def __init__(self, dsn, scope=None, *, historical_source=None, synthetic_provider=None):
+    def __init__(self, dsn, scope=None, *, historical_source=None, synthetic_provider=None,
+                 state_storage_format="snapshot-v1"):
         require(historical_source is None or synthetic_provider is None, 'source', 'IDENTITY_CONFLICT')
         if synthetic_provider is not None:
             manifest = TickManifest.from_wire(
@@ -63,7 +64,7 @@ class ResearchApplication:
         self.__start = historical_source.start_ns if historical_source else START_NS
         self.__warmup = self.__start + 1800*1000000000 if historical_source else WARMUP_NS
         self.__period = historical_source.start_period if historical_source else "2020-01"
-        self.store = PostgresExecutionStore(dsn)
+        self.store = PostgresExecutionStore(dsn, state_storage_format=state_storage_format)
         if historical_source:
             from .historical import IndexedTimelineCache
             self.__timeline_cache = IndexedTimelineCache(historical_source)
@@ -98,10 +99,11 @@ class ResearchApplication:
         require(meta["id"] == session_id and meta["methodId"] == meta_row[2], "session", "CORRUPT_RECORD")
         method = self._method(db, meta["methodId"])
         policy = method_policy(method)
-        row = db.execute("SELECT payload,content_hash,revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s" + (" FOR UPDATE" if lock else ""),
+        row = db.execute("SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s" + (" FOR UPDATE" if lock else ""),
                          (self.scope.workspace_id, session_id)).fetchone()
         require(row is not None, "state", "CORRUPT_RECORD")
-        saved = unpack(*row[:2]); state, checkpoint = saved["state"], saved["controller"]
+        saved = self.store.read_session(db, self.scope, session_id, row)
+        state, checkpoint = saved["state"], saved["controller"]
         snapshot(state, checkpoint)
         require(state["sessionId"] == session_id and state["revision"] == row[2] and
                 state["policy"] == policy_wire(policy) and meta["methodHash"] == policy.definition_hash and
@@ -146,16 +148,10 @@ class ResearchApplication:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             _meta, _method, state, _checkpoint = self._session(db, session_id)
             row = db.execute(
-                "SELECT command_hash,payload,content_hash,revision FROM btl.tick_commands "
+                "SELECT revision,command_hash,payload,content_hash FROM btl.tick_commands "
                 "WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
                 (self.scope.workspace_id, session_id, command_id)).fetchone()
             if row is not None:
-                receipt = unpack(row[1], row[2])
-                require(receipt.get("artifact") == "BTL-TICK-EXECUTION-RESULT-1" and
-                        receipt.get("commandId") == command_id and
-                        receipt.get("commandHash") == row[0] and receipt.get("durable") is True and
-                        receipt.get("state", {}).get("sessionId") == session_id and
-                        receipt["state"].get("revision") == row[3], "receipt", "CORRUPT_RECORD")
                 review_row = db.execute(
                     "SELECT payload,content_hash FROM btl.tick_order_reviews "
                     "WHERE workspace_id=%s AND session_id=%s AND review_id=%s",
@@ -163,11 +159,22 @@ class ResearchApplication:
                 require(review_row is not None, "review", "CORRUPT_RECORD")
                 reviewed = unpack(*review_row)
                 command = reviewed.get("command", {})
+                receipt_wire = unpack(row[2], row[3])
+                if receipt_wire.get("artifact") == "BTL-TICK-EXECUTION-COMPACT-RESULT-1":
+                    receipt = self.store._compact_receipt(command, row, db,
+                                                          self.scope.workspace_id, session_id)
+                else:
+                    receipt = receipt_wire
+                require(receipt.get("artifact") == "BTL-TICK-EXECUTION-RESULT-1" and
+                        receipt.get("commandId") == command_id and
+                        receipt.get("commandHash") == row[1] and receipt.get("durable") is True and
+                        receipt.get("state", {}).get("sessionId") == session_id and
+                        receipt["state"].get("revision") == row[0], "receipt", "CORRUPT_RECORD")
                 expected_revision = command.get("expectedRevision")
                 require(command.get("commandId") == command_id and
                         command.get("sessionId") == session_id and type(expected_revision) is int and
                         expected_revision + 1 == receipt["state"]["revision"] and
-                        content_hash(command) == row[0], "review", "CORRUPT_RECORD")
+                        content_hash(command) == row[1], "review", "CORRUPT_RECORD")
                 return dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
                             sessionId=session_id, commandId=command_id, status="COMMITTED",
                             currentRevision=state["revision"], reviewHash=review_row[1], receipt=receipt)

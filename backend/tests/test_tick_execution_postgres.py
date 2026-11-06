@@ -21,7 +21,7 @@ from execution.controller import ExecutionController
 from execution.postgres import PostgresExecutionStore, grant_execution_runtime
 from infrastructure.database import connect, migrate, backup, restore
 from tests.test_execution_goldens import goldens
-from tests.test_tick_execution import Harness, provider_for, open_plan, command, exercise, assert_case
+from tests.test_tick_execution import Harness, provider_for, profile_for, open_plan, command, exercise, assert_case
 
 DSN = os.getenv("BTL_TEST_DATABASE_URL")
 
@@ -93,6 +93,45 @@ class TickExecutionPostgresTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError,"RESOURCE_UNAVAILABLE"):fresh.apply(outsider,raw)
         with self.assertRaisesRegex(ContractError,"RESOURCE_UNAVAILABLE"):fresh.inspect(outsider,h.session)
         self.assertEqual(self.records(),recorded)
+
+    def test_compact_v1_matches_snapshot_results_cold_recovery_and_idempotency(self):
+        case = self.case
+        session = "fixture:compact:" + uuid.uuid4().hex
+        snapshot_scope = TrustedScope("tickqa:snapshot:" + uuid.uuid4().hex, "fixture:actor")
+        compact_scope = TrustedScope("tickqa:compact:" + uuid.uuid4().hex, "fixture:actor")
+        snapshot_store = PostgresExecutionStore(DSN)
+        compact_store = PostgresExecutionStore(DSN, state_storage_format="compact-v1")
+        snapshot_controller = ExecutionController(snapshot_store, provider_for(case))
+        compact_controller = ExecutionController(compact_store, provider_for(case))
+        snapshot_controller.create(snapshot_scope, session, profile_for(case))
+        compact_controller.create(compact_scope, session, profile_for(case))
+
+        opened = command(session, "compact:open", 0, "OPEN", open_plan(case["open"]))
+        expected_open = snapshot_controller.apply(snapshot_scope, opened)
+        actual_open = compact_controller.apply(compact_scope, opened)
+        self.assertEqual(canonical_bytes(actual_open), canonical_bytes(expected_open))
+        self.assertEqual(canonical_bytes(compact_controller.apply(compact_scope, opened)), canonical_bytes(expected_open))
+
+        advanced = command(session, "compact:advance", 1, "ADVANCE", {"targetNs": "2"})
+        expected_advance = snapshot_controller.apply(snapshot_scope, advanced)
+        actual_advance = compact_controller.apply(compact_scope, advanced)
+        self.assertEqual(canonical_bytes(actual_advance), canonical_bytes(expected_advance))
+        fresh = ExecutionController(PostgresExecutionStore(DSN), provider_for(case))
+        self.assertEqual(canonical_bytes(fresh.apply(compact_scope, advanced)), canonical_bytes(expected_advance))
+        self.assertEqual(fresh.inspect(compact_scope, session, maximum=256),
+                         compact_controller.inspect(compact_scope, session, maximum=256))
+        snapshot_fork = snapshot_controller.fork(snapshot_scope, session, 1, "fixture:compact-child",
+                                                 command_id="compact:fork")
+        compact_fork = compact_controller.fork(compact_scope, session, 1, "fixture:compact-child",
+                                               command_id="compact:fork")
+        self.assertEqual(canonical_bytes(compact_fork), canonical_bytes(snapshot_fork))
+        self.assertEqual(canonical_bytes(compact_controller.fork(compact_scope, session, 1,
+            "fixture:compact-child", command_id="compact:fork")), canonical_bytes(snapshot_fork))
+        with connect(DSN) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s",
+                                        (compact_scope.workspace_id, session)).fetchone()[0], 2)
+            self.assertEqual(db.execute("SELECT count(*) FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s",
+                                        (compact_scope.workspace_id, session)).fetchone()[0], 3)
 
     def _worker_death(self, phase):
         h=self.harness();h.call("OPEN",open_plan(self.case["open"]),name="order")
