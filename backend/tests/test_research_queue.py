@@ -314,6 +314,22 @@ class QueueTests(unittest.TestCase):
                     self.assertEqual(journal.json()['notes'][0]['text'], note['text'])
                     self.assertEqual(len(journal.json()['orders']), 1)
 
+                    summary = self.fixture.client.get(
+                        path + '/sessions/' + session_id + '/summary', headers=self.fixture.headers)
+                    self.assertEqual(summary.status_code, 200, summary.text)
+                    self.assertEqual(summary.json()['artifact'], 'BTL-SESSION-SUMMARY-1')
+                    self.assertEqual((summary.json()['datasetId'], summary.json()['datasetVersion']),
+                                     (source.dataset_id, source.dataset_version))
+                    self.assertEqual(summary.json()['model'], 'SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION')
+
+                    storage = self.fixture.client.get(
+                        path + '/sessions/' + session_id + '/metering/storage',
+                        headers=self.fixture.headers)
+                    self.assertEqual(storage.status_code, 200, storage.text)
+                    self.assertEqual(storage.json()['artifact'], 'BTL-SESSION-STORAGE-METRICS-1')
+                    self.assertEqual(storage.json()['integrityStatus'], 'NOT_CHECKED_BY_STORAGE_METER')
+                    self.assertIsNone(storage.json()['sharedCanonicalDatasetBytes'])
+
                     failed = self.submit(operation='workspace',
                                          args=(session_id, {'timeframe': 'invalid'}))
                     self.assertTrue(queue.work_one(self.dsn, worker.run))
