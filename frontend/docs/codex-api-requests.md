@@ -47,3 +47,29 @@ A server refusal (`REFUSED_HISTORICAL_PERIOD`, `REFUSED_FIXTURE_PERIOD`) returns
 **Acceptance.** Catalog fixture from the backend test suite with a gap, a rights-blocked month, an expired month and a cross-year range; `tests/period-availability.test.mjs` and `tests/qa/wizard-period-qa.cjs` then run against that real response instead of the browser fixture.
 
 **Proof today.** Unit: `npm run test:period-availability`. Browser: `node tests/qa/wizard-period-qa.cjs <out>` (all `/tick-alpha` routes answered by a labeled browser fixture `QA FIXTURE / PERIOD AVAILABILITY / NOT MARKET DATA`; it proves UI behaviour only, not backend support).
+
+## REQ-02: order confirmation receipt lookup (P0, founder remediation round 2, 2026-11-06)
+
+**Status: HOLD: CODEX RECEIPT INSPECTION.** No endpoint returns the outcome of a confirmation by its id.
+
+**Why.** After `POST /sessions/{id}/confirm`, a lost response, timeout or 5xx leaves the outcome unknown. The frontend must never say "not placed" without a definitive answer, and must never re-send the confirmation or create a new review on the user's behalf.
+
+**What the frontend does today** (`src/tickAlpha/confirmOutcome.js`, read from the current backend code, not from a published contract):
+
+| Situation | Frontend outcome |
+|---|---|
+| 200 with `artifact: BTL-TICK-EXECUTION-RESULT-1`, matching `commandId`, `durable: true` | COMMITTED. A failed Session refresh afterwards shows "Order saved" with Reload Session. |
+| 400 / 401 / 403 / 404 / 409 / 413 / 415 / 422; local 429 `LOCAL_BUSY` or `RATE_LIMITED` | REFUSED (STALE when a 409 names a stale revision/review). Only these say "not placed". |
+| Anything else: network error, abort/timeout, 408, 5xx, unreadable body, other 200 body, hosted 429 | UNKNOWN: "Could not verify whether the order was saved; checking Session status." The review identity is kept, new orders are locked, and only a read-only check is offered. |
+
+The read-only check is `GET /sessions/{id}`: the order is COMMITTED if `state.orders` has the key `commandId` (current `engine.py`: order id = commandId). It is REFUSED if the key is absent and `state.revision` is past the review's `expectedRevision` (current `postgres.py`: a command applies only at its `expectedRevision`). Otherwise it stays UNKNOWN. Any later Session view the page loads runs the same check.
+
+**Requested contract.** A versioned read, for example `GET /sessions/{id}/commands/{commandId}` returning `{schemaVersion, commandId, status: COMMITTED | NOT_FOUND, revision, result?}`, with written guarantees that:
+1. order id equals commandId, or the receipt names the order id;
+2. a command never applies after the Session revision moved past its `expectedRevision`;
+3. which HTTP statuses on `/confirm` are definitive (no commit happened);
+4. whether re-posting the same `{reviewId, reviewHash}` is a safe idempotent retry. The current code returns the stored result, but the frontend does not offer it until Codex confirms.
+
+**Acceptance.** Codex confirms or corrects items 1–4. `tests/confirm-outcome.test.mjs` and `tests/qa/confirm-outcome-qa.cjs` then switch from the Session read to the receipt read.
+
+**Proof today.** Unit: `npm run test:confirm-outcome`. Browser, against the real local backend with faults injected in the browser: `node tests/qa/confirm-outcome-qa.cjs <out>` covers (a) POST 200 + refresh failure, (b) commit with a lost response, (c) a real 409 from the server, (d) 503, (e) double tap, (f) Back and reload while pending, (g) reconciliation finding the order saved, or finding that the Session moved on without it.

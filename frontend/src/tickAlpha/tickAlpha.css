@@ -714,6 +714,14 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 .alpha-review-refusal{padding:12px;border-radius:10px;border:2px solid var(--lab-error);background:#3a1a22}
 .tick-alpha .alpha-review-refusal[role=alert]{color:var(--lab-text-primary)}
 .alpha-review-refusal p{margin:4px 0 0}
+/* Unknown outcome (amber) and saved-but-not-refreshed (green): never styled as a refusal. */
+.alpha-review-unknown,.alpha-review-saved{padding:12px;border-radius:10px;border:2px solid var(--lab-warning);background:#3a2f16}
+.alpha-review-saved{border-color:var(--lab-success);background:#15322a}
+.tick-alpha .alpha-review-unknown[role=alert],.tick-alpha .alpha-review-saved{color:var(--lab-text-primary)}
+.alpha-review-unknown p,.alpha-review-saved p{margin:4px 0 0}
+.alpha-unverified{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:8px 12px;padding:10px 12px;border-radius:10px;border:2px solid var(--lab-warning);background:#3a2f16;color:var(--lab-text-primary)}
+.alpha-unverified p{margin:0}
+.alpha-unverified button{min-height:44px;flex:none}
 .alpha-review-pending{display:flex;align-items:center;gap:10px;margin:0;font-weight:600}
 .alpha-review-spinner{width:16px;height:16px;border-radius:50%;border:3px solid var(--lab-border);border-top-color:var(--rk-yellow,#ffce55);animation:alpha-spin .8s linear infinite}
 @keyframes alpha-spin{to{transform:rotate(360deg)}}

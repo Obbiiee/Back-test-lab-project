@@ -25,7 +25,8 @@ import AlphaShell,{StatePanel} from './AlphaShell.jsx';
 import {MyMethods,MethodNew,MethodOverview,Analytics,Placeholder} from './AlphaProduct.jsx';
 import {HelpPage,LocalAccountPage} from './AlphaHelp.jsx';
 import {rememberSession} from './productData.js';
-import {useRoute,navigate,linkTo,accountLink} from './productRoute.js';
+import {useRoute,navigate,linkTo,accountLink,setLeaveGuard} from './productRoute.js';
+import {classifyConfirmError,committedReceipt,reconcile,UNKNOWN_TEXT} from './confirmOutcome.js';
 import './tickAlpha.css';
 import {isAccountPage} from './accountClient.js';
 
@@ -38,6 +39,8 @@ export default function TickAlpha(){
   const [notice,setNotice]=useState(''),[dialog,setDialog]=useState(null),[review,setReview]=useState(null);
   const [plan,setPlan]=useState(initialPlan),[planRevision,setPlanRevision]=useState(0);
   const [picked,setPicked]=useState(null);
+  // Identity of a confirmation with no definitive answer (see confirmOutcome.js).
+  const [unverified,setUnverified]=useState(null);
   const flight=useRef(false),returnFocus=useRef(null);
   const [connecting,setConnecting]=useState(true);
   const creationId=useRef(null);
@@ -98,19 +101,65 @@ export default function TickAlpha(){
       planId:planned?id('plan'):null,planRevision:planned?planRevision:null,draft});
     setReview(request);setDialog('review');
   });};
-  // Returns {ok, code} so the review sheet can show refusal/stale states (C-14).
+  // Confirm returns an outcome, not a boolean (confirmOutcome.js). The POST result and
+  // the Session refresh are separate: a failed refresh after a commit stays COMMITTED.
+  // An UNKNOWN outcome keeps this review's identity in `unverified`, locks new orders
+  // and is settled only by a read-only Session check, never by re-sending.
   const confirm=async()=>{
-    let code=null;
-    const result=await confirmReviewed(failure=>{code=failure;});
-    return {ok:result===true,code:result===undefined?'LOCAL_BUSY':code};
+    if(flight.current)return {outcome:'NOT_SENT',code:'LOCAL_BUSY'};
+    const sessionId=view.metadata.id,command=review.review.command;
+    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision};
+    flight.current=true;setBusy(true);setNotice('');
+    // While the confirmation is in flight, in-app navigation and Back are held and
+    // a page unload asks first; the sheet says to keep it open.
+    const unload=event=>{event.preventDefault();event.returnValue='';};
+    const leave=setLeaveGuard(()=>false);window.addEventListener('beforeunload',unload);
+    const release=()=>{leave();window.removeEventListener('beforeunload',unload);};
+    try{
+      let result;
+      try{result=await api(sessionPath(sessionId)+'/confirm',{reviewId:command.commandId,reviewHash:review.reviewHash});}
+      catch(error){
+        const outcome=classifyConfirmError(error);
+        if(outcome.outcome==='UNKNOWN'){setUnverified(identity);return {...outcome,identity};}
+        return outcome;
+      }
+      if(!committedReceipt(result,command.commandId)){setUnverified(identity);return {outcome:'UNKNOWN',code:'UNRECOGNISED_RESPONSE',identity};}
+      emitLocal('order_command_submitted');
+      return await refreshAfterCommit(sessionId);
+    }finally{release();flight.current=false;setBusy(false);}
   };
-  const confirmReviewed=onFailure=>run(async()=>{
-    try{await api(sessionPath(view.metadata.id)+'/confirm',{reviewId:review.review.command.commandId,reviewHash:review.reviewHash});}
-    catch(error){onFailure(error.message);throw error;}
-    setView(await loadWorkspace(view.metadata.id));setDialog(null);setReview(null);
-    emitLocal('order_command_submitted');
+  const refreshAfterCommit=async sessionId=>{
+    try{setView(await loadWorkspace(sessionId));}
+    catch{setNotice('Order saved. The Session view could not refresh; reload the Session to see it.');return {outcome:'COMMITTED',refreshed:false};}
+    setDialog(null);setReview(null);
     setNotice('Order accepted and saved. A fill requires the next eligible tick.');
-  });
+    return {outcome:'COMMITTED',refreshed:true};
+  };
+  // Read-only: GET the saved Session and look for this review's order.
+  // The sheet passes the identity from confirm()'s result for its immediate check,
+  // before this state has re-rendered.
+  const checkUnverified=async(pending=unverified)=>{
+    if(!pending||flight.current)return {outcome:'UNKNOWN',code:'LOCAL_BUSY'};
+    flight.current=true;setBusy(true);
+    try{
+      let saved;
+      try{saved=await api(sessionPath(pending.sessionId));}catch(error){setNotice('The Session could not be read, so the order status is still not verified. Check again in a moment.');return {outcome:'UNKNOWN',code:error.message};}
+      const found=reconcile(saved,pending);
+      if(found==='UNKNOWN'){setNotice('The saved Session does not show this order yet. Check again in a moment; nothing was sent again.');return {outcome:'UNKNOWN',code:'NOT_FOUND_YET'};}
+      setUnverified(null);
+      if(found==='REFUSED'){setNotice('The earlier confirmation was not saved: the Session moved on without it.');return {outcome:'REFUSED',code:'RECONCILED_NOT_SAVED',reconciled:true};}
+      emitLocal('order_command_submitted');
+      return {...await refreshAfterCommit(pending.sessionId),reconciled:true};
+    }finally{flight.current=false;setBusy(false);}
+  };
+  // A view loaded for another reason can also settle an unverified confirmation.
+  const [settledBy,setSettledBy]=useState(null);
+  if(unverified&&view&&view!==settledBy&&view.metadata.id===unverified.sessionId){
+    setSettledBy(view);
+    const found=reconcile(view,unverified);
+    if(found!=='UNKNOWN'){setUnverified(null);setNotice(found==='COMMITTED'?'The earlier order was saved.':'The earlier confirmation was not saved: the Session moved on without it.');}
+  }
+  const orderLocked=busy||Boolean(view?.state.unresolved)||Boolean(unverified);
   const requestAction=(order,kind,quantity=null)=>{
     returnFocus.current=document.activeElement;setNotice('');
     const payload={orderId:order.id,...(kind==='CLOSE'?{quantity}:{})};
@@ -118,7 +167,10 @@ export default function TickAlpha(){
   };
   const confirmAction=()=>run(async()=>{
     await api(sessionPath(view.metadata.id)+'/commands',orderAction.command);
-    setView(await loadWorkspace(view.metadata.id));setDialog(null);setOrderAction(null);
+    setDialog(null);setOrderAction(null);
+    // The command is committed once the POST succeeds; a failed refresh must not read as a failed action.
+    try{setView(await loadWorkspace(view.metadata.id));}
+    catch{setNotice(`${orderAction.kind==='CANCEL'?'Cancellation':'Exit request'} saved. The Session view could not refresh; reload the Session to see it.`);return;}
     setNotice(orderAction.kind==='CANCEL'?'Pending order cancellation committed.':'Exit requested. Actual closure needs the next eligible liquidation-side tick.');
   });
   // Called by the New Session wizard with the same POST /sessions payload the old dialog sent.
@@ -187,9 +239,10 @@ export default function TickAlpha(){
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
           catch(error){setNotice(error.message);}
-        }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button aria-label="Drawing objects" aria-expanded={objectsOpen} title="Drawing objects" onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Objects</span></button><button disabled={busy||view.state.unresolved} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/><span>Order</span></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/><span>News</span></button><button aria-label="Open journal panel" title="Journal" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog("journal");}}><Icon name="journal"/><span>Journal</span></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/><span>Source</span></button></aside>
+        }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button aria-label="Drawing objects" aria-expanded={objectsOpen} title="Drawing objects" onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Objects</span></button><button disabled={orderLocked} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/><span>Order</span></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/><span>News</span></button><button aria-label="Open journal panel" title="Journal" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog("journal");}}><Icon name="journal"/><span>Journal</span></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/><span>Source</span></button></aside>
       </div>
-      <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><label className="alpha-bar-lots" title={planned?'Planned orders size from risk in the ticket':'Draft quantity; the ticket still reviews it'}><span>Lots</span><input aria-label="Draft lots" inputMode="decimal" value={planned?'':plan.quantity??''} placeholder={planned?'risk':''} disabled={busy||planned||protocol} onChange={e=>edit({quantity:e.target.value})}/></label><button className="alpha-new-order" disabled={busy||view.state.unresolved} onClick={event=>openTicket(event)}>New order</button><span className="alpha-order-hint">{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span><span className="alpha-balance-pill" aria-label={`Saved balance ${view.state.balance} USD`}>${view.state.balance}</span></div>
+      {unverified&&unverified.sessionId===view.metadata.id&&dialog!=='review'&&<div className="alpha-unverified" role="status"><p><strong>Order status not verified.</strong> {UNKNOWN_TEXT} New orders stay locked until the saved Session shows the result.</p><button type="button" disabled={busy} onClick={()=>checkUnverified()}>Check again</button></div>}
+      <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={orderLocked||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={orderLocked||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><label className="alpha-bar-lots" title={planned?'Planned orders size from risk in the ticket':'Draft quantity; the ticket still reviews it'}><span>Lots</span><input aria-label="Draft lots" inputMode="decimal" value={planned?'':plan.quantity??''} placeholder={planned?'risk':''} disabled={busy||planned||protocol} onChange={e=>edit({quantity:e.target.value})}/></label><button className="alpha-new-order" disabled={orderLocked} onClick={event=>openTicket(event)}>New order</button><span className="alpha-order-hint">{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span><span className="alpha-balance-pill" aria-label={`Saved balance ${view.state.balance} USD`}>${view.state.balance}</span></div>
       <AlphaTerminal key={view.metadata.id} request={terminalRequest} view={view} busy={busy} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
     </>}
     {showWorkspace&&<nav className="alpha-bottom-nav" aria-label="App sections">
@@ -211,13 +264,13 @@ export default function TickAlpha(){
         {planned?<><label>Entry<input aria-label="Entry" inputMode="decimal" value={plan.entry} disabled={busy} onChange={e=>edit({entry:e.target.value})}/></label><label>Stop Loss<input aria-label="Stop Loss" inputMode="decimal" value={plan.sl} disabled={busy} onChange={e=>edit({sl:e.target.value})}/></label>{protocol?<p>Target and quantity derive from locked RR {view.method.rr} and risk {view.method.riskPercent}%.</p>:<><label>Take Profit<input aria-label="Take Profit" inputMode="decimal" value={plan.tp} disabled={busy} onChange={e=>edit({tp:e.target.value})}/></label><div className="alpha-ticket-chips" role="group" aria-label="Set take profit by reward to risk">{['1','1.5','2','3'].map(rr=><button type="button" key={rr} disabled={busy} onClick={()=>{const tp=targetForRR({side:plan.side,entry:plan.entry,sl:plan.sl,rr,tickSize:view.state.profile.tickSize});if(tp)edit({tp});else setNotice('Enter a valid entry and stop first; the stop must be on the losing side.');}}>TP {rr}R</button>)}</div><fieldset className="alpha-ticket-risk"><legend>Risk per trade</legend><div className="alpha-ticket-chips" role="group" aria-label="Risk presets">{['0.5','1','2','3'].map(r=><button type="button" key={r} aria-pressed={plan.riskPercent===r} disabled={busy} onClick={()=>edit({riskPercent:r})}>{r}%</button>)}</div><label>Risk %<input aria-label="Risk %" inputMode="decimal" value={plan.riskPercent} disabled={busy} onChange={e=>edit({riskPercent:e.target.value})}/></label></fieldset><AlphaTicketEstimate plan={plan} view={view}/></>}</>:<><label>Quantity (lots)<input aria-label="Quantity (lots)" inputMode="decimal" value={plan.quantity} disabled={busy} onChange={e=>edit({quantity:e.target.value})}/></label>{!protocol&&<p className="alpha-ticket-hint">Quick sends a market order without a stop or target.<button type="button" disabled={busy} onClick={()=>edit({workflow:'PLANNED',orderType:'MARKET',entry:quoteFor(plan.side)})}>Add stop &amp; target</button></p>}</>}
         {protocol&&<fieldset><legend>Checklist · enforcement {view.method.checklistOn?'ON':'OFF'}</legend>{view.method.conditions.map(c=><label key={c.id}>{c.label}<select aria-label={c.label} disabled={busy} value={plan.observations.find(o=>o.conditionId===c.id)?.outcome||'NOT_ASSESSED'} onChange={e=>edit({observations:[...plan.observations.filter(o=>o.conditionId!==c.id),{conditionId:c.id,outcome:e.target.value}]})}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</fieldset>}
         {notice&&<p className="alpha-ticket-notice" role="alert">{notice==="INVALID_INPUT"?"Check the order values: quantity must be positive and match the Session lot step. For Planned orders, check the entry, stop and target values. (INVALID_INPUT)":noticeText(notice)}</p>}
-        <button disabled={busy||view.state.unresolved} onClick={openReview}>Review order</button><p>Quote-based simulation; no broker fill, margin, liquidity or slippage claim. The explicit QUOTE_BASELINE model uses zero commission; broker terms are not certified.</p>
+        <button disabled={orderLocked} onClick={openReview}>Review order</button><p>Quote-based simulation; no broker fill, margin, liquidity or slippage claim. The explicit QUOTE_BASELINE model uses zero commission; broker terms are not certified.</p>
       </section></WorkspaceModal>}
     {dialog==='action'&&orderAction&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm position action" onClose={()=>{if(!busy){setDialog(null);setOrderAction(null);}}}><section className="alpha-dialog"><h2>{orderAction.kind==='CANCEL'?'Cancel pending order':orderAction.quantity===null?'Request full close':'Request partial close'}</h2><p>{orderAction.order.side} · {orderAction.order.id}</p><p>{orderAction.kind==='CLOSE'?`Quantity: ${orderAction.quantity??orderAction.order.remaining} lots. A request does not settle the trade; the next eligible observed Bid/Ask determines its exit.`:'This cancels an unfilled intent; it does not close a position.'}</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button disabled={busy} onClick={()=>{setDialog(null);setOrderAction(null);}}>Keep current order</button><button disabled={busy} onClick={confirmAction}>Confirm action</button></section></WorkspaceModal>}
     {picked&&view&&!dialog&&<AlphaPickTicket key={picked.at} price={picked.price} tickSize={view.state.profile?.tickSize} plan={plan} protocol={protocol}
       onCancel={()=>{setPicked(null);[...document.querySelectorAll('button')].find(button=>button.textContent==='Pick order price')?.focus();}} onApply={(field,patch)=>{const value=patch[field];edit(patch);setPicked(null);returnFocus.current=document.querySelector('.alpha-order-bar button')||null;setDialog('ticket');
         setNotice(`${({entry:'Entry',sl:'Stop loss',tp:'Take profit'})[field]} set to ${value} from the chart. Review before confirming.`);}}/>}
     {dialog==='review'&&review&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm reviewed order" onClose={()=>{if(!busy){setDialog(null);setReview(null);}}}><AlphaReviewSheet key={review.reviewHash} review={review} view={view} busy={busy}
-      onConfirm={confirm} onCancel={()=>{setReview(null);setDialog(null);setOrderAction(null);}} onReviewAgain={()=>{setReview(null);openReview();}}/></WorkspaceModal>}
+      onConfirm={confirm} onCheck={checkUnverified} onReload={()=>run(()=>reopen(view.metadata.id,{push:false}))} onCancel={()=>{setReview(null);setDialog(null);setOrderAction(null);}} onReviewAgain={()=>{setReview(null);openReview();}}/></WorkspaceModal>}
   </main>;
 }
