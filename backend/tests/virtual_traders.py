@@ -75,3 +75,27 @@ def build_cohort(run_id: UUID | str, requested_users: int) -> VirtualTraderCohor
             command_id="order:" + str(command),
         ))
     return VirtualTraderCohort(run_id, requested_users, tuple(traders))
+
+
+def build_stages(run_id: UUID | str, sizes: tuple[int, ...] = COHORT_SIZES) -> tuple[VirtualTraderCohort, ...]:
+    """Build disjoint deterministic cohorts for progressive acceptance stages.
+
+    Every stage gets its own derived run identity, so 1 → 5 → 10 → 25 → 50 →
+    100-user runs in one isolated QA database cannot accidentally reuse the
+    same synthetic accounts or Sessions. Descriptors create no workload.
+    """
+    if isinstance(run_id, str):
+        try:
+            run_id = UUID(run_id)
+        except (ValueError, AttributeError) as error:
+            raise ValueError("run_id must be a UUID") from error
+    if not isinstance(run_id, UUID):
+        raise ValueError("run_id must be a UUID")
+    if type(sizes) is not tuple or not sizes or any(type(size) is not int for size in sizes):
+        raise ValueError("sizes must be a non-empty tuple of supported cohort sizes")
+    if tuple(sorted(set(sizes))) != sizes or any(size not in COHORT_SIZES for size in sizes):
+        raise ValueError("sizes must be strictly increasing supported cohort sizes")
+    return tuple(
+        build_cohort(uuid5(run_id, f"riksora-virtual-trader-stage:{size}"), size)
+        for size in sizes
+    )

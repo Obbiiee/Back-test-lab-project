@@ -1,7 +1,7 @@
 import unittest
 from uuid import UUID
 
-from tests.virtual_traders import COHORT_SIZES, build_cohort
+from tests.virtual_traders import COHORT_SIZES, build_cohort, build_stages
 
 
 class VirtualTraderCohortTests(unittest.TestCase):
@@ -33,6 +33,23 @@ class VirtualTraderCohortTests(unittest.TestCase):
         self.assertFalse(hasattr(cohort.traders[0], "password"))
         self.assertFalse(hasattr(cohort.traders[0], "access_token"))
         self.assertEqual(cohort.requested_users, 1)
+
+    def test_progressive_stage_cohorts_are_stable_and_disjoint(self):
+        run_id = UUID("f78f0c4c-aafe-416c-84bb-6b55dc0af05c")
+        stages = build_stages(run_id)
+        self.assertEqual(tuple(stage.requested_users for stage in stages), COHORT_SIZES)
+        self.assertEqual(stages, build_stages(str(run_id)))
+        stage_run_ids = [stage.run_id for stage in stages]
+        self.assertEqual(len(set(stage_run_ids)), len(COHORT_SIZES))
+        for field in ("identity_key", "workspace_key", "method_id", "session_id", "command_id", "email"):
+            values = [getattr(trader, field) for stage in stages for trader in stage.traders]
+            self.assertEqual(len(set(values)), len(values), field)
+
+    def test_stage_plan_rejects_ambiguous_or_unsupported_sizes(self):
+        run_id = UUID("f78f0c4c-aafe-416c-84bb-6b55dc0af05c")
+        for sizes in ((), (5, 1), (1, 1), (2,)):
+            with self.subTest(sizes=sizes), self.assertRaises(ValueError):
+                build_stages(run_id, sizes)
 
 
 if __name__ == "__main__":
