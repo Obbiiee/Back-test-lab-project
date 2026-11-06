@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 from contracts.canonical import canonical_bytes
 from execution.engine import can_change
-from execution.next_event import scan_untrusted_tie
+from execution.next_event import scan_next_group, scan_untrusted_tie
 from tests.test_execution_goldens import goldens
-from tests.test_tick_execution import Harness, open_plan, provider_for
+from tests.test_tick_execution import Harness, exercise, open_plan, provider_for
 
 
 def quote(time_ns, bid, ask, *, quality=None):
@@ -91,12 +91,57 @@ class NextEventScannerTests(unittest.TestCase):
         self.assertIsNone(scan_untrusted_tie(self.state({}), [too_large, too_large]))
         self.assertIsNone(scan_untrusted_tie(state, [quote(100, 100, 101)]))
 
+    def test_vectorized_next_group_matches_chronological_candidate_index(self):
+        randomizer = random.Random(130771)
+        statuses = ("PENDING", "ACTIVE", "CLOSED", "CANCELLED")
+        kinds = ("MARKET", "LIMIT", "STOP")
+        for case in range(200):
+            orders = {}
+            for index in range(randomizer.randint(0, 8)):
+                status = randomizer.choice(statuses)
+                orders[str(index)] = order(
+                    status=status, side=randomizer.choice(("LONG", "SHORT")),
+                    order_type=randomizer.choice(kinds),
+                    entry=str(randomizer.randint(90, 110)),
+                    sl=None if randomizer.randrange(3) == 0 else str(randomizer.randint(90, 105)),
+                    tp=None if randomizer.randrange(3) == 0 else str(randomizer.randint(95, 115)),
+                    available=str(randomizer.choice((0, 100, 200, 400))),
+                    exit_request=(None if randomizer.randrange(3) else
+                                  {"availableNs": "999"}) if status == "ACTIVE" else None,
+                )
+            groups = []
+            for group_index in range(randomizer.randint(1, 12)):
+                moment = (group_index + 1) * 100
+                rows = [quote(moment, randomizer.randint(90, 110), randomizer.randint(90, 110))
+                        for _ in range(randomizer.randint(1, 5))]
+                groups.append({"timeNs": str(moment), "order": "TRUSTED_SEQUENCE", "events": rows})
+            state = self.state(orders)
+            expected = next((index for index, group in enumerate(groups)
+                             if any(can_change(state, row) for row in group["events"])), None)
+            proven, actual = scan_next_group(state, groups)
+            self.assertTrue(proven, f"case={case}")
+            self.assertEqual(actual, expected, f"case={case} orders={orders} groups={groups}")
+
+    def test_next_group_falls_back_on_unproven_source_or_scan_bound(self):
+        state = self.state({"p": order(status="PENDING", side="LONG", order_type="MARKET")})
+        bad = quote(100, 100, 101, quality={
+            "quote": "VALID", "freshness": "UNKNOWN", "gapBefore": "NONE",
+            "evidenceHash": "a" * 64, "duplicateOf": None,
+        })
+        self.assertEqual(scan_next_group(state, [{"timeNs": "100", "events": [bad], "order": "TRUSTED_SEQUENCE"}]),
+                         (False, None))
+        too_many = [{"timeNs": str(index), "events": [quote(index, 100, 101)],
+                     "order": "TRUSTED_SEQUENCE"} for index in range(65)]
+        self.assertEqual(scan_next_group(state, too_many), (False, None))
+
     def test_engine_uses_scanner_for_changing_untrusted_tie_and_keeps_frozen_result(self):
         case = next(row for row in goldens()["scenarios"] if row["id"] == "changing-untrusted-tie")
         harness = Harness(provider_for(case))
         harness.call("OPEN", open_plan(case["open"]), name="scanner:order")
         with patch("execution.engine.scan_untrusted_tie", wraps=scan_untrusted_tie) as scanner:
-            harness.through(2)
+            with patch("execution.engine.scan_next_group", wraps=scan_next_group) as next_scan:
+                harness.through(2)
+        self.assertEqual(next_scan.call_count, 1)
         self.assertEqual(scanner.call_count, 1)
         self.assertTrue(harness.state["unresolved"])
         self.assertEqual(harness.state["balance"], case["balance"])
@@ -106,7 +151,8 @@ class NextEventScannerTests(unittest.TestCase):
 
         fallback = Harness(provider_for(case))
         fallback.call("OPEN", open_plan(case["open"]), name="scanner:order")
-        with patch("execution.engine.scan_untrusted_tie", return_value=None):
+        with patch("execution.engine.scan_next_group", return_value=(False, None)), \
+                patch("execution.engine.scan_untrusted_tie", return_value=None):
             fallback.through(2)
         fallback_events = fallback.controller.inspect(fallback.scope, fallback.session, maximum=256)["events"]
         check = lambda state, rows: canonical_bytes({
@@ -114,6 +160,25 @@ class NextEventScannerTests(unittest.TestCase):
             "state": state, "events": rows,
         })
         self.assertEqual(check(harness.state, events), check(fallback.state, fallback_events))
+
+    def test_all_authored_financial_goldens_match_chronological_fallback_bytes(self):
+        for case in goldens()["scenarios"]:
+            with self.subTest(case=case["id"]):
+                optimized = exercise(case)
+                with patch("execution.engine.scan_next_group", return_value=(False, None)), \
+                        patch("execution.engine.scan_untrusted_tie", return_value=None):
+                    chronological = exercise(case)
+                optimized_events = optimized.controller.inspect(optimized.scope, optimized.session,
+                                                                 maximum=256)["events"]
+                chronological_events = chronological.controller.inspect(chronological.scope,
+                                                                          chronological.session,
+                                                                          maximum=256)["events"]
+                artifact = lambda state, events: canonical_bytes({
+                    "schemaVersion": 1, "artifact": "BTL-NEXT-EVENT-GOLDEN-PARITY-1",
+                    "state": state, "events": events,
+                })
+                self.assertEqual(artifact(optimized.state, optimized_events),
+                                 artifact(chronological.state, chronological_events))
 
 
 if __name__ == "__main__":

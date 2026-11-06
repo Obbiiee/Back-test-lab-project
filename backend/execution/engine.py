@@ -13,7 +13,7 @@ from ticks.contracts import CanonicalTick, keys, uint
 from ticks.timeline import make_group
 from .contracts import (ENGINE_VERSION, MAX_EVENTS, MAX_ORDERS, command_wire, exact,
                         money, open_payload, policy_from_wire, price, text, validate_state)
-from .next_event import scan_untrusted_tie
+from .next_event import scan_next_group, scan_untrusted_tie
 
 
 def emit(state, events, kind, *, order_id=None, classification="OBSERVED_FEED_EVENT", **detail):
@@ -217,6 +217,7 @@ def advance(state, groups, coverage, diagnostics, through_ns):
     require(all(int(state["throughNs"]) <= uint(d["timeNs"]) <= through for d in diagnostics["records"]),
             "diagnostics", "REFUSED_FUTURE_EVIDENCE")
     previous = int(state["throughNs"])
+    validated_groups = []
     for index, group in enumerate(groups):
         keys(group, "groupId timeNs order events")
         moment = uint(group["timeNs"])
@@ -233,6 +234,17 @@ def advance(state, groups, coverage, diagnostics, through_ns):
         if group["order"] == "TRUSTED_SEQUENCE":
             sequences = [int(r["trustedSequence"]) for r in rows]
             require(sequences == sorted(set(sequences)), "sequence", "REFUSED_GROUP_ORDER")
+        validated_groups.append((group, rows))
+        previous = moment
+
+    scanner_proven, candidate_index = (False, None)
+    if groups and live(state) and not state["unresolved"] and not state["ended"]:
+        scanner_proven, candidate_index = scan_next_group(state, groups)
+
+    previous = int(state["throughNs"])
+    for index, (group, rows) in enumerate(validated_groups):
+        moment = int(group["timeNs"])
+        skip_quote_reducer = scanner_proven and (candidate_index is None or index < candidate_index)
         active = live(state) and not state["unresolved"] and not state["ended"]
         if active and not coverage_complete(coverage, previous, moment):
             unresolved(state, events, "UNRESOLVED_COVERAGE", dict(throughNs=group["timeNs"]))
@@ -255,11 +267,15 @@ def advance(state, groups, coverage, diagnostics, through_ns):
                     if group["order"] == "UNTRUSTED" and len(rows) > 1:
                         before = len(events)
                         if equivalent:
-                            quote_fill(state, events, rows[0], group, sorted(r["eventId"] for r in rows))
+                            if not skip_quote_reducer:
+                                quote_fill(state, events, rows[0], group, sorted(r["eventId"] for r in rows))
                         else:
-                            candidate = scan_untrusted_tie(state, rows)
-                            if candidate is None:
-                                candidate = any(can_change(state, r) for r in rows)
+                            if skip_quote_reducer:
+                                candidate = False
+                            else:
+                                candidate = scan_untrusted_tie(state, rows)
+                                if candidate is None:
+                                    candidate = any(can_change(state, r) for r in rows)
                             if candidate:
                                 unresolved(state, events, "UNRESOLVED_EQUAL_TIME_ORDER", dict(groupId=group["groupId"], timeNs=group["timeNs"]))
                         # No financial action is a proven common outcome; no row is selected as chronology.
@@ -267,8 +283,9 @@ def advance(state, groups, coverage, diagnostics, through_ns):
                             emit(state, events, "CHRONOLOGY_LIMITATION", groupId=group["groupId"],
                                  timeNs=group["timeNs"], commonOutcome="NO_FINANCIAL_ACTION")
                     else:
-                        for row in rows:
-                            quote_fill(state, events, row, group, [row["eventId"]])
+                        if not skip_quote_reducer:
+                            for row in rows:
+                                quote_fill(state, events, row, group, [row["eventId"]])
         previous = moment
         state["throughNs"] = group["timeNs"]
         state["nextGroupIndex"] = str(int(state["nextGroupIndex"])+1)
