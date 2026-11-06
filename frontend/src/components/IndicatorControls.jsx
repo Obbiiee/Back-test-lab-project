@@ -4,6 +4,9 @@ import { productionRegistry } from '../indicators/productionRegistry.js';
 import { instanceConfig, effectivePlacement } from '../indicators/indicatorValidation.js';
 import { outputStyle } from '../indicators/indicatorStyle.js';
 import { CATEGORY_ORDER, UNAVAILABLE_INDICATORS, categoryOf } from './indicatorCatalog.js';
+
+// Shown first, before the collapsed category groups.
+const POPULAR = ['SMA', 'EMA', 'BOLLINGER_BANDS', 'RSI', 'MACD', 'ATR', 'SUPERTREND', 'ICHIMOKU'];
 import './IndicatorControls.css';
 
 // Issue #21 C-05: indicator picker + per-instance settings (Inputs / Style /
@@ -86,16 +89,24 @@ export default function IndicatorControls({ instances, onChange, onOpen, registr
         <div className="ind-layout">
           <div className="ind-catalog">
             <input type="search" aria-label="Search indicators" placeholder="Search indicators…" value={query} onChange={event => setQuery(event.target.value)} />
+            {/* Progressive disclosure: a short Popular row, then collapsed groups with counts.
+                Searching opens every group that has a match. */}
+            {!query.trim() && <div className="ind-group ind-popular" role="group" aria-label="Popular">
+              <h3>Popular</h3>
+              <div className="indicator-add-tools">
+                {POPULAR.filter(type => registry.types().includes(type)).map(type => { const spec = registry.get(type); return <button type="button" key={type} title={spec.description ?? ''} disabled={instances.length >= 16} onClick={() => add(type)}><span className="ind-plus" aria-hidden="true">+</span><span className="dp-sr">Add </span>{spec.name}</button>; })}
+              </div>
+            </div>}
             {[...catalog].map(([category, items]) => {
               const shown = items.filter(matches), blocked = UNAVAILABLE_INDICATORS.filter(item => item.category === category && matches({ ...item, type: item.id }));
               if (!shown.length && !blocked.length) return null;
-              return <div key={category} className="ind-group" role="group" aria-label={category}>
-                <h3>{category}</h3>
-                <div className="indicator-add-tools">
-                  {shown.map(item => <button type="button" key={item.type} title={item.description} disabled={instances.length >= 16} onClick={() => add(item.type)}><span className="ind-plus" aria-hidden="true">+</span><span className="dp-sr">Add </span>{item.name}</button>)}
-                  {blocked.map(item => <button type="button" key={item.id} disabled className="ind-blocked" title={item.reason} aria-label={`${item.name} unavailable: ${item.reason}`}>{item.name}<small>needs volume</small></button>)}
-                </div>
+              const tools = <div className="indicator-add-tools">
+                {shown.map(item => <button type="button" key={item.type} title={item.description} disabled={instances.length >= 16} onClick={() => add(item.type)}><span className="ind-plus" aria-hidden="true">+</span><span className="dp-sr">Add </span>{item.name}</button>)}
+                {blocked.map(item => <button type="button" key={item.id} disabled className="ind-blocked" title={item.reason} aria-label={`${item.name} unavailable: ${item.reason}`}>{item.name}<small>needs volume</small></button>)}
               </div>;
+              return query.trim()
+                ? <div key={category} className="ind-group" role="group" aria-label={category}><h3>{category}</h3>{tools}</div>
+                : <details key={category} className="ind-group ind-fold"><summary><h3>{category}</h3><span className="ind-fold-count">{shown.length + blocked.length}</span></summary>{tools}</details>;
             })}
           </div>
           <div className="ind-active">
