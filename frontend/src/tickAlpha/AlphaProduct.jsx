@@ -18,13 +18,13 @@ function sourceLine(catalog){
 
 function SessionRow({session,catalog,onOpen}){
   return <tr>
-    <th scope="row"><a {...linkTo({screen:'replay',session:session.id})} onClick={event=>{event.preventDefault();onOpen(session.id);}}>{session.name}</a></th>
+    <th scope="row"><a {...linkTo({screen:'session',of:session.id})}>{session.name}</a></th>
     <td>{catalog.profile.instrumentId}</td><td className="rk-num">{session.startPeriod}</td><td className="rk-num">{money(session.initialBalance)}</td>
     <td className="rk-row-actions"><button type="button" className="rk-btn rk-btn-small" onClick={()=>onOpen(session.id)} aria-label={`Open replay for ${session.name}`}>Open replay</button><a className="rk-btn rk-btn-small rk-btn-quiet" {...linkTo({screen:'analytics',of:session.id})} aria-label={`Analytics for ${session.name}`}>Analytics</a></td>
   </tr>;
 }
 
-function SessionTable({sessions,catalog,onOpen,caption}){
+export function SessionTable({sessions,catalog,onOpen,caption}){
   return <div className="rk-table-scroll" tabIndex={0} role="region" aria-label={`${caption}, scrolls sideways`}><table className="rk-table">
     <caption className="alpha-sr-only">{caption}</caption>
     <thead><tr><th scope="col">Session</th><th scope="col">Instrument</th><th scope="col">Start month</th><th scope="col">Starting balance</th><th scope="col"><span className="alpha-sr-only">Actions</span></th></tr></thead>
@@ -256,10 +256,6 @@ export function Placeholder({screen,catalog,onOpen,onSource,onFeedback}){
     {catalog.sessions.length?<SessionTable sessions={catalog.sessions.slice().reverse()} catalog={catalog} onOpen={onOpen} caption="Sessions you can replay"/>:<StatePanel kind="empty" title="No Sessions yet" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Create a Method, then a Session inside it.</p></StatePanel>}</>;
   if(screen==='journal')return <><PageHead eyebrow="Journal" title="Journal" lead="Each Session keeps its own journal next to the chart. A journal across Sessions needs a server list that is not published yet."/>
     {catalog.sessions.length?<SessionTable sessions={catalog.sessions.slice().reverse()} catalog={catalog} onOpen={onOpen} caption="Sessions with a journal"/>:<StatePanel kind="empty" title="Nothing journaled yet"><p>Journals start when you create a Session.</p></StatePanel>}</>;
-  if(screen==='catalog'){const p=catalog.profile;return <><PageHead eyebrow="Data Catalog" title="Data Catalog" lead="What this workspace can replay today. The 16-instrument target list with per-instrument status is not published by the service yet, so it is not shown as available."/>
-    <section className="rk-card" aria-labelledby="rk-cat-h"><div className="rk-section-head"><h2 id="rk-cat-h">{p.instrumentId}</h2><span className="rk-tag rk-tag-free">{catalog.label}</span></div>
-      <dl className="rk-facts"><div><dt>Provider / feed</dt><dd>{p.providerId} / {p.feedId}</dd></div><div><dt>Quote currency</dt><dd>{p.quoteCurrency}</dd></div><div><dt>Tick size</dt><dd className="rk-num">{p.tickSize}</dd></div><div><dt>Lots</dt><dd className="rk-num">{p.minLot}–{p.maxLot} step {p.lotStep}</dd></div><div><dt>Contract size</dt><dd className="rk-num">{p.contractSize}</dd></div><div><dt>Commission</dt><dd>{p.commissionModel}</dd></div><div><dt>Earliest start month</dt><dd className="rk-num">{catalog.startPeriod}</dd></div></dl>
-      <button type="button" className="rk-btn" onClick={onSource}>Source details and limitations</button></section></>;}
   return <><PageHead eyebrow="Help" title="Help" lead="Short answers about how RIKSORA research works."/>
     <div className="rk-grid-2">
       <section className="rk-card"><h2>How replay works</h2><p>History is revealed step by step from the Session’s saved time. Orders fill on later observed Bid/Ask quotes only, never on prices that were not yet visible.</p></section>

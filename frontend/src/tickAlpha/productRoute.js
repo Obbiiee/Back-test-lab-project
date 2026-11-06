@@ -4,7 +4,7 @@ import {isAccountPage} from './accountClient.js';
 // Product routes live in query parameters so the same build serves the local
 // workspace (?tick-alpha=local) and the account page (?page=account) without a
 // server rewrite. Old links keep working: ?session=<id> still opens replay.
-export const SCREENS=['account','methods','method','method-new','sessions','analytics','journal','catalog','help','replay'];
+export const SCREENS=['account','methods','method','method-new','sessions','session','session-new','analytics','journal','catalog','help','replay'];
 export const METHOD_TABS=['overview','sessions','analytics','rules'];
 const EVENT='riksora:route';
 

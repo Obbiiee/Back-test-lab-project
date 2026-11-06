@@ -269,3 +269,94 @@
 .rk-auth-row .rk-auth-btn{flex:1 1 160px}
 .rk-auth :is(a,button):focus-visible{outline:3px solid #ffce55;outline-offset:2px}
 @media(max-width:760px){.rk-auth-hero{min-height:0;padding:24px 20px 8px;gap:16px}.rk-auth-hero::before{width:180px;height:180px;right:-60px;top:40px}.rk-auth-hero::after{display:none}.rk-auth-hero p{font-size:15px}.rk-auth-hero .rk-auth-small{display:none}.rk-auth-panel{padding:12px 12px 24px}.rk-auth-card{padding:22px;border-radius:24px}}
+/* ---------- Shared motion tokens ---------- */
+.tick-alpha .rk-shell{--rk-ease:cubic-bezier(.2,.8,.2,1);--rk-fast:.16s;--rk-mid:.22s}
+.tick-alpha .rk-shell .rk-btn{transition:transform var(--rk-fast) var(--rk-ease),box-shadow var(--rk-fast) var(--rk-ease),background-color var(--rk-fast) ease}
+.tick-alpha .rk-shell .rk-btn-primary:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #0b3f8a}
+.tick-alpha .rk-nav-item{transition:background-color var(--rk-fast) ease,color var(--rk-fast) ease}
+/* ---------- SearchableSelect (rk-combo) ---------- */
+.tick-alpha .rk-combo{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tick-alpha .rk-combo-label{font-size:13px;font-weight:800}
+.tick-alpha .rk-toolbar .rk-combo-label{font-size:12px;font-weight:700;color:var(--rk-muted-on-navy)}
+.tick-alpha .rk-combo-field{position:relative;display:flex}
+.tick-alpha .rk-shell .rk-combo-trigger{flex:1;display:flex;align-items:center;gap:10px;min-height:48px;width:100%;padding:6px 40px 6px 14px;border-radius:16px;border:2px solid #d9eafe;background:var(--rk-soft);color:var(--rk-ink);font:600 15px var(--rk-font-ui,Inter,sans-serif);text-align:left;cursor:pointer;box-sizing:border-box;transition:border-color var(--rk-fast) ease}
+.tick-alpha .rk-toolbar .rk-combo-trigger{min-height:44px;border-radius:999px;border-color:var(--rk-line);background:var(--rk-panel);color:#fff}
+.tick-alpha .rk-shell .rk-combo-trigger:hover:not(:disabled),.tick-alpha .rk-combo.is-open .rk-combo-trigger{border-color:#1378f5}
+.tick-alpha .rk-shell .rk-combo-trigger:disabled{opacity:.6;cursor:not-allowed}
+.tick-alpha .rk-combo-value{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.tick-alpha .rk-combo-value strong,.tick-alpha .rk-combo-value small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tick-alpha .rk-combo-value small{font-size:12px;font-weight:600;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-toolbar .rk-combo-value small{color:var(--rk-muted-on-navy)}
+.tick-alpha .rk-combo-placeholder{color:#5f6f87;font-weight:600}
+.tick-alpha .rk-toolbar .rk-combo-placeholder{color:#c3d6f2}
+.tick-alpha .rk-combo-chevron{position:absolute;right:14px;top:50%;translate:0 -50%;pointer-events:none;transition:rotate var(--rk-fast) var(--rk-ease)}
+.tick-alpha .rk-combo.is-open .rk-combo-chevron{rotate:180deg}
+.tick-alpha .rk-combo-field:has(.rk-combo-clear) .rk-combo-chevron{right:40px}
+.tick-alpha .rk-shell .rk-combo-clear{position:absolute;right:8px;top:50%;translate:0 -50%;width:28px;height:28px;border-radius:50%;border:0;background:#eaf2fd;color:var(--rk-ink);font:800 16px/1 var(--rk-font-ui,Inter,sans-serif);cursor:pointer}
+.tick-alpha .rk-combo-hint{font-size:12px;font-weight:600;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-combo-backdrop{display:none}
+.tick-alpha .rk-combo-panel{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;min-width:260px;max-height:min(360px,60vh);display:flex;flex-direction:column;background:#fff;color:var(--rk-ink);border:2px solid #d9eafe;border-radius:20px;box-shadow:0 6px 0 #1378f5;overflow:hidden;animation:rk-pop var(--rk-mid) var(--rk-ease)}
+.tick-alpha .rk-combo-handle{display:none}
+.tick-alpha .rk-combo-search{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:2px solid #eaf2fd;color:#5f6f87;font-size:18px}
+.tick-alpha .rk-shell .rk-combo-search input{flex:1;min-width:0;min-height:40px;border:0;background:transparent;color:var(--rk-ink);font:600 15px var(--rk-font-ui,Inter,sans-serif);outline:none;padding:0}
+.tick-alpha .rk-combo-search:focus-within{box-shadow:inset 0 -3px 0 #ffce55}
+.tick-alpha .rk-combo-list{list-style:none;margin:0;padding:6px;overflow:auto;overscroll-behavior:contain}
+.tick-alpha .rk-combo-list li{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 12px;border-radius:14px;cursor:pointer}
+.tick-alpha .rk-combo-list li.is-active{background:#eaf2fd}
+.tick-alpha .rk-combo-list li[aria-selected=true]{font-weight:800}
+.tick-alpha .rk-combo-list li.is-disabled{opacity:.55;cursor:not-allowed}
+.tick-alpha .rk-combo-opt-text{flex:1;display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.tick-alpha .rk-combo-opt-text small{font-size:12px;font-weight:600;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-combo-opt-badge{border-radius:999px;padding:3px 10px;background:#d9eafe;color:#0b55b8;font-size:11px;font-weight:800}
+.tick-alpha .rk-combo-opt-check{color:#0f67d8;font-weight:900}
+.tick-alpha .rk-combo-note{margin:0;padding:16px;font-size:14px;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-combo-note.is-error{color:#9e2b33}
+@keyframes rk-pop{from{opacity:0;transform:translateY(-4px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes rk-sheet{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
+@media(max-width:760px){
+  .tick-alpha .rk-combo-backdrop{display:block;position:fixed;inset:0;z-index:80;background:rgba(6,26,60,.55)}
+  .tick-alpha .rk-combo-panel{position:fixed;z-index:81;top:auto;left:0;right:0;bottom:0;min-width:0;max-height:75dvh;border-radius:28px 28px 0 0;border:0;box-shadow:0 -6px 0 #1378f5;padding-bottom:env(safe-area-inset-bottom);animation:rk-sheet var(--rk-mid) var(--rk-ease)}
+  .tick-alpha .rk-combo-handle{display:block;width:44px;height:5px;border-radius:999px;background:#c9d6ea;margin:10px auto 2px}
+}
+/* ---------- Toolbar, wizard, steps ---------- */
+.tick-alpha .rk-toolbar-combo{flex:0 1 260px;min-width:200px}
+.tick-alpha .rk-steps{list-style:none;margin:0;padding:0;display:flex;gap:6px;flex-wrap:wrap}
+.tick-alpha .rk-shell .rk-steps button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px 0 6px;border-radius:999px;border:2px solid var(--rk-line);background:transparent;color:#d9eafe;font:700 13px var(--rk-font-ui,Inter,sans-serif);cursor:pointer}
+.tick-alpha .rk-steps button span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--rk-panel);font-weight:900}
+.tick-alpha .rk-shell .rk-steps button.is-current{background:#fff;color:var(--rk-ink);border-color:#fff}
+.tick-alpha .rk-steps button.is-current span{background:#ffce55;color:var(--rk-ink)}
+.tick-alpha .rk-shell .rk-steps button.is-done{background:#d9eafe;color:#0b55b8;border-color:#d9eafe}
+.tick-alpha .rk-steps button.is-done span{background:#fff}
+.tick-alpha .rk-shell .rk-steps button:disabled{opacity:.5;cursor:not-allowed}
+.tick-alpha .rk-wizard{max-width:760px;box-shadow:0 8px 0 #1378f5;border-radius:32px;padding:28px}
+.tick-alpha .rk-wizard-step{animation:rk-pop var(--rk-mid) var(--rk-ease)}
+.tick-alpha .rk-form .rk-wizard-step legend{font-size:22px;font-weight:900;letter-spacing:-.01em;margin-bottom:14px}
+.tick-alpha .rk-wizard-note{margin:4px 0 0;font-size:13px;line-height:1.5;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-wizard-fixed{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:18px;background:var(--rk-soft);font-size:14px}
+.tick-alpha .rk-form fieldset>label small{font-size:12px;font-weight:600;color:var(--rk-muted-on-white)}
+.tick-alpha .rk-form .rk-field-error,.tick-alpha .rk-form-error{color:#9e2b33;font-weight:700}
+.tick-alpha .rk-form-error{margin:0;padding:10px 14px;border-radius:14px;background:#ffe1e1;font-size:14px}
+.tick-alpha .rk-shell .rk-form input[aria-invalid=true]{border-color:#ff7373}
+.tick-alpha .rk-review{padding:16px;border-radius:20px;background:var(--rk-soft)}
+.tick-alpha .rk-wizard-actions{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:2px solid #eaf2fd}
+.tick-alpha .rk-wizard-actions .rk-btn-primary{min-width:180px}
+/* ---------- Catalog + disclosures ---------- */
+.tick-alpha .rk-catalog{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.tick-alpha .rk-catalog-main{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.tick-alpha .rk-catalog-main>div{flex:1;min-width:160px}
+.tick-alpha .rk-catalog-main h2{margin:0;font:500 20px var(--rk-font-data,'IBM Plex Mono',monospace)}
+.tick-alpha .rk-catalog-main .rk-note{margin:2px 0 0}
+.tick-alpha .rk-disclosure{margin-top:12px}
+.tick-alpha .rk-disclosure>summary{cursor:pointer;font-weight:800;font-size:14px;min-height:32px;display:flex;align-items:center;gap:6px}
+.tick-alpha .rk-disclosure[open]>summary{margin-bottom:10px}
+.tick-alpha details.rk-card.rk-disclosure{padding:14px 22px}
+.tick-alpha .rk-main-note{margin:0;font-size:13px;color:var(--rk-muted-on-navy)}
+@media(max-width:760px){
+  .tick-alpha .rk-toolbar-combo{flex:1 1 100%}
+  .tick-alpha .rk-wizard{padding:20px;border-radius:26px}
+  .tick-alpha .rk-wizard-actions .rk-btn{flex:1}
+  .tick-alpha .rk-steps{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+  .tick-alpha .rk-steps li{flex:none}
+}
+@media(prefers-reduced-motion:reduce){.tick-alpha .rk-combo-panel,.tick-alpha .rk-wizard-step{animation:none}.tick-alpha .rk-shell .rk-btn,.tick-alpha .rk-combo-chevron{transition:none}}
+.tick-alpha .rk-card a:not(.rk-btn){color:#0b55b8;font-weight:800}

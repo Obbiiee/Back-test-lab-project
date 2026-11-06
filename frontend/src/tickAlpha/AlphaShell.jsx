@@ -12,6 +12,7 @@ const PHONE=[['methods','Methods','layers'],['sessions','Sessions','calendar'],[
 
 function active(route,key){
   if(key==='methods')return ['methods','method','method-new'].includes(route.screen);
+  if(key==='sessions')return ['sessions','session','session-new'].includes(route.screen);
   return route.screen===key;
 }
 

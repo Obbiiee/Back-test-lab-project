@@ -5,7 +5,8 @@ import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourc
 import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
-import AlphaSessions from './AlphaSessions.jsx';
+import AlphaSessionWizard from './AlphaSessionWizard.jsx';
+import {SessionsPage,SessionOverview,CatalogPage} from './AlphaSessionPages.jsx';
 import AlphaTicketEstimate from './AlphaTicketEstimate.jsx';
 import {targetForRR} from './orderEstimate.js';
 import AlphaTerminal from './AlphaTerminal.jsx';
@@ -38,6 +39,7 @@ export default function TickAlpha(){
   const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
   const [orderAction,setOrderAction]=useState(null);
   const [selectedMethod,setSelectedMethod]=useState('');
+  const [createError,setCreateError]=useState(null);
   const route=useRoute();
   const showWorkspace=Boolean(view&&route.screen==='replay'&&route.session===view.metadata.id);
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
@@ -107,20 +109,24 @@ export default function TickAlpha(){
     setView(await loadWorkspace(view.metadata.id));setDialog(null);setOrderAction(null);
     setNotice(orderAction.kind==='CANCEL'?'Pending order cancellation committed.':'Exit requested. Actual closure needs the next eligible liquidation-side tick.');
   });
-  const createSession=event=>{
-    event.preventDefault();const fields=new FormData(event.currentTarget);
+  // Called by the New Session wizard with the same POST /sessions payload the old dialog sent.
+  const createSession=fields=>{
+    if(!creationId.current)creationId.current=id('session');
+    setCreateError(null);
     run(async()=>{
-      const saved=await api('/sessions',{id:creationId.current,name:fields.get('name'),methodId:fields.get('method'),
-        initialBalance:fields.get('balance'),startPeriod:fields.get('startPeriod')??catalog.startPeriod});
+     try{
+      const saved=await api('/sessions',{id:creationId.current,name:fields.name,methodId:fields.methodId,
+        initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
       const workspace=await loadWorkspace(saved.metadata.id);
-      setCatalog(await api('/catalog'));setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);setPlan(initialPlan(workspace));setPlanRevision(0);
+      setCatalog(await api('/catalog'));setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
+     }catch(error){setCreateError(noticeText(error.message));throw error;}
     });
   };
   const openCreation=(type,event)=>{
     returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);
     if(type==='method'){navigate({screen:'method-new'});return;}
-    creationId.current=id(type);setDialog('session');
+    creationId.current=id('session');navigate({screen:'session-new',method:selectedMethod||view?.method.id});
   };
   const sessionMenu=<details className="alpha-session-menu"><summary>Session settings</summary>    <section className="alpha-context" aria-label="Method and Session">
       <button disabled={busy||!catalog} onClick={event=>openCreation('method',event)}>New Method</button>
@@ -141,8 +147,11 @@ export default function TickAlpha(){
       })}>Retry connection</button>}><p>{isAccountPage()?'Retry, or sign out and sign in again. Nothing was changed.':'Start the local alpha service and database, then retry. Saved Sessions are kept.'}</p></StatePanel>)
       :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='method-new'?<MethodNew catalog={catalog} onSaved={async methodId=>{setCatalog(await api('/catalog'));setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice('Method saved. Create a Session to start replay.');}}/>
-      :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={(methodId,event)=>{setSelectedMethod(methodId);openCreation('session',event);}}/>
-      :route.screen==='sessions'?<AlphaSessions catalog={catalog} busy={busy} onOpen={sessionId=>run(()=>reopen(sessionId))} onCreate={openCreation} onSource={openSource}/>
+      :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
+      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
+      :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>
       :route.screen==='analytics'?<Analytics catalog={catalog} route={route}/>
       :route.screen==='replay'&&route.session?(busy||!notice?<StatePanel level={1} kind="loading" title="Opening Session…"/>:<StatePanel level={1} kind="unavailable" title="This Session could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
       :<Placeholder screen={route.screen} catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>}
@@ -190,7 +199,6 @@ export default function TickAlpha(){
         <button disabled={busy||view.state.unresolved} onClick={openReview}>Review order</button><p>Quote-based simulation; no broker fill, margin, liquidity or slippage claim. The explicit QUOTE_BASELINE model uses zero commission; broker terms are not certified.</p>
       </section></WorkspaceModal>}
     {dialog==='action'&&orderAction&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm position action" onClose={()=>{if(!busy){setDialog(null);setOrderAction(null);}}}><section className="alpha-dialog"><h2>{orderAction.kind==='CANCEL'?'Cancel pending order':orderAction.quantity===null?'Request full close':'Request partial close'}</h2><p>{orderAction.order.side} · {orderAction.order.id}</p><p>{orderAction.kind==='CLOSE'?`Quantity: ${orderAction.quantity??orderAction.order.remaining} lots. A request does not settle the trade; the next eligible observed Bid/Ask determines its exit.`:'This cancels an unfilled intent; it does not close a position.'}</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button disabled={busy} onClick={()=>{setDialog(null);setOrderAction(null);}}>Keep current order</button><button disabled={busy} onClick={confirmAction}>Confirm action</button></section></WorkspaceModal>}
-    {dialog==='session'&&<WorkspaceModal returnFocusRef={returnFocus} label="Create Session" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createSession}><h2>Create Session</h2><label>Name<input name="name" required maxLength={128}/></label><label>Method<select name="method" defaultValue={selectedMethod||view?.method.id||catalog.methods[0]?.id}>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name} · {m.kind==='PROTOCOL'?'Protocol':'Free Style'}</option>)}</select></label><label>Starting balance (USD)<input name="balance" defaultValue="10000" inputMode="decimal" required/></label>{sourceContext()==='historical'&&<label>Start month (UTC)<input name="startPeriod" type="month" defaultValue={catalog.startPeriod} min={catalog.startPeriod} max={`${catalog.startPeriod.slice(0,4)}-12`} required disabled={busy}/></label>}<p>XAUUSD · {sourceContext()==='historical'?'Exness historical quotes':'Synthetic fixture'}. The Session inherits your Method rules. Replay starts at the first observed quote in the selected month; unavailable months are refused without substituting data.</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button className="alpha-primary-action" disabled={busy}>Save Session</button></form></WorkspaceModal>}
     {dialog==='review'&&review&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm reviewed order" onClose={()=>{if(!busy){setDialog(null);setReview(null);}}}><section className="alpha-dialog"><h2>Confirm reviewed order</h2><ReviewedIntent payload={review.review.command.payload} methodName={view.method.name} riskBasis={review.review.riskBasis} researchRisk={review.review.researchRisk}/><p>Fill uses the next eligible observed Bid/Ask. This confirmation is not an execution price.</p>{review.review.command.payload.observations.map(o=><p key={o.conditionId}>{view.method.conditions.find(c=>c.id===o.conditionId)?.label}: {o.outcome}</p>)}{notice&&<p role="alert">{noticeText(notice)}</p>}<button disabled={busy} onClick={()=>{setReview(null);setDialog(null);setOrderAction(null);}}>Cancel confirmation</button><button disabled={busy} onClick={confirm}>Confirm order</button></section></WorkspaceModal>}
   </main>;
 }

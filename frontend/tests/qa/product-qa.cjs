@@ -122,8 +122,15 @@ function mockAccount(page, state) {
   const sessionName = methodName + ' S1';
   await step('New Session from Method → replay opens with Method breadcrumb', async () => {
     await page.getByRole('button', { name: 'New Session' }).first().click(); await sleep(400);
-    await page.locator('input[name=name]').fill(sessionName);
-    await page.getByRole('button', { name: 'Save Session' }).click();
+    // Wizard: the Method is preselected from the Method overview.
+    must(await page.getByRole('heading', { name: 'Set up a replay' }).isVisible(), 'wizard did not open');
+    must((await page.locator('.rk-combo-trigger').first().innerText()).includes(methodName), 'Method not preselected');
+    for (let i = 0; i < 3; i++) { await page.getByRole('button', { name: 'Continue' }).click(); await sleep(200); }
+    await page.getByLabel('Session name').fill(sessionName);
+    await page.getByRole('button', { name: 'Continue' }).click(); await sleep(200);
+    must(await page.getByRole('heading', { name: 'Review' }).isVisible() || await page.getByText('Review', { exact: true }).first().isVisible(), 'review step missing');
+    await shot('05b-wizard-review');
+    await page.getByRole('button', { name: 'Create Session' }).click();
     await page.waitForSelector('.candle-chart canvas', { timeout: 20000 }); await sleep(1200);
     must(new URL(page.url()).searchParams.get('session'), 'session missing from URL');
     must(await page.getByRole('link', { name: `Back to ${methodName}` }).isVisible(), 'breadcrumb back link missing');
@@ -213,7 +220,37 @@ function mockAccount(page, state) {
     must(await p.getByRole('heading', { name: 'Replay needs a Session' }).isVisible(), 'replay explainer missing');
     await p.screenshot({ path: `${out}/local-390-replay-explainer.png` });
     const sid = await p.locator('.rk-table tbody tr th a').first().getAttribute('href');
-    await p.goto(LOCAL + sid); await p.waitForSelector('.candle-chart canvas', { timeout: 20000 });
+    // Row names open the Session overview; the old ?session=<id> replay link must keep working.
+    const id = new URL(LOCAL + sid).searchParams.get('of'); must(id, 'row link should open the Session overview');
+    await p.goto(LOCAL + '/?tick-alpha=local&session=' + encodeURIComponent(id)); await p.waitForSelector('.candle-chart canvas', { timeout: 20000 });
+    await c.close();
+  });
+  await step('Local CP2: Sessions search + Method combobox (keyboard), filtered-empty, overview, catalog search', async () => {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 800 } }); const p = await c.newPage();
+    await p.goto(LOCAL + '/?tick-alpha=local&screen=sessions'); await sleep(1500);
+    const trigger = p.locator('.rk-combo-trigger').first();
+    await trigger.focus(); await p.keyboard.press('ArrowDown'); await sleep(150);
+    must(await p.getByRole('listbox').isVisible(), 'ArrowDown opens the listbox');
+    must(await p.getByRole('combobox', { name: /Search Method/ }).evaluate(el => el === document.activeElement), 'search input focused');
+    await p.keyboard.press('Escape'); await sleep(120);
+    must(!(await p.getByRole('listbox').isVisible()) && await trigger.evaluate(el => el === document.activeElement), 'Escape closes and returns focus');
+    await trigger.click(); await p.keyboard.type('zzzz-no-method'); await sleep(120);
+    must(await p.getByText('Nothing matches your search.').isVisible(), 'empty search state');
+    await p.keyboard.press('Escape');
+    await p.getByPlaceholder('Search Sessions or Methods').fill('zzzz-none'); await sleep(150);
+    must(await p.getByRole('heading', { name: 'No Session matches' }).isVisible(), 'filtered-empty state');
+    await p.getByRole('button', { name: 'Clear filters' }).click(); await sleep(150);
+    await p.locator('.rk-table tbody th a').first().click(); await sleep(1500);
+    must(await p.getByRole('heading', { name: 'Saved state' }).isVisible() && await p.getByText('Saved revision').isVisible(), 'Session overview shows saved state');
+    await p.screenshot({ path: `${out}/local-1280-session-overview.png` });
+    await p.goto(LOCAL + '/?tick-alpha=local&screen=catalog'); await sleep(1200);
+    await p.getByPlaceholder('Search instruments').fill('eurusd'); await sleep(150);
+    must(await p.getByRole('heading', { name: 'No confirmed instrument matches' }).isVisible(), 'catalog never invents instruments');
+    await p.getByPlaceholder('Search instruments').fill('xau'); await sleep(150);
+    must(await p.getByRole('heading', { name: 'XAUUSD' }).isVisible(), 'server instrument listed');
+    await p.screenshot({ path: `${out}/local-1280-catalog.png` });
+    await p.goto(LOCAL + '/?tick-alpha=local&screen=session-new'); await sleep(1200);
+    must(await p.getByRole('button', { name: 'Continue' }).isDisabled(), 'Continue disabled until a Method is chosen');
     await c.close();
   });
   console.log(`product QA: ${passed} passed, ${fail.length} failed${fail.length ? ' → ' + fail.join(' | ') : ''}`);

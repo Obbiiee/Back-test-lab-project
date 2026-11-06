@@ -237,7 +237,10 @@ assert.ok(noticeText('REFUSED_HISTORICAL_PERIOD').includes('no fallback feed'));
 const observed={state:{throughNs:'1439166600000000000'},replayStepNs:'1000000000'};
 assert.equal(replayTarget(observed,4),'1439166604000000000');
 for(const invalid of ['0','-1','1000000000000',1,true,'1e9'])assert.throws(()=>replayTarget({...observed,replayStepNs:invalid},1));
-assert.ok(ui.includes('name="startPeriod"')&&ui.includes('Start month (UTC)'));
+// The Start month field moved from the old Create Session dialog into the New Session wizard.
+const wizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
+assert.ok(wizard.includes('name="startPeriod"')&&wizard.includes('Start month (UTC)'));
+assert.ok(ui.includes("api('/sessions',{id:creationId.current"),'Session creation still sends the existing POST /sessions payload');
 assert.ok(ui.includes("dialog==='ticket'"));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
 console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');

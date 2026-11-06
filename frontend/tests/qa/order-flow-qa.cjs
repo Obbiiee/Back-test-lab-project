@@ -35,11 +35,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.getByRole('link', { name: /^(New Method|Create your first Method)$/ }).first().click(); await sleep(400);
   await page.getByLabel('Method name').fill(tag); await page.getByRole('button', { name: 'Save Method' }).click(); await sleep(1200);
   const newSession = async name => {
-    await page.goto(base + '/?tick-alpha=local&screen=sessions'); await sleep(1500);
-    await page.getByRole('button', { name: 'New Session' }).first().click();
-    const methodOption = await page.locator('select[name=method] option', { hasText: tag }).getAttribute('value');
-    await page.locator('select[name=method]').selectOption(methodOption);
-    await page.locator('input[name=name]').fill(name); await page.getByRole('button', { name: 'Save Session' }).click();
+    // New Session wizard: searchable Method picker → instrument → period → capital → review.
+    await page.goto(base + '/?tick-alpha=local&screen=session-new'); await sleep(1500);
+    await page.locator('.rk-combo-trigger').first().click(); await page.keyboard.type(tag); await sleep(200); await page.keyboard.press('Enter');
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByLabel('Session name').fill(name); await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('button', { name: 'Create Session' }).click();
     await page.waitForSelector('.candle-chart canvas'); await sleep(1500);
     assert.equal(calls(/^\/sessions$/).at(-1)?.status, 200);
   };
@@ -211,7 +212,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const phone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })).newPage();
   phone.on('pageerror', e => errors.push('phone: ' + e.message));
   await phone.goto(base + '/?tick-alpha=local&screen=sessions'); await sleep(1500);
-  await phone.getByRole('button', { name: `Open ${tag} normal` }).tap();
+  await phone.getByRole('button', { name: `Open replay for ${tag} normal` }).tap();
   await phone.waitForSelector('.candle-chart canvas'); await sleep(1500);
   await pickTool(phone, 'Positions', 'Long Position');
   const pbox = await phone.locator('.candle-chart canvas').first().boundingBox();
