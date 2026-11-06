@@ -368,6 +368,94 @@ class QueueTests(unittest.TestCase):
                     self.assertEqual(storage.json()['integrityStatus'], 'NOT_CHECKED_BY_STORAGE_METER')
                     self.assertIsNone(storage.json()['sharedCanonicalDatasetBytes'])
 
+                    # A second verified tenant traverses the same pinned
+                    # immutable Parquet publication through its own Session.
+                    actor_two, headers_two = self.fixture.account(
+                        email='monthly-parquet-' + uuid.uuid4().hex + '@example.com')
+                    self.assertNotEqual(str(actor_two), str(self.fixture.actor))
+                    workspace_two = self.fixture.client.post('/api/v1/workspaces', headers=headers_two,
+                        json={'name': 'Second shared-source QA trader'})
+                    self.assertEqual(workspace_two.status_code, 201, workspace_two.text)
+                    root_two = '/api/v1/workspaces/' + workspace_two.json()['id'] + '/research'
+                    method_two = method()
+                    created_method_two = self.fixture.client.post(root_two + '/methods',
+                        headers=headers_two, json=method_two)
+                    self.assertEqual(created_method_two.status_code, 200, created_method_two.text)
+                    session_two = 'session:' + uuid.uuid4().hex
+                    create_job_two = str(uuid.uuid4())
+                    queued_two = self.fixture.client.post(root_two + '/sessions',
+                        headers={**headers_two, 'X-BTL-Job': create_job_two}, json={
+                            'id': session_two, 'name': 'Second Monthly Parquet QA trader',
+                            'methodId': method_two['id'], 'initialBalance': '10000',
+                            'startPeriod': '2020-01'})
+                    self.assertEqual(queued_two.status_code, 202, queued_two.text)
+                    self.assertTrue(queue.work_one(self.dsn, worker.run))
+                    created_two = self.fixture.client.get(root_two + '/jobs/' + create_job_two,
+                        headers=headers_two)
+                    self.assertEqual(created_two.json()['state'], 'SUCCEEDED')
+                    view_two = self.fixture.client.get(root_two + '/sessions/' + session_two,
+                        headers=headers_two)
+                    self.assertEqual(view_two.status_code, 200, view_two.text)
+                    self.assertEqual((view_two.json()['state']['datasetId'],
+                                      view_two.json()['state']['datasetVersion']),
+                                     (source.dataset_id, source.dataset_version))
+                    review_two = review_request(view_two.json())
+                    reviewed_two = self.fixture.client.post(root_two + '/reviews',
+                        headers=headers_two, json=review_two)
+                    self.assertEqual(reviewed_two.status_code, 200, reviewed_two.text)
+                    pin_two = {'reviewId': review_two['requestId'],
+                               'reviewHash': reviewed_two.json()['reviewHash']}
+                    confirmed_two = self.fixture.client.post(
+                        root_two + '/sessions/' + session_two + '/confirm',
+                        headers=headers_two, json=pin_two)
+                    self.assertEqual(confirmed_two.status_code, 200, confirmed_two.text)
+                    duplicate_two = self.fixture.client.post(
+                        root_two + '/sessions/' + session_two + '/confirm',
+                        headers=headers_two, json=pin_two)
+                    self.assertEqual(duplicate_two.content, confirmed_two.content)
+                    receipt_two = self.fixture.client.get(
+                        root_two + '/sessions/' + session_two + '/commands/' + review_two['requestId'],
+                        headers=headers_two)
+                    self.assertEqual(receipt_two.json()['status'], 'COMMITTED')
+                    self.assertTrue(receipt_two.json()['receipt']['durable'])
+                    self.assertEqual(self.fixture.client.get(
+                        path + '/sessions/' + session_two, headers=self.fixture.headers).status_code, 404)
+                    self.assertEqual(self.fixture.client.get(
+                        root_two + '/sessions/' + session_id, headers=headers_two).status_code, 404)
+                    confirmed_view_two = self.fixture.client.get(
+                        root_two + '/sessions/' + session_two, headers=headers_two).json()
+                    advance_two = {
+                        'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                        'sessionId': session_two, 'commandId': 'command:' + uuid.uuid4().hex,
+                        'expectedRevision': confirmed_view_two['state']['revision'],
+                        'kind': 'ADVANCE',
+                        'payload': {'targetNs': str(int(confirmed_view_two['state']['throughNs']) +
+                                                   15_000_000_000)},
+                    }
+                    advance_job_two = str(uuid.uuid4())
+                    queued_advance_two = self.fixture.client.post(
+                        root_two + '/sessions/' + session_two + '/commands',
+                        headers={**headers_two, 'X-BTL-Job': advance_job_two}, json=advance_two)
+                    self.assertEqual(queued_advance_two.status_code, 202, queued_advance_two.text)
+                    self.assertTrue(queue.work_one(self.dsn, worker.run))
+                    advanced_two = self.fixture.client.get(root_two + '/jobs/' + advance_job_two,
+                        headers=headers_two)
+                    self.assertEqual(advanced_two.json()['state'], 'SUCCEEDED')
+                    self.assertTrue(advanced_two.json()['result']['durable'])
+                    journal_two = self.fixture.client.get(
+                        root_two + '/sessions/' + session_two + '/journal', headers=headers_two)
+                    self.assertEqual(journal_two.status_code, 200, journal_two.text)
+                    self.assertEqual([order['id'] for order in journal_two.json()['orders']],
+                                     [review_two['requestId']])
+                    summary_two = self.fixture.client.get(
+                        root_two + '/sessions/' + session_two + '/summary', headers=headers_two)
+                    self.assertEqual((summary_two.json()['datasetId'], summary_two.json()['datasetVersion']),
+                                     (source.dataset_id, source.dataset_version))
+                    meter_two = self.fixture.client.get(
+                        root_two + '/sessions/' + session_two + '/metering/storage', headers=headers_two)
+                    self.assertEqual(meter_two.status_code, 200, meter_two.text)
+                    self.assertEqual(meter_two.json()['artifact'], 'BTL-SESSION-STORAGE-METRICS-1')
+
                     failed = self.submit(operation='workspace',
                                          args=(session_id, {'timeframe': 'invalid'}))
                     self.assertTrue(queue.work_one(self.dsn, worker.run))
