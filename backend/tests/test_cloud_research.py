@@ -14,6 +14,7 @@ from execution.research import ResearchApplication
 from application.models import TrustedScope
 from tests.test_identity import RecordingDelivery, client, PASSWORD
 from tests.test_research_sessions import method, review_request
+from tests.virtual_traders import build_cohort
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
@@ -33,8 +34,8 @@ class CloudResearchTests(unittest.TestCase):
                                           json={'name': 'Isolated research QA'}).json()['id']
         self.root = '/api/v1/workspaces/' + self.workspace + '/research'
 
-    def account(self):
-        email = uuid.uuid4().hex + '@example.com'
+    def account(self, email=None):
+        email = email or (uuid.uuid4().hex + '@example.com')
         registered = self.client.post('/api/v1/auth/register', json={'email': email, 'password': PASSWORD})
         self.assertEqual(registered.status_code, 201, registered.text)
         verified = self.client.post('/api/v1/auth/verify', json={'token': self.delivery.token(email, 'verification')})
@@ -119,6 +120,57 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(self.client.get(path).status_code, 401)
         self.assertIn('SYNTHETIC', view['label'])
         self.assertNotIn('sidecar', created.text)
+
+    def test_virtual_traders_complete_isolated_authenticated_journey(self):
+        """Five sequential synthetic identities exercise tenancy, not load capacity."""
+        cohort = build_cohort(uuid.uuid4(), 5)
+        traders = []
+        for trader in cohort.traders:
+            actor, headers = self.account(email=trader.email)
+            created_workspace = self.client.post('/api/v1/workspaces', headers=headers,
+                                                 json={'name': f'Virtual trader {trader.ordinal}'})
+            self.assertEqual(created_workspace.status_code, 201, created_workspace.text)
+            workspace = created_workspace.json()['id']
+            root = f'/api/v1/workspaces/{workspace}/research'
+
+            record = method()
+            record['id'] = trader.method_id
+            created_method = self.client.post(root + '/methods', headers=headers, json=record)
+            self.assertEqual(created_method.status_code, 200, created_method.text)
+            request = {'id': trader.session_id, 'name': f'Virtual trader {trader.ordinal} QA',
+                       'methodId': trader.method_id, 'initialBalance': '10000', 'startPeriod': '2020-01'}
+            created_session = self.client.post(root + '/sessions', headers=headers, json=request)
+            self.assertEqual(created_session.status_code, 200, created_session.text)
+
+            review = review_request(created_session.json())
+            review['requestId'] = trader.command_id
+            reviewed = self.client.post(root + '/reviews', headers=headers, json=review)
+            self.assertEqual(reviewed.status_code, 200, reviewed.text)
+            confirmed = self.client.post(
+                root + '/sessions/' + trader.session_id + '/confirm', headers=headers,
+                json={'reviewId': review['requestId'], 'reviewHash': reviewed.json()['reviewHash']})
+            self.assertEqual(confirmed.status_code, 200, confirmed.text)
+            duplicate = self.client.post(
+                root + '/sessions/' + trader.session_id + '/confirm', headers=headers,
+                json={'reviewId': review['requestId'], 'reviewHash': reviewed.json()['reviewHash']})
+            self.assertEqual(duplicate.content, confirmed.content)
+            status = self.client.get(root + '/sessions/' + trader.session_id + '/commands/' + trader.command_id,
+                                     headers=headers)
+            self.assertEqual(status.status_code, 200, status.text)
+            self.assertEqual(status.json()['status'], 'COMMITTED')
+            self.assertTrue(status.json()['receipt']['durable'])
+            journal = self.client.get(root + '/sessions/' + trader.session_id + '/journal', headers=headers)
+            self.assertEqual(journal.status_code, 200, journal.text)
+            self.assertEqual([order['id'] for order in journal.json()['orders']], [trader.command_id])
+            traders.append((actor, headers, root, trader.session_id))
+
+        for index, (_actor, headers, root, session_id) in enumerate(traders):
+            self.assertEqual(self.client.get(root + '/sessions/' + session_id, headers=headers).status_code, 200)
+            for other_index, (_other_actor, _other_headers, _other_root, other_session) in enumerate(traders):
+                if other_index == index:
+                    continue
+                foreign = self.client.get(root + '/sessions/' + other_session, headers=headers)
+                self.assertEqual(foreign.status_code, 404, foreign.text)
 
     def test_session_creation_honors_durable_job_header(self):
         method_id = 'method:' + uuid.uuid4().hex
