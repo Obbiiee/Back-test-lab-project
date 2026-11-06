@@ -121,6 +121,50 @@ class CloudResearchTests(unittest.TestCase):
         self.assertIn('SYNTHETIC', view['label'])
         self.assertNotIn('sidecar', created.text)
 
+    def test_concurrent_identical_confirm_returns_one_durable_receipt(self):
+        """A lost/racing response must not create a second financial command."""
+        from threading import Barrier
+
+        record = method()
+        self.assertEqual(self.client.post(self.root + '/methods', headers=self.headers,
+                                          json=record).status_code, 200)
+        session_id = 'session:' + uuid.uuid4().hex
+        created = self.client.post(self.root + '/sessions', headers=self.headers, json={
+            'id': session_id, 'name': 'Concurrent confirm QA', 'methodId': record['id'],
+            'initialBalance': '10000', 'startPeriod': '2020-01'})
+        self.assertEqual(created.status_code, 200, created.text)
+        review = review_request(created.json())
+        reviewed = self.client.post(self.root + '/reviews', headers=self.headers, json=review)
+        self.assertEqual(reviewed.status_code, 200, reviewed.text)
+        pin = {'reviewId': review['requestId'], 'reviewHash': reviewed.json()['reviewHash']}
+        path = self.root + '/sessions/' + session_id + '/confirm'
+
+        barrier = Barrier(3)
+
+        def confirm():
+            barrier.wait(timeout=5)
+            return self.client.post(path, headers=self.headers, json=pin)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(confirm)
+            second = pool.submit(confirm)
+            barrier.wait(timeout=5)
+            responses = (first.result(timeout=20), second.result(timeout=20))
+
+        self.assertEqual([response.status_code for response in responses], [200, 200])
+        self.assertEqual(responses[0].content, responses[1].content)
+        self.assertTrue(responses[0].json()['durable'])
+        status = self.client.get(self.root + '/sessions/' + session_id +
+                                 '/commands/' + review['requestId'], headers=self.headers)
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(status.json()['status'], 'COMMITTED')
+        self.assertTrue(status.json()['receipt']['durable'])
+        journal = self.client.get(self.root + '/sessions/' + session_id + '/journal',
+                                  headers=self.headers)
+        self.assertEqual(journal.status_code, 200, journal.text)
+        self.assertEqual([order['id'] for order in journal.json()['orders']], [review['requestId']])
+        self.assertEqual(len(journal.json()['orders']), 1)
+
     def test_virtual_traders_complete_isolated_authenticated_journey(self):
         """Five sequential synthetic identities exercise tenancy, not load capacity."""
         cohort = build_cohort(uuid.uuid4(), 5)
