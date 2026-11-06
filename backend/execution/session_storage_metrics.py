@@ -3,7 +3,17 @@
 These counters deliberately do not claim allocated table/index/TOAST/WAL bytes.
 Canonical market data is shared and is not attributed to a Session.
 """
+import uuid
+
 from contracts.primitives import identifier, require
+from .postgres import unpack
+from psycopg.rows import tuple_row
+
+
+_MAX_EVENT_ROWS_FOR_TRADE_COUNT = 4096
+_MAX_EVENT_BYTES_FOR_TRADE_COUNT = 16 * 1024 * 1024
+_MAX_SINGLE_EVENT_BYTES_FOR_TRADE_COUNT = 64 * 1024
+_EVENT_BATCH_SIZE = 64
 
 
 _TABLES = (
@@ -50,6 +60,8 @@ def collect(db, workspace_id, session_id):
         payload_bytes = measured["payload_bytes"]
         rows[category] = {"rows": count, "tupleBytes": tuple_bytes, "payloadBytes": payload_bytes}
 
+    trade_count, trade_count_status = _closed_trade_event_count(
+        db, workspace_id, session_id, rows["events"])
     return {
         "schemaVersion": 1,
         "artifact": "BTL-SESSION-STORAGE-METRICS-1",
@@ -66,6 +78,49 @@ def collect(db, workspace_id, session_id):
             "tupleBytes": sum(item["tupleBytes"] for item in rows.values()),
             "payloadBytes": sum(item["payloadBytes"] for item in rows.values()),
         },
+        # Preserve the original storage-counter contract. This field remains
+        # unknown because the separate event statistic below is not finance.
         "tradeCount": None,
         "tradeCountStatus": "NOT_COMPUTED_FROM_STORAGE_COUNTERS",
+        "closedTradeEventCount": trade_count,
+        "closedTradeEventCountStatus": trade_count_status,
     }
+
+
+def _closed_trade_event_count(db, workspace_id, session_id, event_measurement):
+    """Count terminal EXIT_FILL evidence under strict row/byte bounds.
+
+    This is a content-hash-checked storage statistic, not event-chain, reducer,
+    or financial verification. Oversized Sessions report an explicit unknown.
+    """
+    count = event_measurement["rows"]
+    byte_count = event_measurement["payloadBytes"]
+    if count > _MAX_EVENT_ROWS_FOR_TRADE_COUNT:
+        return None, "NOT_COMPUTED_EVENT_ROW_LIMIT"
+    if byte_count > _MAX_EVENT_BYTES_FOR_TRADE_COUNT:
+        return None, "NOT_COMPUTED_EVENT_BYTE_LIMIT"
+    if count == 0:
+        return 0, "CONTENT_HASHED_EVENT_SCAN_NOT_FINANCIAL_VERIFICATION"
+
+    cursor_name = "btl_session_event_meter_" + uuid.uuid4().hex
+    with db.cursor(name=cursor_name, row_factory=tuple_row) as cursor:
+        cursor.itersize = _EVENT_BATCH_SIZE
+        cursor.execute(
+            "SELECT payload,content_hash FROM btl.tick_events "
+            "WHERE workspace_id=%s AND session_id=%s ORDER BY sequence",
+            (workspace_id, session_id),
+        )
+        closed = scanned = 0
+        while True:
+            batch = cursor.fetchmany(_EVENT_BATCH_SIZE)
+            if not batch:
+                break
+            for payload, expected_hash in batch:
+                if len(payload) > _MAX_SINGLE_EVENT_BYTES_FOR_TRADE_COUNT:
+                    return None, "NOT_COMPUTED_SINGLE_EVENT_BYTE_LIMIT"
+                event = unpack(payload, expected_hash)
+                scanned += 1
+                if event["kind"] == "EXIT_FILL" and event["detail"]["remaining"] == "0":
+                    closed += 1
+        require(scanned == count, "storageMetrics", "CORRUPT_RECORD")
+    return closed, "CONTENT_HASHED_EVENT_SCAN_NOT_FINANCIAL_VERIFICATION"

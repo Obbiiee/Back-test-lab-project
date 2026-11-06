@@ -215,6 +215,10 @@ class CloudResearchTests(unittest.TestCase):
             self.assertEqual(storage.json()['totals']['rows'],
                              sum(table['rows'] for table in storage.json()['tables'].values()))
             self.assertIsNone(storage.json()['tradeCount'])
+            self.assertEqual(storage.json()['tradeCountStatus'], 'NOT_COMPUTED_FROM_STORAGE_COUNTERS')
+            self.assertEqual(storage.json()['closedTradeEventCount'], 0)
+            self.assertEqual(storage.json()['closedTradeEventCountStatus'],
+                             'CONTENT_HASHED_EVENT_SCAN_NOT_FINANCIAL_VERIFICATION')
             self.assertIsNone(storage.json()['perSessionWalBytes'])
             self.assertIsNone(storage.json()['sharedCanonicalDatasetBytes'])
             traders.append((actor, headers, root, trader.session_id))
