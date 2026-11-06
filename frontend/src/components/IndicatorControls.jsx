@@ -17,7 +17,7 @@ const LINE_STYLES = ['solid', 'dashed', 'dotted'];
 
 function paramsText(spec, item) { return Object.values(item.parameters).join(', '); }
 
-export default function IndicatorControls({ instances, onChange, onOpen, registry = productionRegistry }) {
+export default function IndicatorControls({ instances, onChange, onOpen, registry = productionRegistry, paused = new Set() }) {
   const trigger = useRef(null);
   const [open, setOpen] = useState(false), [editing, setEditing] = useState(null), [error, setError] = useState('');
   const [query, setQuery] = useState(''), [tab, setTab] = useState('inputs');
@@ -85,7 +85,7 @@ export default function IndicatorControls({ instances, onChange, onOpen, registr
     <button ref={trigger} type="button" className="nav-action" aria-label="Indicators" onClick={() => { onOpen?.(); setOpen(true); }}>Indicators{instances.length ? ` (${instances.length})` : ''}</button>
     {open && <WorkspaceModal label="Overlay indicators" onClose={close} returnFocusRef={trigger}>
       <section className="overlay-indicator-dialog indicator-studio">
-        <header><strong>Indicators</strong><span className="ind-count">{instances.length}/16 on chart · saved in this browser only</span><button type="button" aria-label="Close indicators" onClick={close}>×</button></header>
+        <header><strong>Indicators</strong><span className="ind-count">{instances.length}/16 on chart · saved in this browser only{paused.size ? ` · ${paused.size} paused: phones draw 8 at a time, hide one to show another` : ''}</span><button type="button" aria-label="Close indicators" onClick={close}>×</button></header>
         <div className="ind-layout">
           <div className="ind-catalog">
             <input type="search" aria-label="Search indicators" placeholder="Search indicators…" value={query} onChange={event => setQuery(event.target.value)} />
@@ -117,7 +117,7 @@ export default function IndicatorControls({ instances, onChange, onOpen, registr
                 const spec = registry.get(item.type), placement = effectivePlacement(spec, item), paneIndex = paneIds.indexOf(item.id);
                 return <div className={`indicator-instance${editing?.id === item.id ? ' is-editing' : ''}`} key={item.id} role="group" aria-label={`${spec.name} instance ${index + 1}`}>
                   <span className="ind-swatches" aria-hidden="true">{spec.outputs.slice(0, 3).map(output => <i key={output.key} style={{ background: outputStyle(spec, item, output).color }} />)}</span>
-                  <span className="ind-name">{spec.name} <small>({paramsText(spec, item)}){placement === 'pane' ? ` · pane ${paneIndex + 1}` : ' · price'}</small></span>
+                  <span className="ind-name">{spec.name} <small>({paramsText(spec, item)}){placement === 'pane' ? ` · pane ${paneIndex + 1}` : ' · price'}{paused.has(item.id) ? ' · paused on this phone' : ''}</small></span>
                   <button type="button" aria-label={`${item.visible ? 'Hide' : 'Show'} indicator ${index + 1}`} onClick={() => patch(item.id, { visible: !item.visible })}>{item.visible ? 'Hide' : 'Show'}</button>
                   <button type="button" aria-label={`Edit indicator ${index + 1}`} aria-pressed={editing?.id === item.id} onClick={() => { setEditing(editing?.id === item.id ? null : { id: item.id, parameters: stringParams(item) }); setError(''); }}>⚙</button>
                   {placement === 'pane' && <>
