@@ -50,6 +50,8 @@ This verifies the synthetic in-process API worker lifecycle and bounded child cl
 - Worker count: one lifespan worker; no concurrent load or capacity test.
 - Compact storage: enabled by server-pinned `BTL_TICK_SESSION_STORAGE_FORMAT=compact-v1` for this QA-created Session only.
 
+The full `tests.test_research_queue` PostgreSQL suite was then rerun on its own temporary PostgreSQL 16 cluster and passed 18/18 in 104.567 s. This includes worker lease/heartbeat and cancellation, actor fairness, bounded admission, process-death recovery, replay receipt idempotency, both two-tenant and actual-lifespan Monthly Parquet journeys, and the new source-pinned lifespan journey. The cluster was stopped and removed. `tests.test_worker_deadline` separately passed 17/17 in 4.788 s.
+
 This demonstrates a connected synthetic service path. It does not prove historical source eligibility, source rights, production deployment, VPS reboot recovery, or concurrency capacity.
 
 ## Interpretation and limits
