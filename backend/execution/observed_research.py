@@ -25,7 +25,7 @@ from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
 from .observed_kernel import seed_state
-from .observed_postgres import ObservedExecutionStore,read_snapshot
+from .observed_postgres import ObservedExecutionStore
 from .observed_profile import ENGINE_VERSION,MODEL,ObservedExecutionProfile
 from .observed_analysis import ObservedStatistics
 from .postgres import pack,unpack
@@ -42,11 +42,13 @@ REPLAY_TO_CHUNKS=8
 
 class ObservedResearchApplication:
     """One workspace-scoped Method/Session adapter for the observed family."""
-    def __init__(self,dsn,scope,catalog):
+    def __init__(self,dsn,scope,catalog,*,state_storage_format='snapshot-v1'):
         require(type(scope) is TrustedScope,'scope','SCOPE_REQUIRED');require(type(catalog) is ObservedCatalog,'catalog')
-        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(dsn)
+        require(state_storage_format in ('snapshot-v1','compact-v1'),'stateStorageFormat','REFUSED_STATE_VERSION')
+        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(dsn,state_storage_format=state_storage_format)
         self.controller=ObservedExecutionController(self.store,catalog.resolve)
-        key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',dsnHash=content_hash({'schemaVersion':1,'dsn':dsn})))
+        key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',
+                              dsnHash=content_hash({'schemaVersion':1,'dsn':dsn}),stateStorageFormat=state_storage_format))
         with _STATS_LOCK:
             self.statistics=_STATS_BY_DSN.get(key)
             if self.statistics is None:self.statistics=ObservedStatistics(self.store);_STATS_BY_DSN[key]=self.statistics
@@ -111,12 +113,12 @@ class ObservedResearchApplication:
         tag(meta,META,'id name methodId methodHash datasetKey period day datasetId datasetVersion profileHash startNs initialBalance model engineVersion creationRequestHash')
         require(meta['id']==session_id and meta['methodId']==row[2] and meta['model']==MODEL and meta['engineVersion']==ENGINE_VERSION,'session','CORRUPT_RECORD')
         method=self._method(db,meta['methodId']);policy=method_policy(method);scoped_row=db.execute('SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s'+(' FOR UPDATE' if lock else ''),(self.scope.workspace_id,session_id)).fetchone()
-        require(scoped_row is not None,'state','CORRUPT_RECORD');saved=read_snapshot(scoped_row[0],scoped_row[1]);state,cp=saved['state'],saved['controller']
+        require(scoped_row is not None,'state','CORRUPT_RECORD')
+        saved=self.store._read(db,self.scope.workspace_id,session_id,lock=lock,include_format=True)[0];state,cp=saved['state'],saved['controller']
         require(state['sessionId']==session_id and state['policy']==policy_wire(policy) and state['revision']==scoped_row[2] and (state['datasetVersion'],state['profileHash'])==tuple(scoped_row[3:]),'state','CORRUPT_RECORD')
         require((meta['methodHash'],meta['datasetId'],meta['datasetVersion'],meta['profileHash'],meta['startNs'],meta['initialBalance'])==(policy.definition_hash,state['datasetId'],state['datasetVersion'],state['profileHash'],state['startNs'],state['initialBalance']),'sessionPins','CORRUPT_RECORD')
-        # Full current tip must match its immutable checkpoint even on metadata reads.
-        tip=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(self.scope.workspace_id,session_id,state['revision'])).fetchone()
-        require(tip is not None and bytes(tip[0])==bytes(scoped_row[0]) and tip[1]==scoped_row[1],'immutableTip','CORRUPT_RECORD')
+        # The storage adapter verifies the full snapshot or compact hash-chain
+        # tip against the immutable checkpoint for both new and legacy Sessions.
         return meta,method,state,cp
 
     def create_session(self,raw):
@@ -420,7 +422,7 @@ class ObservedResearchApplication:
             meta,method,state,cp=self._session(db,session_id);row=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s AND review_id=%s',(self.scope.workspace_id,session_id,raw['reviewId'])).fetchone();require(row is not None,'review','RESOURCE_UNAVAILABLE');reviewed=unpack(*row);command=reviewed.get('command',{});require(row[1]==raw['reviewHash'] and reviewed.get('artifact')==REVIEW and command.get('sessionId')==session_id and command.get('commandId')==raw['reviewId'],'reviewHash','REFUSED_IDEMPOTENCY_CONFLICT')
             require(reviewed['methodHash']==state['policy']['definitionHash'] and reviewed['profileHash']==state['profileHash'],'review','CORRUPT_RECORD')
             basis_row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(self.scope.workspace_id,session_id,command.get('expectedRevision'))).fetchone();require(basis_row is not None and basis_row[1]==reviewed.get('basisCheckpointHash'),'reviewBasis','CORRUPT_RECORD')
-            basis=read_snapshot(*basis_row)['state'];require(basis['sessionId']==session_id and basis['profileHash']==reviewed['profileHash'] and basis['policy']['definitionHash']==reviewed['methodHash'] and basis['throughNs']==reviewed['throughNs'],'reviewBasis','CORRUPT_RECORD')
+            basis=self.store.historical_checkpoint(db,self.scope,session_id,command.get('expectedRevision'))['state'];require(basis['sessionId']==session_id and basis['profileHash']==reviewed['profileHash'] and basis['policy']['definitionHash']==reviewed['methodHash'] and basis['throughNs']==reviewed['throughNs'],'reviewBasis','CORRUPT_RECORD')
             quote=basis.get('quoteBasis');require(quote is not None and reviewed.get('basisHash')==content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-REVIEW-BASIS-1',snapshotHash=basis_row[1],quote=deepcopy(quote))),'reviewBasis','CORRUPT_RECORD')
             p=ObservedExecutionProfile.from_wire(basis['profile']);payload=open_payload(command['payload'],p.wire,method_policy(method),basis['balance']);require(payload==command['payload'],'reviewPayload','CORRUPT_RECORD')
             if payload['orderType']=='MARKET':require(payload['entry']==quote['ask' if payload['side']=='LONG' else 'bid'],'reviewQuote','CORRUPT_RECORD')

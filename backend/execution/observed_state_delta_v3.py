@@ -1,8 +1,9 @@
-"""QA-only snapshot-plus-delta encoding for complete observed financial states.
+"""Versioned snapshot-plus-delta encodings for complete observed financial states.
 
 The financial reducer still consumes/validates the full logical order map.
 Only the durable representation stores the first full snapshot and subsequent
-order-map changes. Not mounted by the application or production stores.
+order-map changes. Legacy QA wire formats remain readable for preserved test
+evidence; the compact-v1 wire format is separately versioned for new Sessions.
 """
 from copy import deepcopy
 import hashlib
@@ -13,6 +14,8 @@ from contracts.primitives import require
 
 ARTIFACT = 'BTL-QA-OBSERVED-STATE-DELTA-3'
 ARTIFACT_V4 = 'BTL-QA-OBSERVED-STATE-DELTA-4'
+COMPACT_BASE = 'BTL-OBSERVED-STATE-BASE-1'
+COMPACT_DELTA = 'BTL-OBSERVED-STATE-DELTA-1'
 
 
 def encode_base(state):
@@ -55,9 +58,36 @@ def encode_delta_v4(previous,state,previous_hash):
     return dict(schemaVersion=1,formatVersion=4,artifact=ARTIFACT_V4+'-DELTA',body=core)
 
 
+def encode_compact_base(state):
+    raw=canonical_bytes(state)
+    return dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_BASE,revision=state['revision'],state=state,
+                stateHash=hashlib.sha256(raw).hexdigest())
+
+
+def encode_compact_delta(previous,state,previous_hash):
+    """Sparse v1 scalar/order delta; financial state hash is over full state."""
+    require(state['revision']==previous['revision']+1,'revision','CORRUPT_RECORD')
+    def same(left,right):
+        return json.dumps(left,sort_keys=True,separators=(',',':'),ensure_ascii=False)==json.dumps(right,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+    old={k:v for k,v in previous.items() if k!='orders'}
+    new={k:v for k,v in state.items() if k!='orders'}
+    scalar_upserts={k:deepcopy(v) for k,v in new.items() if k not in old or not same(old[k],v)}
+    scalar_deletes=sorted(set(old)-set(new))
+    old_orders=previous['orders'];new_orders=state['orders']
+    order_upserts={k:deepcopy(v) for k,v in new_orders.items()
+                   if k not in old_orders or not same(old_orders[k],v)}
+    core=dict(schemaVersion=1,artifact=COMPACT_DELTA,revision=state['revision'],previousHash=previous_hash,
+              scalarUpserts=scalar_upserts,scalarDeletes=scalar_deletes,
+              orderUpserts=order_upserts,orderDeletes=sorted(set(old_orders)-set(new_orders)))
+    core['stateHash']=hashlib.sha256(canonical_bytes(state)).hexdigest()
+    core['recordHash']=content_hash(dict(schemaVersion=1,artifact=COMPACT_DELTA+'-RECORD',body=core))
+    return dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_DELTA,body=core)
+
+
 def reconstruct(base,deltas,*,state_callback=None):
-    require(base.get('schemaVersion')==1 and base.get('formatVersion')==3
-            and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3'),
+    require(base.get('schemaVersion')==1 and
+            ((base.get('formatVersion')==3 and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3')) or
+             (base.get('formatVersion')==1 and base.get('artifact') in (COMPACT_BASE,'BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1'))),
             'base','CORRUPT_RECORD')
     state=deepcopy(base['state']);prev=base['stateHash']
     require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')
@@ -71,6 +101,10 @@ def reconstruct(base,deltas,*,state_callback=None):
         elif row.get('formatVersion')==4 and row.get('artifact')==ARTIFACT_V4+'-DELTA':
             require(core['schemaVersion']==4 and core['artifact']==ARTIFACT_V4 and
                     core['recordHash']==content_hash(dict(schemaVersion=1,artifact=ARTIFACT_V4+'-RECORD',body=body)),
+                    'deltaChain','CORRUPT_RECORD')
+        elif row.get('formatVersion')==1 and row.get('artifact')==COMPACT_DELTA:
+            require(core['schemaVersion']==1 and core['artifact']==COMPACT_DELTA and
+                    core['recordHash']==content_hash(dict(schemaVersion=1,artifact=COMPACT_DELTA+'-RECORD',body=body)),
                     'deltaChain','CORRUPT_RECORD')
         else:
             require(False,'deltaVersion','CORRUPT_RECORD')
@@ -97,9 +131,16 @@ def reconstruct(base,deltas,*,state_callback=None):
 
 
 def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None):
-    require(type(expected_revision) is int and expected_revision>=0 and len(deltas)==expected_revision,
-            'deltaCount','CORRUPT_RECORD')
-    state=reconstruct(base,deltas,state_callback=state_callback)
+    require(type(expected_revision) is int and expected_revision>=0,'deltaCount','CORRUPT_RECORD')
+    count=0
+    def counted():
+        nonlocal count
+        for row in deltas:
+            count+=1
+            require(count<=expected_revision,'deltaCount','CORRUPT_RECORD')
+            yield row
+    state=reconstruct(base,counted(),state_callback=state_callback)
+    require(count==expected_revision,'deltaCount','CORRUPT_RECORD')
     require(state['revision']==expected_revision,'deltaRevision','CORRUPT_RECORD')
     return state
 

@@ -7,10 +7,10 @@ from unittest.mock import patch
 import hashlib,json,os,signal,subprocess,sys,time,unittest,uuid
 
 from application.models import TrustedScope
-from contracts.canonical import canonical_bytes
+from contracts.canonical import canonical_bytes,content_hash
 from execution.observed_admission import AdmittedObservedSource
 from execution.observed_controller import ObservedExecutionController
-from execution.observed_postgres import ObservedExecutionStore
+from execution.observed_postgres import ObservedExecutionStore,unpack
 from infrastructure.database import migrate,connect
 from tests import test_observed_kernel as fixtures
 
@@ -88,6 +88,57 @@ class ObservedPostgresTests(unittest.TestCase):
 
     def call(self,kind,payload=None,cid=None):
         raw=command(self.sid,cid or 'cmd:'+str(self.rev),self.rev,kind,payload);result=self.controller().apply(self.scope,raw);self.rev=result['state']['revision'];return result
+
+    def test_compact_v1_new_session_commit_cold_read_and_retry_parity(self):
+        from execution.observed_state_delta_v3 import COMPACT_DELTA
+        session='session:compact-v1:'+uuid.uuid4().hex[:12]
+        scope=TrustedScope('observedqa:compact-v1:'+uuid.uuid4().hex,self.scope.actor_ref)
+        legacy_scope=TrustedScope('observedqa:legacy-v1:'+uuid.uuid4().hex,self.scope.actor_ref)
+        compact=ObservedExecutionController(ObservedExecutionStore(DSN,state_storage_format='compact-v1'),
+                                            lambda _:self.source)
+        legacy=ObservedExecutionController(ObservedExecutionStore(DSN),lambda _:self.source)
+        compact.create(scope,session,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+        legacy.create(legacy_scope,session,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+        commands=[command(session,'compact-v1:advance:0',0,'ADVANCE',{'targetNs':'0'}),
+            command(session,'compact-v1:open',1,'OPEN',dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',
+                quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])),
+            command(session,'compact-v1:entry',2,'ADVANCE',{'targetNs':str(S)}),
+            command(session,'compact-v1:close',3,'CLOSE',{'orderId':'compact-v1:open','quantity':None}),
+            command(session,'compact-v1:exit',4,'ADVANCE',{'targetNs':str(2*S)})]
+        compact_results=[]
+        for raw in commands:
+            compact_result=compact.apply(scope,raw);legacy_result=legacy.apply(legacy_scope,raw)
+            self.assertEqual(canonical_bytes(compact_result),canonical_bytes(legacy_result))
+            compact_results.append(compact_result)
+        committed=compact_results[-1];raw=commands[-1]
+        self.assertEqual(committed['state']['balance'],'10001')
+        self.assertEqual([event['kind'] for result in compact_results for event in result['events']
+                          if event['classification']=='SIMULATED_FILL'],['ENTRY_FILL','EXIT_FILL'])
+        fresh=ObservedExecutionController(ObservedExecutionStore(DSN),lambda _:self.source)
+        recovered=fresh.inspect(scope,session)['state']
+        self.assertEqual(canonical_bytes(recovered),canonical_bytes(committed['state']))
+        self.assertEqual(canonical_bytes(fresh.apply(scope,raw)),canonical_bytes(committed))
+        with connect(DSN) as db:
+            initial=compact.store.historical_checkpoint(db,scope,session,0)['state']
+            committed_checkpoint=compact.store.historical_checkpoint(db,scope,session,5)['state']
+        self.assertEqual(initial['revision'],0)
+        self.assertEqual(canonical_bytes(committed_checkpoint),canonical_bytes(recovered))
+        with connect(DSN) as db:
+            tip=unpack(*db.execute('SELECT payload,content_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                                    (scope.workspace_id,session)).fetchone())
+            base=unpack(*db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',
+                                    (scope.workspace_id,session)).fetchone())
+            delta=unpack(*db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=5',
+                                     (scope.workspace_id,session)).fetchone())
+            receipt=unpack(*db.execute('SELECT payload,content_hash FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id=%s',
+                                       (scope.workspace_id,session,raw['commandId'])).fetchone())
+        self.assertEqual(base['artifact'],'BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1')
+        self.assertEqual(base['formatVersion'],1)
+        self.assertEqual(delta['delta']['artifact'],COMPACT_DELTA)
+        self.assertEqual(tip['artifact'],'BTL-OBSERVED-EXECUTION-CHECKPOINT-COMPACT-1')
+        self.assertEqual(receipt['artifact'],'BTL-OBSERVED-EXECUTION-RESULT-COMPACT-1')
+        self.assertNotIn('state',receipt)
+        self.assertEqual(receipt['stateHash'],content_hash(recovered))
 
     def test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger(self):
         from contextlib import contextmanager
@@ -662,7 +713,7 @@ class ObservedPostgresTests(unittest.TestCase):
         private=dict(profile=self.fx.profile.wire,folder=str(self.folder),receiptPath=str(self.proof),receiptSha256=self.proof_hash,logRoot=str(self.root/'controller-logs'))
         catalog._profiles={self.fx.profile.profile_hash:private};catalog._cache=OrderedDict([(self.fx.profile.profile_hash,self.source)]);catalog._lock=RLock()
         catalog.public=lambda:[dict(key=key,period='2024-01',label='Authored QA XAUUSD',model=MODEL,profileHash=self.fx.profile.profile_hash,profile=self.fx.profile.wire)]
-        app=ObservedResearchApplication(DSN,self.scope,catalog)
+        app=ObservedResearchApplication(DSN,self.scope,catalog,state_storage_format='compact-v1')
         method=dict(schemaVersion=1,artifact='BTL-LOCAL-METHOD-1',id='method:observed-app',name='Observed app QA',kind='FREE_STYLE',checklistOn=False,conditions=[],riskPercent=None,rr=None)
         app_sid='session:observed-app';session=dict(id=app_sid,name='Observed app QA',methodId=method['id'],initialBalance='10000',sourceKey=key,period='2024-01',day=None)
         with patch.object(self.source,'start_for_period',return_value=0):
@@ -683,6 +734,7 @@ class ObservedPostgresTests(unittest.TestCase):
             self.assertEqual(app.summary(app_sid)['revision'],1)
             reviewed=app.review(request);accepted=app.confirm(app_sid,dict(reviewId='app:order',reviewHash=reviewed['reviewHash']))
             self.assertTrue(accepted['durable'])
+            self.assertEqual(app.confirm(app_sid,dict(reviewId='app:order',reviewHash=reviewed['reviewHash'])),accepted)
             latest=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:1',latest['revision'],'ADVANCE',dict(targetNs=str(S))))
             current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:close',current['revision'],'CLOSE',dict(orderId='app:order',quantity=None)))
             current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:2',current['revision'],'ADVANCE',dict(targetNs=str(2*S))))

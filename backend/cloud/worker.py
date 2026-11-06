@@ -123,7 +123,9 @@ def _environment(dsn):
     environment = {k: v for k, v in os.environ.items()
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
-                            'BTL_QA_TIMELINE_LOG_CODEC', *monthly_names)}
+                            'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT', *monthly_names)}
+    require(environment.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
+            'stateStorageFormat','REFUSED_STATE_VERSION')
     require(environment.get('BTL_QA_TIMELINE_LOG_CODEC') in (None, 'raw', 'zlib-1'), 'logCodec')
     environment['BTL_WORKER_DATABASE'] = dsn
     require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')

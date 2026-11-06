@@ -8,6 +8,7 @@ from collections import OrderedDict
 from fractions import Fraction
 import os
 from threading import RLock
+from uuid import uuid4
 
 from contracts.canonical import canonical_bytes,content_hash
 from contracts.primitives import require,revision
@@ -20,7 +21,8 @@ from .engine import crossing,protective
 from .observed_finance import exit_amount
 from .observed_profile import ObservedExecutionProfile
 from .contracts import open_payload,policy_from_wire
-from .observed_state_delta_v3 import encode_base,encode_delta,encode_delta_v4,reconstruct_complete
+from .observed_state_delta_v3 import (encode_base,encode_delta,encode_delta_v4,encode_compact_base,
+    encode_compact_delta,reconstruct_complete,COMPACT_DELTA)
 from .observed_order_archive_v1 import (advance as archive_advance, summary as archive_summary, verify_complete as verify_archive_complete,
     verify_record as verify_archive_record)
 from .contracts import text
@@ -32,6 +34,10 @@ QA3_CHECKPOINT='BTL-OBSERVED-EXECUTION-CHECKPOINT-3'
 QA3_CHECKPOINT_BASE='BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3'
 QA3_CHECKPOINT_DELTA='BTL-OBSERVED-EXECUTION-CHECKPOINT-DELTA-3'
 QA3_RESULT='BTL-OBSERVED-EXECUTION-RESULT-3'
+COMPACT_CHECKPOINT='BTL-OBSERVED-EXECUTION-CHECKPOINT-COMPACT-1'
+COMPACT_CHECKPOINT_BASE='BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1'
+COMPACT_CHECKPOINT_DELTA='BTL-OBSERVED-EXECUTION-CHECKPOINT-DELTA-COMPACT-1'
+COMPACT_RESULT='BTL-OBSERVED-EXECUTION-RESULT-COMPACT-1'
 
 
 def read_snapshot(raw,sha,*,order_retention_policy=None):
@@ -103,6 +109,15 @@ def compact_qa3_receipt(result,state_hash,chain_hash):
                 durable=True,model=result['model'])
 
 
+def compact_receipt_v1(result,state_hash,chain_hash):
+    return dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_RESULT,commandId=result['commandId'],commandHash=result['commandHash'],
+                stateRevision=result['state']['revision'],stateHash=state_hash,chainHash=chain_hash,
+                events=deepcopy(result['events']),eventCount=result['eventCount'],
+                eventFromSequence=result['eventFromSequence'],eventsComplete=result['eventsComplete'],
+                nextEventSequence=result['nextEventSequence'],replay=deepcopy(result['replay']),
+                durable=True,model=result['model'])
+
+
 def expand_qa3_receipt(record,command,state,chain_hash,*,order_retention_policy=None):
     keys(record,'schemaVersion formatVersion artifact commandId commandHash stateRevision stateHash chainHash events eventCount eventFromSequence eventsComplete nextEventSequence replay durable model')
     require(record['schemaVersion']==1 and record['formatVersion']==3 and record['artifact']==QA3_RESULT and record['durable'] is True,
@@ -120,15 +135,37 @@ def expand_qa3_receipt(record,command,state,chain_hash,*,order_retention_policy=
     return checked_result(raw,sha,command,order_retention_policy=order_retention_policy)
 
 
+def expand_compact_receipt_v1(record,command,state,chain_hash,*,order_retention_policy=None):
+    keys(record,'schemaVersion formatVersion artifact commandId commandHash stateRevision stateHash chainHash events eventCount eventFromSequence eventsComplete nextEventSequence replay durable model')
+    require(record['schemaVersion']==1 and record['formatVersion']==1 and record['artifact']==COMPACT_RESULT and record['durable'] is True,
+            'receiptVersion','CORRUPT_RECORD')
+    require(record['commandId']==command['commandId'] and record['commandHash']==content_hash(command),
+            'receipt','CORRUPT_RECORD')
+    require(record['stateRevision']==state['revision'] and record['stateHash']==content_hash(state)
+            and record['chainHash']==chain_hash and record['model']==state['model'],
+            'receiptState','CORRUPT_RECORD')
+    result=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-RESULT-1',commandId=record['commandId'],
+                commandHash=record['commandHash'],state=state,events=record['events'],eventCount=record['eventCount'],
+                eventFromSequence=record['eventFromSequence'],eventsComplete=record['eventsComplete'],
+                nextEventSequence=record['nextEventSequence'],replay=record['replay'],durable=True,model=record['model'])
+    raw,sha=pack(result)
+    return checked_result(raw,sha,command,order_retention_policy=order_retention_policy)
+
+
 class ObservedExecutionStore:
-    def __init__(self,dsn,*,order_retention_policy=None,qa_state_delta_v3=False,qa_order_archive_v1=False):
+    def __init__(self,dsn,*,order_retention_policy=None,qa_state_delta_v3=False,qa_order_archive_v1=False,
+                 state_storage_format='snapshot-v1'):
         order_limits(order_retention_policy)
         require(type(qa_state_delta_v3) is bool,'qaStateDeltaV3')
+        require(state_storage_format in ('snapshot-v1','compact-v1'),'stateStorageFormat','REFUSED_STATE_VERSION')
+        require(not (qa_state_delta_v3 and state_storage_format!='snapshot-v1'),
+                'stateStorageFormat','REFUSED_STATE_VERSION')
         require(type(qa_order_archive_v1) is bool and (not qa_order_archive_v1 or qa_state_delta_v3),
                 'qaOrderArchive','REFUSED_POLICY')
         require(not qa_order_archive_v1 or os.environ.get('BTL_ENABLE_QA_ORDER_ARCHIVE_V1')=='1',
                 'qaOrderArchive','REFUSED_POLICY')
         self.dsn=dsn;self.order_retention_policy=deepcopy(order_retention_policy);self.qa_state_delta_v3=qa_state_delta_v3
+        self.state_storage_format=state_storage_format
         self.qa_order_archive_v1=qa_order_archive_v1
         self._qa_state_cache=OrderedDict();self._qa_state_cache_lock=RLock();self._qa_state_cache_max=4
         self._qa_state_cache_stats=dict(hits=0,misses=0,fullReconstructions=0,evictions=0)
@@ -156,7 +193,7 @@ class ObservedExecutionStore:
             return deepcopy(entry['state'])
 
     def _qa_state_cache_write(self,workspace,session,state,chain_hash):
-        if not self.qa_state_delta_v3:return
+        if not (self.qa_state_delta_v3 or self.state_storage_format=='compact-v1'):return
         key=(workspace,session);state_hash=content_hash(state)
         with self._qa_state_cache_lock:
             self._qa_state_cache[key]=dict(revision=state['revision'],stateHash=state_hash,
@@ -379,38 +416,58 @@ class ObservedExecutionStore:
         base_row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
         require(base_row is not None,'qaDeltaBase','CORRUPT_RECORD')
         base_record=unpack(*base_row)
-        if base_record.get('artifact')==QA3_CHECKPOINT_BASE:
+        if base_record.get('artifact') in (QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE):
+            compact_v1=base_record.get('artifact')==COMPACT_CHECKPOINT_BASE
+            expected_base_format=1 if compact_v1 else 3
             keys(base_record,'schemaVersion formatVersion artifact revision state stateHash chainHash controller')
-            require(base_record['schemaVersion']==1 and base_record['formatVersion']==3 and base_record['revision']==0
+            require(base_record['schemaVersion']==1 and base_record['formatVersion']==expected_base_format and base_record['revision']==0
                     and base_record['stateHash']==content_hash(base_record['state'])==base_record['chainHash'],
                     'qaDeltaBase','CORRUPT_RECORD')
-            if upto_revision is None:
-                delta_rows=db.execute('SELECT revision,payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0 ORDER BY revision',(workspace,session)).fetchall()
-                target_revision=len(delta_rows)
-            else:
-                revision(upto_revision)
-                delta_rows=db.execute('SELECT revision,payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s ORDER BY revision',(workspace,session,upto_revision)).fetchall()
-                target_revision=upto_revision
+            require(upto_revision is None or (type(upto_revision) is int and upto_revision>=0),
+                    'qaDeltaRevision','CORRUPT_RECORD')
+            target_revision=(db.execute('SELECT max(revision) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s',
+                                        (workspace,session)).fetchone()[0] if upto_revision is None else upto_revision)
+            require(type(target_revision) is int and target_revision>=0,'qaDeltaRevision','CORRUPT_RECORD')
             if require_tip:
-                total=db.execute('SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0',(workspace,session)).fetchone()[0]
-                require(total==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
-            require(len(delta_rows)==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
-            deltas=[];controllers=[base_record['controller']];previous_hash=base_record['chainHash']
-            for n,(rev,payload,sha) in enumerate(delta_rows,1):
-                checkpoint=unpack(payload,sha)
-                keys(checkpoint,'schemaVersion formatVersion artifact revision stateHash chainHash previousHash delta controller')
-                delta=checkpoint['delta'];body=delta.get('body',{})
-                require(checkpoint['schemaVersion']==1 and checkpoint['formatVersion']==3
-                        and checkpoint['artifact']==QA3_CHECKPOINT_DELTA and checkpoint['revision']==rev==n
-                        and checkpoint['previousHash']==previous_hash and body.get('revision')==rev
-                        and checkpoint['stateHash']==body.get('stateHash')
-                        and checkpoint['chainHash']==body.get('recordHash'),
-                        'qaCheckpointDelta','CORRUPT_RECORD')
-                deltas.append(delta);controllers.append(checkpoint['controller']);previous_hash=checkpoint['chainHash']
+                tip=db.execute('SELECT revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                               (workspace,session)).fetchone()
+                require(tip is not None and tip[0]==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
+                durable_count,durable_max=db.execute('SELECT count(*),max(revision) FROM btl.tick_checkpoints '
+                    'WHERE workspace_id=%s AND session_id=%s AND revision>0',(workspace,session)).fetchone()
+                require(durable_count==target_revision and
+                        durable_max==(target_revision if target_revision else None),
+                        'qaDeltaRevision','CORRUPT_RECORD')
+            total=db.execute('SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s',
+                             (workspace,session,target_revision)).fetchone()[0]
+            require(total==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
+            previous_hash=base_record['chainHash'];current_controller=[base_record['controller']]
+            expected_checkpoint_artifact=COMPACT_CHECKPOINT_DELTA if compact_v1 else QA3_CHECKPOINT_DELTA
+            expected_delta_artifact=COMPACT_DELTA if compact_v1 else None
+            expected_checkpoint_format=1 if compact_v1 else 3
+            def delta_stream():
+                nonlocal previous_hash
+                with db.cursor(name='btl_delta_'+uuid4().hex) as rows:
+                    rows.execute('SELECT revision,payload,content_hash FROM btl.tick_checkpoints '
+                        'WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s ORDER BY revision',
+                        (workspace,session,target_revision))
+                    for n,(rev,payload,sha) in enumerate(rows,1):
+                        checkpoint=unpack(payload,sha)
+                        keys(checkpoint,'schemaVersion formatVersion artifact revision stateHash chainHash previousHash delta controller')
+                        delta=checkpoint['delta'];body=delta.get('body',{})
+                        delta_valid=(delta.get('formatVersion')==1 and delta.get('artifact')==expected_delta_artifact) if compact_v1 else (
+                            delta.get('formatVersion')==4 and delta.get('artifact')=='BTL-QA-OBSERVED-STATE-DELTA-4-DELTA')
+                        require(checkpoint['schemaVersion']==1 and checkpoint['formatVersion']==expected_checkpoint_format
+                                and checkpoint['artifact']==expected_checkpoint_artifact and checkpoint['revision']==rev==n
+                                and checkpoint['previousHash']==previous_hash and body.get('revision')==rev
+                                and delta_valid and checkpoint['stateHash']==body.get('stateHash')
+                                and checkpoint['chainHash']==body.get('recordHash'),
+                                'qaCheckpointDelta','CORRUPT_RECORD')
+                        current_controller[0]=checkpoint['controller'];previous_hash=checkpoint['chainHash']
+                        yield delta
             archive_format=base_record['state'].get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
-            callback=(lambda restored,rev:validate_snapshot(restored,controllers[rev],
+            callback=(lambda restored,rev:validate_snapshot(restored,current_controller[0],
                 order_retention_policy=self.order_retention_policy)) if archive_format else None
-            rebuilt=reconstruct_complete(base_record,deltas,target_revision,state_callback=callback)
+            rebuilt=reconstruct_complete(base_record,delta_stream(),target_revision,state_callback=callback)
             require(rebuilt['revision']==target_revision,'qaDeltaState','CORRUPT_RECORD')
             return rebuilt,previous_hash
 
@@ -444,10 +501,13 @@ class ObservedExecutionStore:
         require(row is not None,'session','RESOURCE_UNAVAILABLE')
         wire=unpack(row[0],row[1])
         chain_hash=None
-        if wire.get('artifact')==QA3_CHECKPOINT:
-            require(self.qa_state_delta_v3,'qaSessionVersion','REFUSED_QA_SESSION_VERSION')
+        compact_artifact=wire.get('artifact') in (QA3_CHECKPOINT,COMPACT_CHECKPOINT)
+        if compact_artifact:
+            compact_v1=wire.get('artifact')==COMPACT_CHECKPOINT
+            require(compact_v1 or self.qa_state_delta_v3,'qaSessionVersion','REFUSED_QA_SESSION_VERSION')
             keys(wire,'schemaVersion formatVersion artifact revision stateHash chainHash controller')
-            require(wire['schemaVersion']==1 and wire['formatVersion']==3 and wire['revision']==row[2],'snapshot','CORRUPT_RECORD')
+            expected_format=1 if compact_v1 else 3
+            require(wire['schemaVersion']==1 and wire['formatVersion']==expected_format and wire['revision']==row[2],'snapshot','CORRUPT_RECORD')
             state=self._qa_state_cache_read(workspace,session,wire)
             if state is None:
                 state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=row[2],require_tip=True)
@@ -463,7 +523,7 @@ class ObservedExecutionStore:
             require(wire['stateHash']==state_hash and wire['chainHash']==chain_hash,'qaCheckpoint','CORRUPT_RECORD')
             validate_snapshot(state,wire['controller'],order_retention_policy=self.order_retention_policy)
             stored=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-CHECKPOINT-1',
-                        state=state,controller=wire['controller']);storage_format='qa3'
+                        state=state,controller=wire['controller']);storage_format='compact-v1' if compact_v1 else 'qa3'
         else:
             stored=read_snapshot(row[0],row[1],order_retention_policy=self.order_retention_policy);state=stored['state'];storage_format='legacy'
             # CP6A-3 full-state Sessions can retain their v3 delta sidecar; keep
@@ -475,9 +535,11 @@ class ObservedExecutionStore:
         require(s['sessionId']==session and (s['revision'],s['datasetVersion'],s['profileHash'])==tuple(row[2:]),'state','CORRUPT_RECORD')
         tip=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(workspace,session,s['revision'])).fetchone()
         require(tip is not None,'immutableTip','CORRUPT_RECORD')
-        if storage_format=='qa3':
+        if storage_format in ('qa3','compact-v1'):
             tip_wire=unpack(*tip)
-            require(tip_wire.get('artifact') in (QA3_CHECKPOINT_BASE,QA3_CHECKPOINT_DELTA)
+            allowed_tip_artifacts=(COMPACT_CHECKPOINT_BASE,COMPACT_CHECKPOINT_DELTA) if storage_format=='compact-v1' else (
+                QA3_CHECKPOINT_BASE,QA3_CHECKPOINT_DELTA)
+            require(tip_wire.get('artifact') in allowed_tip_artifacts
                     and tip_wire.get('revision')==s['revision'] and tip_wire.get('stateHash')==state_hash
                     and tip_wire.get('chainHash')==chain_hash and tip_wire.get('controller')==stored['controller'],
                     'immutableTip','CORRUPT_RECORD')
@@ -491,11 +553,15 @@ class ObservedExecutionStore:
         if row is None:return None
         require(row[1]==content_hash(command),'commandId','REFUSED_IDEMPOTENCY_CONFLICT')
         wire=unpack(row[2],row[3])
-        if wire.get('artifact')==QA3_RESULT:
-            require(self.qa_state_delta_v3,'receiptVersion','REFUSED_QA_RECEIPT_VERSION')
-            require(wire.get('schemaVersion')==1 and wire.get('formatVersion')==3,'receiptVersion','CORRUPT_RECORD')
+        if wire.get('artifact') in (QA3_RESULT,COMPACT_RESULT):
+            compact_v1=wire.get('artifact')==COMPACT_RESULT
+            require(compact_v1 or self.qa_state_delta_v3,'receiptVersion','REFUSED_QA_RECEIPT_VERSION')
+            expected_format=1 if compact_v1 else 3
+            require(wire.get('schemaVersion')==1 and wire.get('formatVersion')==expected_format,'receiptVersion','CORRUPT_RECORD')
             require(type(wire.get('stateRevision')) is int and wire['stateRevision']==row[0],'receiptState','CORRUPT_RECORD')
             state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=wire['stateRevision'])
+            if compact_v1:
+                return expand_compact_receipt_v1(wire,command,state,chain_hash,order_retention_policy=self.order_retention_policy)
             return expand_qa3_receipt(wire,command,state,chain_hash,order_retention_policy=self.order_retention_policy)
         result=checked_result(row[2],row[3],command,order_retention_policy=self.order_retention_policy)
         require(result['state']['revision']==row[0],'receiptState','CORRUPT_RECORD')
@@ -509,17 +575,23 @@ class ObservedExecutionStore:
             base_record.update(artifact=QA3_CHECKPOINT_BASE,chainHash=base_record['stateHash'],controller=deepcopy(checkpoint))
             raw_base,sha_base=pack(base_record)
             raw,sha=pack(compact_qa3_checkpoint(state,checkpoint,base_record['chainHash']))
+        elif self.state_storage_format=='compact-v1':
+            base_record=encode_compact_base(state)
+            base_record.update(artifact=COMPACT_CHECKPOINT_BASE,chainHash=base_record['stateHash'],controller=deepcopy(checkpoint))
+            raw_base,sha_base=pack(base_record)
+            raw,sha=pack(dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT,revision=0,
+                stateHash=base_record['stateHash'],chainHash=base_record['chainHash'],controller=deepcopy(checkpoint)))
         else:
             raw,sha=pack(validate_snapshot(state,checkpoint,order_retention_policy=self.order_retention_policy))
         db.execute('INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,state['datasetVersion'],state['profileHash'],0,raw,sha))
-        if self.qa_state_delta_v3:db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw_base,sha_base))
+        if self.qa_state_delta_v3 or self.state_storage_format=='compact-v1':db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw_base,sha_base))
         else:db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw,sha))
 
     def create(self,scope,state,checkpoint):
         with connect(self.dsn) as db:
             if self.qa_order_archive_v1:self._ensure_order_archive_schema(db)
             self._insert(db,scope,state,checkpoint)
-        if self.qa_state_delta_v3:
+        if self.qa_state_delta_v3 or self.state_storage_format=='compact-v1':
             workspace,session=scoped(scope,state['sessionId'])
             self._qa_state_cache_write(workspace,session,state,content_hash(state))
 
@@ -530,13 +602,35 @@ class ObservedExecutionStore:
             if prior is not None:return stored,prior
             require(stored['state']['revision']==command['expectedRevision'],'revision','REFUSED_STALE_REVISION');return stored,None
 
+    def historical_checkpoint(self,db,scope,session_id,target_revision):
+        """Read one immutable revision in either snapshot-v1 or compact-v1 form."""
+        workspace,session=scoped(scope,session_id);revision(target_revision)
+        row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                       'WHERE workspace_id=%s AND session_id=%s AND revision=%s',
+                       (workspace,session,target_revision)).fetchone()
+        require(row is not None,'checkpoint','REFUSED_FORK_POINT')
+        wire=unpack(*row)
+        if wire.get('artifact') in (QA3_CHECKPOINT_BASE,QA3_CHECKPOINT_DELTA,
+                                    COMPACT_CHECKPOINT_BASE,COMPACT_CHECKPOINT_DELTA):
+            state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=target_revision)
+            require(wire.get('revision')==target_revision and wire.get('stateHash')==content_hash(state)
+                    and wire.get('chainHash')==chain_hash,
+                    'checkpoint','CORRUPT_RECORD')
+            if target_revision==0:
+                state=wire['state']
+            controller=wire['controller']
+            validate_snapshot(state,controller,order_retention_policy=self.order_retention_policy)
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-CHECKPOINT-1',
+                        state=state,controller=controller)
+        return read_snapshot(row[0],row[1],order_retention_policy=self.order_retention_policy)
+
     def commit(self,scope,raw,before,after,checkpoint,events,replay=None,archive_records=None):
         command=command_wire(raw);workspace,session=scoped(scope,command['sessionId'])
         with connect(self.dsn) as db:
             live,storage_format,prior_chain_hash=self._read(db,workspace,session,lock=True,include_format=True);prior=self._prior(db,workspace,session,command)
             if prior is not None:return prior
             old=live['state']
-            if storage_format=='qa3':
+            if storage_format in ('qa3','compact-v1'):
                 # The locked QA-v3 snapshot is already independently checked
                 # against its state and delta commitments by _read. Compare the
                 # complete validated structures directly instead of hashing a
@@ -555,7 +649,7 @@ class ObservedExecutionStore:
                     and Fraction(after['balance'])-Fraction(old['balance'])==sum((Fraction(e['detail']['balanceDelta']) for e in postings),Fraction(0))
                     and Fraction(after['realizedGross'])-Fraction(old['realizedGross'])==sum((Fraction(e['detail']['grossPosted']) for e in postings if e['kind']=='EXIT_FILL'),Fraction(0)),'cashPosting','CORRUPT_RECORD')
             validate_snapshot(after,checkpoint,order_retention_policy=self.order_retention_policy)
-            compact_mode=self.qa_state_delta_v3 and storage_format=='qa3'
+            compact_mode=storage_format in ('qa3','compact-v1')
             archive_mode=after.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
             if archive_mode:
                 require(self.qa_order_archive_v1 and type(archive_records) is list,
@@ -582,7 +676,8 @@ class ObservedExecutionStore:
             legacy_delta_mode=not compact_mode and self._has_qa_base(db,workspace,session)
             delta_record=None;chain_hash=None
             if compact_mode:
-                delta_record=encode_delta_v4(old,after,prior_chain_hash)
+                delta_record=(encode_compact_delta(old,after,prior_chain_hash) if storage_format=='compact-v1'
+                              else encode_delta_v4(old,after,prior_chain_hash))
                 chain_hash=delta_record['body']['recordHash']
             elif legacy_delta_mode:
                 prior_delta=db.execute('SELECT payload,content_hash FROM public.btl_qa_state_delta_v3 WHERE workspace_id=%s AND session_id=%s ORDER BY revision DESC LIMIT 1',(workspace,session)).fetchone()
@@ -591,8 +686,15 @@ class ObservedExecutionStore:
                 delta_record=encode_delta(old,after,previous_hash);chain_hash=delta_record['body']['recordHash']
             if compact_mode:
                 require(chain_hash is not None,'qaDeltaBase','CORRUPT_RECORD')
-                checkpoint_wire=compact_qa3_checkpoint_delta(after,checkpoint,delta_record)
-                session_wire=compact_qa3_checkpoint(after,checkpoint,chain_hash)
+                if storage_format=='compact-v1':
+                    checkpoint_wire=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT_DELTA,
+                        revision=after['revision'],stateHash=content_hash(after),chainHash=chain_hash,
+                        previousHash=delta_record['body']['previousHash'],delta=delta_record,controller=deepcopy(checkpoint))
+                    session_wire=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT,
+                        revision=after['revision'],stateHash=content_hash(after),chainHash=chain_hash,controller=deepcopy(checkpoint))
+                else:
+                    checkpoint_wire=compact_qa3_checkpoint_delta(after,checkpoint,delta_record)
+                    session_wire=compact_qa3_checkpoint(after,checkpoint,chain_hash)
             else:
                 checkpoint_wire=validate_snapshot(after,checkpoint,order_retention_policy=self.order_retention_policy)
                 session_wire=checkpoint_wire
@@ -602,7 +704,8 @@ class ObservedExecutionStore:
             result=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-RESULT-1',commandId=command['commandId'],commandHash=content_hash(command),state=after,events=page,eventCount=len(events),eventFromSequence=old['nextEventIndex'],eventsComplete=complete,nextEventSequence=None if complete else old['nextEventIndex']+len(page),replay=replay,durable=True,model=after['model'])
             if compact_mode:
                 checked=checked_result_value(result,command,order_retention_policy=self.order_retention_policy)
-                receipt_wire=compact_qa3_receipt(checked,content_hash(after),chain_hash)
+                receipt_wire=(compact_receipt_v1(checked,content_hash(after),chain_hash) if storage_format=='compact-v1'
+                              else compact_qa3_receipt(checked,content_hash(after),chain_hash))
             else:
                 checked=checked_result(*pack(result),command,order_retention_policy=self.order_retention_policy)
                 receipt_wire=result
@@ -634,8 +737,9 @@ class ObservedExecutionStore:
             if after_sequence==0:
                 seed=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
                 seed_wire=unpack(*seed)
-                if seed_wire.get('artifact')==QA3_CHECKPOINT_BASE:
-                    require(self.qa_state_delta_v3,'qaSessionVersion','REFUSED_QA_SESSION_VERSION')
+                if seed_wire.get('artifact') in (QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE):
+                    require(seed_wire.get('artifact')==COMPACT_CHECKPOINT_BASE or self.qa_state_delta_v3,
+                            'qaSessionVersion','REFUSED_QA_SESSION_VERSION')
                     initial,_=self._qa_reconstruct(db,workspace,session,upto_revision=0)
                     require(seed_wire['stateHash']==content_hash(initial),'qaCheckpoint','CORRUPT_RECORD')
                     previous=initial['eventHash']

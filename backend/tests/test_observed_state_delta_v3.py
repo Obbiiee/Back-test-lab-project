@@ -7,7 +7,8 @@ import time
 import unittest
 
 from contracts.canonical import canonical_bytes, content_hash
-from execution.observed_state_delta_v3 import QAStateDeltaStore
+from execution.observed_state_delta_v3 import (QAStateDeltaStore,COMPACT_BASE,COMPACT_DELTA,
+    encode_compact_base,encode_compact_delta,reconstruct_complete)
 
 
 def state(revision,orders,balance='10000'):
@@ -17,6 +18,30 @@ def state(revision,orders,balance='10000'):
 
 
 class ObservedStateDeltaV3Tests(unittest.TestCase):
+    def test_compact_v1_streaming_reconstruction_is_exact_and_fail_closed(self):
+        initial=state(0,{})
+        base=encode_compact_base(initial)
+        self.assertEqual((base['formatVersion'],base['artifact']),(1,COMPACT_BASE))
+        previous=initial;chain_hash=base['stateHash'];deltas=[]
+        for revision in range(1,17):
+            orders=dict(previous['orders'])
+            orders[f'closed:{revision}']=dict(id=f'closed:{revision}',status='CLOSED',grossPosted='0')
+            current=state(revision,orders)
+            delta=encode_compact_delta(previous,current,chain_hash)
+            self.assertEqual((delta['formatVersion'],delta['artifact']),(1,COMPACT_DELTA))
+            chain_hash=delta['body']['recordHash'];deltas.append(delta);previous=current
+        recovered=reconstruct_complete(base,(item for item in deltas),len(deltas))
+        self.assertEqual(canonical_bytes(recovered),canonical_bytes(previous))
+        self.assertEqual(content_hash(recovered),deltas[-1]['body']['stateHash'])
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,(item for item in deltas[:-1]),len(deltas))
+        reordered=list(deltas);reordered[3],reordered[4]=reordered[4],reordered[3]
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,(item for item in reordered),len(reordered))
+        corrupted=json.loads(json.dumps(deltas));corrupted[7]['body']['previousHash']='0'*64
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,(item for item in corrupted),len(corrupted))
+
     def test_snapshot_delta_exact_reconstruction_retry_and_corruption_detection(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=os.path.join(tmp,'qa.sqlite');store=QAStateDeltaStore(path);sid='session:qa-v3'

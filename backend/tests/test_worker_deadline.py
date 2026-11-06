@@ -30,6 +30,15 @@ class WorkerDeadlineTests(unittest.TestCase):
         with patch.object(worker, 'MAX_JOBS', 0), self.assertRaises(ContractError):
             worker._environment('private-dsn')
 
+    def test_observed_storage_format_is_server_pinned_and_fail_closed(self):
+        with patch.dict(os.environ,{'BTL_OBSERVED_SESSION_STORAGE_FORMAT':'compact-v1'}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_OBSERVED_SESSION_STORAGE_FORMAT'],'compact-v1')
+        with patch.dict(os.environ,{'BTL_OBSERVED_SESSION_STORAGE_FORMAT':''}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_OBSERVED_SESSION_STORAGE_FORMAT'],'')
+        with patch.dict(os.environ,{'BTL_OBSERVED_SESSION_STORAGE_FORMAT':'unknown-v9'}), \
+                self.assertRaisesRegex(ContractError,'REFUSED_STATE_VERSION'):
+            worker._environment('private-dsn')
+
     def test_private_log_codec_is_propagated_and_unknown_values_refuse(self):
         with patch.dict(os.environ,{'BTL_QA_TIMELINE_LOG_CODEC':'zlib-1'}):
             self.assertEqual(worker._environment('private-dsn')['BTL_QA_TIMELINE_LOG_CODEC'],'zlib-1')
