@@ -6,6 +6,7 @@ typed timestamp/ordinal columns used only for bounded seeking and pruning.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -20,10 +21,10 @@ import pyarrow.parquet as pq
 
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import digest, identifier, require
-from ticks.contracts import CanonicalTick, TickManifest, validate_chunk, uint
+from ticks.contracts import CanonicalTick, TickManifest, validate_chunk, uint, tag
 
 SCHEMA_VERSION = 1
-MANIFEST_ARTIFACT = "BTL-TICK-MONTHLY-PARQUET-MANIFEST-1"
+MANIFEST_ARTIFACT = "BTL-TICK-MONTHLY-PARQUET-MANIFEST-2"
 FORMAT_ARTIFACT = "BTL-CANONICAL-TICK-1"
 COMPRESSION = "zstd"
 COMPRESSION_LEVEL = 3
@@ -37,7 +38,7 @@ MANIFEST_FIELDS = {
     "providerId", "feedId", "instrumentId", "canonicalEventArtifact", "canonicalEventIdentity",
     "sourceManifestHash", "sourceIdentity", "ordering", "sourceRights", "sourceRange", "coverage",
     "gaps", "diagnostics", "compression", "rowGroupSize", "rowGroupHashAlgorithm", "eventCount",
-    "files", "manifestHash",
+    "sourceManifest", "files", "manifestHash",
 }
 
 SCHEMA = pa.schema([
@@ -50,6 +51,7 @@ SCHEMA = pa.schema([
     pa.field("instrument_id", pa.string(), nullable=False),
     pa.field("event_id", pa.string(), nullable=False),
     pa.field("timestamp_ns", pa.int64(), nullable=False),
+    pa.field("global_index", pa.int64(), nullable=False),
     pa.field("resolution_ns", pa.int64(), nullable=False),
     pa.field("source_index", pa.int16(), nullable=False),
     pa.field("bid", pa.string(), nullable=True),
@@ -204,6 +206,8 @@ def _write_monthly_parquet_reserved(root, events, source_manifest, *, expected_v
             "index": len(row_groups), "eventCount": len(rows),
             "firstTimeNs": str(rows[0]["timestamp_ns"]), "lastTimeNs": str(rows[-1]["timestamp_ns"]),
             "firstOrdinal": rows[0]["source_ordinal"], "lastOrdinal": rows[-1]["source_ordinal"],
+            "firstSourceIndex": rows[0]["source_index"], "lastSourceIndex": rows[-1]["source_index"],
+            "firstGlobalIndex": rows[0]["global_index"], "lastGlobalIndex": rows[-1]["global_index"],
             "canonicalEventHash": sha.hexdigest(),
         })
         rows = []
@@ -253,6 +257,7 @@ def _write_monthly_parquet_reserved(root, events, source_manifest, *, expected_v
                     (source_index != previous_source or ordinal > previous_ordinal),
                     "eventOrder", "ORDER_REVERSAL")
             row["source_index"] = source_index
+            row["global_index"] = total_events
             month = _month(time_ns)
             require(int(source_wire["range"]["startNs"]) <= time_ns < int(source_wire["range"]["endNs"]),
                     "eventRange", "RANGE_CONFLICT")
@@ -312,12 +317,13 @@ def _write_monthly_parquet_reserved(root, events, source_manifest, *, expected_v
             "sourceRange", "INCOMPLETE_INGESTION")
     payload = {
         "schemaVersion": SCHEMA_VERSION, "artifact": MANIFEST_ARTIFACT,
-        "manifestVersion": 1, "layout": "ONE_FILE_PER_UTC_MONTH",
+        "manifestVersion": 2, "layout": "ONE_FILE_PER_UTC_MONTH",
         "datasetId": source_wire["datasetId"], "datasetVersion": source.version,
         "providerId": source_wire["providerId"], "feedId": source_wire["feedId"],
         "instrumentId": source_wire["instrumentId"], "canonicalEventArtifact": FORMAT_ARTIFACT,
         "canonicalEventIdentity": "PRESERVED_EVENT_ID_FIELD", "sourceManifestHash": source.version,
         "sourceIdentity": source_wire["sources"],
+        "sourceManifest": source_wire,
         "ordering": source_wire["ordering"], "sourceRights": source_wire["rights"],
         "sourceRange": source_wire["range"], "coverage": source_wire["coverage"],
         "gaps": source_wire["gaps"], "diagnostics": source_wire["diagnostics"],
@@ -384,7 +390,7 @@ class MonthlyParquetProvider:
         raw = (self.root / "manifest.json").read_bytes()
         manifest = _json_object(raw, MANIFEST_FIELDS)
         require(manifest.get("schemaVersion") == SCHEMA_VERSION and
-                manifest.get("artifact") == MANIFEST_ARTIFACT and manifest.get("manifestVersion") == 1,
+                manifest.get("artifact") == MANIFEST_ARTIFACT and manifest.get("manifestVersion") == 2,
                 "manifestVersion", "SCHEMA_MISMATCH")
         supplied_hash = manifest.pop("manifestHash", None)
         digest(supplied_hash, "manifestHash")
@@ -416,8 +422,16 @@ class MonthlyParquetProvider:
         if expected_manifest_hash is not None:
             require(supplied_hash == expected_manifest_hash, "manifestHash", "CHILD_HASH_MISMATCH")
         self.manifest = manifest
-        self.dataset_id = manifest["datasetId"]
-        self.dataset_version = manifest["datasetVersion"]
+        self._source_manifest = TickManifest.from_wire(manifest["sourceManifest"], manifest["datasetVersion"]).wire
+        require(self._source_manifest["datasetId"] == manifest["datasetId"] and
+                self._source_manifest["sources"] == manifest["sourceIdentity"] and
+                self._source_manifest["ordering"] == manifest["ordering"] and
+                self._source_manifest["coverage"] == manifest["coverage"] and
+                self._source_manifest["gaps"] == manifest["gaps"] and
+                self._source_manifest["rights"] == manifest["sourceRights"],
+                "sourceManifest", "IDENTITY_CONFLICT")
+        self._dataset_id = manifest["datasetId"]
+        self._dataset_version = manifest["datasetVersion"]
         self.manifest_hash = supplied_hash
         require(type(manifest.get("sourceIdentity")) is list and
                 1 <= len(manifest["sourceIdentity"]) <= 128,
@@ -455,10 +469,15 @@ class MonthlyParquetProvider:
                     "fileIndex", "CORRUPT_INDEX_POINTER")
             require(all(type(group) is dict and set(group) == {
                             "index", "eventCount", "firstTimeNs", "lastTimeNs", "firstOrdinal",
-                            "lastOrdinal", "canonicalEventHash"} and
+                            "lastOrdinal", "firstSourceIndex", "lastSourceIndex",
+                            "firstGlobalIndex", "lastGlobalIndex", "canonicalEventHash"} and
                         group.get("index") == index and type(group.get("eventCount")) is int and
                         1 <= group["eventCount"] <= manifest["rowGroupSize"] and
                         type(group.get("firstTimeNs")) is str and type(group.get("lastTimeNs")) is str and
+                        type(group.get("firstSourceIndex")) is int and type(group.get("lastSourceIndex")) is int and
+                        type(group.get("firstGlobalIndex")) is int and type(group.get("lastGlobalIndex")) is int and
+                        group["firstGlobalIndex"] == total + sum(prior["eventCount"] for prior in entry["rowGroups"][:index]) and
+                        group["firstGlobalIndex"] <= group["lastGlobalIndex"] and
                         uint(group["firstTimeNs"]) <= uint(group["lastTimeNs"]) and
                         _month(uint(group["firstTimeNs"])) == entry["month"] and
                         _month(uint(group["lastTimeNs"])) == entry["month"] and
@@ -490,6 +509,8 @@ class MonthlyParquetProvider:
 
     def _read_row_group(self, path, file_entry, group_entry):
         parquet = pq.ParquetFile(path)
+        require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()),
+                "parquetSchema", "SCHEMA_MISMATCH")
         index = group_entry["index"]
         require(index < parquet.metadata.num_row_groups, "rowGroup", "CORRUPT_INDEX_POINTER")
         meta = parquet.metadata.row_group(index)
@@ -532,13 +553,102 @@ class MonthlyParquetProvider:
         require(events and events[0]["timeNs"] == group_entry["firstTimeNs"] and
                 events[-1]["timeNs"] == group_entry["lastTimeNs"] and
                 events[0]["rawOrdinal"] == group_entry["firstOrdinal"] and
-                events[-1]["rawOrdinal"] == group_entry["lastOrdinal"],
+                events[-1]["rawOrdinal"] == group_entry["lastOrdinal"] and
+                self._source_indices[events[0]["provenance"]["sourceId"]] == group_entry["firstSourceIndex"] and
+                self._source_indices[events[-1]["provenance"]["sourceId"]] == group_entry["lastSourceIndex"],
                 "rowGroupBounds", "CORRUPT_INDEX_POINTER")
         timestamps = table.column("timestamp_ns").to_numpy(zero_copy_only=False)
         require(timestamps.ndim == 1 and len(timestamps) == len(events) and
                 np.all(timestamps[1:] >= timestamps[:-1]),
                 "timestampIndex", "ORDER_REVERSAL")
-        return events, timestamps
+        global_indices = table.column("global_index").to_numpy(zero_copy_only=False)
+        require(global_indices.ndim == 1 and len(global_indices) == len(events) and
+                int(global_indices[0]) == group_entry["firstGlobalIndex"] and
+                int(global_indices[-1]) == group_entry["lastGlobalIndex"],
+                "globalIndex", "CORRUPT_INDEX_POINTER")
+        return events, timestamps, global_indices
+
+    @property
+    def dataset_id(self):
+        return self._dataset_id
+
+    @property
+    def dataset_version(self):
+        return self._dataset_version
+
+    def describe(self, dataset_id, dataset_version):
+        require((dataset_id, dataset_version) == (self.dataset_id, self.dataset_version),
+                "dataset", "VERSION_MISMATCH")
+        return deepcopy(self._source_manifest)
+
+    def read_page(self, dataset_id, dataset_version, after_token=None, max_events=64):
+        self.describe(dataset_id, dataset_version)
+        require(type(max_events) is int and 1 <= max_events <= 64, "max_events", "ARTIFACT_LIMIT")
+        require(not self._source_manifest["diagnostics"], "diagnostics", "INCOMPLETE_DIAGNOSTICS")
+        start = 0
+        if after_token is not None:
+            tag(after_token, "BTL-TICK-PAGE-TOKEN-1", "datasetVersion sourceIndex afterRawOrdinal")
+            require(after_token["datasetVersion"] == dataset_version, "token", "VERSION_MISMATCH")
+            source_index = uint(after_token["sourceIndex"])
+            require(source_index < len(self._source_manifest["sources"]), "token", "INVALID_PAGE_TOKEN")
+            require(after_token["afterRawOrdinal"] is not None, "token", "INVALID_PAGE_TOKEN")
+            ordinal = uint(after_token["afterRawOrdinal"])
+            found = False
+            for entry in self._files:
+                for group in entry["rowGroups"]:
+                    low = (group["firstSourceIndex"], int(group["firstOrdinal"]))
+                    high = (group["lastSourceIndex"], int(group["lastOrdinal"]))
+                    if low <= (source_index, ordinal) <= high:
+                        path = (self.root / entry["path"]).resolve()
+                        require(path.parent.parent == self.root and path.is_file(),
+                                "file", "MISSING_CHILD")
+                        events, _times, indices = self._read_row_group(path, entry, group)
+                        for event, global_index in zip(events, indices):
+                            if (self._source_indices[event["provenance"]["sourceId"]],
+                                    int(event["rawOrdinal"])) == (source_index, ordinal):
+                                start = int(global_index) + 1
+                                found = True
+                                break
+                    if found:
+                        break
+                if found:
+                    break
+            require(found, "token", "INVALID_PAGE_TOKEN")
+        selected = []
+        stop = start + max_events
+        for entry in self._files:
+            for group in entry["rowGroups"]:
+                if group["lastGlobalIndex"] < start:
+                    continue
+                if group["firstGlobalIndex"] >= stop:
+                    break
+                path = (self.root / entry["path"]).resolve()
+                require(path.parent.parent == self.root and path.is_file(),
+                        "file", "MISSING_CHILD")
+                events, _times, indices = self._read_row_group(path, entry, group)
+                selected.extend(event for event, index in zip(events, indices)
+                                if start <= int(index) < stop)
+            if len(selected) >= max_events:
+                break
+        selected = selected[:max_events]
+        while True:
+            end = start + len(selected) == self.manifest["eventCount"]
+            result = dict(schemaVersion=1, artifact="BTL-TICK-PAGE-1", datasetId=dataset_id,
+                          datasetVersion=dataset_version, events=selected,
+                          diagnostics={"records": [], "counts": {}, "truncated": False},
+                          nextToken=None, endOfDataset=end)
+            if selected and not end:
+                last = selected[-1]
+                result["nextToken"] = dict(schemaVersion=1, artifact="BTL-TICK-PAGE-TOKEN-1",
+                    datasetVersion=dataset_version,
+                    sourceIndex=str(self._source_indices[last["provenance"]["sourceId"]]),
+                    afterRawOrdinal=last["rawOrdinal"])
+            try:
+                canonical_bytes(result)
+                return result
+            except ValueError:
+                require(len(selected) > 1, "page", "RECORD_LIMIT")
+                selected = selected[:max(1, len(selected)//2)]
 
     def iter_range(self, start_ns, end_ns):
         """Yield exact canonical ticks in [start_ns, end_ns), in source order."""
@@ -558,7 +668,7 @@ class MonthlyParquetProvider:
             for group in file_entry["rowGroups"]:
                 if int(group["lastTimeNs"]) < start_ns or int(group["firstTimeNs"]) >= end_ns:
                     continue
-                events, timestamps = self._read_row_group(path, file_entry, group)
+                events, timestamps, _indices = self._read_row_group(path, file_entry, group)
                 # The row-group hash and chronology are verified before this
                 # index can prune candidates. Without the proof, use the
                 # chronological scan rather than granting the accelerator trust.

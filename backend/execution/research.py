@@ -9,7 +9,7 @@ from application.models import TrustedScope
 from contracts.canonical import content_hash, canonical_bytes
 from contracts.models import MethodPolicy, Command, SessionContext, Observation, validate_command
 from contracts.primitives import require, identifier, revision, digest
-from ticks.contracts import keys, tag
+from ticks.contracts import keys, tag, TickManifest
 from ticks.timeline import TickTimeline
 from infrastructure.database import connect
 from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity
@@ -43,11 +43,19 @@ def method_policy(record):
 
 class ResearchApplication:
     """Single-user local operator; no public identity/tenant composition."""
-    def __init__(self, dsn, scope=None, *, historical_source=None):
+    def __init__(self, dsn, scope=None, *, historical_source=None, synthetic_provider=None):
+        require(historical_source is None or synthetic_provider is None, 'source', 'IDENTITY_CONFLICT')
+        if synthetic_provider is not None:
+            manifest = TickManifest.from_wire(
+                synthetic_provider.describe(synthetic_provider.dataset_id, synthetic_provider.dataset_version),
+                synthetic_provider.dataset_version).wire
+            require(manifest['evidenceClass'] == 'SYNTHETIC_CONTRACT_ONLY' and
+                    manifest['rights']['class'] == 'SYNTHETIC',
+                    'syntheticProvider', 'REFUSED_SOURCE')
         self.dsn = dsn
         self.scope = scope or TrustedScope("local:exness:"+historical_source.version if historical_source else "fixture:local-alpha", "fixture:local-operator")
         self.__historical = historical_source
-        self.__provider = historical_source or research_provider()
+        self.__provider = historical_source or synthetic_provider or research_provider()
         self.__profile = historical_source.profile if historical_source else research_profile()
         self.__label = historical_source.label if historical_source else "SYNTHETIC / TEST ONLY"
         self.__start = historical_source.start_ns if historical_source else START_NS
@@ -58,7 +66,8 @@ class ResearchApplication:
             from .historical import IndexedTimelineCache
             self.__timeline_cache = IndexedTimelineCache(historical_source)
         else:
-            self.__timeline_cache = FixtureTimelineCache(self.__provider)
+            self.__timeline_cache = FixtureTimelineCache(self.__provider,
+                allow_injected_synthetic=synthetic_provider is not None)
         self.controller = ExecutionController(self.store, self.__provider, self.__timeline_cache)
 
     def close(self):

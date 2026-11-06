@@ -11,6 +11,8 @@ from contracts.primitives import ContractError
 from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
 from ticks.contracts import TickManifest, chunk_content, event_id
 from ticks.provider import SyntheticTickProvider
+from ticks.provider import validate_provider
+from ticks.timeline import TickTimeline
 
 
 JAN_LAST = 1_706_745_599_999_999_990
@@ -65,6 +67,28 @@ class MonthlyParquetTests(unittest.TestCase):
             parquet = pq.ParquetFile(self.root / item["path"])
             self.assertTrue(all(parquet.metadata.row_group(0).column(i).compression == "ZSTD"
                                 for i in range(parquet.metadata.row_group(0).num_columns)))
+
+    def test_monthly_provider_replays_original_pages_and_timeline(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+                                         expected_version=self.source.dataset_version, row_group_size=2)
+        provider = MonthlyParquetProvider(self.root, expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        accepted = validate_provider(provider, provider.dataset_id, provider.dataset_version)
+        self.assertEqual(accepted.wire, self.manifest)
+        token = None
+        pages = []
+        while True:
+            page = provider.read_page(provider.dataset_id, provider.dataset_version, token, 2)
+            pages.extend(page["events"])
+            if page["endOfDataset"]:
+                break
+            token = page["nextToken"]
+        self.assertEqual(pages, self.wire_events)
+        timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version)
+        prefix = timeline.advance_through(str(FEB_FIRST), timeline.cursor)
+        self.assertEqual([group["timeNs"] for group in prefix["groups"]],
+                         [str(JAN_LAST - 2), str(JAN_LAST), str(FEB_FIRST)])
 
     def test_immutable_publish_and_manifest_pin_fail_closed(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,

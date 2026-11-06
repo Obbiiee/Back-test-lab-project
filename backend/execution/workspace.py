@@ -34,8 +34,9 @@ class FixtureTimelineCache:
     cannot use its successor against the unchanged durable checkpoint. Readers
     hold the same lock and receive decoded past groups, never a mutable timeline.
     """
-    def __init__(self, provider):
-        require(provider is research_provider(), 'cacheProvider', 'REFUSED_NON_FIXTURE_MODE')
+    def __init__(self, provider, *, allow_injected_synthetic=False):
+        require(provider is research_provider() or allow_injected_synthetic,
+                'cacheProvider', 'REFUSED_NON_FIXTURE_MODE')
         self.__provider = provider
         self.__entries = OrderedDict()
         self.__lock = RLock()

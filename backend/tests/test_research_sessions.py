@@ -13,6 +13,7 @@ from contracts.primitives import ContractError
 from infrastructure.database import connect,migrate
 from execution.research import ResearchApplication
 from execution.research_fixture import WARMUP_NS,STEP_NS,research_provider
+from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
 from execution.local_api import create_local_app,body
 from fastapi.testclient import TestClient
 
@@ -133,6 +134,48 @@ class ResearchSessionTests(unittest.TestCase):
             foreign.summary(session)
         self.assertEqual(error.exception.code, 'RESOURCE_UNAVAILABLE')
         foreign.close()
+
+    def test_monthly_parquet_provider_matches_synthetic_financial_reducer(self):
+        import tempfile
+        from pathlib import Path
+        source=research_provider();token=None;events=[]
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,64)
+            events.extend(page['events'])
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)/'monthly'
+            manifest=write_monthly_parquet(root,iter(events),source.describe(source.dataset_id,source.dataset_version),
+                expected_version=source.dataset_version,row_group_size=128)
+            monthly=MonthlyParquetProvider(root,expected_dataset_id=source.dataset_id,
+                expected_dataset_version=source.dataset_version,expected_manifest_hash=manifest['manifestHash'])
+            monthly_scope=TrustedScope('researchqa:'+uuid.uuid4().hex,'fixture:operator')
+            monthly_app=ResearchApplication(DSN,monthly_scope,synthetic_provider=monthly)
+            try:
+                record=method();self.app.create_method(record);monthly_app.create_method(record)
+                session='session:'+uuid.uuid4().hex
+                request=dict(id=session,name='Monthly Parquet E2E',methodId=record['id'],
+                             initialBalance='10000',startPeriod='2020-01')
+                baseline=self.app.create_session(request);candidate=monthly_app.create_session(request)
+                self.assertEqual(baseline['state'],candidate['state'])
+                review=review_request(baseline)
+                approved=self.app.review(review);candidate_approved=monthly_app.review(review)
+                self.assertEqual(approved['review']['command'],candidate_approved['review']['command'])
+                pin=dict(reviewId=review['requestId'],reviewHash=approved['reviewHash'])
+                baseline_confirmed=self.app.confirm(session,pin)
+                candidate_confirmed=monthly_app.confirm(session,dict(reviewId=review['requestId'],
+                    reviewHash=candidate_approved['reviewHash']))
+                self.assertEqual(baseline_confirmed,candidate_confirmed)
+                state=self.app.inspect(session)['state']
+                command=dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',sessionId=session,
+                    commandId='command:'+uuid.uuid4().hex,expectedRevision=state['revision'],kind='ADVANCE',
+                    payload={'targetNs':str(int(state['throughNs'])+STEP_NS)})
+                baseline_result=self.app.apply(session,command)
+                candidate_result=monthly_app.apply(session,command)
+                self.assertEqual(baseline_result,candidate_result)
+                self.assertEqual(self.app.inspect(session),monthly_app.inspect(session))
+            finally:monthly_app.close()
 
     def test_summary_counts_closed_positions_not_partial_exits_and_matches_durable_analysis(self):
         view, _ = self.create()
