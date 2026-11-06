@@ -218,6 +218,78 @@ class ResearchApplication:
                         unresolved=state["unresolved"], ended=state["ended"],
                         model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
 
+    def method_analytics(self, method_id):
+        """Pool completed committed positions across compatible Sessions only.
+
+        This is a bounded read projection. It never combines account balances,
+        runs a replay, or treats incomplete Sessions as zero-return samples.
+        """
+        from .analysis import MAX_ANALYSIS_EVENTS, metrics
+        identifier(method_id, 'methodId')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            method = self._method(db, method_id)
+            policy = method_policy(method)
+            rows = db.execute(
+                'SELECT session_id FROM btl.tick_research_sessions WHERE workspace_id=%s AND method_id=%s '
+                'ORDER BY session_id LIMIT 129', (self.scope.workspace_id, method_id)).fetchall()
+            require(len(rows) <= 128, 'methodSessions', 'REFUSED_METHOD_ANALYSIS_LIMIT')
+
+            compatible = []
+            excluded = []
+            event_budget = 0
+            units = set()
+            for (session_id,) in rows:
+                meta, _method, state, _checkpoint = self._session(db, session_id)
+                require(meta.get('artifact') == 'BTL-LOCAL-SESSION-1' and
+                        meta.get('methodHash') == policy.definition_hash,
+                        'methodSession', 'CORRUPT_RECORD')
+                current_unit = (state['profileHash'], state['engineVersion'],
+                                state['profile']['accountCurrency'])
+                units.add(current_unit)
+                compatible.append((session_id, state['revision'], current_unit))
+                event_budget += state['nextEventIndex']
+
+            common = dict(schemaVersion=1, artifact='BTL-METHOD-ANALYTICS-1', methodId=method_id,
+                          methodHash=policy.definition_hash,
+                          aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
+                          balancesCombined=False, financialAuthority='COMMITTED_EVENTS_ONLY')
+            if len(units) > 1:
+                return dict(**common, status='UNAVAILABLE', reason='INCOMPATIBLE_FINANCIAL_UNITS',
+                            includedSessions=[], excludedSessions=[
+                                {'sessionId': item[0], 'reason': 'MULTIPLE_FINANCIAL_UNITS'} for item in compatible],
+                            metrics=None)
+            if event_budget > MAX_ANALYSIS_EVENTS:
+                return dict(**common, status='UNAVAILABLE', reason='REFUSED_METHOD_ANALYSIS_LIMIT',
+                            eventBudget=MAX_ANALYSIS_EVENTS, observedEventCount=event_budget,
+                            includedSessions=[], excludedSessions=excluded + [
+                                {'sessionId': item[0], 'reason': 'METHOD_EVENT_BUDGET'} for item in compatible],
+                            metrics=None)
+
+            completed = []
+            included = []
+            for session_id, revision_value, _current_unit in compatible:
+                _meta, _method, state, _checkpoint = self._session(db, session_id)
+                analysis = self._committed_analysis(db, state)
+                if analysis['status'] != 'COMPLETE':
+                    excluded.append({'sessionId': session_id, 'reason': analysis.get('reason', 'ANALYSIS_UNAVAILABLE')})
+                    continue
+                completed.extend(analysis['completed'])
+                included.append({'sessionId': session_id, 'revision': revision_value,
+                                 'datasetId': state['datasetId'], 'datasetVersion': state['datasetVersion'],
+                                 'profileHash': state['profileHash'], 'engineVersion': state['engineVersion'],
+                                 'eventHead': state['eventHash'], 'tradeCount': len(analysis['completed'])})
+
+            pooled = metrics(completed)
+            # Trade order across separate Sessions has no shared chronology, so
+            # cross-Session streaks and balances are intentionally not reported.
+            pooled.pop('maxWinStreak', None)
+            pooled.pop('maxLossStreak', None)
+            unit = next(iter(units), None)
+            return dict(**common, status='COMPLETE', accountCurrency=unit[2] if unit else None,
+                        completedTradeNet=text(sum((Fraction(row['net']) for row in completed), Fraction())),
+                        includedSessions=included, excludedSessions=excluded, metrics=pooled)
+
     def create_method(self, raw):
         raw = deepcopy(raw)
         raw["name"] = label(raw.get("name"))

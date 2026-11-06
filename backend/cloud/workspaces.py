@@ -69,6 +69,35 @@ def install(app):
     @app.get(prefix+"/{workspace_id}")
     async def get_workspace(workspace_id: uuid.UUID, user: User = Depends(current)):
         return await call(store.get, user.id, workspace_id)
+    @app.get(prefix+"/{workspace_id}/capabilities")
+    async def capabilities(workspace_id: uuid.UUID, user: User = Depends(current)):
+        workspace = await call(store.get, user.id, workspace_id)
+        owner_role = workspace["role"] == "OWNER"
+        configured = app.state.product_provider_status
+        return {
+            "schemaVersion": 1,
+            "artifact": "BTL-WORKSPACE-CAPABILITIES-1",
+            "workspaceId": str(workspace_id),
+            "role": workspace["role"],
+            "authority": "INFORMATIONAL_SERVER_POLICY_RECHECKED_ON_EACH_REQUEST",
+            "capabilities": {
+                "readResearch": True,
+                "readAnalytics": True,
+                "createMethod": owner_role,
+                "createSession": owner_role,
+                "reviewAndConfirm": owner_role,
+            },
+            "providers": {
+                "emailPasswordConfigured": configured["emailPasswordConfigured"],
+                "googleConfigured": configured["googleConfigured"],
+                "billingConfigured": configured["billingConfigured"],
+            },
+            "entitlement": {
+                "status": "SANDBOX_ONLY" if configured["billingConfigured"] else "NOT_CONFIGURED",
+                "productionEntitlement": False,
+                "fundsCollected": False,
+            },
+        }
     @app.post(prefix+"/{workspace_id}/members", status_code=204)
     async def member(workspace_id: uuid.UUID, body: MemberCreate, user: User = Depends(current)):
         await call(store.add_member, user.id, workspace_id, body.userId)

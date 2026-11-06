@@ -1,66 +1,142 @@
-import {lazy,Suspense,useEffect,useRef,useState} from 'react';
+import {lazy,Suspense,useEffect,useId,useRef,useState} from 'react';
 import {createAccountClient,setAccountTransport,clearAccountTransport} from './accountClient.js';
+import {readRoute,useRoute,navigate} from './productRoute.js';
 import './tickAlpha.css';
-import AlphaBrand from './AlphaBrand.jsx';
+import './alphaProduct.css';
+import {RiksoraMark} from './AlphaBrand.jsx';
 const Workspace=lazy(()=>import('./TickAlpha.jsx'));
-const modes={login:'Sign in',register:'Create account',verify:'Verify email',resend:'Request verification',forgot:'Request recovery',reset:'Reset password'};
+
+// U02 account access (canvas AuthSignIn / AuthStates): one card per job instead of the
+// old six-button switcher. Same /api/v1/auth routes; the bearer token stays in memory,
+// so a refresh or a 401 signs the person out on purpose ("Signed out for safety").
+const TITLES={signin:'Sign in',register:'Create account',verify:'Check your inbox',forgot:'Reset your password',reset:'Pick a new password'};
+const MIN_PASSWORD=15;
+
+function PasswordField({label,autoComplete,busy,value,onChange,invalid}){
+  const [shown,setShown]=useState(false);
+  const fieldId=useId();
+  return <div className="rk-auth-field"><label htmlFor={fieldId}>{label}</label>
+    <span className="rk-auth-password"><input id={fieldId} name="password" type={shown?'text':'password'} autoComplete={autoComplete} minLength={MIN_PASSWORD} maxLength={128} required disabled={busy}
+      value={value} onChange={onChange} aria-invalid={invalid||undefined} placeholder={`At least ${MIN_PASSWORD} characters`}/>
+      <button type="button" onClick={()=>setShown(v=>!v)} aria-pressed={shown} aria-label={shown?'Hide password':'Show password'} disabled={busy}>{shown?'Hide':'Show'}</button></span>
+  </div>;
+}
 
 export default function AlphaAccount(){
-  const [client]=useState(()=>createAccountClient());
-  const [mode,setMode]=useState('login'),[user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]);
-  const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+  const [expired,setExpired]=useState(false);
+  const [client]=useState(()=>createAccountClient({onExpired:()=>setExpired(true)}));
+  const [mode,setMode]=useState('signin'),[user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[capabilities,setCapabilities]=useState(null);
+  const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
+  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
+  const route=useRoute();
+  // Deep link asked for before sign-in (e.g. a Session or Method); restored after a workspace is chosen.
+  const intended=useRef(readRoute());
   const flight=useRef(false),live=useRef(true);
   useEffect(()=>{live.current=true;return()=>{live.current=false;clearAccountTransport();client.clear();};},[client]);
+  // A 401 anywhere (account or research calls) drops back to sign-in with the safety card.
+  const [seenExpired,setSeenExpired]=useState(false);
+  if(expired&&!seenExpired){setSeenExpired(true);setUser(null);setSelected(null);setWorkspaces([]);setCapabilities(null);setMode('signin');}
+  useEffect(()=>{if(expired)clearAccountTransport();},[expired]);
+
   async function action(operation){
     if(flight.current)return;
-    flight.current=true;setBusy(true);setNotice('');
-    try{await operation();}catch(error){if(live.current){setNotice(error.message);if(!client.hasSession()){clearAccountTransport();setSelected(null);setUser(null);setWorkspaces([]);}}}
+    flight.current=true;setBusy(true);setNotice('');setError('');
+    try{await operation();}catch(failure){if(live.current){setError(failure.message);if(!client.hasSession()){clearAccountTransport();setSelected(null);setUser(null);setWorkspaces([]);}}}
     finally{flight.current=false;if(live.current)setBusy(false);}
   }
+  function switchMode(next){setMode(next);setNotice('');setError('');setPassword('');}
   async function submit(event){
-    event.preventDefault();const form=event.currentTarget,data=new FormData(form);
-    const email=data.get('email'),password=data.get('password'),token=data.get('token');
-    form.reset();
+    event.preventDefault();
+    const data=new FormData(event.currentTarget),token=data.get('token');
+    const sentEmail=email.trim(),sentPassword=password;
+    setPassword('');
     await action(async()=>{
-      if(mode==='login'){
-        const me=await client.login(email,password);
+      if(mode==='signin'){
+        const me=await client.login(sentEmail,sentPassword);
         const list=await client.request('/api/v1/workspaces');
-        if(live.current){setUser(me);setWorkspaces(list);}
-      }else{
-        const routes={register:['register',{email,password}],verify:['verify',{token}],resend:['request-verify-token',{email}],forgot:['forgot-password',{email}],reset:['reset-password',{token,password}]};
-        const [route,body]=routes[mode];
-        await client.request('/api/v1/auth/'+route,{method:'POST',body,authenticated:false});
-        if(live.current)setNotice(mode==='register'||mode==='resend'?'If eligible, verification instructions are sent to your email.':mode==='forgot'?'If eligible, recovery instructions are sent to your email.':'Request accepted. Sign in after completing verification or recovery.');
+        if(live.current){setExpired(false);setSeenExpired(false);setUser(me);setWorkspaces(list);}
+        return;
       }
+      const routes={register:['register',{email:sentEmail,password:sentPassword}],verify:['verify',{token}],forgot:['forgot-password',{email:sentEmail}],reset:['reset-password',{token,password:sentPassword}]};
+      const [path,body]=routes[mode];
+      await client.request('/api/v1/auth/'+path,{method:'POST',body,authenticated:false});
+      if(!live.current)return;
+      if(mode==='register'){setMode('verify');setNotice('If this email can sign up, a verification code is on its way.');}
+      else if(mode==='forgot'){setMode('reset');setNotice('If an account exists, a reset code is on its way.');}
+      else{setMode('signin');setNotice(mode==='verify'?'Email verified. Sign in to start.':'Password saved. Sign in with the new password.');}
     });
   }
-  async function logout(all){await action(async()=>{try{await client.logout(all);}finally{clearAccountTransport();if(live.current){setUser(null);setSelected(null);setWorkspaces([]);}}});}
+  async function resend(){await action(async()=>{await client.request('/api/v1/auth/request-verify-token',{method:'POST',body:{email:email.trim()},authenticated:false});if(live.current)setNotice('If eligible, a new code is on its way.');});}
+  async function logout(all){await action(async()=>{try{await client.logout(all);}finally{clearAccountTransport();if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setCapabilities(null);setMode('signin');setNotice(all?'Signed out on every device.':'Signed out.');}}});}
   function open(workspace){
-    clearAccountTransport();setAccountTransport(client,workspace.id);
-    const url=new URL(window.location.href);url.searchParams.delete('session');
-    window.history.replaceState(null,'',url);setSelected(workspace);
+    void action(async()=>{
+      const status=await client.request(`/api/v1/workspaces/${workspace.id}/capabilities`);
+      clearAccountTransport();setAccountTransport(client,workspace.id);
+      setCapabilities(status);setSelected(workspace);
+      const target=intended.current;intended.current=null;
+      navigate(target&&target.screen!=='account'?target:{screen:'methods'},{replace:true});
+    });
   }
   const secure=window.location.protocol==='https:';
-  return <main className="alpha-identity">
-    <header className="alpha-identity-nav"><AlphaBrand href="?page=account"/><span>{user?'Verified account':'Account access'}</span></header>
-    <section className={`alpha-identity-content${selected?' alpha-identity-workspace':''}`}><p className="alpha-eyebrow">RESEARCH / PRIVATE WORKSPACES</p>
-      {!secure?<><h1>Account access requires HTTPS.</h1><p>Open the configured secure application address to sign in. The private local data service is separate.</p><a href="/">Open local workspace</a></>:!user?<>
-        <h1>{modes[mode]}</h1><p>Use your verified account to access authorized workspaces. Tokens stay in memory; refreshing requires signing in again.</p>
-        <form key={mode} onSubmit={submit}>
-          {!['verify','reset'].includes(mode)&&<label>Email<input name="email" type="email" autoComplete="email" maxLength={320} required disabled={busy}/></label>}
-          {['login','register','reset'].includes(mode)&&<label>Password<input name="password" type="password" autoComplete={mode==='login'?'current-password':'new-password'} minLength={15} maxLength={128} required disabled={busy}/></label>}
-          {['verify','reset'].includes(mode)&&<label>{mode==='verify'?'Verification':'Recovery'} token<input name="token" type="password" autoComplete="off" maxLength={4096} required disabled={busy}/></label>}
-          <button type="submit" disabled={busy}>{busy?'Working…':modes[mode]}</button>
-        </form><nav aria-label="Account actions">{Object.entries(modes).filter(([key])=>key!==mode).map(([key,label])=><button key={key} disabled={busy} onClick={()=>{setMode(key);setNotice('');}}>{label}</button>)}</nav>
-      </>:<>
-        <div className="alpha-identity-actions"><span title={user.email}>{user.email}</span><button disabled={busy} onClick={()=>logout(false)}>Sign out</button><button disabled={busy} onClick={()=>logout(true)}>Sign out all sessions</button></div>
-        {selected?<><button disabled={busy} onClick={()=>{clearAccountTransport();setSelected(null);}}>Back to workspaces</button><p>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access; owner required for changes'}</p><Suspense fallback={<p>Loading workspace…</p>}><Workspace key={selected.id}/></Suspense></>:<>
-          <h1>Your workspaces</h1><p>Available research sources are configured by the operator for each workspace. Source identity and limitations appear in the workspace. This list shows at most 50 authorized workspaces.</p>
-          <ul>{workspaces.map(workspace=><li key={workspace.id}><button disabled={busy} onClick={()=>open(workspace)}>{workspace.name} · {workspace.role}</button></li>)}</ul>
-          <form onSubmit={event=>{event.preventDefault();const name=new FormData(event.currentTarget).get('name');event.currentTarget.reset();action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);});}}><label>Workspace name<input name="name" maxLength={128} required disabled={busy}/></label><button disabled={busy}>Create workspace</button></form>
+
+  if(user&&selected&&route.screen!=='account')return <Suspense fallback={<main className="rk-auth"><p className="rk-auth-loading">Loading workspace…</p></main>}><Workspace key={selected.id}/></Suspense>;
+
+  const passwordShort=password.length>0&&password.length<MIN_PASSWORD;
+  return <main className="rk-auth">
+    <section className="rk-auth-hero">
+      <a className="rk-auth-brand" href="/" aria-label="RIKSORA home"><RiksoraMark size={40}/><span>RIKSORA</span></a>
+      <div><h1>{user?<>Your research,<br/><span>your rules.</span></>:<>Welcome back,<br/><span>trader.</span></>}</h1>
+        <p>Your Methods, Sessions, journal and replay position stay saved on the server between visits.</p></div>
+      <p className="rk-auth-small">Research tool. Results describe past data and are not a promise of future profit.</p>
+    </section>
+    <section className="rk-auth-panel">
+      <div className="rk-auth-card" aria-live="polite">
+        {!secure?<><h2>Use the secure address</h2><p>Accounts only work on the https:// address. The private local workspace is separate.</p><a className="rk-auth-btn rk-auth-primary" href="/">Open local workspace</a></>
+        :user?<AccountPanel user={user} workspaces={workspaces} selected={selected} capabilities={capabilities} busy={busy} onOpen={open} onLogout={logout} onCreate={name=>action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);})} onBack={()=>navigate({screen:'methods'})}/>
+        :<>
+          {expired&&<div className="rk-auth-safety" role="status"><strong>Signed out for safety</strong><span>Your sign-in ended after a refresh or a while away. Your Sessions are saved.</span></div>}
+          {['signin','register'].includes(mode)&&<div className="rk-auth-tabs" role="tablist" aria-label="Account">
+            {[['signin','Sign in'],['register','Create account']].map(([key,text])=><button key={key} type="button" role="tab" aria-selected={mode===key} disabled={busy} onClick={()=>switchMode(key)}>{text}</button>)}
+          </div>}
+          {['verify','forgot','reset'].includes(mode)&&<h2>{TITLES[mode]}</h2>}
+          {['signin','register'].includes(mode)&&<><button type="button" className="rk-auth-btn rk-auth-google" disabled aria-describedby="rk-google-note"><span aria-hidden="true">G</span>Continue with Google</button>
+            <p id="rk-google-note" className="rk-auth-hint">Google sign-in is not available yet.</p>
+            <div className="rk-auth-or" aria-hidden="true"><span/>or with email<span/></div></>}
+          {mode==='verify'&&<p className="rk-auth-hint">Open the link in the email, or paste the code from it below.</p>}
+          {mode==='forgot'&&<p className="rk-auth-hint">Enter your email. If the account exists, we send a reset code.</p>}
+          <form key={mode} onSubmit={submit} className="rk-auth-form" noValidate={false}>
+            {['signin','register','forgot'].includes(mode)&&<label className="rk-auth-field">Email<input name="email" type="email" autoComplete="email" maxLength={320} required disabled={busy} value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label>}
+            {['verify','reset'].includes(mode)&&<label className="rk-auth-field">{mode==='verify'?'Verification code':'Reset code'}<input name="token" type="password" autoComplete="one-time-code" maxLength={4096} required disabled={busy}/></label>}
+            {['signin','register','reset'].includes(mode)&&<>
+              {mode==='signin'&&<button type="button" className="rk-auth-link rk-auth-forgot" disabled={busy} onClick={()=>switchMode('forgot')}>Forgot password?</button>}
+              <PasswordField label={mode==='reset'?'New password':'Password'} autoComplete={mode==='signin'?'current-password':'new-password'} busy={busy} value={password} onChange={e=>setPassword(e.target.value)} invalid={mode!=='signin'&&passwordShort}/>
+              {mode!=='signin'&&<p className={`rk-auth-hint${passwordShort?' rk-auth-warn':''}`}>{passwordShort?`${MIN_PASSWORD-password.length} more characters to go (${MIN_PASSWORD} minimum).`:`${MIN_PASSWORD}+ characters. A short sentence works well.`}</p>}
+            </>}
+            {error&&<p className="rk-auth-error" role="alert">{error}</p>}
+            {notice&&<p className="rk-auth-notice" role="status">{notice}</p>}
+            <button type="submit" className="rk-auth-btn rk-auth-primary" disabled={busy}>{busy?'Working…':mode==='signin'?'Sign in':mode==='register'?'Create account':mode==='verify'?'Verify email':mode==='forgot'?'Send reset code':'Save password'}</button>
+          </form>
+          {mode==='verify'&&<button type="button" className="rk-auth-btn" disabled={busy||!email.trim()} onClick={resend}>Resend code</button>}
+          {mode==='signin'&&<button type="button" className="rk-auth-link" disabled={busy} onClick={()=>switchMode('verify')}>Have a verification code?</button>}
+          {['verify','forgot','reset'].includes(mode)&&<button type="button" className="rk-auth-link" disabled={busy} onClick={()=>switchMode('signin')}>Back to sign in</button>}
+          <p className="rk-auth-small rk-auth-foot">For your safety you sign in again after closing or refreshing the tab.</p>
         </>}
-      </>}
-      <p role="status" aria-live="polite">{notice}</p>
+      </div>
     </section>
   </main>;
+}
+
+function AccountPanel({user,workspaces,selected,capabilities,busy,onOpen,onLogout,onCreate,onBack}){
+  return <>
+    <h2>{selected?'Account':'Choose a workspace'}</h2>
+    <dl className="rk-auth-facts"><div><dt>Signed in as</dt><dd>{user.email}</dd></div><div><dt>Email</dt><dd>Verified</dd></div>{selected&&<div><dt>Workspace</dt><dd>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access'}</dd></div>}<div><dt>Sign-in methods</dt><dd>Email and password · Google sign-in is not available yet</dd></div><div><dt>Plan</dt><dd>{capabilities?.entitlement?.status==='SANDBOX_ONLY'?'Sandbox entitlement only; no production access or funds collected.':'Not configured. No production plan or payment is available.'}</dd></div></dl>
+    {selected&&<button type="button" className="rk-auth-btn rk-auth-primary" onClick={onBack}>Back to My Methods</button>}
+    <h3>{selected?'Switch workspace':'Your workspaces'}</h3>
+    <p className="rk-auth-hint">Workspaces keep research separate. At most 50 are listed. Research here uses the synthetic test feed.</p>
+    {workspaces.length?<ul className="rk-auth-list">{workspaces.map(w=><li key={w.id}><button type="button" className="rk-auth-btn" disabled={busy} aria-current={selected?.id===w.id||undefined} onClick={()=>onOpen(w)}><span>{w.name}</span><small>{w.role==='OWNER'?'Owner':'Read access'}</small></button></li>)}</ul>:<p className="rk-auth-hint">No workspace yet. Create one to start.</p>}
+    <form className="rk-auth-form rk-auth-inline" onSubmit={event=>{event.preventDefault();const name=new FormData(event.currentTarget).get('name');event.currentTarget.reset();onCreate(name);}}>
+      <label className="rk-auth-field">New workspace name<input name="name" maxLength={128} required disabled={busy}/></label><button className="rk-auth-btn" disabled={busy}>Create workspace</button>
+    </form>
+    <div className="rk-auth-row"><button type="button" className="rk-auth-btn" disabled={busy} onClick={()=>onLogout(false)}>Sign out</button><button type="button" className="rk-auth-btn" disabled={busy} onClick={()=>onLogout(true)}>Sign out on all devices</button></div>
+  </>;
 }
