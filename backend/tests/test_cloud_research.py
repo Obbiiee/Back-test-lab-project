@@ -162,6 +162,17 @@ class CloudResearchTests(unittest.TestCase):
             journal = self.client.get(root + '/sessions/' + trader.session_id + '/journal', headers=headers)
             self.assertEqual(journal.status_code, 200, journal.text)
             self.assertEqual([order['id'] for order in journal.json()['orders']], [trader.command_id])
+            storage = self.client.get(root + '/sessions/' + trader.session_id + '/metering/storage', headers=headers)
+            self.assertEqual(storage.status_code, 200, storage.text)
+            self.assertEqual(storage.json()['artifact'], 'BTL-SESSION-STORAGE-METRICS-1')
+            self.assertEqual(storage.json()['tables']['sessionState']['rows'], 1)
+            self.assertEqual(storage.json()['tables']['commandsAndReceipts']['rows'], 1)
+            self.assertEqual(storage.json()['integrityStatus'], 'NOT_CHECKED_BY_STORAGE_METER')
+            self.assertEqual(storage.json()['totals']['rows'],
+                             sum(table['rows'] for table in storage.json()['tables'].values()))
+            self.assertIsNone(storage.json()['tradeCount'])
+            self.assertIsNone(storage.json()['perSessionWalBytes'])
+            self.assertIsNone(storage.json()['sharedCanonicalDatasetBytes'])
             traders.append((actor, headers, root, trader.session_id))
 
         for index, (_actor, headers, root, session_id) in enumerate(traders):
@@ -171,6 +182,9 @@ class CloudResearchTests(unittest.TestCase):
                     continue
                 foreign = self.client.get(root + '/sessions/' + other_session, headers=headers)
                 self.assertEqual(foreign.status_code, 404, foreign.text)
+                foreign_metrics = self.client.get(root + '/sessions/' + other_session + '/metering/storage',
+                                                  headers=headers)
+                self.assertEqual(foreign_metrics.status_code, 404, foreign_metrics.text)
 
     def test_session_creation_honors_durable_job_header(self):
         method_id = 'method:' + uuid.uuid4().hex
@@ -203,10 +217,18 @@ class CloudResearchTests(unittest.TestCase):
 
     def test_member_read_only_then_revocation_and_logout(self):
         member, header = self.account()
+        record = method()
+        self.assertEqual(self.client.post(self.root + '/methods', headers=self.headers, json=record).status_code, 200)
+        session_id = 'session:' + uuid.uuid4().hex
+        session = {'id': session_id, 'name': 'Owner metering scope', 'methodId': record['id'],
+                   'initialBalance': '10000', 'startPeriod': '2020-01'}
+        self.assertEqual(self.client.post(self.root + '/sessions', headers=self.headers, json=session).status_code, 200)
         target = '/api/v1/workspaces/' + self.workspace + '/members'
         self.assertEqual(self.client.post(target, headers=self.headers, json={'userId': member}).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=header).status_code, 200)
         self.assertEqual(self.client.post(self.root + '/methods', headers=header, json=method()).status_code, 403)
+        self.assertEqual(self.client.get(self.root + '/sessions/' + session_id + '/metering/storage',
+                                         headers=header).status_code, 403)
         self.assertEqual(self.client.delete(target + '/' + member, headers=self.headers).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=header).status_code, 404)
         self.assertEqual(self.client.post('/api/v1/auth/logout-all', headers=self.headers).status_code, 204)

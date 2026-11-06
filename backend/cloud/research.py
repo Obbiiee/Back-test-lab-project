@@ -113,9 +113,16 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
     # public keys, periods and normal trading intentions.
     with connect(dsn) as db:
         db.row_factory = dict_row
+        if operation == 'storage_metrics':
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')
         unit = WorkspaceUnit(db, actor_id, workspace_id)
         if write:
             owner(unit.role)
+        if operation == 'storage_metrics':
+            owner(unit.role)
+            require(type(args) in (tuple, list) and len(args) == 1, 'storageMetrics')
+            from execution.session_storage_metrics import collect
+            return collect(db, str(workspace_id), args[0])
         catalog=_operator_catalog(dsn)
         observed=False;session_id=None
         if catalog is not None:
@@ -229,6 +236,10 @@ def install(app):
     @app.get(prefix + '/sessions/{session_id}/summary')
     async def summary(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'summary', session_id)
+
+    @app.get(prefix + '/sessions/{session_id}/metering/storage')
+    async def storage_metrics(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'storage_metrics', session_id)
 
     @app.get(prefix + '/sessions/{session_id}/commands/{command_id}')
     async def command_result(workspace_id: uuid.UUID, session_id: str, command_id: str,
