@@ -9,6 +9,7 @@ import logging
 import json
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from threading import Event, Thread
 from time import monotonic
 
@@ -132,6 +133,26 @@ def _worker_measurements(result):
         return None, None
 
 
+def _queue_wait_measurements(created_at, claimed_at):
+    """Hash first durable admission-to-claim delay at PostgreSQL timestamp precision."""
+    if (not isinstance(created_at, datetime) or not isinstance(claimed_at, datetime) or
+            created_at.tzinfo is None or claimed_at.tzinfo is None):
+        return None, None
+    delta = claimed_at.astimezone(timezone.utc) - created_at.astimezone(timezone.utc)
+    if delta < timedelta(0):
+        return None, None
+    wait_us = (delta.days * 86_400 + delta.seconds) * 1_000_000 + delta.microseconds
+    value = {
+        'schemaVersion': 1,
+        'artifact': 'BTL-QUEUE-WAIT-METRICS-1',
+        'measurementScope': 'FIRST_DURABLE_ADMISSION_TO_FIRST_WORKER_CLAIM',
+        'clock': 'POSTGRESQL_CLOCK_TIMESTAMP_MICROSECOND',
+        'waitMicroseconds': wait_us,
+    }
+    raw = canonical_bytes(value)
+    return raw, content_hash(value)
+
+
 def submit(dsn, actor_id, workspace_id, job_id, operation, args):
     job_id = uuid.UUID(str(job_id))
     require(operation in OPERATIONS and type(args) in (tuple, list)
@@ -226,6 +247,14 @@ def work_one(dsn, runner):
             WHERE id=%s AND state='QUEUED' RETURNING *
         """, (lease_owner, LEASE_SECONDS, row['id'])).fetchone()
         require(row is not None, 'jobClaim', 'RESOURCE_UNAVAILABLE')
+        if row['attempts'] == 1:
+            queue_metrics_raw, queue_metrics_hash = _queue_wait_measurements(row['created_at'], row['heartbeat_at'])
+            if queue_metrics_raw is not None:
+                db.execute("""
+                    UPDATE btl.research_jobs SET queue_metrics=%s,queue_metrics_hash=%s
+                    WHERE id=%s AND state='RUNNING' AND lease_owner=%s
+                      AND queue_metrics IS NULL AND queue_metrics_hash IS NULL
+                """, (queue_metrics_raw, queue_metrics_hash, row['id'], lease_owner))
         db.commit()  # Release the row lock; the session-level worker slot stays fenced.
         started = monotonic()
         stop_heartbeat = Event()

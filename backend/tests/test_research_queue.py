@@ -95,6 +95,21 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(self.submit(job_id=job['jobId']),result)
         self.assertFalse(queue.work_one(self.dsn,crash))
 
+    def test_first_claim_queue_wait_is_content_hashed_and_not_user_result(self):
+        job = self.submit()
+        self.assertTrue(queue.work_one(self.dsn, lambda *args: {'value': 'bounded result'}))
+        with connect(self.dsn) as db:
+            row = db.execute('SELECT queue_metrics,queue_metrics_hash FROM btl.research_jobs WHERE id=%s',
+                             (job['jobId'],)).fetchone()
+        metrics = json.loads(bytes(row[0]))
+        self.assertEqual(content_hash(metrics), row[1])
+        self.assertEqual(metrics['artifact'], 'BTL-QUEUE-WAIT-METRICS-1')
+        self.assertEqual(metrics['measurementScope'], 'FIRST_DURABLE_ADMISSION_TO_FIRST_WORKER_CLAIM')
+        self.assertGreaterEqual(metrics['waitMicroseconds'], 0)
+        result = queue.inspect(self.dsn, self.actor, self.workspace, job['jobId'])
+        self.assertEqual(result['result'], {'schemaVersion': 1, 'value': 'bounded result'})
+        self.assertNotIn('queueMetrics', result)
+
     def test_actual_process_exit_releases_claim_and_worker_slots(self):
         job=self.submit()
         script="from cloud.queue import work_one; import os; work_one(os.environ['BTL_TEST_DATABASE_URL'], lambda *args: os._exit(17))"
