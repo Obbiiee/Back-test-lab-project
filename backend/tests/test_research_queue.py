@@ -5,6 +5,7 @@ import unittest
 import subprocess
 import sys
 import time
+import tempfile
 from unittest.mock import patch
 import psycopg
 from psycopg import sql
@@ -19,6 +20,8 @@ from tests import test_cloud_research as cloud_fixture
 from tests.test_research_sessions import method, review_request
 from execution.research import ResearchApplication
 from application.models import TrustedScope
+from execution.research_fixture import research_provider
+from market_data.monthly_parquet import write_monthly_parquet
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
@@ -175,6 +178,116 @@ class QueueTests(unittest.TestCase):
                 bounded_run(self.dsn,self.actor,self.workspace,'workspace',(session,{'timeframe':'1m'}))
         finally:
             app.close()
+
+    def test_monthly_parquet_synthetic_source_crosses_authenticated_queue_worker_and_journal(self):
+        from cloud import worker
+        worker.close()
+        source = research_provider()
+        token = None
+        events = []
+        while True:
+            page = source.read_page(source.dataset_id, source.dataset_version, token, 64)
+            events.extend(page['events'])
+            if page['endOfDataset']:
+                break
+            token = page['nextToken']
+        with tempfile.TemporaryDirectory() as temporary:
+            root = os.path.join(temporary, 'monthly')
+            manifest = write_monthly_parquet(root, iter(events),
+                source.describe(source.dataset_id, source.dataset_version),
+                expected_version=source.dataset_version, row_group_size=128)
+            pin = {
+                'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+                'BTL_QA_SYNTHETIC_MONTHLY_ROOT': root,
+                'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': source.dataset_id,
+                'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': source.dataset_version,
+                'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': manifest['manifestHash'],
+            }
+            with patch.dict(os.environ, pin):
+                try:
+                    path = self.fixture.root
+                    record = method()
+                    created_method = self.fixture.client.post(path + '/methods',
+                        headers=self.fixture.headers, json=record)
+                    self.assertEqual(created_method.status_code, 200, created_method.text)
+                    session_id = 'session:' + uuid.uuid4().hex
+                    request = {'id': session_id, 'name': 'Monthly Parquet queue QA',
+                               'methodId': record['id'], 'initialBalance': '10000',
+                               'startPeriod': '2020-01'}
+                    create_job = str(uuid.uuid4())
+                    queued = self.fixture.client.post(path + '/sessions',
+                        headers={**self.fixture.headers, 'X-BTL-Job': create_job}, json=request)
+                    self.assertEqual(queued.status_code, 202, queued.text)
+                    self.assertEqual(queued.json()['state'], 'QUEUED')
+                    self.assertTrue(queue.work_one(self.dsn, worker.run))
+                    created = self.fixture.client.get(path + '/jobs/' + create_job,
+                        headers=self.fixture.headers)
+                    self.assertEqual(created.status_code, 200, created.text)
+                    self.assertEqual(created.json()['state'], 'SUCCEEDED')
+                    view = self.fixture.client.get(path + '/sessions/' + session_id,
+                        headers=self.fixture.headers)
+                    self.assertEqual(view.status_code, 200, view.text)
+                    self.assertEqual((view.json()['state']['datasetId'],
+                                      view.json()['state']['datasetVersion']),
+                                     (source.dataset_id, source.dataset_version))
+
+                    review = review_request(view.json())
+                    reviewed = self.fixture.client.post(path + '/reviews',
+                        headers=self.fixture.headers, json=review)
+                    self.assertEqual(reviewed.status_code, 200, reviewed.text)
+                    pin_body = {'reviewId': review['requestId'],
+                                'reviewHash': reviewed.json()['reviewHash']}
+                    confirmed = self.fixture.client.post(path + '/sessions/' + session_id + '/confirm',
+                        headers=self.fixture.headers, json=pin_body)
+                    self.assertEqual(confirmed.status_code, 200, confirmed.text)
+                    duplicate = self.fixture.client.post(path + '/sessions/' + session_id + '/confirm',
+                        headers=self.fixture.headers, json=pin_body)
+                    self.assertEqual(duplicate.content, confirmed.content)
+                    status = self.fixture.client.get(path + '/sessions/' + session_id +
+                        '/commands/' + review['requestId'], headers=self.fixture.headers)
+                    self.assertEqual(status.json()['status'], 'COMMITTED')
+                    self.assertTrue(status.json()['receipt']['durable'])
+
+                    confirmed_view = self.fixture.client.get(path + '/sessions/' + session_id,
+                        headers=self.fixture.headers).json()
+                    advance_id = 'command:' + uuid.uuid4().hex
+                    advance = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                               'sessionId': session_id, 'commandId': advance_id,
+                               'expectedRevision': confirmed_view['state']['revision'],
+                               'kind': 'ADVANCE',
+                               'payload': {'targetNs': str(int(confirmed_view['state']['throughNs']) +
+                                                          15_000_000_000)}}
+                    advance_job = str(uuid.uuid4())
+                    queued_advance = self.fixture.client.post(
+                        path + '/sessions/' + session_id + '/commands',
+                        headers={**self.fixture.headers, 'X-BTL-Job': advance_job}, json=advance)
+                    self.assertEqual(queued_advance.status_code, 202, queued_advance.text)
+                    self.assertTrue(queue.work_one(self.dsn, worker.run))
+                    advance_status = self.fixture.client.get(path + '/jobs/' + advance_job,
+                        headers=self.fixture.headers)
+                    self.assertEqual(advance_status.json()['state'], 'SUCCEEDED')
+                    self.assertTrue(advance_status.json()['result']['durable'])
+                    advanced_view = self.fixture.client.get(path + '/sessions/' + session_id,
+                        headers=self.fixture.headers).json()
+                    self.assertGreater(advanced_view['state']['revision'],
+                                       confirmed_view['state']['revision'])
+
+                    journal = self.fixture.client.get(path + '/sessions/' + session_id + '/journal',
+                        headers=self.fixture.headers)
+                    self.assertEqual(journal.status_code, 200, journal.text)
+                    self.assertEqual([order['id'] for order in journal.json()['orders']],
+                                     [review['requestId']])
+                    note = {'orderId': review['requestId'], 'expectedNoteRevision': 0,
+                            'text': 'synthetic monthly parquet QA', 'tags': ['qa']}
+                    saved = self.fixture.client.post(path + '/sessions/' + session_id + '/journal',
+                        headers=self.fixture.headers, json=note)
+                    self.assertEqual(saved.status_code, 200, saved.text)
+                    journal = self.fixture.client.get(path + '/sessions/' + session_id + '/journal',
+                        headers=self.fixture.headers)
+                    self.assertEqual(journal.json()['notes'][0]['text'], note['text'])
+                    self.assertEqual(len(journal.json()['orders']), 1)
+                finally:
+                    worker.close()
 
     def test_replay_process_death_after_inner_commit_recovers_without_duplicate_fill(self):
         app,session,command=self.replay_fixture()

@@ -24,6 +24,9 @@ from . import queue
 
 _OPERATOR_LOCK=RLock()
 _OPERATOR_CATALOGS=OrderedDict()
+_MONTHLY_LOCK=RLock()
+_MONTHLY_PROVIDER=None
+_MONTHLY_PIN=None
 
 
 def _operator_catalog(dsn):
@@ -44,10 +47,54 @@ def _operator_catalog(dsn):
         return catalog
 
 
+def _synthetic_monthly_provider():
+    """Resolve only a server-pinned synthetic QA fixture; requests carry no path."""
+    values = tuple(os.environ.get(name) for name in (
+        'BTL_QA_SYNTHETIC_MONTHLY_ROOT', 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID',
+        'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION', 'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256'))
+    if not any(values):
+        return None
+    require(os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1' and all(values),
+            'syntheticMonthly', 'REFUSED_SOURCE')
+    root, dataset_id, dataset_version, manifest_hash = values
+    require(len(root) <= 4096 and os.path.isabs(root), 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    from contracts.primitives import digest
+    digest(dataset_version, 'syntheticMonthlyVersion')
+    digest(manifest_hash, 'syntheticMonthlyManifestHash')
+    pin = (os.path.realpath(root), dataset_id, dataset_version, manifest_hash)
+    global _MONTHLY_PROVIDER, _MONTHLY_PIN
+    with _MONTHLY_LOCK:
+        require(_MONTHLY_PIN in (None, pin), 'syntheticMonthly', 'SOURCE_PIN_CHANGED')
+        if _MONTHLY_PROVIDER is None:
+            from market_data.monthly_parquet import MonthlyParquetProvider
+            provider = MonthlyParquetProvider(pin[0], expected_dataset_id=dataset_id,
+                expected_dataset_version=dataset_version, expected_manifest_hash=manifest_hash)
+            manifest = provider.describe(dataset_id, dataset_version)
+            require(manifest['evidenceClass'] == 'SYNTHETIC_CONTRACT_ONLY' and
+                    manifest['rights']['class'] == 'SYNTHETIC' and not manifest['diagnostics'],
+                    'syntheticMonthly', 'REFUSED_SOURCE')
+            _MONTHLY_PROVIDER, _MONTHLY_PIN = provider, pin
+        return _MONTHLY_PROVIDER
+
+
+def warm_worker_sources(dsn):
+    """Admit all server-pinned sources before the native worker accepts jobs."""
+    catalog = _operator_catalog(dsn)
+    if catalog is not None:
+        for profile_hash in sorted(catalog._profiles):
+            catalog.resolve(profile_hash)
+    monthly = _synthetic_monthly_provider()
+    return catalog is not None or monthly is not None
+
+
 def close_operator_catalogs():
+    global _MONTHLY_PROVIDER, _MONTHLY_PIN
     with _OPERATOR_LOCK:
         for catalog in _OPERATOR_CATALOGS.values():catalog.close()
         _OPERATOR_CATALOGS.clear()
+    with _MONTHLY_LOCK:
+        _MONTHLY_PROVIDER = None
+        _MONTHLY_PIN = None
 
 
 def warm_operator_sources(dsn):
@@ -95,11 +142,13 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
         if operation=='command_result':
             require(not observed,'commandResult','REFUSED_OBSERVED_OPERATION')
+        monthly = None if observed else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication
             research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog)
         else:
-            research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)))
+            research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),
+                                         synthetic_provider=monthly)
         try:
             return research.catalog_view() if observed and operation=='catalog' else getattr(research,operation)(*args)
         finally:

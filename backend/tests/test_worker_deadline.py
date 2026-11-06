@@ -36,6 +36,25 @@ class WorkerDeadlineTests(unittest.TestCase):
         with patch.dict(os.environ,{'BTL_QA_TIMELINE_LOG_CODEC':'unknown'}),self.assertRaises(ContractError):
             worker._environment('private-dsn')
 
+    def test_synthetic_monthly_pin_is_all_or_nothing_and_server_only(self):
+        names = {
+            'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+            'BTL_QA_SYNTHETIC_MONTHLY_ROOT': '/qa/monthly',
+            'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': 'synthetic:fixture-v1',
+            'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': 'a' * 64,
+            'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': 'b' * 64,
+        }
+        with patch.dict(os.environ, names):
+            child_env = worker._environment('private-dsn')
+            self.assertEqual({name: child_env[name] for name in names}, names)
+        with patch.dict(os.environ, {'BTL_QA_SYNTHETIC_MONTHLY_ROOT': '/qa/monthly'}), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+                                     'BTL_QA_SYNTHETIC_MONTHLY_ROOT': 'relative'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
     def test_actual_serve_crosses_4096_and_recycles_at_propagated_parent_limit(self):
         # Exercise the production serve loop, with only DB/source work replaced
         # by authored replies. A child silently retaining 4096 exits early.
@@ -67,6 +86,15 @@ worker.serve()
             self.assertNotEqual(first,recycled)
             rebound=worker.pooled_invoke('different-authored-database',{'schemaVersion':1})
             self.assertNotEqual(recycled,rebound)
+
+    def test_pooled_worker_restarts_when_server_source_pin_changes(self):
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), \
+                patch.dict(os.environ, {'BTL_QA_TIMELINE_LOG_CODEC': 'raw'}):
+            first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), \
+                patch.dict(os.environ, {'BTL_QA_TIMELINE_LOG_CODEC': 'zlib-1'}):
+            second = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        self.assertNotEqual(first['pid'], second['pid'])
 
     def test_pooled_timeout_reaps_child_and_next_job_uses_fresh_process(self):
         entry='import json,os,sys,time\nfor line in sys.stdin:\n p=json.loads(line)\n if p.get("control")=="WARM_OPERATOR_SOURCES": result={"schemaVersion":1,"ready":True}\n else:\n  if p.get("sleep"): time.sleep(300)\n  result={"schemaVersion":1,"result":{"pid":os.getpid()}}\n sys.stdout.write(json.dumps(result)+"\\n");sys.stdout.flush()'

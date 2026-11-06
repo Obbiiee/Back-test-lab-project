@@ -33,12 +33,13 @@ class _Slot:
         self.lock = Lock()
         self.process = None
         self.dsn = None
+        self.environment_pin = None
         self.jobs = 0
         self.ready = False
 
     def close(self):
         process, self.process = self.process, None
-        self.dsn, self.jobs, self.ready = None, 0, False
+        self.dsn, self.environment_pin, self.jobs, self.ready = None, None, 0, False
         if process is not None:
             if process.poll() is None:
                 process.kill()
@@ -63,9 +64,21 @@ atexit.register(close)
 
 
 def _environment(dsn):
+    monthly_names = ('BTL_QA_SYNTHETIC_MONTHLY_ENABLE', 'BTL_QA_SYNTHETIC_MONTHLY_ROOT',
+                     'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID', 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION',
+                     'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256')
+    monthly_values = tuple(os.environ.get(name) for name in monthly_names)
+    if any(monthly_values):
+        require(monthly_values[0] == '1' and all(monthly_values[1:]),
+                'syntheticMonthly', 'REFUSED_SOURCE')
+        require(len(monthly_values[1]) <= 4096 and os.path.isabs(monthly_values[1]),
+                'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    else:
+        require(monthly_values[0] is None, 'syntheticMonthly', 'REFUSED_SOURCE')
     environment = {k: v for k, v in os.environ.items()
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
-                   or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256','BTL_QA_TIMELINE_LOG_CODEC')}
+                   or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
+                            'BTL_QA_TIMELINE_LOG_CODEC', *monthly_names)}
     require(environment.get('BTL_QA_TIMELINE_LOG_CODEC') in (None, 'raw', 'zlib-1'), 'logCodec')
     environment['BTL_WORKER_DATABASE'] = dsn
     require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')
@@ -78,12 +91,20 @@ def _argv(entry):
             str(Path(__file__).resolve().parents[1]), sysconfig.get_path('purelib')]
 
 
+def _environment_pin(dsn):
+    return tuple(sorted((key, value) for key, value in _environment(dsn).items()
+                        if key != 'BTL_WORKER_DATABASE'))
+
+
 def _start_slot(slot, dsn, timeout):
+    environment = _environment(dsn)
     slot.process = subprocess.Popen(_argv(SERVE_ENTRY), stdin=subprocess.PIPE,
                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                    env=_environment(dsn),
+                                    env=environment,
                                     cwd=Path(__file__).resolve().parents[1])
     slot.dsn = dsn
+    slot.environment_pin = tuple(sorted((key, value) for key, value in environment.items()
+                                        if key != 'BTL_WORKER_DATABASE'))
     process = slot.process
     future = _exchanges.submit(lambda: (process.stdin.write(WARM_REQUEST), process.stdin.flush(),
                                         process.stdout.readline(MAX_RESULT+2))[2])
@@ -111,13 +132,15 @@ def _start_slot(slot, dsn, timeout):
 def warm_sources(dsn, *, deadline=STARTUP_WARMUP_DEADLINE):
     """Admit configured sources before queued work starts, outside job deadlines."""
     require(type(deadline) in (int, float) and 0 < deadline <= STARTUP_WARMUP_DEADLINE, 'deadline')
-    if not os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG'):
+    has_monthly = os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1'
+    if not os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG') and not has_monthly:
         return False
     slot = _slots[0]
     if not slot.lock.acquire(False):
         raise ContractError('RESEARCH_BUSY', 'workerWarmup')
     try:
-        if slot.process is not None and (slot.dsn != dsn or slot.process.poll() is not None):
+        if slot.process is not None and (slot.dsn != dsn or slot.environment_pin != _environment_pin(dsn)
+                                         or slot.process.poll() is not None):
             slot.close()
         if slot.process is None:
             _start_slot(slot, dsn, deadline)
@@ -163,7 +186,8 @@ def pooled_invoke(dsn, payload, *, deadline=DEADLINE):
         raise RuntimeError('Native worker slots unavailable')
     future = None
     try:
-        if slot.process is not None and (slot.dsn != dsn or slot.jobs >= MAX_JOBS or slot.process.poll() is not None):
+        if slot.process is not None and (slot.dsn != dsn or slot.environment_pin != _environment_pin(dsn)
+                                         or slot.jobs >= MAX_JOBS or slot.process.poll() is not None):
             slot.close()
         if slot.process is None:
             # Source admission belongs to the startup phase, including safe
@@ -258,11 +282,8 @@ def serve():
         return
     try:
         dsn = os.environ['BTL_WORKER_DATABASE']
-        from .research import _operator_catalog
-        catalog = _operator_catalog(dsn)
-        if catalog is not None:
-            for profile_hash in sorted(catalog._profiles):
-                catalog.resolve(profile_hash)
+        from .research import warm_worker_sources
+        warm_worker_sources(dsn)
         ready = True
     except Exception:
         ready = False
