@@ -1,5 +1,19 @@
 # One-day Parquet/DuckDB benchmark — COMPLETE_PENDING_OWNER_REVIEW (2026-11-05)
 
+# OWNER DIRECTIVE — Integrated Backend V1 build (2026-11-06)
+
+The owner's latest directive authorizes continuing implementation toward one integrated RIKSORA Backend V1, superseding this file's earlier “STOP pending new owner gate” for **bounded engineering only**. The CP6A-10 Annual PASS and all historical acceptance evidence remain protected; source rights remain UNKNOWN and historical execution eligibility remains NOT_GRANTED. No production deployment, merge, rights promotion, evidence migration/deletion, annual replay, or final heavy benchmark is authorized.
+
+Work is on `codex/integrated-backend-v1-20261106`, branched from the verified one-day CP6A-10 benchmark commit `9add15607730f632fc76e1d88f5a9c69cec8e2fd`. PR #41's P0 local integration (`eb66a646090a1b46253eebfa64ae6c0dabcdef06`) and Claude PR #39 remain untouched on their own refs; whole-branch merge currently has frontend, dependency, timeline and handoff conflicts. The P0 backend receipt-status and synthetic-availability contracts have been ported narrowly; their relevant PostgreSQL/historical tests now pass on an isolated QA cluster. Hosted authentication and product-path integration remain open. No Claude-owned frontend files are being rewritten here.
+
+Current implementation slice: a synthetic-tested immutable monthly Parquet writer/reader is in progress. It carries the pinned canonical source manifest identity, validates original source chunks, preserves source rights/quality and exact event IDs/wire values, writes ZSTD files with bounded row groups and canonical per-group hashes, and supports partial range reads with fail-closed manifest pinning. This is a backend storage adapter only; it is not yet registered with the replay engine/queue and does not select a production storage layout. Latest focused checks: 8/8 synthetic Parquet tests pass; 25/25 P0 receipt/availability plus historical workspace tests pass against a dedicated PostgreSQL 16 QA cluster. That cluster was stopped and retained at `/tmp/riksora-integrated-v1-qa-pg-20261106`; the host PostgreSQL service was not used. Synthetic Parquet tests ran under PyArrow 26.0.1 while runtime dependency is pinned to 26.0.0; exact pinned-environment validation remains outstanding. No real market data or historical replay was read or generated in this slice.
+
+Build policy: compile/lint and relevant unit/golden/transaction-integrity checks only during implementation. Defer multi-day replay, all-engine sweep, profiling, load/scaling, and economics until the integrated synthetic pipeline is ready and resource preflight permits them. Initial worker target is one worker with a proportional one-vCPU budget; hardware is nominal 6 vCPU / 16 GiB / 200 GB, not a production capacity claim.
+
+Preserve the two intentionally untracked CP6A-8 files and do not modify agent branches or worktrees.
+
+---
+
 Latest bounded checkpoint: SQLite, PyArrow Single/Daily and DuckDB Single/Daily all PASS for137,108 XAUUSD groups on2024-01-02UTC, with86 completed simulated trades and identical canonical/financial/event/receipt/final/resume hashes. See `docs/acceptance/CP6A-10-one-day-parquet-duckdb-report.md` and evidence JSON. CP6A-10 annual independent recovery also PASS; its report SHA256 remains `cdc65e4c7fd7e65e85fac38726472c2ad92925c502afc2f08482a01b897fc831`. The original annual OOM incident and failed verifier attempts remain preserved.
 
 All one-day services/timers stopped after completion. No seven-day/month/year/concurrency benchmark is authorized. STOP pending new owner gate. Production, source and accepted financial standards unchanged. Source rights UNKNOWN; execution eligibility NOT_GRANTED. Parquet readers are QA-only projections with original position wires; canonical SQLite still supplies admission metadata and independent verification. No production format decision or Beta readiness claim.

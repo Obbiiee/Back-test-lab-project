@@ -20,6 +20,7 @@ from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
 from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
 from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
+from .availability import catalog_availability, eligible_start_month
 
 
 def label(value):
@@ -112,7 +113,76 @@ class ResearchApplication:
             for meta in metas:
                 self._session(db, meta["id"])
             return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=metas,
-                        label=self.__label, profile=self.__profile, startPeriod=self.__period)
+                        label=self.__label, profile=self.__profile, startPeriod=self.__period,
+                        availability=self.availability())
+
+    def availability(self):
+        return catalog_availability(instrument_id=self.__profile["instrumentId"],
+                                    dataset_id=self.__provider.dataset_id,
+                                    dataset_version=self.__provider.dataset_version,
+                                    start_period=self.__period,
+                                    synthetic=self.__historical is None)
+
+    def assert_start_month_available(self, period):
+        require(eligible_start_month(self.availability(), self.__profile["instrumentId"], period),
+                "period", "REFUSED_SOURCE_NOT_AVAILABLE")
+
+    def command_result(self, session_id, command_id):
+        """Read the durable command receipt or conservatively report uncertainty."""
+        identifier(session_id, "sessionId")
+        identifier(command_id, "commandId")
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            _meta, _method, state, _checkpoint = self._session(db, session_id)
+            row = db.execute(
+                "SELECT command_hash,payload,content_hash,revision FROM btl.tick_commands "
+                "WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
+                (self.scope.workspace_id, session_id, command_id)).fetchone()
+            if row is not None:
+                receipt = unpack(row[1], row[2])
+                require(receipt.get("artifact") == "BTL-TICK-EXECUTION-RESULT-1" and
+                        receipt.get("commandId") == command_id and
+                        receipt.get("commandHash") == row[0] and receipt.get("durable") is True and
+                        receipt.get("state", {}).get("sessionId") == session_id and
+                        receipt["state"].get("revision") == row[3], "receipt", "CORRUPT_RECORD")
+                review_row = db.execute(
+                    "SELECT payload,content_hash FROM btl.tick_order_reviews "
+                    "WHERE workspace_id=%s AND session_id=%s AND review_id=%s",
+                    (self.scope.workspace_id, session_id, command_id)).fetchone()
+                require(review_row is not None, "review", "CORRUPT_RECORD")
+                reviewed = unpack(*review_row)
+                command = reviewed.get("command", {})
+                expected_revision = command.get("expectedRevision")
+                require(command.get("commandId") == command_id and
+                        command.get("sessionId") == session_id and type(expected_revision) is int and
+                        expected_revision + 1 == receipt["state"]["revision"] and
+                        content_hash(command) == row[0], "review", "CORRUPT_RECORD")
+                return dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
+                            sessionId=session_id, commandId=command_id, status="COMMITTED",
+                            currentRevision=state["revision"], reviewHash=review_row[1], receipt=receipt)
+
+            review_row = db.execute(
+                "SELECT payload,content_hash FROM btl.tick_order_reviews "
+                "WHERE workspace_id=%s AND session_id=%s AND review_id=%s",
+                (self.scope.workspace_id, session_id, command_id)).fetchone()
+            if review_row is None:
+                return dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
+                            sessionId=session_id, commandId=command_id, status="UNKNOWN",
+                            reason="REVIEW_OR_COMMAND_NOT_VISIBLE", currentRevision=state["revision"])
+
+            reviewed = unpack(*review_row)
+            command = reviewed.get("command", {})
+            require(command.get("commandId") == command_id and command.get("sessionId") == session_id,
+                    "review", "CORRUPT_RECORD")
+            expected_revision = command.get("expectedRevision")
+            revision(expected_revision, "expectedRevision")
+            require(command_id not in state["orders"], "receipt", "CORRUPT_RECORD")
+            common = dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
+                          sessionId=session_id, commandId=command_id, reviewHash=review_row[1],
+                          expectedRevision=expected_revision, currentRevision=state["revision"])
+            if state["revision"] > expected_revision:
+                return dict(**common, status="NOT_COMMITTED", reason="SESSION_REVISION_ADVANCED")
+            return dict(**common, status="UNKNOWN", reason="NO_DURABLE_COMMAND_AT_REVIEW_REVISION")
 
     def summary(self, session_id):
         """One committed, scoped snapshot; no timeline, quote or event replay."""

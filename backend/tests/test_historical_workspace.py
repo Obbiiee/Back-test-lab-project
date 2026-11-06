@@ -321,18 +321,34 @@ class HistoricalApplicationTests(unittest.TestCase):
         headers={'Origin':'http://127.0.0.1:5173','X-BTL-Local':'1','X-BTL-Source':'historical'}
         with TestClient(create_local_app(self.dsn,historical_source=source),base_url='http://127.0.0.1:5188',
                         client=('127.0.0.1',60000),headers=headers) as client:
+            catalog=client.get('/api/v1/tick-alpha/catalog').json()
+            self.assertEqual(catalog['availability']['sourceRights'],'UNKNOWN')
+            self.assertEqual(catalog['availability']['executionEligibility'],'NOT_GRANTED')
+            self.assertEqual(catalog['availability']['instruments'][0]['status'],'UNKNOWN')
             self.assertEqual(client.post('/api/v1/tick-alpha/methods',json=self.method).status_code,200)
             body=dict(self.body,startPeriod='2015-12')
-            self.assertEqual(client.post('/api/v1/tick-alpha/sessions',json=body).status_code,200)
-            path='/api/v1/tick-alpha/sessions/'+body['id']
-            before=client.get(path).json()
-            result=client.post(path+'/chart-history',json={'timeframe':'1m','offset':0})
-            self.assertEqual(result.status_code,200)
-            self.assertFalse(result.json()['executionAuthority'])
-            self.assertEqual(client.get(path).json(),before)
-            self.assertEqual(client.post(path+'/chart-history',json={'timeframe':{},'offset':0}).status_code,409)
-            self.assertEqual(client.post(path+'/chart-history',json={'timeframe':'1m','offset':0},headers={'Origin':'https://foreign.invalid'}).status_code,403)
-            self.assertEqual(client.post(path+'/chart-history',json={'timeframe':'1m','offset':0},headers={'X-BTL-Source':'synthetic'}).status_code,409)
+            refused=client.post('/api/v1/tick-alpha/sessions',json=body)
+            self.assertEqual(refused.status_code,409)
+            self.assertEqual(refused.json()['detail'],'REFUSED_SOURCE_NOT_AVAILABLE')
+            self.assertEqual(client.get('/api/v1/tick-alpha/sessions/'+body['id']).status_code,409)
+
+            # Existing research Sessions retain chart-only reads. A new Session
+            # from a source with UNKNOWN rights remains blocked at the API.
+            from execution.research import ResearchApplication
+            service=ResearchApplication(self.dsn,historical_source=source)
+            try:
+                service.create_session(body)
+                path='/api/v1/tick-alpha/sessions/'+body['id']
+                before=client.get(path).json()
+                result=client.post(path+'/chart-history',json={'timeframe':'1m','offset':0})
+                self.assertEqual(result.status_code,200)
+                self.assertFalse(result.json()['executionAuthority'])
+                self.assertEqual(client.get(path).json(),before)
+                self.assertEqual(client.post(path+'/chart-history',json={'timeframe':{},'offset':0}).status_code,409)
+                self.assertEqual(client.post(path+'/chart-history',json={'timeframe':'1m','offset':0},headers={'Origin':'https://foreign.invalid'}).status_code,403)
+                self.assertEqual(client.post(path+'/chart-history',json={'timeframe':'1m','offset':0},headers={'X-BTL-Source':'synthetic'}).status_code,409)
+            finally:
+                service.close()
 
     def test_month_selection_preserves_old_session_pins_and_survives_durable_reload(self):
         from execution.research import ResearchApplication
