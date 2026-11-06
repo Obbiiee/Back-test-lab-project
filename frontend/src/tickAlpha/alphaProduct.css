@@ -386,6 +386,7 @@
 .tick-alpha .rk-shell .rk-btn-danger{background:var(--rk-danger-ink);color:#fff}
 .tick-alpha .rk-draft-flag{margin:0;font-size:13px;font-weight:700}
 .tick-alpha .rk-conflict{display:grid;gap:8px;padding:12px 14px;border-radius:16px;border:2px solid var(--rk-yellow);background:var(--rk-warning-bg);color:var(--rk-ink)}
+.tick-alpha .rk-draft-lost{margin:0;padding:10px 12px;border-radius:12px;border:2px solid var(--rk-yellow);background:var(--rk-warning-bg);color:var(--rk-ink);font-weight:600}
 .tick-alpha .rk-conflict p{margin:0}
 .tick-alpha .rk-conflict-server{margin:0;padding:10px 12px;border-left:4px solid var(--rk-blue);border-radius:10px;background:#fff;display:grid;gap:4px}
 .tick-alpha .rk-conflict-server>span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--rk-muted-on-white)}

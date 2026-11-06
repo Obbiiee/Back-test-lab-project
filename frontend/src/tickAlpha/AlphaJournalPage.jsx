@@ -24,10 +24,12 @@ function NoteEditor({order,note,sessionId,path,onSaved,onDirty,onReload}){
   const [restored]=useState(()=>Boolean(readDraft(sessionId,order.id)));
   const [state,setState]=useState({saving:false,error:null,conflict:false,confirmDiscard:false,stored:true});
   const dirty=isDirty(draft,note);
-  useEffect(()=>{onDirty(order.id,dirty);},[order.id,dirty,onDirty]);
+  // Reports 'kept' (in tab storage) or 'lost' (storage blocked/full) while dirty.
+  const report=dirty?(state.stored?'kept':'lost'):false;
+  useEffect(()=>{onDirty(order.id,report);},[order.id,report,onDirty]);
   useEffect(()=>()=>onDirty(order.id,false),[order.id,onDirty]);
   const update=next=>{const value={...draft,...next};setDraft(value);setState(previous=>({...previous,stored:writeDraft(sessionId,order.id,value),confirmDiscard:false}));};
-  const start=()=>{const value={text:note?.text??'',tags:tagText(note?.tags),baseRevision:note?.noteRevision??0};setDraft(value);writeDraft(sessionId,order.id,value);setState(previous=>({...previous,error:null,conflict:false}));};
+  const start=()=>{const value={text:note?.text??'',tags:tagText(note?.tags),baseRevision:note?.noteRevision??0};setDraft(value);const stored=writeDraft(sessionId,order.id,value);setState(previous=>({...previous,stored,error:null,conflict:false}));};
   const discard=()=>{clearDraft(sessionId,order.id);setDraft(null);setState({saving:false,error:null,conflict:false,confirmDiscard:false,stored:true});};
   const save=async(event,baseRevision=draft.baseRevision)=>{
     event?.preventDefault();
@@ -61,7 +63,7 @@ function NoteEditor({order,note,sessionId,path,onSaved,onDirty,onReload}){
     </div>}
     <label>Research note<textarea value={draft.text} maxLength={4096} rows={4} onChange={event=>update({text:event.target.value})} disabled={state.saving}/></label>
     <label>Tags<input value={draft.tags} onChange={event=>update({tags:event.target.value})} placeholder="breakout, london" disabled={state.saving}/><small>Up to 8, separated by commas.</small></label>
-    {!state.stored&&<p className="rk-note" role="status">This browser blocks tab storage, so the draft is lost if you leave this page.</p>}
+    {!state.stored&&<p className="rk-note rk-draft-lost" role="alert">This browser could not keep the draft (tab storage is blocked or full). Save the note, or the text is lost if you leave or reload this page.</p>}
     {state.error&&<p className="rk-form-error" role="alert">{state.error} Your text is kept here.</p>}
     {state.confirmDiscard?<div className="rk-form-actions" role="group" aria-label="Discard unsaved text?">
         <span className="rk-note">Discard the unsaved text?</span>
@@ -80,18 +82,24 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
   const [side,setSide]=useState('ALL');
   const [status,setStatus]=useState(null);
   const [query,setQuery]=useState('');
-  const [dirty,setDirty]=useState(()=>new Set());
+  const [dirty,setDirty]=useState(()=>new Map()); // orderId → 'kept' | 'lost'
   const [leaving,setLeaving]=useState(null);
-  const stay=useRef(null);
+  const stay=useRef(null),allow=useRef(false);
+  // Open replay loads the Session before it changes the route, so ask before starting it.
+  const leaveThen=action=>{if(dirty.size&&!allow.current)setLeaving(()=>action);else action();};
   const onDirty=useCallback((orderId,value)=>setDirty(previous=>{
-    if(previous.has(orderId)===value)return previous;
-    const next=new Set(previous);if(value)next.add(orderId);else next.delete(orderId);return next;
+    if((previous.get(orderId)??false)===value)return previous;
+    const next=new Map(previous);if(value)next.set(orderId,value);else next.delete(orderId);return next;
   }),[]);
+  const lost=[...dirty.values()].filter(value=>value==='lost').length;
   // Leaving with unsaved drafts (Session picker, sidebar, Back) asks first; closing the tab warns.
   useEffect(()=>{
     if(!dirty.size)return undefined;
-    const release=setLeaveGuard(proceed=>{setLeaving(()=>proceed);return false;});
-    const unload=event=>{event.preventDefault();event.returnValue='';};
+    // `allow` is set once the person chose Leave, so the move it starts (which may
+    // navigate again, or load another document) is not asked about twice.
+    allow.current=false;
+    const release=setLeaveGuard(proceed=>{if(allow.current)return true;setLeaving(()=>proceed);return false;});
+    const unload=event=>{if(allow.current)return;event.preventDefault();event.returnValue='';};
     globalThis.addEventListener('beforeunload',unload);
     return()=>{release();globalThis.removeEventListener('beforeunload',unload);};
   },[dirty.size]);
@@ -129,17 +137,17 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
       else if(event.key==='Tab'){const buttons=[...event.currentTarget.querySelectorAll('button')];const at=buttons.indexOf(document.activeElement);event.preventDefault();buttons[(at+(event.shiftKey?-1:1)+buttons.length)%buttons.length]?.focus();}
     }}>
     <div className="rk-card rk-leave-card"><h2 id="rk-leave-title">Unsaved notes</h2>
-      <p id="rk-leave-text">{dirty.size===1?'One order has':`${dirty.size} orders have`} unsaved note text. Drafts stay in this browser tab until you save or discard them; they never change fills or cash.</p>
+      <p id="rk-leave-text">{dirty.size===1?'One order has':`${dirty.size} orders have`} unsaved note text. {lost?`${lost===dirty.size?(lost===1?'It':'They'):`${lost} of them`} could not be kept in this browser, so leaving loses that text.`:'Drafts stay in this browser tab until you save or discard them.'} Notes never change fills or cash.</p>
       <div className="rk-form-actions"><button ref={stay} type="button" className="rk-btn rk-btn-primary" onClick={()=>setLeaving(null)}>Keep editing</button>
-        <button type="button" className="rk-btn" onClick={()=>{const proceed=leaving;setLeaving(null);proceed();}}>Leave, keep drafts</button></div></div></div>;
+        <button type="button" className="rk-btn" onClick={()=>{const proceed=leaving;setLeaving(null);allow.current=true;proceed();}}>{lost?'Leave and lose text':'Leave, keep drafts'}</button></div></div></div>;
   return <>{leaveDialog}<PageHead eyebrow="Research" title="Journal" lead="Committed orders of one Session with your notes. Notes never change fills or cash."
-      actions={session&&<button type="button" className="rk-btn" onClick={()=>onOpen(session.id)}>Open replay</button>}/>
+      actions={session&&<button type="button" className="rk-btn" onClick={()=>leaveThen(()=>onOpen(session.id))}>Open replay</button>}/>
     <div className="rk-toolbar">{picker}</div>
     {!catalog.sessions.length?<StatePanel kind="empty" title="Nothing journaled yet" action={<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new'})}>New Session</a>}><p>Journals start when you confirm the first order in a Session.</p></StatePanel>
       :!session?<StatePanel kind="empty" title={sessionId?'This Session is not in this workspace':'Choose a Session'}><p>{sessionId?'Pick one from the list above.':'A journal across all Sessions needs a server list that is not published yet, so pick one Session.'}</p></StatePanel>
       :state.status==='loading'?<StatePanel kind="loading" title="Loading the journal…"/>
       :state.status==='error'?<StatePanel kind="error" title="The journal could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message}</p></StatePanel>
-      :!journal.orders.length?<StatePanel kind="empty" title="No orders yet" action={<button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(session.id)}>Open replay</button>}><p>Review and confirm an order in replay; it appears here with room for a note.</p></StatePanel>
+      :!journal.orders.length?<StatePanel kind="empty" title="No orders yet" action={<button type="button" className="rk-btn rk-btn-primary" onClick={()=>leaveThen(()=>onOpen(session.id))}>Open replay</button>}><p>Review and confirm an order in replay; it appears here with room for a note.</p></StatePanel>
       :<>
         <div className="rk-toolbar">
           <Segmented label="Side" options={SIDES} value={side} onChange={setSide}/>
@@ -161,7 +169,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
             <NoteEditor key={order.id} order={order} note={note} sessionId={session.id} path={path} onSaved={savedNote} onDirty={onDirty} onReload={()=>setAttempt(n=>n+1)}/>
           </li>;})}</ol>
           :<StatePanel kind="filtered" title="No order matches" action={<button type="button" className="rk-btn" onClick={()=>{setSide('ALL');setStatus(null);setQuery('');}}>Clear filters</button>}><p>Try another side, status or search.</p></StatePanel>}
-        {dirty.size>0&&<p className="rk-note rk-draft-flag" role="status">{dirty.size===1?'1 unsaved note draft':`${dirty.size} unsaved note drafts`} in this tab.</p>}
+        {dirty.size>0&&<p className="rk-note rk-draft-flag" role="status">{dirty.size===1?'1 unsaved note draft':`${dirty.size} unsaved note drafts`} in this tab{lost?`; ${lost} not kept by this browser`:''}.</p>}
         <p className="rk-main-note">Snapshot revision {journal.provenance.revision}. Financial values come from committed events only.</p>
       </>}
   </>;

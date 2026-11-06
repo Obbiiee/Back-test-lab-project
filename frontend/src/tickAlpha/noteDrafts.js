@@ -20,8 +20,12 @@ export function readDraft(sessionId,orderId){
   }catch{return null;}
 }
 
+// True only when the draft is actually in tab storage. Missing storage, a blocked
+// accessor or a full quota all return false, so the page can say the text is not kept.
 export function writeDraft(sessionId,orderId,draft){
-  try{store()?.setItem(draftKey(sessionId,orderId),JSON.stringify({text:draft.text,tags:draft.tags,baseRevision:draft.baseRevision}));return true;}
+  const target=store();
+  if(!target||typeof target.setItem!=='function')return false;
+  try{target.setItem(draftKey(sessionId,orderId),JSON.stringify({text:draft.text,tags:draft.tags,baseRevision:draft.baseRevision}));return true;}
   catch{return false;}
 }
 

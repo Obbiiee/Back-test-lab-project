@@ -1,6 +1,8 @@
 // P1 Journal draft safety (founder remediation 2026-11-06) against the unchanged
 // local API (synthetic source): unsaved drafts survive reload, leaving by the
-// Session picker / sidebar / browser Back asks first, Cancel asks before
+// Session picker / sidebar / Back / Forward / Open replay / Account link asks first
+// (direct URL changes get the browser prompt), blocked or full tab storage is
+// reported and never called kept, Cancel asks before
 // discarding, and a save from an older revision is refused by the server
 // (REFUSED_STALE_NOTE) and shown next to the newer saved note.
 // Usage: PRODUCT_LOCAL=http://127.0.0.1:5196 node tests/qa/journal-drafts-qa.cjs <outDir>
@@ -83,6 +85,58 @@ const get = async path => (await fetch(API + path, { headers: HEADERS })).json()
     must(await firstCard().getByLabel('Research note').inputValue() === marker, 'draft not restored after leaving');
   });
 
+  // Every other way out of the Journal (founder P1 round 2): both answers each time.
+  const backToA = async () => { await page.goto(journalUrl(A.session.id)); await page.waitForSelector('.rk-journal-item'); must(await firstCard().getByLabel('Research note').inputValue() === marker, 'draft not restored'); };
+  await step('Open replay button: Keep editing stays without loading; Leave opens the replay', async () => {
+    const url = page.url(); const views = [];
+    const onReq = r => { if (r.url().endsWith('/view')) views.push(r.url()); }; page.on('request', onReq);
+    await page.getByRole('button', { name: 'Open replay' }).first().click();
+    must(await dialog().isVisible(), 'no dialog on Open replay');
+    await page.getByRole('button', { name: 'Keep editing' }).click(); await sleep(300);
+    must(page.url() === url && views.length === 0, `stayed? ${page.url()} views ${views.length}`);
+    await page.getByRole('button', { name: 'Open replay' }).first().click();
+    await page.getByRole('button', { name: 'Leave, keep drafts' }).click();
+    await page.waitForSelector('.candle-chart canvas', { timeout: 20000 });
+    must(/screen=replay/.test(page.url()) || /session=/.test(page.url()), 'replay not opened: ' + page.url());
+    must(!(await dialog().count()), 'asked twice');
+    page.off('request', onReq);
+    await backToA();
+  });
+  await step('browser Forward asks first; Keep editing stays', async () => {
+    await page.getByRole('link', { name: 'Help', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Leave, keep drafts' }).click(); await sleep(300);
+    await page.goBack(); await page.waitForSelector('.rk-journal-item'); await sleep(300);
+    const url = page.url();
+    await page.goForward(); await sleep(300);
+    must(await dialog().isVisible(), 'no dialog on Forward');
+    must(page.url() === url, 'URL moved: ' + page.url());
+    await page.getByRole('button', { name: 'Keep editing' }).click();
+    must(await firstCard().getByLabel('Research note').inputValue() === marker, 'draft changed');
+  });
+  await step('Account link (loads another page): same dialog; Leave goes without a second browser prompt', async () => {
+    const prompts = []; const onDialog = d => { prompts.push(d.type()); d.dismiss().catch(() => {}); }; page.on('dialog', onDialog);
+    const url = page.url();
+    await page.getByRole('link', { name: 'Account', exact: true }).first().click();
+    must(await dialog().isVisible(), 'no dialog on Account');
+    await page.getByRole('button', { name: 'Keep editing' }).click(); await sleep(300);
+    must(page.url() === url, 'left on Keep editing');
+    await page.getByRole('link', { name: 'Account', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Leave, keep drafts' }).click();
+    await page.waitForURL(/page=account/, { timeout: 10000 });
+    must(!prompts.length, 'browser prompt after Leave: ' + prompts);
+    page.off('dialog', onDialog);
+    await backToA();
+  });
+  await step('direct URL change: the browser asks before unloading; dismiss stays', async () => {
+    const prompts = []; const onDialog = d => { prompts.push(d.type()); d.dismiss().catch(() => {}); }; page.on('dialog', onDialog);
+    const url = page.url();
+    await page.evaluate(() => { location.assign('/?tick-alpha=local&screen=help'); }).catch(() => {}); await sleep(800);
+    page.off('dialog', onDialog);
+    must(prompts.includes('beforeunload'), 'no beforeunload prompt: ' + prompts);
+    must(page.url() === url, 'left: ' + page.url());
+    must(await firstCard().getByLabel('Research note').inputValue() === marker, 'draft changed');
+  });
+
   await step('Cancel asks before discarding; Discard clears the stored draft', async () => {
     await firstCard().getByRole('button', { name: 'Cancel' }).click();
     must(await page.getByRole('group', { name: 'Discard unsaved text?' }).isVisible(), 'no discard confirm');
@@ -114,6 +168,31 @@ const get = async path => (await fetch(API + path, { headers: HEADERS })).json()
     must(saved.text === mine && saved.noteRevision === rev + 2, `server has ${saved.text} rev ${saved.noteRevision}`);
     must(await firstCard().getByText(mine).isVisible(), 'saved note not shown');
     return `revision ${rev} → ${saved.noteRevision}`;
+  });
+
+  // Storage that does not keep the draft (founder P1 round 2): blocked and full.
+  for (const [label, init] of [
+    ['blocked', () => { Object.defineProperty(window, 'sessionStorage', { configurable: true, get() { throw new DOMException('blocked', 'SecurityError'); } }); }],
+    ['full', () => { Storage.prototype.setItem = function () { throw new DOMException('full', 'QuotaExceededError'); }; }],
+  ]) await step(`tab storage ${label}: warning shown; leaving says the text is lost`, async () => {
+    const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); const p2 = await c2.newPage(); const e2 = [];
+    p2.on('pageerror', e => e2.push(e.message));
+    await p2.addInitScript(init);
+    try {
+      await p2.goto(journalUrl(A.session.id)); await p2.waitForSelector('.rk-journal-item', { timeout: 20000 });
+      const card = p2.locator('.rk-journal-item').first();
+      await card.getByRole('button', { name: /Add note|Edit note/ }).click(); await card.getByLabel('Research note').fill('not kept ' + label);
+      must(await card.locator('.rk-draft-lost').isVisible(), 'no warning');
+      must(await p2.getByText(/1 not kept by this browser/).isVisible(), 'summary does not say not kept');
+      await p2.screenshot({ path: `${out}/journal-storage-${label}-390.png` });
+      await p2.getByRole('link', { name: 'Sessions', exact: true }).first().click();
+      must(await p2.getByRole('alertdialog', { name: 'Unsaved notes' }).getByText(/could not be kept in this browser/).isVisible(), 'dialog claims drafts are kept');
+      must(await p2.getByRole('button', { name: 'Leave and lose text' }).isVisible(), 'button still says keep drafts');
+      must(!(await p2.getByRole('button', { name: 'Leave, keep drafts' }).count()), 'false keep-drafts button');
+      await p2.getByRole('button', { name: 'Keep editing' }).click();
+      must(await card.getByLabel('Research note').inputValue() === 'not kept ' + label, 'text lost on Keep editing');
+      must(!e2.length, 'page errors: ' + e2.join(' | '));
+    } finally { await c2.close(); }
   });
 
   await step('no page errors', async () => must(!errors.length, errors.join(' | ')));

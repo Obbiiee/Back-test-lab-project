@@ -79,4 +79,14 @@ export function linkTo(next){
 
 // Inside the account page the token lives in memory, so Account must route in-app
 // (a full reload would sign the person out). Locally it opens the separate account page.
-export function accountLink(){return isAccountPage()?linkTo({screen:'account'}):{href:'/?page=account'};}
+// A link that loads another document (the local Account page) still asks the leave
+// guard first, so unsaved work gets the same in-app dialog as an in-app link.
+export function documentLink(href){
+  return {href,onClick:event=>{
+    if(!leaveGuard||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();
+    const go=()=>window.location.assign(href);
+    if(leaveGuard(go))go();
+  }};
+}
+export function accountLink(){return isAccountPage()?linkTo({screen:'account'}):documentLink('/?page=account');}
