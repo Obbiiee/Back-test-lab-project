@@ -1,6 +1,8 @@
 import '../workspace/designTokens.css';
 import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
+import AlphaReviewSheet from './AlphaReviewSheet.jsx';
+import AlphaPickTicket from './AlphaPickTicket.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
@@ -14,7 +16,7 @@ import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
 import {emitLocal} from './measurement.js';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
+import {DirectionQuotes} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
 import Segmented from './AlphaSegmented.jsx';
 import './tickAlpha.css';
@@ -28,6 +30,7 @@ export default function TickAlpha(){
   const [objectsOpen,setObjectsOpen]=useState(false),[terminalRequest,setTerminalRequest]=useState(null);
   const [notice,setNotice]=useState(''),[dialog,setDialog]=useState(null),[review,setReview]=useState(null);
   const [kind,setKind]=useState('FREE_STYLE'),[plan,setPlan]=useState(initialPlan),[planRevision,setPlanRevision]=useState(0);
+  const [picked,setPicked]=useState(null);
   const flight=useRef(false),returnFocus=useRef(null);
   const [connecting,setConnecting]=useState(true);
   const creationId=useRef(null);
@@ -78,8 +81,15 @@ export default function TickAlpha(){
       planId:planned?id('plan'):null,planRevision:planned?planRevision:null,draft});
     setReview(request);setDialog('review');
   });};
-  const confirm=()=>run(async()=>{
-    await api(sessionPath(view.metadata.id)+'/confirm',{reviewId:review.review.command.commandId,reviewHash:review.reviewHash});
+  // Returns {ok, code} so the review sheet can show refusal/stale states (C-14).
+  const confirm=async()=>{
+    let code=null;
+    const result=await confirmReviewed(failure=>{code=failure;});
+    return {ok:result===true,code:result===undefined?'LOCAL_BUSY':code};
+  };
+  const confirmReviewed=onFailure=>run(async()=>{
+    try{await api(sessionPath(view.metadata.id)+'/confirm',{reviewId:review.review.command.commandId,reviewHash:review.reviewHash});}
+    catch(error){onFailure(error.message);throw error;}
     setView(await loadWorkspace(view.metadata.id));setDialog(null);setReview(null);
     emitLocal('order_command_submitted');
     setNotice('Order accepted and saved. A fill requires the next eligible tick.');
@@ -148,7 +158,7 @@ export default function TickAlpha(){
           if(saved.analysis.metrics.tradeCount>view.analysis.metrics.tradeCount)emitLocal('order_outcome_committed');
           if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
           return true;
-        })} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
+        })} onPriceSelect={price=>{setPauseToken(n=>n+1);setPicked({price,at:Date.now()});}} onPlanDrawing={drawing=>{
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
           catch(error){setNotice(error.message);}
@@ -181,6 +191,10 @@ export default function TickAlpha(){
     {dialog==='action'&&orderAction&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm position action" onClose={()=>{if(!busy){setDialog(null);setOrderAction(null);}}}><section className="alpha-dialog"><h2>{orderAction.kind==='CANCEL'?'Cancel pending order':orderAction.quantity===null?'Request full close':'Request partial close'}</h2><p>{orderAction.order.side} · {orderAction.order.id}</p><p>{orderAction.kind==='CLOSE'?`Quantity: ${orderAction.quantity??orderAction.order.remaining} lots. A request does not settle the trade; the next eligible observed Bid/Ask determines its exit.`:'This cancels an unfilled intent; it does not close a position.'}</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button disabled={busy} onClick={()=>{setDialog(null);setOrderAction(null);}}>Keep current order</button><button disabled={busy} onClick={confirmAction}>Confirm action</button></section></WorkspaceModal>}
     {dialog==='method'&&<WorkspaceModal returnFocusRef={returnFocus} label="Create strategy" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createMethod}><h2>Create strategy</h2><label>Name<input name="name" required maxLength={128}/></label><label>Type<select name="kind" value={kind} onChange={e=>setKind(e.target.value)}><option value="FREE_STYLE">Free Style</option><option value="PROTOCOL">Protocol</option></select></label>{kind==='PROTOCOL'&&<><label>Locked risk %<input name="risk" defaultValue="1" inputMode="decimal" required/></label><label>Locked RR<input name="rr" defaultValue="2" inputMode="decimal" required/></label><label>Conditions (one per line)<textarea name="conditions" required maxLength={4096}/></label><label>Checklist enforcement<select name="checklist"><option>ON</option><option>OFF</option></select></label></>}<p>Free Style lets you explore discretionary ideas. Protocol locks risk, reward and checklist rules for the Session.</p><p>Strategy rules are fixed for each Session. Create another strategy to test different rules.</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button className="alpha-primary-action" disabled={busy}>Save strategy</button></form></WorkspaceModal>}
     {dialog==='session'&&<WorkspaceModal returnFocusRef={returnFocus} label="Create Session" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createSession}><h2>Create Session</h2><label>Name<input name="name" required maxLength={128}/></label><label>Strategy<select name="method" defaultValue={selectedMethod||view?.method.id||catalog.methods[0]?.id}>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name} · {m.kind==='PROTOCOL'?'Protocol':'Free Style'}</option>)}</select></label><label>Starting balance (USD)<input name="balance" defaultValue="10000" inputMode="decimal" required/></label>{sourceContext()==='historical'&&<label>Start month (UTC)<input name="startPeriod" type="month" defaultValue={catalog.startPeriod} min={catalog.startPeriod} max={`${catalog.startPeriod.slice(0,4)}-12`} required disabled={busy}/></label>}<p>XAUUSD · {sourceContext()==='historical'?'Exness historical quotes':'Synthetic fixture'}. The Session inherits your strategy rules. Replay starts at the first observed quote in the selected month; unavailable months are refused without substituting data.</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button className="alpha-primary-action" disabled={busy}>Save Session</button></form></WorkspaceModal>}
-    {dialog==='review'&&review&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm reviewed order" onClose={()=>{if(!busy){setDialog(null);setReview(null);}}}><section className="alpha-dialog"><h2>Confirm reviewed order</h2><ReviewedIntent payload={review.review.command.payload} methodName={view.method.name} riskBasis={review.review.riskBasis} researchRisk={review.review.researchRisk}/><p>Fill uses the next eligible observed Bid/Ask. This confirmation is not an execution price.</p>{review.review.command.payload.observations.map(o=><p key={o.conditionId}>{view.method.conditions.find(c=>c.id===o.conditionId)?.label}: {o.outcome}</p>)}{notice&&<p role="alert">{noticeText(notice)}</p>}<button disabled={busy} onClick={()=>{setReview(null);setDialog(null);setOrderAction(null);}}>Cancel confirmation</button><button disabled={busy} onClick={confirm}>Confirm order</button></section></WorkspaceModal>}
+    {picked&&view&&!dialog&&<AlphaPickTicket key={picked.at} price={picked.price} tickSize={view.state.profile?.tickSize} plan={plan} protocol={protocol}
+      onCancel={()=>{setPicked(null);[...document.querySelectorAll('button')].find(button=>button.textContent==='Pick order price')?.focus();}} onApply={(field,patch)=>{const value=patch[field];edit(patch);setPicked(null);returnFocus.current=document.querySelector('.alpha-order-bar button')||null;setDialog('ticket');
+        setNotice(`${({entry:'Entry',sl:'Stop loss',tp:'Take profit'})[field]} set to ${value} from the chart. Review before confirming.`);}}/>}
+    {dialog==='review'&&review&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm reviewed order" onClose={()=>{if(!busy){setDialog(null);setReview(null);}}}><AlphaReviewSheet key={review.reviewHash} review={review} view={view} busy={busy}
+      onConfirm={confirm} onCancel={()=>{setReview(null);setDialog(null);setOrderAction(null);}} onReviewAgain={()=>{setReview(null);openReview();}}/></WorkspaceModal>}
   </main>;
 }
