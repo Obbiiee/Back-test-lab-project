@@ -192,6 +192,52 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(status.json()['result'],completed.json())
         self.assertEqual(self.fixture.client.get(path,headers=self.fixture.headers).content,before)
 
+    def test_api_lifespan_worker_consumes_and_deduplicates_durable_job(self):
+        """Exercise the actual API lifespan pump, not a test-side work_one call."""
+        from cloud import worker
+        service = ResearchApplication(self.dsn, TrustedScope(str(self.workspace), str(self.actor)))
+        record = method()
+        service.create_method(record)
+        session = 'session:' + uuid.uuid4().hex
+        service.create_session({'id': session, 'name': 'Lifespan queue QA',
+                                'methodId': record['id'], 'initialBalance': '10000',
+                                'startPeriod': '2020-01'})
+        service.close()
+
+        job_id = str(uuid.uuid4())
+        path = self.fixture.root + '/sessions/' + session + '/view'
+        headers = {**self.fixture.headers, 'X-BTL-Job': job_id}
+        api_client = cloud_fixture.client(self.fixture.app)
+        try:
+            with api_client as active:
+                submitted = active.post(path, headers=headers, json={'timeframe': '1m'})
+                self.assertEqual(submitted.status_code, 202, submitted.text)
+                self.assertEqual(submitted.json()['state'], 'QUEUED')
+
+                deadline = time.monotonic() + 20
+                status = None
+                while time.monotonic() < deadline:
+                    response = active.get(self.fixture.root + '/jobs/' + job_id,
+                                          headers=self.fixture.headers)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    status = response.json()
+                    if status['state'] not in ('QUEUED', 'RUNNING'):
+                        break
+                    time.sleep(.05)
+
+                self.assertIsNotNone(status)
+                self.assertEqual(status['state'], 'SUCCEEDED', status)
+                self.assertEqual(status['result']['artifact'], 'BTL-LOCAL-SESSION-VIEW-1')
+                self.assertEqual(status['result']['state']['sessionId'], session)
+
+                repeated = active.post(path, headers=headers, json={'timeframe': '1m'})
+                self.assertEqual(repeated.status_code, 200, repeated.text)
+                self.assertEqual(repeated.json(), status['result'])
+        finally:
+            api_client.close()
+        self.assertTrue(all(slot.process is None for slot in worker._slots),
+                        'API lifespan must reap retained native worker children')
+
     def replay_fixture(self):
         app=ResearchApplication(self.dsn,TrustedScope(str(self.workspace),str(self.actor)))
         m=method();app.create_method(m)

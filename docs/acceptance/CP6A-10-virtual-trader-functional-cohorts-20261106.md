@@ -31,6 +31,15 @@ Both runs executed `test_virtual_traders_complete_isolated_authenticated_journey
 
 The runner output classified both results as `BTL-VIRTUAL-TRADER-FUNCTIONAL-COHORT-RESULT-1`, `status=PASS`, `executionMode=SEQUENTIAL_FUNCTIONAL_JOURNEY`, `workerConcurrency=NOT_EXERCISED`, and `capacityStatus=NOT_MEASURED`.
 
+## API-lifespan worker regression
+
+The previous Monthly Parquet integration test drove `queue.work_one()` directly. To verify the product service lifecycle, `backend/tests/test_research_queue.py` now also submits one synthetic read job through the authenticated API while its real FastAPI lifespan is active. The test waits for the background one-worker pump to complete the durable job, resubmits the exact job ID and payload and checks the identical result, then verifies the native child process was reaped when the lifespan closed.
+
+- `QueueTests.test_api_lifespan_worker_consumes_and_deduplicates_durable_job`: 1/1 PASS, 5.064 s, isolated temporary PostgreSQL 16 cluster stopped and removed.
+- `tests.test_worker_deadline`: 17/17 PASS, 4.788 s.
+
+This verifies the synthetic in-process API worker lifecycle and bounded child cleanup. It does not prove service supervision across VPS reboot, live deployment behavior, or production queue capacity.
+
 ## Interpretation and limits
 
 - These passes complete the sequential functional cohort sizes 1, 5, 10, 25, 50 and 100 when combined with the earlier results recorded in `AI_CONTEXT/04_CURRENT_PHASE.md`.
