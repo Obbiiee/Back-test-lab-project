@@ -1,8 +1,9 @@
 """Bounded PostgreSQL scheduling, never independent financial authority.
 
-Row + advisory transaction locks own a worker until completion. A process death
-rolls back the claim: the original QUEUED row survives without a lease guess.
-No provider handle/evidence is serialized. Worker authorization is revalidated.
+Committed RUNNING leases expose worker ownership and heartbeat. A database
+advisory session lock fences each worker slot; a process death releases that
+lock, and lease expiry triggers bounded retry or reconciliation. No provider
+handle/evidence is serialized. Worker authorization is revalidated.
 """
 import logging
 import json
