@@ -14,7 +14,7 @@ from execution.research import ResearchApplication
 from application.models import TrustedScope
 from tests.test_identity import RecordingDelivery, client, PASSWORD
 from tests.test_research_sessions import method, review_request
-from tests.virtual_traders import build_cohort
+from tests.virtual_traders import COHORT_SIZES, build_stages
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
@@ -27,7 +27,9 @@ class CloudResearchTests(unittest.TestCase):
 
     def setUp(self):
         self.delivery = RecordingDelivery()
-        self.app = create_app(DSN, secrets.token_urlsafe(48), self.delivery, rate_limit=200)
+        requested_users = int(os.environ.get('BTL_QA_VIRTUAL_TRADER_USERS', '5'))
+        self.app = create_app(DSN, secrets.token_urlsafe(48), self.delivery,
+                              rate_limit=max(200, requested_users * 20))
         self.client = client(self.app)
         self.actor, self.headers = self.account()
         self.workspace = self.client.post('/api/v1/workspaces', headers=self.headers,
@@ -166,8 +168,13 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(len(journal.json()['orders']), 1)
 
     def test_virtual_traders_complete_isolated_authenticated_journey(self):
-        """Five sequential synthetic identities exercise tenancy, not load capacity."""
-        cohort = build_cohort(uuid.uuid4(), 5)
+        """A bounded synthetic cohort journey; never a capacity certification."""
+        requested_users = int(os.environ.get('BTL_QA_VIRTUAL_TRADER_USERS', '5'))
+        self.assertIn(requested_users, COHORT_SIZES)
+        base_run_id = uuid.UUID(os.environ['BTL_QA_VIRTUAL_TRADER_RUN_ID']) \
+            if os.environ.get('BTL_QA_VIRTUAL_TRADER_RUN_ID') else uuid.uuid4()
+        cohort = next(stage for stage in build_stages(base_run_id)
+                      if stage.requested_users == requested_users)
         traders = []
         for trader in cohort.traders:
             actor, headers = self.account(email=trader.email)
@@ -225,9 +232,14 @@ class CloudResearchTests(unittest.TestCase):
 
         for index, (_actor, headers, root, session_id) in enumerate(traders):
             self.assertEqual(self.client.get(root + '/sessions/' + session_id, headers=headers).status_code, 200)
-            for other_index, (_other_actor, _other_headers, _other_root, other_session) in enumerate(traders):
-                if other_index == index:
-                    continue
+            if len(traders) <= 5:
+                foreign_sessions = [item[3] for other_index, item in enumerate(traders)
+                                    if other_index != index]
+            else:
+                # Linear-cost ring sampling keeps the 100-user functional
+                # cohort bounded while exercising every tenant boundary.
+                foreign_sessions = [traders[(index + 1) % len(traders)][3]] if len(traders) > 1 else []
+            for other_session in foreign_sessions:
                 foreign = self.client.get(root + '/sessions/' + other_session, headers=headers)
                 self.assertEqual(foreign.status_code, 404, foreign.text)
                 foreign_metrics = self.client.get(root + '/sessions/' + other_session + '/metering/storage',
