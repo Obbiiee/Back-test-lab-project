@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS",
+  "scope": "isolated synthetic local QA only",
+  "branch": "codex/p0-local-integration-20261106",
+  "baseCommit": "274d592e06a9a8afc2a7b7e2efdf09498da36a34",
+  "database": {
+    "engine": "PostgreSQL 16",
+    "isolated": true,
+    "unixSocketOnly": true,
+    "directory": "/tmp/riksora-p0-local-integration-pg-20261106",
+    "stoppedAfterTests": true
+  },
+  "tests": {
+    "p0LocalIntegration": {"passed": 6, "failed": 0},
+    "postgresExecutionRegression": {"passed": 9, "failed": 0},
+    "researchSessionRegression": {"passed": 13, "failed": 0},
+    "historicalLocalApiRegression": {"passed": 1, "failed": 0},
+    "frontendPeriodAvailability": "PASS",
+    "frontendConfirmOutcome": "PASS",
+    "eslint": "PASS",
+    "viteBuild": "PASS",
+    "browserConfirmOutcome": {"passed": 8, "failed": 0}
+  },
+  "financialReducerChanged": false,
+  "canonicalDatasetChanged": false,
+  "historicalSourceEligibility": "NOT_GRANTED",
+  "productionChanged": false,
+  "deployed": false,
+  "merged": false,
+  "browserEvidence": "screenshots/"
+}

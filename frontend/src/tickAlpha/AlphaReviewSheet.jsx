@@ -74,7 +74,7 @@ export default function AlphaReviewSheet({review,view,busy,onConfirm,onCheck,onR
       </div>}
       {phase==='UNKNOWN'&&<div className="alpha-review-unknown" role="alert">
         <strong>Order status not verified</strong>
-        <p>{checking?UNKNOWN_TEXT:'The saved Session does not show this order yet. It may still be saving. Check again; nothing is sent twice.'}</p>
+        <p>{checking?UNKNOWN_TEXT:'The durable receipt is not conclusive yet. It may still be in flight. Check again; nothing is sent twice.'}</p>
       </div>}
       {phase==='COMMITTED'&&<div className="alpha-review-saved" role="status">
         <strong>Order saved</strong>

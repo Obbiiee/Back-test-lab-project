@@ -1,6 +1,6 @@
 // Unit proof for the confirm outcome model (founder P0 2026-11-06).
 import assert from 'node:assert/strict';
-import {classifyConfirmError,committedReceipt,reconcile} from '../src/tickAlpha/confirmOutcome.js';
+import {classifyConfirmError,committedReceipt,classifyCommandResult} from '../src/tickAlpha/confirmOutcome.js';
 const err=(message,status)=>Object.assign(Error(message),status===undefined?{}:{status});
 
 // Definitive refusals.
@@ -25,13 +25,25 @@ assert.equal(committedReceipt({...ok,durable:false},'order:a'),false);
 assert.equal(committedReceipt({schemaVersion:1},'order:a'),false);
 assert.equal(committedReceipt(null,'order:a'),false);
 
-// Reconciliation.
-const pending={commandId:'order:a',expectedRevision:4};
-assert.equal(reconcile({state:{revision:5,orders:{'order:a':{}}}},pending),'COMMITTED');
-assert.equal(reconcile({state:{revision:4,orders:{}}},pending),'UNKNOWN');
-assert.equal(reconcile({state:{revision:6,orders:{'order:z':{}}}},pending),'REFUSED');
-assert.equal(reconcile({state:{revision:4}},pending),'UNKNOWN');
-assert.equal(reconcile({},pending),'UNKNOWN');
-assert.equal(reconcile({state:{revision:'5',orders:{}}},pending),'UNKNOWN');
-assert.equal(reconcile({state:{revision:9,orders:Object.create({'order:a':1})}},pending),'REFUSED','inherited keys are not orders');
+// Receipt reconciliation is bound to the exact Session, command, review, and basis.
+const pending={sessionId:'session:a',commandId:'order:a',expectedRevision:4,reviewHash:'b'.repeat(64)};
+const receipt={artifact:'BTL-TICK-EXECUTION-RESULT-1',commandId:'order:a',commandHash:'a'.repeat(64),durable:true,
+  state:{sessionId:'session:a',revision:5}};
+const status=(status,extra={})=>({schemaVersion:1,artifact:'BTL-TICK-COMMAND-STATUS-1',
+  sessionId:'session:a',commandId:'order:a',reviewHash:pending.reviewHash,currentRevision:5,
+  status,...extra});
+assert.deepEqual(classifyCommandResult(status('COMMITTED',{receipt}),pending),{outcome:'COMMITTED',code:'DURABLE_RECEIPT'});
+assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,durable:false}}),pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,commandId:'order:b'}}),pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,commandHash:'bad'}}),pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,state:{sessionId:'session:b',revision:5}}}),pending).outcome,'UNKNOWN');
+assert.deepEqual(classifyCommandResult(status('NOT_COMMITTED',{expectedRevision:4,currentRevision:6,
+  reason:'SESSION_REVISION_ADVANCED'}),pending),{outcome:'REFUSED',code:'SESSION_REVISION_ADVANCED'});
+assert.equal(classifyCommandResult(status('NOT_COMMITTED',{expectedRevision:4,currentRevision:4,
+  reason:'SESSION_REVISION_ADVANCED'}),pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult(status('UNKNOWN',{reason:'NO_DURABLE_COMMAND_AT_REVIEW_REVISION'}),pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult(status('UNKNOWN',{reason:'REVIEW_OR_COMMAND_NOT_VISIBLE'}),pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult({...status('COMMITTED',{receipt}),reviewHash:'c'.repeat(64)},pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult({...status('COMMITTED',{receipt}),sessionId:'session:b'},pending).outcome,'UNKNOWN');
+assert.equal(classifyCommandResult({...status('COMMITTED',{receipt}),schemaVersion:2},pending).outcome,'UNKNOWN');
 console.log('confirm-outcome: PASS');
