@@ -53,6 +53,7 @@
     "test:c04-extended-drawings": "node tests/c04-extended-drawings.test.mjs",
     "test:f08-pwa": "node tests/f08-pwa.test.mjs",
     "test:period-availability": "node tests/period-availability.test.mjs",
+    "test:product-pages": "node tests/product-pages.test.mjs",
     "test:note-drafts": "node tests/note-drafts.test.mjs",
     "test:confirm-outcome": "node tests/confirm-outcome.test.mjs",
     "test:indicator-window": "node tests/indicator-window.test.mjs",

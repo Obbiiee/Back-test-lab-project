@@ -7,6 +7,7 @@ import {StatePanel,PageHead} from './AlphaShell.jsx';
 import Segmented from './AlphaSegmented.jsx';
 import AlphaEquityChart from './AlphaEquityChart.jsx';
 import {ratioLabel} from './annotations.js';
+import {accountTransport} from './accountClient.js';
 
 // Product pages (U03 My Methods, U04 Method create, U05 Method overview, U12/U13
 // analytics layout). They read only the existing catalog and per-Session DTOs; any
@@ -189,9 +190,37 @@ export function MethodOverview({catalog,route,onOpen,onNewSession}){
 }
 
 function MethodAnalytics({method,sessions}){
+  const [result,setResult]=useState({key:null});
+  const [attempt,setAttempt]=useState(0);
+  const key=accountTransport()?`${method.id}:${attempt}`:null;
+  useEffect(()=>{
+    if(!key)return;
+    let live=true;
+    api(`/methods/${encodeURIComponent(method.id)}/analytics`).then(value=>{if(live)setResult({key,status:'ready',value});},error=>{if(live)setResult({key,status:'error',message:error.message});});
+    return()=>{live=false;};
+  },[key,method.id]);
+  const state=result.key===key?result:{status:key?'loading':'local'};
+  const retry=<button type="button" className="rk-btn" onClick={()=>setAttempt(value=>value+1)}>Retry</button>;
   return <div className="rk-stack">
-    <StatePanel kind="unavailable" title="Method analytics is not published yet"><p>Combining Sessions needs a server calculation (pooled completed positions, expectancy in R, profit factor on compatible units, and which Sessions were included or excluded). RIKSORA does not average win rates or stitch independent balances in the browser.</p></StatePanel>
-    {sessions.length>0&&<section className="rk-card" aria-labelledby="rk-ma-h"><h2 id="rk-ma-h">Analytics per Session</h2><p className="rk-note">Each Session has its own committed analytics.</p>
+    {state.status==='loading'&&<StatePanel kind="loading" title="Loading committed Method analytics…"/>}
+    {state.status==='error'&&<StatePanel kind="error" title="Method analytics could not load" action={retry}><p>{state.message} Nothing was changed.</p></StatePanel>}
+    {state.status==='local'&&<StatePanel kind="unavailable" title="Method analytics is not available in the local workspace"><p>Open a verified hosted workspace to request server-side pooled results.</p></StatePanel>}
+    {state.status==='ready'&&state.value.status!=='COMPLETE'&&<StatePanel kind="unavailable" title="Method analytics is unavailable"><p>{state.value.reason??'No complete compatible Session projection is available.'} No partial aggregate is shown.</p></StatePanel>}
+    {state.status==='ready'&&state.value.status==='COMPLETE'&&<>
+      <section className="rk-card" aria-labelledby="rk-ma-h"><h2 id="rk-ma-h">Committed position results</h2>
+        <p className="rk-note">Pooled completed positions from {state.value.includedSessions.length} compatible Sessions. Account balances and equity curves remain separate.</p>
+        <dl className="rk-metrics" aria-label="Pooled Method results">
+          <div><dt>Completed positions</dt><dd className="rk-num">{state.value.metrics.tradeCount}</dd></div>
+          <div><dt>Trade net ({state.value.accountCurrency||'currency unavailable'})</dt><dd className="rk-num">{state.value.completedTradeNet}</dd></div>
+          <div><dt>Win rate</dt><dd className="rk-num">{ratioLabel(state.value.metrics.winRate,{percent:true})}</dd></div>
+          <div><dt>Expectancy per position</dt><dd className="rk-num">{ratioLabel(state.value.metrics.expectancy)} {state.value.accountCurrency||''}</dd></div>
+          <div><dt>Profit factor</dt><dd className="rk-num">{ratioLabel(state.value.metrics.profitFactor)}</dd></div>
+          <div><dt>Mean R</dt><dd className="rk-num">{ratioLabel(state.value.metrics.averageR)}</dd><dd className="rk-sub">{state.value.metrics.rEligible} eligible · {state.value.metrics.rExcluded} excluded</dd></div>
+        </dl>
+      </section>
+      {!!state.value.excludedSessions.length&&<section className="rk-card"><h2>Excluded Sessions</h2><ul className="rk-mini-list">{state.value.excludedSessions.map(item=><li key={item.sessionId}><span><strong>{item.sessionId}</strong><small>{item.reason}</small></span></li>)}</ul></section>}
+    </>}
+    {sessions.length>0&&<section className="rk-card" aria-labelledby="rk-ma-sessions"><h2 id="rk-ma-sessions">Analytics per Session</h2><p className="rk-note">Each Session retains its own committed analytics and balance path.</p>
       <ul className="rk-mini-list">{sessions.map(s=><li key={s.id}><span><strong>{s.name}</strong><small>from {s.startPeriod} · {money(s.initialBalance)} starting balance</small></span><a className="rk-btn rk-btn-small" {...linkTo({screen:'analytics',method:method.id,of:s.id})} aria-label={`Analytics for ${s.name}`}>Session analytics</a></li>)}</ul></section>}
   </div>;
 }

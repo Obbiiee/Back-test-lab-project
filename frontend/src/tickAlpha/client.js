@@ -84,8 +84,39 @@ export function command(view,kind,payload){
 }
 
 // Reads only; an obsolete StrictMode mount must not start another workspace read.
-export async function loadResearchContext(selected,{active=()=>true,timeframe='1m'}={}){
+async function collectProductPage(path,artifact,project=value=>value){
+  const items=[];let after=null;const cursors=new Set();
+  for(;;){
+    const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
+    const page=await api(`${path}?${query}`);
+    if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
+      throw Error('Unsupported workspace page; no state was imported.');
+    items.push(...page.items.map(project));
+    if(items.length>128)throw Error('Workspace list exceeded its published bound.');
+    if(page.complete)return items;
+    if(typeof page.nextCursor!=='string'||cursors.has(page.nextCursor))
+      throw Error('Workspace pagination did not advance.');
+    cursors.add(page.nextCursor);after=page.nextCursor;
+  }
+}
+
+export async function loadProductCatalog(){
   const catalog=await api('/catalog');
+  if(accountTransport()){
+    const [methods,sessions]=await Promise.all([
+      collectProductPage('/methods','BTL-METHOD-PAGE-1'),
+      collectProductPage('/sessions','BTL-SESSION-PAGE-1',item=>({
+        ...item.metadata,revision:item.revision,
+        financialCountsStatus:item.financialCountsStatus,
+      })),
+    ]);
+    return {...catalog,methods,sessions};
+  }
+  return catalog;
+}
+
+export async function loadResearchContext(selected,{active=()=>true,timeframe='1m'}={}){
+  const catalog=await loadProductCatalog();
   if(!active())return null;
   const view=selected?await api(sessionPath(selected)+'/view',{timeframe}):null;
   return active()?{catalog,view}:null;

@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
-import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
+import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
 import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
@@ -181,7 +181,7 @@ export default function TickAlpha(){
       const saved=await api('/sessions',{id:creationId.current,name:fields.name,methodId:fields.methodId,
         initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
       const workspace=await loadWorkspace(saved.metadata.id);
-      setCatalog(await api('/catalog'));setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
+      setCatalog(await loadProductCatalog());setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
      }catch(error){setCreateError({code:error.message,text:noticeText(error.message)});return false;}
     });
@@ -209,7 +209,7 @@ export default function TickAlpha(){
         setConnecting(true);try{const result=await loadResearchContext(route.screen==='replay'?route.session:null,{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button>}><p>{isAccountPage()?'Retry, or sign out and sign in again. Nothing was changed.':'Start the local alpha service and database, then retry. Saved Sessions are kept.'}</p></StatePanel>)
       :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='method-new'?<MethodNew catalog={catalog} onSaved={async methodId=>{setCatalog(await api('/catalog'));setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice('Method saved. Create a Session to start replay.');}}/>
+      :route.screen==='method-new'?<MethodNew catalog={catalog} onSaved={async methodId=>{setCatalog(await loadProductCatalog());setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice('Method saved. Create a Session to start replay.');}}/>
       :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
       :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>

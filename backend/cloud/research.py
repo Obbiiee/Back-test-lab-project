@@ -7,7 +7,7 @@ import os
 import uuid
 
 import anyio
-from fastapi import Depends, Request
+from fastapi import Depends, Request, Query
 from fastapi.responses import Response
 from psycopg.rows import dict_row
 
@@ -118,6 +118,22 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
         unit = WorkspaceUnit(db, actor_id, workspace_id)
         if write:
             owner(unit.role)
+        if operation in ('method_page', 'method_detail', 'session_page'):
+            from execution import product_read_model
+            if operation == 'method_page':
+                return product_read_model.methods(db, str(workspace_id), **args[0])
+            if operation == 'method_detail':
+                return product_read_model.method(db, str(workspace_id), args[0])
+            return product_read_model.sessions(db, str(workspace_id), **args[0])
+        if operation == 'method_analytics':
+            require(_operator_catalog(dsn) is None, 'methodAnalytics', 'REFUSED_ANALYSIS_SOURCE')
+            research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
+                                           synthetic_provider=_synthetic_monthly_provider(),
+                                           state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+            try:
+                return research.method_analytics(args[0])
+            finally:
+                research.close()
         if operation == 'storage_metrics':
             owner(unit.role)
             require(type(args) in (tuple, list) and len(args) == 1, 'storageMetrics')
@@ -249,6 +265,26 @@ def install(app):
     @app.get(prefix + '/catalog')
     async def catalog(workspace_id: uuid.UUID, user: User = Depends(current)):
         return await execute(user, workspace_id, 'catalog')
+
+    @app.get(prefix + '/methods')
+    async def methods(workspace_id: uuid.UUID, limit: int = Query(25, ge=1, le=50),
+                      after: str | None = None, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_page', {'limit': limit, 'after': after})
+
+    @app.get(prefix + '/methods/{method_id}')
+    async def method_detail(workspace_id: uuid.UUID, method_id: str, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_detail', method_id)
+
+    @app.get(prefix + '/methods/{method_id}/analytics')
+    async def method_analytics(workspace_id: uuid.UUID, method_id: str, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_analytics', method_id)
+
+    @app.get(prefix + '/sessions')
+    async def sessions(workspace_id: uuid.UUID, limit: int = Query(25, ge=1, le=50),
+                       after: str | None = None, method_id: str | None = Query(None, alias='methodId'),
+                       user: User = Depends(current)):
+        return await execute(user, workspace_id, 'session_page',
+                             {'limit': limit, 'after': after, 'method_id': method_id})
 
     @app.post(prefix + '/methods')
     async def method(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):

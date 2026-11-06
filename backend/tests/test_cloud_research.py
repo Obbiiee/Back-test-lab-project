@@ -67,6 +67,70 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(self.client.get(foreign_path,headers=foreign_headers).status_code,404)
         app.close()
 
+    def test_product_method_and_session_pages_are_authenticated_bounded_metadata(self):
+        app = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
+        methods = [method() for _ in range(2)]
+        methods.sort(key=lambda item: item['id'])
+        for record in methods:
+            app.create_method(record)
+        session_ids = []
+        for index, record in enumerate(methods):
+            session_id = 'session:product-page-' + uuid.uuid4().hex
+            session_ids.append(session_id)
+            app.create_session({'id': session_id, 'name': f'Product page {index}',
+                                'methodId': record['id'], 'initialBalance': '10000',
+                                'startPeriod': '2020-01'})
+
+        method_page = self.client.get(self.root + '/methods?limit=1', headers=self.headers)
+        self.assertEqual(method_page.status_code, 200, method_page.text)
+        first = method_page.json()
+        self.assertEqual(first['artifact'], 'BTL-METHOD-PAGE-1')
+        self.assertEqual(len(first['items']), 1)
+        self.assertFalse(first['complete'])
+        detail = self.client.get(self.root + '/methods/' + first['items'][0]['id'], headers=self.headers)
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()['method'], first['items'][0])
+        second = self.client.get(self.root + '/methods?limit=1&after=' + first['nextCursor'], headers=self.headers)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertTrue(second.json()['complete'])
+        self.assertNotEqual(first['items'][0]['id'], second.json()['items'][0]['id'])
+
+        sessions = self.client.get(self.root + '/sessions?limit=1&methodId=' + methods[0]['id'],
+                                   headers=self.headers)
+        self.assertEqual(sessions.status_code, 200, sessions.text)
+        page = sessions.json()
+        self.assertEqual(page['artifact'], 'BTL-SESSION-PAGE-1')
+        self.assertEqual(len(page['items']), 1)
+        item = page['items'][0]
+        self.assertEqual(item['metadata']['id'], session_ids[0])
+        self.assertEqual(item['metadata']['methodId'], methods[0]['id'])
+        self.assertEqual(item['metadata']['startPeriod'], '2020-01')
+        self.assertEqual(item['revision'], 0)
+        self.assertEqual(item['financialCountsStatus'], 'NOT_COMPUTED_ON_LIST')
+        self.assertNotIn('orders', item)
+        analytics = self.client.get(self.root + '/methods/' + methods[0]['id'] + '/analytics',
+                                    headers=self.headers)
+        self.assertEqual(analytics.status_code, 200, analytics.text)
+        aggregate = analytics.json()
+        self.assertEqual(aggregate['artifact'], 'BTL-METHOD-ANALYTICS-1')
+        self.assertEqual(aggregate['status'], 'COMPLETE')
+        self.assertEqual(aggregate['aggregation'], 'POOLED_COMMITTED_COMPLETED_POSITIONS')
+        self.assertEqual(aggregate['includedSessions'][0]['sessionId'], session_ids[0])
+        self.assertEqual(aggregate['metrics']['tradeCount'], 0)
+        self.assertFalse(aggregate['balancesCombined'])
+        self.assertNotIn('balance', aggregate)
+        self.assertEqual(self.client.get(self.root + '/sessions').status_code, 401)
+        self.assertEqual(self.client.get(self.root + '/methods/' + methods[0]['id'] + '/analytics').status_code, 401)
+
+        _foreign_actor, foreign_headers = self.account()
+        self.assertEqual(self.client.get(self.root + '/methods', headers=foreign_headers).status_code, 404)
+        self.assertEqual(self.client.get(self.root + '/methods/' + methods[0]['id'],
+                                         headers=foreign_headers).status_code, 404)
+        self.assertEqual(self.client.get(self.root + '/methods/' + methods[0]['id'] + '/analytics',
+                                         headers=foreign_headers).status_code, 404)
+        self.assertEqual(self.client.get(self.root + '/sessions?limit=51', headers=self.headers).status_code, 422)
+        app.close()
+
     def test_paginated_journal_route_keeps_workspace_authority_and_financial_projection(self):
         app=ResearchApplication(DSN,TrustedScope(self.workspace,self.actor))
         record=method();app.create_method(record)
