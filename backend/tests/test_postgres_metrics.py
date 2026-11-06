@@ -33,7 +33,10 @@ class PostgresMetricsTests(unittest.TestCase):
         self.assertEqual(measured["walScope"], "POSTGRESQL_SERVER")
         self.assertGreater(measured["databaseBytes"], 0)
         self.assertTrue(any(row["relation"] == "research_jobs" for row in measured["relations"]))
-        self.assertIsNone(measured["retainedWalFileBytes"])
+        if measured["retainedWalFileStatus"] == "AVAILABLE_RETAINED_FILE_BYTES":
+            self.assertIsInstance(measured["retainedWalFileBytes"], int)
+        else:
+            self.assertIsNone(measured["retainedWalFileBytes"])
         self.assertIsNone(measured["perSessionWalBytes"])
         self.assertIsNone(measured["perSessionPhysicalBytes"])
         if measured["walStatus"] == "AVAILABLE_CUMULATIVE_COUNTER":
@@ -57,6 +60,12 @@ class PostgresMetricsTests(unittest.TestCase):
         relation = before["relations"][0]["relation"]
         relation_delta = next(row for row in delta["relationDeltas"] if row["relation"] == relation)
         self.assertEqual(relation_delta["totalBytesDelta"], 1024)
+        if before["retainedWalFileStatus"] == "AVAILABLE_RETAINED_FILE_BYTES":
+            self.assertEqual(delta["retainedWalFileDeltaStatus"], "COMPARABLE")
+            self.assertEqual(delta["retainedWalFileBytesDelta"], 0)
+        else:
+            self.assertEqual(delta["retainedWalFileDeltaStatus"], "NOT_COMPARABLE_OR_UNAVAILABLE")
+            self.assertIsNone(delta["retainedWalFileBytesDelta"])
 
         reset = deepcopy(after)
         if reset["walStatus"] == "AVAILABLE_CUMULATIVE_COUNTER":

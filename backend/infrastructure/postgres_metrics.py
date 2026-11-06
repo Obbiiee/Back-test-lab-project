@@ -60,6 +60,19 @@ def collect(dsn):
             db.execute("ROLLBACK TO SAVEPOINT postgres_metrics_wal")
             db.execute("RELEASE SAVEPOINT postgres_metrics_wal")
 
+        retained_wal_bytes = None
+        retained_wal_status = "UNAVAILABLE"
+        db.execute("SAVEPOINT postgres_metrics_wal_files")
+        try:
+            retained_wal_bytes = db.execute(
+                "SELECT coalesce(sum(size),0)::bigint AS retained_bytes FROM pg_ls_waldir()"
+            ).fetchone()["retained_bytes"]
+            retained_wal_status = "AVAILABLE_RETAINED_FILE_BYTES"
+            db.execute("RELEASE SAVEPOINT postgres_metrics_wal_files")
+        except PsycopgError:
+            db.execute("ROLLBACK TO SAVEPOINT postgres_metrics_wal_files")
+            db.execute("RELEASE SAVEPOINT postgres_metrics_wal_files")
+
     return {
         "schemaVersion": 1,
         "artifact": ARTIFACT,
@@ -78,11 +91,13 @@ def collect(dsn):
         "walFullPageImagesSinceReset": int(wal["wal_fpi"]) if wal else None,
         "walGeneratedBytesSinceReset": int(wal["wal_bytes"]) if wal else None,
         "walBuffersFullSinceReset": int(wal["wal_buffers_full"]) if wal else None,
-        "retainedWalFileBytes": None,
+        "retainedWalFileStatus": retained_wal_status,
+        "retainedWalFileBytes": retained_wal_bytes,
         "perSessionWalBytes": None,
         "perSessionPhysicalBytes": None,
         "allocationNote": "databaseBytes covers the current database; relation sizes cover PostgreSQL table/TOAST/index allocation for each btl relation",
         "walNote": "wal_generated_bytes is a cumulative server counter since stats reset, not retained pg_wal disk allocation or per-job attribution",
+        "retainedWalFileNote": "pg_ls_waldir aggregate is current retained server WAL-file size when permission allows; it is not WAL produced by this database or a job",
     }
 
 
@@ -204,8 +219,14 @@ def compare(before, after):
                 type(snapshot.get("serverStartedAt")) is str and
                 type(snapshot.get("databaseBytes")) is int and snapshot["databaseBytes"] >= 0 and
                 type(snapshot.get("relations")) is list and type(snapshot.get("measuredAt")) is str and
-                snapshot.get("walStatus") in ("AVAILABLE_CUMULATIVE_COUNTER", "UNAVAILABLE"),
+                snapshot.get("walStatus") in ("AVAILABLE_CUMULATIVE_COUNTER", "UNAVAILABLE") and
+                snapshot.get("retainedWalFileStatus") in ("AVAILABLE_RETAINED_FILE_BYTES", "UNAVAILABLE"),
                 "metrics", "CORRUPT_RECORD")
+        if snapshot["retainedWalFileStatus"] == "AVAILABLE_RETAINED_FILE_BYTES":
+            require(type(snapshot.get("retainedWalFileBytes")) is int and
+                    snapshot["retainedWalFileBytes"] >= 0, "metrics", "CORRUPT_RECORD")
+        else:
+            require(snapshot.get("retainedWalFileBytes") is None, "metrics", "CORRUPT_RECORD")
         for row in snapshot["relations"]:
             require(type(row) is dict and type(row.get("relation")) is str and
                     all(type(row.get(field)) is int and row[field] >= 0
@@ -274,7 +295,19 @@ def compare(before, after):
             after["walGeneratedBytesSinceReset"] - before["walGeneratedBytesSinceReset"]
             if wal_comparable else None
         ),
-        "retainedWalFileBytesDelta": None,
+        "retainedWalFileDeltaStatus": (
+            "COMPARABLE" if type(before.get("retainedWalFileBytes")) is int and
+            type(after.get("retainedWalFileBytes")) is int and
+            before.get("retainedWalFileStatus") == after.get("retainedWalFileStatus") == "AVAILABLE_RETAINED_FILE_BYTES"
+            else "NOT_COMPARABLE_OR_UNAVAILABLE"
+        ),
+        "retainedWalFileBytesDelta": (
+            after["retainedWalFileBytes"] - before["retainedWalFileBytes"]
+            if type(before.get("retainedWalFileBytes")) is int and
+            type(after.get("retainedWalFileBytes")) is int and
+            before.get("retainedWalFileStatus") == after.get("retainedWalFileStatus") == "AVAILABLE_RETAINED_FILE_BYTES"
+            else None
+        ),
         "perSessionWalBytesDelta": None,
         "attribution": "CURRENT_DATABASE_AND_SERVER_WAL_GLOBAL_ONLY",
         "currentOperationalJobMetrics": after.get("operationalJobMetrics"),
