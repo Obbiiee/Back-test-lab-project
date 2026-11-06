@@ -7,3 +7,4 @@ fastapi-users==15.0.5
 httpx==0.28.1
 certifi>=2026.10.19
 httpx-oauth==0.17.0
+pyarrow==26.0.0
