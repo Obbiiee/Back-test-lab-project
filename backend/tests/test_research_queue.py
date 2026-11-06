@@ -518,6 +518,135 @@ class QueueTests(unittest.TestCase):
                 finally:
                     worker.close()
 
+    def test_api_lifespan_worker_executes_pinned_monthly_parquet_pipeline(self):
+        """Exercise the complete shared-source path through the service worker pump."""
+        from cloud import worker
+        worker.close()
+        source = research_provider()
+        token = None
+        events = []
+        while True:
+            page = source.read_page(source.dataset_id, source.dataset_version, token, 64)
+            events.extend(page['events'])
+            if page['endOfDataset']:
+                break
+            token = page['nextToken']
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = os.path.join(temporary, 'monthly')
+            manifest = write_monthly_parquet(root, iter(events),
+                source.describe(source.dataset_id, source.dataset_version),
+                expected_version=source.dataset_version, row_group_size=128)
+            pin = {
+                'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+                'BTL_QA_SYNTHETIC_MONTHLY_ROOT': root,
+                'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': source.dataset_id,
+                'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': source.dataset_version,
+                'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': manifest['manifestHash'],
+                'BTL_TICK_SESSION_STORAGE_FORMAT': 'compact-v1',
+            }
+            with patch.dict(os.environ, pin):
+                api_client = cloud_fixture.client(self.fixture.app)
+
+                def completed_job(client, root_path, job_id):
+                    deadline = time.monotonic() + 25
+                    while time.monotonic() < deadline:
+                        response = client.get(root_path + '/jobs/' + job_id,
+                                              headers=self.fixture.headers)
+                        self.assertEqual(response.status_code, 200, response.text)
+                        result = response.json()
+                        if result['state'] not in ('QUEUED', 'RUNNING'):
+                            return result
+                        time.sleep(.05)
+                    self.fail('Timed out waiting for lifespan worker job ' + job_id)
+
+                try:
+                    with api_client as active:
+                        path = self.fixture.root
+                        record = method()
+                        created_method = active.post(path + '/methods',
+                            headers=self.fixture.headers, json=record)
+                        self.assertEqual(created_method.status_code, 200, created_method.text)
+
+                        session_id = 'session:' + uuid.uuid4().hex
+                        create_job = str(uuid.uuid4())
+                        queued = active.post(path + '/sessions',
+                            headers={**self.fixture.headers, 'X-BTL-Job': create_job}, json={
+                                'id': session_id, 'name': 'Lifespan Monthly Parquet QA',
+                                'methodId': record['id'], 'initialBalance': '10000',
+                                'startPeriod': '2020-01'})
+                        self.assertEqual(queued.status_code, 202, queued.text)
+                        self.assertEqual(queued.json()['state'], 'QUEUED')
+                        created = completed_job(active, path, create_job)
+                        self.assertEqual(created['state'], 'SUCCEEDED', created)
+                        created_response = active.post(path + '/sessions',
+                            headers={**self.fixture.headers, 'X-BTL-Job': create_job}, json={
+                                'id': session_id, 'name': 'Lifespan Monthly Parquet QA',
+                                'methodId': record['id'], 'initialBalance': '10000',
+                                'startPeriod': '2020-01'})
+                        self.assertEqual(created_response.status_code, 200, created_response.text)
+                        self.assertEqual(created_response.json(), created['result'])
+
+                        view = active.get(path + '/sessions/' + session_id,
+                                          headers=self.fixture.headers)
+                        self.assertEqual(view.status_code, 200, view.text)
+                        self.assertEqual((view.json()['state']['datasetId'],
+                                          view.json()['state']['datasetVersion']),
+                                         (source.dataset_id, source.dataset_version))
+                        review = review_request(view.json())
+                        reviewed = active.post(path + '/reviews', headers=self.fixture.headers,
+                                               json=review)
+                        self.assertEqual(reviewed.status_code, 200, reviewed.text)
+                        confirmation = {'reviewId': review['requestId'],
+                                        'reviewHash': reviewed.json()['reviewHash']}
+                        confirmed = active.post(path + '/sessions/' + session_id + '/confirm',
+                                                headers=self.fixture.headers, json=confirmation)
+                        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+                        repeated = active.post(path + '/sessions/' + session_id + '/confirm',
+                                               headers=self.fixture.headers, json=confirmation)
+                        self.assertEqual(repeated.content, confirmed.content)
+                        receipt = active.get(path + '/sessions/' + session_id + '/commands/' +
+                                             review['requestId'], headers=self.fixture.headers)
+                        self.assertEqual(receipt.status_code, 200, receipt.text)
+                        self.assertEqual(receipt.json()['status'], 'COMMITTED')
+                        self.assertTrue(receipt.json()['receipt']['durable'])
+
+                        confirmed_view = active.get(path + '/sessions/' + session_id,
+                                                    headers=self.fixture.headers).json()
+                        advance = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                                   'sessionId': session_id,
+                                   'commandId': 'command:' + uuid.uuid4().hex,
+                                   'expectedRevision': confirmed_view['state']['revision'],
+                                   'kind': 'ADVANCE',
+                                   'payload': {'targetNs': str(int(confirmed_view['state']['throughNs']) +
+                                                              15_000_000_000)}}
+                        advance_job = str(uuid.uuid4())
+                        queued_advance = active.post(
+                            path + '/sessions/' + session_id + '/commands',
+                            headers={**self.fixture.headers, 'X-BTL-Job': advance_job}, json=advance)
+                        self.assertEqual(queued_advance.status_code, 202, queued_advance.text)
+                        advance_status = completed_job(active, path, advance_job)
+                        self.assertEqual(advance_status['state'], 'SUCCEEDED', advance_status)
+                        self.assertTrue(advance_status['result']['durable'])
+
+                        journal = active.get(path + '/sessions/' + session_id + '/journal',
+                                             headers=self.fixture.headers)
+                        self.assertEqual(journal.status_code, 200, journal.text)
+                        self.assertEqual([order['id'] for order in journal.json()['orders']],
+                                         [review['requestId']])
+                        summary = active.get(path + '/sessions/' + session_id + '/summary',
+                                             headers=self.fixture.headers)
+                        self.assertEqual(summary.status_code, 200, summary.text)
+                        self.assertEqual((summary.json()['datasetId'],
+                                          summary.json()['datasetVersion']),
+                                         (source.dataset_id, source.dataset_version))
+                        meter = active.get(path + '/sessions/' + session_id + '/metering/storage',
+                                           headers=self.fixture.headers)
+                        self.assertEqual(meter.status_code, 200, meter.text)
+                        self.assertEqual(meter.json()['artifact'], 'BTL-SESSION-STORAGE-METRICS-1')
+                finally:
+                    worker.close()
+
     def test_replay_process_death_after_inner_commit_recovers_without_duplicate_fill(self):
         app,session,command=self.replay_fixture()
         try:

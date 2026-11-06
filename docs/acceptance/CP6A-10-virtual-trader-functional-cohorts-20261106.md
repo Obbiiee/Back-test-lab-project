@@ -40,6 +40,18 @@ The previous Monthly Parquet integration test drove `queue.work_one()` directly.
 
 This verifies the synthetic in-process API worker lifecycle and bounded child cleanup. It does not prove service supervision across VPS reboot, live deployment behavior, or production queue capacity.
 
+## Shared Monthly Parquet through API lifespan
+
+`QueueTests.test_api_lifespan_worker_executes_pinned_monthly_parquet_pipeline` now exercises the complete synthetic shared-source path with the actual FastAPI lifespan worker, rather than manually calling the queue pump. The test pins a temporary immutable Monthly Parquet manifest in server-side QA configuration, queues Session creation and an ADVANCE through authenticated API routes, and verifies Review → Confirm → durable receipt lookup → Journal → summary → storage meter. It resubmits Session creation with the exact same job ID and payload and receives the identical durable result.
+
+- Result: 1/1 PASS, 22.345 s.
+- PostgreSQL: temporary exclusive PostgreSQL 16 cluster stopped and removed after the run.
+- Source: generated synthetic fixture only; no historical or externally licensed source.
+- Worker count: one lifespan worker; no concurrent load or capacity test.
+- Compact storage: enabled by server-pinned `BTL_TICK_SESSION_STORAGE_FORMAT=compact-v1` for this QA-created Session only.
+
+This demonstrates a connected synthetic service path. It does not prove historical source eligibility, source rights, production deployment, VPS reboot recovery, or concurrency capacity.
+
 ## Interpretation and limits
 
 - These passes complete the sequential functional cohort sizes 1, 5, 10, 25, 50 and 100 when combined with the earlier results recorded in `AI_CONTEXT/04_CURRENT_PHASE.md`.
