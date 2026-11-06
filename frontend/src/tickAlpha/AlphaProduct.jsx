@@ -249,16 +249,8 @@ function SessionAnalytics({view,catalog}){
   </div>;
 }
 
-export function Placeholder({screen,catalog,onOpen,onSource,onFeedback}){
-  if(screen==='account')return <><PageHead eyebrow="Account" title="Account" lead="This is the private local workspace, so there is no account here. Signing in, workspaces and plans live on the secure account page."/>
-    <StatePanel kind="unavailable" title="No account in local mode" action={<a className="rk-btn rk-btn-primary" href="/?page=account">Open account page</a>}><p>The account page needs the https:// address. Local Sessions stay on this computer.</p></StatePanel></>;
-  if(screen==='replay')return <><PageHead eyebrow="Replay" title="Replay needs a Session" lead="Pick a Session to continue from its saved replay time, or open a Method to start a new one."/>
+// Replay tab without a Session (Help and Account moved to AlphaHelp.jsx in CP4).
+export function Placeholder({catalog,onOpen}){
+  return <><PageHead eyebrow="Replay" title="Replay needs a Session" lead="Pick a Session to continue from its saved replay time, or open a Method to start a new one."/>
     {catalog.sessions.length?<SessionTable sessions={catalog.sessions.slice().reverse()} catalog={catalog} onOpen={onOpen} caption="Sessions you can replay"/>:<StatePanel kind="empty" title="No Sessions yet" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Create a Method, then a Session inside it.</p></StatePanel>}</>;
-  return <><PageHead eyebrow="Help" title="Help" lead="Short answers about how RIKSORA research works."/>
-    <div className="rk-grid-2">
-      <section className="rk-card"><h2>How replay works</h2><p>History is revealed step by step from the Session’s saved time. Orders fill on later observed Bid/Ask quotes only, never on prices that were not yet visible.</p></section>
-      <section className="rk-card"><h2>Draft, review, confirm</h2><p>Buy or Sell opens a draft. The server reviews exact values, and nothing is placed until you confirm. Drawing a position is a planning tool, not a trade.</p></section>
-      <section className="rk-card"><h2>Data limitations</h2><p>Each Session pins one source and version. Missing or refused months are never filled with another feed.</p><button type="button" className="rk-btn" onClick={onSource}>Source details</button></section>
-      <section className="rk-card"><h2>Report a problem</h2><p>Send optional research feedback. Do not include passwords or tokens.</p><button type="button" className="rk-btn" onClick={onFeedback}>Open feedback</button></section>
-    </div></>;
 }

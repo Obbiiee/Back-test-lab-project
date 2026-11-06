@@ -21,6 +21,7 @@ import {planningIntent} from './planningIntent.js';
 import Segmented from './AlphaSegmented.jsx';
 import AlphaShell,{StatePanel} from './AlphaShell.jsx';
 import {MyMethods,MethodNew,MethodOverview,Analytics,Placeholder} from './AlphaProduct.jsx';
+import {HelpPage,LocalAccountPage} from './AlphaHelp.jsx';
 import {rememberSession} from './productData.js';
 import {useRoute,navigate,linkTo,accountLink} from './productRoute.js';
 import './tickAlpha.css';
@@ -156,7 +157,9 @@ export default function TickAlpha(){
       :route.screen==='journal'?<AlphaJournalPage catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='analytics'?<Analytics catalog={catalog} route={route}/>
       :route.screen==='replay'&&route.session?(busy||!notice?<StatePanel level={1} kind="loading" title="Opening Session…"/>:<StatePanel level={1} kind="unavailable" title="This Session could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
-      :<Placeholder screen={route.screen} catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>}
+      :route.screen==='help'?<HelpPage catalog={catalog} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>
+      :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
+      :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
     </AlphaShell>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>XAUUSD</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
       <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label="XAUUSD data source" title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">Au</span>XAUUSD</button><span className="alpha-ws-phone-title"><strong>XAUUSD · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}

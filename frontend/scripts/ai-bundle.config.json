@@ -59,6 +59,8 @@
     "frontend/src/tickAlpha/AlphaSessionWizard.jsx",
     "frontend/src/tickAlpha/periodAvailability.js",
     "frontend/src/tickAlpha/noteDrafts.js",
+    "frontend/src/tickAlpha/capabilities.js",
+    "frontend/src/tickAlpha/AlphaHelp.jsx",
     "frontend/src/tickAlpha/AlphaSessionPages.jsx",
     "frontend/src/tickAlpha/AlphaJournalPage.jsx",
     "frontend/src/tickAlpha/orderEstimate.js",

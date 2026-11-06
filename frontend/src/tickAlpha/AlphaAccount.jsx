@@ -126,7 +126,7 @@ export default function AlphaAccount(){
 function AccountPanel({user,workspaces,selected,busy,onOpen,onLogout,onCreate,onBack}){
   return <>
     <h2>{selected?'Account':'Choose a workspace'}</h2>
-    <dl className="rk-auth-facts"><div><dt>Signed in as</dt><dd>{user.email}</dd></div><div><dt>Email</dt><dd>Verified</dd></div>{selected&&<div><dt>Workspace</dt><dd>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access'}</dd></div>}<div><dt>Plan</dt><dd>Plans are not live yet. No payment is taken.</dd></div></dl>
+    <dl className="rk-auth-facts"><div><dt>Signed in as</dt><dd>{user.email}</dd></div><div><dt>Email</dt><dd>Verified</dd></div>{selected&&<div><dt>Workspace</dt><dd>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access'}</dd></div>}<div><dt>Sign-in methods</dt><dd>Email and password · Google sign-in is not available yet</dd></div><div><dt>Plan</dt><dd>Plans are not live yet. No payment is taken.</dd></div></dl>
     {selected&&<button type="button" className="rk-auth-btn rk-auth-primary" onClick={onBack}>Back to My Methods</button>}
     <h3>{selected?'Switch workspace':'Your workspaces'}</h3>
     <p className="rk-auth-hint">Workspaces keep research separate. At most 50 are listed. Research here uses the synthetic test feed.</p>
