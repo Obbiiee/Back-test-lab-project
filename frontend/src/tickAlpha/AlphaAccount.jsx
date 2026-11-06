@@ -25,7 +25,7 @@ function PasswordField({label,autoComplete,busy,value,onChange,invalid}){
 export default function AlphaAccount(){
   const [expired,setExpired]=useState(false);
   const [client]=useState(()=>createAccountClient({onExpired:()=>setExpired(true)}));
-  const [mode,setMode]=useState('signin'),[user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]);
+  const [mode,setMode]=useState('signin'),[user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[capabilities,setCapabilities]=useState(null);
   const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
   const route=useRoute();
@@ -35,7 +35,7 @@ export default function AlphaAccount(){
   useEffect(()=>{live.current=true;return()=>{live.current=false;clearAccountTransport();client.clear();};},[client]);
   // A 401 anywhere (account or research calls) drops back to sign-in with the safety card.
   const [seenExpired,setSeenExpired]=useState(false);
-  if(expired&&!seenExpired){setSeenExpired(true);setUser(null);setSelected(null);setWorkspaces([]);setMode('signin');}
+  if(expired&&!seenExpired){setSeenExpired(true);setUser(null);setSelected(null);setWorkspaces([]);setCapabilities(null);setMode('signin');}
   useEffect(()=>{if(expired)clearAccountTransport();},[expired]);
 
   async function action(operation){
@@ -67,12 +67,15 @@ export default function AlphaAccount(){
     });
   }
   async function resend(){await action(async()=>{await client.request('/api/v1/auth/request-verify-token',{method:'POST',body:{email:email.trim()},authenticated:false});if(live.current)setNotice('If eligible, a new code is on its way.');});}
-  async function logout(all){await action(async()=>{try{await client.logout(all);}finally{clearAccountTransport();if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setMode('signin');setNotice(all?'Signed out on every device.':'Signed out.');}}});}
+  async function logout(all){await action(async()=>{try{await client.logout(all);}finally{clearAccountTransport();if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setCapabilities(null);setMode('signin');setNotice(all?'Signed out on every device.':'Signed out.');}}});}
   function open(workspace){
-    clearAccountTransport();setAccountTransport(client,workspace.id);
-    setSelected(workspace);
-    const target=intended.current;intended.current=null;
-    navigate(target&&target.screen!=='account'?target:{screen:'methods'},{replace:true});
+    void action(async()=>{
+      const status=await client.request(`/api/v1/workspaces/${workspace.id}/capabilities`);
+      clearAccountTransport();setAccountTransport(client,workspace.id);
+      setCapabilities(status);setSelected(workspace);
+      const target=intended.current;intended.current=null;
+      navigate(target&&target.screen!=='account'?target:{screen:'methods'},{replace:true});
+    });
   }
   const secure=window.location.protocol==='https:';
 
@@ -89,7 +92,7 @@ export default function AlphaAccount(){
     <section className="rk-auth-panel">
       <div className="rk-auth-card" aria-live="polite">
         {!secure?<><h2>Use the secure address</h2><p>Accounts only work on the https:// address. The private local workspace is separate.</p><a className="rk-auth-btn rk-auth-primary" href="/">Open local workspace</a></>
-        :user?<AccountPanel user={user} workspaces={workspaces} selected={selected} busy={busy} onOpen={open} onLogout={logout} onCreate={name=>action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);})} onBack={()=>navigate({screen:'methods'})}/>
+        :user?<AccountPanel user={user} workspaces={workspaces} selected={selected} capabilities={capabilities} busy={busy} onOpen={open} onLogout={logout} onCreate={name=>action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);})} onBack={()=>navigate({screen:'methods'})}/>
         :<>
           {expired&&<div className="rk-auth-safety" role="status"><strong>Signed out for safety</strong><span>Your sign-in ended after a refresh or a while away. Your Sessions are saved.</span></div>}
           {['signin','register'].includes(mode)&&<div className="rk-auth-tabs" role="tablist" aria-label="Account">
@@ -123,10 +126,10 @@ export default function AlphaAccount(){
   </main>;
 }
 
-function AccountPanel({user,workspaces,selected,busy,onOpen,onLogout,onCreate,onBack}){
+function AccountPanel({user,workspaces,selected,capabilities,busy,onOpen,onLogout,onCreate,onBack}){
   return <>
     <h2>{selected?'Account':'Choose a workspace'}</h2>
-    <dl className="rk-auth-facts"><div><dt>Signed in as</dt><dd>{user.email}</dd></div><div><dt>Email</dt><dd>Verified</dd></div>{selected&&<div><dt>Workspace</dt><dd>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access'}</dd></div>}<div><dt>Sign-in methods</dt><dd>Email and password · Google sign-in is not available yet</dd></div><div><dt>Plan</dt><dd>Plans are not live yet. No payment is taken.</dd></div></dl>
+    <dl className="rk-auth-facts"><div><dt>Signed in as</dt><dd>{user.email}</dd></div><div><dt>Email</dt><dd>Verified</dd></div>{selected&&<div><dt>Workspace</dt><dd>{selected.name} · {selected.role==='OWNER'?'Owner':'Read access'}</dd></div>}<div><dt>Sign-in methods</dt><dd>Email and password · Google sign-in is not available yet</dd></div><div><dt>Plan</dt><dd>{capabilities?.entitlement?.status==='SANDBOX_ONLY'?'Sandbox entitlement only; no production access or funds collected.':'Not configured. No production plan or payment is available.'}</dd></div></dl>
     {selected&&<button type="button" className="rk-auth-btn rk-auth-primary" onClick={onBack}>Back to My Methods</button>}
     <h3>{selected?'Switch workspace':'Your workspaces'}</h3>
     <p className="rk-auth-hint">Workspaces keep research separate. At most 50 are listed. Research here uses the synthetic test feed.</p>
