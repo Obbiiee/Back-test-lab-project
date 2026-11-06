@@ -144,7 +144,9 @@
 .tick-alpha .rk-form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
 .tick-alpha .rk-chips{display:flex;gap:6px;flex-wrap:wrap}
 .tick-alpha .rk-shell .rk-chips button{min-height:40px;padding:0 14px;border-radius:999px;border:2px solid #d9eafe;background:#fff;color:var(--rk-ink);font:600 13px var(--rk-font-data,'IBM Plex Mono',monospace);cursor:pointer}
-.tick-alpha .rk-shell .rk-chips button[aria-pressed=true]{background:#ffce55;border-color:#ffce55}
+.tick-alpha .rk-shell .rk-chips button[aria-pressed=true],.tick-alpha .rk-shell .rk-chips button[aria-checked=true]{background:#ffce55;border-color:#ffce55}
+.tick-alpha .rk-period{display:grid;gap:12px}
+.tick-alpha .rk-shell .rk-period .rk-chips button{font-family:var(--rk-font-ui,Inter,sans-serif);text-align:left}
 .tick-alpha .rk-shell .rk-type{margin:0;background:#eaf2fd}
 .tick-alpha .rk-shell .rk-type button{min-height:44px;color:var(--rk-ink)}
 .tick-alpha .rk-shell .rk-type button[aria-checked=true]{background:var(--rk-ink);color:#fff;box-shadow:none}

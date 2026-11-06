@@ -121,7 +121,7 @@ export default function TickAlpha(){
       const workspace=await loadWorkspace(saved.metadata.id);
       setCatalog(await api('/catalog'));setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
-     }catch(error){setCreateError(noticeText(error.message));throw error;}
+     }catch(error){setCreateError({code:error.message,text:noticeText(error.message)});return false;}
     });
   };
   const openCreation=(type,event)=>{
