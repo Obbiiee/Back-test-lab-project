@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import tempfile
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -389,6 +390,9 @@ class MonthlyParquetProvider:
         digest(supplied_hash, "manifestHash")
         require(content_hash(manifest) == supplied_hash, "manifestHash", "CHILD_HASH_MISMATCH")
         manifest["manifestHash"] = supplied_hash
+        ordered = (type(manifest.get("ordering")) is dict and
+                   manifest["ordering"].get("timestamps") == "VERIFIED_NONDECREASING")
+        require(ordered, "ordering", "UNVERIFIED_ORDER")
         require(manifest["canonicalEventArtifact"] == FORMAT_ARTIFACT and
                 manifest["canonicalEventIdentity"] == "PRESERVED_EVENT_ID_FIELD" and
                 manifest["compression"] == {"codec": COMPRESSION, "level": COMPRESSION_LEVEL},
@@ -530,7 +534,11 @@ class MonthlyParquetProvider:
                 events[0]["rawOrdinal"] == group_entry["firstOrdinal"] and
                 events[-1]["rawOrdinal"] == group_entry["lastOrdinal"],
                 "rowGroupBounds", "CORRUPT_INDEX_POINTER")
-        return events
+        timestamps = table.column("timestamp_ns").to_numpy(zero_copy_only=False)
+        require(timestamps.ndim == 1 and len(timestamps) == len(events) and
+                np.all(timestamps[1:] >= timestamps[:-1]),
+                "timestampIndex", "ORDER_REVERSAL")
+        return events, timestamps
 
     def iter_range(self, start_ns, end_ns):
         """Yield exact canonical ticks in [start_ns, end_ns), in source order."""
@@ -550,8 +558,19 @@ class MonthlyParquetProvider:
             for group in file_entry["rowGroups"]:
                 if int(group["lastTimeNs"]) < start_ns or int(group["firstTimeNs"]) >= end_ns:
                     continue
-                events = self._read_row_group(path, file_entry, group)
-                for event in events:
+                events, timestamps = self._read_row_group(path, file_entry, group)
+                # The row-group hash and chronology are verified before this
+                # index can prune candidates. Without the proof, use the
+                # chronological scan rather than granting the accelerator trust.
+                if self.manifest["ordering"]["timestamps"] == "VERIFIED_NONDECREASING":
+                    lo = int(np.searchsorted(timestamps, np.int64(start_ns), side="left"))
+                    hi = (len(timestamps) if end_ns == 2**63 else
+                          int(np.searchsorted(timestamps, np.int64(end_ns), side="left")))
+                    candidates = events[lo:hi]
+                else:  # Defensive fallback if a future manifest version allows unproven order.
+                    candidates = [event for event in events
+                                  if start_ns <= int(event["timeNs"]) < end_ns]
+                for event in candidates:
                     moment = int(event["timeNs"])
                     ordinal = int(event["rawOrdinal"])
                     source_id = event["provenance"]["sourceId"]
@@ -562,8 +581,7 @@ class MonthlyParquetProvider:
                             (source_index != previous_source or ordinal > previous_ordinal),
                             "datasetOrder", "ORDER_REVERSAL")
                     previous_time, previous_source, previous_ordinal = moment, source_index, ordinal
-                    if start_ns <= moment < end_ns:
-                        yield event
+                    yield event
 
     def iter_groups(self, start_ns, end_ns):
         """Yield whole equal-timestamp groups, even across Arrow batches/groups."""
