@@ -1,0 +1,47 @@
+@import '../tickAlpha/riksoraBrand.css';
+
+html, body, #root { min-width: 320px; min-height: 100%; margin: 0; }
+body { min-height: 100vh; overflow: auto; background: #071226; color: #edf3fb; }
+.terminal-preview { min-height: 100vh; display: flex; flex-direction: column; background: #071226; color: #edf3fb; font: 14px var(--rk-font-ui, Inter, sans-serif); }
+.tp-header { min-height: 62px; display: flex; align-items: center; gap: 18px; padding: 10px clamp(12px, 3vw, 36px); background: #061a3c; border-bottom: 1px solid #254775; }
+.tp-brand { color: #fff; text-decoration: none; font-weight: 800; letter-spacing: .12em; white-space: nowrap; }
+.tp-brand span { color: #b9cde8; font-weight: 500; letter-spacing: .08em; }
+.tp-preview-badge { display: inline-flex; min-height: 30px; align-items: center; padding: 5px 12px; border: 1px solid #9a7618; border-radius: 999px; background: #392d0e; color: #ffdb76; font-size: 11px; font-weight: 800; letter-spacing: .045em; }
+.tp-header-note { margin-left: auto; color: #b9cde8; font-size: 12px; }
+.tp-meta { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px clamp(12px, 3vw, 36px); border-bottom: 1px solid #1c3357; }
+.tp-meta div { display: grid; gap: 4px; }
+.tp-meta div span, .tp-meta p, .tp-footer { color: #a8bad3; font-size: 12px; }
+.tp-meta p { max-width: 600px; margin: 0; text-align: right; }
+.tp-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px clamp(12px, 3vw, 36px); background: #0b1d38; border-bottom: 1px solid #1c3357; }
+.tp-tools label { color: #b9cde8; font-size: 12px; }
+.tp-tools select, .tp-tools > button { min-height: 36px; border: 1px solid #36547b; border-radius: 8px; padding: 0 10px; background: #10284b; color: #eef4fc; }
+.tp-tools .nav-action { display: inline-flex; height: 36px; border: 1px solid #36547b; border-radius: 8px; background: #10284b; color: #eef4fc; }
+.tp-tool-hint { color: #96abc8; font-size: 11px; }
+.tp-chart-card { flex: 1; min-height: 540px; display: flex; flex-direction: column; margin: 14px clamp(8px, 2vw, 24px); overflow: hidden; border: 1px solid #243b5d; border-radius: 12px; background: #101216; }
+.tp-chart-title { min-height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid #273242; }
+.tp-chart-title span { color: #e8c866; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.tp-chart-host { position: relative; flex: 1; min-height: 490px; }
+.tp-chart-host .chart-wrap { position: absolute; inset: 0; background: #101216; }
+.tp-chart-host .chart-tools { display: flex; position: absolute; z-index: 5; top: 0; left: 0; right: 0; gap: 6px; overflow-x: auto; min-height: 36px; padding: 2px 8px; background: #111d30; }
+.tp-chart-host .chart-tools button { min-height: 30px; border: 1px solid #29476e; border-radius: 6px; padding: 2px 8px; background: #0b1d38; color: #d9e8fa; font-size: 11px; }
+.tp-chart-host .chart-tools button.active { border-color: #f2cd5c; }
+.tp-chart-host .chart-canvas-layer { inset: 36px 0 0; }
+.tp-chart-host .candle-chart { position: absolute; inset: 0; }
+.tp-chart-host .chart-action-hint { position: absolute; top: 40px; left: 10px; z-index: 7; max-width: calc(100% - 20px); padding: 5px 8px; border-radius: 6px; background: #10284be8; color: #f3d675; font-size: 11px; }
+.tp-footer { display: flex; justify-content: space-between; gap: 12px; padding: 0 clamp(12px, 3vw, 36px) 16px; }
+.tp-chart-host .overlay-indicator-dialog { background: #081a35; color: #edf3fb; }
+@media (max-width: 760px) {
+  .tp-header { min-height: 56px; flex-wrap: wrap; gap: 8px; }
+  .tp-preview-badge { order: 3; width: 100%; justify-content: center; }
+  .tp-header-note { margin-left: auto; }
+  .tp-meta { align-items: flex-start; flex-direction: column; }
+  .tp-meta p { text-align: left; }
+  .tp-tools { align-items: stretch; }
+  .tp-tools label { align-self: center; }
+  .tp-tools select { flex: 1; min-width: 0; }
+  .tp-tool-hint { flex-basis: 100%; }
+  .tp-chart-card { min-height: 510px; margin: 8px; border-radius: 8px; }
+  .tp-chart-host { min-height: 460px; }
+  .tp-chart-title { min-height: 38px; }
+  .tp-footer { flex-direction: column; padding: 0 12px 14px; }
+}
