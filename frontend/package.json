@@ -55,7 +55,8 @@
     "test:period-availability": "node tests/period-availability.test.mjs",
     "test:note-drafts": "node tests/note-drafts.test.mjs",
     "test:confirm-outcome": "node tests/confirm-outcome.test.mjs",
-    "test:indicator-window": "node tests/indicator-window.test.mjs"
+    "test:indicator-window": "node tests/indicator-window.test.mjs",
+    "test:indicator-cap": "node tests/indicator-cap.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",

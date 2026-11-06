@@ -78,7 +78,7 @@ React rerenders and hydration are not the cost. The heap at 45k candles without 
 
 - Memory: PASS for the simulated budget (154 MB at the API maximum).
 - Low-memory phone acceptance: **HOLD** until it is measured on a real device.
-- **Proposal for owner review (not implemented):** on phones (≤ 760 px), show at most 8 indicators by default and keep the rest stored but hidden until enabled. The measured phone frame p95 is 33 ms at 8 indicators vs 50 ms at 16.
+- **Phone indicator cap (owner approved 2026-11-06, `src/tickAlpha/indicatorCap.js`):** at ≤ 760 px only the first 8 visible indicators are mounted on the chart. The rest keep their stored settings and are marked "paused on this phone" in the indicator studio and the object tree. Desktop is unchanged, and nothing is written back to storage. Measured at 390 px with 4× CPU and 16 stored indicators (8 drawn): heap 154 → 86.5 MB, frame p95 50 → 33 ms, max 100 → 50 ms. `tests/indicator-cap.test.mjs`; screenshot `docs/evidence/c15/phone-cap-390.png`.
 
 ## Viewports, orientation, gestures, motion
 
