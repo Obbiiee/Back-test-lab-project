@@ -1,4 +1,5 @@
 import './riksoraBrand.css';
+import {capabilities,STATUS_LABEL} from './capabilities.js';
 import './alphaHome.css';
 import {RiksoraMark} from './AlphaBrand.jsx';
 import {pagePath} from './client.js';
@@ -20,7 +21,7 @@ function previewCandles(){
 }
 const candles=previewCandles();
 const steps=[
-  ['Pick a moment','Write your strategy, choose a start month and a starting balance. The chart stops right there.'],
+  ['Write a Method, start a Session','Write the rules once, then pick the instrument, start month and balance. The chart stops right there.'],
   ['Press Play and trade','Candles form one by one. Buy, Sell, or plan a trade with stop and target when your setup shows up.'],
   ['Learn from the results','Every trade lands in the journal and Analysis: win rate, profit factor, drawdown and the balance line.'],
 ];
@@ -31,7 +32,7 @@ export default function AlphaHome(){
     <a className="alpha-home-skip" href="#how">Skip to how it works</a>
     <header className="alpha-home-nav">
       <a className="alpha-home-brand" href={home} aria-label="Riksora Labs home"><RiksoraMark size={40}/><span>RIKSORA <small>BACKTEST LAB</small></span></a>
-      <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#features">Features</a><a href="#principles">Principles</a></nav>
+      <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#features">Features</a><a href="#principles">Principles</a><a href="#today">Today</a></nav>
       <a className="alpha-home-pill" href={workspace}>Open workspace</a>
     </header>
 
@@ -39,7 +40,7 @@ export default function AlphaHome(){
       <div className="alpha-home-copy">
         <p className="alpha-home-badge"><span>Local Alpha</span>Replay real bid/ask ticks</p>
         <h1>Practice trading on <span className="alpha-home-sticker">yesterday’s</span> market.</h1>
-        <p className="alpha-home-intro">Pick a date, press Play and trade the candles as they form. No peeking at the future, no guessed fills. Just you, your plan and the replay.</p>
+        <p className="alpha-home-intro">Pick a start month, press Play and trade the candles as they form. No peeking at the future, no guessed fills. Just you, your plan and the replay.</p>
         <div className="alpha-home-actions">
           <a className="alpha-home-primary" href={workspace}>Start backtesting</a>
           <a className="alpha-home-secondary" href="#how"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg></span>See how it works</a>
@@ -83,10 +84,19 @@ export default function AlphaHome(){
       <ul><li>Data provenance</li><li>No look-ahead</li><li>Reproducible Sessions</li><li>Explicit limitations</li></ul>
     </section>
 
+    <section id="today" className="alpha-home-today" aria-labelledby="alpha-home-today">
+      <h2 id="alpha-home-today">What works today</h2>
+      <p>This is an early research build. Here is exactly what it does and does not do yet.</p>
+      <div className="alpha-home-today-cols">
+        <div><h3>Available</h3><ul>{capabilities().filter(item=>item.status==='AVAILABLE').map(item=><li key={item.id}>{item.label}</li>)}</ul></div>
+        <div><h3>Not yet</h3><ul>{capabilities().filter(item=>item.status!=='AVAILABLE').map(item=><li key={item.id}>{item.label} <small>({STATUS_LABEL[item.status].toLowerCase()})</small></li>)}</ul></div>
+      </div>
+    </section>
+
     <section className="alpha-home-cta">
       <span className="alpha-home-cta-square" aria-hidden="true"/><span className="alpha-home-cta-circle" aria-hidden="true"/><span className="alpha-home-cta-dot" aria-hidden="true"/>
       <h2>Your next 100 trades can happen tonight.</h2>
-      <p>Practice months of market in an evening.</p>
+      <p>Replay runs at the speed you choose and stops whenever you do.</p>
       <a href={workspace}>Start backtesting</a>
     </section>
 

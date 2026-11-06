@@ -52,7 +52,8 @@ export async function api(path,body,{signal}={}){
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
     ...(body===undefined?{}:{body:JSON.stringify(body)}),signal:signal??AbortSignal.timeout(30000)});
   const value=await response.json();
-  if(!response.ok)throw new Error(value.detail||'Local service unavailable');
+  // `status` lets callers tell a definitive refusal from an unknown outcome (confirmOutcome.js).
+  if(!response.ok)throw Object.assign(new Error(value.detail||'Local service unavailable'),{status:response.status});
   if(value.schemaVersion!==1)throw new Error('Unsupported local response; no state was imported.');
   return value;
 }
