@@ -8,6 +8,7 @@ import logging
 import json
 import uuid
 from contextlib import asynccontextmanager
+from threading import Event, Thread
 from time import monotonic
 
 import anyio
@@ -23,8 +24,13 @@ from ticks.contracts import tag, uint
 GLOBAL_LIMIT = 16
 USER_LIMIT = 2
 RETAINED_LIMIT = 32
-WORKERS = 2
+WORKERS = 1
+MAX_JOB_ATTEMPTS = 3
+LEASE_SECONDS = 30
+HEARTBEAT_SECONDS = 5
+QUEUE_TTL_SECONDS = 60
 OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to'))
+MUTATING_OPERATIONS = frozenset(('create_session', 'replay', 'replay_to'))
 
 
 def scoped(db, actor_id, workspace_id):
@@ -33,8 +39,50 @@ def scoped(db, actor_id, workspace_id):
 
 
 def view(row):
+    cancellation = ('CANCELLED' if row['state'] == 'CANCELLED' else 'NOT_REQUESTED')
+    if row.get('cancel_requested_at') is not None and row['state'] != 'CANCELLED':
+        cancellation = ('REQUESTED' if row['state'] == 'RUNNING' else
+                        'TOO_LATE' if row['state'] == 'SUCCEEDED' else 'RECONCILE_REQUIRED')
     return {'schemaVersion': 1, 'jobId': str(row['id']), 'state': row['state'],
-            'result': json.loads(bytes(row['result'])) if row['result'] is not None else None}
+            'result': json.loads(bytes(row['result'])) if row['result'] is not None else None,
+            'attempt': row.get('attempts', 0), 'heartbeatAt': row.get('heartbeat_at'),
+            'cancellation': cancellation}
+
+
+def _reap_expired_leases(db):
+    """Requeue a bounded number of abandoned claims; never discard financial uncertainty."""
+    return db.execute("""
+        WITH expired AS (
+            SELECT id FROM btl.research_jobs
+            WHERE state='RUNNING' AND lease_until <= clock_timestamp()
+            ORDER BY lease_until,id LIMIT 32 FOR UPDATE SKIP LOCKED
+        )
+        UPDATE btl.research_jobs j SET
+            state = CASE
+                WHEN j.cancel_requested_at IS NOT NULL AND j.operation NOT IN ('replay','replay_to','create_session') THEN 'CANCELLED'
+                WHEN j.cancel_requested_at IS NOT NULL THEN 'RECONCILE_REQUIRED'
+                WHEN j.attempts < %s THEN 'QUEUED'
+                WHEN j.operation IN ('replay','replay_to','create_session') THEN 'RECONCILE_REQUIRED'
+                ELSE 'FAILED'
+            END,
+            expires_at = CASE WHEN j.cancel_requested_at IS NULL AND j.attempts < %s
+                              THEN clock_timestamp() + (%s * interval '1 second') ELSE j.expires_at END,
+            result = NULL,
+            finished_at = CASE WHEN j.cancel_requested_at IS NULL AND j.attempts < %s
+                               THEN NULL ELSE clock_timestamp() END,
+            lease_owner = NULL, lease_until = NULL, heartbeat_at = NULL
+        FROM expired WHERE j.id=expired.id
+        RETURNING j.id
+    """, (MAX_JOB_ATTEMPTS, MAX_JOB_ATTEMPTS, QUEUE_TTL_SECONDS, MAX_JOB_ATTEMPTS)).fetchall()
+
+
+def _expire_queued(db):
+    return db.execute("""
+        UPDATE btl.research_jobs SET
+            state=CASE WHEN operation IN ('replay','replay_to','create_session') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,
+            finished_at=clock_timestamp()
+        WHERE state='QUEUED' AND expires_at < clock_timestamp()
+    """).rowcount
 
 
 def replay_command(raw, session_id):
@@ -92,11 +140,12 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
             require((previous['actor_id'], previous['workspace_id']) == (actor_id, workspace_id), 'job', 'RESOURCE_UNAVAILABLE')
             require(previous['input_hash'] == digest, 'jobInput', 'IDEMPOTENCY_CONFLICT')
             return view(previous)
-        db.execute("UPDATE btl.research_jobs SET state=CASE WHEN operation IN ('replay','replay_to') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,finished_at=clock_timestamp() WHERE id IN (SELECT id FROM btl.research_jobs WHERE state='QUEUED' AND expires_at<clock_timestamp() FOR UPDATE SKIP LOCKED)")
+        _reap_expired_leases(db)
+        _expire_queued(db)
         counts = db.execute("SELECT count(*) AS global_count,count(*) FILTER (WHERE actor_id=%s) AS user_count FROM btl.research_jobs WHERE state='QUEUED'", (actor_id,)).fetchone()
         require(counts['global_count'] < GLOBAL_LIMIT and counts['user_count'] < USER_LIMIT, 'queue', 'QUEUE_CAPACITY')
         # Bounded completed operational receipts; canonical financial history is untouched.
-        db.execute("DELETE FROM btl.research_jobs WHERE id IN (SELECT id FROM btl.research_jobs WHERE state<>'QUEUED' ORDER BY finished_at DESC,id OFFSET %s)", (RETAINED_LIMIT-GLOBAL_LIMIT-1,))
+        db.execute("DELETE FROM btl.research_jobs WHERE id IN (SELECT id FROM btl.research_jobs WHERE state NOT IN ('QUEUED','RUNNING') ORDER BY finished_at DESC,id OFFSET %s)", (RETAINED_LIMIT-GLOBAL_LIMIT-1,))
         row = db.execute("INSERT INTO btl.research_jobs(id,actor_id,workspace_id,operation,input,input_hash,state) VALUES (%s,%s,%s,%s,%s,%s,'QUEUED') RETURNING *",
                          (job_id, actor_id, workspace_id, operation, raw, digest)).fetchone()
         return view(row)
@@ -105,11 +154,12 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
 def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
     with connect(dsn) as db:
         scoped(db, actor_id, workspace_id)
+        _reap_expired_leases(db)
         row = db.execute('SELECT * FROM btl.research_jobs WHERE id=%s AND actor_id=%s AND workspace_id=%s',
                          (job_id, actor_id, workspace_id)).fetchone()
         require(row is not None, 'job', 'RESOURCE_UNAVAILABLE')
         if row['state'] == 'QUEUED':
-            # SKIP LOCKED: already executing read work is not falsely reported cancelled.
+            # SKIP LOCKED: a claim that won the race is reported as RUNNING, never cancelled falsely.
             claimed = db.execute("SELECT * FROM btl.research_jobs WHERE id=%s FOR UPDATE SKIP LOCKED", (job_id,)).fetchone()
             if not claimed:
                 return {**view(row), 'state': 'RUNNING', 'cancellation': 'WAIT_FOR_RESULT'}
@@ -118,25 +168,65 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
                 return view(row)
             if cancel:
                 state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else 'CANCELLED'
-                row = db.execute("UPDATE btl.research_jobs SET state=%s,finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *", (state, job_id)).fetchone() or row
+                row = db.execute("UPDATE btl.research_jobs SET state=%s,cancel_requested_at=clock_timestamp(),finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *", (state, job_id)).fetchone() or row
             elif not db.execute('SELECT clock_timestamp()<%s AS valid',(row['expires_at'],)).fetchone()['valid']:
                 state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else 'EXPIRED'
                 row = db.execute("UPDATE btl.research_jobs SET state=%s,finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *",(state, job_id)).fetchone()
+        elif row['state'] == 'RUNNING' and cancel:
+            row = db.execute("UPDATE btl.research_jobs SET cancel_requested_at=COALESCE(cancel_requested_at,clock_timestamp()) WHERE id=%s AND state='RUNNING' RETURNING *",
+                             (job_id,)).fetchone() or row
         return view(row)
 
 
 def work_one(dsn, runner):
-    """One admitted task, retaining exclusive database-owned worker scope."""
+    """Claim durably, heartbeat a short lease, and finalize by lease fencing token."""
     with connect(dsn) as db:
         db.row_factory = dict_row
-        slot = next((i for i in range(WORKERS) if db.execute('SELECT pg_try_advisory_xact_lock(2020,%s) AS acquired', (310+i,)).fetchone()['acquired']), None)
+        slot = next((i for i in range(WORKERS) if db.execute(
+            'SELECT pg_try_advisory_lock(2020,%s) AS acquired', (310+i,)).fetchone()['acquired']), None)
         if slot is None:
             return False
+        _reap_expired_leases(db)
+        _expire_queued(db)
         # Oldest head per actor first: one actor cannot consume both slots.
         row = db.execute("SELECT * FROM btl.research_jobs j WHERE state='QUEUED' AND NOT EXISTS (SELECT 1 FROM btl.research_jobs p WHERE p.actor_id=j.actor_id AND p.state='QUEUED' AND (p.created_at,p.id)<(j.created_at,j.id)) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED").fetchone()
         if row is None:
             return False
-        start = monotonic()
+        if not db.execute('SELECT clock_timestamp()<%s AS valid', (row['expires_at'],)).fetchone()['valid']:
+            state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS else 'EXPIRED'
+            db.execute('UPDATE btl.research_jobs SET state=%s,finished_at=clock_timestamp() WHERE id=%s AND state=\'QUEUED\'',
+                       (state, row['id']))
+            return True
+        lease_owner = uuid.uuid4()
+        row = db.execute("""
+            UPDATE btl.research_jobs SET state='RUNNING',lease_owner=%s,
+                lease_until=clock_timestamp() + (%s * interval '1 second'),
+                heartbeat_at=clock_timestamp(),attempts=attempts+1
+            WHERE id=%s AND state='QUEUED' RETURNING *
+        """, (lease_owner, LEASE_SECONDS, row['id'])).fetchone()
+        require(row is not None, 'jobClaim', 'RESOURCE_UNAVAILABLE')
+        db.commit()  # Release the row lock; the session-level worker slot stays fenced.
+        started = monotonic()
+        stop_heartbeat = Event()
+
+        def heartbeat():
+            while not stop_heartbeat.wait(HEARTBEAT_SECONDS):
+                try:
+                    with connect(dsn) as beat_db:
+                        refreshed = beat_db.execute("""
+                            UPDATE btl.research_jobs SET heartbeat_at=clock_timestamp(),
+                                lease_until=clock_timestamp() + (%s * interval '1 second')
+                            WHERE id=%s AND state='RUNNING' AND lease_owner=%s RETURNING id
+                        """, (LEASE_SECONDS, row['id'], lease_owner)).fetchone()
+                    if refreshed is None:
+                        return
+                except Exception as error:
+                    logging.getLogger(__name__).warning(
+                        'research_job_heartbeat_failed job_id=%s error_type=%s',
+                        row['id'], type(error).__name__)
+
+        heartbeat_thread = Thread(target=heartbeat, name=f"btl-job-heartbeat-{row['id']}", daemon=True)
+        heartbeat_thread.start()
         try:
             try:
                 payload = json.loads(bytes(row['input']))
@@ -144,7 +234,6 @@ def work_one(dsn, runner):
                 raise ContractError('CORRUPT_RECORD', 'job') from None
             require(content_hash(payload) == row['input_hash'] and payload['operation'] == row['operation'], 'jobHash', 'CORRUPT_RECORD')
             args = payload['args']
-            require(db.execute('SELECT clock_timestamp()<%s AS valid', (row['expires_at'],)).fetchone()['valid'], 'deadline', 'EXPIRED')
             # Existing runner locks verified membership through the actual read.
             if row['operation'] == 'replay':
                 # Existing permanent command dedup recovers an inner COMMIT if
@@ -159,7 +248,7 @@ def work_one(dsn, runner):
                 result = runner(dsn, row['actor_id'], row['workspace_id'], 'create_session', tuple(args), write=True)
             else:
                 result = runner(dsn, row['actor_id'], row['workspace_id'], row['operation'], tuple(args))
-                require(monotonic()-start <= 30, 'deadline', 'EXPIRED')
+                require(monotonic()-started <= 30, 'deadline', 'EXPIRED')
             raw = canonical_bytes({'schemaVersion': 1, **result})
             require(len(raw) <= 8388608, 'result', 'REFUSED_RESPONSE_LIMIT')
             state = 'SUCCEEDED'
@@ -168,9 +257,29 @@ def work_one(dsn, runner):
                 'research_job_failed job_id=%s operation=%s error_code=%s',
                 row['id'], row['operation'], error.code)
             raw = None
-            state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
-        # Infrastructure/process faults intentionally roll back, leaving QUEUED.
-        db.execute('UPDATE btl.research_jobs SET state=%s,result=%s,finished_at=clock_timestamp() WHERE id=%s', (state, raw, row['id']))
+            state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
+        except BaseException:
+            # Leave RUNNING durable. Lease expiry performs the bounded retry or
+            # reconciliation transition after this process and its heartbeat exit.
+            raise
+        finally:
+            stop_heartbeat.set()
+            heartbeat_thread.join(timeout=HEARTBEAT_SECONDS + 1)
+
+        latest = db.execute('SELECT cancel_requested_at FROM btl.research_jobs WHERE id=%s AND state=\'RUNNING\' AND lease_owner=%s FOR UPDATE',
+                             (row['id'], lease_owner)).fetchone()
+        if latest is None:
+            return True  # A newer fencing token owns recovery; durable inner receipt remains authoritative.
+        cancelled = latest['cancel_requested_at'] is not None
+        if cancelled and row['operation'] not in MUTATING_OPERATIONS:
+            state, raw = 'CANCELLED', None
+        elif cancelled and state != 'SUCCEEDED':
+            state, raw = 'RECONCILE_REQUIRED', None
+        db.execute("""
+            UPDATE btl.research_jobs SET state=%s,result=%s,finished_at=clock_timestamp(),
+                lease_owner=NULL,lease_until=NULL,heartbeat_at=NULL
+            WHERE id=%s AND state='RUNNING' AND lease_owner=%s
+        """, (state, raw, row['id'], lease_owner))
         return True
 
 

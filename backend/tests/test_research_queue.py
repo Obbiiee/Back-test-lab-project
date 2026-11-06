@@ -4,6 +4,7 @@ import uuid
 import unittest
 import subprocess
 import sys
+import time
 from unittest.mock import patch
 import psycopg
 from psycopg import sql
@@ -78,6 +79,9 @@ class QueueTests(unittest.TestCase):
             raise RuntimeError('authored process-stage fault')
         with self.assertRaises(RuntimeError):
             queue.work_one(self.dsn, crash)
+        with connect(self.dsn) as db:
+            db.execute("UPDATE btl.research_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=%s",
+                       (job['jobId'],))
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])['state'],'QUEUED')
         self.assertTrue(queue.work_one(self.dsn,lambda *args: {'value':'authored bounded result'}))
         result = queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])
@@ -91,6 +95,9 @@ class QueueTests(unittest.TestCase):
         script="from cloud.queue import work_one; import os; work_one(os.environ['BTL_TEST_DATABASE_URL'], lambda *args: os._exit(17))"
         process=subprocess.run([sys.executable,'-B','-c',script],timeout=15,capture_output=True,env={**os.environ,'BTL_TEST_DATABASE_URL':self.dsn})
         self.assertEqual(process.returncode,17,process.stderr.decode(errors='replace'))
+        with connect(self.dsn) as db:
+            db.execute("UPDATE btl.research_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=%s",
+                       (job['jobId'],))
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])['state'],'QUEUED')
         self.assertTrue(queue.work_one(self.dsn,lambda *args:{'value':'after actual process death'}))
 
@@ -182,6 +189,9 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
             before=app.inspect(session)
             self.assertEqual(before['state']['revision'],command['expectedRevision']+1)
             self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in before['events']))
+            with connect(self.dsn) as db:
+                db.execute("UPDATE btl.research_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=%s",
+                           (job['jobId'],))
             self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])['state'],'QUEUED')
             self.assertTrue(queue.work_one(self.dsn,run))
             result=queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])
@@ -202,7 +212,6 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
             expired=self.submit(operation='replay',args=(session,command))
             with connect(self.dsn) as db:
                 db.execute("UPDATE btl.research_jobs SET expires_at=clock_timestamp()-interval '1 second' WHERE id=%s",(expired['jobId'],))
-            self.assertTrue(queue.work_one(self.dsn,run))
             self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,expired['jobId'])['state'],'RECONCILE_REQUIRED')
             conflict={**command,'payload':{'targetNs':str(int(command['payload']['targetNs'])+60_000_000_000)}}
             changed=self.submit(operation='replay',args=(session,conflict))
@@ -229,7 +238,7 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
         finally:
             app.close()
 
-    def test_two_workers_cannot_run_same_actor_and_cancel_running_is_honest(self):
+    def test_single_worker_lease_heartbeat_and_cancel_running_is_honest(self):
         first, second = self.submit(), self.submit()
         entered, release = Event(), Event()
         def hold(*args):
@@ -241,11 +250,21 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
             task=pool.submit(queue.work_one,self.dsn,hold)
             try:
                 self.assertTrue(entered.wait(5))
-                self.assertFalse(queue.work_one(self.dsn,lambda *args:self.fail('same actor may not occupy both workers')))
-                self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,first['jobId'],cancel=True)['state'],'RUNNING')
+                self.assertFalse(queue.work_one(self.dsn,lambda *args:self.fail('single worker slot is exclusive')))
+                initial=queue.inspect(self.dsn,self.actor,self.workspace,first['jobId'])
+                self.assertEqual(initial['state'],'RUNNING')
+                time.sleep(queue.HEARTBEAT_SECONDS + .2)
+                running=queue.inspect(self.dsn,self.actor,self.workspace,first['jobId'],cancel=True)
+                self.assertEqual(running['state'],'RUNNING')
+                self.assertEqual(running['cancellation'],'REQUESTED')
+                self.assertEqual(running['attempt'],1)
+                self.assertGreater(running['heartbeatAt'],initial['heartbeatAt'])
             finally:
                 release.set()
             self.assertTrue(task.result(8))
+        finished=queue.inspect(self.dsn,self.actor,self.workspace,first['jobId'])
+        self.assertEqual(finished['state'],'CANCELLED')
+        self.assertEqual(finished['cancellation'],'CANCELLED')
         self.assertTrue(queue.work_one(self.dsn,lambda *args:{'value':'second'}))
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,second['jobId'])['state'],'SUCCEEDED')
 
@@ -254,8 +273,8 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
         with connect(self.dsn) as db:
             db.execute("UPDATE btl.research_jobs SET expires_at=clock_timestamp()-interval '1 second' WHERE id=%s",(expired['jobId'],))
             db.execute("UPDATE btl.research_jobs SET input=%s WHERE id=%s",(b'{"schemaVersion":1,"operation":"workspace","args":["session:changed",{}]}',corrupt['jobId']))
-        for _ in range(2):
-            self.assertTrue(queue.work_one(self.dsn,lambda *args:self.fail('invalid job must not execute')))
+        self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,expired['jobId'])['state'],'EXPIRED')
+        self.assertTrue(queue.work_one(self.dsn,lambda *args:self.fail('invalid job must not execute')))
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,expired['jobId'])['state'],'EXPIRED')
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,corrupt['jobId'])['state'],'FAILED')
 
