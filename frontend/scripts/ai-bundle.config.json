@@ -55,6 +55,7 @@
     "frontend/src/tickAlpha/productRoute.js",
     "frontend/src/tickAlpha/productData.js",
     "frontend/src/tickAlpha/alphaProduct.css",
+    "frontend/src/tickAlpha/AlphaChartSettings.jsx",
     "frontend/src/tickAlpha/orderEstimate.js",
     "frontend/src/tickAlpha/AlphaEquityChart.jsx",
     "frontend/src/assets/riksora-mark.png",
