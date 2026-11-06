@@ -51,7 +51,8 @@
     "test:c06-indicators": "node tests/c06-indicators.test.mjs",
     "test:c03-professional-drawings": "node tests/c03-professional-drawings.test.mjs",
     "test:c04-extended-drawings": "node tests/c04-extended-drawings.test.mjs",
-    "test:f08-pwa": "node tests/f08-pwa.test.mjs"
+    "test:f08-pwa": "node tests/f08-pwa.test.mjs",
+    "test:indicator-window": "node tests/indicator-window.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
