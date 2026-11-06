@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {PageHead,StatePanel} from './AlphaShell.jsx';
 import {InstrumentPicker,MethodPicker,SearchableSelect} from './AlphaSelect.jsx';
-import {periodAvailability,periodChoiceOk,defaultPeriod,monthLabel} from './periodAvailability.js';
+import {periodAvailability,periodChoiceOk,defaultPeriod,monthLabel,instrumentReason} from './periodAvailability.js';
 import {sourceContext} from './client.js';
 import {money,kindLabel} from './productData.js';
 import {linkTo} from './productRoute.js';
@@ -67,7 +67,7 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
             ?<SearchableSelect label="Start month (UTC)" placeholder="Search or select month" searchPlaceholder="Search months…" value={period} onChange={setPeriod} disabled={busy}
               options={availability.months.map(item=>({value:item.period,label:monthLabel(item.period),description:item.period,keywords:[item.period],badge:item.selectable?'Available':undefined,disabled:!item.selectable,disabledReason:item.reason}))}
               hint="Only months the server lists as available can be chosen."/>
-            :<div className="rk-wizard-fixed" role="status"><strong>No month is available for {instrument}</strong><span>The server lists no available start month for this instrument right now. Nothing is filled from other data.</span></div>)
+            :<div className="rk-wizard-fixed" role="status"><strong>No month is available for {instrument}</strong><span>{availability.instrumentStatus&&availability.instrumentStatus!=='AVAILABLE'?`${instrumentReason(availability.instrumentStatus)}.`:'The server lists no available start month for this instrument right now.'} Nothing is filled from other data.</span></div>)
           :!availability.earliest?<div className="rk-wizard-fixed" role="status"><strong>Start months are not published</strong><span>The server did not state an earliest month for this source, so a Session cannot be set up here.</span></div>
           :<div className="rk-period">
             <div className="rk-chips" role="group" aria-label="Start month">

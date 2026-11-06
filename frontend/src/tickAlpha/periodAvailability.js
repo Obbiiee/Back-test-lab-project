@@ -17,6 +17,17 @@ const REASONS={
   EXPIRED:'No longer offered for new Sessions',
   QA_BLOCKED:'Held back until data checks pass',
 };
+// Instrument-level statuses. PARTIAL is pinned fail-closed (REQ-01): until Codex
+// states that an AVAILABLE month of a PARTIAL instrument is complete and accepted by
+// POST /sessions, no month of it is offered. Any unknown status is also closed.
+export const INSTRUMENT_REASONS={
+  PARTIAL:'Coverage for this instrument is partial; months open when the server confirms which are complete',
+  QA_BLOCKED:'Held back until data checks pass',
+  RIGHTS_BLOCKED:'Data rights do not cover this instrument',
+  PLANNED:'Planned; not ingested yet',
+  NOT_LISTED:'The server does not list this instrument',
+};
+export const instrumentReason=status=>INSTRUMENT_REASONS[status]||'Instrument not available';
 
 export const isMonth=value=>typeof value==='string'&&MONTH.test(value);
 
@@ -32,7 +43,7 @@ export function periodAvailability(catalog,instrumentId,historical){
     const months=(Array.isArray(entry.periods)?entry.periods:[])
       .filter(item=>isMonth(item?.period)&&typeof item.status==='string')
       .map(item=>({period:item.period,status:item.status,selectable:entry.status==='AVAILABLE'&&item.status==='AVAILABLE',
-        reason:item.status==='AVAILABLE'?(entry.status==='AVAILABLE'?null:REASONS[entry.status]||'Instrument not available'):(item.reason||REASONS[item.status]||'Not available')}))
+        reason:item.status==='AVAILABLE'?(entry.status==='AVAILABLE'?null:instrumentReason(entry.status)):(item.reason||REASONS[item.status]||'Not available')}))
       .sort((a,b)=>a.period.localeCompare(b.period));
     return {mode:'published',months,instrumentStatus:entry.status};
   }

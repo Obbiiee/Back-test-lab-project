@@ -43,6 +43,23 @@ assert.equal(eur.months[0].reason,'Held back until data checks pass');
 assert.equal(defaultPeriod(eur),null);
 assert.deepEqual(periodAvailability(dto,'GBPUSD',true),{mode:'published',months:[],instrumentStatus:'NOT_LISTED'});
 
+// Pinned fixtures per instrument status (REQ-01): PARTIAL / RIGHTS_BLOCKED / QA_BLOCKED / PLANNED / unknown
+// instruments offer no month even when a month row says AVAILABLE; GAP rows never open.
+const fixture=status=>({...base,label:'QA FIXTURE / INSTRUMENT STATUS / NOT MARKET DATA',availability:{schemaVersion:1,instruments:[{instrumentId:'XAUUSD',status,periods:[
+  {period:'2024-11',status:'AVAILABLE'},{period:'2024-12',status:'GAP'},{period:'2025-01',status:'AVAILABLE'}]}]}});
+for(const status of ['PARTIAL','RIGHTS_BLOCKED','QA_BLOCKED','PLANNED','SOMETHING_NEW']){
+  const a=periodAvailability(fixture(status),'XAUUSD',true);
+  assert.equal(a.instrumentStatus,status);
+  assert.ok(a.months.every(m=>!m.selectable),status+' opened a month');
+  assert.equal(defaultPeriod(a),null,status);
+  assert.equal(periodChoiceOk(a,'2024-11'),false,status);
+  assert.equal(a.months[1].reason,'No observations in this month','GAP keeps its own reason');
+}
+assert.match(periodAvailability(fixture('PARTIAL'),'XAUUSD',true).months[0].reason,/partial/);
+assert.equal(periodAvailability(fixture('SOMETHING_NEW'),'XAUUSD',true).months[0].reason,'Instrument not available');
+const okGap=periodAvailability(fixture('AVAILABLE'),'XAUUSD',true);
+assert.deepEqual(okGap.months.map(m=>m.selectable),[true,false,true]);
+
 // Unknown schema version is ignored rather than guessed.
 assert.equal(periodAvailability({...dto,availability:{...dto.availability,schemaVersion:2}},'XAUUSD',true).mode,'unpublished');
 assert.equal(monthLabel('2025-01'),'January 2025');

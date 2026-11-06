@@ -28,6 +28,7 @@ Requests from the frontend for routes or fields that the UI needs but the backen
 
 - `period` is `YYYY-MM` in UTC; `periods` lists every month the server knows about for that instrument. Unlisted months are never offered.
 - A month is selectable only when both the instrument and the month are `AVAILABLE`.
+- **Pinned semantics (founder round 2).** Instrument `PARTIAL`, `QA_BLOCKED`, `RIGHTS_BLOCKED`, `PLANNED`, or any status the frontend does not know: no month is offered, even rows marked `AVAILABLE`, and the Period step shows the instrument reason. Month `GAP`, `RIGHTS_BLOCKED`, `EXPIRED`, `QA_BLOCKED` or unknown: listed but disabled with its reason. **Open question for Codex:** does `PARTIAL` with an `AVAILABLE` month mean that month is complete and accepted by `POST /sessions`? Until Codex answers in this document, the frontend stays fail-closed; it does not relax the gate on a guess. Fixtures: `tests/period-availability.test.mjs` (labeled `QA FIXTURE / INSTRUMENT STATUS / NOT MARKET DATA`).
 - `POST /sessions` stays the authority: it must still refuse a month it would not serve, even if the catalog listed it (race with re-ingest).
 - No future knowledge leaks: the list describes which months a new Session may start in, not EOF or the future tick range of an open Session.
 

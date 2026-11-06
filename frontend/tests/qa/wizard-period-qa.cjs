@@ -111,6 +111,13 @@ const NONE_AVAILABLE = { schemaVersion: 1, instruments: [{ instrumentId: 'XAUUSD
     await page.screenshot({ path: `${out}/period-none-available-1440.png` });
   });
 
+  await run('PARTIAL instrument with AVAILABLE months stays closed and says why (pinned REQ-01)', { availability: { schemaVersion: 1, instruments: [{ instrumentId: 'XAUUSD', status: 'PARTIAL', periods: [{ period: '2024-11', status: 'AVAILABLE' }, { period: '2025-01', status: 'AVAILABLE' }] }] }, refuse: { status: 422, code: 'X' } }, async page => {
+    must(await page.getByText('No month is available for XAUUSD').isVisible(), 'PARTIAL opened months');
+    must(await page.getByText(/Coverage for this instrument is partial/).isVisible(), 'instrument reason missing');
+    must(!(await cont(page).isEnabled()), 'Continue enabled');
+    await page.screenshot({ path: `${out}/period-partial-1440.png` });
+  });
+
   for (const vp of [{ width: 390, height: 844 }, { width: 320, height: 640 }])
     await run(`phone ${vp.width}: period step fits`, { viewport: vp, refuse: { status: 422, code: 'X' } }, async page => {
       await page.getByRole('button', { name: 'Another month' }).click();
