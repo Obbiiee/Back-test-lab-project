@@ -13,6 +13,7 @@ from ticks.contracts import CanonicalTick, keys, uint
 from ticks.timeline import make_group
 from .contracts import (ENGINE_VERSION, MAX_EVENTS, MAX_ORDERS, command_wire, exact,
                         money, open_payload, policy_from_wire, price, text, validate_state)
+from .next_event import scan_untrusted_tie
 
 
 def emit(state, events, kind, *, order_id=None, classification="OBSERVED_FEED_EVENT", **detail):
@@ -255,8 +256,12 @@ def advance(state, groups, coverage, diagnostics, through_ns):
                         before = len(events)
                         if equivalent:
                             quote_fill(state, events, rows[0], group, sorted(r["eventId"] for r in rows))
-                        elif any(can_change(state, r) for r in rows):
-                            unresolved(state, events, "UNRESOLVED_EQUAL_TIME_ORDER", dict(groupId=group["groupId"], timeNs=group["timeNs"]))
+                        else:
+                            candidate = scan_untrusted_tie(state, rows)
+                            if candidate is None:
+                                candidate = any(can_change(state, r) for r in rows)
+                            if candidate:
+                                unresolved(state, events, "UNRESOLVED_EQUAL_TIME_ORDER", dict(groupId=group["groupId"], timeNs=group["timeNs"]))
                         # No financial action is a proven common outcome; no row is selected as chronology.
                         if len(events) == before:
                             emit(state, events, "CHRONOLOGY_LIMITATION", groupId=group["groupId"],
