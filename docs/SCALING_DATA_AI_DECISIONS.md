@@ -652,11 +652,11 @@ Use Odoo aggressively where it saves commodity business-development work, but pr
 
 ## 21. RIKSORA Lean Execution & Unit-Economics Architecture — 2026-11-06
 
-> **Status:** Owner-selected **planning direction** for a complete low-cost execution platform, consolidated here instead of creating a competing architecture file. **Not a production freeze, merge, deploy, schema migration, source license, or benchmark authorization.** \`AGENTS.md\`, frozen decisions, current-phase gates and the financial/data source contracts remain superior. Reviews of [Claude's PR #42](https://github.com/Obbiiee/Back-test-lab-project/pull/42) and Codex CP6A evidence inform this section. Items marked **RESEARCH/HOLD** are NOT adopted implementations.
+> **Status:** Owner-selected **planning direction** for a complete low-cost execution platform, consolidated here instead of creating a competing architecture file. **Not a production freeze, merge, deploy, schema migration, source license, or benchmark authorization.** `AGENTS.md`, frozen decisions, current-phase gates and the financial/data source contracts remain superior. Reviews of [Claude's PR #42](https://github.com/Obbiiee/Back-test-lab-project/pull/42) and Codex CP6A evidence inform this section. Items marked **RESEARCH/HOLD** are NOT adopted implementations.
 
 ### 21.1 Product architecture to build as one coherent backend
 
-\`\`\`text
+```text
 Authenticated trader -> FastAPI modular API
    -> cheap read path (Session, chart, journal, job status)
    -> per-workspace admission -> PostgreSQL bounded durable research_jobs queue
@@ -667,10 +667,10 @@ Authenticated trader -> FastAPI modular API
       -> existing causal controller + exact deterministic reducer [SOLE FINANCIAL AUTHORITY]
    -> atomic PostgreSQL command/receipt/event/current-state/checkpoint commit
    -> paginated journal/trade read models, observable job/usage meters
-\`\`\`
+```
 
 - **Keep:** existing React/Vite/Lightweight Charts, FastAPI, PostgreSQL, exact tick-native reducer and Bid/Ask, atomic timestamp groups, no look-ahead, quality/gap/UNRESOLVED gates, immutable ledger and identical idempotent confirm outcomes. Avoid replacing engine or adding Redis/Celery/Kubernetes/Rust/extra databases without demonstrated need.
-- **Reuse:** existing \`btl.research_jobs\` and migration 008/009 queue schema as starting point; do not create a second incompatible queue. Lease/claim, bounded backlog, expiration, per-tenant fairness, progress/status, safe cancel and recovery must be added/validated. Financial effects are committed exactly once by durable dedup, despite at-least-once job delivery. Read-only journal/status requests do not wait for heavy replay jobs.
+- **Reuse:** existing `btl.research_jobs` and migration 008/009 queue schema as starting point; do not create a second incompatible queue. Lease/claim, bounded backlog, expiration, per-tenant fairness, progress/status, safe cancel and recovery must be added/validated. Financial effects are committed exactly once by durable dedup, despite at-least-once job delivery. Read-only journal/status requests do not wait for heavy replay jobs.
 - **One source, multiple readers:** immutable **Monthly Parquet** under provider/feed/instrument/version/year/month is the owner-selected experiment layout, **not a production-performance winner**. The owner's requested DuckDB monthly read path can coexist with PyArrow/NumPy on the SAME Parquet files, without duplicated market data. Choose the operator based on workload and measurements, not library labels. No new history download/convert/publish for a source without the required rights/admission.
 - **Parquet correctness contract:** preserve full precision, quality/diagnostics, source ordinal and original ordering TRUST; do not sort an untrusted provider order into a trusted one. Version manifest binds source, coverage, rights, file hashes, row-group bounds, encoding, schema, timezone and price scale. Stable tick identity and forensic proofs remain compatible with frozen canonical event IDs until an independently accepted migration. A row-group hash alone is NOT proven a drop-in replacement for per-event semantics.
 - **Parquet performance candidate:** start with ZSTD and integer bid/ask/ts plus validated group statistics; ~128k row-group records is an *initial hypothesis*, not a universal optimum. Read bounded ranges with explicit timestamp + ordinal ordering, preserve equal-time groups across batch/month boundaries, never materialize a whole month per Session.
@@ -700,10 +700,10 @@ Record cost units during normal operations:
 
 ### 21.3 Review decisions still required — do not silently adopt
 
-1. **Canonical identity:** replacing the existing per-event canonical commitment with only \`(file, row)\` + hash of a row group is **NEEDS-CHANGE** pending a proof of unchanged semantic identities, original ordinal/trust, auditability, cold/fork/recovery and data migration. Keep canonical identity unless independently proved equivalent and owner-approved.
+1. **Canonical identity:** replacing the existing per-event canonical commitment with only `(file, row)` + hash of a row group is **NEEDS-CHANGE** pending a proof of unchanged semantic identities, original ordinal/trust, auditability, cold/fork/recovery and data migration. Keep canonical identity unless independently proved equivalent and owner-approved.
 2. **Fast path:** large performance wins are plausible, but hftbacktest's accelerated example loses some fidelity. Adopt only an *optional exactly-equivalent proof-gated* scanner with fallback until representative RIKSORA parity and end-to-end CPU gains are measured; do not market 260×/40,000× as measured RIKSORA performance.
 3. **Storage policy:** compact QA-v3 is promising; neither checkpoint pruning nor short command receipts may alter immutable recoverability or identical durable retry responses. Select cadence and delta/index policy by bounded restore/fork measurements, not a fixed N.
-4. **Rights/public distribution:** commercial and even free beta access to data is separate from an internal owner decision. Keep \`UNKNOWN/NOT_GRANTED\` until a sufficient data-source agreement/rights review supports the actual uses; do not make unlicensed files globally cacheable. Public price assets require a deliberate legal/repository cleanup plan, not automatic history rewrite.
+4. **Rights/public distribution:** commercial and even free beta access to data is separate from an internal owner decision. Keep `UNKNOWN/NOT_GRANTED` until a sufficient data-source agreement/rights review supports the actual uses; do not make unlicensed files globally cacheable. Public price assets require a deliberate legal/repository cleanup plan, not automatic history rewrite.
 5. **Scaling/claims:** one-core/100-user synthetic acceptance and RAM <85% do not alone prove comfortable SaaS capacity. Set queue depth, per-user fairness, p95 request and queue-wait targets, recovery and error budgets and then measure the entire pipeline.
 
 **Review references:**
@@ -714,5 +714,5 @@ Record cost units during normal operations:
 - [HFTBacktest accelerated versus full comparison](https://hftbacktest.readthedocs.io/en/latest/tutorials/Accelerated%20Backtesting.html)
 - [Parquet on-disk checksums/specification](https://github.com/apache/parquet-format)
 - [RFC 6962 Merkle inclusion and consistency proofs](https://www.rfc-editor.org/rfc/rfc6962)
-- [PostgreSQL \`SKIP LOCKED\` queue semantics](https://www.postgresql.org/docs/current/sql-select.html)
+- [PostgreSQL `SKIP LOCKED` queue semantics](https://www.postgresql.org/docs/current/sql-select.html)
 - [Dukascopy terms of use](https://www.dukascopy.com/swiss/english/legal-pages/terms-of-use/)
