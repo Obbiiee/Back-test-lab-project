@@ -699,6 +699,7 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 }
 /* C-14 (2026-11-06): confirm sheet (REVIEW_EXACT / COMMIT_PENDING / STALE / REFUSED) and Pick-from-chart mini ticket. */
 .alpha-review-sheet{display:flex;flex-direction:column;gap:12px;width:min(520px,calc(100vw - 32px))}
+.alpha-review-sheet:focus{outline:none}.alpha-review-sheet:focus-visible{outline:2px solid var(--lab-focus,#5aa2ff);outline-offset:2px}
 .alpha-review-sheet-head h2{margin:2px 0 0;font-size:20px}
 .alpha-review-step{font:600 12px var(--rk-font-data,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--lab-text-secondary)}
 .alpha-review-sheet-body{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto}

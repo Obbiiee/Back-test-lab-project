@@ -33,6 +33,14 @@ export default function AlphaReviewSheet({review,view,busy,onConfirm,onCheck,onR
   const [failure,setFailure]=useState(null);
   const [checking,setChecking]=useState(false);
   const sending=useRef(false);
+  // Focus follows the phase: disabling the focused Confirm button would otherwise drop
+  // focus to the page, so pending moves it to the sheet and an outcome to its main action.
+  const sheet=useRef(null);
+  useEffect(()=>{
+    if(phase==='REVIEW_EXACT')return;
+    const primary=sheet.current?.querySelector('.alpha-review-primary:not(:disabled)');
+    (phase==='COMMIT_PENDING'||!primary?sheet.current:primary)?.focus();
+  },[phase,checking]);
   useEffect(()=>{const timer=setTimeout(()=>setArmed(true),ARM_MS);return()=>clearTimeout(timer);},[]);
   const settle=result=>{
     if(result.outcome==='COMMITTED'){if(!result.refreshed)setPhase('COMMITTED');return;} // refreshed: parent closes
@@ -55,7 +63,7 @@ export default function AlphaReviewSheet({review,view,busy,onConfirm,onCheck,onR
   const pending=phase==='COMMIT_PENDING';
   const rr=ratio(payload.entry,payload.sl,payload.tp);
   const conditions=payload.observations??[];
-  return <section className={`alpha-dialog alpha-review-sheet is-${phase.toLowerCase().replace('_','-')}`} aria-busy={pending||undefined}>
+  return <section ref={sheet} tabIndex={-1} className={`alpha-dialog alpha-review-sheet is-${phase.toLowerCase().replace('_','-')}`} aria-busy={pending||undefined}>
     <div className="alpha-review-sheet-head"><span className="alpha-review-step">Step 3 of 3 · Confirm</span><h2>Confirm reviewed order</h2></div>
     <div className="alpha-review-sheet-body">
       {(phase==='STALE'||phase==='REFUSED')&&<div className="alpha-review-refusal" role="alert">
