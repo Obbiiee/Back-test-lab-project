@@ -63,3 +63,12 @@ section.overlay-indicator-dialog.indicator-studio form button[type=submit]:activ
   section.overlay-indicator-dialog.indicator-studio button, section.overlay-indicator-dialog.indicator-studio input, section.overlay-indicator-dialog.indicator-studio select { min-height:44px; }
   section.overlay-indicator-dialog.indicator-studio .indicator-instance button { min-width:44px; height:44px; }
 }
+/* C-15 declutter: collapsed category groups with a count; Popular stays open. */
+.ind-fold > summary { display:flex; align-items:center; gap:8px; min-height:36px; cursor:pointer; list-style:none; }
+.ind-fold > summary::-webkit-details-marker { display:none; }
+.ind-fold > summary::before { content:'›'; font-weight:800; transition:transform var(--rk-fast,120ms); color:var(--rk-muted,#52627a); }
+.ind-fold[open] > summary::before { transform:rotate(90deg); }
+.ind-fold > summary h3 { margin:0; }
+.ind-fold-count { font-size:11px; font-weight:700; color:var(--rk-muted,#52627a); }
+.ind-fold > summary:focus-visible { outline:2px solid var(--rk-focus,#1378f5); outline-offset:2px; border-radius:6px; }
+@media (prefers-reduced-motion: reduce) { .ind-fold > summary::before { transition:none; } }

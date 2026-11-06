@@ -27,7 +27,12 @@ const stored = page => page.evaluate(() => {
 
   // Catalog: categories, search, volume entries shown as unavailable.
   await page.getByRole('button', { name: 'Indicators' }).click(); await sleep(300);
-  const addButtons = await dialog().getByRole('button', { name: /^Add / }).count();
+  // C-15: a Popular row is open; category groups start collapsed with a count.
+  const popular = await dialog().getByRole('group', { name: 'Popular' }).getByRole('button', { name: /^Add / }).count();
+  assert.equal(popular, 8, 'Popular row');
+  assert.equal(await dialog().getByRole('button', { name: /^Add / }).count(), 8, 'groups start collapsed');
+  for (const summary of await dialog().locator('details.ind-fold > summary').all()) await summary.click();
+  const addButtons = await dialog().locator('details.ind-fold').getByRole('button', { name: /^Add / }).count();
   assert.equal(addButtons, 50, 'All 50 registered indicators are offered');
   const blocked = await dialog().locator('button.ind-blocked').count();
   assert.ok(blocked >= 10, 'Volume indicators listed as unavailable');

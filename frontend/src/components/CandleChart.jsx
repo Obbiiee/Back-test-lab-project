@@ -535,9 +535,12 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
         {/* compactTools: the host shows Volume inside its Chart settings popover. previewOnly: design preview (PR #38) has no order path. */}
         {!compactTools && <button type="button" disabled={!volumeAvailable} title={volumeAvailable ? 'Volume' : 'Source volume is unavailable; tick count is not exchange volume'} className={showVolume ? "active" : ""} aria-pressed={showVolume} onClick={() => onChartPreferencesChange((value) => ({ ...value, showVolume: !value.showVolume }))}>Volume</button>}
         {!previewOnly && <button type="button" className={drawingMode === "order" ? "active" : ""} aria-pressed={drawingMode === "order"} onClick={() => onDrawingModeChange(drawingMode === "order" ? "none" : "order")}>Pick order price</button>}
-        <span className="tool-divider" />
-        <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>
-        <button type="button" onClick={redoDrawing} disabled={!historyState.canRedo} aria-label="Redo drawing" title="Redo (Ctrl+Y)">↷ Redo</button>
+        {/* Contextual: Undo/Redo appear once there is drawing history (Ctrl+Z / Ctrl+Y and the chart menu always work). */}
+        {(historyState.canUndo || historyState.canRedo) && <>
+          <span className="tool-divider" />
+          <button type="button" onClick={undoDrawing} disabled={!historyState.canUndo} aria-label="Undo drawing" title="Undo (Ctrl+Z)">↶ Undo</button>
+          <button type="button" onClick={redoDrawing} disabled={!historyState.canRedo} aria-label="Redo drawing" title="Redo (Ctrl+Y)">↷ Redo</button>
+        </>}
         {selectedDrawingId && <>
           <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, locked: !drawing.locked } : drawing))} aria-label="Lock drawing" title="Lock / unlock drawing">{drawings.find((drawing) => drawing.id === selectedDrawingId)?.locked ? "🔒" : "🔓"}</button>
           <button type="button" onClick={() => commitDrawings((current) => current.map((drawing) => drawing.id === selectedDrawingId ? { ...drawing, hidden: !drawing.hidden } : drawing))} aria-label="Hide drawing" title="Show / hide drawing">◉</button>
