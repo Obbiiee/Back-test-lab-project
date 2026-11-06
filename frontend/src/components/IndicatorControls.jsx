@@ -82,7 +82,7 @@ export default function IndicatorControls({ instances, onChange, onOpen, registr
     <button ref={trigger} type="button" className="nav-action" aria-label="Indicators" onClick={() => { onOpen?.(); setOpen(true); }}>Indicators{instances.length ? ` (${instances.length})` : ''}</button>
     {open && <WorkspaceModal label="Overlay indicators" onClose={close} returnFocusRef={trigger}>
       <section className="overlay-indicator-dialog indicator-studio">
-        <header><strong>Indicators</strong><span className="ind-count">{instances.length}/16 on chart</span><button type="button" aria-label="Close indicators" onClick={close}>×</button></header>
+        <header><strong>Indicators</strong><span className="ind-count">{instances.length}/16 on chart · saved in this browser only</span><button type="button" aria-label="Close indicators" onClick={close}>×</button></header>
         <div className="ind-layout">
           <div className="ind-catalog">
             <input type="search" aria-label="Search indicators" placeholder="Search indicators…" value={query} onChange={event => setQuery(event.target.value)} />

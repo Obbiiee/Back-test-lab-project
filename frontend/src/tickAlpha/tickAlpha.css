@@ -719,3 +719,16 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 .alpha-pick-reasons{margin:0;padding-left:18px;font-size:12px;color:var(--rk-muted,#52627a);display:grid;gap:2px}
 @media(max-width:400px){.alpha-pick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.tick-alpha .alpha-review-sheet,.alpha-pick-ticket{animation:none}.alpha-review-spinner{animation-duration:2.4s}}
+.alpha-sheet-search{display:block;margin:4px 0 8px}.tick-alpha .alpha-sheet-search input{width:100%;box-sizing:border-box;min-height:44px;border-radius:999px;padding:0 16px}
+.alpha-sheet-empty{margin:8px 0;color:var(--lab-text-secondary)}
+.alpha-local-only{margin:8px 0 0;font-size:12px;color:var(--lab-text-secondary)}
+/* C-14: phone landscape keeps the single-row, chart-first header (the C-13 two-row phone header is portrait only). */
+@media(max-height:500px) and (orientation:landscape) and (max-width:1000px){
+  .tick-alpha.has-workspace .alpha-chart-header{flex-wrap:nowrap;overflow-x:auto;row-gap:0}
+  .tick-alpha.has-workspace .alpha-chart-header::after{display:none}
+  .tick-alpha.has-workspace .alpha-chart-header>*{order:0}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-back,.tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{order:-1}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex:0 1 auto;min-width:0;overflow:hidden}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title *{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{margin-left:auto;order:1}
+}
