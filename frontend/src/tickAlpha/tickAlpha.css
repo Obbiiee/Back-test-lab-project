@@ -636,3 +636,44 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button[aria-pressed=true] small{color:inherit}
 .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes button.alpha-buy[aria-pressed=true]{background:#0f67d8;border-color:#0f67d8}
 .tick-alpha .alpha-ticket.alpha-dialog .alpha-direction-quotes small{opacity:1}
+/* Chart settings popover (progressive disclosure: Fit, Grid, Crosshair, Volume, Full screen) */
+.tick-alpha .alpha-chart-settings{position:relative;display:inline-flex}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-trigger{display:inline-flex;align-items:center;gap:6px}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-trigger[aria-expanded=true]{background:var(--rk-yellow);color:var(--rk-navy);border-color:var(--rk-yellow)}
+.tick-alpha .alpha-chart-settings-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:60;min-width:240px;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:20px;background:var(--rk-white,#fff);color:var(--rk-navy,#061a3c);border:2px solid var(--rk-ice,#d9eafe);box-shadow:0 6px 0 var(--rk-blue,#1378f5);animation:alpha-pop .16s ease-out;font-family:var(--rk-font-ui,Inter,sans-serif)}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-panel .alpha-settings-row,.tick-alpha .alpha-chart-settings-panel .alpha-settings-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;border:0;background:transparent;color:var(--rk-navy,#061a3c);font:700 14px var(--rk-font-ui,Inter,sans-serif);text-align:left;cursor:pointer;margin:0}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-panel .alpha-settings-row{justify-content:flex-start}
+.tick-alpha .alpha-chart-header .alpha-chart-settings-panel .alpha-settings-row:hover,.tick-alpha .alpha-chart-settings-panel .alpha-settings-switch:hover{background:var(--rk-ice-soft,#f3f8ff)}
+.tick-alpha .alpha-chart-settings-panel .alpha-settings-switch span{display:flex;flex-direction:column;line-height:1.25}
+.tick-alpha .alpha-chart-settings-panel small{font-size:11px;font-weight:600;color:#52627a}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]{appearance:none;-webkit-appearance:none;flex:none;width:40px;height:24px;margin:0;border-radius:999px;background:#c9d6ea;position:relative;cursor:pointer;transition:background .18s ease}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .18s ease}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]:checked{background:var(--rk-blue-strong,#0f67d8)}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]:checked::after{transform:translateX(16px)}
+.tick-alpha .alpha-chart-settings-panel input[role=switch]:disabled{opacity:.45;cursor:not-allowed}
+.tick-alpha .alpha-chart-settings-panel :focus-visible{outline:3px solid var(--rk-yellow,#ffce55);outline-offset:2px}
+@keyframes alpha-pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@media(max-width:760px){
+  .tick-alpha .alpha-chart-header .alpha-btn-label,.tick-alpha .alpha-chart-settings-trigger span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .tick-alpha .alpha-chart-settings-panel{position:fixed;left:12px;right:12px;top:auto;bottom:calc(84px + env(safe-area-inset-bottom));min-width:0;border-radius:24px}
+}
+@media(prefers-reduced-motion:reduce){.tick-alpha .alpha-chart-settings-panel{animation:none}}
+/* Phone: two-row chart header so nothing scrolls sideways. Row 1 = back, title, Session menu; row 2 = chart tools. */
+@media(max-width:760px){
+  .tick-alpha.has-workspace .alpha-chart-header{flex-wrap:wrap;overflow:visible;row-gap:6px}
+  .tick-alpha.has-workspace .alpha-chart-header>*{order:2}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-back,.tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title,.tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{order:1}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex:1 1 0;min-width:0}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{margin-left:auto}
+}
+@media(max-width:760px){
+  .tick-alpha.has-workspace .alpha-chart-header::after{content:"";order:1;flex-basis:100%;height:0}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex:1 1 120px}
+}
+@media(max-width:400px){
+  .tick-alpha.has-workspace .alpha-chart-header{gap:5px;padding-inline:6px}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title{flex-basis:80px}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu>summary{padding-inline:10px;font-size:12px}
+  .tick-alpha.has-workspace .alpha-chart-header>.alpha-touch-only,.tick-alpha.has-workspace .alpha-chart-settings-trigger{min-width:40px;width:40px;padding:0;justify-content:center}
+  .tick-alpha.has-workspace .alpha-chart-header .nav-action{padding-inline:10px}
+}
