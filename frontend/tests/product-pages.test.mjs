@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {loadProductCatalog,createMethodVersion,setMethodArchived} from '../src/tickAlpha/client.js';
+import {loadProductCatalog,loadMoreProductCatalog,createMethodVersion,setMethodArchived} from '../src/tickAlpha/client.js';
 import {setAccountTransport,clearAccountTransport} from '../src/tickAlpha/accountClient.js';
 import {readRoute,routeHref} from '../src/tickAlpha/productRoute.js';
 
@@ -32,10 +32,14 @@ const client={subject:()=>subject,request:async (path,options={})=>{
 setAccountTransport(client,workspace);
 try{
   const catalog=await loadProductCatalog();
-  assert.equal(catalog.methods.length,51);
-  assert.equal(catalog.methods[50].id,'method:050');
-  assert.equal(catalog.methods[50].methodFamilyId,'method:050');
-  assert.equal(catalog.methods[50].methodVersion,1);
+  assert.equal(catalog.methods.length,50,'initial load remains one bounded page');
+  assert.equal(catalog.methods[49].id,'method:049');
+  assert.equal(catalog.methods[49].methodFamilyId,'method:049');
+  assert.equal(catalog.methods[49].methodVersion,1);
+  assert.equal(catalog.productPagination.methods.complete,false);
+  const more=await loadMoreProductCatalog(catalog,'methods');
+  assert.equal(more.methods.length,51);
+  assert.equal(more.methods[50].id,'method:050');
   assert.deepEqual(catalog.sessions,[{id:'session:one',name:'Synthetic QA',methodId:'method:000',
     startPeriod:'2020-01',initialBalance:'10000',revision:4,
     financialCountsStatus:'NOT_COMPUTED_ON_LIST'}]);
@@ -48,14 +52,16 @@ try{
   assert.ok(calls.includes('/api/v1/workspaces/'+workspace+'/research/method-families/method%3A050/lifecycle'));
 }finally{clearAccountTransport();}
 
-let methodPage=0;
 const nonAdvancingClient={subject:()=>subject,request:async path=>{
   if(path.endsWith('/catalog'))return {schemaVersion:1,artifact:'BTL-LOCAL-CATALOG-1',methods:[],sessions:[],profile:{instrumentId:'XAUUSD'}};
-  if(path.includes('/method-families?includeArchived=true&limit=50'))return {schemaVersion:1,artifact:'BTL-METHOD-FAMILY-PAGE-1',items:[],complete:false,nextCursor:`method:${++methodPage}`};
+  if(path.includes('/method-families?includeArchived=true&limit=50'))return {schemaVersion:1,artifact:'BTL-METHOD-FAMILY-PAGE-1',items:[],complete:false,nextCursor:'method:stuck'};
   if(path.includes('/sessions?limit=50'))return {schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',items:[],complete:true,nextCursor:null};
   throw new Error(`Unexpected path ${path}`);
 }};
 setAccountTransport(nonAdvancingClient,workspace);
-try{await assert.rejects(loadProductCatalog(),/page bound/);}
+try{
+  const first=await loadProductCatalog();
+  await assert.rejects(loadMoreProductCatalog(first,'methods'),/did not advance/);
+}
 finally{clearAccountTransport();}
 console.log('hosted product pagination: ok');

@@ -108,44 +108,65 @@ export function command(view,kind,payload){
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
-// Reads only; an obsolete StrictMode mount must not start another workspace read.
-async function collectProductPage(path,artifact,project=value=>value){
-  const items=[];let after=null;let pages=0;const cursors=new Set();
-  for(;;){
-    if(++pages>3)throw Error('Workspace pagination exceeded its published page bound.');
-    const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
-    const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
-    if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
-      throw Error('Unsupported workspace page; no state was imported.');
-    items.push(...page.items.map(project));
-    if(items.length>128)throw Error('Workspace list exceeded its published bound.');
-    if(page.complete)return items;
-    if(typeof page.nextCursor!=='string'||cursors.has(page.nextCursor))
-      throw Error('Workspace pagination did not advance.');
-    cursors.add(page.nextCursor);after=page.nextCursor;
-  }
+async function productPage(path,artifact,after=null,project=value=>value){
+  const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
+  const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
+  if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
+    throw Error('Unsupported workspace page; no state was imported.');
+  if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===after))
+    throw Error('Workspace pagination did not advance.');
+  return {...page,items:page.items.map(project)};
 }
 
 export async function loadProductCatalog(){
   const catalog=await api('/catalog');
   if(accountTransport()){
-    const [methodFamilies,sessions]=await Promise.all([
-      collectProductPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1'),
-      collectProductPage('/sessions','BTL-SESSION-PAGE-1',item=>({
+    const [families,sessions]=await Promise.all([
+      productPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1'),
+      productPage('/sessions','BTL-SESSION-PAGE-1',null,item=>({
         ...item.metadata,revision:item.revision,
         financialCountsStatus:item.financialCountsStatus,
       })),
     ]);
-    const currentFamilies=methodFamilies.map(family=>({...family,versions:[{
+    const methodFamilies=families.items.map(family=>({...family,versions:[{
       version:family.latestVersion,methodId:family.latestMethodId,method:family.current,
     }]}));
-    const methods=currentFamilies.map(family=>({
+    const methods=methodFamilies.map(family=>({
       ...family.current,methodFamilyId:family.familyId,methodVersion:family.latestVersion,
       methodFamilyRevision:family.revision,methodArchived:family.archived,methodLatest:true,
     }));
-    return {...catalog,methods,methodFamilies:currentFamilies,sessions};
+    return {...catalog,methods,methodFamilies,sessions:sessions.items,
+      productPagination:{methods:{cursor:families.nextCursor,complete:families.complete},
+        sessions:{cursor:sessions.nextCursor,complete:sessions.complete}}};
   }
   return catalog;
+}
+
+export async function loadMoreProductCatalog(catalog,kind){
+  if(!accountTransport()||!catalog?.productPagination?.[kind])
+    throw Error('Workspace pagination is unavailable. Reload the workspace.');
+  const state=catalog.productPagination[kind];
+  if(state.complete||typeof state.cursor!=='string')return catalog;
+  if(kind==='methods'){
+    const page=await productPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1',state.cursor);
+    const families=page.items.map(family=>({...family,versions:[{
+      version:family.latestVersion,methodId:family.latestMethodId,method:family.current,
+    }]}));
+    const methods=families.map(family=>({...family.current,methodFamilyId:family.familyId,
+      methodVersion:family.latestVersion,methodFamilyRevision:family.revision,
+      methodArchived:family.archived,methodLatest:true}));
+    return {...catalog,methods:[...catalog.methods,...methods],
+      methodFamilies:[...catalog.methodFamilies,...families],
+      productPagination:{...catalog.productPagination,methods:{cursor:page.nextCursor,complete:page.complete}}};
+  }
+  if(kind==='sessions'){
+    const page=await productPage('/sessions','BTL-SESSION-PAGE-1',state.cursor,item=>({
+      ...item.metadata,revision:item.revision,financialCountsStatus:item.financialCountsStatus,
+    }));
+    return {...catalog,sessions:[...catalog.sessions,...page.items],
+      productPagination:{...catalog.productPagination,sessions:{cursor:page.nextCursor,complete:page.complete}}};
+  }
+  throw Error('Unknown workspace page.');
 }
 
 export async function createMethodVersion(family,method){

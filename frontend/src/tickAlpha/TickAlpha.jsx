@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
-import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
+import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,loadMoreProductCatalog,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
 import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
@@ -186,6 +186,9 @@ export default function TickAlpha(){
      }catch(error){setCreateError({code:error.message,text:noticeText(error.message)});return false;}
     });
   };
+  const loadMoreCatalog=kind=>run(async()=>{
+    setCatalog(await loadMoreProductCatalog(catalog,kind));
+  });
   const openCreation=(type,event)=>{
     returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);
     if(type==='method'){navigate({screen:'method-new'});return;}
@@ -221,6 +224,12 @@ export default function TickAlpha(){
       :route.screen==='help'?<HelpPage catalog={catalog} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>
       :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
       :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
+      {isAccountPage()&&catalog?.productPagination&&
+        (!catalog.productPagination.methods.complete||!catalog.productPagination.sessions.complete)&&
+        <nav className="alpha-catalog-more" aria-label="Load more workspace records">
+          {!catalog.productPagination.methods.complete&&<button type="button" disabled={busy} onClick={()=>loadMoreCatalog('methods')}>Load more Methods</button>}
+          {!catalog.productPagination.sessions.complete&&<button type="button" disabled={busy} onClick={()=>loadMoreCatalog('sessions')}>Load more Sessions</button>}
+        </nav>}
     </AlphaShell>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
       <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
