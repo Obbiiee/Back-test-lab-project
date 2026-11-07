@@ -1,5 +1,15 @@
 # Backtest Lab — Agent Instructions
 
+## ACTIVE OWNER DIRECTIVE — Claude owns frontend UX simplification (2026-11-08)
+
+**Owner decision:** Claude has full creative and implementation ownership of RIKSORA Product V1 frontend/UI/UX. The current screens/mockups are references, not layout constraints: redesign or consolidate them when it produces a demonstrably simpler, clearer, responsive product. **SIMPLE BY DEFAULT: complex engine, simple interface.** Chart and primary action dominate; avoid competing permanent panels, repetitive wizards, excessive toggles, fake capabilities, and engineering jargon. Reveal advanced controls contextually; preserve accessible errors, risks, uncertainty, source availability and order status. Mobile gets a purpose-built experience, not a scaled desktop.
+
+**Non-negotiable domain authority:** `docs/TRADING_METHOD_SESSION_SPEC.md`, `docs/TRADING_PROTOCOL_SPEC.md` (current authority notice), and `docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` override older visual workflow mockups. Method type is `FREE_STYLE` or `PROTOCOL`, inherited by Session, not a separate per-trade toggle. Free Style supports Quick and Planned. Protocol is Planned-only **pending Limit/Stop**, never Quick or direct Market entry; locks RR and risk, requires at least one condition, checklist ON requires **all** conditions PASS while OFF retains observations without blocking, and discretionary manual close after a fill is prohibited. A chart planner must preserve locked RR/risk when geometry changes. No Session balance reset or future-data leak. Server review and explicit Confirm precede orders; financial execution/receipt/reconciliation remain backend-authoritative, including when response is UNKNOWN. A frontend-only CSS restriction is not protocol enforcement.
+
+**Ownership and coordination:** Claude owns `frontend/` component/layout/navigation/accessibility implementation and can refactor it creatively. Codex owns API, identity, queue, storage and deterministic financial engine. Neither agent silently overwrites the other's active/uncommitted work. New DTO/API needs go in `frontend/docs/codex-api-requests.md` for Codex, not in a fake frontend financial fallback. Read the latest `CHATGPT -> CLAUDE / CODEX` handoff at the top of `docs/AI_HANDOFF.md`, then inspect active branch/PRs and actual current code before edits. Work through reviewable frontend code, focused regression, lint/build, browser screenshots/UX acceptance when a safe browser exists, and a PR; do not stop at a design document or assume a build alone proves UX.
+
+**Boundaries:** This UI delegation does not approve touching VPS, historical data, production, benchmark loads, deployment, source-rights promotion, payment/monetization, or financial/causal contract changes. Repository-only source/test work; operational restrictions in the current authorized phase still apply. Mark unavailable acceptance honestly.
+
 ## Authority
 - Read the existing repository authority and current project state before changing code.
 - Treat `docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` and the existing AI context/authority documents as the architectural source of truth.
