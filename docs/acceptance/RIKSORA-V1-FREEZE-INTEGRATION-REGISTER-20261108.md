@@ -30,6 +30,12 @@ This register tracks the gap between the **agreed target** and **verified code**
 
 **Each "audit repo" response must return:** baseline branch/SHA and PR state, source-evidenced DONE/PARTIAL/TODO table, one next ready P0 task with code paths, tests not run, and explicit VPS/rights/hosted blockers. **Each "lanjut/kerjakan" response must also include a code diff/commit/PR and scoped synthetic test result, unless a concrete blocker prevents safe edits.** Update this same register and the top current-phase entry after a real milestone; no parallel status spreadsheets/roadmaps.
 
+### P0-1 checkpoint — hosted entry isolation (PARTIAL)
+
+The public entry now mounts the existing RIKSORA landing, with account sign-in as its workspace link. Explicit loopback routes retain the local workspace, legacy simulator, review and prototype. Hosted route selection never mounts those entries, even when a local selector is supplied. The signed-in workspace continues to use the existing account transport and server financial authority. The public landing identifies the preview and leaves source availability to the selected workspace.
+
+Verified on the integration candidate: route and account transport regression, Local Tick Review, prototype isolation, confirm/receipt outcome, product pagination, repository boundaries, changed-file ESLint, production build, rendered landing CTA/source disclosure and independent Node golden vectors. Full authenticated browser → worker → receipt → Journal/analytics → logout/resume remains pending a small isolated synthetic integration check. Commercial-source acceptance, live provider verification, deployment and capacity acceptance were outside this checkpoint.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

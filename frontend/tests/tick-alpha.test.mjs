@@ -1,3 +1,4 @@
+import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
@@ -214,8 +215,15 @@ const ui=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),
 for(const prohibited of ['useTrading','prototypeModel','localStorage','simulate trigger','manage('])assert.ok(!ui.includes(prohibited),'Alpha must not adopt a second financial truth: '+prohibited);
 assert.ok(ui.includes('review.reviewHash')&&ui.includes("+'/confirm'"));
 assert.ok(ui.includes('flight.current')&&ui.includes('loadWorkspace(view.metadata.id)'));
-const main=readFileSync(new URL('../src/main.jsx',import.meta.url),'utf8');
-assert.ok(main.includes("get('tick-alpha')==='local'"));assert.ok(main.includes('localOrigin?<TickAlphaEntry/>'));
+assert.equal(entryRoute({hostname:'localhost',search:'?tick-alpha=local'}),'workspace');
+assert.equal(entryRoute({hostname:'127.0.0.1',search:'?legacy=local'}),'legacy');
+assert.equal(entryRoute({hostname:'[::1]',search:'?tick-alpha=exness'}),'workspace');
+for(const search of ['', '?legacy=local', '?tick-alpha=local', '?tick-alpha=exness',
+  '?tick-review=local', '?trading-ux=prototype']){
+  assert.equal(entryRoute({hostname:'research.example',search}),'hosted-home',search);
+}
+assert.equal(entryRoute({hostname:'research.example',
+  search:'?page=account&session=saved&legacy=local'}),'account');
 console.log('PASS tick-alpha transport exact strings, explicit revision/command identity, local-only opt-in and durable-review UI boundary.');
 
 const view={state:{throughNs:'1577838600000000000'},chart:{timeframe:'1m',priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable:false,candles:[

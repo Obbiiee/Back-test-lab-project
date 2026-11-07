@@ -6,6 +6,8 @@ Root AGENTS.md is the current **agent permission and action** contract; docs/PRO
 
 As of the last inspected candidate PR #44 head 4bc3defe, the synthetic integrated pipeline passed scoped functional regressions, but customer product V1 is **INCOMPLETE**: no production-versioned terminal archive without 128 lifetime cap, no verified production-wired shared-source Parquet route, incomplete long-lived compact recovery/analytics/pagination and hosted auth/UI acceptance. These are **last-inspected facts**, not a statement about newer commits; recheck repo before selecting a task. Product V1 frozen target is PR #45, P0 lifetime orders is issue #47, six-slice work is issue #46. Final historical/VPS tests are a separate owner-approved acceptance stage.
 
+**P0-1 hosted entry (PARTIAL):** Public entry routes to the existing account sign-in; loopback-only tools and legacy browser execution remain isolated. Focused routing, transport, receipt, repository, lint and build checks passed. The next P0-1 check is the complete authenticated synthetic browser journey against isolated API/worker/PostgreSQL, including Journal/analytics and logout/login resume.
+
 ---
 
 # Current implementation checkpoint — replay persistence correction (2026-11-07)

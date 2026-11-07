@@ -1,3 +1,4 @@
+import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {SAMPLE_METHODS,createMethod,makeRequest,confirmRequest,amendExits,manage,validateRequest} from '../src/tradingUx/prototypeModel.js';
@@ -8,7 +9,7 @@ assert.equal(frozen.length,1);assert.equal(frozen[0].VERSION,1);assert.equal(fro
 const docs=readdirSync(new URL('../../docs/',import.meta.url)).filter(p=>p.endsWith('.md'));
 assert.deepEqual(docs.filter(p=>read('../../docs/'+p).includes('"CONTRACT": "TRADING_UX_HANDOFF"')),['TRADING_METHOD_SESSION_SPEC.md'],'One frozen handoff owner');
 for(const file of readdirSync(new URL('../src/tradingUx/',import.meta.url)).filter(p=>/\.(js|jsx)$/.test(p))){const source=read('../src/tradingUx/'+file);assert(!/localStorage|sessionStorage|indexedDB|fetch\(|useTrading|AccountPersistence|placeOrder\(/.test(source),file+' must not write account/storage or call production execution');}
-assert(read('../src/main.jsx').includes("get('trading-ux')==='prototype'"));
+assert.equal(entryRoute({hostname:'localhost',search:'?trading-ux=prototype'}),'prototype');
 const [free,on,off]=SAMPLE_METHODS,quote={price:2332,revision:10};
 const draft={workflow:'PLANNED',side:'Buy',type:'Limit',entry:2330,sl:2328,tp:2334,risk:1,riskMode:'PERCENT',checklist:{}};
 const request=makeRequest(off,draft,quote,3,'frozen');assert(Object.isFrozen(request));assert(Object.isFrozen(request.checklist));assert.throws(()=>{request.tp=9999;});
