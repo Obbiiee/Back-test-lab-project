@@ -7,6 +7,29 @@
 
 This register tracks the gap between the **agreed target** and **verified code**. It is not a competing architecture source, a claim that every task is complete, or permission to bypass protected financial/no-look-ahead contracts. Each item below is a product implementation task, **not a request for a new exploratory benchmark**.
 
+## ACTIVE execution pointer — repo-only Product V1 (2026-11-08)
+
+**Use the CURRENT state of the code, not the age of a test report.** This is the existing Product V1 implementation register, not an architecture replacement. Agent permissions are in root AGENTS.md and active phase is the newest AI_CONTEXT/04_CURRENT_PHASE.md entry. **No VPS, SSH, deployment, historical replay, data ingestion, storage/performance/load/concurrency benchmark or big evidence generation during coding.** A new owner approval is required for those actions.
+
+### Deterministic next-work queue (check actual code before claiming complete)
+
+**Rule:** Work on the earliest *ready, unimplemented* task in the list below. If its dependency is missing, complete that dependency first. A synthetic vertical slice is valid for coding; it is **not** commercial/historical acceptance. Implement source and bounded tests, not another plan.
+
+| Sequence | Work item | Baseline condition at PR #44 (4bc3defe) | Coding-only definition of done |
+| --- | --- | --- | --- |
+| **P0-1** | Single customer vertical slice and server as financial truth | Synthetic API → worker → Parquet → receipt → Journal exists; frontend/client and hosted journey are partial | One integrated frontend-to-API synthetic Method → Session → replay → review/confirm → durable receipt → journal → analytics → logout/resume path; no local browser financial settlement in hosted mode; scoped synthetic regression + frontend build |
+| **P0-2** | Remove 128 cumulative Session order cap safely (issue #47) | 128 cumulative default; QA-only 512/1024/4096 and archive proof-of-concept | Versioned active-only hot state + atomic append-only production terminal archive, indexed history, legacy readers; 129/240+ synthetic completed orders with financial/crash/idempotency checks; no unlimited in-memory order map |
+| **P0-3** | Shared-source V2 progress and compact recovery | v2 direct-index logic exists, not customer default; no-trade progress and compact cold reconstruction still costly | Code-wired new-Session versioned v2 source-index route; monotonic revealed high-water and financial/cursor crash parity; compact state with periodic verified recovery base; legacy formats untouched |
+| **P0-4** | Monthly Parquet + source catalog without historical rights bypass | Synthetic QA provider exists; historical observed catalog still uses original archive | Versioned shared-source catalog/manifest + bounded PyArrow streaming and S3-compatible configuration using generated synthetic data; no per-user tick copy; rights UNKNOWN remains fail-closed |
+| **P0-5** | Scalable journal, Method/Session pages and analytics | Hard 128/4096 and historical fold limits remain in parts of app/client | Indexed keyset pages + revision-pinned incremental trade/Method/session projections and bounded browser state; financial parity from committed events |
+| **P0-6** | Identity, workflow modes and UX completion | Google/password conflict linking not yet an explicit safe workflow; chart/product UI partial | Explicit account linking, Free Style/Protocol/Planned/Quick flows, source/entitlement guards; bounded synthetic E2E and no duplicate account/financial authority |
+| **P1-7** | Worker QoS and repo deployment recipes | One-worker queue works for synthetic QA; economics and runtime unverified | Bounded interactive/heavy QoS, idempotent resumable work and scoped telemetry; version-pinned scripts/docs to rebuild a *fresh* VPS later; do not execute scripts on any VPS |
+| **RELEASE GATE** | Historical, crash-recovery, resource economics, concurrency, backup restore, browser hosted, commercial source rights | **NOT VERIFIED** for product; older annual evidence belongs to historical QA | Produce one finite final acceptance plan for owner approval **after** Product V1 feature integration; do not run it automatically |
+
+**Ordering is dependency-aware:** P0-2 or P0-3 may be taken before P0-1 if necessary to make the integrated vertical slice safe, but give the owner a concrete code reason and return to P0-1. Treat these as one continuous Product V1 build, not separate QA campaigns. Do not claim a task DONE merely because a QA-only prototype or freeze document exists.
+
+**Each "audit repo" response must return:** baseline branch/SHA and PR state, source-evidenced DONE/PARTIAL/TODO table, one next ready P0 task with code paths, tests not run, and explicit VPS/rights/hosted blockers. **Each "lanjut/kerjakan" response must also include a code diff/commit/PR and scoped synthetic test result, unless a concrete blocker prevents safe edits.** Update this same register and the top current-phase entry after a real milestone; no parallel status spreadsheets/roadmaps.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.
