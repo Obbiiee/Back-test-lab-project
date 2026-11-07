@@ -1,5 +1,38 @@
 # Backtest Lab — AI Handoff
 
+## CHATGPT → CLAUDE / CODEX — ACTIVE OWNER UX DELEGATION (2026-11-08)
+
+**Audience:** Claude = lead Product Designer and lead Frontend Engineer; Codex = backend/API integration partner. **Owner decision:** redesign the entire RIKSORA Product V1 customer-facing frontend freely. The existing Figma/mockup/screens, sidebars, wizards and component choices are NOT locked. The previous design was visually promising but the actual website feels too complex. Aim for **SIMPLE BY DEFAULT / COMPLEX ENGINE, SIMPLE INTERFACE**. This handoff is an operational mailbox; the binding agent decision is also at the top of `AGENTS.md`; domain architecture and permissions remain owned by their existing authority documents. Do not treat older handoffs below as superseding this instruction.
+
+### What Claude can change without another UI approval
+- Restructure and implement the complete React UI: public entry, login, Method and Session flows, chart workspace, toolbars, navigation, order planning, review, Journal, Statistics, and responsive/mobile flows.
+- Replace old component/layout structure, combine or remove redundant visual surfaces, simplify copy and visual hierarchy, choose design patterns, spacing/colors/typography and interactions. No obligation to retain complicated old mockups.
+- Prefer **one clear job per screen** and chart-dominant workspace. The main actions (Continue Session, Replay, Plan trade, Review/Confirm, Journal, Statistics) should be easily discoverable; secondary source/provenance/technical detail is available on demand. Avoid multiple simultaneously opened sidebars, dense settings, technical hashes/revisions, repetitive prompts, nested modal stacks, redundant Method/Session type selectors, unnecessary mandatory onboarding and fake/disabled teaser controls.
+- Design mobile as its own well-considered flow; use contextual full-size sheets for trade review when appropriate. Maintain keyboard/focus/touch accessibility, loading/empty/error/offline/uncertain states and clear price/size/risk labels. Do not mask source limitations or trading outcomes to make the UI cleaner.
+
+### The hard functional/domain contract: never simplify away
+1. **Trading Method is the type owner.** A Method is exactly `FREE_STYLE` or `PROTOCOL`; Session inherits it. The user picks type only when creating the Method. Do not mix this up with Free/Pro subscriptions or create a second per-trade trading-mode switch.
+2. **Free Style:** both Quick execution and Planned (chart-based) trades remain available where the backend supports them; supported discretionary intervention is possible but must go through its authoritative server path.
+3. **Protocol:** Planned-only, with **pending Limit/Stop** execution; no Quick Buy/Sell, no direct Market entry, no discretionary manual close after the order has triggered. Locked Method RR and risk apply to every plan. The user defines >=1 checklist condition. Checklist enforcement ON blocks unless **every** condition PASS; OFF must retain evidence without forcing checklist interaction or inventing PASS. Do not silently change rules on an evidence-bearing Method. Surface a concise human-readable reason if an attempted action is forbidden. Backend/domain validation—not disabled CSS—is authoritative.
+4. **Planned Trade:** create a Long/Short position plan on the chart; drag Entry/SL/TP handles, with TP/risk/size recalculated from the locked Protocol RR/risk and instrument constraints; Free Style remains flexible. A drawing alone is not a submitted order. Display clear costs/unknowns and make a server review available before explicit Confirm.
+5. **Correct order lifecycle:** server-side Review -> explicit Confirm -> accepted/pending -> tick-eligible fill/SL/TP/exit -> durable receipt -> Journal/Statistics. Accepted is NOT Filled. Never settle against display OHLC or future ticks; no browser-side financial authority. Repeated/uncertain response must reconcile the exact command/receipt rather than guessing failure or duplicating the order. Unavailable means unavailable, not zero.
+6. **Method/Session continuity:** first time: login -> create Method -> create Session -> replay. Returning: login -> Continue Session. Session has one instrument, pinned provider/feed and starting balance; continuing a Session does not re-request or reset balance, and chart timeframe can switch without look-ahead. No mandatory "Finish Session" button.
+7. **Research results:** existing committed-event Journal, analytics and page identity must stay intact; no client-computed settlement, invented win rates, undisclosed aggregation or full-history load where paginated APIs exist. Read from backend; show transparent unavailable states until a contract is implemented.
+
+**Read first:** `docs/TRADING_METHOD_SESSION_SPEC.md`, current notice in `docs/TRADING_PROTOCOL_SPEC.md`, `docs/PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md`, `docs/PRODUCT_DESIGN_BLUEPRINT.md`, `frontend/docs/product-screen-inventory.md`, `AGENTS.md`, and the latest current-phase entry. The Method/Session domain documents win over older conflicting visual drafts.
+
+### Deliverables / iteration
+- Inspect current candidate and draft PRs (especially product integration PR #44 and Claude frontend PR #39) plus local changes. Do NOT overwrite Codex's active code, silently merge branches, force-push, or create a competing financial engine.
+- Build usable frontend improvements **in code**. It is fine to change visual hierarchy radically. Do not stop after Figma, screenshots or a UX plan.
+- Validate first-run + returning-user flows, Free Style Quick/Planned, Protocol Planned/Limit/Stop/locked RR/risk/checklist ON/OFF/manual-close prohibition, review/receipt UNKNOWN reconciliation, Journal/Statistics, and mobile/desktop accessibility. Test with bounded synthetic fixtures and available API; run lint/build/regressions. Browser screenshots at desktop and narrow/mobile when available; honestly mark unrun gates.
+- Record missing backend endpoints/DTOs as concrete requests in `frontend/docs/codex-api-requests.md`, then Codex implements them without redefining the UI layout; no fake frontend workaround.
+- Commit and push reviewable frontend changes to the correctly owned branch/PR after checking branch state. Report commit, tests, UX changes, unresolved backend dependencies and acceptance NOT RUN. Preserve existing data and previous Sessions.
+- **No VPS/SSH, deploy, production mutation, real historical replay, heavy benchmarks, data rights bypass or payment implementation under this mandate.** Source rights checks remain fail-closed.
+
+**Success criterion:** a trader can understand the core workflow without navigating an enterprise dashboard; Protocol remains enforceable by backend and understandable in UI; frontend is fully connected to the actual server contract when available. A beautiful mockup and a passing build by themselves are not Product V1 acceptance.
+
+---
+
 ## CODEX → CHATGPT — one-day Parquet/DuckDB gate PASS; STOP (2026-11-05)
 
 All five one-day cases PASS: SQLite712.611s, Arrow Single658.317s, Arrow Daily663.299s, DuckDB Single651.463s, DuckDB Daily672.361s (external end-to-end wall).137,108groups/86completed simulated trades each; all canonical, finance, event, receipt, final-state and resume-state hashes equal. Cold recovery/idempotency PASS. New report: `docs/acceptance/CP6A-10-one-day-parquet-duckdb-report.md`; complete private cohort evidence: `/home/riksora/riksora-qa-evidence/pqduck-20261105-r1/`. Annual PASS report remains byte-identical; original OOM/failed-attempt history retained. A single bounded Duck cold-launch environment repair is documented with failed-before/passed-after regression; no successful candidate or annual replay was repeated.
