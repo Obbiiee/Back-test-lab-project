@@ -8,6 +8,8 @@ As of the last inspected candidate PR #44 head 4bc3defe, the synthetic integrate
 
 **P0-1 hosted entry (PARTIAL):** Public entry routes to the existing account sign-in; loopback-only tools and legacy browser execution remain isolated. Focused routing, transport, receipt, repository, lint and build checks passed. Hosted Session reads now bypass retained stale queue results and sign-out reports unconfirmed revocation honestly. Scoped client fixtures passed. The next P0-1 check is the complete authenticated synthetic browser journey against isolated API/worker/PostgreSQL, including Journal/analytics and logout/login resume.
 
+**P0-3 replay recovery (PARTIAL):** Shared-source-v2 now validates its genesis, reveal ordinal bounds and final group at cold resume. Synthetic replay, causal contracts, legacy recovery and financial golden checks passed. Production selection, replaceable PostgreSQL progress and periodic recovery bases remain open. This controller prerequisite does not close the P0-1 browser/worker acceptance.
+
 ---
 
 # Current implementation checkpoint — replay persistence correction (2026-11-07)

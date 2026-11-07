@@ -2,6 +2,7 @@
 
 Preserves V1 runtime. No prices generated, execution, or account mutations.
 """
+from contextlib import closing
 from copy import deepcopy
 from pathlib import Path
 import sqlite3
@@ -204,7 +205,7 @@ class IndexedTickTimeline:
             # Physical-only opt-in on NEW logs. Existing archives are never migrated.
             present = None
             if self.__log_path.exists():
-                with sqlite3.connect(self.__log_path.resolve().as_uri()+'?mode=ro', uri=True) as probe:
+                with closing(sqlite3.connect(self.__log_path.resolve().as_uri()+'?mode=ro', uri=True)) as probe:
                     if probe.execute("SELECT 1 FROM sqlite_master WHERE name='log_layout'").fetchone():
                         rows = probe.execute('SELECT codec FROM log_layout').fetchall()
                         require(len(rows) == 1 and rows[0][0] in ('zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'CORRUPT_RECORD')
@@ -794,29 +795,40 @@ class IndexedTickTimeline:
                 'cursor', 'IDENTITY_CONFLICT')
         self.__generation = uint(cursor['generation'])
         self.__initialize()
-        if uint(cursor['revision']) == 0:
-            expected = self.__provider.locate_v2(self.__id, self.__version, str(self.__start))['position']
+        revision = uint(cursor['revision'])
+        through = uint(cursor['throughNs'])
+        start_position = self.__next_position
+        if revision == 0:
+            require(cursor == self.__cursor, 'cursor', 'IDENTITY_CONFLICT')
+            expected = start_position
         else:
-            expected = self.__provider.locate_v2(self.__id, self.__version,
-                                                  str(int(cursor['throughNs']) + 1))['position']
+            require(through >= self.__start, 'cursor', 'IDENTITY_CONFLICT')
+            expected = self.__provider.locate_v2(self.__id, self.__version, str(through + 1))['position']
         position = checkpoint['nextPosition']
         require(position == expected, 'position', 'CORRUPT_INDEX_POINTER')
         group_index = uint(cursor['nextGroupIndex'])
-        end_ordinal = int(position['globalOrdinal']) if position is not None else int(self.__root['eventCount'])
-        require((group_index == 0) == (cursor['lastGroupId'] is None),
+        event_count = int(self.__root['eventCount'])
+        start_ordinal = int(start_position['globalOrdinal']) if start_position is not None else event_count
+        end_ordinal = int(position['globalOrdinal']) if position is not None else event_count
+        revealed_events = end_ordinal - start_ordinal
+        # Raw event ordinals cannot prove the exact group count without a scan,
+        # but they do prove whether the prefix is empty and bound its count.
+        require(0 <= group_index <= revealed_events and
+                (group_index == 0) == (revealed_events == 0) and
+                (group_index == 0) == (cursor['lastGroupId'] is None),
                 'cursor', 'IDENTITY_CONFLICT')
+        digest(cursor['visiblePrefixHash'], 'visiblePrefixHash')
         if position is not None:
             shape(position, 'BTL-TICK-POSITION-2')
             first = next(self.__groups(position), None)
-            require(first is not None and (int(first[1]['timeNs']) > int(cursor['throughNs']) or
-                    (uint(cursor['revision']) == 0 and int(first[1]['timeNs']) == int(cursor['throughNs']))),
+            require(first is not None and (int(first[1]['timeNs']) > through or
+                    (revision == 0 and int(first[1]['timeNs']) == through)),
                     'position', 'INCOMPLETE_ATOMIC_BOUNDARY')
         if group_index:
-            require(end_ordinal > 0, 'position', 'CORRUPT_INDEX_POINTER')
             prior_position = self.__provider.locate_ordinal_v2(self.__id, self.__version, str(end_ordinal-1))
             prior = next(self.__groups(prior_position), None) if prior_position is not None else None
             require(prior is not None and prior[1]['groupId'] == cursor['lastGroupId'] and
-                    int(prior[1]['timeNs']) <= int(cursor['throughNs']),
+                    self.__start <= int(prior[1]['timeNs']) <= through,
                     'cursor', 'IDENTITY_CONFLICT')
         self.__cursor = deepcopy(cursor)
         self.__next_position = deepcopy(position)

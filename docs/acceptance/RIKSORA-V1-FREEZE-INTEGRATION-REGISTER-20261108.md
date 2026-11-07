@@ -42,6 +42,12 @@ Hosted view, bootstrap and chart-history reads now use a fresh queue identity pe
 
 A bounded client fixture that retains completed results by job ID verified revision 3 before sign-out and revision 4 after sign-in. The same suite verified stable mutation retries, local fallback refusal, and removal of the tab token when the logout response is lost. Full authenticated browser and isolated PostgreSQL worker verification remain open.
 
+### P0-3 checkpoint — direct replay recovery integrity (PARTIAL)
+
+Shared-source-v2 cold resume now refuses an altered genesis cursor and verifies that the revealed group count is consistent with the source ordinal bounds and the last revealed group is inside the Session interval. This preserves empty progress and atomic timestamp groups without rebuilding the historical prefix. The existing legacy replay-log reader now closes its read-only format probe deterministically.
+
+Focused validation: 31 tests passed for shared-source recovery, legacy replay-log compatibility, tick storage and sidecar contracts, and financial goldens. Independent Node golden vectors also passed. The regression reproduced acceptance of a corrupted genesis before the fix. PostgreSQL frontier persistence, periodic compact recovery bases, replaceable no-trade progress, and production source selection remain open. The next replay integration must use an eligible shared source and must not enable the legacy QA-only observed admission mode as a customer default.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.
