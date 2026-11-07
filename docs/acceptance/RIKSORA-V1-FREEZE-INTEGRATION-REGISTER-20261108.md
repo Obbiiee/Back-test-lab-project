@@ -36,6 +36,12 @@ The public entry now mounts the existing RIKSORA landing, with account sign-in a
 
 Verified on the integration candidate: route and account transport regression, Local Tick Review, prototype isolation, confirm/receipt outcome, product pagination, repository boundaries, changed-file ESLint, production build, rendered landing CTA/source disclosure and independent Node golden vectors. Full authenticated browser → worker → receipt → Journal/analytics → logout/resume remains pending a small isolated synthetic integration check. Commercial-source acceptance, live provider verification, deployment and capacity acceptance were outside this checkpoint.
 
+### P0-1 checkpoint — current Session reads and sign-out (PARTIAL)
+
+Hosted view, bootstrap and chart-history reads now use a fresh queue identity per request. The queue retains completed results by ID, so a reused read ID could restore an old committed revision after replay or sign-in. A single read still polls its original job; mutation retries retain their deterministic ID and unexpected results remain explicitly uncertain. Hosted transport refuses local fallback, and sign-out only confirms server revocation after a successful server response.
+
+A bounded client fixture that retains completed results by job ID verified revision 3 before sign-out and revision 4 after sign-in. The same suite verified stable mutation retries, local fallback refusal, and removal of the tab token when the logout response is lost. Full authenticated browser and isolated PostgreSQL worker verification remain open.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

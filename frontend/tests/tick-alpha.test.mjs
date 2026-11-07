@@ -39,11 +39,11 @@ setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
 const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
-assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const readRetryIds=[];
 setAccountTransport({subject:queuedAccount.subject,request:async(_path,options={})=>{readRetryIds.push(options.jobId);return {schemaVersion:1,label:'done'};}},'11111111-1111-4111-8111-111111111111');
 await api('/sessions/session:queue/view',{timeframe:'1m'});
-assert.equal(readRetryIds[0],queuedId,'same read request keeps durable identity after retry');
+assert.notEqual(readRetryIds[0],queuedId,'a new view read cannot reuse a completed queue result');
 assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
 const additionalQueued=[];
 setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
@@ -58,6 +58,7 @@ assert.ok(additionalQueued.every(([,options])=>options.jobId),'chart-history and
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
+await assert.rejects(()=>api('/sessions',{id:'session:uncertain'}),error=>error.code==='UNKNOWN'&&!!error.jobId);
 let replayJob;
 const replayCalls=[];
 const reconciliation={subject:queuedAccount.subject,request:async(path,options={})=>{
@@ -124,10 +125,44 @@ await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);
 clearAccountTransport();
 assert.equal(accountStorageKey('same-session-id'),'same-session-id');
+// Match the server queue's retained result semantics across sign-out/sign-in.
+const retainedViews=new Map();
+let committedRevision=3;
+const resumeClient=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(!path.endsWith('/view'))return accountFetch(path,options);
+  const jobId=options.headers['X-BTL-Job'];
+  assert.ok(jobId);
+  if(!retainedViews.has(jobId))retainedViews.set(jobId,{schemaVersion:1,state:{revision:committedRevision}});
+  return {ok:true,status:200,json:async()=>retainedViews.get(jobId)};
+}});
+const resumeWorkspace='11111111-1111-4111-8111-111111111111';
+const loadResume=()=>api('/sessions/session:saved/view',{timeframe:'1m'});
+await resumeClient.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(resumeClient,resumeWorkspace);
+assert.equal((await loadResume()).state.revision,3);
+await resumeClient.logout();
+clearAccountTransport();
+committedRevision=4;
+await resumeClient.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(resumeClient,resumeWorkspace);
+assert.equal((await loadResume()).state.revision,4,'resume must load a newly committed server revision');
+assert.equal(retainedViews.size,2);
+clearAccountTransport();
+
+const failedLogout=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(path.endsWith('/logout-all'))throw new DOMException('Response lost','TimeoutError');
+  return accountFetch(path,options);
+}});
+await failedLogout.login('qa@example.com','Test fixture passphrase only');
+await assert.rejects(()=>failedLogout.logout(true),{name:'TimeoutError'});
+assert.equal(failedLogout.hasSession(),false);
+assert.equal(failedLogout.subject(),null);
 const beforeAccountWindow=globalThis.window;
 globalThis.window={location:{href:'https://localhost:5197/?page=account'}};
 await assert.rejects(()=>api('/catalog'),/No private local fallback/);
 assert.equal(pagePath('home'),'/?page=account');
+window.location.href='https://research.example/?tick-alpha=local';
+await assert.rejects(()=>api('/catalog'),/No private local fallback/);
 if(beforeAccountWindow===undefined)delete globalThis.window;else globalThis.window=beforeAccountWindow;
 const insecure=createAccountClient({fetcher:()=>{throw Error('Must not fetch');},secure:()=>false});
 await assert.rejects(()=>insecure.login('qa@example.com','password'),/HTTPS/);
@@ -184,6 +219,7 @@ const quotaStore={getItem:()=>JSON.stringify({...disabledMeasurement,enabled:tru
 assert.equal(eventTo(quotaStore,{id:'event:quota',name:'analysis_opened'},observedNow),false);
 console.log('PASS optional internal measurement: disabled/no-op, typed privacy, idempotent/bounded events, separate feedback/retry/retention, honest cost unknowns and corrupt/denied/quota preservation.');
 
+globalThis.window={location:{href:'http://127.0.0.1:5173/'}};
 const calls=[];
 globalThis.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({schemaVersion:1,reviewHash:'pinned'})};};
 const exact='0.123456789012345678';
