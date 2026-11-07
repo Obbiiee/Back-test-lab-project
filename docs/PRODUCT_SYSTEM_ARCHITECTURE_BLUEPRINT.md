@@ -3840,3 +3840,68 @@ This owner-authorized correction supersedes the earlier Section 43 statement tha
 Cold resume validates the exact source pin, resolves the expected next position from the immutable source index at the cursor boundary, checks atomic group boundaries and the last revealed group, then continues at that position; it does not replay the historical prefix. Legacy `BTL-TICK-CHECKPOINT-2` and `BTL-TICK-SHARED-SOURCE-CHECKPOINT-1` remain readable through their original validators and are not migrated in place. The new per-Session reveal/evidence cache is process-private SQLite `:memory:` only, capped at 16 MiB per timeline and discarded on eviction/restart. Chart history after cold resume is served from a bounded source-index window of at most 65,560 raw events, 1,024 groups, and 8 MiB; requests outside that retained window fail explicitly rather than scan the full prefix. No temporary timeline file is created for new v2 Sessions.
 
 This is an implementation checkpoint, not full historical acceptance: source rights remain UNKNOWN and execution eligibility remains NOT_GRANTED; no full-year replay, resource benchmark, recovery-under-crash, or production readiness claim follows. Existing annual evidence and prior checkpoint artifacts remain untouched.
+---
+
+## Owner decision — RIKSORA Product V1 architecture freeze (2026-11-08)
+
+**Decision:** FROZEN AS TARGET DESIGN; IMPLEMENTATION IN PROGRESS; NOT A PRODUCTION OR PERFORMANCE ACCEPTANCE.
+
+**Authority and compatibility.** This section is an owner-approved Product V1 integration decision inside the existing architecture authority. It supersedes contradictory *aspirational* storage/implementation choices for **new V1 Sessions** only. It does **not** rewrite protected financial semantics, source provenance, anti-look-ahead contracts (including 42.17/42.19), immutable historical artifacts, legacy Sessions, or data-rights restrictions. No feature is declared implemented merely because it appears below. Historical sections describe earlier checkpoints and remain evidence, not current defaults. The operational checklist is in \`docs/acceptance/RIKSORA-V1-FREEZE-INTEGRATION-REGISTER-20261108.md\` (non-authoritative tracking only).
+
+### 1. Reuse-first stack; no new infrastructure by default
+
+| Responsibility | Frozen selection | Boundary |
+| --- | --- | --- |
+| Browser UI and chart | React, Vite, TradingView Lightweight Charts | Presentation, order intention and display; not hosted financial settlement |
+| API and application services | Python/FastAPI modular monolith | Auth, workspace ACLs, Methods, Sessions, commands, journals and billing entitlement |
+| Shared market data | Immutable, versioned Parquet files **partitioned by UTC month** per source/instrument | Exactly one canonical published source copy, shared across users, with manifest, timestamp/ordinal ordering and verifiable row-group bounds |
+| Market-data readers | PyArrow streaming/range adapter; DuckDB where a bounded analytical/query workload benefits | Reuse readers; do not route every tick through both engines or add a SQL query per tick; DuckDB must not be presented as production-wired before it is |
+| Simulation authority | Existing deterministic Python tick financial reducer | Exact Bid/Ask, source precision, partial fills, order lifecycle, no invented candle intrabar path; preserve no-look-ahead and unresolved evidence behavior |
+| Transactions and user state | PostgreSQL | Scoped Methods, Sessions, durable financial events/receipts, orders, journal and bounded progress |
+| Async compute | Existing PostgreSQL durable queue + bounded worker processes | Fencing, heartbeat, idempotency, admission fairness, cancellation/reconciliation; no Redis, Kafka or Kubernetes by default |
+| Large data and backup | S3-compatible object storage, with appropriately controlled local cache | Immutable source objects and separate encrypted/off-host backups; avoid per-user tick replicas |
+
+Before adopting new OSS libraries or borrowing source code: verify maintenance, exact release, security, dependency cost, license/NOTICE and compatible API; prioritize library reuse over new engine designs. NautilusTrader's stream/catalog/event-sourcing patterns are reference ideas, **not** permission to copy LGPL code or replace the V1 financial reducer.
+
+### 2. Replay and time-integrity contract: shared source, bounded per-user footprint
+
+A **new Product V1 replay Session** holds source identity/version/hash, causal timestamp and ordinal/indexed position, financial state, active orders and limited checkpoints. No production path may durably copy all traversed ticks, every timestamp-group position, the revealed prefix, or a linear position/advance acknowledgment log **per user**. Cached chart windows and tick batches are ephemeral, capped by memory and retention policy. Old checkpoint formats remain read-only/recoverable via version dispatch; do not silently migrate or delete.
+
+The target is the already implemented \`shared-source-v2\` direct indexed cursor pattern, made safe and explicitly selected for **eligible new production Sessions**, not enabled by repurposing \`BTL_QA_*\` flags. Indexed cold resume must validate source pin, exact next ordinal/timestamp-group boundary, last revealed group, finance state and committed revision without replaying a year's prefix. Respect immutable dataset versions and the no-future-metadata boundary; consumers cannot access raw provider/index handles or unrevealed EOF.
+
+**Two different guarantees must not be conflated:**
+- **Financial commits:** a confirmed order, fill, exit, partial, cancellation or other financially relevant transition, its receipt/idempotency identity, and the matching replay cursor must commit consistently. Never report COMMITTED before that transaction is durable. Recovery must neither skip an eligible fill nor execute it twice.
+- **Non-financial replay progress:** target a bounded ~30-second wall-clock checkpoint cadence during active replay, plus pause/explicit save, using a **replaceable/compacted progress state**, not an immutable full Session snapshot per tick/advance. Publish only replay data with a durably recorded *monotonic revealed high-water mark*. A crash must not let a user trade from an earlier cursor after seeing later market data; if a visual position is restored behind that mark, enforce read-only catch-up to the proven revealed frontier before accepting orders. The 30 seconds is a design target and is **not an implemented RPO guarantee**.
+
+Avoid converting every tiny no-trade step into permanent command/event/checkpoint rows. A chunk/job may carry a compact, bounded progress receipt with durable high-water/identity; financial mutations retain their own immutable receipts. If the current contract forces unbounded per-advance writes, change that contract explicitly, with causal/idempotency review; do not bypass it with undocumented cleanup.
+
+### 3. Trade, Method, Session and analytics persistence
+
+PostgreSQL append-only financial events and committed receipts remain the authority for trade cashflows, fills, SL/TP, partials and fees. Hot Session state holds **only active orders** and a compact revisioned basis. Closed/expired/cancelled orders move into a durable, queryable, versioned archive or event-derived read projection. No V1 customer Session has a **128 cumulative lifetime orders** product limit; reasonable simultaneous-active-order quotas may remain. QA-only archive implementations are evidence/adapters, not production schemas or flag defaults.
+
+Choose versioned \`compact-v1\` for eligible **new** Session persistence after integration checks, and preserve snapshot-v1/legacy readers. Do not copy all historical orders or a full state into every receipt/checkpoint. Compact delta chains alone are **not** sufficient: periodically publish verified compact recovery bases so cold resume is bounded by the tail since the latest base rather than total Session age. Preserve immutable event history, hashes, source pins, revision concurrency and exact retry outcomes; never delete receipts referenced by unresolved commands.
+
+Methods remain immutable versions with separately managed family lifecycle; historical Sessions retain their original Method hashes. Remove product-level hard 128 Method/Session list and lifetime ceilings by using keyset pagination, not by loading everything into memory. Journal notes are separate mutable annotations and must not modify financial truth.
+
+Session and Method analytics derive from **committed events only**. Keep revision-bound, incrementally updated persistent aggregates (and bounded page/query projections); event replay is for validation/rebuild, not every page load. Do not combine heterogeneous currency/engine/profile account balances; cross-Session statistics require explicit compatible-unit semantics. Equity/time series are bounded-downsampled for presentation, not stored at each historical tick.
+
+### 4. Resource control and operational economics
+
+One heavy replay measured near **one vCPU** in the existing one-day gate; it is a preliminary per-job planning input, not an inference that a 6-vCPU host can serve six heavy jobs alongside API/PG. Keep admission/worker pools, per-actor fairness, memory/disk/CPU quotas, a bounded interactive-vs-heavy job policy, resumable chunks, lease/reconciliation semantics and a bounded queue-retention strategy. Existing one-worker, 30-second per-job deadline and 60-second queue TTL are current implementation limits, **not immutable product scalability targets**. Do not add infrastructure on a speculative future concurrent-user estimate.
+
+All persistent/temporary classes require documented owner, lifecycle and budget:
+- Shared immutable tick data: count once per source/version, not per user; object request/I/O fees are separately measured.
+- User-attributable durable footprint: orders, events, Methods, journal, progress, checkpoint bases, receipts, index and TOAST allocation; attribute via measured database allocation rather than JSON payload alone.
+- Operational storage: WAL, backups, indexes, retained queue rows, server logs, cache, scratch/QA and object request costs are tracked separately and may not be silently omitted.
+- Production caches and logs: strict byte/age caps, safe eviction and rotation; no QA raw replay artifacts in production. Scratch cleanup must never delete originals, live data, immutable financial history, keys, or required accepted evidence.
+- Backups: encrypted/off-host, retention policy and restore drill, without misrepresenting a backup file as proven recovery.
+
+Initial design *review thresholds*, **not guarantees or achieved measurements**: examine normal completed-trade physical DB attribution above ~16 KiB/trade, investigate sustained >32 KiB/trade; target <=10 MiB of non-trading *persistent replay progress* for a full-year Session. These exclude common market source bytes and separately-accounted off-host backup/WAL. Confirm feasibility with physical measurements after product integration; revise thresholds only with documented evidence, never silently mask overhead. Maintain alerts on disk free space, per-Session growth, PostgreSQL/WAL, cache, source admission time, worker CPU/RSS and queue age.
+
+### 5. Product boundaries and acceptance
+
+A customer can create/login/link identity, select authorized market source, create/version Method, create/continue Session, replay a real historical source under temporal gating, plan/review/confirm trades, read durable receipts, write journal and view committed analyses. Google/email linking must use explicit authenticated linking, not verified-email collision auto-merging. User/provider permissions and commercial data rights remain fail-closed. Synthetic QA success does not grant historical source licensing, commercial entitlement, or live payment readiness.
+
+**Sequence:** (1) settle owner-approved frozen design, (2) implement one integrated Product V1 vertical slice using existing components, (3) relevant focused tests while coding, (4) one final acceptance plan for historical accuracy/parity, crash recovery, no-look-ahead, browser flow, tenancy, source rights, real storage allocation, worker CPU/RSS and concurrency, (5) optimize measured bottlenecks only. Do not launch or promise specific throughput/cost before passing gates. Keep production and protected evidence untouched until separately authorized.
+
+**Change control:** deviations require a real correctness/security/recovery/business-rights blocker or measured cost/performance problem and a minimally scoped, reviewed decision. No default technology swap, no new persistence layer, no unbounded raw artifact, and no duplicate hosted financial authority.
