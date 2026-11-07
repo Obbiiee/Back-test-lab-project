@@ -10,7 +10,7 @@ import hashlib
 import json
 
 from contracts.canonical import canonical_bytes, content_hash
-from contracts.primitives import require
+from contracts.primitives import digest, require
 
 ARTIFACT = 'BTL-QA-OBSERVED-STATE-DELTA-3'
 ARTIFACT_V4 = 'BTL-QA-OBSERVED-STATE-DELTA-4'
@@ -84,7 +84,7 @@ def encode_compact_delta(previous,state,previous_hash):
     return dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_DELTA,body=core)
 
 
-def reconstruct(base,deltas,*,state_callback=None):
+def reconstruct(base,deltas,*,state_callback=None,base_chain_hash=None):
     require(base.get('schemaVersion')==1 and
             ((base.get('formatVersion')==3 and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3')) or
              (base.get('formatVersion')==1 and base.get('artifact') in (
@@ -93,7 +93,14 @@ def reconstruct(base,deltas,*,state_callback=None):
             'base','CORRUPT_RECORD')
     state=deepcopy(base['state']);prev=base['stateHash']
     require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')
-    if state_callback is not None:state_callback(state,0)
+    base_revision = state['revision']
+    require(type(base_revision) is int and base_revision >= 0 and
+            (base_revision == 0 if base_chain_hash is None else base_revision == base['revision']),
+            'baseRevision','CORRUPT_RECORD')
+    if base_chain_hash is not None:
+        digest(base_chain_hash,'baseChainHash')
+        prev=base_chain_hash
+    if state_callback is not None:state_callback(state,base_revision)
     for row in deltas:
         core=row.get('body',{})
         body={k:v for k,v in core.items() if k!='recordHash'}
@@ -132,17 +139,19 @@ def reconstruct(base,deltas,*,state_callback=None):
     return state
 
 
-def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None):
+def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None,base_chain_hash=None):
     require(type(expected_revision) is int and expected_revision>=0,'deltaCount','CORRUPT_RECORD')
+    expected_count=expected_revision-(base['revision'] if base_chain_hash is not None else 0)
+    require(expected_count>=0,'deltaCount','CORRUPT_RECORD')
     count=0
     def counted():
         nonlocal count
         for row in deltas:
             count+=1
-            require(count<=expected_revision,'deltaCount','CORRUPT_RECORD')
+            require(count<=expected_count,'deltaCount','CORRUPT_RECORD')
             yield row
-    state=reconstruct(base,counted(),state_callback=state_callback)
-    require(count==expected_revision,'deltaCount','CORRUPT_RECORD')
+    state=reconstruct(base,counted(),state_callback=state_callback,base_chain_hash=base_chain_hash)
+    require(count==expected_count,'deltaCount','CORRUPT_RECORD')
     require(state['revision']==expected_revision,'deltaRevision','CORRUPT_RECORD')
     return state
 

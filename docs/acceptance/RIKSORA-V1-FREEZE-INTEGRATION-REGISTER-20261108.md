@@ -54,6 +54,12 @@ A shared-source-v2 checkpoint can resume an interrupted bounded advance directly
 
 33 focused synthetic tests passed, including parity between uninterrupted and resumed advancement, refusal of invalid continuation targets and refusal of a rewind before any write through a mocked database boundary. PostgreSQL transaction integration, replaceable non-financial progress, periodic recovery bases and eligible production source selection remain open.
 
+### P0-3 checkpoint — periodic compact recovery bases (PARTIAL)
+
+The observed compact-v1 writer records a versioned recovery base every 64 revisions in the same immutable checkpoint row and transaction as the existing delta. The reader uses scoped indexed lookups to bind the base state and controller to its delta hash and predecessor, then validates at most 63 later deltas when a base is present. Older compact checkpoints fall back to the genesis reader. Receipt and checkpoint chain hashes retain their existing definitions.
+
+17 focused tests passed, including a mocked database test proving the selected tail range and corruption refusal. Six independent Node golden vectors passed. Live PostgreSQL integration, maximum-size base acceptance, replaceable non-financial progress and production shared-source selection remain open.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

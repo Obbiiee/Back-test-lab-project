@@ -38,6 +38,8 @@ COMPACT_CHECKPOINT='BTL-OBSERVED-EXECUTION-CHECKPOINT-COMPACT-1'
 COMPACT_CHECKPOINT_BASE='BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1'
 COMPACT_CHECKPOINT_DELTA='BTL-OBSERVED-EXECUTION-CHECKPOINT-DELTA-COMPACT-1'
 COMPACT_RESULT='BTL-OBSERVED-EXECUTION-RESULT-COMPACT-1'
+COMPACT_RECOVERY='BTL-OBSERVED-EXECUTION-CHECKPOINT-RECOVERY-COMPACT-1'
+COMPACT_RECOVERY_INTERVAL=64
 
 
 def read_snapshot(raw,sha,*,order_retention_policy=None):
@@ -428,19 +430,57 @@ class ObservedExecutionStore:
             target_revision=(db.execute('SELECT max(revision) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s',
                                         (workspace,session)).fetchone()[0] if upto_revision is None else upto_revision)
             require(type(target_revision) is int and target_revision>=0,'qaDeltaRevision','CORRUPT_RECORD')
+            start_revision=0
+            recovery_chain=None
+            if compact_v1 and target_revision>=COMPACT_RECOVERY_INTERVAL:
+                candidate_revision=target_revision-target_revision%COMPACT_RECOVERY_INTERVAL
+                row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                               'WHERE workspace_id=%s AND session_id=%s AND revision=%s',
+                               (workspace,session,candidate_revision)).fetchone()
+                require(row is not None,'compactRecovery','CORRUPT_RECORD')
+                candidate=unpack(*row)
+                if candidate.get('artifact')==COMPACT_RECOVERY:
+                    keys(candidate,'schemaVersion formatVersion artifact revision stateHash chainHash previousHash delta controller state')
+                    delta=candidate['delta']
+                    keys(delta,'schemaVersion formatVersion artifact body')
+                    body=delta['body']
+                    chain=content_hash(dict(schemaVersion=1,artifact=COMPACT_DELTA+'-RECORD',
+                                            body={k:v for k,v in body.items() if k!='recordHash'}))
+                    require(candidate['schemaVersion']==candidate['formatVersion']==delta['schemaVersion']==delta['formatVersion']==1 and
+                            delta['artifact']==body.get('artifact')==COMPACT_DELTA and body.get('schemaVersion')==1 and
+                            candidate['revision']==candidate_revision==body.get('revision')==candidate['state'].get('revision') and
+                            candidate['previousHash']==body.get('previousHash') and
+                            candidate['stateHash']==body.get('stateHash')==content_hash(candidate['state']) and
+                            candidate['chainHash']==body.get('recordHash')==chain,
+                            'compactRecovery','CORRUPT_RECORD')
+                    predecessor=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                                           'WHERE workspace_id=%s AND session_id=%s AND revision=%s',
+                                           (workspace,session,candidate_revision-1)).fetchone()
+                    require(predecessor is not None,'compactRecovery','CORRUPT_RECORD')
+                    prior=unpack(*predecessor)
+                    require(prior.get('artifact')==COMPACT_CHECKPOINT_DELTA and
+                            prior.get('revision')==candidate_revision-1 and
+                            prior.get('chainHash')==candidate['previousHash'],
+                            'compactRecovery','CORRUPT_RECORD')
+                    validate_snapshot(candidate['state'],candidate['controller'],order_retention_policy=self.order_retention_policy)
+                    base_record=encode_compact_base(candidate['state'])
+                    base_record['controller']=candidate['controller']
+                    start_revision=candidate_revision
+                    recovery_chain=chain
+                else:
+                    require(candidate.get('artifact')==COMPACT_CHECKPOINT_DELTA,'compactRecovery','CORRUPT_RECORD')
             if require_tip:
                 tip=db.execute('SELECT revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
                                (workspace,session)).fetchone()
                 require(tip is not None and tip[0]==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
+            if require_tip and recovery_chain is None:
                 durable_count,durable_max=db.execute('SELECT count(*),max(revision) FROM btl.tick_checkpoints '
                     'WHERE workspace_id=%s AND session_id=%s AND revision>0',(workspace,session)).fetchone()
                 require(durable_count==target_revision and
                         durable_max==(target_revision if target_revision else None),
                         'qaDeltaRevision','CORRUPT_RECORD')
-            total=db.execute('SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s',
-                             (workspace,session,target_revision)).fetchone()[0]
-            require(total==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
-            previous_hash=base_record['chainHash'];current_controller=[base_record['controller']]
+            previous_hash=recovery_chain or base_record['chainHash']
+            current_controller=[base_record['controller']]
             expected_checkpoint_artifact=COMPACT_CHECKPOINT_DELTA if compact_v1 else QA3_CHECKPOINT_DELTA
             expected_delta_artifact=COMPACT_DELTA if compact_v1 else None
             expected_checkpoint_format=1 if compact_v1 else 3
@@ -448,9 +488,9 @@ class ObservedExecutionStore:
                 nonlocal previous_hash
                 with db.cursor(name='btl_delta_'+uuid4().hex) as rows:
                     rows.execute('SELECT revision,payload,content_hash FROM btl.tick_checkpoints '
-                        'WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s ORDER BY revision',
-                        (workspace,session,target_revision))
-                    for n,(rev,payload,sha) in enumerate(rows,1):
+                        'WHERE workspace_id=%s AND session_id=%s AND revision>%s AND revision<=%s ORDER BY revision',
+                        (workspace,session,start_revision,target_revision))
+                    for n,(rev,payload,sha) in enumerate(rows,start_revision+1):
                         checkpoint=unpack(payload,sha)
                         keys(checkpoint,'schemaVersion formatVersion artifact revision stateHash chainHash previousHash delta controller')
                         delta=checkpoint['delta'];body=delta.get('body',{})
@@ -467,7 +507,7 @@ class ObservedExecutionStore:
             archive_format=base_record['state'].get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
             callback=(lambda restored,rev:validate_snapshot(restored,current_controller[0],
                 order_retention_policy=self.order_retention_policy)) if archive_format else None
-            rebuilt=reconstruct_complete(base_record,delta_stream(),target_revision,state_callback=callback)
+            rebuilt=reconstruct_complete(base_record,delta_stream(),target_revision,state_callback=callback,base_chain_hash=recovery_chain)
             require(rebuilt['revision']==target_revision,'qaDeltaState','CORRUPT_RECORD')
             return rebuilt,previous_hash
 
@@ -537,7 +577,7 @@ class ObservedExecutionStore:
         require(tip is not None,'immutableTip','CORRUPT_RECORD')
         if storage_format in ('qa3','compact-v1'):
             tip_wire=unpack(*tip)
-            allowed_tip_artifacts=(COMPACT_CHECKPOINT_BASE,COMPACT_CHECKPOINT_DELTA) if storage_format=='compact-v1' else (
+            allowed_tip_artifacts=(COMPACT_CHECKPOINT_BASE,COMPACT_CHECKPOINT_DELTA,COMPACT_RECOVERY) if storage_format=='compact-v1' else (
                 QA3_CHECKPOINT_BASE,QA3_CHECKPOINT_DELTA)
             require(tip_wire.get('artifact') in allowed_tip_artifacts
                     and tip_wire.get('revision')==s['revision'] and tip_wire.get('stateHash')==state_hash
@@ -611,7 +651,7 @@ class ObservedExecutionStore:
         require(row is not None,'checkpoint','REFUSED_FORK_POINT')
         wire=unpack(*row)
         if wire.get('artifact') in (QA3_CHECKPOINT_BASE,QA3_CHECKPOINT_DELTA,
-                                    COMPACT_CHECKPOINT_BASE,COMPACT_CHECKPOINT_DELTA):
+                                    COMPACT_CHECKPOINT_BASE,COMPACT_CHECKPOINT_DELTA,COMPACT_RECOVERY):
             state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=target_revision)
             require(wire.get('revision')==target_revision and wire.get('stateHash')==content_hash(state)
                     and wire.get('chainHash')==chain_hash,
@@ -711,6 +751,8 @@ class ObservedExecutionStore:
                     checkpoint_wire=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT_DELTA,
                         revision=after['revision'],stateHash=content_hash(after),chainHash=chain_hash,
                         previousHash=delta_record['body']['previousHash'],delta=delta_record,controller=deepcopy(checkpoint))
+                    if after['revision']%COMPACT_RECOVERY_INTERVAL==0:
+                        checkpoint_wire.update(artifact=COMPACT_RECOVERY,state=after)
                     session_wire=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT,
                         revision=after['revision'],stateHash=content_hash(after),chainHash=chain_hash,controller=deepcopy(checkpoint))
                 else:
