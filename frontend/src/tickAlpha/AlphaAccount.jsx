@@ -67,7 +67,21 @@ export default function AlphaAccount(){
     });
   }
   async function resend(){await action(async()=>{await client.request('/api/v1/auth/request-verify-token',{method:'POST',body:{email:email.trim()},authenticated:false});if(live.current)setNotice('If eligible, a new code is on its way.');});}
-  async function logout(all){await action(async()=>{try{await client.logout(all);}finally{clearAccountTransport();if(live.current){setUser(null);setSelected(null);setWorkspaces([]);setCapabilities(null);setMode('signin');setNotice(all?'Signed out on every device.':'Signed out.');}}});}
+  async function logout(all){
+    await action(async()=>{
+      try{
+        await client.logout(all);
+        if(live.current)setNotice(all?'Signed out on every device.':'Signed out.');
+      }catch{
+        if(live.current)setError('Signed out of this tab. The server did not confirm session revocation.');
+      }finally{
+        clearAccountTransport();
+        if(live.current){
+          setUser(null);setSelected(null);setWorkspaces([]);setCapabilities(null);setMode('signin');
+        }
+      }
+    });
+  }
   function open(workspace){
     void action(async()=>{
       const status=await client.request(`/api/v1/workspaces/${workspace.id}/capabilities`);

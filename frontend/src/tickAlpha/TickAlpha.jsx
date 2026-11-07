@@ -4,7 +4,7 @@ import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
-import {command} from './client.js';
+import {command,replayObservedTo} from './client.js';
 import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
@@ -227,11 +227,20 @@ export default function TickAlpha(){
         trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         onReplay={(kind,targetNs)=>run(async()=>{
-          await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
-          const saved=await loadWorkspace(view.metadata.id);setView(saved);
+          let saved;
+          if(kind==='SEEK'&&isAccountPage()&&view.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'){
+            const result=await replayObservedTo(view,targetNs,timeframe);
+            saved=result.view;
+            if(!result.targetReached)setNotice('Replay saved a bounded part of the jump. Continue saved replay to reach the target.');
+          }else{
+            await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
+            saved=await loadWorkspace(view.metadata.id);
+          }
+          setView(saved);
           if(saved.state.nextGroupIndex!==view.state.nextGroupIndex)emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
           if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
-          if(saved.analysis.metrics.tradeCount>view.analysis.metrics.tradeCount)emitLocal('order_outcome_committed');
+          const tradeCount=saved.analysis?.metrics?.tradeCount, previousTradeCount=view.analysis?.metrics?.tradeCount;
+          if(tradeCount!=null&&previousTradeCount!=null&&tradeCount>previousTradeCount)emitLocal('order_outcome_committed');
           if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
           return true;
         })} onPriceSelect={price=>{setPauseToken(n=>n+1);setPicked({price,at:Date.now()});}} onPlanDrawing={drawing=>{

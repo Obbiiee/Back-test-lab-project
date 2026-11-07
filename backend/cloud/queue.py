@@ -34,6 +34,26 @@ QUEUE_TTL_SECONDS = 60
 OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to'))
 MUTATING_OPERATIONS = frozenset(('create_session', 'replay', 'replay_to'))
 
+_CLAIM_NEXT_JOB = """
+SELECT j.* FROM btl.research_jobs j
+LEFT JOIN btl.research_queue_actor_turns t ON t.actor_id=j.actor_id
+WHERE j.state='QUEUED'
+  AND NOT EXISTS (
+      SELECT 1 FROM btl.research_jobs p
+      WHERE p.actor_id=j.actor_id AND p.state='QUEUED'
+        AND (p.created_at,p.id)<(j.created_at,j.id)
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM btl.research_jobs r
+      WHERE r.actor_id=j.actor_id AND r.state='RUNNING'
+  )
+ORDER BY CASE WHEN j.operation='replay_to'
+                AND j.created_at>statement_timestamp()-interval '5 seconds'
+              THEN 1 ELSE 0 END,
+         t.last_claimed_at NULLS FIRST,j.created_at,j.id
+LIMIT 1 FOR UPDATE OF j SKIP LOCKED
+"""
+
 
 def scoped(db, actor_id, workspace_id):
     db.row_factory = dict_row
@@ -255,24 +275,9 @@ def work_one(dsn, runner):
             return False
         _reap_expired_leases(db)
         _expire_queued(db)
-        # Serve the least recently claimed actor's oldest queued job. Keep one
-        # visible queue head per actor so a busy user cannot jump its own turn.
-        row = db.execute("""
-            SELECT j.* FROM btl.research_jobs j
-            LEFT JOIN btl.research_queue_actor_turns t ON t.actor_id=j.actor_id
-            WHERE j.state='QUEUED'
-              AND NOT EXISTS (
-                  SELECT 1 FROM btl.research_jobs p
-                  WHERE p.actor_id=j.actor_id AND p.state='QUEUED'
-                    AND (p.created_at,p.id)<(j.created_at,j.id)
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM btl.research_jobs r
-                  WHERE r.actor_id=j.actor_id AND r.state='RUNNING'
-              )
-            ORDER BY t.last_claimed_at NULLS FIRST,j.created_at,j.id
-            LIMIT 1 FOR UPDATE OF j SKIP LOCKED
-        """).fetchone()
+        # FIFO per actor; cross-actor short reads can pass a fresh multi-chunk
+        # replay. Aging returns long jobs to the ordinary fair rotation.
+        row = db.execute(_CLAIM_NEXT_JOB).fetchone()
         if row is None:
             return False
         if not db.execute('SELECT clock_timestamp()<%s AS valid', (row['expires_at'],)).fetchone()['valid']:

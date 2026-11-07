@@ -10,12 +10,13 @@ import hashlib
 import json
 
 from contracts.canonical import canonical_bytes, content_hash
-from contracts.primitives import require
+from contracts.primitives import digest, require, revision
 
 ARTIFACT = 'BTL-QA-OBSERVED-STATE-DELTA-3'
 ARTIFACT_V4 = 'BTL-QA-OBSERVED-STATE-DELTA-4'
 COMPACT_BASE = 'BTL-OBSERVED-STATE-BASE-1'
 COMPACT_DELTA = 'BTL-OBSERVED-STATE-DELTA-1'
+COMPACT_PROGRESS_DELTA = 'BTL-OBSERVED-STATE-PROGRESS-DELTA-1'
 
 
 def encode_base(state):
@@ -64,9 +65,16 @@ def encode_compact_base(state):
                 stateHash=hashlib.sha256(raw).hexdigest())
 
 
-def encode_compact_delta(previous,state,previous_hash):
-    """Sparse v1 scalar/order delta; financial state hash is over full state."""
-    require(state['revision']==previous['revision']+1,'revision','CORRUPT_RECORD')
+def encode_compact_delta(previous,state,previous_hash,*,progress_revision=None):
+    """Encode a normal delta or fold a verified mutable frontier into one delta."""
+    if progress_revision is None:
+        artifact=COMPACT_DELTA
+        require(state['revision']==previous['revision']+1,'revision','CORRUPT_RECORD')
+    else:
+        artifact=COMPACT_PROGRESS_DELTA
+        revision(progress_revision)
+        require(previous['revision']<progress_revision and state['revision']==progress_revision+1,
+                'revision','CORRUPT_RECORD')
     def same(left,right):
         return json.dumps(left,sort_keys=True,separators=(',',':'),ensure_ascii=False)==json.dumps(right,sort_keys=True,separators=(',',':'),ensure_ascii=False)
     old={k:v for k,v in previous.items() if k!='orders'}
@@ -76,15 +84,17 @@ def encode_compact_delta(previous,state,previous_hash):
     old_orders=previous['orders'];new_orders=state['orders']
     order_upserts={k:deepcopy(v) for k,v in new_orders.items()
                    if k not in old_orders or not same(old_orders[k],v)}
-    core=dict(schemaVersion=1,artifact=COMPACT_DELTA,revision=state['revision'],previousHash=previous_hash,
+    core=dict(schemaVersion=1,artifact=artifact,revision=state['revision'],previousHash=previous_hash,
               scalarUpserts=scalar_upserts,scalarDeletes=scalar_deletes,
               orderUpserts=order_upserts,orderDeletes=sorted(set(old_orders)-set(new_orders)))
     core['stateHash']=hashlib.sha256(canonical_bytes(state)).hexdigest()
-    core['recordHash']=content_hash(dict(schemaVersion=1,artifact=COMPACT_DELTA+'-RECORD',body=core))
-    return dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_DELTA,body=core)
+    if progress_revision is not None:
+        core.update(previousRevision=previous['revision'],progressRevision=progress_revision)
+    core['recordHash']=content_hash(dict(schemaVersion=1,artifact=artifact+'-RECORD',body=core))
+    return dict(schemaVersion=1,formatVersion=1,artifact=artifact,body=core)
 
 
-def reconstruct(base,deltas,*,state_callback=None):
+def reconstruct(base,deltas,*,state_callback=None,base_chain_hash=None,allow_progress=False):
     require(base.get('schemaVersion')==1 and
             ((base.get('formatVersion')==3 and base.get('artifact') in (ARTIFACT+'-BASE','BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-3')) or
              (base.get('formatVersion')==1 and base.get('artifact') in (
@@ -93,9 +103,18 @@ def reconstruct(base,deltas,*,state_callback=None):
             'base','CORRUPT_RECORD')
     state=deepcopy(base['state']);prev=base['stateHash']
     require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')
-    if state_callback is not None:state_callback(state,0)
+    base_revision = state['revision']
+    require(type(base_revision) is int and base_revision >= 0 and
+            (base_revision == 0 if base_chain_hash is None else base_revision == base['revision']),
+            'baseRevision','CORRUPT_RECORD')
+    if base_chain_hash is not None:
+        digest(base_chain_hash,'baseChainHash')
+        prev=base_chain_hash
+    if state_callback is not None:state_callback(state,base_revision)
     for row in deltas:
         core=row.get('body',{})
+        artifact=row.get('artifact')
+        next_revision=state['revision']+1
         body={k:v for k,v in core.items() if k!='recordHash'}
         if row.get('formatVersion')==3 and row.get('artifact')==ARTIFACT+'-DELTA':
             require(core['recordHash']==content_hash(dict(schemaVersion=1,artifact=ARTIFACT+'-RECORD',body=body)),
@@ -108,9 +127,17 @@ def reconstruct(base,deltas,*,state_callback=None):
             require(core['schemaVersion']==1 and core['artifact']==COMPACT_DELTA and
                     core['recordHash']==content_hash(dict(schemaVersion=1,artifact=COMPACT_DELTA+'-RECORD',body=body)),
                     'deltaChain','CORRUPT_RECORD')
+        elif allow_progress and row.get('formatVersion')==1 and artifact==COMPACT_PROGRESS_DELTA:
+            progress_revision=core.get('progressRevision')
+            revision(progress_revision)
+            require(core.get('schemaVersion')==1 and core.get('artifact')==artifact and
+                    core.get('previousRevision')==state['revision']<progress_revision and
+                    core['recordHash']==content_hash(dict(schemaVersion=1,artifact=artifact+'-RECORD',body=body)),
+                    'deltaChain','CORRUPT_RECORD')
+            next_revision=progress_revision+1
         else:
             require(False,'deltaVersion','CORRUPT_RECORD')
-        require(core['previousHash']==prev and core['revision']==state['revision']+1,
+        require(core['previousHash']==prev and core['revision']==next_revision,
                 'deltaChain','CORRUPT_RECORD')
         orders=state['orders']
         for oid in core['orderDeletes']:
@@ -132,17 +159,20 @@ def reconstruct(base,deltas,*,state_callback=None):
     return state
 
 
-def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None):
+def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None,base_chain_hash=None,allow_progress=False):
     require(type(expected_revision) is int and expected_revision>=0,'deltaCount','CORRUPT_RECORD')
+    expected_count=expected_revision-(base['revision'] if base_chain_hash is not None else 0)
+    require(expected_count>=0,'deltaCount','CORRUPT_RECORD')
     count=0
     def counted():
         nonlocal count
         for row in deltas:
             count+=1
-            require(count<=expected_revision,'deltaCount','CORRUPT_RECORD')
+            require(count<=expected_count,'deltaCount','CORRUPT_RECORD')
             yield row
-    state=reconstruct(base,counted(),state_callback=state_callback)
-    require(count==expected_revision,'deltaCount','CORRUPT_RECORD')
+    state=reconstruct(base,counted(),state_callback=state_callback,base_chain_hash=base_chain_hash,
+                      allow_progress=allow_progress)
+    require(allow_progress or count==expected_count,'deltaCount','CORRUPT_RECORD')
     require(state['revision']==expected_revision,'deltaRevision','CORRUPT_RECORD')
     return state
 

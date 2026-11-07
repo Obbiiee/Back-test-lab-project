@@ -39,6 +39,12 @@ export function displayBars(view){
 }
 export function replayTarget(view,steps){
   if(![1,4,16].includes(steps))throw Error('Unsupported replay batch');
+  const pending=view.pendingReplayTargetNs;
+  if(pending!=null){
+    if(typeof pending!=='string'||!/^(0|[1-9][0-9]{0,19})$/.test(pending)||
+      BigInt(pending)<=BigInt(view.state.throughNs))throw Error('Invalid pending replay target');
+    return pending;
+  }
   const step=view.replayStepNs===undefined?TICK_STEP_NS:BigInt(view.replayStepNs);
   if(typeof view.replayStepNs!=="undefined"&&(typeof view.replayStepNs!=="string"||!/^[1-9][0-9]{0,10}$/.test(view.replayStepNs)||step>60000000000n))throw Error('Invalid replay interval');
   return String(BigInt(view.state.throughNs)+BigInt(steps)*step);

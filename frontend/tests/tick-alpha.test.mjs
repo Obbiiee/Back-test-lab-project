@@ -1,6 +1,7 @@
+import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
+import {api,command,replayObservedTo,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
@@ -38,11 +39,11 @@ setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
 const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
-assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 const readRetryIds=[];
 setAccountTransport({subject:queuedAccount.subject,request:async(_path,options={})=>{readRetryIds.push(options.jobId);return {schemaVersion:1,label:'done'};}},'11111111-1111-4111-8111-111111111111');
 await api('/sessions/session:queue/view',{timeframe:'1m'});
-assert.equal(readRetryIds[0],queuedId,'same read request keeps durable identity after retry');
+assert.notEqual(readRetryIds[0],queuedId,'a new view read cannot reuse a completed queue result');
 assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
 const additionalQueued=[];
 setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
@@ -54,9 +55,25 @@ setAccountTransport({subject:queuedAccount.subject,request:async(path,options={}
 assert.equal((await api('/sessions/session:queued/chart-history',{timeframe:'1m',offset:0})).artifact,'BTL-SYNTHETIC-RESULT-1');
 assert.equal((await api('/sessions/session:queued/replay-to',{requestId:'request:stable'})).artifact,'BTL-SYNTHETIC-RESULT-1');
 assert.ok(additionalQueued.every(([,options])=>options.jobId),'chart-history and replay-to use durable queue IDs');
+const observedJump={metadata:{id:'session:jump',artifact:'BTL-OBSERVED-RESEARCH-SESSION-1'},state:{revision:3,throughNs:'100'}};
+const jumpRequests=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(_path,{body,jobId})=>{
+  jumpRequests.push([body.requestId,jobId]);
+  const view={metadata:{id:body.sessionId},state:{throughNs:'150',revision:4}};
+  return {schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-RESULT-1',requestId:body.requestId,
+    sessionId:body.sessionId,targetNs:body.targetNs,throughNs:'150',targetReached:false,view};
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>replayObservedTo(observedJump,'99','1m'),/after the saved replay/);
+await assert.rejects(()=>replayObservedTo({...observedJump,pendingReplayTargetNs:'175'},'200','1m'),/Continue the saved replay/);
+assert.equal((await replayObservedTo(observedJump,'200','1m')).targetReached,false);
+await replayObservedTo(observedJump,'200','1m');
+assert.equal(jumpRequests.length,2);
+assert.deepEqual(jumpRequests[0],jumpRequests[1],'retry keeps both request and queue identities');
+
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
+await assert.rejects(()=>api('/sessions',{id:'session:uncertain'}),error=>error.code==='UNKNOWN'&&!!error.jobId);
 let replayJob;
 const replayCalls=[];
 const reconciliation={subject:queuedAccount.subject,request:async(path,options={})=>{
@@ -123,10 +140,44 @@ await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);
 clearAccountTransport();
 assert.equal(accountStorageKey('same-session-id'),'same-session-id');
+// Match the server queue's retained result semantics across sign-out/sign-in.
+const retainedViews=new Map();
+let committedRevision=3;
+const resumeClient=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(!path.endsWith('/view'))return accountFetch(path,options);
+  const jobId=options.headers['X-BTL-Job'];
+  assert.ok(jobId);
+  if(!retainedViews.has(jobId))retainedViews.set(jobId,{schemaVersion:1,state:{revision:committedRevision}});
+  return {ok:true,status:200,json:async()=>retainedViews.get(jobId)};
+}});
+const resumeWorkspace='11111111-1111-4111-8111-111111111111';
+const loadResume=()=>api('/sessions/session:saved/view',{timeframe:'1m'});
+await resumeClient.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(resumeClient,resumeWorkspace);
+assert.equal((await loadResume()).state.revision,3);
+await resumeClient.logout();
+clearAccountTransport();
+committedRevision=4;
+await resumeClient.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(resumeClient,resumeWorkspace);
+assert.equal((await loadResume()).state.revision,4,'resume must load a newly committed server revision');
+assert.equal(retainedViews.size,2);
+clearAccountTransport();
+
+const failedLogout=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(path.endsWith('/logout-all'))throw new DOMException('Response lost','TimeoutError');
+  return accountFetch(path,options);
+}});
+await failedLogout.login('qa@example.com','Test fixture passphrase only');
+await assert.rejects(()=>failedLogout.logout(true),{name:'TimeoutError'});
+assert.equal(failedLogout.hasSession(),false);
+assert.equal(failedLogout.subject(),null);
 const beforeAccountWindow=globalThis.window;
 globalThis.window={location:{href:'https://localhost:5197/?page=account'}};
 await assert.rejects(()=>api('/catalog'),/No private local fallback/);
 assert.equal(pagePath('home'),'/?page=account');
+window.location.href='https://research.example/?tick-alpha=local';
+await assert.rejects(()=>api('/catalog'),/No private local fallback/);
 if(beforeAccountWindow===undefined)delete globalThis.window;else globalThis.window=beforeAccountWindow;
 const insecure=createAccountClient({fetcher:()=>{throw Error('Must not fetch');},secure:()=>false});
 await assert.rejects(()=>insecure.login('qa@example.com','password'),/HTTPS/);
@@ -183,6 +234,7 @@ const quotaStore={getItem:()=>JSON.stringify({...disabledMeasurement,enabled:tru
 assert.equal(eventTo(quotaStore,{id:'event:quota',name:'analysis_opened'},observedNow),false);
 console.log('PASS optional internal measurement: disabled/no-op, typed privacy, idempotent/bounded events, separate feedback/retry/retention, honest cost unknowns and corrupt/denied/quota preservation.');
 
+globalThis.window={location:{href:'http://127.0.0.1:5173/'}};
 const calls=[];
 globalThis.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({schemaVersion:1,reviewHash:'pinned'})};};
 const exact='0.123456789012345678';
@@ -214,8 +266,15 @@ const ui=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),
 for(const prohibited of ['useTrading','prototypeModel','localStorage','simulate trigger','manage('])assert.ok(!ui.includes(prohibited),'Alpha must not adopt a second financial truth: '+prohibited);
 assert.ok(ui.includes('review.reviewHash')&&ui.includes("+'/confirm'"));
 assert.ok(ui.includes('flight.current')&&ui.includes('loadWorkspace(view.metadata.id)'));
-const main=readFileSync(new URL('../src/main.jsx',import.meta.url),'utf8');
-assert.ok(main.includes("get('tick-alpha')==='local'"));assert.ok(main.includes('localOrigin?<TickAlphaEntry/>'));
+assert.equal(entryRoute({hostname:'localhost',search:'?tick-alpha=local'}),'workspace');
+assert.equal(entryRoute({hostname:'127.0.0.1',search:'?legacy=local'}),'legacy');
+assert.equal(entryRoute({hostname:'[::1]',search:'?tick-alpha=exness'}),'workspace');
+for(const search of ['', '?legacy=local', '?tick-alpha=local', '?tick-alpha=exness',
+  '?tick-review=local', '?trading-ux=prototype']){
+  assert.equal(entryRoute({hostname:'research.example',search}),'hosted-home',search);
+}
+assert.equal(entryRoute({hostname:'research.example',
+  search:'?page=account&session=saved&legacy=local'}),'account');
 console.log('PASS tick-alpha transport exact strings, explicit revision/command identity, local-only opt-in and durable-review UI boundary.');
 
 const view={state:{throughNs:'1577838600000000000'},chart:{timeframe:'1m',priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable:false,candles:[
@@ -226,6 +285,11 @@ assert.equal(bars[0].open,2000.015);assert.ok(!Object.hasOwn(bars[0],'volume'));
 assert.deepEqual(Object.keys(bars[0]),['time','open','high','low','close']);
 assert.equal(view.chart.candles[0].open,'2000.015');
 assert.equal(replayTarget(view,4),'1577838660000000000');
+const resumedView={...view,pendingReplayTargetNs:'1577838700000000000'};
+for(const steps of [1,4,16])assert.equal(replayTarget(resumedView,steps),resumedView.pendingReplayTargetNs);
+for(const pending of ['1577838600000000000','-1','1.5',1577838700000000000]){
+  assert.throws(()=>replayTarget({...view,pendingReplayTargetNs:pending},1),/Invalid pending replay target/);
+}
 assert.equal(seekTarget('2020-01-01T00:30'),'1577838600000000000');
 assert.equal(seekTarget('2020-02-29T12:34:56'),'1582979696000000000');
 assert.equal(seekTarget('2000-02-29T00:00'),'951782400000000000');

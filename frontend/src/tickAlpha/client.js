@@ -1,6 +1,7 @@
-// Local transport only. Financial values stay exact strings; no browser settlement.
+// Financial values stay exact strings across hosted and loopback transports.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 import {accountTransport,isAccountPage} from './accountClient.js';
+import {isLocalReview} from '../tickReview/LocalOrigin.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
 function stableValue(value){
   if(Array.isArray(value))return value.map(stableValue);
@@ -24,9 +25,11 @@ export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
     const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const queued=replay||(/^\/sessions$/.test(path))||/\/sessions\/[^/]+\/(view|bootstrap|chart-history|replay-to)$/.test(path);
-    const mutating=replay||path==='/sessions'||/\/replay-to$/.test(path);
-    const jobId=queued?await durableJobId(account,path,body):undefined;
+    const mutating=replay||(path==='/sessions'&&body!==undefined)||/\/replay-to$/.test(path);
+    const queuedRead=/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
+    // The queue reuses completed results by job ID. A new read must see the
+    // current committed revision; only retries of a mutation reuse its ID.
+    const jobId=mutating?await durableJobId(account,path,body):queuedRead?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
     const uncertain=()=>Object.assign(Error('UNKNOWN: durable operation outcome is not yet known. Reconcile its job or authoritative Session/receipt before retrying.'),{code:'UNKNOWN',jobId});
     let value;
@@ -36,12 +39,15 @@ export async function api(path,body,{signal}={}){
       if(mutating&&!definitiveRefusal)throw uncertain();
       throw error;
     }
-    if(queued&&['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','EXPIRED','RECONCILE_REQUIRED'].includes(value?.state)&&!value?.jobId){
+    if(jobId&&['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','EXPIRED','RECONCILE_REQUIRED'].includes(value?.state)&&!value?.jobId){
       if(mutating)throw uncertain();
       throw Error('Queued research response omitted its durable job identity.');
     }
     while(value?.jobId){
-      if(value.jobId!==jobId)throw Error('Unexpected research job; no state was imported.');
+      if(value.jobId!==jobId){
+        if(mutating)throw uncertain();
+        throw Error('Unexpected research job; no state was imported.');
+      }
       if(value.state==='SUCCEEDED'){value=value.result;break;}
       if(!['QUEUED','RUNNING'].includes(value.state)){
         if(mutating)throw uncertain();
@@ -62,10 +68,15 @@ export async function api(path,body,{signal}={}){
         throw error;
       }
     }
-    if(value?.schemaVersion!==1)throw Error('Unsupported workspace response; no state was imported.');
+    if(value?.schemaVersion!==1){
+      if(mutating)throw uncertain();
+      throw Error('Unsupported workspace response; no state was imported.');
+    }
     return value;
   }
-  if(isAccountPage())throw Error('Sign in to continue. No private local fallback was requested.');
+  if(isAccountPage()||typeof window==='undefined'||!isLocalReview(new URL(window.location.href).hostname)){
+    throw Error('Sign in to continue. No private local fallback was requested.');
+  }
   const source=sourceContext();
   const response=await fetch(ROOT+path,{method:body===undefined?'GET':'POST',cache:'no-store',
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
@@ -97,6 +108,31 @@ export function selectSessionUrl(session){
   url.searchParams.set('session',session);
   window.history.replaceState(null,'',url);
 }
+export async function replayObservedTo(view,targetNs,timeframe){
+  const account=accountTransport();
+  if(!account||view.metadata.artifact!=='BTL-OBSERVED-RESEARCH-SESSION-1')throw Error('Forward jump requires a hosted observed Session.');
+  if(typeof targetNs!=='string'||!/^(0|[1-9][0-9]{0,19})$/.test(targetNs)||
+    BigInt(targetNs)<=BigInt(view.state.throughNs))throw Error('Choose a time after the saved replay position.');
+  if(view.pendingReplayTargetNs!=null&&view.pendingReplayTargetNs!==targetNs){
+    throw Error('Continue the saved replay target before choosing another time.');
+  }
+  const sessionId=view.metadata.id;
+  const path=sessionPath(sessionId)+'/replay-to';
+  const request={schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-1',sessionId,expectedRevision:view.state.revision,targetNs,timeframe};
+  const requestId=(await durableJobId(account,path,request)).replaceAll('-','');
+  if(accountTransport()!==account)throw Error('Account changed before replay could start.');
+  const result=await api(path,{...request,requestId});
+  if(accountTransport()!==account||result.artifact!=='BTL-OBSERVED-REPLAY-TO-RESULT-1'||result.requestId!==requestId||
+    result.sessionId!==sessionId||result.targetNs!==targetNs||result.view?.metadata?.id!==sessionId||
+    result.view?.state?.throughNs!==result.throughNs||!Number.isSafeInteger(result.view?.state?.revision)||
+    result.view.state.revision<request.expectedRevision||typeof result.throughNs!=='string'||
+    !/^(0|[1-9][0-9]{0,19})$/.test(result.throughNs)||BigInt(result.throughNs)<BigInt(view.state.throughNs)||
+    BigInt(result.throughNs)>BigInt(targetNs)||result.targetReached!==(result.throughNs===targetNs)){
+    throw Error('Replay result could not be verified. Reopen the saved Session before continuing.');
+  }
+  return result;
+}
+
 export function command(view,kind,payload){
   const artifact=view?.metadata?.artifact;
   const dialect=artifact==='BTL-LOCAL-SESSION-1'?'BTL-TICK-EXECUTION-COMMAND-1':
