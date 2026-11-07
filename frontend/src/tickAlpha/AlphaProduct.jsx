@@ -167,10 +167,20 @@ export function MethodNew({catalog,route,onSaved}){
 
 export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
   const method=catalog.methods.find(m=>m.id===route.method);
-  const family=catalog.methodFamilies?.find(item=>item.familyId===method?.methodFamilyId||item.versions?.some(version=>version.methodId===route.method));
+  const familySummary=catalog.methodFamilies?.find(item=>item.familyId===method?.methodFamilyId||item.versions?.some(version=>version.methodId===route.method));
   const [lifecycleError,setLifecycleError]=useState('');
   const [lifecycleBusy,setLifecycleBusy]=useState(false);
+  const [familyDetail,setFamilyDetail]=useState(null),[versionError,setVersionError]=useState(''),[versionBusy,setVersionBusy]=useState(false);
   const sessions=useMemo(()=>catalog.sessions.filter(s=>s.methodId===route.method),[catalog.sessions,route.method]);
+  const familyId=familySummary?.familyId;
+  useEffect(()=>{
+    if(!familyId||!accountTransport())return;
+    let live=true;
+    api(`/method-families/${encodeURIComponent(familyId)}?version_limit=25`)
+      .then(result=>{if(live){setFamilyDetail(result.family);setVersionError('');}},error=>{if(live)setVersionError(error.message);});
+    return()=>{live=false;};
+  },[familyId]);
+  const family=familyDetail?.familyId===familyId?familyDetail:familySummary;
   if(!method)return <><PageHead back={{label:'My Methods',to:{screen:'methods'}}} title="Method unavailable"/><StatePanel kind="unavailable" title="This Method is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>It may belong to another workspace or account. Nothing was changed.</p></StatePanel></>;
   const tab=route.tab;
   const newSession=<button type="button" className="rk-btn rk-btn-primary" onClick={event=>onNewSession(method.id,event)}><Icon name="plus" size={18}/><span>New Session</span></button>;
@@ -180,6 +190,15 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     setLifecycleBusy(true);setLifecycleError('');
     try{await setMethodArchived(family,archived);await onLifecycle?.();}
     catch(error){setLifecycleError(error.message);setLifecycleBusy(false);}
+  }
+  async function loadMoreVersions(){
+    if(!family?.nextVersionCursor||versionBusy)return;
+    setVersionBusy(true);setVersionError('');
+    try{
+      const result=await api(`/method-families/${encodeURIComponent(family.familyId)}?version_limit=25&after_version=${family.nextVersionCursor}`);
+      setFamilyDetail(current=>current?.familyId===result.family.familyId?{...result.family,
+        versions:[...current.versions,...result.family.versions]}:current);
+    }catch(error){setVersionError(error.message);}finally{setVersionBusy(false);}
   }
   const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
   return <>
@@ -203,7 +222,10 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     {tab==='rules'&&<section className="rk-card" aria-labelledby="rk-rules-h"><h2 id="rk-rules-h">Rules</h2>
       <dl className="rk-facts"><div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>{method.kind==='PROTOCOL'&&<><div><dt>Locked risk per trade</dt><dd className="rk-num">{method.riskPercent}%</dd></div><div><dt>Locked reward : risk</dt><dd className="rk-num">{method.rr}</dd></div><div><dt>Checklist enforcement</dt><dd>{method.checklistOn?'On: orders need every condition assessed':'Off: conditions are recorded only'}</dd></div></>}</dl>
       {method.kind==='PROTOCOL'&&<><h3>Conditions</h3><ol className="rk-rule-list">{method.conditions.map(c=><li key={c.id}>{c.label}</li>)}</ol></>}
-      {family&&<><h3>Immutable version history</h3><ol className="rk-rule-list">{family.versions.map(version=><li key={version.version}><a {...linkTo({screen:'method',method:version.methodId,tab:'rules'})}>Version {version.version}: {version.method.name}</a>{version.version===family.latestVersion?' · latest':''}</li>)}</ol></>}
+      {family&&<><h3>Immutable version history</h3><ol className="rk-rule-list">{family.versions.map(version=><li key={version.version}><a {...linkTo({screen:'method',method:version.methodId,tab:'rules'})}>Version {version.version}: {version.method.name}</a>{version.version===family.latestVersion?' · latest':''}</li>)}</ol>
+        {versionError&&<p className="rk-error" role="alert">{versionError}</p>}
+        {family.nextVersionCursor&&<button type="button" className="rk-btn rk-btn-quiet" disabled={versionBusy} onClick={loadMoreVersions}>{versionBusy?'Loading…':'Load more versions'}</button>}
+      </>}
       <details className="rk-provenance"><summary>Provenance</summary><dl className="rk-facts"><div><dt>Method id</dt><dd><code>{method.id}</code></dd></div>{sessions[0]&&<div><dt>Rule hash (pinned by Sessions)</dt><dd><code>{sessions[0].methodHash}</code></dd></div>}</dl></details>
       <p className="rk-note">Rules stay fixed after saving so earlier evidence keeps its meaning. {family?`Family ${family.familyId} · revision ${family.revision} · ${family.versions.length} immutable version${family.versions.length===1?'':'s'}.`:'Local Methods are immutable.'}</p>
     </section>}
