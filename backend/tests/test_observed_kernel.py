@@ -115,7 +115,7 @@ class ObservedKernelTests(unittest.TestCase):
         state,_,_=apply(state,command,reveal=frame,checkpoint=checkpoint,terminal_order_archive_v1=True,
                       archived_order_lookup=lambda _:None)
         archived=[]
-        for index in range(129):
+        for index in range(240):
             order_id=f'archive:order:{index}'
             opened=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
                 sessionId=state['sessionId'],commandId=order_id,expectedRevision=state['revision'],
@@ -130,8 +130,8 @@ class ObservedKernelTests(unittest.TestCase):
             self.assertEqual(state['orders'],{})
             archived.extend(records)
         verified=verify_complete(iter(archived),state['orderArchive'])
-        self.assertEqual(state['orderArchive']['count'],129)
-        self.assertEqual(verified['count'],129)
+        self.assertEqual(state['orderArchive']['count'],240)
+        self.assertEqual(verified['count'],240)
 
     def test_historical_v2_records_gap_then_evaluates_only_actual_resumption_quote(self):
         self.setup_stream([(0,'2300','2300.1'),(120*S,'2299','2299.1')])

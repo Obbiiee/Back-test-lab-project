@@ -169,7 +169,7 @@ class TickExecutionTests(unittest.TestCase):
         case=goldens()["scenarios"][0];h=Harness(provider_for(case))
         genesis=deepcopy(h.state);plan=open_plan(case["open"])
         archived=[];previous=GENESIS
-        for index in range(129):
+        for index in range(240):
             order_id=f'order:{index}'
             h.call('OPEN',plan,name=order_id)
             self.assertEqual(set(h.state['orders']),{order_id})
@@ -184,13 +184,13 @@ class TickExecutionTests(unittest.TestCase):
                 previous_hash=previous)
             verify(archived_order,session_id=h.session,sequence=index,previous_hash=previous)
             archived.append(archived_order);previous=archived_order['recordHash']
-        self.assertEqual(h.state['nextEventIndex'],258)
-        self.assertEqual(len(archived),129)
+        self.assertEqual(h.state['nextEventIndex'],480)
+        self.assertEqual(len(archived),240)
         self.assertEqual(archived[-1]['order']['status'],'CANCELLED')
         result=project(h.state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
         self.assertEqual(result['status'],'COMPLETE')
         self.assertEqual(result['metrics']['tradeCount'],0)
-        self.assertEqual(len(result['orders']),129)
+        self.assertEqual(len(result['orders']),240)
 
     def test_closed_order_archive_projection_preserves_financial_event_details(self):
         from execution.terminal_order_archive import terminal_orders, record, verify, GENESIS
