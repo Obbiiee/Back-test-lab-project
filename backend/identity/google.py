@@ -1,5 +1,6 @@
-"""Opt-in Google OIDC via mature OAuth/PKCE and JWT libraries; no email linking."""
+"""Opt-in Google OIDC and reauthenticated explicit identity linking."""
 from dataclasses import dataclass,field
+from functools import partial
 from urllib.parse import urlsplit
 import base64,hashlib,re,secrets
 import anyio,httpx,jwt
@@ -8,6 +9,8 @@ from fastapi.responses import JSONResponse,RedirectResponse
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.exceptions import HTTPXOAuthError
 from pydantic import TypeAdapter,EmailStr
+from fastapi import Depends
+from fastapi_users.password import PasswordHelper
 from contracts.canonical import content_hash
 from contracts.primitives import require,ContractError
 from execution.local_api import body
@@ -72,6 +75,11 @@ class GoogleVerifier:
         return claims['sub'],email
 
 
+async def _threaded(function,*args,limiter=None,**kwargs):
+    """Run blocking identity-store work without dropping keyword arguments."""
+    return await anyio.to_thread.run_sync(partial(function,*args,**kwargs),limiter=limiter)
+
+
 def opaque(value):
     require(type(value) is str and re.fullmatch(r'[A-Za-z0-9_-]{32,128}',value),'googleState','GOOGLE_STATE_REFUSED');return value
 
@@ -90,7 +98,8 @@ def install(app,config,backend,strategy,user_store):
     client=GoogleClient(config.client_id,config.client_secret,scopes=['openid','email']);verifier=GoogleVerifier(config)
     app.state.google_store,app.state.google_client,app.state.google_verifier=store,client,verifier
     admission=anyio.Semaphore(2);limiter=anyio.CapacityLimiter(2)
-    async def threaded(function,*args):return await anyio.to_thread.run_sync(function,*args,limiter=limiter)
+    async def threaded(function,*args,**kwargs):
+        return await _threaded(function,*args,limiter=limiter,**kwargs)
     def host(request):
         allowed={urlsplit(config.origin).netloc}
         if urlsplit(config.redirect_uri).port in (None,443):allowed.add(urlsplit(config.origin).netloc+':443')
@@ -108,6 +117,29 @@ def install(app,config,backend,strategy,user_store):
         url=await client.get_authorization_url(config.redirect_uri,state,scope=['openid','email'],code_challenge=challenge,code_challenge_method='S256',extras_params={'nonce':nonce,'access_type':'online','prompt':'select_account'})
         result=RedirectResponse(url,status_code=303,headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
         cookie(result,BROWSER_COOKIE,browser,300);return result
+    @app.post('/api/v1/auth/google/link/start')
+    async def start_link(request:Request,user=Depends(app.state.current_user)):
+        host(request)
+        if request.url.query or request.headers.get('origin')!=config.origin or request.headers.get('x-btl-google-link')!='1':
+            raise HTTPException(status_code=403,detail='GOOGLE_REQUEST_REFUSED')
+        if request.headers.get('content-type','').split(';')[0]!='application/json':return fail('GOOGLE_LINK_REQUEST_REFUSED',415)
+        try:supplied=await body(request)
+        except ContractError:return fail('GOOGLE_LINK_REQUEST_REFUSED',400)
+        if not (type(supplied) is dict and set(supplied)=={'password'} and type(supplied['password']) is str
+                and 1<=len(supplied['password'])<=128):return fail('GOOGLE_LINK_REQUEST_REFUSED',400)
+        valid=False
+        if user.password_enabled:
+            try:valid,_updated=await threaded(PasswordHelper().verify_and_update,supplied['password'],user.hashed_password)
+            except (ValueError,UnicodeError):valid=False
+        if not valid:return fail('GOOGLE_REAUTH_REQUIRED',403)
+        state,browser,nonce,verifier_text=(secrets.token_urlsafe(32),secrets.token_urlsafe(32),secrets.token_urlsafe(32),secrets.token_urlsafe(48))
+        challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier_text.encode('ascii')).digest()).rstrip(b'=').decode('ascii')
+        try:await threaded(store.begin,state,browser,nonce,verifier_text,purpose='LINK',target_user_id=user.id)
+        except ContractError:return fail('GOOGLE_BUSY',429)
+        url=await client.get_authorization_url(config.redirect_uri,state,scope=['openid','email'],code_challenge=challenge,
+            code_challenge_method='S256',extras_params={'nonce':nonce,'access_type':'online','prompt':'select_account'})
+        result=JSONResponse({'schemaVersion':1,'authorizationUrl':url},headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
+        cookie(result,BROWSER_COOKIE,browser,300);return result
     @app.get(CALLBACK)
     async def callback(request:Request):
         host(request)
@@ -117,13 +149,15 @@ def install(app,config,backend,strategy,user_store):
             params=request.query_params
             require(len(params.multi_items())<=16 and len(set(params.keys()))==len(params.multi_items()),'googleParameters')
             state=opaque(params.get('state'));browser=opaque(request.cookies.get(BROWSER_COOKIE))
-            nonce,verifier_text=await threaded(store.claim,state,browser)
+            claimed=await threaded(store.claim,state,browser)
+            nonce,verifier_text=claimed['nonce'],claimed['verifier']
             require(not params.get('error') and type(params.get('code')) is str and 1<=len(params['code'])<=4096,'googleCode')
             token=await client.get_access_token(params['code'],config.redirect_uri,code_verifier=verifier_text)
             subject,email=await threaded(verifier.verify,token.get('id_token'),nonce)
             handoff=secrets.token_urlsafe(32)
-            await threaded(store.ready,state,subject,email,handoff)
-            result=RedirectResponse(config.origin+'/?auth=google',status_code=303,headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
+            await threaded(store.ready,state,subject,email,handoff,purpose=claimed['purpose'],target_user_id=claimed['target_user_id'])
+            destination='/?page=account&auth=google-linked' if claimed['purpose']=='LINK' else '/?page=account&auth=google'
+            result=RedirectResponse(config.origin+destination,status_code=303,headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'})
             cookie(result,HANDOFF_COOKIE,handoff,120);return result
         except (ContractError,jwt.PyJWTError,httpx.HTTPError,HTTPXOAuthError,ValueError,TypeError,KeyError):return fail()
         finally:admission.release()
@@ -134,9 +168,14 @@ def install(app,config,backend,strategy,user_store):
             raise HTTPException(status_code=403,detail='GOOGLE_REQUEST_REFUSED')
         require(request.headers.get('content-type','').split(';')[0]=='application/json' and await body(request)=={},'googleBody')
         try:
-            uid=await threaded(store.exchange,opaque(request.cookies.get(HANDOFF_COOKIE)),opaque(request.cookies.get(BROWSER_COOKIE)))
+            outcome=await threaded(store.exchange,opaque(request.cookies.get(HANDOFF_COOKIE)),opaque(request.cookies.get(BROWSER_COOKIE)))
+            if outcome['purpose']=='LINK':
+                return clear(JSONResponse({'schemaVersion':1,'linked':True,'userId':str(outcome['user_id'])},headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}))
+            uid=outcome['user_id']
             user=await user_store.get(uid)
-            require(user is not None and user.is_active and user.is_verified and not user.password_enabled,'googleAccount')
+            # The verified Google subject is the login proof for both a Google-only
+            # account and a password account that explicitly linked this subject.
+            require(user is not None and user.is_active and user.is_verified,'googleAccount')
             # No state/user row lock is held across the existing token strategy.
             return clear(await backend.login(strategy(),user))
         except (ContractError,ValueError):return clear(fail())

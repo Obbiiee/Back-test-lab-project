@@ -43,12 +43,19 @@ def unresolved(state, events, reason, evidence=None):
          affectedOrderIds=affected, evidence=evidence)
 
 
+def archive_terminal(state):
+    """Keep only executable orders hot; terminal history lives in tick_events."""
+    state['orders']={order_id:order for order_id,order in state['orders'].items()
+                     if order['status'] in ('PENDING','ACTIVE')}
+
+
 def submit(state, raw):
     validate_state(state)
     command = command_wire(raw)
     require(command["sessionId"] == state["sessionId"], "session", "REFUSED_SESSION_MISMATCH")
     require(command["expectedRevision"] == state["revision"], "revision", "REFUSED_STALE_REVISION")
     state, events = deepcopy(state), []
+    archive_terminal(state)
     kind, payload = command["kind"], command["payload"]
     require(kind in ("ADVANCE", "SEEK") or not state["ended"], "ended", "REFUSED_SESSION_ENDED")
     require(kind in ("ADVANCE", "SEEK", "END") or not state["unresolved"], "unresolved", "REFUSED_UNRESOLVED_SESSION")
@@ -95,6 +102,8 @@ def submit(state, raw):
         require(not state["financial"] and not state["unresolved"] and not state["ended"] and
                 not any(o["status"] in ("PENDING", "ACTIVE") for o in state["orders"].values()),
                 "seek", "REFUSED_REWIND_REQUIRES_FORK")
+    archive_terminal(state)
+    validate_state(state)
     return state, events
 
 
@@ -295,5 +304,6 @@ def advance(state, groups, coverage, diagnostics, through_ns):
         elif any(previous < int(d["timeNs"]) <= through for d in diagnostics["records"]):
             unresolved(state, events, "UNRESOLVED_DIAGNOSTIC", dict(throughNs=through_ns))
     state["throughNs"] = through_ns
+    archive_terminal(state)
     validate_state(state)
     return state, events

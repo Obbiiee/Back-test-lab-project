@@ -46,7 +46,7 @@ def method_policy(record):
 class ResearchApplication:
     """Single-user local operator; no public identity/tenant composition."""
     def __init__(self, dsn, scope=None, *, historical_source=None, synthetic_provider=None,
-                 state_storage_format="snapshot-v1"):
+                 state_storage_format="compact-v1"):
         require(historical_source is None or synthetic_provider is None, 'source', 'IDENTITY_CONFLICT')
         if synthetic_provider is not None:
             manifest = TickManifest.from_wire(
@@ -194,7 +194,6 @@ class ResearchApplication:
                     "review", "CORRUPT_RECORD")
             expected_revision = command.get("expectedRevision")
             revision(expected_revision, "expectedRevision")
-            require(command_id not in state["orders"], "receipt", "CORRUPT_RECORD")
             common = dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
                           sessionId=session_id, commandId=command_id, reviewHash=review_row[1],
                           expectedRevision=expected_revision, currentRevision=state["revision"])
@@ -207,6 +206,16 @@ class ResearchApplication:
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             meta, _method, state, _checkpoint = self._session(db, session_id)
+            completed_trades=0
+            # Terminal orders are compacted out of new hot snapshots. Their
+            # immutable EXIT_FILL events are the durable history authority.
+            rows=db.execute('SELECT payload,content_hash FROM btl.tick_events '
+                'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
+                (self.scope.workspace_id,session_id))
+            for raw,sha in rows:
+                event=unpack(raw,sha)
+                if event.get('kind')=='EXIT_FILL' and event.get('detail',{}).get('remaining')=='0':
+                    completed_trades+=1
             return dict(schemaVersion=1, artifact="BTL-SESSION-SUMMARY-1",
                         sessionId=meta["id"], revision=state["revision"],
                         throughNs=state["throughNs"], datasetId=state["datasetId"],
@@ -214,7 +223,7 @@ class ResearchApplication:
                         accountCurrency=state["profile"]["accountCurrency"],
                         initialBalance=state["initialBalance"], balance=state["balance"],
                         netCashChange=text(Fraction(state["balance"])-Fraction(state["initialBalance"])),
-                        completedTrades=sum(o["status"] == "CLOSED" for o in state["orders"].values()),
+                        completedTrades=completed_trades,
                         unresolved=state["unresolved"], ended=state["ended"],
                         model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
 

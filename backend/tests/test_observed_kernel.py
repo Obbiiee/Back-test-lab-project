@@ -154,6 +154,15 @@ class ObservedKernelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'REFUSED_POLICY'):
             order_limits(changed)
 
+    def test_compact_v1_default_accepts_versioned_qa_archive_without_legacy_delta_mode(self):
+        from unittest.mock import patch
+        from execution.observed_postgres import ObservedExecutionStore
+        with patch.dict('os.environ',{'BTL_ENABLE_QA_ORDER_ARCHIVE_V1':'1'}):
+            store=ObservedExecutionStore('authored:unused',qa_order_archive_v1=True)
+        self.assertEqual(store.state_storage_format,'compact-v1')
+        self.assertFalse(store.qa_state_delta_v3)
+        self.assertTrue(store.qa_order_archive_v1)
+
     def setup_v2_state(self,quotes,*,gap_kinds=None):
         self.setup_stream(quotes,gap_kinds=gap_kinds)
         self.profile=self.v2_profile()

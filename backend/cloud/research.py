@@ -140,10 +140,25 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
             return product_method_lifecycle.set_archived(db, str(workspace_id), args[0], args[1])
         if operation == 'method_analytics':
-            require(_operator_catalog(dsn) is None, 'methodAnalytics', 'REFUSED_ANALYSIS_SOURCE')
-            research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
-                                           synthetic_provider=_synthetic_monthly_provider(),
-                                           state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+            catalog=_operator_catalog(dsn)
+            observed_method=False
+            if catalog is not None:
+                with connect(dsn) as db:
+                    db.row_factory=dict_row
+                    candidates=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions '
+                        'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id LIMIT 128',
+                        (str(workspace_id),args[0])).fetchall()
+                from execution.postgres import unpack
+                observed_method=any(unpack(row['payload'],row['content_hash']).get('artifact')==
+                    'BTL-OBSERVED-RESEARCH-SESSION-1' for row in candidates)
+            if catalog is not None and observed_method:
+                from execution.observed_research import ObservedResearchApplication
+                research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog,
+                    state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'compact-v1')
+            else:
+                research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
+                    synthetic_provider=_synthetic_monthly_provider(),
+                    state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'compact-v1')
             try:
                 return research.method_analytics(args[0])
             finally:
@@ -177,17 +192,15 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                             raise ContractError('CORRUPT_RECORD','session')
         if operation=='replay_to':
             require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
-        if operation=='command_result':
-            require(not observed,'commandResult','REFUSED_OBSERVED_OPERATION')
         monthly = None if observed else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication
             research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog,
-                state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+                state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'compact-v1')
         else:
             research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),
                 synthetic_provider=monthly,
-                state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+                state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'compact-v1')
         try:
             return research.catalog_view() if observed and operation=='catalog' else getattr(research,operation)(*args)
         finally:

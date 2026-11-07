@@ -154,13 +154,16 @@ def expand_compact_receipt_v1(record,command,state,chain_hash,*,order_retention_
 
 class ObservedExecutionStore:
     def __init__(self,dsn,*,order_retention_policy=None,qa_state_delta_v3=False,qa_order_archive_v1=False,
-                 state_storage_format='snapshot-v1'):
+                 state_storage_format=None):
         order_limits(order_retention_policy)
         require(type(qa_state_delta_v3) is bool,'qaStateDeltaV3')
+        if state_storage_format is None:
+            state_storage_format='snapshot-v1' if qa_state_delta_v3 else 'compact-v1'
         require(state_storage_format in ('snapshot-v1','compact-v1'),'stateStorageFormat','REFUSED_STATE_VERSION')
         require(not (qa_state_delta_v3 and state_storage_format!='snapshot-v1'),
                 'stateStorageFormat','REFUSED_STATE_VERSION')
-        require(type(qa_order_archive_v1) is bool and (not qa_order_archive_v1 or qa_state_delta_v3),
+        require(type(qa_order_archive_v1) is bool and
+                (not qa_order_archive_v1 or qa_state_delta_v3 or state_storage_format=='compact-v1'),
                 'qaOrderArchive','REFUSED_POLICY')
         require(not qa_order_archive_v1 or os.environ.get('BTL_ENABLE_QA_ORDER_ARCHIVE_V1')=='1',
                 'qaOrderArchive','REFUSED_POLICY')
@@ -566,6 +569,37 @@ class ObservedExecutionStore:
         result=checked_result(row[2],row[3],command,order_retention_policy=self.order_retention_policy)
         require(result['state']['revision']==row[0],'receiptState','CORRUPT_RECORD')
         return result
+
+    def command_result(self,scope,session_id,command_id):
+        """Resolve an observed command from its immutable review and receipt."""
+        workspace,session=scoped(scope,session_id);identifier(command_id,'commandId')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            state=self._read(db,workspace,session)['state']
+            review_row=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews '
+                'WHERE workspace_id=%s AND session_id=%s AND review_id=%s',
+                (workspace,session,command_id)).fetchone()
+            if review_row is None:
+                return dict(schemaVersion=1,artifact='BTL-TICK-COMMAND-STATUS-1',sessionId=session,
+                    commandId=command_id,status='UNKNOWN',reason='REVIEW_OR_COMMAND_NOT_VISIBLE',
+                    currentRevision=state['revision'])
+            reviewed=unpack(*review_row);command=reviewed.get('command',{})
+            require(command.get('commandId')==command_id and command.get('sessionId')==session,
+                    'review','CORRUPT_RECORD')
+            receipt=self._prior(db,workspace,session,command)
+            if receipt is not None:
+                return dict(schemaVersion=1,artifact='BTL-TICK-COMMAND-STATUS-1',sessionId=session,
+                    commandId=command_id,status='COMMITTED',currentRevision=state['revision'],
+                    reviewHash=review_row[1],receipt=receipt)
+            expected=command.get('expectedRevision')
+            revision(expected,'expectedRevision')
+            if state['revision']>expected:
+                return dict(schemaVersion=1,artifact='BTL-TICK-COMMAND-STATUS-1',sessionId=session,
+                    commandId=command_id,status='NOT_COMMITTED',reason='SESSION_REVISION_ADVANCED',
+                    currentRevision=state['revision'],reviewHash=review_row[1],expectedRevision=expected)
+            return dict(schemaVersion=1,artifact='BTL-TICK-COMMAND-STATUS-1',sessionId=session,
+                commandId=command_id,status='UNKNOWN',reason='NO_DURABLE_COMMAND_AT_REVIEW_REVISION',
+                currentRevision=state['revision'],reviewHash=review_row[1],expectedRevision=expected)
 
     def _insert(self,db,scope,state,checkpoint):
         workspace,session=scoped(scope,state['sessionId']);require(state['revision']==0,'initialRevision')

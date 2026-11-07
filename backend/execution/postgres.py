@@ -55,7 +55,7 @@ def scoped(scope, session_id):
 
 class PostgresExecutionStore:
     """One connection/row lock per bounded local command; not public composition."""
-    def __init__(self, dsn, *, state_storage_format="snapshot-v1"):
+    def __init__(self, dsn, *, state_storage_format="compact-v1"):
         require(state_storage_format in ("snapshot-v1", "compact-v1"),
                 "stateStorageFormat", "REFUSED_STATE_VERSION")
         self.dsn = dsn
