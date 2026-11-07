@@ -3,7 +3,6 @@ from contracts.primitives import require, identifier, revision
 from .postgres import unpack, pack
 from .research import method_policy, label
 
-MAX_METHODS = 128
 MAX_PAGE = 50
 
 
@@ -52,28 +51,34 @@ def _family(db, workspace_id, family_id, *, lock=False):
     return row, current, policy
 
 
-def _view(db, workspace_id, family_id):
+def _view(db, workspace_id, family_id, *, version_limit=MAX_PAGE, after_version=None, include_versions=True):
     family, current, _ = _family(db, workspace_id, family_id)
-    rows = db.execute(
+    require(type(version_limit) is int and 1 <= version_limit <= MAX_PAGE, "versionLimit")
+    require(after_version is None or (type(after_version) is int and after_version >= 1), "afterVersion")
+    rows = [] if not include_versions else db.execute(
         "SELECT v.version,v.method_id,m.payload,m.content_hash "
         "FROM btl.product_method_versions v JOIN btl.tick_methods m "
         "ON m.workspace_id=v.workspace_id AND m.method_id=v.method_id "
-        "WHERE v.workspace_id=%s AND v.family_id=%s ORDER BY v.version LIMIT %s",
-        (workspace_id, family_id, MAX_METHODS + 1),
+        "WHERE v.workspace_id=%s AND v.family_id=%s AND (%s::bigint IS NULL OR v.version>%s) "
+        "ORDER BY v.version LIMIT %s",
+        (workspace_id, family_id, after_version, after_version, version_limit + 1),
     ).fetchall()
-    require(0 < len(rows) <= MAX_METHODS, "methodVersions", "REFUSED_METHOD_VERSION_LIMIT")
+    more = len(rows) > version_limit
+    rows = rows[:version_limit]
     versions = []
     for row in rows:
         value = unpack(row["payload"], row["content_hash"])
         method_policy(value)
         require(value["id"] == row["method_id"], "method", "CORRUPT_RECORD")
         versions.append({"version": row["version"], "methodId": row["method_id"], "method": value})
-    require(versions[-1]["version"] == family["latest_version"] and
-            versions[-1]["methodId"] == family["latest_method_id"] and current == versions[-1]["method"],
+    require(current["id"] == family["latest_method_id"],
             "methodFamily", "CORRUPT_RECORD")
     return {"familyId": family_id, "revision": family["revision"], "archived": family["archived"],
             "latestVersion": family["latest_version"], "latestMethodId": family["latest_method_id"],
-            "current": current, "versions": versions}
+            "current": current, "versions": versions,
+            "nextVersionCursor": versions[-1]["version"] if more and versions else None,
+            "versionsComplete": include_versions and not more and (after_version is None or not versions or
+                versions[-1]["version"] == family["latest_version"])}
 
 
 def page(db, workspace_id, *, limit=25, after=None, include_archived=False):
@@ -88,15 +93,16 @@ def page(db, workspace_id, *, limit=25, after=None, include_archived=False):
         "AND (%s OR NOT archived) ORDER BY family_id LIMIT %s",
         (workspace_id, after, after, include_archived, limit + 1),
     ).fetchall()
-    items = [_view(db, workspace_id, row["family_id"]) for row in rows[:limit]]
+    items = [_view(db, workspace_id, row["family_id"], include_versions=False) for row in rows[:limit]]
     more = len(rows) > limit
     return {"schemaVersion": 1, "artifact": "BTL-METHOD-FAMILY-PAGE-1", "items": items,
             "nextCursor": items[-1]["familyId"] if more and items else None, "complete": not more}
 
 
-def detail(db, workspace_id, family_id):
+def detail(db, workspace_id, family_id, *, version_limit=MAX_PAGE, after_version=None):
     return {"schemaVersion": 1, "artifact": "BTL-METHOD-FAMILY-1",
-            "family": _view(db, workspace_id, family_id)}
+            "family": _view(db, workspace_id, family_id, version_limit=version_limit,
+                            after_version=after_version)}
 
 
 def add_version(db, workspace_id, family_id, raw):
@@ -127,11 +133,6 @@ def add_version(db, workspace_id, family_id, raw):
     require(family["revision"] == raw["expectedRevision"], "revision", "REFUSED_STALE_REVISION")
     require(not family["archived"], "methodFamily", "REFUSED_ARCHIVED")
     require(method["id"] != family_id and method["id"] != current["id"], "methodId", "REFUSED_IDENTITY_REUSE")
-    # The pre-existing 128-row catalog bound counts every immutable Method
-    # payload, including successors. Archive is lifecycle metadata and never
-    # frees a slot or makes historical version mappings unreadable.
-    count = db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s", (workspace_id,)).fetchone()[0]
-    require(count < MAX_METHODS, "methods", "REFUSED_CATALOG_LIMIT")
     db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",
                (workspace_id, method["id"], blob, sha))
     next_version = family["latest_version"] + 1

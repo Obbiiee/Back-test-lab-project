@@ -118,16 +118,17 @@ class ResearchApplication:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             methods = db.execute("SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129", (self.scope.workspace_id,)).fetchall()
             sessions = db.execute("SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129", (self.scope.workspace_id,)).fetchall()
-            require(len(methods) <= 128 and len(sessions) <= 128, "catalog", "REFUSED_CATALOG_LIMIT")
-            parsed = [unpack(*row) for row in methods]
+            methods_complete, sessions_complete = len(methods) <= 128, len(sessions) <= 128
+            parsed = [unpack(*row) for row in methods[:128]]
             for value in parsed:
                 method_policy(value)
-            metas = [unpack(*row) for row in sessions]
+            metas = [unpack(*row) for row in sessions[:128]]
             for meta in metas:
                 self._session(db, meta["id"])
             return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=metas,
                         label=self.__label, profile=self.__profile, startPeriod=self.__period,
-                        availability=self.availability())
+                        availability=self.availability(),
+                        methodsComplete=methods_complete,sessionsComplete=sessions_complete)
 
     def availability(self):
         return catalog_availability(instrument_id=self.__profile["instrumentId"],
@@ -322,8 +323,6 @@ class ResearchApplication:
             if prior:
                 require(prior[0] == sha, "methodId", "REFUSED_IDEMPOTENCY_CONFLICT")
                 return self._method(db,raw["id"])
-            count = db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
-            require(count < 128, "methods", "REFUSED_CATALOG_LIMIT")
             db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],blob,sha))
             from .product_method_lifecycle import register_first_version
             register_first_version(db, self.scope.workspace_id, raw["id"])
@@ -360,8 +359,6 @@ class ResearchApplication:
                     require(prior[0] == sha, "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
                     self._session(db,raw["id"])
                 else:
-                    count = db.execute("SELECT count(*) FROM btl.tick_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
-                    require(count < 128, "sessions", "REFUSED_CATALOG_LIMIT")
                     timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(start))
                     timeline.seek(str(warmup))
                     state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])

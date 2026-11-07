@@ -136,13 +136,14 @@ export async function loadProductCatalog(){
         financialCountsStatus:item.financialCountsStatus,
       })),
     ]);
-    const methods=methodFamilies.flatMap(family=>family.versions.map(version=>({
-      ...version.method,methodFamilyId:family.familyId,methodVersion:version.version,
-      methodFamilyRevision:family.revision,methodArchived:family.archived,
-      methodLatest:version.version===family.latestVersion,
-    })));
-    if(methods.length>128)throw Error('Method version catalog exceeded its published bound.');
-    return {...catalog,methods,methodFamilies,sessions};
+    const currentFamilies=methodFamilies.map(family=>({...family,versions:[{
+      version:family.latestVersion,methodId:family.latestMethodId,method:family.current,
+    }]}));
+    const methods=currentFamilies.map(family=>({
+      ...family.current,methodFamilyId:family.familyId,methodVersion:family.latestVersion,
+      methodFamilyRevision:family.revision,methodArchived:family.archived,methodLatest:true,
+    }));
+    return {...catalog,methods,methodFamilies:currentFamilies,sessions};
   }
   return catalog;
 }

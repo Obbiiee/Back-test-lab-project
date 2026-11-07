@@ -132,7 +132,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             if operation == 'method_family_page':
                 return product_method_lifecycle.page(db, str(workspace_id), **args[0])
             if operation == 'method_family_detail':
-                return product_method_lifecycle.detail(db, str(workspace_id), args[0])
+                return product_method_lifecycle.detail(db, str(workspace_id), args[0], **args[1])
             if operation == 'method_new_version':
                 db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
                 return product_method_lifecycle.add_version(db, str(workspace_id), args[0], args[1])
@@ -314,8 +314,12 @@ def install(app):
                              {'limit': limit, 'after': after, 'include_archived': include_archived})
 
     @app.get(prefix + '/method-families/{family_id}')
-    async def method_family(workspace_id: uuid.UUID, family_id: str, user: User = Depends(current)):
-        return await execute(user, workspace_id, 'method_family_detail', family_id)
+    async def method_family(workspace_id: uuid.UUID, family_id: str,
+                            version_limit: int = Query(25, ge=1, le=50),
+                            after_version: int | None = Query(None, ge=1),
+                            user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_family_detail', family_id,
+                             {'version_limit': version_limit, 'after_version': after_version})
 
     @app.post(prefix + '/method-families/{family_id}/versions')
     async def method_version(workspace_id: uuid.UUID, family_id: str, request: Request,

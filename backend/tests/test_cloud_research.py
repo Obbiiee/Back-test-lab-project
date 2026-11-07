@@ -355,6 +355,41 @@ class CloudResearchTests(unittest.TestCase):
                                           json={'expectedRevision': 4, 'archived': True}).status_code, 404)
         app.close()
 
+    def test_method_family_version_history_exceeds_128_and_is_keyset_paginated(self):
+        from psycopg.rows import dict_row
+        from execution.product_method_lifecycle import add_version
+        from infrastructure.database import connect
+        original=method()
+        created=self.client.post(self.root+'/methods',headers=self.headers,json=original)
+        self.assertEqual(created.status_code,200,created.text)
+        expected=[original['id']]
+        revision=1
+        with connect(DSN) as db:
+            db.row_factory=dict_row
+            for index in range(128):
+                successor=dict(original,id='method-version:'+uuid.uuid4().hex,name=f'Version {index+2}')
+                add_version(db,self.workspace,original['id'],{'expectedRevision':revision,'method':successor})
+                expected.append(successor['id']);revision+=1
+        first=self.client.get(self.root+'/method-families/'+original['id']+'?version_limit=50',headers=self.headers)
+        self.assertEqual(first.status_code,200,first.text)
+        family=first.json()['family']
+        self.assertEqual(family['latestVersion'],129)
+        self.assertEqual([row['version'] for row in family['versions']],list(range(1,51)))
+        self.assertEqual(family['nextVersionCursor'],50)
+        second=self.client.get(self.root+'/method-families/'+original['id']+
+            '?version_limit=50&after_version=50',headers=self.headers)
+        self.assertEqual(second.status_code,200,second.text)
+        second_family=second.json()['family']
+        self.assertEqual([row['version'] for row in second_family['versions']],list(range(51,101)))
+        self.assertEqual(second_family['nextVersionCursor'],100)
+        final=self.client.get(self.root+'/method-families/'+original['id']+
+            '?version_limit=50&after_version=100',headers=self.headers)
+        self.assertEqual(final.status_code,200,final.text)
+        final_family=final.json()['family']
+        self.assertEqual([row['methodId'] for row in final_family['versions']],expected[100:])
+        self.assertIsNone(final_family['nextVersionCursor'])
+        self.assertTrue(final_family['versionsComplete'])
+
     def test_paginated_journal_route_keeps_workspace_authority_and_financial_projection(self):
         app=ResearchApplication(DSN,TrustedScope(self.workspace,self.actor))
         record=method();app.create_method(record)

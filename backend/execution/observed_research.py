@@ -93,19 +93,20 @@ class ObservedResearchApplication:
     def catalog_view(self):
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
-            methods=[unpack(*row) for row in db.execute('SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129',(self.scope.workspace_id,)).fetchall()]
-            require(len(methods)<=128,'catalog','REFUSED_CATALOG_LIMIT')
+            method_rows=db.execute('SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
+            methods=[unpack(*row) for row in method_rows[:128]]
             for method in methods:method_policy(method)
             rows=db.execute('SELECT payload,content_hash,method_id FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
-            require(len(rows)<=128,'catalog','REFUSED_CATALOG_LIMIT');sessions=[]
-            for raw,sha,method_id in rows:
+            sessions=[]
+            for raw,sha,method_id in rows[:128]:
                 meta=unpack(raw,sha)
                 if meta.get('artifact')==META:
                     self._session(db,meta['id']);sessions.append(meta)
                 elif meta.get('artifact')=='BTL-LOCAL-SESSION-1':
                     tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance')
                     require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id);sessions.append(meta)
-            return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,datasets=self.catalog.public(),model=MODEL)
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,
+                datasets=self.catalog.public(),model=MODEL,methodsComplete=len(method_rows)<=128,sessionsComplete=len(rows)<=128)
 
     def _session(self,db,session_id,*,lock=False):
         identifier(session_id,'sessionId')
