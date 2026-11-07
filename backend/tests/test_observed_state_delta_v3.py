@@ -42,6 +42,23 @@ class ObservedStateDeltaV3Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
             reconstruct_complete(base,(item for item in corrupted),len(corrupted))
 
+    def test_progress_consolidation_preserves_financial_delta_and_refuses_gaps_by_default(self):
+        initial = state(0,{})
+        base = encode_compact_base(initial)
+        completed = state(5,{'closed:1':{'status':'CLOSED','grossPosted':'2'}},balance='10002')
+        consolidated = encode_compact_delta(initial,completed,base['stateHash'],progress_revision=4)
+        following = state(6,completed['orders'],balance='10002')
+        tail = encode_compact_delta(completed,following,consolidated['body']['recordHash'])
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,[consolidated,tail],6)
+        self.assertEqual(reconstruct_complete(base,[consolidated,tail],6,allow_progress=True),following)
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,[tail],6,allow_progress=True)
+        corrupt = json.loads(json.dumps(consolidated))
+        corrupt['body']['progressRevision'] = 3
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,[corrupt,tail],6,allow_progress=True)
+
     def test_compact_store_cold_recovery_reads_only_tail_and_checks_anchor(self):
         from unittest.mock import MagicMock, patch
         from execution.observed_postgres import (

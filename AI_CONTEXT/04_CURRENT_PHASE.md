@@ -12,7 +12,7 @@ As of the last inspected candidate PR #44 head 4bc3defe, the synthetic integrate
 
 **Hosted forward replay (PARTIAL):** Observed Sessions use queued forward jumps and resume the saved user target. Synthetic controller, transport and receipt checks passed. Live worker/browser verification and replaceable progress remain open.
 
-**Replaceable replay progress (PARTIAL):** Migration 023 adds the monotonic Session frontier row bound to an immutable checkpoint. Embedded PostgreSQL schema/refusal checks passed. The internal reader/writer passed synthetic checks for scoped base verification and unchanged financial evidence. Hosted routing, atomic frontier consumption, receipt reconciliation and native integration remain open.
+**Replaceable replay progress (PARTIAL):** Migration 023 adds the monotonic Session frontier row bound to an immutable checkpoint. Embedded PostgreSQL schema/refusal checks passed. The internal reader/writer passed synthetic checks for scoped base verification and unchanged financial evidence. Migration 024 and the opt-in delta codec now support atomic frontier consolidation; embedded PostgreSQL rollback/commit checks passed. Hosted routing and receipt reconciliation still require end-to-end integration.
 
 ---
 

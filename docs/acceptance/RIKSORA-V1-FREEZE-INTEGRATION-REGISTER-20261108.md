@@ -78,6 +78,12 @@ The new internal progress adapter locks the scoped Session before replacement, c
 
 17 focused synthetic tests and six independent Node golden vectors passed. The progress round-trip used real authored tick frames and a mocked database boundary. Next, add versioned hosted routing and make a financial commit atomically consume or consolidate the effective frontier, including durable command retries. The native PostgreSQL/browser gate remains open.
 
+### P0-3 checkpoint — atomic progress consolidation contract (PARTIAL)
+
+Migration 024 permits a skipped immutable revision only when the scoped progress row proves the exact intervening logical frontier and the replacement checkpoint and command receipt exist in the same transaction. An after-update trigger consumes that row atomically. Sessions without a progress row still advance one immutable revision at a time. The explicitly opted-in compact delta codec represents the consolidation with the previous immutable and consumed progress revisions, preserving the existing delta format for other Sessions.
+
+All 24 migrations ran in a disposable embedded PostgreSQL engine. SQL assertions passed for rollback, successful consumption, rejection of an unbacked jump or stale anchor, and a legacy update by a role with no direct progress-table access. 13 focused backend tests and six independent golden vectors passed. The native PostgreSQL regression was skipped without a test DSN. The hosted observed store still needs version selection, sparse checkpoint reads/writes, and end-to-end receipt reconciliation before enabling replaceable progress.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

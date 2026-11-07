@@ -122,6 +122,42 @@ class ObservedPostgresTests(unittest.TestCase):
                                    scope).fetchone()
             self.assertEqual(receipts,0)
 
+    def test_replay_progress_consumption_is_atomic_with_receipt(self):
+        from psycopg import IntegrityError
+
+        scope = (self.scope.workspace_id,self.sid)
+        with connect(DSN) as db:
+            base_hash, = db.execute('SELECT content_hash FROM btl.tick_checkpoints '
+                'WHERE workspace_id=%s AND session_id=%s AND revision=0',scope).fetchone()
+            db.execute('INSERT INTO btl.observed_replay_progress VALUES (%s,%s,0,%s,4,200,2,%s,%s)',
+                       (*scope,base_hash,b'progress','a'*64))
+
+        def consolidate(db):
+            db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,5,%s,%s)',(*scope,b'checkpoint','b'*64))
+            db.execute('INSERT INTO btl.tick_commands VALUES (%s,%s,%s,5,%s,%s,%s)',
+                       (*scope,'command:synthetic','c'*64,b'receipt','d'*64))
+            db.execute('UPDATE btl.tick_sessions SET revision=5 WHERE workspace_id=%s AND session_id=%s',scope)
+
+        with self.assertRaises(IntegrityError):
+            with connect(DSN) as db:
+                db.execute('UPDATE btl.tick_sessions SET revision=5 WHERE workspace_id=%s AND session_id=%s',scope)
+
+        with self.assertRaisesRegex(RuntimeError,'abort test commit'):
+            with connect(DSN) as db:
+                consolidate(db)
+                raise RuntimeError('abort test commit')
+        with connect(DSN) as db:
+            self.assertEqual(db.execute('SELECT revision FROM btl.observed_replay_progress '
+                'WHERE workspace_id=%s AND session_id=%s',scope).fetchone(),(4,))
+            self.assertIsNone(db.execute('SELECT revision FROM btl.tick_commands '
+                'WHERE workspace_id=%s AND session_id=%s',scope).fetchone())
+            consolidate(db)
+        with connect(DSN) as db:
+            self.assertIsNone(db.execute('SELECT revision FROM btl.observed_replay_progress '
+                'WHERE workspace_id=%s AND session_id=%s',scope).fetchone())
+            self.assertEqual(db.execute('SELECT revision FROM btl.tick_commands '
+                'WHERE workspace_id=%s AND session_id=%s',scope).fetchone(),(5,))
+
     def test_compact_v1_new_session_commit_cold_read_and_retry_parity(self):
         from execution.observed_state_delta_v3 import COMPACT_DELTA
         session='session:compact-v1:'+uuid.uuid4().hex[:12]
