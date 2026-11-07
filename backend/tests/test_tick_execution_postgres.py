@@ -119,6 +119,34 @@ class TickExecutionPostgresTests(unittest.TestCase):
                              (self.scope.workspace_id,h.session)).fetchone()[0]
         self.assertEqual(count,3)
 
+    def test_compact_cold_recovery_uses_periodic_verified_base(self):
+        from unittest.mock import patch
+        from execution.postgres import COMPACT_RECOVERY_INTERVAL
+        h=self.harness(session='fixture:recovery-base:'+uuid.uuid4().hex)
+        h.through(0)
+        for index in range(COMPACT_RECOVERY_INTERVAL//2):
+            order_id=f'recovery:order:{index}'
+            opened=h.call('OPEN',open_plan(self.case['open']),name=order_id)
+            h.call('CANCEL',dict(orderId=order_id),name=f'recovery:cancel:{index}')
+        self.assertGreaterEqual(h.state['revision'],COMPACT_RECOVERY_INTERVAL)
+        with connect(DSN) as db:
+            row=db.execute('SELECT revision,state_hash,chain_hash,record_hash,payload,content_hash '
+                'FROM btl.tick_recovery_bases WHERE workspace_id=%s AND session_id=%s '
+                'ORDER BY revision DESC LIMIT 1',(self.scope.workspace_id,h.session)).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row[0],COMPACT_RECOVERY_INTERVAL)
+        used=[]
+        from execution import observed_state_delta_v3
+        original=observed_state_delta_v3.reconstruct_complete
+        def track(base,deltas,target_revision,**kwargs):
+            used.append(kwargs.get('base_revision',0))
+            return original(base,deltas,target_revision,**kwargs)
+        with patch('execution.postgres.PostgresExecutionStore._cache_read',return_value=None), \
+             patch('execution.postgres.reconstruct_complete',side_effect=track):
+            cold=PostgresExecutionStore(DSN).inspect(self.scope,h.session)
+        self.assertEqual(cold['state'],h.state)
+        self.assertEqual(used,[COMPACT_RECOVERY_INTERVAL])
+
     def test_compact_v1_matches_snapshot_results_cold_recovery_and_idempotency(self):
         case = self.case
         session = "fixture:compact:" + uuid.uuid4().hex

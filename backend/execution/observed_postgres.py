@@ -41,6 +41,7 @@ COMPACT_CHECKPOINT='BTL-OBSERVED-EXECUTION-CHECKPOINT-COMPACT-1'
 COMPACT_CHECKPOINT_BASE='BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1'
 COMPACT_CHECKPOINT_DELTA='BTL-OBSERVED-EXECUTION-CHECKPOINT-DELTA-COMPACT-1'
 COMPACT_RESULT='BTL-OBSERVED-EXECUTION-RESULT-COMPACT-1'
+COMPACT_RECOVERY_INTERVAL=128
 
 
 def read_snapshot(raw,sha,*,order_retention_policy=None):
@@ -212,6 +213,18 @@ class ObservedExecutionStore:
             while len(self._qa_state_cache)>self._qa_state_cache_max:
                 self._qa_state_cache.popitem(last=False)
                 self._qa_state_cache_stats['evictions']+=1
+
+    @staticmethod
+    def _write_compact_recovery_base(db,workspace,session,state,controller,chain_hash):
+        value=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT_BASE,
+            sessionId=session,revision=state['revision'],state=deepcopy(state),
+            stateHash=content_hash(state),chainHash=chain_hash,controller=deepcopy(controller))
+        value['recordHash']=content_hash(value)
+        raw,sha=pack(value)
+        db.execute('INSERT INTO btl.tick_recovery_bases '
+            '(workspace_id,session_id,revision,state_hash,chain_hash,record_hash,payload,content_hash) '
+            'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+            (workspace,session,state['revision'],value['stateHash'],chain_hash,value['recordHash'],raw,sha))
 
     def _has_qa_base(self,db,workspace,session):
         if not self.qa_state_delta_v3:return False
@@ -517,6 +530,40 @@ class ObservedExecutionStore:
             target_revision=(db.execute('SELECT max(revision) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s',
                                         (workspace,session)).fetchone()[0] if upto_revision is None else upto_revision)
             require(type(target_revision) is int and target_revision>=0,'qaDeltaRevision','CORRUPT_RECORD')
+            base_revision=0
+            recovery_row=db.execute('SELECT revision,state_hash,chain_hash,record_hash,payload,content_hash FROM btl.tick_recovery_bases '
+                'WHERE workspace_id=%s AND session_id=%s AND revision<=%s ORDER BY revision DESC LIMIT 1',
+                (workspace,session,target_revision)).fetchone()
+            if recovery_row is not None:
+                base_revision,stored_state_hash,stored_chain_hash,stored_record_hash,recovery_payload,recovery_sha=recovery_row
+                recovery=unpack(recovery_payload,recovery_sha)
+                record_hash=recovery.get('recordHash')
+                require(recovery.get('schemaVersion')==1 and recovery.get('formatVersion')==1
+                        and recovery.get('artifact')==COMPACT_CHECKPOINT_BASE
+                        and recovery.get('sessionId')==session and recovery.get('revision')==base_revision
+                        and recovery.get('stateHash')==stored_state_hash==content_hash(recovery.get('state'))
+                        and recovery.get('chainHash')==stored_chain_hash
+                        and record_hash==stored_record_hash
+                        and record_hash==content_hash({k:v for k,v in recovery.items() if k!='recordHash'}),
+                        'compactRecoveryBase','CORRUPT_RECORD')
+                linked=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                    'WHERE workspace_id=%s AND session_id=%s AND revision=%s',
+                    (workspace,session,base_revision)).fetchone()
+                require(linked is not None,'compactRecoveryLink','CORRUPT_RECORD')
+                checkpoint=unpack(*linked)
+                require(checkpoint.get('stateHash')==recovery['stateHash']
+                        and checkpoint.get('chainHash')==recovery['chainHash']
+                        and checkpoint.get('controller')==recovery.get('controller'),
+                        'compactRecoveryLink','CORRUPT_RECORD')
+                base_record=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_CHECKPOINT_BASE,
+                    revision=base_revision,state=recovery['state'],stateHash=recovery['stateHash'],
+                    chainHash=recovery['chainHash'],controller=recovery['controller'])
+            else:
+                require(base_record.get('state') is not None,'qaDeltaBase','CORRUPT_RECORD')
+            require(base_revision<=target_revision,'compactRecoveryRevision','CORRUPT_RECORD')
+            if base_revision:
+                require(base_record['artifact']==COMPACT_CHECKPOINT_BASE,'compactRecoveryFormat','CORRUPT_RECORD')
+                compact_v1=True
             if require_tip:
                 tip=db.execute('SELECT revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
                                (workspace,session)).fetchone()
@@ -526,9 +573,9 @@ class ObservedExecutionStore:
                 require(durable_count==target_revision and
                         durable_max==(target_revision if target_revision else None),
                         'qaDeltaRevision','CORRUPT_RECORD')
-            total=db.execute('SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s',
-                             (workspace,session,target_revision)).fetchone()[0]
-            require(total==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
+            total=db.execute('SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>%s AND revision<=%s',
+                             (workspace,session,base_revision,target_revision)).fetchone()[0]
+            require(total==target_revision-base_revision,'qaDeltaRevision','CORRUPT_RECORD')
             previous_hash=base_record['chainHash'];current_controller=[base_record['controller']]
             expected_checkpoint_artifact=COMPACT_CHECKPOINT_DELTA if compact_v1 else QA3_CHECKPOINT_DELTA
             expected_delta_artifact=COMPACT_DELTA if compact_v1 else None
@@ -537,9 +584,9 @@ class ObservedExecutionStore:
                 nonlocal previous_hash
                 with db.cursor(name='btl_delta_'+uuid4().hex) as rows:
                     rows.execute('SELECT revision,payload,content_hash FROM btl.tick_checkpoints '
-                        'WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s ORDER BY revision',
-                        (workspace,session,target_revision))
-                    for n,(rev,payload,sha) in enumerate(rows,1):
+                        'WHERE workspace_id=%s AND session_id=%s AND revision>%s AND revision<=%s ORDER BY revision',
+                        (workspace,session,base_revision,target_revision))
+                    for n,(rev,payload,sha) in enumerate(rows,base_revision+1):
                         checkpoint=unpack(payload,sha)
                         keys(checkpoint,'schemaVersion formatVersion artifact revision stateHash chainHash previousHash delta controller')
                         delta=checkpoint['delta'];body=delta.get('body',{})
@@ -558,7 +605,8 @@ class ObservedExecutionStore:
                 'BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1')
             callback=(lambda restored,rev:validate_snapshot(restored,current_controller[0],
                 order_retention_policy=self.order_retention_policy)) if archive_format else None
-            rebuilt=reconstruct_complete(base_record,delta_stream(),target_revision,state_callback=callback)
+            rebuilt=reconstruct_complete(base_record,delta_stream(),target_revision,
+                state_callback=callback,base_revision=base_revision)
             require(rebuilt['revision']==target_revision,'qaDeltaState','CORRUPT_RECORD')
             return rebuilt,previous_hash
 
@@ -714,6 +762,8 @@ class ObservedExecutionStore:
         db.execute('INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,state['datasetVersion'],state['profileHash'],0,raw,sha))
         if self.qa_state_delta_v3 or self.state_storage_format=='compact-v1':db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw_base,sha_base))
         else:db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,0,raw,sha))
+        if self.state_storage_format=='compact-v1':
+            self._write_compact_recovery_base(db,workspace,session,state,checkpoint,base_record['chainHash'])
 
     def create(self,scope,state,checkpoint):
         with connect(self.dsn) as db:
@@ -858,6 +908,8 @@ class ObservedExecutionStore:
             for e in events:
                 eraw,esha=pack(e);db.execute('INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,command['commandId'],e['eventId'],e['sequence'],eraw,esha))
             db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,after['revision'],checkpoint_raw,checkpoint_hash))
+            if storage_format=='compact-v1' and after['revision']%COMPACT_RECOVERY_INTERVAL==0:
+                self._write_compact_recovery_base(db,workspace,session,after,checkpoint,chain_hash)
             db.execute('UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s',(after['revision'],session_raw,session_hash,workspace,session))
             if legacy_delta_mode:
                 delta_raw,delta_hash=pack(delta_record)

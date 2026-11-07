@@ -344,6 +344,41 @@ class ObservedPostgresTests(unittest.TestCase):
             state_storage_format='compact-v1'),lambda _:self.source)
         self.assertEqual(cold.inspect(scope,sid)['state'],cancelled['state'])
 
+    def test_product_compact_session_cold_recovers_from_verified_periodic_base(self):
+        from unittest.mock import patch
+        from execution.observed_postgres import COMPACT_RECOVERY_INTERVAL
+        scope=TrustedScope('observedqa:recovery-base:'+uuid.uuid4().hex,'authored:actor')
+        sid='session:recovery-base:'+uuid.uuid4().hex
+        store=ObservedExecutionStore(DSN,state_storage_format='compact-v1')
+        controller=ObservedExecutionController(store,lambda _:self.source)
+        state=controller.create(scope,sid,self.fx.profile,self.fx.policy,period='1970-01')['state']
+        state=controller.apply(scope,command(sid,'recovery:quote',state['revision'],'ADVANCE',dict(targetNs='0')))['state']
+        for index in range(COMPACT_RECOVERY_INTERVAL//2):
+            order_id=f'recovery:open:{index}'
+            plan=dict(side='LONG',orderType='LIMIT',workflow='PLANNED',entry='2290',quantity='0.01',
+                sl='2289',tp='2291',riskPercent='1',observations=[])
+            opened=controller.apply(scope,command(sid,f'recovery:open-command:{index}',state['revision'],'OPEN',plan))
+            state=opened['state']
+            cancelled=controller.apply(scope,command(sid,f'recovery:cancel-command:{index}',state['revision'],'CANCEL',
+                dict(orderId=f'recovery:open-command:{index}')))
+            state=cancelled['state']
+        self.assertGreaterEqual(state['revision'],COMPACT_RECOVERY_INTERVAL)
+        with connect(DSN) as db:
+            row=db.execute('SELECT revision FROM btl.tick_recovery_bases '
+                'WHERE workspace_id=%s AND session_id=%s ORDER BY revision DESC LIMIT 1',
+                (scope.workspace_id,sid)).fetchone()
+        self.assertEqual(row[0],COMPACT_RECOVERY_INTERVAL)
+        used=[]
+        import execution.observed_state_delta_v3 as delta_module
+        original=delta_module.reconstruct_complete
+        def track(base,deltas,target_revision,**kwargs):
+            used.append(kwargs.get('base_revision',0))
+            return original(base,deltas,target_revision,**kwargs)
+        cold=ObservedExecutionStore(DSN,state_storage_format='compact-v1')
+        with patch('execution.observed_postgres.reconstruct_complete',side_effect=track):
+            self.assertEqual(cold.inspect(scope,sid)['state'],state)
+        self.assertIn(COMPACT_RECOVERY_INTERVAL,used)
+
     def opening(self):return dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])
 
     def test_compact_v1_keeps_versioned_qa_order_archive_compatible(self):
