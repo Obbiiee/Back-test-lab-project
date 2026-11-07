@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 17210)
-Total output lines: 889
-
 """Separate observed-family transactional boundary on existing opaque tick tables.
 
 No migration or old-family dispatch changes. Market work happens outside row
@@ -405,7 +402,154 @@ class ObservedExecutionStore:
         profile=ObservedExecutionProfile.from_wire(state['profile']);event_gross=Fraction(0)
         event_balance=Fraction(state['initialBalance']);financial_seen=False
 
-        def archive_…3210 tokens truncated…h'),
+        def archive_terminal(oid,order,command_revision):
+            nonlocal archived_count
+            table='btl.tick_terminal_orders' if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1' else 'public.btl_qa_terminal_order_archive_v1'
+            columns='sequence,finalized_revision,record_hash,payload,content_hash,terminal_status' if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1' else 'sequence,finalized_revision,record_hash,payload,content_hash'
+            row=db.execute('SELECT '+columns+' FROM '+table+
+                ' WHERE workspace_id=%s AND session_id=%s AND order_id=%s',(workspace,session,oid)).fetchone()
+            require(row is not None,'archiveMissing','CORRUPT_RECORD')
+            sequence,finalized_revision,record_hash,raw,sha,*status=row;record=unpack(raw,sha)
+            verify_record=(verify_product_archive_record if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1' else verify_archive_record)
+            verify_record(record,expected_sequence=sequence)
+            require(record['recordHash']==record_hash and record['orderId']==oid and record['order']==order
+                    and record['finalizedRevision']==finalized_revision==command_revision,
+                    'archiveEventParity','CORRUPT_RECORD')
+            if status:require(record['order']['status']==status[0],'archiveEventParity','CORRUPT_RECORD')
+            archived_count+=1
+
+        while start<state['nextEventIndex']:
+            rows=db.execute('SELECT e.command_id,e.payload,e.content_hash,c.revision FROM btl.tick_events e '
+                'JOIN btl.tick_commands c USING(workspace_id,session_id,command_id) '
+                'WHERE e.workspace_id=%s AND e.session_id=%s AND e.sequence>=%s '
+                'AND e.sequence<%s ORDER BY e.sequence LIMIT 256',
+                (workspace,session,start,state['nextEventIndex'])).fetchall()
+            require(len(rows)==min(256,state['nextEventIndex']-start),'eventCount','CORRUPT_RECORD')
+            events=[unpack(row[1],row[2]) for row in rows]
+            start,previous=check_events(events,state,start,previous)
+            for (command_id,_,_,command_revision),event in zip(rows,events):
+                kind=event['kind'];oid=event['orderId'];detail=event['detail']
+                if kind=='ORDER_ACCEPTED':
+                    require(oid not in seen_order_ids,'eventOrderDuplicate','CORRUPT_RECORD')
+                    seen_order_ids.add(oid)
+                    plan=deepcopy(detail['plan'])
+                    require(open_payload(plan,state['profile'],policy_from_wire(state['policy']),detail['riskBalance'])==plan,
+                            'eventOrderPlan','CORRUPT_RECORD')
+                    active[oid]=dict(plan,status='PENDING',availableNs=detail['availableNs'],remaining=plan['quantity'],
+                        entryPrice=None,entryFillRef=None,entryCost='0',exitRequest=None,grossPosted='0',
+                        riskBalance=detail['riskBalance'],riskBasisHash=detail['riskBasisHash'])
+                elif kind in ('ENTRY_FILL','EXIT_FILL','ORDER_CANCELLED','EXPIRED_NO_QUOTE','EXIT_REQUESTED'):
+                    require(oid in active,'eventOrderMissing','CORRUPT_RECORD');order=active[oid]
+                    if kind=='ENTRY_FILL':
+                        require(order['status']=='PENDING','eventEntryState','CORRUPT_RECORD')
+                        evidence=detail['evidence'];quote=dict(bid=evidence['bid'],ask=evidence['ask'])
+                        expected=quote['ask'] if order['side']=='LONG' else quote['bid']
+                        require(int(evidence['timeNs'])>=int(order['availableNs']) and crossing(order,quote)
+                                and detail['price']==expected and detail['quantity']==order['quantity']
+                                and detail['commission']=='0' and detail['balanceDelta']=='0',
+                                'eventEntryFill','CORRUPT_RECORD')
+                        order.update(status='ACTIVE',entryPrice=detail['price'],entryFillRef=event['eventId'])
+                        financial_seen=True
+                    elif kind=='EXIT_FILL':
+                        evidence=detail['evidence'];quote=dict(bid=evidence['bid'],ask=evidence['ask'])
+                        expected=quote['bid'] if order['side']=='LONG' else quote['ask']
+                        require(order['status']=='ACTIVE' and int(evidence['timeNs'])>=int(order['availableNs'])
+                                and detail['price']==expected and detail['commission']=='0',
+                                'eventExitFill','CORRUPT_RECORD')
+                        reason=protective(order,quote)
+                        if reason is None and order['exitRequest'] is not None and \
+                                int(evidence['timeNs'])>=int(order['exitRequest']['availableNs']):reason='MANUAL'
+                        require(detail['reason']==reason,'eventExitReason','CORRUPT_RECORD')
+                        size=detail['quantity'] if reason=='MANUAL' else order['remaining']
+                        require(detail['quantity']==size,'eventExitQuantity','CORRUPT_RECORD')
+                        prior_remaining=Fraction(order['remaining'])
+                        amount=exit_amount(profile,side=order['side'],entry_price=order['entryPrice'],
+                            exit_price=detail['price'],lots=size)
+                        require(amount['grossExact']==detail['grossExact'] and amount['grossPosted']==detail['grossPosted']
+                                and detail['balanceDelta']==detail['grossPosted'],
+                                'eventExitCash','CORRUPT_RECORD')
+                        posted=Fraction(order['grossPosted'])+Fraction(detail['grossPosted'])
+                        order.update(status='CLOSED' if detail['remaining']=='0' else 'ACTIVE',
+                            remaining=detail['remaining'],exitRequest=None,grossPosted=text(posted))
+                        require(prior_remaining-Fraction(size)==Fraction(detail['remaining']) and
+                                (order['status']=='CLOSED') is (Fraction(detail['remaining'])==0),
+                                'eventExitState','CORRUPT_RECORD')
+                        event_gross+=Fraction(detail['grossPosted']);event_balance+=Fraction(detail['balanceDelta'])
+                        financial_seen=True
+                    elif kind=='ORDER_CANCELLED':
+                        require(order['status']=='PENDING','eventCancelState','CORRUPT_RECORD');order['status']='CANCELLED'
+                    elif kind=='EXPIRED_NO_QUOTE':
+                        require(order['status']=='PENDING','eventExpireState','CORRUPT_RECORD');order['status']='EXPIRED'
+                    elif kind=='EXIT_REQUESTED':
+                        require(order['status']=='ACTIVE' and order['exitRequest'] is None and
+                                0<Fraction(detail['quantity'])<=Fraction(order['remaining']) and
+                                int(order['availableNs'])<=int(detail['availableNs']),
+                                'eventExitRequest','CORRUPT_RECORD')
+                        order['exitRequest']=dict(quantity=detail['quantity'],availableNs=detail['availableNs'])
+                    if order['status'] in ('CLOSED','CANCELLED','EXPIRED'):
+                        archive_terminal(oid,order,command_revision);del active[oid]
+                elif kind=='UNRESOLVED':
+                    for affected in detail['affectedOrderIds']:
+                        require(affected in active,'eventUnresolvedOrder','CORRUPT_RECORD')
+                        active[affected].update(status='UNRESOLVED',exitRequest=None)
+                        archive_terminal(affected,active[affected],command_revision);del active[affected]
+            require(start<=state['nextEventIndex'],'eventOffset','CORRUPT_RECORD')
+        require(previous==state['eventHash'],'eventHead','CORRUPT_RECORD')
+        require(active==state['orders'],'activeEventParity','CORRUPT_RECORD')
+        require(archived_count==state['orderArchive']['count'],'archiveEventSet','CORRUPT_RECORD')
+        require(event_gross==Fraction(state['realizedGross']) and event_balance==Fraction(state['balance'])
+                and state['financial'] is financial_seen,'eventFinancialParity','CORRUPT_RECORD')
+
+    def _qa_reconstruct(self,db,workspace,session,*,upto_revision=None,require_tip=False):
+        with self._qa_state_cache_lock:self._qa_state_cache_stats['fullReconstructions']+=1
+        base_row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
+        require(base_row is not None,'qaDeltaBase','CORRUPT_RECORD')
+        base_record=unpack(*base_row)
+        if base_record.get('artifact') in (QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE):
+            compact_v1=base_record.get('artifact')==COMPACT_CHECKPOINT_BASE
+            expected_base_format=1 if compact_v1 else 3
+            keys(base_record,'schemaVersion formatVersion artifact revision state stateHash chainHash controller')
+            require(base_record['schemaVersion']==1 and base_record['formatVersion']==expected_base_format and base_record['revision']==0
+                    and base_record['stateHash']==content_hash(base_record['state'])==base_record['chainHash'],
+                    'qaDeltaBase','CORRUPT_RECORD')
+            require(upto_revision is None or (type(upto_revision) is int and upto_revision>=0),
+                    'qaDeltaRevision','CORRUPT_RECORD')
+            target_revision=(db.execute('SELECT max(revision) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s',
+                                        (workspace,session)).fetchone()[0] if upto_revision is None else upto_revision)
+            require(type(target_revision) is int and target_revision>=0,'qaDeltaRevision','CORRUPT_RECORD')
+            if require_tip:
+                tip=db.execute('SELECT revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                               (workspace,session)).fetchone()
+                require(tip is not None and tip[0]==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
+                durable_count,durable_max=db.execute('SELECT count(*),max(revision) FROM btl.tick_checkpoints '
+                    'WHERE workspace_id=%s AND session_id=%s AND revision>0',(workspace,session)).fetchone()
+                require(durable_count==target_revision and
+                        durable_max==(target_revision if target_revision else None),
+                        'qaDeltaRevision','CORRUPT_RECORD')
+            total=db.execute('SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s',
+                             (workspace,session,target_revision)).fetchone()[0]
+            require(total==target_revision,'qaDeltaRevision','CORRUPT_RECORD')
+            previous_hash=base_record['chainHash'];current_controller=[base_record['controller']]
+            expected_checkpoint_artifact=COMPACT_CHECKPOINT_DELTA if compact_v1 else QA3_CHECKPOINT_DELTA
+            expected_delta_artifact=COMPACT_DELTA if compact_v1 else None
+            expected_checkpoint_format=1 if compact_v1 else 3
+            def delta_stream():
+                nonlocal previous_hash
+                with db.cursor(name='btl_delta_'+uuid4().hex) as rows:
+                    rows.execute('SELECT revision,payload,content_hash FROM btl.tick_checkpoints '
+                        'WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s ORDER BY revision',
+                        (workspace,session,target_revision))
+                    for n,(rev,payload,sha) in enumerate(rows,1):
+                        checkpoint=unpack(payload,sha)
+                        keys(checkpoint,'schemaVersion formatVersion artifact revision stateHash chainHash previousHash delta controller')
+                        delta=checkpoint['delta'];body=delta.get('body',{})
+                        delta_valid=(delta.get('formatVersion')==1 and delta.get('artifact')==expected_delta_artifact) if compact_v1 else (
+                            delta.get('formatVersion')==4 and delta.get('artifact')=='BTL-QA-OBSERVED-STATE-DELTA-4-DELTA')
+                        require(checkpoint['schemaVersion']==1 and checkpoint['formatVersion']==expected_checkpoint_format
+                                and checkpoint['artifact']==expected_checkpoint_artifact and checkpoint['revision']==rev==n
+                                and checkpoint['previousHash']==previous_hash and body.get('revision')==rev
+                                and delta_valid and checkpoint['stateHash']==body.get('stateHash')
+                                and checkpoint['chainHash']==body.get('recordHash'),
                                 'qaCheckpointDelta','CORRUPT_RECORD')
                         current_controller[0]=checkpoint['controller'];previous_hash=checkpoint['chainHash']
                         yield delta
