@@ -95,6 +95,64 @@ class ObservedKernelTests(unittest.TestCase):
         payload=dict(side=side,orderType='MARKET',workflow='QUICK',entry=entry,quantity=size,sl=None,tp=None,riskPercent='1',observations=[]);payload.update(changes)
         self.command('OPEN',payload,command='order:z');return payload
 
+    def test_replaceable_progress_round_trips_without_changing_financial_state(self):
+        from unittest.mock import MagicMock
+        from application.models import TrustedScope
+        from execution.observed_replay_progress import read_progress, replace_progress
+
+        self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
+        provider = self.provider
+        version = provider.dataset_version
+        root = provider.describe_v2(provider.dataset_id,version)['root']
+        pin = dict(schemaVersion=1, artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+                   datasetId=provider.dataset_id, datasetVersion=version,
+                   manifestHash=version, rootHash=version, indexContentHash=root['indexContentHash'],
+                   archiveSha256='a'*64, qualificationReceiptSha256='b'*64)
+        timeline = IndexedTickTimeline(provider,provider.dataset_id,version,'0',
+                                       log_folder=self.root/'shared',storage_mode='shared-source-v2',source_pin=pin)
+        self.handles.append(timeline)
+        start = timeline.checkpoint()
+        self.state = seed_state('session:qa',self.profile,self.policy,start)
+        base = validate_snapshot(self.state,start)
+        scope = TrustedScope('workspace:qa','actor:qa')
+        frame = timeline.advance_through(str(S),timeline.cursor)
+        checkpoint = timeline.checkpoint()
+        after, events = apply(self.state,self.raw('ADVANCE',{'targetNs':str(S)}),
+                              reveal=frame,checkpoint=checkpoint)
+        proposal = validate_snapshot(after,checkpoint)
+        restored = validate_snapshot(dict(after,nextEventIndex=self.state['nextEventIndex'],
+                                          eventHash=self.state['eventHash']),checkpoint)
+        base_hash = 'a'*64
+
+        db = MagicMock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': None}), MagicMock()]
+        replace_progress(db,scope,base,base_hash,0,proposal,events)
+        sql, params = db.execute.call_args.args
+        self.assertIn('ON CONFLICT (workspace_id,session_id) DO UPDATE',sql)
+        self.assertEqual(params[:2],(scope.workspace_id,'session:qa'))
+
+        reader = MagicMock()
+        reader.execute.return_value.fetchone.return_value = params[2:]
+        self.assertEqual(read_progress(reader,scope,base,base_hash),restored)
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            read_progress(reader,scope,base,'b'*64)
+
+        db.reset_mock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': None})]
+        changed = dict(proposal,state=dict(after,balance='10001',initialBalance='10001'))
+        with self.assertRaisesRegex(ValueError,'REFUSED_FINANCIAL_PROGRESS'):
+            replace_progress(db,scope,base,base_hash,0,changed,events)
+        self.assertEqual(db.execute.call_count,2)
+
+        db.reset_mock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': None})]
+        with self.assertRaisesRegex(ValueError,'REFUSED_FINANCIAL_PROGRESS'):
+            replace_progress(db,scope,base,base_hash,0,proposal,[dict(events[0],kind='STALE_QUOTE')])
+        self.assertEqual(db.execute.call_count,2)
+
     def test_replay_to_retry_is_bound_to_the_original_target(self):
         from unittest.mock import MagicMock, patch
         from application.models import TrustedScope

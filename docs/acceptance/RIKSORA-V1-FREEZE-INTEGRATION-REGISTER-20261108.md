@@ -72,6 +72,12 @@ Migration 023 adds one replaceable progress row per scoped Session, anchored to 
 
 All 23 migrations executed in a disposable embedded PostgreSQL engine. Synthetic SQL assertions verified a single row across updates, refusal cases and no new immutable command receipt. The isolated native PostgreSQL regression is authored and was skipped locally because no test database was configured. Next, wire versioned progress writes and reads under the existing Session lock, with immutable financial commits consuming the exact revealed frontier and legacy Session reads preserved.
 
+### P0-3 checkpoint — verified progress reader and writer (PARTIAL)
+
+The new internal progress adapter locks the scoped Session before replacement, checks the expected revision, verifies the pinned shared-source checkpoint, and stores only replay fields over the verified immutable base. The reader rechecks the persisted hash, base revision, scoped row and frontier. The writer refuses active or pending orders, changed financial state, and any event other than the reducer's exact replay bookkeeping event. No hosted caller selects the new adapter yet.
+
+17 focused synthetic tests and six independent Node golden vectors passed. The progress round-trip used real authored tick frames and a mocked database boundary. Next, add versioned hosted routing and make a financial commit atomically consume or consolidate the effective frontier, including durable command retries. The native PostgreSQL/browser gate remains open.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.
