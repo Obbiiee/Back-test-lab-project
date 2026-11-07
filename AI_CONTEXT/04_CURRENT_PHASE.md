@@ -10,6 +10,8 @@ As of the last inspected candidate PR #44 head 4bc3defe, the synthetic integrate
 
 **P0-3 replay recovery (PARTIAL):** Shared-source-v2 now validates its genesis, reveal ordinal bounds and final group at cold resume. Synthetic replay, causal contracts, legacy recovery and financial golden checks passed. Interrupted advances can now resume directly; the observed write path also refuses a rewind against the locked Session frontier. Observed compact-v1 now writes periodic recovery bases and the scoped reader restores from the bounded tail when a base is present. Real PostgreSQL integration, replaceable progress and production selection remain open. This controller prerequisite does not close the P0-1 browser/worker acceptance.
 
+**Hosted forward replay (PARTIAL):** Observed Sessions use queued forward jumps and resume the saved user target. Synthetic controller, transport and receipt checks passed. Live worker/browser verification and replaceable progress remain open.
+
 ---
 
 # Current implementation checkpoint — replay persistence correction (2026-11-07)

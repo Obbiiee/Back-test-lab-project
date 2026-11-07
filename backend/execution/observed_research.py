@@ -174,6 +174,8 @@ class ObservedResearchApplication:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');meta,method,state,cp=self._session(db,session_id)
             rows=db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 64',(self.scope.workspace_id,session_id)).fetchall();events=[unpack(*row) for row in reversed(rows)]
             view=dict(schemaVersion=1,artifact=VIEW,metadata=meta,method=method,state=state,events=events,eventWindowStart=max(0,state['nextEventIndex']-64),quote=deepcopy(state['quoteBasis']),label=f"{self.catalog.selection(meta['datasetKey'],meta['period']).wire['primary']['providerId']} · {MODEL}",replayStepNs='1000000000')
+            # This is the user's previously requested target, not source availability.
+            view['pendingReplayTargetNs']=cp['cursor']['pendingTargetNs']
             # The display helper sees only groups already clipped to this cursor.
             source=self.catalog.resolve(state['profileHash']);groups=source.cache.window(self.scope,session_id,cp)
             start=max(0,int(state['nextGroupIndex'])-len(groups));view['chart']=display_candles(groups,state['throughNs'],timeframe,start)
@@ -227,10 +229,22 @@ class ObservedResearchApplication:
         from .workspace import TIMEFRAMES
         require(type(raw['timeframe']) is str and raw['timeframe'] in TIMEFRAMES,'timeframe','REFUSED_TIMEFRAME')
         prefix=f"command:replay-to:{raw['requestId']}:r"
+        def advance_command(expected_revision):
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=session_id,
+                        commandId=f"{prefix}{expected_revision}",expectedRevision=expected_revision,
+                        kind='ADVANCE',payload={'targetNs':str(target)})
+
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             meta,method,state,checkpoint=self._session(db,session_id)
             prior_revision=db.execute('SELECT max(revision) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id LIKE %s',(self.scope.workspace_id,session_id,prefix+'%')).fetchone()[0]
+            if prior_revision is not None:
+                initial=advance_command(raw['expectedRevision'])
+                original=db.execute('SELECT revision,command_hash FROM btl.tick_commands '
+                    'WHERE workspace_id=%s AND session_id=%s AND command_id=%s',
+                    (self.scope.workspace_id,session_id,initial['commandId'])).fetchone()
+                require(original is not None and original[0]==raw['expectedRevision']+1 and
+                        original[1]==content_hash(initial),'requestId','REFUSED_IDEMPOTENCY_CONFLICT')
         if prior_revision is None:
             require(state['revision']==raw['expectedRevision'],'revision','REFUSED_STALE_REVISION')
         else:
@@ -239,9 +253,7 @@ class ObservedResearchApplication:
         advances=0
         while advances<REPLAY_TO_CHUNKS and int(state['throughNs'])<target:
             previous_index=int(state['nextGroupIndex']);previous_through=int(state['throughNs'])
-            command=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=session_id,
-                         commandId=f"{prefix}{state['revision']}",expectedRevision=state['revision'],
-                         kind='ADVANCE',payload={'targetNs':str(target)})
+            command=advance_command(state['revision'])
             saved=self.controller.apply(self.scope,command);state=saved['state'];advances+=1
             if int(state['nextGroupIndex'])==previous_index and int(state['throughNs'])==previous_through:break
         view=self.inspect(session_id,raw['timeframe'])

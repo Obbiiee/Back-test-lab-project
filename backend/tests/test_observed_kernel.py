@@ -95,6 +95,40 @@ class ObservedKernelTests(unittest.TestCase):
         payload=dict(side=side,orderType='MARKET',workflow='QUICK',entry=entry,quantity=size,sl=None,tp=None,riskPercent='1',observations=[]);payload.update(changes)
         self.command('OPEN',payload,command='order:z');return payload
 
+    def test_replay_to_retry_is_bound_to_the_original_target(self):
+        from unittest.mock import MagicMock, patch
+        from application.models import TrustedScope
+        from execution.observed_research import ObservedResearchApplication
+
+        app = object.__new__(ObservedResearchApplication)
+        app.dsn = 'unused'
+        app.scope = TrustedScope('workspace:qa','actor:qa')
+        app.controller = MagicMock()
+        session = 'session:qa'
+        request = dict(schemaVersion=1, artifact='BTL-OBSERVED-REPLAY-TO-1', requestId='a'*32,
+                       sessionId=session, expectedRevision=0, targetNs='200', timeframe='1m')
+        state = dict(revision=1, throughNs='200')
+        original = dict(schemaVersion=1, artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                        sessionId=session, commandId=f"command:replay-to:{request['requestId']}:r0",
+                        expectedRevision=0, kind='ADVANCE', payload={'targetNs':'200'})
+        app._session = lambda *_: (None,None,state,None)
+        app.inspect = lambda *_: {'state':state}
+
+        def database():
+            conn = MagicMock()
+            conn.__enter__.return_value.execute.side_effect = [
+                None, MagicMock(**{'fetchone.return_value':(1,)}),
+                MagicMock(**{'fetchone.return_value':(1,content_hash(original))}),
+            ]
+            return conn
+
+        with patch('execution.observed_research.connect', return_value=database()):
+            self.assertEqual(app.replay_to(session,request)['advances'],0)
+        with patch('execution.observed_research.connect', return_value=database()):
+            with self.assertRaisesRegex(ValueError,'REFUSED_IDEMPOTENCY_CONFLICT'):
+                app.replay_to(session,dict(request,targetNs='300'))
+        app.controller.apply.assert_not_called()
+
     def test_shared_source_commit_refuses_rewind_before_writing(self):
         from unittest.mock import MagicMock, patch
         from application.models import TrustedScope

@@ -60,6 +60,12 @@ The observed compact-v1 writer records a versioned recovery base every 64 revisi
 
 17 focused tests passed, including a mocked database test proving the selected tail range and corruption refusal. Six independent Node golden vectors passed. Live PostgreSQL integration, maximum-size base acceptance, replaceable non-financial progress and production shared-source selection remain open.
 
+### P0-1/P0-3 checkpoint — hosted forward jump and continuation (PARTIAL)
+
+Hosted observed Sessions use the existing bounded replay-to worker for forward UTC jumps. The authenticated view returns only the user's pending requested target, and the browser resumes that target with Step or Play before requesting a new one. The client verifies the result's Session, request identity, revision and frontier before rendering it. Server retries are bound to the original target and starting revision through the first immutable advance command hash.
+
+10 focused backend tests, frontend transport and receipt tests, repository checks, lint, build and six independent golden vectors passed. This covers synthetic controller and mocked transport/storage cases. Live PostgreSQL worker and interactive browser acceptance remain open. Replaceable non-financial progress still requires a new persistence contract rather than discarding existing immutable advances.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

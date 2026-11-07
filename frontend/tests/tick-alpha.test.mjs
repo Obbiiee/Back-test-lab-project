@@ -1,7 +1,7 @@
 import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
+import {api,command,replayObservedTo,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
@@ -55,6 +55,21 @@ setAccountTransport({subject:queuedAccount.subject,request:async(path,options={}
 assert.equal((await api('/sessions/session:queued/chart-history',{timeframe:'1m',offset:0})).artifact,'BTL-SYNTHETIC-RESULT-1');
 assert.equal((await api('/sessions/session:queued/replay-to',{requestId:'request:stable'})).artifact,'BTL-SYNTHETIC-RESULT-1');
 assert.ok(additionalQueued.every(([,options])=>options.jobId),'chart-history and replay-to use durable queue IDs');
+const observedJump={metadata:{id:'session:jump',artifact:'BTL-OBSERVED-RESEARCH-SESSION-1'},state:{revision:3,throughNs:'100'}};
+const jumpRequests=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(_path,{body,jobId})=>{
+  jumpRequests.push([body.requestId,jobId]);
+  const view={metadata:{id:body.sessionId},state:{throughNs:'150',revision:4}};
+  return {schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-RESULT-1',requestId:body.requestId,
+    sessionId:body.sessionId,targetNs:body.targetNs,throughNs:'150',targetReached:false,view};
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>replayObservedTo(observedJump,'99','1m'),/after the saved replay/);
+await assert.rejects(()=>replayObservedTo({...observedJump,pendingReplayTargetNs:'175'},'200','1m'),/Continue the saved replay/);
+assert.equal((await replayObservedTo(observedJump,'200','1m')).targetReached,false);
+await replayObservedTo(observedJump,'200','1m');
+assert.equal(jumpRequests.length,2);
+assert.deepEqual(jumpRequests[0],jumpRequests[1],'retry keeps both request and queue identities');
+
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
@@ -270,6 +285,11 @@ assert.equal(bars[0].open,2000.015);assert.ok(!Object.hasOwn(bars[0],'volume'));
 assert.deepEqual(Object.keys(bars[0]),['time','open','high','low','close']);
 assert.equal(view.chart.candles[0].open,'2000.015');
 assert.equal(replayTarget(view,4),'1577838660000000000');
+const resumedView={...view,pendingReplayTargetNs:'1577838700000000000'};
+for(const steps of [1,4,16])assert.equal(replayTarget(resumedView,steps),resumedView.pendingReplayTargetNs);
+for(const pending of ['1577838600000000000','-1','1.5',1577838700000000000]){
+  assert.throws(()=>replayTarget({...view,pendingReplayTargetNs:pending},1),/Invalid pending replay target/);
+}
 assert.equal(seekTarget('2020-01-01T00:30'),'1577838600000000000');
 assert.equal(seekTarget('2020-02-29T12:34:56'),'1582979696000000000');
 assert.equal(seekTarget('2000-02-29T00:00'),'951782400000000000');

@@ -108,6 +108,31 @@ export function selectSessionUrl(session){
   url.searchParams.set('session',session);
   window.history.replaceState(null,'',url);
 }
+export async function replayObservedTo(view,targetNs,timeframe){
+  const account=accountTransport();
+  if(!account||view.metadata.artifact!=='BTL-OBSERVED-RESEARCH-SESSION-1')throw Error('Forward jump requires a hosted observed Session.');
+  if(typeof targetNs!=='string'||!/^(0|[1-9][0-9]{0,19})$/.test(targetNs)||
+    BigInt(targetNs)<=BigInt(view.state.throughNs))throw Error('Choose a time after the saved replay position.');
+  if(view.pendingReplayTargetNs!=null&&view.pendingReplayTargetNs!==targetNs){
+    throw Error('Continue the saved replay target before choosing another time.');
+  }
+  const sessionId=view.metadata.id;
+  const path=sessionPath(sessionId)+'/replay-to';
+  const request={schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-1',sessionId,expectedRevision:view.state.revision,targetNs,timeframe};
+  const requestId=(await durableJobId(account,path,request)).replaceAll('-','');
+  if(accountTransport()!==account)throw Error('Account changed before replay could start.');
+  const result=await api(path,{...request,requestId});
+  if(accountTransport()!==account||result.artifact!=='BTL-OBSERVED-REPLAY-TO-RESULT-1'||result.requestId!==requestId||
+    result.sessionId!==sessionId||result.targetNs!==targetNs||result.view?.metadata?.id!==sessionId||
+    result.view?.state?.throughNs!==result.throughNs||!Number.isSafeInteger(result.view?.state?.revision)||
+    result.view.state.revision<request.expectedRevision||typeof result.throughNs!=='string'||
+    !/^(0|[1-9][0-9]{0,19})$/.test(result.throughNs)||BigInt(result.throughNs)<BigInt(view.state.throughNs)||
+    BigInt(result.throughNs)>BigInt(targetNs)||result.targetReached!==(result.throughNs===targetNs)){
+    throw Error('Replay result could not be verified. Reopen the saved Session before continuing.');
+  }
+  return result;
+}
+
 export function command(view,kind,payload){
   const artifact=view?.metadata?.artifact;
   const dialect=artifact==='BTL-LOCAL-SESSION-1'?'BTL-TICK-EXECUTION-COMMAND-1':
