@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 16422)
+Total output lines: 818
+
 """Native new-family isolated transactions/source admission; never production DB."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -322,6 +325,28 @@ class ObservedPostgresTests(unittest.TestCase):
             if previous_gate is None:os.environ.pop('BTL_ENABLE_QA_ORDER_ARCHIVE_V1',None)
             else:os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']=previous_gate
 
+    def test_product_compact_session_archives_terminal_orders_without_qa_flag(self):
+        scope=TrustedScope('observedqa:product-archive:'+uuid.uuid4().hex,'authored:actor')
+        sid='session:product-archive:'+uuid.uuid4().hex
+        store=ObservedExecutionStore(DSN,terminal_order_archive_v1=True,state_storage_format='compact-v1')
+        controller=ObservedExecutionController(store,lambda _:self.source)
+        created=controller.create(scope,sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+        self.assertEqual(created['artifact'],'BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1')
+        quote=controller.apply(scope,command(sid,'product:quote',0,'ADVANCE',dict(targetNs='0')))
+        plan=dict(side='LONG',orderType='LIMIT',workflow='PLANNED',entry='2290',quantity='0.01',
+            sl='2289',tp='2291',riskPercent='1',observations=[])
+        opened=controller.apply(scope,command(sid,'product:open',quote['state']['revision'],'OPEN',plan))
+        cancelled=controller.apply(scope,command(sid,'product:cancel',opened['state']['revision'],'CANCEL',
+            dict(orderId='product:open')))
+        self.assertEqual(cancelled['state']['orders'],{})
+        self.assertEqual(cancelled['state']['orderArchive']['count'],1)
+        self.assertEqual(store.archive_order(scope,sid,'product:open')['status'],'CANCELLED')
+        first=store.product_order_history(scope,sid,maximum=1)
+        self.assertEqual(first['records'][0]['orderId'],'product:open')
+        cold=ObservedExecutionController(ObservedExecutionStore(DSN,terminal_order_archive_v1=True,
+            state_storage_format='compact-v1'),lambda _:self.source)
+        self.assertEqual(cold.inspect(scope,sid)['state'],cancelled['state'])
+
     def opening(self):return dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])
 
     def test_compact_v1_keeps_versioned_qa_order_archive_compatible(self):
@@ -352,130 +377,7 @@ class ObservedPostgresTests(unittest.TestCase):
                 qa_order_archive_v1=True,order_retention_policy=QA_ORDER_RETENTION_V3)
             self.assertEqual(cold.archive_order(scope,session,'compact:open'),archived)
             prior_result=cold.prepare(scope,command(session,'compact:cancel',1,'CANCEL',
-                dict(orderId='compact:open')))[1]
-            self.assertEqual(prior_result['state']['revision'],2)
-        finally:
-            if prior is None:os.environ.pop('BTL_ENABLE_QA_ORDER_ARCHIVE_V1',None)
-            else:os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']=prior
-
-    def test_actual_transactions_cold_source_and_source_outage_receipt_and_journal(self):
-        self.call('ADVANCE',dict(targetNs='0'));self.call('OPEN',self.opening(),cid='order:one');self.call('ADVANCE',dict(targetNs=str(S)));self.source.cache.close()
-        self.call('CLOSE',dict(orderId='order:one',quantity=None));raw=command(self.sid,'final',self.rev,'ADVANCE',dict(targetNs=str(2*S)));result=self.controller().apply(self.scope,raw)
-        self.assertTrue(result['durable']);self.assertEqual(result['state']['balance'],'10001')
-        self.source.cache.close();offline=self.root/'offline';self.folder.rename(offline)
-        try:
-            retry=ObservedExecutionController(self.store,lambda _:(_ for _ in ()).throw(AssertionError('source must not be opened'))).apply(self.scope,raw)
-            self.assertEqual(canonical_bytes(result),canonical_bytes(retry))
-            view=self.controller().inspect(self.scope,self.sid,maximum=64);self.assertEqual(view['state']['balance'],'10001');self.assertEqual(len([e for e in view['events'] if e['kind']=='EXIT_FILL']),1)
-        finally:offline.rename(self.folder)
-
-    def test_replay_to_uses_existing_durable_advances_and_recovers_idempotently(self):
-        from execution.observed_research import ObservedResearchApplication
-        app=object.__new__(ObservedResearchApplication);app.dsn=DSN;app.scope=self.scope;app.controller=self.controller()
-        def current_state():return self.c.inspect(self.scope,self.sid)['state']
-        app._session=lambda db,session:(None,None,current_state(),None)
-        app.inspect=lambda session,timeframe:{'metadata':{'id':session},'state':current_state()}
-        request=dict(schemaVersion=1,artifact='BTL-OBSERVED-REPLAY-TO-1',requestId=uuid.uuid4().hex,
-                     sessionId=self.sid,expectedRevision=0,targetNs=str(2*S),timeframe='1m')
-        first=app.replay_to(self.sid,request)
-        self.assertTrue(first['targetReached']);self.assertEqual(first['advances'],1)
-        self.assertEqual(first['view']['state']['nextGroupIndex'],'3')
-        retry=app.replay_to(self.sid,request)
-        self.assertTrue(retry['targetReached']);self.assertEqual(retry['advances'],0)
-        self.assertEqual(retry['view']['state']['revision'],first['view']['state']['revision'])
-        stale=dict(request,requestId=uuid.uuid4().hex)
-        with self.assertRaisesRegex(ValueError,'REFUSED_STALE_REVISION'):app.replay_to(self.sid,stale)
-
-    def test_concurrent_duplicate_conflict_and_other_workspace_refused(self):
-        raw=command(self.sid,'same',0,'ADVANCE',dict(targetNs='0'))
-        with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(lambda _:self.controller().apply(self.scope,deepcopy(raw)),range(2)))
-        self.assertEqual(results[0],results[1]);self.assertEqual(self.controller().inspect(self.scope,self.sid)['state']['revision'],1)
-        changed=deepcopy(raw);changed['payload']['targetNs']=str(S)
-        with self.assertRaisesRegex(ValueError,'REFUSED_IDEMPOTENCY_CONFLICT'):self.controller().apply(self.scope,changed)
-        with self.assertRaisesRegex(ValueError,'RESOURCE_UNAVAILABLE'):self.controller().inspect(TrustedScope('other:workspace','other:actor'),self.sid)
-        with self.assertRaises(ValueError):self.controller().inspect({'workspace_id':self.scope.workspace_id},self.sid)
-
-    def test_shared_source_checkpoint_survives_pg_sigkill_after_commit_and_retry(self):
-        from unittest.mock import patch
-        suffix=uuid.uuid4().hex[:10]
-        shared_dsn=isolated_database(DSN,'sharedsrc_'+suffix)
-        shared_scope=TrustedScope('observedqa:shared:'+suffix,'authored:actor')
-        sid='session:shared:'+suffix;logs=self.root/'shared-source-controller-logs'
-        qa_env={'BTL_HISTORICAL_QA_ROOT':str(self.root),'BTL_QA_SHARED_CANONICAL_SOURCE_V1':'1'}
-        with patch.dict(os.environ,qa_env):
-            shared=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
-                receipt_sha256=self.proof_hash,log_root=logs,timeline_storage_mode='shared-source-v1')
-            store=ObservedExecutionStore(shared_dsn)
-            controller=ObservedExecutionController(store,lambda _:shared)
-            seeded=controller.create(shared_scope,sid,self.fx.profile,self.fx.policy,period='1970-01')
-            self.assertEqual(seeded['nextGroupIndex'],'0')
-            self.assertEqual(len(seeded['sourceCheckpointHash']),64)
-            first=controller.apply(shared_scope,command(sid,'shared:quote',0,'ADVANCE',dict(targetNs='0')))
-            self.assertEqual(first['state']['nextGroupIndex'],'1')
-            basis=first['state']['quoteBasis']
-            order_raw=command(sid,'shared:sigkill:open',1,'OPEN',dict(side='LONG',orderType='MARKET',
-                workflow='QUICK',entry=basis['ask'],quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]))
-            shared.close()
-        data=dict(profile=self.fx.profile.wire,folder=str(self.folder),proof=str(self.proof),proofHash=self.proof_hash,
-            logs=str(logs),workspace=shared_scope.workspace_id,actor=shared_scope.actor_ref,session=sid,
-            dsn=shared_dsn,command=order_raw,phase='delta_after_commit',timelineStorageMode='shared-source-v1')
-        env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(data),BTL_TEST_DATABASE_URL=shared_dsn,**qa_env)
-        proc=subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],
-            env=env,capture_output=True,text=True,timeout=90)
-        self.assertEqual(proc.returncode,-signal.SIGKILL,proc.stderr)
-        with patch.dict(os.environ,qa_env):
-            cold_source=AdmittedObservedSource(self.folder,self.fx.profile,receipt_path=self.proof,
-                receipt_sha256=self.proof_hash,log_root=logs,timeline_storage_mode='shared-source-v1')
-            cold_store=ObservedExecutionStore(shared_dsn)
-            cold=ObservedExecutionController(cold_store,lambda _:cold_source)
-            committed=cold.inspect(shared_scope,sid)
-            self.assertEqual(committed['state']['revision'],2)
-            retry=cold.apply(shared_scope,order_raw)
-            self.assertEqual(retry['state'],committed['state'])
-            self.assertEqual(retry,cold.apply(shared_scope,order_raw))
-            self.assertEqual(sum(event['kind']=='ORDER_ACCEPTED' for event in cold_store.inspect(shared_scope,sid)['events']),1)
-            advanced=cold.apply(shared_scope,command(sid,'shared:cold:advance',2,'ADVANCE',dict(targetNs=str(2*S))))
-            self.assertEqual(advanced['state']['nextGroupIndex'],'3')
-            self.assertEqual(advanced['state']['balance'],'10000')
-            self.assertEqual(sum(event['kind']=='ENTRY_FILL' for event in cold_store.inspect(shared_scope,sid)['events']),1)
-            cold_source.close()
-
-    def test_before_commit_process_death_rolls_back_after_commit_death_retries_once(self):
-        raw=command(self.sid,'worker',0,'ADVANCE',dict(targetNs='0'))
-        data=dict(profile=self.fx.profile.wire,folder=str(self.folder),proof=str(self.proof),proofHash=self.proof_hash,logs=str(self.root/'controller-logs'),workspace=self.scope.workspace_id,command=raw,phase='before')
-        def run(phase):
-            data['phase']=phase;env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(data))
-            return subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],env=env,capture_output=True,text=True,timeout=60)
-        before=run('before');self.assertEqual(before.returncode,73,before.stderr);self.assertEqual(self.c.inspect(self.scope,self.sid)['state']['revision'],0)
-        after=run('after');self.assertEqual(after.returncode,74,after.stderr);view=self.c.inspect(self.scope,self.sid);self.assertEqual(view['state']['revision'],1)
-        retry=self.c.apply(self.scope,raw);self.assertEqual(retry['state'],view['state'])
-
-    def test_qa_v3_postgres_delta_atomic_financial_parity_and_recovery(self):
-        from contextlib import contextmanager
-        import psycopg
-        import execution.observed_postgres as storage
-        from execution.observed_postgres import QA3_RESULT,unpack
-        from contracts.canonical import content_hash
-        sid=self.sid;legacy_scope=self.scope
-        qa_scope=TrustedScope(self.scope.workspace_id+':delta-v3',self.scope.actor_ref)
-        suffix=uuid.uuid4().hex[:12]
-        legacy_dsn=isolated_database(DSN,'cp6a4_legacy_'+suffix)
-        delta_dsn=isolated_database(DSN,'cp6a4_v3_'+suffix)
-        legacy_store=ObservedExecutionStore(legacy_dsn)
-        delta_store=ObservedExecutionStore(delta_dsn,qa_state_delta_v3=True)
-        legacy_controller=ObservedExecutionController(legacy_store,lambda _:self.source)
-        delta_controller=ObservedExecutionController(delta_store,lambda _:self.source)
-
-        def database_bytes(dsn):
-            with connect(dsn) as db:return int(db.execute('SELECT pg_database_size(current_database())').fetchone()[0])
-        def current_lsn():
-            with connect(DSN) as db:return db.execute('SELECT pg_current_wal_lsn()').fetchone()[0]
-        def wal_delta(first,last):
-            with connect(DSN) as db:return int(db.execute('SELECT pg_wal_lsn_diff(%s,%s)',(last,first)).fetchone()[0])
-        def checkpoint_cluster():
-            with psycopg.connect(DSN,autocommit=True) as db:db.execute('CHECKPOINT')
-        def wal_allocated_bytes():
-            root=Path(os.environ['BTL_QA_CLUSTER_ROOT'])/'data'/'pg_wal'
+                dict…2422 tokens truncated…T'])/'data'/'pg_wal'
             return sum(path.stat().st_blocks*512 for path in root.rglob('*') if path.is_file())
         def write_footprint(dsn,workspace,revision_number,command_id=None):
             with connect(dsn) as db:

@@ -42,10 +42,11 @@ REPLAY_TO_CHUNKS=8
 
 class ObservedResearchApplication:
     """One workspace-scoped Method/Session adapter for the observed family."""
-    def __init__(self,dsn,scope,catalog,*,state_storage_format='compact-v1'):
+    def __init__(self,dsn,scope,catalog,*,state_storage_format='compact-v1',terminal_order_archive_v1=True):
         require(type(scope) is TrustedScope,'scope','SCOPE_REQUIRED');require(type(catalog) is ObservedCatalog,'catalog')
         require(state_storage_format in ('snapshot-v1','compact-v1'),'stateStorageFormat','REFUSED_STATE_VERSION')
-        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(dsn,state_storage_format=state_storage_format)
+        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(
+            dsn,state_storage_format=state_storage_format,terminal_order_archive_v1=terminal_order_archive_v1)
         self.controller=ObservedExecutionController(self.store,catalog.resolve)
         key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',
                               dsnHash=content_hash({'schemaVersion':1,'dsn':dsn}),stateStorageFormat=state_storage_format))
@@ -163,7 +164,12 @@ class ObservedResearchApplication:
     def summary(self,session_id):
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');meta,method,state,cp=self._session(db,session_id)
-            return dict(schemaVersion=1,artifact='BTL-OBSERVED-SESSION-SUMMARY-1',sessionId=meta['id'],revision=state['revision'],throughNs=state['throughNs'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],accountCurrency='USD',initialBalance=state['initialBalance'],balance=state['balance'],netCashChange=text(Fraction(state['balance'])-Fraction(state['initialBalance'])),completedTrades=sum(o['status']=='CLOSED' for o in state['orders'].values()),unresolved=state['unresolved'],ended=state['ended'],model=MODEL)
+            completed=sum(o['status']=='CLOSED' for o in state['orders'].values())
+            if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1':
+                completed+=db.execute('SELECT count(*) FROM btl.tick_terminal_orders '
+                    "WHERE workspace_id=%s AND session_id=%s AND terminal_status='CLOSED'",
+                    (self.scope.workspace_id,session_id)).fetchone()[0]
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-SESSION-SUMMARY-1',sessionId=meta['id'],revision=state['revision'],throughNs=state['throughNs'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],accountCurrency='USD',initialBalance=state['initialBalance'],balance=state['balance'],netCashChange=text(Fraction(state['balance'])-Fraction(state['initialBalance'])),completedTrades=completed,unresolved=state['unresolved'],ended=state['ended'],model=MODEL)
 
     def terminal_order_page(self,session_id,raw):
         keys(raw,'afterSequence limit')
@@ -173,6 +179,10 @@ class ObservedResearchApplication:
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             self._session(db,session_id)
+        if self.store.terminal_order_archive_v1:
+            page=self.store.product_order_history(self.scope,session_id,after_sequence=after,maximum=limit)
+            return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
+                sessionId=session_id,status='COMPLETE',**page)
         if not self.store.qa_order_archive_v1:
             return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
                 sessionId=session_id,status='UNAVAILABLE',reason='OBSERVED_TERMINAL_ARCHIVE_NOT_ENABLED',

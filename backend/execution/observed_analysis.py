@@ -72,7 +72,8 @@ class LedgerFold:
 
     def project(self,state,offset=0,maximum=64,archive_orders=None):
         validate_state(state,order_retention_policy=self.order_retention_policy);require(all(state[k]==self.genesis[k] for k in ('sessionId','datasetId','datasetVersion','profileHash','profile','policy','initialBalance','startNs','parent')),'context','CORRUPT_RECORD')
-        if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
+        if state['artifact'] in ('BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1',
+                                 'BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1'):
             active={oid:o for oid,o in self.orders.items() if o['status'] in ('PENDING','ACTIVE')}
             terminal={oid:o for oid,o in self.orders.items() if o['status'] not in ('PENDING','ACTIVE')}
             require(type(archive_orders) is dict and terminal==archive_orders and active==state['orders'],
@@ -136,6 +137,9 @@ class ObservedStatistics:
                 if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
                     self.store._verify_order_archive(db,workspace,session,state,full=True)
                     archive_orders={row['orderId']:row['order'] for row in self.store._archive_rows(db,workspace,session)}
+                elif state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1':
+                    self.store._verify_product_archive(db,workspace,session,state,full=True)
+                    archive_orders={row['orderId']:row['order'] for row in self.store._product_archive_rows(db,workspace,session)}
                 result=fold.project(state,offset,maximum,archive_orders=archive_orders)
             else:
                 result=dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='BUILDING',sessionId=session,revision=state['revision'],processedEvents=fold.next,totalEvents=state['nextEventIndex'],metrics=None,completed=[],nextTradeOffset=None)

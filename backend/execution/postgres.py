@@ -256,9 +256,9 @@ class PostgresExecutionStore:
                 events=item["events"], previous_hash=previous_hash)
             raw, digest = pack(value)
             db.execute("INSERT INTO btl.tick_terminal_orders "
-                "(workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                (workspace, session, sequence, order_id, revision_value,
+                "(workspace_id,session_id,sequence,order_id,terminal_status,finalized_revision,record_hash,payload,content_hash) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (workspace, session, sequence, order_id, item["order"]["status"], revision_value,
                  value["recordHash"], raw, digest))
             sequence += 1
             previous_hash = value["recordHash"]
@@ -356,14 +356,14 @@ class PostgresExecutionStore:
         workspace, session = scoped(scope, session_id)
         identifier(order_id, "orderId")
         with connect(self.dsn) as db:
-            row = db.execute("SELECT payload,content_hash,record_hash,sequence FROM btl.tick_terminal_orders "
+            row = db.execute("SELECT payload,content_hash,record_hash,sequence,terminal_status FROM btl.tick_terminal_orders "
                 "WHERE workspace_id=%s AND session_id=%s AND order_id=%s",
                 (workspace, session, order_id)).fetchone()
             if row is None:
                 return None
             value = unpack(row[0], row[1])
             verify_terminal_record(value, session_id=session, sequence=row[3])
-            require(value["recordHash"] == row[2] and value["orderId"] == order_id,
+            require(value["recordHash"] == row[2] and value["orderId"] == order_id and value["order"]["status"]==row[4],
                     "terminalArchiveLookup", "CORRUPT_RECORD")
             return deepcopy(value)
 
@@ -376,23 +376,24 @@ class PostgresExecutionStore:
                 previous_hash = ORDER_ARCHIVE_GENESIS
                 start = 0
             else:
-                prior = db.execute("SELECT payload,content_hash,record_hash FROM btl.tick_terminal_orders "
+                prior = db.execute("SELECT payload,content_hash,record_hash,terminal_status FROM btl.tick_terminal_orders "
                     "WHERE workspace_id=%s AND session_id=%s AND sequence=%s",
                     (workspace, session, after_sequence)).fetchone()
                 require(prior is not None, "cursor", "REFUSED_STALE_CURSOR")
                 value = unpack(prior[0], prior[1])
                 verify_terminal_record(value, session_id=session, sequence=after_sequence)
-                require(value["recordHash"] == prior[2], "terminalArchiveCursor", "CORRUPT_RECORD")
+                require(value["recordHash"] == prior[2] and value["order"]["status"]==prior[3], "terminalArchiveCursor", "CORRUPT_RECORD")
                 previous_hash, start = prior[2], after_sequence + 1
-            rows = db.execute("SELECT payload,content_hash,record_hash,sequence FROM btl.tick_terminal_orders "
+            rows = db.execute("SELECT payload,content_hash,record_hash,sequence,terminal_status FROM btl.tick_terminal_orders "
                 "WHERE workspace_id=%s AND session_id=%s AND sequence >= %s "
                 "ORDER BY sequence LIMIT %s", (workspace, session, start, limit + 1)).fetchall()
             values = []
-            for raw, digest, record_hash, sequence in rows:
+            for raw, digest, record_hash, sequence, terminal_status in rows:
                 value = unpack(raw, digest)
                 verify_terminal_record(value, session_id=session, sequence=sequence,
                                        previous_hash=previous_hash)
                 require(value["recordHash"] == record_hash, "terminalArchiveLookup", "CORRUPT_RECORD")
+                require(value["order"]["status"] == terminal_status, "terminalArchiveStatus", "CORRUPT_RECORD")
                 values.append(value)
                 previous_hash = record_hash
             page = values[:limit]
