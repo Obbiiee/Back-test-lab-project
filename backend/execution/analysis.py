@@ -134,8 +134,6 @@ def project(state, events, quote):
         datasetVersion=state['datasetVersion'], engineVersion=state['engineVersion'], profileHash=state['profileHash'],
         methodHash=state['policy']['definitionHash'], eventHead=state['eventHash'], analysisVersion=ANALYSIS_VERSION,
         model='SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION')
-    if state['nextEventIndex'] > MAX_ANALYSIS_EVENTS:
-        return dict(status='UNAVAILABLE', reason='REFUSED_ANALYSIS_LIMIT', maximumEvents=MAX_ANALYSIS_EVENTS, provenance=provenance)
     require(state['parent'] is None, 'analysisLineage', 'REFUSED_UNSUPPORTED_LINEAGE')
     previous = content_hash(dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-SEED-1', sessionId=state['sessionId'],
         datasetId=state['datasetId'], datasetVersion=state['datasetVersion'], profile=state['profile'],

@@ -21,7 +21,7 @@ from ticks.contracts import keys,tag,uint
 from infrastructure.database import connect
 from .analysis import RESEARCH_VERSION,planned_risk
 from .contracts import exact,open_payload,policy_wire,text,risk_quantity
-from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
+from .journal import validate_note,request as journal_request
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
 from .observed_kernel import seed_state
@@ -323,7 +323,6 @@ class ObservedResearchApplication:
     def journal(self,session_id):
         # Reuse the immutable committed analysis projection. Notes are held
         # separately and cannot affect financial results.
-        from .journal import MAX_JOURNAL_ORDERS
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self._session(db,session_id)[2]
@@ -332,14 +331,12 @@ class ObservedResearchApplication:
         analysis=self._view_analysis(state,projection)
         require(analysis['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
         orders=analysis['orders']
-        require(len(orders)<=MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         notes=[]
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             live=self._session(db,session_id)[2]
             require(live['revision']==state['revision'] and live['eventHash']==state['eventHash'],'journal','REFUSED_STALE_REVISION')
-            saved=db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id LIMIT %s',(self.scope.workspace_id,session_id,MAX_JOURNAL_ORDERS+1)).fetchall()
-            require(len(saved)<=MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+            saved=db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id',(self.scope.workspace_id,session_id)).fetchall()
             indexed={order['id']:order for order in orders}
             for blob,sha,note_revision,order_id in saved:
                 value=validate_note(unpack(blob,sha),state,indexed)
@@ -348,7 +345,7 @@ class ObservedResearchApplication:
                     financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
 
     def journal_page(self, session_id, raw):
-        from .journal import (MAX_JOURNAL_PAGE_SIZE, MAX_JOURNAL_READ_ORDERS,
+        from .journal import (MAX_JOURNAL_PAGE_SIZE,
                               encode_cursor, decode_cursor, validate_note)
         keys(raw, 'limit cursor')
         limit=raw['limit']
@@ -369,7 +366,6 @@ class ObservedResearchApplication:
         for row in analysis['completed']:
             by_id[row['id']]=row
         all_orders=sorted(by_id.values(),key=lambda row:row['id'])
-        require(len(all_orders)<=MAX_JOURNAL_READ_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         orders=[row for row in all_orders if after_order_id is None or row['id']>after_order_id]
         page=orders[:limit];more=len(orders)>len(page);indexed={row['id']:row for row in page};notes=[]
         with connect(self.dsn) as db:

@@ -17,9 +17,8 @@ from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
-from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
-from .journal import (validate_note, request as journal_request, MAX_JOURNAL_ORDERS,
-                      MAX_JOURNAL_PAGE_SIZE, MAX_JOURNAL_READ_ORDERS,
+from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION
+from .journal import (validate_note, request as journal_request, MAX_JOURNAL_PAGE_SIZE,
                       encode_cursor, decode_cursor)
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 from .availability import catalog_availability, eligible_start_month
@@ -245,7 +244,7 @@ class ResearchApplication:
         This is a bounded read projection. It never combines account balances,
         runs a replay, or treats incomplete Sessions as zero-return samples.
         """
-        from .analysis import MAX_ANALYSIS_EVENTS, metrics
+        from .analysis import metrics
         identifier(method_id, 'methodId')
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
@@ -253,12 +252,10 @@ class ResearchApplication:
             policy = method_policy(method)
             rows = db.execute(
                 'SELECT session_id FROM btl.tick_research_sessions WHERE workspace_id=%s AND method_id=%s '
-                'ORDER BY session_id LIMIT 129', (self.scope.workspace_id, method_id)).fetchall()
-            require(len(rows) <= 128, 'methodSessions', 'REFUSED_METHOD_ANALYSIS_LIMIT')
+                'ORDER BY session_id', (self.scope.workspace_id, method_id)).fetchall()
 
             compatible = []
             excluded = []
-            event_budget = 0
             units = set()
             for (session_id,) in rows:
                 meta, _method, state, _checkpoint = self._session(db, session_id)
@@ -269,7 +266,6 @@ class ResearchApplication:
                                 state['profile']['accountCurrency'])
                 units.add(current_unit)
                 compatible.append((session_id, state['revision'], current_unit))
-                event_budget += state['nextEventIndex']
 
             common = dict(schemaVersion=1, artifact='BTL-METHOD-ANALYTICS-1', methodId=method_id,
                           methodHash=policy.definition_hash,
@@ -280,13 +276,6 @@ class ResearchApplication:
                             includedSessions=[], excludedSessions=[
                                 {'sessionId': item[0], 'reason': 'MULTIPLE_FINANCIAL_UNITS'} for item in compatible],
                             metrics=None)
-            if event_budget > MAX_ANALYSIS_EVENTS:
-                return dict(**common, status='UNAVAILABLE', reason='REFUSED_METHOD_ANALYSIS_LIMIT',
-                            eventBudget=MAX_ANALYSIS_EVENTS, observedEventCount=event_budget,
-                            includedSessions=[], excludedSessions=excluded + [
-                                {'sessionId': item[0], 'reason': 'METHOD_EVENT_BUDGET'} for item in compatible],
-                            metrics=None)
-
             completed = []
             included = []
             for session_id, revision_value, _current_unit in compatible:
@@ -401,7 +390,7 @@ class ResearchApplication:
                 def committed_events():
                     # Small bounded pages from this same repeatable-read snapshot.
                     # Refusal above the projection budget occurs before this generator runs.
-                    for offset in range(0, min(state['nextEventIndex'], MAX_ANALYSIS_EVENTS), 256):
+                    for offset in range(0, state['nextEventIndex'], 256):
                         page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
                             (self.scope.workspace_id,session_id,offset)).fetchall()
                         for row in page:
@@ -468,7 +457,7 @@ class ResearchApplication:
 
     def _committed_analysis(self, db, state, quote=None):
         def events():
-            for offset in range(0,min(state['nextEventIndex'],MAX_ANALYSIS_EVENTS),256):
+            for offset in range(0,state['nextEventIndex'],256):
                 page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
                                   (self.scope.workspace_id,state['sessionId'],offset)).fetchall()
                 for row in page:
@@ -489,11 +478,9 @@ class ResearchApplication:
         result['provenance']=analysis['provenance']
         return result
 
-    def _journal_projection(self, db, state, checkpoint, max_orders=MAX_JOURNAL_ORDERS):
-        require(state['nextEventIndex'] <= MAX_ANALYSIS_EVENTS, 'journal', 'REFUSED_ANALYSIS_LIMIT')
+    def _journal_projection(self, db, state, checkpoint):
         analysis = self._committed_analysis(db,state,self._quote(state,checkpoint))
         self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
-        require(len(analysis['orders']) <= max_orders,'journal','REFUSED_JOURNAL_LIMIT')
         return analysis
 
     def journal(self, session_id):
@@ -502,9 +489,8 @@ class ResearchApplication:
             _, _, state, checkpoint = self._session(db,session_id)
             analysis = self._journal_projection(db,state,checkpoint)
             orders = {row['id']:row for row in analysis['orders']}
-            saved = db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id LIMIT %s',
-                               (self.scope.workspace_id,session_id,MAX_JOURNAL_ORDERS+1)).fetchall()
-            require(len(saved) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+            saved = db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id',
+                               (self.scope.workspace_id,session_id)).fetchall()
             notes = []
             for blob,sha,note_revision,order_id in saved:
                 value = validate_note(unpack(blob,sha),state,orders)
@@ -526,9 +512,8 @@ class ResearchApplication:
             _meta, _method, state, checkpoint = self._session(db, session_id)
             if requested_revision is not None:
                 require(requested_revision == state['revision'], 'cursor', 'STALE_REVISION')
-            analysis = self._journal_projection(db, state, checkpoint, MAX_ORDERS)
+            analysis = self._journal_projection(db, state, checkpoint)
             orders = sorted(analysis['orders'], key=lambda row: row['id'])
-            require(len(orders) <= MAX_JOURNAL_READ_ORDERS, 'journal', 'REFUSED_JOURNAL_LIMIT')
             if after_order_id is not None:
                 orders = [row for row in orders if row['id'] > after_order_id]
             page = orders[:limit]
