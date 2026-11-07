@@ -66,6 +66,12 @@ Hosted observed Sessions use the existing bounded replay-to worker for forward U
 
 10 focused backend tests, frontend transport and receipt tests, repository checks, lint, build and six independent golden vectors passed. This covers synthetic controller and mocked transport/storage cases. Live PostgreSQL worker and interactive browser acceptance remain open. Replaceable non-financial progress still requires a new persistence contract rather than discarding existing immutable advances.
 
+### P0-3 checkpoint — replaceable replay frontier schema (PARTIAL)
+
+Migration 023 adds one replaceable progress row per scoped Session, anchored to an immutable checkpoint revision and content hash. The database refuses backward time, backward group index, stale revisions, a different workspace's checkpoint, and row removal. The table is additive and has no hosted runtime grants or writers in this checkpoint.
+
+All 23 migrations executed in a disposable embedded PostgreSQL engine. Synthetic SQL assertions verified a single row across updates, refusal cases and no new immutable command receipt. The isolated native PostgreSQL regression is authored and was skipped locally because no test database was configured. Next, wire versioned progress writes and reads under the existing Session lock, with immutable financial commits consuming the exact revealed frontier and legacy Session reads preserved.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

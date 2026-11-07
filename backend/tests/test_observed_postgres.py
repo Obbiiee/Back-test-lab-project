@@ -89,6 +89,39 @@ class ObservedPostgresTests(unittest.TestCase):
     def call(self,kind,payload=None,cid=None):
         raw=command(self.sid,cid or 'cmd:'+str(self.rev),self.rev,kind,payload);result=self.controller().apply(self.scope,raw);self.rev=result['state']['revision'];return result
 
+    def test_replaceable_replay_progress_rejects_rewind_and_wrong_base(self):
+        from psycopg import IntegrityError
+
+        scope = (self.scope.workspace_id,self.sid)
+        with connect(DSN) as db:
+            base_hash, = db.execute('SELECT content_hash FROM btl.tick_checkpoints '
+                'WHERE workspace_id=%s AND session_id=%s AND revision=0',scope).fetchone()
+            db.execute('INSERT INTO btl.observed_replay_progress '
+                '(workspace_id,session_id,base_revision,base_hash,revision,through_ns,next_group_index,payload,content_hash) '
+                'VALUES (%s,%s,0,%s,1,100,1,%s,%s)',(*scope,base_hash,b'first','a'*64))
+            db.execute('UPDATE btl.observed_replay_progress SET revision=2,through_ns=200,next_group_index=2 '
+                'WHERE workspace_id=%s AND session_id=%s',scope)
+
+        for assignment in ("revision=3,through_ns=199", "revision=3,next_group_index=1",
+                           "revision=2,through_ns=201", "revision=3,base_hash=repeat('0',64)"):
+            with self.subTest(assignment=assignment), self.assertRaises(IntegrityError):
+                with connect(DSN) as db:
+                    db.execute('UPDATE btl.observed_replay_progress SET '+assignment+
+                        ' WHERE workspace_id=%s AND session_id=%s',scope)
+
+        with self.assertRaises(IntegrityError):
+            with connect(DSN) as db:
+                db.execute('INSERT INTO btl.observed_replay_progress '
+                    '(workspace_id,session_id,base_revision,base_hash,revision,through_ns,next_group_index,payload,content_hash) '
+                    'VALUES (%s,%s,0,%s,1,100,1,%s,%s)',('foreign:workspace',self.sid,base_hash,b'first','a'*64))
+        with connect(DSN) as db:
+            rows = db.execute('SELECT revision,through_ns,next_group_index FROM btl.observed_replay_progress '
+                'WHERE workspace_id=%s AND session_id=%s',scope).fetchall()
+            self.assertEqual(rows,[(2,200,2)])
+            receipts, = db.execute('SELECT count(*) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s',
+                                   scope).fetchone()
+            self.assertEqual(receipts,0)
+
     def test_compact_v1_new_session_commit_cold_read_and_retry_parity(self):
         from execution.observed_state_delta_v3 import COMPACT_DELTA
         session='session:compact-v1:'+uuid.uuid4().hex[:12]

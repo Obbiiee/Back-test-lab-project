@@ -12,6 +12,8 @@ As of the last inspected candidate PR #44 head 4bc3defe, the synthetic integrate
 
 **Hosted forward replay (PARTIAL):** Observed Sessions use queued forward jumps and resume the saved user target. Synthetic controller, transport and receipt checks passed. Live worker/browser verification and replaceable progress remain open.
 
+**Replaceable replay progress (PARTIAL):** Migration 023 adds the monotonic Session frontier row bound to an immutable checkpoint. Embedded PostgreSQL schema/refusal checks passed. Hosted writes, receipt reconciliation and native integration remain open.
+
 ---
 
 # Current implementation checkpoint — replay persistence correction (2026-11-07)
