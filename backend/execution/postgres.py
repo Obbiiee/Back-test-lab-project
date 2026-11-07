@@ -14,6 +14,8 @@ from infrastructure.database import connect
 from .contracts import MAX_EVENTS, command_wire, validate_state
 from .engine import emit
 from .observed_state_delta_v3 import encode_compact_base, encode_compact_delta, reconstruct_complete
+from .terminal_order_archive import GENESIS as ORDER_ARCHIVE_GENESIS, record as terminal_record
+from .terminal_order_archive import terminal_orders, verify as verify_terminal_record
 
 
 COMPACT_BASE = "BTL-TICK-EXECUTION-COMPACT-BASE-1"
@@ -233,6 +235,34 @@ class PostgresExecutionStore:
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                        (workspace, session, state["revision"], raw, sha))
 
+    @staticmethod
+    def _append_terminal_orders(db, workspace, session, revision_value, finalized):
+        if not finalized:
+            return
+        last = db.execute("SELECT sequence,record_hash,payload,content_hash FROM btl.tick_terminal_orders "
+                          "WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 1",
+                          (workspace, session)).fetchone()
+        if last is None:
+            sequence, previous_hash = 0, ORDER_ARCHIVE_GENESIS
+        else:
+            prior = unpack(last[2], last[3])
+            verify_terminal_record(prior, session_id=session, sequence=last[0])
+            require(prior["recordHash"] == last[1], "terminalArchiveHead", "CORRUPT_RECORD")
+            sequence, previous_hash = last[0] + 1, last[1]
+        for order_id in sorted(finalized):
+            item = finalized[order_id]
+            value = terminal_record(session_id=session, sequence=sequence,
+                revision=revision_value, order_id=order_id, order=item["order"],
+                events=item["events"], previous_hash=previous_hash)
+            raw, digest = pack(value)
+            db.execute("INSERT INTO btl.tick_terminal_orders "
+                "(workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (workspace, session, sequence, order_id, revision_value,
+                 value["recordHash"], raw, digest))
+            sequence += 1
+            previous_hash = value["recordHash"]
+
     def create(self, scope, state, checkpoint):
         with connect(self.dsn) as db:
             self._insert(db, scope, state, checkpoint)
@@ -273,6 +303,7 @@ class PostgresExecutionStore:
                 previous_hash, sequence = event["eventId"], sequence+1
             require(next_state["eventHash"] == previous_hash and next_state["nextEventIndex"] == sequence, "eventHead", "CORRUPT_RECORD")
             next_state["revision"] += 1
+            finalized_orders = terminal_orders(state, next_state, events)
             logical_snapshot = snapshot(next_state, next_checkpoint)
             compact_mode = unpack(row[0], row[1]).get("artifact") == COMPACT_POINTER
             if compact_mode:
@@ -307,6 +338,7 @@ class PostgresExecutionStore:
                 event_raw, event_hash = pack(event)
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace, session, command["commandId"], event["eventId"], event["sequence"], event_raw, event_hash))
+            self._append_terminal_orders(db, workspace, session, next_state["revision"], finalized_orders)
             if compact_mode:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                            (workspace, session, next_state["revision"], checkpoint_raw, checkpoint_hash))
@@ -319,6 +351,55 @@ class PostgresExecutionStore:
         if compact_mode:
             self._cache_write(workspace, session, next_state, next_checkpoint, next_chain)
         return deepcopy(result)
+
+    def archive_order(self, scope, session_id, order_id):
+        workspace, session = scoped(scope, session_id)
+        identifier(order_id, "orderId")
+        with connect(self.dsn) as db:
+            row = db.execute("SELECT payload,content_hash,record_hash,sequence FROM btl.tick_terminal_orders "
+                "WHERE workspace_id=%s AND session_id=%s AND order_id=%s",
+                (workspace, session, order_id)).fetchone()
+            if row is None:
+                return None
+            value = unpack(row[0], row[1])
+            verify_terminal_record(value, session_id=session, sequence=row[3])
+            require(value["recordHash"] == row[2] and value["orderId"] == order_id,
+                    "terminalArchiveLookup", "CORRUPT_RECORD")
+            return deepcopy(value)
+
+    def order_history(self, scope, session_id, *, after_sequence=None, limit=64):
+        workspace, session = scoped(scope, session_id)
+        require(after_sequence is None or (type(after_sequence) is int and after_sequence >= -1), "cursor")
+        require(type(limit) is int and 1 <= limit <= 128, "limit")
+        with connect(self.dsn) as db:
+            if after_sequence is None or after_sequence < 0:
+                previous_hash = ORDER_ARCHIVE_GENESIS
+                start = 0
+            else:
+                prior = db.execute("SELECT payload,content_hash,record_hash FROM btl.tick_terminal_orders "
+                    "WHERE workspace_id=%s AND session_id=%s AND sequence=%s",
+                    (workspace, session, after_sequence)).fetchone()
+                require(prior is not None, "cursor", "REFUSED_STALE_CURSOR")
+                value = unpack(prior[0], prior[1])
+                verify_terminal_record(value, session_id=session, sequence=after_sequence)
+                require(value["recordHash"] == prior[2], "terminalArchiveCursor", "CORRUPT_RECORD")
+                previous_hash, start = prior[2], after_sequence + 1
+            rows = db.execute("SELECT payload,content_hash,record_hash,sequence FROM btl.tick_terminal_orders "
+                "WHERE workspace_id=%s AND session_id=%s AND sequence >= %s "
+                "ORDER BY sequence LIMIT %s", (workspace, session, start, limit + 1)).fetchall()
+            values = []
+            for raw, digest, record_hash, sequence in rows:
+                value = unpack(raw, digest)
+                verify_terminal_record(value, session_id=session, sequence=sequence,
+                                       previous_hash=previous_hash)
+                require(value["recordHash"] == record_hash, "terminalArchiveLookup", "CORRUPT_RECORD")
+                values.append(value)
+                previous_hash = record_hash
+            page = values[:limit]
+            return dict(schemaVersion=1, artifact="BTL-TICK-TERMINAL-ORDER-PAGE-1",
+                sessionId=session, records=page,
+                nextCursor=page[-1]["sequence"] if len(values) > limit and page else None,
+                complete=len(values) <= limit)
 
     def inspect(self, scope, session_id, after_sequence=0, maximum=64):
         workspace, session = scoped(scope, session_id)
@@ -424,5 +505,5 @@ def grant_execution_runtime(dsn, role):
     """Explicit operator action; no automatic role creation or credentials."""
     with connect(dsn) as db:
         db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
-        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints,btl.tick_terminal_orders TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}").format(sql.Identifier(role)))

@@ -227,6 +227,17 @@ class ResearchApplication:
                         unresolved=state["unresolved"], ended=state["ended"],
                         model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
 
+    def terminal_order_page(self, session_id, raw):
+        keys(raw, 'afterSequence limit')
+        after=raw['afterSequence'];limit=raw['limit']
+        require(after is None or (type(after) is int and after>=0),'afterSequence','INVALID_INPUT')
+        require(type(limit) is int and 1<=limit<=128,'limit','INVALID_INPUT')
+        # Validate workspace/session membership before reading the archive.
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            self._session(db,session_id)
+        return self.store.order_history(self.scope,session_id,after_sequence=after,limit=limit)
+
     def method_analytics(self, method_id):
         """Pool completed committed positions across compatible Sessions only.
 

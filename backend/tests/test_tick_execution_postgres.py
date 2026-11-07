@@ -94,6 +94,31 @@ class TickExecutionPostgresTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError,"RESOURCE_UNAVAILABLE"):fresh.inspect(outsider,h.session)
         self.assertEqual(self.records(),recorded)
 
+    def test_terminal_order_archive_is_indexed_immutable_and_keyset_paginated(self):
+        h=self.harness(session='fixture:terminal-archive:'+uuid.uuid4().hex)
+        for index in range(3):
+            order_id=f'archive:order:{index}'
+            opened=h.call('OPEN',open_plan(self.case['open']),name=order_id)
+            raw=command(h.session,f'archive:cancel:{index}',opened['state']['revision'],
+                        'CANCEL',{'orderId':order_id})
+            receipt=h.controller.apply(self.scope,raw)
+            self.assertEqual(receipt['state']['orders'],{})
+            self.assertEqual(h.controller.apply(self.scope,raw),receipt)
+        first=self.store.order_history(self.scope,h.session,limit=2)
+        self.assertEqual(len(first['records']),2)
+        self.assertFalse(first['complete'])
+        self.assertEqual(first['records'][0]['order']['status'],'CANCELLED')
+        second=self.store.order_history(self.scope,h.session,after_sequence=first['nextCursor'],limit=2)
+        self.assertEqual(len(second['records']),1)
+        self.assertTrue(second['complete'])
+        self.assertEqual(second['records'][0]['sequence'],2)
+        self.assertEqual(self.store.archive_order(self.scope,h.session,'archive:order:1')['order']['status'],
+                         'CANCELLED')
+        with connect(DSN) as db:
+            count=db.execute('SELECT count(*) FROM btl.tick_terminal_orders WHERE workspace_id=%s AND session_id=%s',
+                             (self.scope.workspace_id,h.session)).fetchone()[0]
+        self.assertEqual(count,3)
+
     def test_compact_v1_matches_snapshot_results_cold_recovery_and_idempotency(self):
         case = self.case
         session = "fixture:compact:" + uuid.uuid4().hex
@@ -152,6 +177,10 @@ class TickExecutionPostgresTests(unittest.TestCase):
         self.assertEqual(len(self.records()["tick_events"]),3)
         self.assertEqual(len(self.records()["tick_commands"]),2)
         self.assertEqual(h.controller.apply(self.scope,raw),result)
+        if phase == 'after':
+            page=self.store.order_history(self.scope,h.session,limit=8)
+            self.assertEqual(len(page['records']),1)
+            self.assertEqual(page['records'][0]['order']['status'],'CLOSED')
 
     def test_real_worker_death_after_sql_before_commit(self):
         self._worker_death("before")

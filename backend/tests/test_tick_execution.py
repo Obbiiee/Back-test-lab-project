@@ -165,19 +165,53 @@ class TickExecutionTests(unittest.TestCase):
 
     def test_terminal_orders_leave_hot_state_and_cumulative_orders_are_unbounded(self):
         from execution.analysis import project
+        from execution.terminal_order_archive import GENESIS, record, terminal_orders, verify
         case=goldens()["scenarios"][0];h=Harness(provider_for(case))
         genesis=deepcopy(h.state);plan=open_plan(case["open"])
+        archived=[];previous=GENESIS
         for index in range(129):
             order_id=f'order:{index}'
             h.call('OPEN',plan,name=order_id)
             self.assertEqual(set(h.state['orders']),{order_id})
+            before=deepcopy(h.state)
+            first=len(h.store.events[(h.scope.workspace_id,h.session)])
             h.call('CANCEL',dict(orderId=order_id),name=f'cancel:{index}')
             self.assertEqual(h.state['orders'],{})
+            events=h.store.events[(h.scope.workspace_id,h.session)][first:]
+            values=terminal_orders(before,h.state,events)
+            archived_order=record(session_id=h.session,sequence=index,revision=h.state['revision'],
+                order_id=order_id,order=values[order_id]['order'],events=values[order_id]['events'],
+                previous_hash=previous)
+            verify(archived_order,session_id=h.session,sequence=index,previous_hash=previous)
+            archived.append(archived_order);previous=archived_order['recordHash']
         self.assertEqual(h.state['nextEventIndex'],258)
+        self.assertEqual(len(archived),129)
+        self.assertEqual(archived[-1]['order']['status'],'CANCELLED')
         result=project(h.state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
         self.assertEqual(result['status'],'COMPLETE')
         self.assertEqual(result['metrics']['tradeCount'],0)
         self.assertEqual(len(result['orders']),129)
+
+    def test_closed_order_archive_projection_preserves_financial_event_details(self):
+        from execution.terminal_order_archive import terminal_orders, record, verify, GENESIS
+        case=next(row for row in goldens()['scenarios'] if row['id']=='partial-then-full-fixed-commission')
+        h=Harness(provider_for(case),profile=profile_for(case))
+        h.call('OPEN',open_plan(case['open']),name='trade:archive')
+        h.through(1)
+        h.call('CLOSE',dict(orderId='trade:archive',quantity='0.04'))
+        h.through(2)
+        h.call('CLOSE',dict(orderId='trade:archive',quantity=None))
+        before=deepcopy(h.state);first=len(h.store.events[(h.scope.workspace_id,h.session)])
+        h.through(3);after=h.state
+        events=h.store.events[(h.scope.workspace_id,h.session)][first:]
+        projected=terminal_orders(before,after,events)['trade:archive']
+        archived=record(session_id=h.session,sequence=0,revision=after['revision'],
+            order_id='trade:archive',order=projected['order'],events=projected['events'],
+            previous_hash=GENESIS)
+        verify(archived,session_id=h.session,sequence=0,previous_hash=GENESIS)
+        self.assertEqual(archived['order']['status'],'CLOSED')
+        self.assertEqual([event['kind'] for event in archived['terminalEvents']],['EXIT_FILL'])
+        self.assertEqual(archived['terminalEvents'][0]['detail']['gross'],'18')
 
     def test_exact_rounding_risk_sizing_and_profile_refusal(self):
         with localcontext() as ctx:

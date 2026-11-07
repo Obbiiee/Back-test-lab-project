@@ -165,6 +165,25 @@ class ObservedResearchApplication:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');meta,method,state,cp=self._session(db,session_id)
             return dict(schemaVersion=1,artifact='BTL-OBSERVED-SESSION-SUMMARY-1',sessionId=meta['id'],revision=state['revision'],throughNs=state['throughNs'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],accountCurrency='USD',initialBalance=state['initialBalance'],balance=state['balance'],netCashChange=text(Fraction(state['balance'])-Fraction(state['initialBalance'])),completedTrades=sum(o['status']=='CLOSED' for o in state['orders'].values()),unresolved=state['unresolved'],ended=state['ended'],model=MODEL)
 
+    def terminal_order_page(self,session_id,raw):
+        keys(raw,'afterSequence limit')
+        after=raw['afterSequence'];limit=raw['limit']
+        require(after is None or (type(after) is int and after>=0),'afterSequence','INVALID_INPUT')
+        require(type(limit) is int and 1<=limit<=128,'limit','INVALID_INPUT')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            self._session(db,session_id)
+        if not self.store.qa_order_archive_v1:
+            return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
+                sessionId=session_id,status='UNAVAILABLE',reason='OBSERVED_TERMINAL_ARCHIVE_NOT_ENABLED',
+                records=[],nextCursor=None,complete=False)
+        offset=0 if after is None else after+1
+        page=self.store.order_history(self.scope,session_id,offset=offset,maximum=limit)
+        records=page['records'];next_cursor=records[-1]['sequence'] if page['nextOffset'] is not None and records else None
+        return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
+            sessionId=session_id,status='COMPLETE',records=records,nextCursor=next_cursor,
+            complete=page['nextOffset'] is None,total=page['total'])
+
     def inspect(self,session_id,timeframe='1m',*,trade_offset=0):
         # Workspace/chart is a controller operation; only prior observed groups
         # at this accepted checkpoint are projected. No candle settles a trade.
