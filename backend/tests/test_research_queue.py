@@ -139,6 +139,24 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(queue.inspect(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b),
                                        third['jobId'])['state'], 'SUCCEEDED')
 
+    def test_fresh_multichunk_replay_yields_to_other_actor_then_ages(self):
+        long_job = self.submit(args=('session:long', {'timeframe':'1m'}))
+        self.submit(args=('session:behind-long', {'timeframe':'1m'}))
+        actor_b, headers_b = self.fixture.account()
+        workspace_b = self.fixture.client.post('/api/v1/workspaces',headers=headers_b,
+                                               json={'name':'Priority queue QA'}).json()['id']
+        short_job = uuid.uuid4()
+        queue.submit(self.dsn,uuid.UUID(actor_b),uuid.UUID(workspace_b),short_job,
+                     'workspace',('session:short',{'timeframe':'1m'}))
+        long_id = uuid.UUID(long_job['jobId'])
+        with connect(self.dsn) as db:
+            db.execute("UPDATE btl.research_jobs SET operation='replay_to', "
+                       "created_at=statement_timestamp()-interval '1 second' WHERE id=%s",(long_id,))
+            self.assertEqual(db.execute(queue._CLAIM_NEXT_JOB).fetchone()[0],short_job)
+            db.execute("UPDATE btl.research_jobs SET created_at=statement_timestamp()-interval '6 seconds' "
+                       "WHERE id=%s",(long_id,))
+            self.assertEqual(db.execute(queue._CLAIM_NEXT_JOB).fetchone()[0],long_id)
+
     def test_worker_rollback_then_exact_result_recovery(self):
         job = self.submit()
         def crash(*args):

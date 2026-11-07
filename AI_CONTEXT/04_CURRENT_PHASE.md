@@ -14,6 +14,8 @@ As of the last inspected candidate PR #44 head 4bc3defe, the synthetic integrate
 
 **Replaceable replay progress (PARTIAL):** Migration 023 adds the monotonic Session frontier row bound to an immutable checkpoint. Embedded PostgreSQL schema/refusal checks passed. The internal reader/writer passed synthetic checks for scoped base verification and unchanged financial evidence. Migration 024 and the opt-in delta codec now support atomic frontier consolidation; embedded PostgreSQL rollback/commit checks passed. Hosted routing and receipt reconciliation still require end-to-end integration.
 
+**Replay receipts and worker queue (PARTIAL):** The internal progress adapter can reconcile its latest exact command retry. Queue claim SQL now prioritizes other actors' interactive work over fresh multi-chunk replay and ages waiting replay into normal rotation. Synthetic replay and embedded SQL passed. Hosted progress selection and native worker acceptance remain open.
+
 ---
 
 # Current implementation checkpoint — replay persistence correction (2026-11-07)

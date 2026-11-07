@@ -84,6 +84,14 @@ Migration 024 permits a skipped immutable revision only when the scoped progress
 
 All 24 migrations ran in a disposable embedded PostgreSQL engine. SQL assertions passed for rollback, successful consumption, rejection of an unbacked jump or stale anchor, and a legacy update by a role with no direct progress-table access. 13 focused backend tests and six independent golden vectors passed. The native PostgreSQL regression was skipped without a test DSN. The hosted observed store still needs version selection, sparse checkpoint reads/writes, and end-to-end receipt reconciliation before enabling replaceable progress.
 
+### P0-3 checkpoint — latest replaceable receipt (PARTIAL)
+
+The internal progress row now retains the latest advance command ID and canonical input hash. Exact retry returns the same bounded result with no additional write or financial event. Reusing the ID with changed input is refused. The result is recoverable while its progress row is current. The hosted store still does not select the adapter, and this does not replace immutable financial receipts.
+
+### P1-7 checkpoint — priority across queued actor heads (PARTIAL)
+
+The claim query lets another actor's interactive job pass a fresh multi-chunk replay-to job. Replay-to returns to ordinary actor rotation after five seconds of queue age. Per-actor FIFO and the worker lease are retained. Embedded PostgreSQL ran the actual claim SQL and proved both selection orders on three generated jobs. No throughput or wait-time guarantee is inferred. Native worker, durable unresolved-receipt retention and operational acceptance remain open.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

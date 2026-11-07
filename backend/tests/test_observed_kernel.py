@@ -98,7 +98,7 @@ class ObservedKernelTests(unittest.TestCase):
     def test_replaceable_progress_round_trips_without_changing_financial_state(self):
         from unittest.mock import MagicMock
         from application.models import TrustedScope
-        from execution.observed_replay_progress import read_progress, replace_progress
+        from execution.observed_replay_progress import progress_receipt, read_progress, replace_progress
 
         self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
         provider = self.provider
@@ -117,8 +117,8 @@ class ObservedKernelTests(unittest.TestCase):
         scope = TrustedScope('workspace:qa','actor:qa')
         frame = timeline.advance_through(str(S),timeline.cursor)
         checkpoint = timeline.checkpoint()
-        after, events = apply(self.state,self.raw('ADVANCE',{'targetNs':str(S)}),
-                              reveal=frame,checkpoint=checkpoint)
+        command = self.raw('ADVANCE',{'targetNs':str(S)})
+        after, events = apply(self.state,command,reveal=frame,checkpoint=checkpoint)
         proposal = validate_snapshot(after,checkpoint)
         restored = validate_snapshot(dict(after,nextEventIndex=self.state['nextEventIndex'],
                                           eventHash=self.state['eventHash']),checkpoint)
@@ -127,7 +127,7 @@ class ObservedKernelTests(unittest.TestCase):
         db = MagicMock()
         db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
                                   MagicMock(**{'fetchone.return_value': None}), MagicMock()]
-        replace_progress(db,scope,base,base_hash,0,proposal,events)
+        receipt = replace_progress(db,scope,base,base_hash,command,proposal,events)
         sql, params = db.execute.call_args.args
         self.assertIn('ON CONFLICT (workspace_id,session_id) DO UPDATE',sql)
         self.assertEqual(params[:2],(scope.workspace_id,'session:qa'))
@@ -135,6 +135,16 @@ class ObservedKernelTests(unittest.TestCase):
         reader = MagicMock()
         reader.execute.return_value.fetchone.return_value = params[2:]
         self.assertEqual(read_progress(reader,scope,base,base_hash),restored)
+        self.assertEqual(progress_receipt(reader,scope,base,base_hash,command),receipt)
+        with self.assertRaisesRegex(ValueError,'REFUSED_IDEMPOTENCY_CONFLICT'):
+            progress_receipt(reader,scope,base,base_hash,dict(command,payload={'targetNs':str(S+1)}))
+
+        db.reset_mock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': params[2:]})]
+        self.assertEqual(replace_progress(db,scope,base,base_hash,command,proposal,events),receipt)
+        self.assertEqual(db.execute.call_count,2)
+
         with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
             read_progress(reader,scope,base,'b'*64)
 
@@ -143,14 +153,14 @@ class ObservedKernelTests(unittest.TestCase):
                                   MagicMock(**{'fetchone.return_value': None})]
         changed = dict(proposal,state=dict(after,balance='10001',initialBalance='10001'))
         with self.assertRaisesRegex(ValueError,'REFUSED_FINANCIAL_PROGRESS'):
-            replace_progress(db,scope,base,base_hash,0,changed,events)
+            replace_progress(db,scope,base,base_hash,command,changed,events)
         self.assertEqual(db.execute.call_count,2)
 
         db.reset_mock()
         db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
                                   MagicMock(**{'fetchone.return_value': None})]
         with self.assertRaisesRegex(ValueError,'REFUSED_FINANCIAL_PROGRESS'):
-            replace_progress(db,scope,base,base_hash,0,proposal,[dict(events[0],kind='STALE_QUOTE')])
+            replace_progress(db,scope,base,base_hash,command,proposal,[dict(events[0],kind='STALE_QUOTE')])
         self.assertEqual(db.execute.call_count,2)
 
     def test_replay_to_retry_is_bound_to_the_original_target(self):
