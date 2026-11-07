@@ -48,6 +48,12 @@ Shared-source-v2 cold resume now refuses an altered genesis cursor and verifies 
 
 Focused validation: 31 tests passed for shared-source recovery, legacy replay-log compatibility, tick storage and sidecar contracts, and financial goldens. Independent Node golden vectors also passed. The regression reproduced acceptance of a corrupted genesis before the fix. PostgreSQL frontier persistence, periodic compact recovery bases, replaceable no-trade progress, and production source selection remain open. The next replay integration must use an eligible shared source and must not enable the legacy QA-only observed admission mode as a customer default.
 
+### P0-3 checkpoint — interrupted advance and monotonic commit (PARTIAL)
+
+A shared-source-v2 checkpoint can resume an interrupted bounded advance directly at the next atomic timestamp group. Recovery verifies the remaining target against the pinned source. At the observed store write boundary, under the existing Session lock, the proposed checkpoint cannot rewind the committed time/group frontier, change its source pin, skip its pending target, or move the frontier during a non-replay command.
+
+33 focused synthetic tests passed, including parity between uninterrupted and resumed advancement, refusal of invalid continuation targets and refusal of a rewind before any write through a mocked database boundary. PostgreSQL transaction integration, replaceable non-financial progress, periodic recovery bases and eligible production source selection remain open.
+
 ## Executive status
 
 - **ALIGNED BASE:** React/Vite/Lightweight Charts; Python/FastAPI; PostgreSQL financial events/receipts/checkpoints; versioned immutable source contracts; durable queue leases/fencing; workspace scoping; deterministic financial reducer.

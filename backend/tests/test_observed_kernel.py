@@ -95,6 +95,42 @@ class ObservedKernelTests(unittest.TestCase):
         payload=dict(side=side,orderType='MARKET',workflow='QUICK',entry=entry,quantity=size,sl=None,tp=None,riskPercent='1',observations=[]);payload.update(changes)
         self.command('OPEN',payload,command='order:z');return payload
 
+    def test_shared_source_commit_refuses_rewind_before_writing(self):
+        from unittest.mock import MagicMock, patch
+        from application.models import TrustedScope
+        from execution.observed_postgres import ObservedExecutionStore
+
+        self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
+        root = self.provider.describe_v2(self.provider.dataset_id,self.provider.dataset_version)['root']
+        version = self.provider.dataset_version
+        pin = dict(schemaVersion=1, artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+                   datasetId=self.provider.dataset_id, datasetVersion=version,
+                   manifestHash=version, rootHash=version, indexContentHash=root['indexContentHash'],
+                   archiveSha256='a'*64, qualificationReceiptSha256='b'*64)
+        timeline = IndexedTickTimeline(self.provider,self.provider.dataset_id,version,'0',
+                                       log_folder=self.root/'shared',storage_mode='shared-source-v2',source_pin=pin)
+        self.handles.append(timeline)
+        genesis = timeline.checkpoint()
+        self.state = seed_state('session:qa',self.profile,self.policy,genesis)
+        before_start = deepcopy(self.state)
+        command = self.raw('ADVANCE',{'targetNs':str(S)})
+        frame = timeline.advance_through(str(S),timeline.cursor)
+        current = timeline.checkpoint()
+        self.state, _ = apply(self.state,command,reveal=frame,checkpoint=current)
+        before = dict(state=self.state,controller=current)
+        rewind = dict(before_start,revision=self.state['revision']+1)
+        validate_snapshot(rewind,genesis)
+
+        store = ObservedExecutionStore('unused')
+        db = MagicMock()
+        with patch('execution.observed_postgres.connect',return_value=db), \
+             patch.object(store,'_read',return_value=(before,'compact-v1','a'*64)), \
+             patch.object(store,'_prior',return_value=None):
+            with self.assertRaisesRegex(ValueError,'REFUSED_REPLAY_FRONTIER'):
+                store.commit(TrustedScope('workspace:qa','actor:qa'),
+                             self.raw('ADVANCE',{'targetNs':str(S)}),before,rewind,genesis,[])
+        db.__enter__.return_value.execute.assert_not_called()
+
     def test_long_uses_ask_then_bid_preserves_unknown_and_event_chain(self):
         self.setup_stream([(0,'2300','2300.1'),(S,'2300.9','2301'),(2*S,'2302','2302.1')]);self.advance(0);self.open();entry,frame=self.advance(S)
         self.assertEqual(entry[0]['detail']['price'],'2301');self.assertEqual(entry[0]['detail']['evidence']['rawQualities'][0]['freshness'],'UNKNOWN')

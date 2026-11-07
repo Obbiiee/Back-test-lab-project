@@ -933,6 +933,30 @@ class SharedSourceTimelineTests(unittest.TestCase):
         self.assertEqual((group['timeNs'], len(group['events'])), ('200', 3))
         self.assertFalse(folder.exists())
 
+    def test_shared_source_v2_resumes_a_committed_partial_advance(self):
+        _, provider = self.fixture.build()
+        folder = self.fixture.path/'shared-v2-partial'
+        options = dict(log_folder=folder, storage_mode='shared-source-v2',
+                       source_pin=self._pin(provider), max_groups_per_advance=1)
+        timeline = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version, '0', **options)
+        self.fixture.resources.append(timeline)
+        first = timeline.advance_through('400', timeline.cursor)
+        self.assertFalse(first['exhaustedThroughBoundary'])
+        checkpoint = timeline.checkpoint()
+        self.assertEqual(checkpoint['cursor']['pendingTargetNs'], '400')
+        for target in ('100', '199'):
+            corrupt = deepcopy(checkpoint)
+            corrupt['cursor']['pendingTargetNs'] = target
+            with self.assertRaisesRegex(ValueError, 'IDENTITY_CONFLICT'):
+                IndexedTickTimeline.resume(provider, corrupt, **options)
+        resumed = IndexedTickTimeline.resume(provider, checkpoint, **options)
+        self.fixture.resources.append(resumed)
+        self.assertEqual(resumed.checkpoint(), checkpoint)
+        self.assertEqual(resumed.consumer().read_revealed('0', 4), first['groups'])
+        self.assertEqual(pump(resumed, 400), pump(timeline, 400))
+        self.assertEqual(resumed.checkpoint(), timeline.checkpoint())
+        self.assertFalse(folder.exists())
+
     def test_shared_source_v2_rejects_wrong_direct_source_position(self):
         _,provider=self.fixture.build()
         pin=self._pin(provider);folder=self.fixture.path/'shared-v2-corrupt'

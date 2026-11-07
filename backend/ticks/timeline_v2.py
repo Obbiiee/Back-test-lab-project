@@ -791,7 +791,7 @@ class IndexedTickTimeline:
 
     def __resume_shared_source_v2(self, checkpoint, cursor):
         require(cursor['datasetId'] == self.__id and cursor['datasetVersion'] == self.__version
-                and cursor['sessionStartNs'] == str(self.__start) and cursor['pendingTargetNs'] is None,
+                and cursor['sessionStartNs'] == str(self.__start),
                 'cursor', 'IDENTITY_CONFLICT')
         self.__generation = uint(cursor['generation'])
         self.__initialize()
@@ -818,12 +818,18 @@ class IndexedTickTimeline:
                 (group_index == 0) == (cursor['lastGroupId'] is None),
                 'cursor', 'IDENTITY_CONFLICT')
         digest(cursor['visiblePrefixHash'], 'visiblePrefixHash')
+        pending = cursor['pendingTargetNs']
+        if pending is not None:
+            require(revision > 0 and group_index > 0 and uint(pending) > through and position is not None,
+                    'target', 'IDENTITY_CONFLICT')
         if position is not None:
             shape(position, 'BTL-TICK-POSITION-2')
             first = next(self.__groups(position), None)
             require(first is not None and (int(first[1]['timeNs']) > through or
                     (revision == 0 and int(first[1]['timeNs']) == through)),
                     'position', 'INCOMPLETE_ATOMIC_BOUNDARY')
+            if pending is not None:
+                require(int(first[1]['timeNs']) <= int(pending), 'target', 'IDENTITY_CONFLICT')
         if group_index:
             prior_position = self.__provider.locate_ordinal_v2(self.__id, self.__version, str(end_ordinal-1))
             prior = next(self.__groups(prior_position), None) if prior_position is not None else None

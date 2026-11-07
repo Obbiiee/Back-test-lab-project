@@ -642,6 +642,27 @@ class ObservedExecutionStore:
             require(same_before and old['revision']==command['expectedRevision'],'revision','REFUSED_STALE_REVISION')
             require(after['revision']==old['revision']+1 and all(after[k]==old[k] for k in ('sessionId','datasetId','datasetVersion','engineVersion','model','profile','profileHash','policy','startNs','initialBalance','parent')),'immutableContext')
             validate_snapshot(after,checkpoint,order_retention_policy=self.order_retention_policy)
+            previous_checkpoint = live['controller']
+            if previous_checkpoint['artifact'] == 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-2':
+                require(checkpoint['artifact'] == previous_checkpoint['artifact'] and
+                        checkpoint['sourcePin'] == previous_checkpoint['sourcePin'],
+                        'sourcePin', 'REFUSED_OBSERVED_SOURCE_IDENTITY')
+                if command['kind'] == 'ADVANCE':
+                    require(int(old['throughNs']) <= int(after['throughNs']) <= int(command['payload']['targetNs']) and
+                            int(after['nextGroupIndex']) >= int(old['nextGroupIndex']) and
+                            0 <= int(after['sourceCursorRevision']) - int(old['sourceCursorRevision']) <= 1,
+                            'frontier', 'REFUSED_REPLAY_FRONTIER')
+                    require(after['sourceCursorRevision'] != old['sourceCursorRevision'] or
+                            checkpoint == previous_checkpoint, 'frontier', 'REFUSED_REPLAY_FRONTIER')
+                    target = command['payload']['targetNs']
+                    pending = checkpoint['cursor']['pendingTargetNs']
+                    require(previous_checkpoint['cursor']['pendingTargetNs'] in (None,target) and
+                            pending in (None,target) and type(replay) is dict and
+                            replay.get('exhaustedThroughBoundary') is (pending is None) and
+                            (pending is not None or after['throughNs'] == target),
+                            'frontier', 'REFUSED_REPLAY_FRONTIER')
+                else:
+                    require(checkpoint == previous_checkpoint, 'frontier', 'REFUSED_REPLAY_FRONTIER')
             end,head=check_events(events,after,old['nextEventIndex'],old['eventHash'])
             require(after['nextEventIndex']==end and after['eventHash']==head,'eventHead','CORRUPT_RECORD')
             postings=[e for e in events if e['classification']=='SIMULATED_FILL']
