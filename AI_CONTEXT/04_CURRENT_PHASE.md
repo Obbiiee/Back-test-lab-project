@@ -1,3 +1,7 @@
+# Current implementation checkpoint — replay persistence correction (2026-11-07)
+
+Product Integration V1 remains IN PROGRESS. The `shared-source-v2` replay persistence implementation is under focused review on branch `codex/product-integration-v1-20261106`; it uses direct source-index checkpoints and a capped process-private reveal cache. Legacy checkpoint formats remain readable. Focused unit/regression coverage passes; no full-year replay, heavy benchmark, PostgreSQL acceptance, deployment, or production change was run. Source rights remain UNKNOWN and historical execution eligibility remains NOT_GRANTED. The existing VPS #2 development preview was not restarted while files were being edited. Historical notes below are preserved as prior checkpoints.
+
 # One-day Parquet/DuckDB benchmark — COMPLETE_PENDING_OWNER_REVIEW (2026-11-05)
 
 # OWNER DIRECTIVE — Integrated Backend V1 build (2026-11-06)

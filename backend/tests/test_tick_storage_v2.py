@@ -866,6 +866,52 @@ class SharedSourceTimelineTests(unittest.TestCase):
                 storage_mode='shared-source-v1',source_pin=pin)
 
 
+    def test_shared_source_v2_checkpoint_is_direct_and_cache_is_transient(self):
+        _,provider=self.fixture.build()
+        pin=self._pin(provider);folder=self.fixture.path/'shared-v2'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v2',source_pin=pin,max_groups_per_advance=1)
+        self.fixture.resources.append(timeline)
+        observed=pump(timeline,250)
+        checkpoint=timeline.checkpoint()
+        self.assertGreater(int(checkpoint['cursor']['revision']),1)
+        self.assertEqual(checkpoint['artifact'],'BTL-TICK-SHARED-SOURCE-CHECKPOINT-2')
+        self.assertNotIn('advanceLogHash',checkpoint)
+        self.assertIsNotNone(checkpoint['nextPosition'])
+        self.assertFalse(folder.exists())
+        self.assertEqual(timeline.read_revealed('0',4),observed)
+        self.assertEqual(timeline.read_revealed('2',2),observed[2:4])
+        timeline.close()
+
+        class CountingProvider:
+            def __init__(self,inner): self.inner=inner; self.page_reads=0
+            def __getattr__(self,name): return getattr(self.inner,name)
+            def read_page_v2(self,*args,**kwargs):
+                self.page_reads+=1
+                return self.inner.read_page_v2(*args,**kwargs)
+        counted=CountingProvider(provider)
+        resumed=IndexedTickTimeline.resume(counted,checkpoint,log_folder=folder,
+            storage_mode='shared-source-v2',source_pin=pin)
+        self.fixture.resources.append(resumed)
+        self.assertLessEqual(counted.page_reads,4)
+        self.assertEqual(resumed.checkpoint(),checkpoint)
+        self.assertEqual(resumed.read_revealed('0',4),observed)
+
+    def test_shared_source_v2_rejects_wrong_direct_source_position(self):
+        _,provider=self.fixture.build()
+        pin=self._pin(provider);folder=self.fixture.path/'shared-v2-corrupt'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v2',source_pin=pin,max_groups_per_advance=1)
+        pump(timeline,250);checkpoint=timeline.checkpoint();timeline.close()
+        bad=deepcopy(checkpoint)
+        bad['nextPosition']=dict(schemaVersion=2,artifact='BTL-TICK-POSITION-2',datasetId=provider.dataset_id,
+            datasetVersion=provider.dataset_version,manifestHash=provider.dataset_version,
+            directoryIndex='0',partitionIndex='0',chunkIndex='0',eventOffset='0',globalOrdinal='0')
+        with self.assertRaisesRegex(ValueError,'CORRUPT_INDEX_POINTER'):
+            IndexedTickTimeline.resume(provider,bad,log_folder=folder,
+                storage_mode='shared-source-v2',source_pin=pin)
+
+
 class IncrementalCanonicalBudgetTests(unittest.TestCase):
     def test_exact_original_envelope_limits_and_failed_append_recovery(self):
         from ticks.contracts_v2 import CanonicalGroupBudget, canonical_v2_bytes

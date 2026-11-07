@@ -161,9 +161,9 @@ class IndexedTickTimeline:
     def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64, storage_mode="session-log-v2", source_pin=None):
         require(log_codec in (None, 'raw', 'zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'INVALID_INPUT')
         require(lookup_layout in ('dense', 'range-v1'), 'lookupLayout', 'INVALID_INPUT')
-        require(storage_mode in ('session-log-v2', 'shared-source-v1'), 'storageMode', 'INVALID_INPUT')
+        require(storage_mode in ('session-log-v2', 'shared-source-v1', 'shared-source-v2'), 'storageMode', 'INVALID_INPUT')
         require((storage_mode == 'session-log-v2' and source_pin is None) or
-                (storage_mode == 'shared-source-v1' and type(source_pin) is dict),
+                (storage_mode in ('shared-source-v1', 'shared-source-v2') and type(source_pin) is dict),
                 'sourcePin', 'INVALID_INPUT')
         require(type(max_groups_per_advance) is int and 1 <= max_groups_per_advance <= 256,
                 'maxGroupsPerAdvance', 'INVALID_INPUT')
@@ -179,33 +179,42 @@ class IndexedTickTimeline:
         self.__root = described["root"]
         self.__storage_mode = storage_mode
         self.__source_pin = deepcopy(source_pin)
-        if storage_mode == 'shared-source-v1':
+        if storage_mode in ('shared-source-v1', 'shared-source-v2'):
+            require(source_pin.get('schemaVersion') == 1 and
+                    source_pin.get('artifact') in ('BTL-TICK-SOURCE-PIN-1', 'BTL-QA-SHARED-SOURCE-PIN-1'),
+                    'sourcePin', 'SCHEMA_MISMATCH')
             require(source_pin.get('datasetId') == dataset_id and
                     source_pin.get('datasetVersion') == dataset_version and
                     source_pin.get('manifestHash') == dataset_version and
                     source_pin.get('rootHash') == hash_v2(self.__root) and
                     source_pin.get('indexContentHash') == self.__root['indexContentHash'],
                     'sourcePin', 'VERSION_MISMATCH')
-        folder = Path(log_folder); folder.mkdir(parents=True, exist_ok=True)
-        self.__log_path = folder / "timeline.sqlite"
-        # Physical-only opt-in on NEW logs. Existing archives are never migrated.
-        # Existing compressed logs identify themselves on cold resume; wire/hash
-        # identity always refers to the original uncompressed canonical bytes.
-        present = None
-        if self.__log_path.exists():
-            with sqlite3.connect(self.__log_path.resolve().as_uri()+'?mode=ro', uri=True) as probe:
-                if probe.execute("SELECT 1 FROM sqlite_master WHERE name='log_layout'").fetchone():
-                    rows = probe.execute('SELECT codec FROM log_layout').fetchall()
-                    require(len(rows) == 1 and rows[0][0] in ('zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'CORRUPT_RECORD')
-                    present = rows[0][0]
-                else:
-                    present = 'raw'
-        require(present is None or log_codec is None or present == log_codec,
-                'logCodec', 'REFUSED_LOG_LAYOUT')
-        self.__log_codec = present or log_codec or 'raw'
         self.__lookup_layout = lookup_layout
         self.__max_groups_per_advance = max_groups_per_advance
-        self.__db = connect(self.__log_path, allow_threads=allow_threads)
+        if storage_mode == 'shared-source-v2':
+            # Connection-private reveal/evidence cache only. The authoritative
+            # checkpoint is committed with Session state in PostgreSQL.
+            self.__log_path = None
+            self.__log_codec = 'raw'
+            self.__db = connect(':memory:', allow_threads=allow_threads)
+            self.__db.execute('PRAGMA temp_store=MEMORY')
+        else:
+            folder = Path(log_folder); folder.mkdir(parents=True, exist_ok=True)
+            self.__log_path = folder / "timeline.sqlite"
+            # Physical-only opt-in on NEW logs. Existing archives are never migrated.
+            present = None
+            if self.__log_path.exists():
+                with sqlite3.connect(self.__log_path.resolve().as_uri()+'?mode=ro', uri=True) as probe:
+                    if probe.execute("SELECT 1 FROM sqlite_master WHERE name='log_layout'").fetchone():
+                        rows = probe.execute('SELECT codec FROM log_layout').fetchall()
+                        require(len(rows) == 1 and rows[0][0] in ('zlib-1', 'delta-dict-zlib-1'), 'logCodec', 'CORRUPT_RECORD')
+                        present = rows[0][0]
+                    else:
+                        present = 'raw'
+            require(present is None or log_codec is None or present == log_codec,
+                    'logCodec', 'REFUSED_LOG_LAYOUT')
+            self.__log_codec = present or log_codec or 'raw'
+            self.__db = connect(self.__log_path, allow_threads=allow_threads)
         if self.__log_codec != 'raw':
             self.__db.execute('CREATE TABLE IF NOT EXISTS log_layout(codec TEXT PRIMARY KEY) WITHOUT ROWID')
             self.__db.execute("INSERT OR IGNORE INTO log_layout VALUES(?)", (self.__log_codec,))
@@ -494,6 +503,11 @@ class IndexedTickTimeline:
             through = target if done else int(groups[-1]["timeNs"]) if groups else old
             coverage = [] if through == old else [dict(startNs=str(old), endNs=str(through), status="UNKNOWN", evidenceHash=None)]
             diagnostics, updated = self.__evidence(old, through, groups, cancel, epoch), self.cursor
+            if self.__storage_mode == 'shared-source-v2':
+                cache_bytes = sum(self.__db.execute(f'PRAGMA {schema}.page_count').fetchone()[0] *
+                                  self.__db.execute(f'PRAGMA {schema}.page_size').fetchone()[0]
+                                  for schema in ('main', 'temp'))
+                require(cache_bytes <= 16 * 1048576, 'transientCache', 'REFUSED_TRANSIENT_CACHE_LIMIT')
             noop = not groups and not diagnostics["records"] and through == old and updated["pendingTargetNs"] is None
             if not noop:
                 step = dict(schemaVersion=2, artifact="BTL-TICK-PREFIX-STEP-2", previousHash=updated["visiblePrefixHash"], throughNs=str(through),
@@ -509,8 +523,9 @@ class IndexedTickTimeline:
             advance_tip, position_tip = self.__advance_tip, self.__position_tip
             if not noop:
                 cursor_hash = hash_v2(updated)
-                advance_tip = self.__append_block("BTL-TICK-ADVANCE-LOG-2", self.__advance_blocks, advance_tip,
-                                                 [dict(targetNs=target_ns, predecessorCursorHash=hash_v2(self.__cursor), successorCursorHash=cursor_hash)])
+                if self.__storage_mode != 'shared-source-v2':
+                    advance_tip = self.__append_block("BTL-TICK-ADVANCE-LOG-2", self.__advance_blocks, advance_tip,
+                                                     [dict(targetNs=target_ns, predecessorCursorHash=hash_v2(self.__cursor), successorCursorHash=cursor_hash)])
                 if groups and self.__storage_mode == 'session-log-v2':
                     start_index = int(self.__cursor["nextGroupIndex"])
                     position_block_count = 0
@@ -526,8 +541,10 @@ class IndexedTickTimeline:
                         else:
                             self.__db.executemany("INSERT INTO position_lookup VALUES(?,?,?)",
                                 [(start_index+i, position_tip, i-offset) for i in range(offset, stop)])
-                persisted = self.__checkpoint_value(updated, advance_tip, position_tip)
-                self.__db.execute("INSERT OR REPLACE INTO heads VALUES(1,?)", (canonical_v2_bytes(persisted),))
+                persisted = self.__checkpoint_value(updated, advance_tip, position_tip,
+                                                   None if pending is None else pending[0])
+                if self.__storage_mode != 'shared-source-v2':
+                    self.__db.execute("INSERT OR REPLACE INTO heads VALUES(1,?)", (canonical_v2_bytes(persisted),))
                 self.__db.commit()
             else:
                 self.__db.rollback()
@@ -537,9 +554,10 @@ class IndexedTickTimeline:
             raise
         if not noop:
             self.__advance_tip, self.__position_tip = advance_tip, position_tip
-            self.__advance_blocks += 1
-            if groups:
-                self.__position_blocks += (len(groups)+127)//128
+            if self.__storage_mode != 'shared-source-v2':
+                self.__advance_blocks += 1
+                if groups:
+                    self.__position_blocks += (len(groups)+127)//128
         self.__cursor = updated
         self.__next_position = None if pending is None else pending[0]
         return deepcopy(result)
@@ -556,6 +574,8 @@ class IndexedTickTimeline:
         require(type(max_groups) is int and 1 <= max_groups <= 1024, "groups")
         end = int(self.__cursor["nextGroupIndex"])
         require(start <= end, "index", "UNREVEALED_INDEX")
+        if self.__storage_mode == 'shared-source-v2':
+            return self.__read_recent_source_window(start, max_groups)
         if self.__storage_mode == 'shared-source-v1':
             # Positions are derived from the immutable shared source. This
             # constant-memory iterator is only a convenience cache; cold
@@ -645,6 +665,51 @@ class IndexedTickTimeline:
                 break
         return deepcopy(groups)
 
+    def __read_recent_source_window(self, requested_start, max_groups):
+        end = int(self.__cursor['nextGroupIndex'])
+        if end == 0:
+            require(requested_start == 0, 'index', 'UNREVEALED_INDEX')
+            return []
+        end_position = self.__next_position
+        end_ordinal = int(end_position['globalOrdinal']) if end_position is not None else int(self.__root['eventCount'])
+        event_floor = max(0, end_ordinal - 65536)
+        position = self.__provider.locate_ordinal_v2(self.__id, self.__version, str(event_floor))
+        session_position = self.__provider.locate_v2(self.__id, self.__version, str(self.__start))['position']
+        if session_position is None or (position is not None and
+                int(session_position['globalOrdinal']) > int(position['globalOrdinal'])):
+            position = session_position
+        require(position is not None, 'prefix', 'INCOMPLETE_ATOMIC_BOUNDARY')
+        selected, selected_bytes, scanned = [], 0, 0
+        reached_end = False
+        for group_position, group in self.__groups(position):
+            if end_position is not None and group_position == end_position:
+                reached_end = True
+                break
+            group_ordinal = int(group_position['globalOrdinal'])
+            if group_ordinal >= end_ordinal:
+                reached_end = end_position is None
+                break
+            scanned += len(group['events'])
+            require(scanned <= 66560, 'revealedWindow', 'REFUSED_CHART_WINDOW_LIMIT')
+            raw = json.dumps(group, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')
+            selected.append(group); selected_bytes += len(raw)
+            if len(selected) > 1024:
+                selected_bytes -= len(json.dumps(selected.pop(0), sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8'))
+            require(selected_bytes <= 8 * 1048576, 'revealedWindow', 'REFUSED_CHART_WINDOW_LIMIT')
+        if end_position is None:
+            reached_end = True
+        require(reached_end, 'prefix', 'INCOMPLETE_ATOMIC_BOUNDARY')
+        require(bool(selected) and selected[-1]['groupId'] == self.__cursor['lastGroupId'],
+                'prefix', 'IDENTITY_CONFLICT')
+        first_index = end - len(selected)
+        require(requested_start >= first_index and requested_start <= end,
+                'index', 'REVEALED_WINDOW_UNAVAILABLE')
+        offset = requested_start - first_index
+        result = selected[offset:offset + max_groups]
+        require(all(int(g['timeNs']) <= int(self.__cursor['throughNs']) for g in result),
+                'future', 'UNREVEALED_INDEX')
+        return deepcopy(result)
+
     def reset(self, session_start_ns=None):
         require(self.__active, "timeline", "REPLACED_TIMELINE")
         if session_start_ns is not None:
@@ -679,7 +744,12 @@ class IndexedTickTimeline:
         require(self.__active, "timeline", "REPLACED_TIMELINE")
         return self.__checkpoint_value(self.cursor, self.__advance_tip, self.__position_tip)
 
-    def __checkpoint_value(self, cursor, advance_tip, position_tip):
+    def __checkpoint_value(self, cursor, advance_tip, position_tip, next_position='__CURRENT__'):
+        if self.__storage_mode == 'shared-source-v2':
+            position = self.__next_position if next_position == '__CURRENT__' else next_position
+            return dict(schemaVersion=2, artifact="BTL-TICK-SHARED-SOURCE-CHECKPOINT-2",
+                        sourcePin=deepcopy(self.__source_pin), cursor=deepcopy(cursor),
+                        nextPosition=deepcopy(position))
         if self.__storage_mode == 'shared-source-v1':
             return dict(schemaVersion=2, artifact="BTL-TICK-SHARED-SOURCE-CHECKPOINT-1",
                         sourcePin=deepcopy(self.__source_pin), cursor=deepcopy(cursor),
@@ -689,8 +759,15 @@ class IndexedTickTimeline:
 
     @classmethod
     def resume(cls, provider, checkpoint, *, log_folder, allow_threads=False, log_codec=None, lookup_layout="dense", max_groups_per_advance=64, storage_mode=None, source_pin=None):
-        shared = type(checkpoint) is dict and checkpoint.get('artifact') == 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-1'
-        if shared:
+        artifact = checkpoint.get('artifact') if type(checkpoint) is dict else None
+        shared_v1 = artifact == 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-1'
+        shared_v2 = artifact == 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-2'
+        if shared_v2:
+            keys(checkpoint, "schemaVersion artifact sourcePin cursor nextPosition")
+            require(storage_mode == 'shared-source-v2' and type(source_pin) is dict and
+                    checkpoint['schemaVersion'] == 2 and checkpoint['sourcePin'] == source_pin,
+                    'sourcePin', 'VERSION_MISMATCH')
+        elif shared_v1:
             keys(checkpoint, "schemaVersion artifact sourcePin cursor advanceLogHash")
             require(storage_mode == 'shared-source-v1' and type(source_pin) is dict and
                     checkpoint['schemaVersion'] == 2 and checkpoint['sourcePin'] == source_pin,
@@ -702,12 +779,50 @@ class IndexedTickTimeline:
         cursor = checkpoint["cursor"]
         keys(cursor, "schemaVersion artifact " + CURSOR_FIELDS)
         require(cursor["artifact"] == "BTL-TICK-CURSOR-2" and cursor["timelineVersion"] == VERSION, "cursor", "SCHEMA_MISMATCH")
-        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout, max_groups_per_advance=max_groups_per_advance, storage_mode='shared-source-v1' if shared else 'session-log-v2', source_pin=source_pin if shared else None)
+        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], log_folder=log_folder, allow_threads=allow_threads, log_codec=log_codec, lookup_layout=lookup_layout, max_groups_per_advance=max_groups_per_advance, storage_mode=('shared-source-v2' if shared_v2 else 'shared-source-v1' if shared_v1 else 'session-log-v2'), source_pin=source_pin if (shared_v1 or shared_v2) else None)
         try:
+            if shared_v2:
+                return result.__resume_shared_source_v2(checkpoint, cursor)
             return result.__reconstruct(checkpoint, cursor)
         except BaseException:
             result.close()
             raise
+
+    def __resume_shared_source_v2(self, checkpoint, cursor):
+        require(cursor['datasetId'] == self.__id and cursor['datasetVersion'] == self.__version
+                and cursor['sessionStartNs'] == str(self.__start) and cursor['pendingTargetNs'] is None,
+                'cursor', 'IDENTITY_CONFLICT')
+        self.__generation = uint(cursor['generation'])
+        self.__initialize()
+        if uint(cursor['revision']) == 0:
+            expected = self.__provider.locate_v2(self.__id, self.__version, str(self.__start))['position']
+        else:
+            expected = self.__provider.locate_v2(self.__id, self.__version,
+                                                  str(int(cursor['throughNs']) + 1))['position']
+        position = checkpoint['nextPosition']
+        require(position == expected, 'position', 'CORRUPT_INDEX_POINTER')
+        group_index = uint(cursor['nextGroupIndex'])
+        end_ordinal = int(position['globalOrdinal']) if position is not None else int(self.__root['eventCount'])
+        require((group_index == 0) == (cursor['lastGroupId'] is None),
+                'cursor', 'IDENTITY_CONFLICT')
+        if position is not None:
+            shape(position, 'BTL-TICK-POSITION-2')
+            first = next(self.__groups(position), None)
+            require(first is not None and (int(first[1]['timeNs']) > int(cursor['throughNs']) or
+                    (uint(cursor['revision']) == 0 and int(first[1]['timeNs']) == int(cursor['throughNs']))),
+                    'position', 'INCOMPLETE_ATOMIC_BOUNDARY')
+        if group_index:
+            require(end_ordinal > 0, 'position', 'CORRUPT_INDEX_POINTER')
+            prior_position = self.__provider.locate_ordinal_v2(self.__id, self.__version, str(end_ordinal-1))
+            prior = next(self.__groups(prior_position), None) if prior_position is not None else None
+            require(prior is not None and prior[1]['groupId'] == cursor['lastGroupId'] and
+                    int(prior[1]['timeNs']) <= int(cursor['throughNs']),
+                    'cursor', 'IDENTITY_CONFLICT')
+        self.__cursor = deepcopy(cursor)
+        self.__next_position = deepcopy(position)
+        self.__iterator = self.__groups(self.__next_position)
+        self.__pending, self.__has_pending = None, False
+        return self
 
     def __reconstruct(self, checkpoint, cursor):
         result = self

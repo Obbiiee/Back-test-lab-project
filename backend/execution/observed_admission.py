@@ -65,13 +65,15 @@ class AdmittedObservedSource:
         # Admission is static operator configuration. No future catalog fields
         # or refusal diagnostics are projected into an active revealed view.
         self.dataset_id=p['datasetId'];self.version=p['datasetVersion'];self.log_root=Path(log_root);self.qualification_hash=receipt_sha256
-        require(timeline_storage_mode in ('session-log-v2','shared-source-v1'),
+        require(timeline_storage_mode in ('session-log-v2','shared-source-v1','shared-source-v2'),
                 'timelineStorageMode','INVALID_INPUT')
-        if timeline_storage_mode=='shared-source-v1':
-            # This versioned path is only reachable from the isolated
-            # historical QA runner; production adapters keep the legacy mode.
+        if timeline_storage_mode == 'shared-source-v1':
             require(bool(os.environ.get('BTL_HISTORICAL_QA_ROOT')) and
                     os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1',
+                    'timelineStorageMode','REFUSED_QA_ONLY_MODE')
+        elif timeline_storage_mode == 'shared-source-v2':
+            require(bool(os.environ.get('BTL_HISTORICAL_QA_ROOT')) and
+                    os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V2')=='1',
                     'timelineStorageMode','REFUSED_QA_ONLY_MODE')
         self.timeline_storage_mode=timeline_storage_mode
         self.source_archive_sha256=archive_hash
