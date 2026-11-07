@@ -87,19 +87,39 @@ def _expire_queued(db):
     """).rowcount
 
 
-def replay_command(raw, session_id):
-    """Validate the frozen command dialect selected by this request's tag.
-
-    The worker still resolves the persisted Session family and revalidates the
-    command there. Queue admission only performs bounded wire validation.
-    """
-    if type(raw) is dict and raw.get('artifact') == 'BTL-OBSERVED-EXECUTION-COMMAND-1':
+def replay_command(raw, session_id, session_artifact):
+    """Validate the command dialect against authenticated durable Session metadata."""
+    if session_artifact == 'BTL-OBSERVED-RESEARCH-SESSION-1':
         from execution.observed_kernel import command_wire as validate
-    else:
+        expected = 'BTL-OBSERVED-EXECUTION-COMMAND-1'
+    elif session_artifact == 'BTL-LOCAL-SESSION-1':
         validate = command_wire
+        expected = 'BTL-TICK-EXECUTION-COMMAND-1'
+    else:
+        require(False, 'sessionModel', 'REFUSED_SESSION_MODEL')
+    require(type(raw) is dict and raw.get('artifact') == expected,
+            'command', 'REFUSED_COMMAND_DIALECT')
     command = validate(raw)
     require(command['sessionId'] == session_id and command['kind'] in ('ADVANCE', 'SEEK'), 'replay')
     return command
+
+
+def _persisted_session_artifact(db, workspace_id, session_id):
+    """Return a model only after workspace-scoped canonical payload verification."""
+    row = db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions '
+                     'WHERE workspace_id=%s AND session_id=%s', (workspace_id, session_id)).fetchone()
+    require(row is not None, 'session', 'RESOURCE_UNAVAILABLE')
+    from execution.postgres import unpack
+    try:
+        metadata = unpack(row['payload'], row['content_hash'])
+    except (TypeError, ValueError, UnicodeError, KeyError) as error:
+        raise ContractError('CORRUPT_RECORD', 'session') from error
+    artifact = metadata.get('artifact') if type(metadata) is dict else None
+    require(artifact in ('BTL-LOCAL-SESSION-1', 'BTL-OBSERVED-RESEARCH-SESSION-1'),
+            'sessionModel', 'REFUSED_SESSION_MODEL')
+    require(metadata.get('schemaVersion') == 1 and metadata.get('id') == session_id,
+            'session', 'CORRUPT_RECORD')
+    return artifact
 
 
 def replay_to_request(raw, session_id):
@@ -163,9 +183,7 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
     else:
         identifier(args[0], 'sessionId')
         require(type(args[1]) is dict, 'request')
-    if operation == 'replay':
-        replay_command(args[1], args[0])
-    elif operation == 'replay_to':
+    if operation == 'replay_to':
         replay_to_request(args[1], args[0])
     payload = {'schemaVersion': 1, 'operation': operation, 'args': list(args)}
     raw = canonical_bytes(payload)
@@ -175,6 +193,13 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
         unit = scoped(db, actor_id, workspace_id)
         if operation in ('replay', 'replay_to', 'create_session'):
             owner(unit.role)
+        if operation in ('replay', 'replay_to'):
+            session_artifact = _persisted_session_artifact(db, str(workspace_id), args[0])
+            if operation == 'replay':
+                replay_command(args[1], args[0], session_artifact)
+            else:
+                require(session_artifact == 'BTL-OBSERVED-RESEARCH-SESSION-1',
+                        'replayTo', 'REFUSED_OBSERVED_OPERATION')
         # Serialize inexpensive count/admission across all API processes.
         db.execute('SELECT pg_advisory_xact_lock(2020,300)')
         previous = db.execute('SELECT * FROM btl.research_jobs WHERE id=%s', (job_id,)).fetchone()

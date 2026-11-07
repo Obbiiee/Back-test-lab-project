@@ -56,7 +56,10 @@ def install(app):
     @app.exception_handler(ContractError)
     async def domain_error(request, error):
         statuses = {"RESOURCE_UNAVAILABLE": 404, "UNAUTHORIZED": 401, "OWNER_REQUIRED": 403, "WRITE_FORBIDDEN": 403,
-                    "SCOPE_MISMATCH": 403, "STALE_REVISION": 409, "IDEMPOTENCY_CONFLICT": 409, "INVALID_INPUT": 422}
+                    "SCOPE_MISMATCH": 403, "STALE_REVISION": 409, "IDEMPOTENCY_CONFLICT": 409,
+                    "REFUSED_STALE_REVISION": 409, "REFUSED_IDEMPOTENCY_CONFLICT": 409,
+                    "REFUSED_ARCHIVED": 409, "REFUSED_IDENTITY_REUSE": 409,
+                    "INVALID_INPUT": 422}
         status = statuses.get(error.code, 503)
         body = {"detail": error.code if status != 503 else "SERVICE_UNAVAILABLE"}
         return Response(canonical_bytes({"schemaVersion": 1, **body}), status_code=status, media_type="application/json")

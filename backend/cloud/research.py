@@ -118,13 +118,27 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
         unit = WorkspaceUnit(db, actor_id, workspace_id)
         if write:
             owner(unit.role)
-        if operation in ('method_page', 'method_detail', 'session_page'):
+        if operation in ('method_page', 'method_detail', 'session_page',
+                         'method_family_page', 'method_family_detail',
+                         'method_new_version', 'method_lifecycle'):
             from execution import product_read_model
+            from execution import product_method_lifecycle
             if operation == 'method_page':
                 return product_read_model.methods(db, str(workspace_id), **args[0])
             if operation == 'method_detail':
                 return product_read_model.method(db, str(workspace_id), args[0])
-            return product_read_model.sessions(db, str(workspace_id), **args[0])
+            if operation == 'session_page':
+                return product_read_model.sessions(db, str(workspace_id), **args[0])
+            if operation == 'method_family_page':
+                return product_method_lifecycle.page(db, str(workspace_id), **args[0])
+            if operation == 'method_family_detail':
+                return product_method_lifecycle.detail(db, str(workspace_id), args[0])
+            if operation == 'method_new_version':
+                db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
+                return product_method_lifecycle.add_version(db, str(workspace_id), args[0], args[1])
+            if operation == 'method_lifecycle':
+                db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
+            return product_method_lifecycle.set_archived(db, str(workspace_id), args[0], args[1])
         if operation == 'method_analytics':
             require(_operator_catalog(dsn) is None, 'methodAnalytics', 'REFUSED_ANALYSIS_SOURCE')
             research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
@@ -278,6 +292,29 @@ def install(app):
     @app.get(prefix + '/methods/{method_id}/analytics')
     async def method_analytics(workspace_id: uuid.UUID, method_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'method_analytics', method_id)
+
+    @app.get(prefix + '/method-families')
+    async def method_families(workspace_id: uuid.UUID, limit: int = Query(25, ge=1, le=50),
+                              after: str | None = None, include_archived: bool = Query(False, alias='includeArchived'),
+                              user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_family_page',
+                             {'limit': limit, 'after': after, 'include_archived': include_archived})
+
+    @app.get(prefix + '/method-families/{family_id}')
+    async def method_family(workspace_id: uuid.UUID, family_id: str, user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_family_detail', family_id)
+
+    @app.post(prefix + '/method-families/{family_id}/versions')
+    async def method_version(workspace_id: uuid.UUID, family_id: str, request: Request,
+                             user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_new_version', family_id,
+                             await json_body(request), write=True)
+
+    @app.post(prefix + '/method-families/{family_id}/lifecycle')
+    async def method_lifecycle(workspace_id: uuid.UUID, family_id: str, request: Request,
+                               user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_lifecycle', family_id,
+                             await json_body(request), write=True)
 
     @app.get(prefix + '/sessions')
     async def sessions(workspace_id: uuid.UUID, limit: int = Query(25, ge=1, le=50),

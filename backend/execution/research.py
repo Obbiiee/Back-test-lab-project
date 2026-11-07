@@ -305,6 +305,8 @@ class ResearchApplication:
             count = db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
             require(count < 128, "methods", "REFUSED_CATALOG_LIMIT")
             db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],blob,sha))
+            from .product_method_lifecycle import register_first_version
+            register_first_version(db, self.scope.workspace_id, raw["id"])
         return raw
 
     def create_session(self, raw):
@@ -321,6 +323,8 @@ class ResearchApplication:
         try:
             with connect(self.dsn) as db:
                 self._catalog_lock(db)
+                from .product_method_lifecycle import require_active_method
+                require_active_method(db, self.scope.workspace_id, raw["methodId"])
                 method = self._method(db, raw["methodId"]); policy = method_policy(method)
                 state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
                                    str(start), self.__profile, policy, raw["initialBalance"])

@@ -14,17 +14,18 @@ export function readRoute(href=typeof window==='undefined'?'http://localhost/':w
   const asked=params.get('screen');
   const screen=SCREENS.includes(asked)?asked:session?'replay':'methods';
   const tab=METHOD_TABS.includes(params.get('tab'))?params.get('tab'):'overview';
-  return {screen,session,method:params.get('method'),tab,analyticsSession:params.get('of')};
+  return {screen,session,method:params.get('method'),family:params.get('family'),tab,analyticsSession:params.get('of')};
 }
 
 // Builds a URL for a product route while keeping the transport selectors
 // (tick-alpha, page=account) and dropping route parameters that do not apply.
 export function routeHref(next,href=typeof window==='undefined'?'http://localhost/':window.location.href){
   const url=new URL(href);
-  for(const key of ['screen','method','tab','of','session'])url.searchParams.delete(key);
+  for(const key of ['screen','method','family','tab','of','session'])url.searchParams.delete(key);
   if(next.screen==='replay'&&next.session){url.searchParams.set('session',next.session);return url.pathname+url.search;}
   if(next.screen&&next.screen!=='methods')url.searchParams.set('screen',next.screen);
   if(next.method)url.searchParams.set('method',next.method);
+  if(next.family)url.searchParams.set('family',next.family);
   if(next.screen==='method'&&next.tab&&next.tab!=='overview')url.searchParams.set('tab',next.tab);
   if(next.of)url.searchParams.set('of',next.of);
   return url.pathname+url.search;

@@ -139,6 +139,8 @@ class ObservedResearchApplication:
                     old=unpack(*previous);require(old.get('artifact')==META and old.get('creationRequestHash')==request_hash,'sessionId','REFUSED_IDEMPOTENCY_CONFLICT')
                     self._session(db,raw['id'])
                     return self.inspect(raw['id'])
+                from .product_method_lifecycle import require_active_method
+                require_active_method(db,self.scope.workspace_id,raw['methodId'])
                 method=self._method(db,raw['methodId']);policy=method_policy(method)
                 start=source.start_for_period(raw['period'],day=raw['day']);timeline=source.cache.new_timeline(self.scope,raw['id'],start);cp=timeline.checkpoint()
                 state=seed_state(raw['id'],profile,policy,cp,initial)

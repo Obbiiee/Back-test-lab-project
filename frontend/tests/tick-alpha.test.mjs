@@ -38,8 +38,22 @@ setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
 const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
-assert.match(queuedId,/^[0-9a-f-]{36}$/);
+assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+const readRetryIds=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(_path,options={})=>{readRetryIds.push(options.jobId);return {schemaVersion:1,label:'done'};}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions/session:queue/view',{timeframe:'1m'});
+assert.equal(readRetryIds[0],queuedId,'same read request keeps durable identity after retry');
 assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
+const additionalQueued=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  additionalQueued.push([path,options]);
+  return path.endsWith('/chart-history')||path.endsWith('/replay-to')
+    ?{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,artifact:'BTL-SYNTHETIC-RESULT-1'}}
+    :{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:created'}}};
+}},'11111111-1111-4111-8111-111111111111');
+assert.equal((await api('/sessions/session:queued/chart-history',{timeframe:'1m',offset:0})).artifact,'BTL-SYNTHETIC-RESULT-1');
+assert.equal((await api('/sessions/session:queued/replay-to',{requestId:'request:stable'})).artifact,'BTL-SYNTHETIC-RESULT-1');
+assert.ok(additionalQueued.every(([,options])=>options.jobId),'chart-history and replay-to use durable queue IDs');
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
@@ -53,17 +67,57 @@ const reconciliation={subject:queuedAccount.subject,request:async(path,options={
 setAccountTransport(reconciliation,'11111111-1111-4111-8111-111111111111');
 const replayBody={kind:'ADVANCE',commandId:'command:retained'};
 await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>
-  error.message.includes('Reload committed Session evidence')&&!error.message.includes('unchanged'));
+  error.code==='UNKNOWN'&&error.jobId===replayJob);
 assert.equal(replayCalls.length,2,'Uncertain replay polls its existing job; never silently resubmits a financial command');
 assert.equal(replayCalls[0][1].body,replayBody,'Preserve canonical financial command identity');
 const lostReplayCalls=[];
+let lostId;
 setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
   lostReplayCalls.push([path,options]);
+  lostId=options.jobId;
   throw new DOMException('Response lost after possible commit','TimeoutError');
 }},'11111111-1111-4111-8111-111111111111');
-await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),/Reload committed Session evidence/);
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===lostId);
 assert.equal(lostReplayCalls.filter(([path])=>path.endsWith('/commands')).length,1);
-assert.ok(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),'Best-effort stop never asserts that an earlier attempt did not commit');
+assert.equal(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),false,'do not cancel an uncertain financial mutation');
+const retried=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  retried.push([path,options]);
+  return path.endsWith('/commands')?{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,revision:8}}:{schemaVersion:1};
+}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions/session:queue/commands',replayBody);
+assert.equal(retried[0][1].jobId,lostId,'retry reuses the durable financial job ID');
+const createCalls=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  createCalls.push([path,options]);
+  return {schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:new'}}};
+}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions',{id:'session:new',name:'Synthetic'});
+assert.ok(createCalls[0][1].jobId,'POST /sessions is submitted with a durable job identity');
+setAccountTransport({subject:queuedAccount.subject,request:async()=>{throw Object.assign(Error('definitive stale request'),{status:409});}},
+  '11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{id:'session:stale',name:'Synthetic'}),error=>error.status===409&&error.code!=='UNKNOWN');
+setAccountTransport({subject:queuedAccount.subject,request:async()=>({schemaVersion:1,state:'QUEUED'})},
+  '11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{id:'session:missing-job',name:'Synthetic'}),error=>error.code==='UNKNOWN');
+const cancelUncertainty=[];
+let cancelJob;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  cancelUncertainty.push([path,options]);
+  if(path.endsWith('/commands')){cancelJob=options.jobId;return {schemaVersion:1,jobId:cancelJob,state:'QUEUED',result:null};}
+  return {schemaVersion:1,jobId:cancelJob,state:'RECONCILE_REQUIRED',cancellation:'RECONCILE_REQUIRED',result:null};
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN');
+assert.equal(cancelUncertainty.length,2,'cancellation race remains an explicit unknown until reconciliation');
+const pollTimeout=[];
+let timeoutJob;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  pollTimeout.push([path,options]);
+  if(path.endsWith('/commands')){timeoutJob=options.jobId;return {schemaVersion:1,jobId:timeoutJob,state:'QUEUED',result:null};}
+  throw new DOMException('poll response timed out','TimeoutError');
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===timeoutJob);
+assert.equal(pollTimeout.length,2,'poll timeout preserves the durable job for later reconciliation');
 setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);
@@ -143,9 +197,15 @@ const optionalReadController=new AbortController();
 await api('/measurement/operational',undefined,{signal:optionalReadController.signal});
 assert.equal(calls[2].options.signal,optionalReadController.signal,'Optional observation timeout must abort the actual request');
 assert.equal(sessionPath('session:α'),'/sessions/session%3A%CE%B1');
-const raw=command({metadata:{id:'session:one'},state:{revision:7}},'ADVANCE',{targetNs:'1577838600000000000'});
+const localView={metadata:{id:'session:one',artifact:'BTL-LOCAL-SESSION-1'},state:{revision:7}};
+const observedView={metadata:{id:'session:observed',artifact:'BTL-OBSERVED-RESEARCH-SESSION-1'},state:{revision:7}};
+const raw=command(localView,'ADVANCE',{targetNs:'1577838600000000000'});
+assert.equal(raw.artifact,'BTL-TICK-EXECUTION-COMMAND-1');
+assert.equal(command(observedView,'ADVANCE',{targetNs:'1577838600000000000'}).artifact,'BTL-OBSERVED-EXECUTION-COMMAND-1');
+assert.throws(()=>command(observedView,'SEEK',{targetNs:'1577838600000000000'}),/do not support SEEK/);
+assert.throws(()=>command({metadata:{id:'ambiguous'}},'ADVANCE',{}),/ambiguous Session model/);
 assert.equal(raw.expectedRevision,7);assert.equal(raw.payload.targetNs,'1577838600000000000');
-assert.notEqual(raw.commandId,command({metadata:{id:'session:one'},state:{revision:7}},'ADVANCE',raw.payload).commandId);
+assert.notEqual(raw.commandId,command(localView,'ADVANCE',raw.payload).commandId);
 globalThis.fetch=async()=>({ok:false,json:async()=>({detail:'REFUSED_STALE_REVISION'})});
 await assert.rejects(()=>api('/reviews',{}),/REFUSED_STALE_REVISION/);
 globalThis.fetch=async()=>({ok:true,json:async()=>({schemaVersion:2})});

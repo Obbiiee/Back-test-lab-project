@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {api,id,sessionPath,sourceContext} from './client.js';
+import {api,id,sessionPath,sourceContext,createMethodVersion,setMethodArchived} from './client.js';
 import {money,kindLabel,utc,lastSession} from './productData.js';
 import {linkTo,navigate,METHOD_TABS} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
@@ -60,13 +60,19 @@ function ContinueCard({catalog,onOpen}){
 }
 
 export function MyMethods({catalog,onOpen}){
-  const [query,setQuery]=useState(''),[type,setType]=useState('ALL'),[sort,setSort]=useState('name');
+  const [query,setQuery]=useState(''),[type,setType]=useState('ALL'),[sort,setSort]=useState('name'),[showArchived,setShowArchived]=useState(false);
   const counts=useMemo(()=>{const map=new Map();for(const s of catalog.sessions)map.set(s.methodId,(map.get(s.methodId)||0)+1);return map;},[catalog.sessions]);
+  const familyCounts=useMemo(()=>new Map((catalog.methodFamilies||[]).map(family=>[
+    family.familyId,family.versions.reduce((sum,version)=>sum+(counts.get(version.methodId)||0),0),
+  ])),[catalog.methodFamilies,counts]);
   const visible=useMemo(()=>{
     const text=query.trim().toLowerCase();
-    return catalog.methods.filter(m=>(type==='ALL'||m.kind===type)&&(!text||m.name.toLowerCase().includes(text)))
-      .sort((a,b)=>sort==='sessions'?(counts.get(b.id)||0)-(counts.get(a.id)||0)||a.name.localeCompare(b.name):a.name.localeCompare(b.name));
-  },[catalog.methods,query,type,sort,counts]);
+    const current=Array.isArray(catalog.methodFamilies)
+      ?catalog.methodFamilies.filter(f=>showArchived||!f.archived).map(f=>({...f.current,methodFamilyId:f.familyId,methodVersion:f.latestVersion,methodFamilyRevision:f.revision,methodArchived:f.archived}))
+      :catalog.methods.filter(m=>(showArchived||!m.methodArchived)&&(m.methodLatest!==false));
+    return current.filter(m=>(type==='ALL'||m.kind===type)&&(!text||m.name.toLowerCase().includes(text)))
+      .sort((a,b)=>sort==='sessions'?(familyCounts.get(b.methodFamilyId)||counts.get(b.id)||0)-(familyCounts.get(a.methodFamilyId)||counts.get(a.id)||0)||a.name.localeCompare(b.name):a.name.localeCompare(b.name));
+  },[catalog.methods,catalog.methodFamilies,query,type,sort,counts,familyCounts,showArchived]);
   const newMethod=<a className="rk-btn rk-btn-primary" {...linkTo({screen:'method-new'})}><Icon name="plus" size={18}/><span>New Method</span></a>;
   if(!catalog.methods.length)return <>
     <PageHead eyebrow="Dashboard" title="My Methods" lead="A Method is the set of rules you want to test. Every Session replays one Method on real-time-ordered history."/>
@@ -92,12 +98,13 @@ export function MyMethods({catalog,onOpen}){
       <label className="rk-search"><Icon name="search" size={18}/><span className="alpha-sr-only">Search Methods</span><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search Methods"/></label>
       <Segmented className="rk-filter" label="Method type" value={type} onChange={setType} options={[['ALL','All'],['FREE_STYLE','Free Style'],['PROTOCOL','Protocol']]}/>
       <label className="rk-select">Sort<select value={sort} onChange={e=>setSort(e.target.value)}><option value="name">Name A–Z</option><option value="sessions">Most Sessions</option></select></label>
+      {accountTransport()&&catalog.methodFamilies?.some(family=>family.archived)&&<label className="rk-switch"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span aria-hidden="true"/>Show archived</label>}
       <span className="rk-count" aria-live="polite">{visible.length} of {catalog.methods.length}</span>
     </div>
-    {visible.length?<ul className="rk-method-grid" aria-label="Methods">{visible.map(m=>{const n=counts.get(m.id)||0;const resume=catalog.sessions.find(s=>s.id===lastSession()&&s.methodId===m.id);return <li key={m.id}><article className="rk-method-card">
-      <div className="rk-method-head"><span className="rk-avatar" aria-hidden="true">{m.name.charAt(0).toUpperCase()}</span><div><h2><a {...linkTo({screen:'method',method:m.id})}>{m.name}</a></h2><p>{n} {n===1?'Session':'Sessions'}{n?` · ${catalog.profile.instrumentId}`:''}</p></div><span className={`rk-tag rk-tag-${m.kind==='PROTOCOL'?'protocol':'free'}`}>{kindLabel(m.kind)}</span></div>
+    {visible.length?<ul className="rk-method-grid" aria-label="Methods">{visible.map(m=>{const n=familyCounts.get(m.methodFamilyId)||counts.get(m.id)||0;const family=catalog.methodFamilies?.find(item=>item.familyId===m.methodFamilyId);const versionIds=new Set(family?.versions.map(version=>version.methodId)||[m.id]);const resume=catalog.sessions.find(s=>s.id===lastSession()&&versionIds.has(s.methodId));return <li key={m.id}><article className="rk-method-card">
+      <div className="rk-method-head"><span className="rk-avatar" aria-hidden="true">{m.name.charAt(0).toUpperCase()}</span><div><h2><a {...linkTo({screen:'method',method:m.id})}>{m.name}</a></h2><p>{n} {n===1?'Session':'Sessions'}{n?` · ${catalog.profile.instrumentId}`:''}{family?` · v${family.latestVersion}`:''}{m.methodArchived?' · Archived':''}</p></div><span className={`rk-tag rk-tag-${m.kind==='PROTOCOL'?'protocol':'free'}`}>{kindLabel(m.kind)}</span></div>
       <p className="rk-method-rules">{m.kind==='PROTOCOL'?`Risk ${m.riskPercent}% · R:R ${m.rr} · checklist ${m.checklistOn?'on':'off'} · ${m.conditions.length} ${m.conditions.length===1?'condition':'conditions'}`:'Quick or planned orders; stop and target chosen per order.'}</p>
-      <div className="rk-method-foot"><a className="rk-btn" {...linkTo({screen:'method',method:m.id})}>Open</a>{resume?<button type="button" className="rk-btn rk-btn-quiet" onClick={()=>onOpen(resume.id)}>Resume</button>:!n?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:m.id,tab:'sessions'})}>New Session</a>:null}</div>
+      <div className="rk-method-foot"><a className="rk-btn" {...linkTo({screen:'method',method:m.id})}>Open</a>{resume?<button type="button" className="rk-btn rk-btn-quiet" onClick={()=>onOpen(resume.id)}>Resume</button>:!n&&!m.methodArchived?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:m.id,tab:'sessions'})}>New Session</a>:null}</div>
     </article></li>;})}</ul>:<StatePanel kind="filtered" title="No Method matches" action={<button type="button" className="rk-btn" onClick={()=>{setQuery('');setType('ALL');}}>Clear search</button>}><p>Your Methods are still saved. Clear the search or filter to see them.</p></StatePanel>}
     {catalog.sessions.length>0&&<section className="rk-section" aria-labelledby="rk-sessions-h"><div className="rk-section-head"><h2 id="rk-sessions-h">Sessions</h2><a {...linkTo({screen:'sessions'})}>All Sessions</a></div>
       <SessionTable sessions={catalog.sessions.slice(-5).reverse()} catalog={catalog} onOpen={onOpen} caption="Latest saved Sessions"/></section>}
@@ -105,9 +112,11 @@ export function MyMethods({catalog,onOpen}){
 }
 
 const RISK=['0.5','1','2'],RR=['1.5','2','3'];
-export function MethodNew({catalog,onSaved}){
-  const [kind,setKind]=useState('FREE_STYLE'),[name,setName]=useState(''),[risk,setRisk]=useState('1'),[rr,setRr]=useState('2');
-  const [checklist,setChecklist]=useState(true),[conditions,setConditions]=useState(['']);
+export function MethodNew({catalog,route,onSaved}){
+  const family=catalog.methodFamilies?.find(item=>item.familyId===route.family);
+  const initial=family?.current;
+  const [kind,setKind]=useState(initial?.kind||'FREE_STYLE'),[name,setName]=useState(initial?.name||''),[risk,setRisk]=useState(initial?.riskPercent||'1'),[rr,setRr]=useState(initial?.rr||'2');
+  const [checklist,setChecklist]=useState(initial?.checklistOn??true),[conditions,setConditions]=useState(initial?.conditions?.map(item=>item.label)||['']);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const creation=useRef(id('method'));
   const protocol=kind==='PROTOCOL';
@@ -119,12 +128,12 @@ export function MethodNew({catalog,onSaved}){
       const value={schemaVersion:1,artifact:'BTL-LOCAL-METHOD-1',id:creation.current,name:name.trim(),kind,
         checklistOn:protocol&&checklist,conditions:protocol?filled.map((label,i)=>({id:`condition:${i}`,label})):[],
         riskPercent:protocol?risk:null,rr:protocol?rr:null};
-      await api('/methods',value);
+      if(family)await createMethodVersion(family,value);else await api('/methods',value);
       await onSaved(value.id);
     }catch(failure){setError(failure.message);setBusy(false);}
   }
   return <>
-    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow="New Method" title="Write the rules first" lead="The type is chosen once. Sessions created from this Method inherit it."/>
+    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={family?`New version · v${family.latestVersion+1}`:'New Method'} title={family?'Write the updated rules':'Write the rules first'} lead="Saved Method versions stay immutable. Existing Sessions keep the exact version and rule hash they started with."/>
     <div className="rk-editor">
       <form className="rk-card rk-form" onSubmit={save} aria-describedby={error?'rk-method-error':undefined}>
         <label>Method name<input value={name} onChange={e=>setName(e.target.value)} required maxLength={128} disabled={busy} autoComplete="off"/></label>
@@ -141,7 +150,7 @@ export function MethodNew({catalog,onSaved}){
           </fieldset>
         </>}
         {error&&<p id="rk-method-error" className="rk-error" role="alert">{error}</p>}
-        <div className="rk-form-actions"><button className="rk-btn rk-btn-primary" disabled={busy||!name.trim()||(protocol&&!filled.length)}>{busy?'Saving…':'Save Method'}</button><a className="rk-btn rk-btn-quiet" {...linkTo({screen:'methods'})}>Cancel</a></div>
+        <div className="rk-form-actions"><button className="rk-btn rk-btn-primary" disabled={busy||!name.trim()||(protocol&&!filled.length)}>{busy?'Saving…':family?'Save new version':'Save Method'}</button><a className="rk-btn rk-btn-quiet" {...linkTo({screen:'methods'})}>Cancel</a></div>
       </form>
       <aside className="rk-card rk-card-navy rk-howto" aria-labelledby="rk-howto-h">
         <h2 id="rk-howto-h">How this Method trades</h2>
@@ -150,21 +159,32 @@ export function MethodNew({catalog,onSaved}){
           <li>The server sizes lots from {risk||'—'}% of the saved balance and your stop.</li>
           <li>Target is set at {rr||'—'}R. Planned Limit or Stop entries only; no manual or partial close.</li>
         </ol>:<ol><li>Quick sends a market order without a stop or target.</li><li>Planned orders take your entry, stop and target, with an estimate before review.</li><li>Every order goes Draft → server Review → Confirm.</li></ol>}
-        <p className="rk-note">Rules are fixed after saving; editing a Method is not available yet. Data for new Sessions: {sourceLine(catalog)}.</p>
+        <p className="rk-note">Saving creates a new immutable version; earlier Sessions remain pinned. Data for new Sessions: {sourceLine(catalog)}.</p>
       </aside>
     </div>
   </>;
 }
 
-export function MethodOverview({catalog,route,onOpen,onNewSession}){
+export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
   const method=catalog.methods.find(m=>m.id===route.method);
+  const family=catalog.methodFamilies?.find(item=>item.familyId===method?.methodFamilyId||item.versions?.some(version=>version.methodId===route.method));
+  const [lifecycleError,setLifecycleError]=useState('');
+  const [lifecycleBusy,setLifecycleBusy]=useState(false);
   const sessions=useMemo(()=>catalog.sessions.filter(s=>s.methodId===route.method),[catalog.sessions,route.method]);
   if(!method)return <><PageHead back={{label:'My Methods',to:{screen:'methods'}}} title="Method unavailable"/><StatePanel kind="unavailable" title="This Method is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>It may belong to another workspace or account. Nothing was changed.</p></StatePanel></>;
   const tab=route.tab;
   const newSession=<button type="button" className="rk-btn rk-btn-primary" onClick={event=>onNewSession(method.id,event)}><Icon name="plus" size={18}/><span>New Session</span></button>;
+  const createVersion=family&&!family.archived?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method-new',family:family.familyId})}>Create new version</a>:null;
+  async function changeLifecycle(archived){
+    if(!family||lifecycleBusy)return;
+    setLifecycleBusy(true);setLifecycleError('');
+    try{await setMethodArchived(family,archived);await onLifecycle?.();}
+    catch(error){setLifecycleError(error.message);setLifecycleBusy(false);}
+  }
   const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
   return <>
-    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={kindLabel(method.kind)} title={method.name} actions={newSession}/>
+    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={family?`${kindLabel(method.kind)} · v${family.versions.find(version=>version.methodId===method.id)?.version||family.latestVersion}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
+    {lifecycleError&&<p className="rk-error" role="alert">{lifecycleError}</p>}
     <nav className="rk-tabs" aria-label="Method sections">{METHOD_TABS.map(key=><a key={key} aria-current={tab===key?'page':undefined} {...linkTo({screen:'method',method:method.id,tab:key})}>{labels[key]}</a>)}</nav>
     {tab==='overview'&&<div className="rk-grid-2">
       <section className="rk-card" aria-labelledby="rk-ov-h"><h2 id="rk-ov-h">At a glance</h2><dl className="rk-facts">
@@ -183,8 +203,9 @@ export function MethodOverview({catalog,route,onOpen,onNewSession}){
     {tab==='rules'&&<section className="rk-card" aria-labelledby="rk-rules-h"><h2 id="rk-rules-h">Rules</h2>
       <dl className="rk-facts"><div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>{method.kind==='PROTOCOL'&&<><div><dt>Locked risk per trade</dt><dd className="rk-num">{method.riskPercent}%</dd></div><div><dt>Locked reward : risk</dt><dd className="rk-num">{method.rr}</dd></div><div><dt>Checklist enforcement</dt><dd>{method.checklistOn?'On: orders need every condition assessed':'Off: conditions are recorded only'}</dd></div></>}</dl>
       {method.kind==='PROTOCOL'&&<><h3>Conditions</h3><ol className="rk-rule-list">{method.conditions.map(c=><li key={c.id}>{c.label}</li>)}</ol></>}
+      {family&&<><h3>Immutable version history</h3><ol className="rk-rule-list">{family.versions.map(version=><li key={version.version}><a {...linkTo({screen:'method',method:version.methodId,tab:'rules'})}>Version {version.version}: {version.method.name}</a>{version.version===family.latestVersion?' · latest':''}</li>)}</ol></>}
       <details className="rk-provenance"><summary>Provenance</summary><dl className="rk-facts"><div><dt>Method id</dt><dd><code>{method.id}</code></dd></div>{sessions[0]&&<div><dt>Rule hash (pinned by Sessions)</dt><dd><code>{sessions[0].methodHash}</code></dd></div>}</dl></details>
-      <p className="rk-note">Rules stay fixed after saving so earlier evidence keeps its meaning. Editing and archiving are not available yet.</p>
+      <p className="rk-note">Rules stay fixed after saving so earlier evidence keeps its meaning. {family?`Family ${family.familyId} · revision ${family.revision} · ${family.versions.length} immutable version${family.versions.length===1?'':'s'}.`:'Local Methods are immutable.'}</p>
     </section>}
   </>;
 }

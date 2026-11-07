@@ -2,6 +2,20 @@
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 import {accountTransport,isAccountPage} from './accountClient.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
+function stableValue(value){
+  if(Array.isArray(value))return value.map(stableValue);
+  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,stableValue(value[key])]));
+  return value;
+}
+async function durableJobId(account,path,body){
+  // A retry of the same operation must address the same durable queue record,
+  // including after a lost HTTP response or a page reload.
+  const identity=`${account.storageScope}\n${path}\n${JSON.stringify(stableValue(body??null))}`;
+  const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(identity)));
+  const bytes=digest.slice(0,16);bytes[6]=(bytes[6]&0x0f)|0x50;bytes[8]=(bytes[8]&0x3f)|0x80;
+  const hex=[...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 export function sourceContext(){
   if(accountTransport()||isAccountPage())return 'synthetic';
   return typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('tick-alpha')==='local'?'synthetic':'historical';
@@ -10,23 +24,29 @@ export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
     const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const queued=replay||/\/sessions\/[^/]+\/(view|bootstrap)$/.test(path);
-    const jobId=queued?crypto.randomUUID():undefined;
+    const queued=replay||(/^\/sessions$/.test(path))||/\/sessions\/[^/]+\/(view|bootstrap|chart-history|replay-to)$/.test(path);
+    const mutating=replay||path==='/sessions'||/\/replay-to$/.test(path);
+    const jobId=queued?await durableJobId(account,path,body):undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
-    const uncertainReplay=()=>Error('Replay outcome requires reconciliation. Reload committed Session evidence before retrying.');
+    const uncertain=()=>Object.assign(Error('UNKNOWN: durable operation outcome is not yet known. Reconcile its job or authoritative Session/receipt before retrying.'),{code:'UNKNOWN',jobId});
     let value;
     try{value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal:bounded,jobId});}
     catch(error){
-      if(jobId)void account.client.request(account.root+'/jobs/'+jobId+'/cancel',{method:'POST'}).catch(()=>{});
-      if(replay)throw uncertainReplay();
+      const definitiveRefusal=[400,401,403,404,409,422,426,429].includes(error?.status);
+      if(mutating&&!definitiveRefusal)throw uncertain();
       throw error;
+    }
+    if(queued&&['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','EXPIRED','RECONCILE_REQUIRED'].includes(value?.state)&&!value?.jobId){
+      if(mutating)throw uncertain();
+      throw Error('Queued research response omitted its durable job identity.');
     }
     while(value?.jobId){
       if(value.jobId!==jobId)throw Error('Unexpected research job; no state was imported.');
       if(value.state==='SUCCEEDED'){value=value.result;break;}
-      if(!['QUEUED','RUNNING'].includes(value.state))throw Error(replay
-        ?'Replay outcome requires reconciliation. Reload committed Session evidence before retrying.'
-        :'Research calculation did not complete. Financial state is unchanged.');
+      if(!['QUEUED','RUNNING'].includes(value.state)){
+        if(mutating)throw uncertain();
+        throw Object.assign(Error(`Research job ended in ${value.state}.`),{code:value.state,jobId});
+      }
       try{
         await new Promise((resolve,reject)=>{
           if(bounded.aborted)return reject(bounded.reason);
@@ -36,10 +56,9 @@ export async function api(path,body,{signal}={}){
         });
         value=await account.client.request(account.root+'/jobs/'+jobId,{signal:bounded});
       }catch(error){
-        // Best-effort stop: replay cancellation requires committed-state
-        // reconciliation and never claims an earlier attempt did not commit.
-        void account.client.request(account.root+'/jobs/'+jobId+'/cancel',{method:'POST'}).catch(()=>{});
-        if(replay)throw uncertainReplay();
+        // Mutations are never cancelled on a transport timeout: cancellation
+        // races the commit and can only leave an UNKNOWN outcome.
+        if(mutating)throw uncertain();
         throw error;
       }
     }
@@ -79,7 +98,13 @@ export function selectSessionUrl(session){
   window.history.replaceState(null,'',url);
 }
 export function command(view,kind,payload){
-  return {schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-1',sessionId:view.metadata.id,
+  const artifact=view?.metadata?.artifact;
+  const dialect=artifact==='BTL-LOCAL-SESSION-1'?'BTL-TICK-EXECUTION-COMMAND-1':
+    artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'?'BTL-OBSERVED-EXECUTION-COMMAND-1':null;
+  if(!dialect)throw Error('Unsupported or ambiguous Session model. Reload the authoritative Session metadata.');
+  if(dialect==='BTL-OBSERVED-EXECUTION-COMMAND-1'&&kind==='SEEK')
+    throw Error('Observed Sessions do not support SEEK commands.');
+  return {schemaVersion:1,artifact:dialect,sessionId:view.metadata.id,
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
@@ -89,7 +114,7 @@ async function collectProductPage(path,artifact,project=value=>value){
   for(;;){
     if(++pages>3)throw Error('Workspace pagination exceeded its published page bound.');
     const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
-    const page=await api(`${path}?${query}`);
+    const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
     if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
       throw Error('Unsupported workspace page; no state was imported.');
     items.push(...page.items.map(project));
@@ -104,16 +129,38 @@ async function collectProductPage(path,artifact,project=value=>value){
 export async function loadProductCatalog(){
   const catalog=await api('/catalog');
   if(accountTransport()){
-    const [methods,sessions]=await Promise.all([
-      collectProductPage('/methods','BTL-METHOD-PAGE-1'),
+    const [methodFamilies,sessions]=await Promise.all([
+      collectProductPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1'),
       collectProductPage('/sessions','BTL-SESSION-PAGE-1',item=>({
         ...item.metadata,revision:item.revision,
         financialCountsStatus:item.financialCountsStatus,
       })),
     ]);
-    return {...catalog,methods,sessions};
+    const methods=methodFamilies.flatMap(family=>family.versions.map(version=>({
+      ...version.method,methodFamilyId:family.familyId,methodVersion:version.version,
+      methodFamilyRevision:family.revision,methodArchived:family.archived,
+      methodLatest:version.version===family.latestVersion,
+    })));
+    if(methods.length>128)throw Error('Method version catalog exceeded its published bound.');
+    return {...catalog,methods,methodFamilies,sessions};
   }
   return catalog;
+}
+
+export async function createMethodVersion(family,method){
+  if(!accountTransport())throw Error('Method versioning requires an authenticated workspace.');
+  if(!family||typeof family.familyId!=='string'||!Number.isSafeInteger(family.revision))
+    throw Error('Method family revision is unavailable. Reload before creating a version.');
+  return api(`/method-families/${encodeURIComponent(family.familyId)}/versions`,
+    {expectedRevision:family.revision,method});
+}
+
+export async function setMethodArchived(family,archived){
+  if(!accountTransport())throw Error('Method lifecycle requires an authenticated workspace.');
+  if(!family||typeof family.familyId!=='string'||!Number.isSafeInteger(family.revision))
+    throw Error('Method family revision is unavailable. Reload before changing lifecycle.');
+  return api(`/method-families/${encodeURIComponent(family.familyId)}/lifecycle`,
+    {expectedRevision:family.revision,archived});
 }
 
 export async function loadResearchContext(selected,{active=()=>true,timeframe='1m'}={}){
