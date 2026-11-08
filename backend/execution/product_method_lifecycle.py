@@ -2,7 +2,7 @@
 from contracts.primitives import require, identifier, revision
 from .postgres import unpack, pack
 from .research import method_policy, label
-from .method_version_query import version_rows
+from .method_version_query import version_rows, latest_version_window
 from .method_version_cursor import encode as encode_version_cursor, decode as decode_version_cursor
 
 MAX_METHODS = 128
@@ -57,14 +57,10 @@ def _family(db, workspace_id, family_id, *, lock=False):
 
 def _view(db, workspace_id, family_id):
     family, current, _ = _family(db, workspace_id, family_id)
-    rows = db.execute(
-        "SELECT v.version,v.method_id,m.payload,m.content_hash "
-        "FROM btl.product_method_versions v JOIN btl.tick_methods m "
-        "ON m.workspace_id=v.workspace_id AND m.method_id=v.method_id "
-        "WHERE v.workspace_id=%s AND v.family_id=%s ORDER BY v.version LIMIT %s",
-        (workspace_id, family_id, MAX_METHODS + 1),
-    ).fetchall()
-    require(0 < len(rows) <= MAX_METHODS, "methodVersions", "REFUSED_METHOD_VERSION_LIMIT")
+    rows, truncated = latest_version_window(
+        db, workspace_id, family_id,
+        latest_version=family["latest_version"], limit=MAX_METHODS)
+    require(bool(rows), "methodVersions", "CORRUPT_RECORD")
     versions = []
     for row in rows:
         value = unpack(row["payload"], row["content_hash"])
@@ -76,7 +72,7 @@ def _view(db, workspace_id, family_id):
             "methodFamily", "CORRUPT_RECORD")
     return {"familyId": family_id, "revision": family["revision"], "archived": family["archived"],
             "latestVersion": family["latest_version"], "latestMethodId": family["latest_method_id"],
-            "current": current, "versions": versions}
+            "current": current, "versions": versions, "versionsTruncated": truncated}
 
 
 def page(db, workspace_id, *, limit=25, after=None, include_archived=False):

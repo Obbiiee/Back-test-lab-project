@@ -2,7 +2,7 @@
 import unittest
 
 from contracts.primitives import ContractError
-from execution.method_version_query import version_rows
+from execution.method_version_query import version_rows, latest_version_window
 from execution.method_version_cursor import decode, encode
 
 
@@ -51,6 +51,30 @@ class MethodVersionQueryTests(unittest.TestCase):
         with self.assertRaises(ContractError):
             version_rows(FakeDb([]),'workspace:one','family:one',
                          after_version=0,limit=51)
+
+    def test_compatibility_window_is_bounded_and_ends_at_latest(self):
+        descending=[row(version) for version in range(130,1,-1)]
+        db=FakeDb(descending)
+        window,truncated=latest_version_window(
+            db,'workspace:one','family:one',latest_version=130,limit=128)
+        self.assertTrue(truncated)
+        self.assertEqual([item['version'] for item in window],list(range(3,131)))
+        sql,params=db.calls[0]
+        self.assertIn('ORDER BY v.version DESC LIMIT %s',sql)
+        self.assertNotIn('OFFSET',sql.upper())
+        self.assertEqual(params,('workspace:one','family:one',130,129))
+
+    def test_compatibility_window_rejects_a_gap(self):
+        with self.assertRaises(ContractError):
+            latest_version_window(FakeDb([row(4),row(2),row(1)]),
+                                  'workspace:one','family:one',latest_version=4,limit=3)
+
+    def test_compatibility_window_preserves_complete_short_history(self):
+        window,truncated=latest_version_window(
+            FakeDb([row(3),row(2),row(1)]),
+            'workspace:one','family:one',latest_version=3,limit=128)
+        self.assertFalse(truncated)
+        self.assertEqual([item['version'] for item in window],[1,2,3])
 
     def test_cursor_is_canonical_and_bound_to_family_and_revision(self):
         token=encode('family:one',9,50)
