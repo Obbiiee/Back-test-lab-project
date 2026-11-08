@@ -3,6 +3,10 @@ Total output lines: 599
 
 # Current Product V1 implementation update — source routing and cumulative analytics (2026-11-08)
 
+## 2026-11-08 streaming exact metric aggregation
+
+Refactored the canonical V1 `metrics()` calculator to consume any single-pass iterable using running exact-rational counts/sums/streaks, removing temporary lifetime-sized nets/wins/losses/R/duration lists. Financial formulas and result shape are unchanged. Added an iterator-only regression; frozen financial analysis/golden suite: 10/10 PASS; Python compilation and `git diff --check` PASS. This bounds calculator scratch memory only; the upstream V1 projector still materializes per-Session order/completed rows and Journal pages can still require a full event fold on cache miss. Next P0-A work remains a durable indexed Journal projection with legacy fallback.
+
 ## 2026-11-08 bounded committed-analysis projection cache
 
 Added a process-local byte-bounded LRU for checkpoint-independent committed-event projections used by analytics. Cache identity includes the database identity hash, workspace, Session, revision, and event head; canonical bytes are decoded into a fresh object on every hit. Quote-bearing projections bypass the cache; Journal excursion enrichment still runs against the current replay window on every request. Oversized values bypass storage. Five synthetic regressions cover cache identity, copy isolation, LRU bounds, oversized bypass, event-fold avoidance, and quote-context bypass. Focused Method + observed analytics suites: 15 PASS, 3 PostgreSQL tests SKIPPED because no isolated database is available; Python compilation and `git diff --check` PASS. This is a disposable same-process optimization, not a durable incremental read model. Product V1 remains IN PROGRESS; Journal still folds committed history when its Session projection is not cached.
