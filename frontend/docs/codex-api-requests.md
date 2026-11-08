@@ -72,3 +72,15 @@ Only local API validation refusals (400/409/413/415) are definitive after the se
 **Acceptance.** Backend PostgreSQL race/idempotency tests plus `tests/confirm-outcome.test.mjs` and `tests/qa/confirm-outcome-qa.cjs` exercise receipt read, lost response, stale revision and exact retry.
 
 **Proof today.** See the CP6A-10 P0 local integration report and branch test evidence. The hosted account API remains a separate checkpoint; this local loopback API is not a production authentication contract.
+
+## REQ-03: select a pinned observed source when the hosted catalog is active (P0 integration)
+
+**Status: the backend contract already exists; the frontend must consume it.** When the hosted service has an operator-pinned observed catalog, `GET /api/v1/workspaces/{workspaceId}/research/catalog` returns `artifact: BTL-OBSERVED-RESEARCH-CATALOG-1` and a `datasets` array. Each public dataset includes `key`, `period`, `label`, and its source profile. `POST /sessions` for a new Session must include the selected `sourceKey`, its exact `period`, and `day` (`null` for a whole-period start or a selected UTC date where that mode is exposed), in addition to `id`, `name`, `methodId`, and `initialBalance`.
+
+- Use the catalog's public `key` as `sourceKey`; do not synthesize a key or infer it from a label.
+- Keep the selected key and period paired. The backend revalidates their membership and profile pin during creation.
+- Do not send filesystem paths, qualification receipt locations/hashes, provider handles, or profile overrides. These are operator-only capabilities and are not part of the request DTO.
+- If a configured catalog is active and `sourceKey` is absent, the queued creation resolves as `INVALID_INPUT`; it will not silently create a V1 synthetic Session. The API's durable queue may acknowledge admission before the worker returns this refusal.
+- Catalog visibility does not grant data rights or financial eligibility. Source rights remain fail-closed and limitations must remain visible.
+
+**Acceptance.** Frontend account-transport tests should cover the observed catalog artifact, selecting a dataset, the exact `sourceKey`/`period`/`day` payload, and preserving the selection across a definitive refusal. The authenticated UI → queue → worker → replay → receipt → Journal → Analytics → resume journey still needs integration evidence.
