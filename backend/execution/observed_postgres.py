@@ -26,6 +26,7 @@ from .contracts import open_payload,policy_from_wire
 from .observed_state_delta_v3 import (encode_base,encode_delta,encode_delta_v4,encode_compact_base,
     encode_compact_delta,reconstruct_complete,COMPACT_DELTA,COMPACT_PROGRESS_DELTA)
 from .observed_replay_progress import CONTROLLER as PROGRESS_CONTROLLER, load_progress, match_progress_receipt, replace_progress
+from .journal_projection import journal_projection_changes
 from .observed_order_archive_v1 import (ARTIFACT as QA_ORDER_ARCHIVE_ARTIFACT,
     PRODUCT_ARTIFACT as PRODUCT_ORDER_ARCHIVE_ARTIFACT, advance as archive_advance,
     summary as archive_summary, verify_complete as verify_archive_complete,
@@ -1024,6 +1025,59 @@ class ObservedExecutionStore:
                          row['recordHash'],archive_raw,archive_hash))
             for e in events:
                 eraw,esha=pack(e);db.execute('INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,command['commandId'],e['eventId'],e['sequence'],eraw,esha))
+            # Maintain the bounded Journal read model only for Sessions that
+            # opted into the versioned projection at creation. Legacy Sessions
+            # keep their existing verified compatibility path.
+            journal_head=db.execute('SELECT format_version,through_sequence,event_hash,order_count '
+                'FROM btl.tick_journal_projection_heads WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
+                (workspace,session)).fetchone()
+            if journal_head is not None:
+                format_version,through_sequence,head_hash,order_count=journal_head
+                require(format_version==1 and through_sequence==old['nextEventIndex'] and
+                        head_hash==old['eventHash'],'journalProjectionHead','CORRUPT_RECORD')
+                touched_ids=set()
+                for event in events:
+                    if event['orderId'] is not None:touched_ids.add(event['orderId'])
+                    if event['kind']=='UNRESOLVED':touched_ids.update(event['detail']['affectedOrderIds'])
+                prior_history={}
+                for order_id in touched_ids:
+                    prior_payload=db.execute('SELECT payload,content_hash FROM btl.tick_journal_order_projection '
+                        'WHERE workspace_id=%s AND session_id=%s AND order_id=%s FOR UPDATE',
+                        (workspace,session,order_id)).fetchone()
+                    if prior_payload:
+                        prior_wire=unpack(*prior_payload)
+                        require(prior_wire.get('artifact')=='BTL-TICK-JOURNAL-ORDER-PROJECTION-1' and
+                                prior_wire.get('orderId')==order_id,'journalProjection','CORRUPT_RECORD')
+                        require(type(prior_wire.get('history')) is dict,'journalProjection','CORRUPT_RECORD')
+                        prior_history[order_id]=prior_wire['history']
+                projection_rows=journal_projection_changes(events,after,archive_records,prior_history)
+                closed_delta=0
+                for row in projection_rows:
+                    payload=dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-ORDER-PROJECTION-1',
+                        workspaceId=workspace,sessionId=session,orderId=row['orderId'],
+                        status=row['status'],lastSequence=row['sequence'],eventId=row['eventId'],
+                        order=row['order'],history=row['history'])
+                    projection_raw,projection_hash=pack(payload)
+                    prior_projection=db.execute('SELECT order_status FROM btl.tick_journal_order_projection '
+                        'WHERE workspace_id=%s AND session_id=%s AND order_id=%s FOR UPDATE',
+                        (workspace,session,row['orderId'])).fetchone()
+                    prior_status=prior_projection[0] if prior_projection else None
+                    closed_delta += int(row['status']=='CLOSED')-int(prior_status=='CLOSED')
+                    db.execute('INSERT INTO btl.tick_journal_order_events '
+                        '(workspace_id,session_id,order_id,sequence,event_id,event_kind,projection_hash) '
+                        'VALUES (%s,%s,%s,%s,%s,%s,%s)',
+                        (workspace,session,row['orderId'],row['sequence'],row['eventId'],row['kind'],projection_hash))
+                    db.execute('INSERT INTO btl.tick_journal_order_projection '
+                        '(workspace_id,session_id,order_id,order_status,last_sequence,event_id,payload,content_hash) '
+                        'VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (workspace_id,session_id,order_id) '
+                        'DO UPDATE SET order_status=EXCLUDED.order_status,last_sequence=EXCLUDED.last_sequence,'
+                        'event_id=EXCLUDED.event_id,payload=EXCLUDED.payload,content_hash=EXCLUDED.content_hash',
+                        (workspace,session,row['orderId'],row['status'],row['sequence'],row['eventId'],projection_raw,projection_hash))
+                accepted_count=sum(1 for event in events if event['kind']=='ORDER_ACCEPTED')
+                db.execute('UPDATE btl.tick_journal_projection_heads SET through_sequence=%s,event_hash=%s,'
+                    'order_count=order_count+%s,closed_order_count=closed_order_count+%s '
+                    'WHERE workspace_id=%s AND session_id=%s',
+                    (after['nextEventIndex'],after['eventHash'],accepted_count,closed_delta,workspace,session))
             db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,after['revision'],checkpoint_raw,checkpoint_hash))
             db.execute('UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s',(after['revision'],session_raw,session_hash,workspace,session))
             if legacy_delta_mode:

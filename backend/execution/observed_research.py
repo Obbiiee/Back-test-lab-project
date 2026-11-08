@@ -197,6 +197,12 @@ class ObservedResearchApplication:
                     product_order_archive_v1=self.store.product_order_archive_v1)
                 meta=dict(schemaVersion=1,artifact=META,id=raw['id'],name=name,methodId=raw['methodId'],methodHash=policy.definition_hash,datasetKey=raw['sourceKey'],period=raw['period'],day=raw['day'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],startNs=state['startNs'],initialBalance=state['initialBalance'],model=MODEL,engineVersion=ENGINE_VERSION,creationRequestHash=request_hash)
                 blob,sha=pack(meta);self.store._insert(db,self.scope,state,cp)
+                # New Sessions start with an explicit empty keyset projection.
+                # Older Sessions without this marker retain their compatibility path.
+                db.execute('INSERT INTO btl.tick_journal_projection_heads '
+                    '(workspace_id,session_id,format_version,through_sequence,event_hash,order_count) '
+                    'VALUES (%s,%s,1,0,%s,0)',
+                    (self.scope.workspace_id,raw['id'],state['eventHash']))
                 db.execute('INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['id'],raw['methodId'],blob,sha))
             source.cache.seed(self.scope,raw['id'],timeline);timeline=None
             return self.inspect(raw['id'])
@@ -397,6 +403,18 @@ class ObservedResearchApplication:
             state=self._session(db,session_id)[2]
         if requested_revision is not None:
             require(requested_revision==state['revision'],'cursor','STALE_REVISION')
+        indexed=self._journal_projection_page(session_id,state,limit,after_order_id)
+        if indexed is not None:
+            page,more,total,notes=self._journal_projection_notes(session_id,state,indexed)
+            next_cursor=encode_cursor(session_id,state['revision'],page[-1]['id']) if more and page else None
+            return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-PAGE-1',sessionId=session_id,
+                revision=state['revision'],totalOrders=total,orders=page,notes=notes,
+                nextCursor=next_cursor,complete=next_cursor is None,
+                provenance=dict(sessionId=state['sessionId'],revision=state['revision'],
+                    datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],
+                    profileHash=state['profileHash'],engineVersion=state['engineVersion'],model=MODEL,
+                    methodHash=state['policy']['definitionHash'],analysisVersion=RESEARCH_VERSION),
+                financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
         projection=self._complete_statistics(session_id,state)
         require(self._same_projection(projection,state),'journal','REFUSED_STALE_REVISION')
         analysis=self._view_analysis(state,projection)
@@ -426,6 +444,93 @@ class ObservedResearchApplication:
                     revision=state['revision'],totalOrders=len(all_orders),orders=page,notes=notes,
                     nextCursor=next_cursor,complete=next_cursor is None,provenance=analysis['provenance'],
                     financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
+    def _journal_projection_page(self,session_id,state,limit,after_order_id):
+        """Read one indexed page, returning None for pre-index compatibility Sessions."""
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            live=self._session(db,session_id)[2]
+            require(live['revision']==state['revision'] and live['eventHash']==state['eventHash'],
+                    'journal','REFUSED_STALE_REVISION')
+            head=db.execute('SELECT format_version,through_sequence,event_hash,order_count '
+                'FROM btl.tick_journal_projection_heads WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id,session_id)).fetchone()
+            if head is None:return None
+            format_version,through_sequence,event_hash,total=head
+            require(format_version==1 and through_sequence==state['nextEventIndex'] and
+                    event_hash==state['eventHash'],'journalProjectionHead','CORRUPT_RECORD')
+            if after_order_id is None:
+                rows=db.execute('SELECT order_id,order_status,last_sequence,event_id,payload,content_hash '
+                    'FROM btl.tick_journal_order_projection WHERE workspace_id=%s AND session_id=%s '
+                    'ORDER BY order_id COLLATE "C" LIMIT %s',
+                    (self.scope.workspace_id,session_id,limit+1)).fetchall()
+            else:
+                rows=db.execute('SELECT order_id,order_status,last_sequence,event_id,payload,content_hash '
+                    'FROM btl.tick_journal_order_projection WHERE workspace_id=%s AND session_id=%s '
+                    'AND order_id COLLATE "C">%s COLLATE "C" ORDER BY order_id COLLATE "C" LIMIT %s',
+                    (self.scope.workspace_id,session_id,after_order_id,limit+1)).fetchall()
+            more=len(rows)>limit;rows=rows[:limit];orders=[]
+            for order_id,status,sequence,event_id,blob,sha in rows:
+                wire=unpack(blob,sha)
+                require(wire.get('artifact')=='BTL-TICK-JOURNAL-ORDER-PROJECTION-1' and
+                    (wire.get('sessionId'),wire.get('orderId'),wire.get('status'),
+                     wire.get('lastSequence'),wire.get('eventId'))==
+                    (session_id,order_id,status,sequence,event_id),'journalProjection','CORRUPT_RECORD')
+                order=wire.get('order');history=wire.get('history')
+                require(type(order) is dict and type(history) is dict,'journalProjection','CORRUPT_RECORD')
+                completed=None
+                if status=='CLOSED':
+                    require(history.get('entryTimeNs') is not None and history.get('exitTimeNs') is not None and
+                        history.get('entryFillRef') is not None and history.get('exitFillRef') is not None,
+                        'journalProjectionHistory','CORRUPT_RECORD')
+                    completed=dict(id=order_id,side=order['side'],status='CLOSED',quantity=order['quantity'],
+                        remaining='0',entry=order['entryPrice'],entryPrice=order['entryPrice'],
+                        entryTimeNs=history['entryTimeNs'],exitTimeNs=history['exitTimeNs'],
+                        entryFillRef=history['entryFillRef'],sl=order['sl'],tp=order['tp'],
+                        exitPrice=history['exitPrice'],exitFillRef=history['exitFillRef'],
+                        exitReason=history['exitReason'],gross=history['exactGross'],commission='0',
+                        net=order['grossPosted'],durationNs=str(int(history['exitTimeNs'])-int(history['entryTimeNs'])),
+                        mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',
+                        rMultiple=None,rReason='PREENTRY_REVIEW_RISK_NOT_JOINED')
+                orders.append(dict(id=order_id,side=order['side'],status=status,quantity=order['quantity'],
+                    remaining=order['remaining'],entry=order['entry'],entryPrice=order['entryPrice'],
+                    entryTimeNs=None if completed is None else completed['entryTimeNs'],
+                    entryFillRef=None if completed is None else completed['entryFillRef'],
+                    sl=order['sl'],tp=order['tp'],exitRequested=order['exitRequest'] is not None,
+                    exitPrice=None if completed is None else completed['exitPrice'],
+                    exitFillRef=None if completed is None else completed['exitFillRef'],
+                    exitReason=None if completed is None else completed['exitReason'],
+                    gross=order['grossPosted'],commission='0',net=order['grossPosted'],
+                    netCashChange=order['grossPosted'],unrealizedIndicative=None,mae=None,mfe=None,
+                    excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED'))
+                if completed is not None:orders[-1]['_completed']=completed
+            return orders,more,total
+
+    def _journal_projection_notes(self,session_id,state,projection_page):
+        orders,more,total=projection_page
+        completed=[row.pop('_completed') for row in orders if '_completed' in row]
+        indexed={row['id']:row for row in orders}
+        notes=[]
+        if orders:
+            ids=[row['id'] for row in orders]
+            with connect(self.dsn) as db:
+                db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+                live=self._session(db,session_id)[2]
+                require(live['revision']==state['revision'] and live['eventHash']==state['eventHash'],
+                        'journal','REFUSED_STALE_REVISION')
+                saved=db.execute('SELECT payload,content_hash,note_revision,order_id '
+                    'FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s '
+                    'AND order_id=ANY(%s) ORDER BY order_id LIMIT %s',
+                    (self.scope.workspace_id,session_id,ids,len(ids)+1)).fetchall()
+                require(len(saved)<=len(ids),'journalNotes','CORRUPT_RECORD')
+                for blob,sha,note_revision,order_id in saved:
+                    value=validate_note(unpack(blob,sha),state,indexed)
+                    require((value['orderId'],value['noteRevision'])==(order_id,note_revision),
+                            'journalNote','CORRUPT_RECORD')
+                    notes.append(value)
+        # Keep the same summary-order shape exposed by the legacy Journal path;
+        # completed trade rows remain available through Analytics pagination.
+        return orders,more,total,notes
 
     def order_history_page(self,session_id,raw):
         keys(raw,'limit afterSequence revision')
