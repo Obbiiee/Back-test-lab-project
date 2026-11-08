@@ -113,18 +113,15 @@ def _environment(dsn):
                      'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID', 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION',
                      'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256')
     monthly_values = tuple(os.environ.get(name) for name in monthly_names)
-    if any(monthly_values):
-        require(monthly_values[0] == '1' and all(monthly_values[1:]),
-                'syntheticMonthly', 'REFUSED_SOURCE')
-        require(len(monthly_values[1]) <= 4096 and os.path.isabs(monthly_values[1]),
-                'syntheticMonthlyRoot', 'REFUSED_SOURCE')
-    else:
-        require(monthly_values[0] is None, 'syntheticMonthly', 'REFUSED_SOURCE')
+    from market_data.monthly_root import monthly_root_from_environment
+    monthly_root = monthly_root_from_environment(monthly_values)
     environment = {k: v for k, v in os.environ.items()
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
                             'BTL_TICK_SESSION_STORAGE_FORMAT', *monthly_names)}
+    if monthly_root is not None:
+        environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
     require(environment.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
             'stateStorageFormat','REFUSED_STATE_VERSION')
     require(environment.get('BTL_TICK_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),

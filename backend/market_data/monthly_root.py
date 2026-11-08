@@ -53,6 +53,24 @@ def pin_monthly_root(value):
     return os.path.realpath(value)
 
 
+def monthly_root_from_environment(values):
+    """Validate the worker's all-or-nothing synthetic source pin."""
+    require(type(values) in (tuple, list) and len(values) == 5,
+            "syntheticMonthly", "REFUSED_SOURCE")
+    if not any(values):
+        require(values[0] is None, "syntheticMonthly", "REFUSED_SOURCE")
+        return None
+    require(values[0] == "1" and all(values[1:]),
+            "syntheticMonthly", "REFUSED_SOURCE")
+    root = values[1]
+    require(type(root) is str and len(root) <= 4096,
+            "syntheticMonthlyRoot", "REFUSED_SOURCE")
+    if root.startswith("s3://"):
+        return pin_monthly_root(root)
+    require(os.path.isabs(root), "syntheticMonthlyRoot", "REFUSED_SOURCE")
+    return root
+
+
 def monthly_object_path(root, base_path, relative):
     """Resolve a manifest child without permitting local or object-store escape."""
     require(type(relative) is str and relative and "\\" not in relative and

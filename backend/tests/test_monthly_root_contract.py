@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 
 from contracts.primitives import ContractError
-from market_data.monthly_root import (monthly_object_path, parse_s3_monthly_root,
-                                      pin_monthly_root)
+from market_data.monthly_root import (monthly_object_path, monthly_root_from_environment,
+                                      parse_s3_monthly_root, pin_monthly_root)
 
 
 class MonthlyRootContractTests(unittest.TestCase):
@@ -50,6 +50,19 @@ class MonthlyRootContractTests(unittest.TestCase):
 
         with self.assertRaises(ContractError):
             monthly_object_path(root.resolve(), "", "../escape.parquet")
+
+    def test_worker_pin_is_all_or_nothing_and_canonicalizes_s3(self):
+        values = ("1", "s3://btl-qa-data/monthly/ticks/", "synthetic:qa",
+                  "a" * 64, "b" * 64)
+        self.assertEqual(monthly_root_from_environment(values),
+                         "s3://btl-qa-data/monthly/ticks")
+        self.assertEqual(monthly_root_from_environment((None,) * 5), None)
+        for invalid in (("1", "s3://bucket/../ticks", "synthetic:qa", "a" * 64, "b" * 64),
+                        ("1", "relative", "synthetic:qa", "a" * 64, "b" * 64),
+                        (None, "/qa/monthly", "synthetic:qa", "a" * 64, "b" * 64),
+                        ("1", None, "synthetic:qa", "a" * 64, "b" * 64)):
+            with self.subTest(values=invalid), self.assertRaises(ContractError):
+                monthly_root_from_environment(invalid)
 
 
 if __name__ == "__main__":
