@@ -3,6 +3,12 @@ Total output lines: 599
 
 # Current Product V1 implementation update — source routing and cumulative analytics (2026-11-08)
 
+## 2026-11-08 observed Method Analytics pooling
+
+Code commit `598664117860955a9e4a9512e5c338a9fae426aa` is on PR #44. Observed Method Analytics now reads one bounded completed-trade page per Session and combines the exact lifetime metrics emitted by each committed ledger fold, rather than collecting all completed trade rows in application memory. Rational sums/weighted averages are preserved exactly; streaks remain omitted across Sessions because there is no shared chronology. A regression verifies pooled output against the existing all-trades calculator. Observed-analysis suite: 7 runnable tests PASS; 3 PostgreSQL tests SKIPPED (isolated database unavailable); compile and diff check PASS.
+
+This reduces historical trade-row materialization but does not create the durable indexed analytics projection required by the frozen architecture. Journal pages still need an indexed projection, and the method/session list of source Sessions still uses a per-request catalog scan. Monthly Parquet source registration/S3 and end-to-end acceptance remain open. Product V1 remains IN PROGRESS.
+
 ## 2026-11-08 Monthly Parquet reader follow-up
 
 Committed `cdc9f233e59753d7ed7cc93543ff3615d8098ef9` to PR #44. Monthly Parquet row groups now use `ParquetFile.iter_batches()` with an 8,192-row Arrow batch bound instead of materializing an entire Arrow row-group table. Canonical row hashing, event order, provenance/source identity, Bid/Ask and global-index checks still run across the complete row group before its results are returned. Added a synthetic test that forbids the unbounded `read_row_group()` path. Monthly Parquet suite: 10/10 PASS; connected synthetic reducer test SKIPPED because isolated PostgreSQL is unavailable; compilation and `git diff --check` PASS.
