@@ -31,7 +31,7 @@ from .observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
 from .observed_profile import ENGINE_VERSION,MODEL,ObservedExecutionProfile
 from .observed_analysis import ObservedStatistics
 from .analytics_projection import (initial_projection,analytics_view,completed_trade_row,
-    ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT)
+    encode_trade_cursor,decode_trade_cursor,ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT)
 from .postgres import pack,unpack
 from .research import method_policy,label
 from .bootstrap import bootstrap as descriptive_bootstrap,validate_seed
@@ -534,18 +534,30 @@ class ObservedResearchApplication:
 
     def analytics_page(self,session_id,raw):
         """Return one bounded completed-trade page with revision-pinned metrics."""
-        keys(raw,'limit offset revision')
+        required={'limit','offset','revision'}
+        require(type(raw) is dict and required.issubset(raw) and
+            set(raw).issubset(required|{'cursor'}),'analyticsPage','SCHEMA_MISMATCH')
         limit=raw['limit'];offset=raw['offset'];revision_pin=raw['revision']
         require(type(limit) is int and 1<=limit<=64,'limit','INVALID_INPUT')
         require(type(offset) is int and offset>=0,'offset','INVALID_CURSOR')
         require(revision_pin is None or (type(revision_pin) is int and revision_pin>=0),
                 'revision','INVALID_CURSOR')
+        cursor_token=raw.get('cursor')
+        require(cursor_token is None or type(cursor_token) is str,'cursor','INVALID_CURSOR')
+        require(cursor_token is None or offset==0,'cursor','INVALID_CURSOR')
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self._session(db,session_id)[2]
+        cursor=None
+        if cursor_token is not None:
+            cursor_revision,after_sequence,after_order_id=decode_trade_cursor(cursor_token,session_id)
+            require(cursor_revision==state['revision'] and
+                (revision_pin is None or revision_pin==cursor_revision),'revision','STALE_REVISION')
+            revision_pin=cursor_revision;cursor=(after_sequence,after_order_id)
         require(revision_pin is None or revision_pin==state['revision'],'revision','STALE_REVISION')
-        durable=self._durable_analytics_page(session_id,state,offset,limit)
+        durable=self._durable_analytics_page(session_id,state,offset,limit,cursor=cursor)
         if durable is not None:return durable
+        require(cursor is None,'cursor','ANALYTICS_CURSOR_UNAVAILABLE')
         projection=self.statistics.inspect(self.scope,session_id,offset,limit)
         require(self._same_projection(projection,state),'analysisSnapshot','REFUSED_STALE_REVISION')
         if projection['status']=='BUILDING':
@@ -562,7 +574,7 @@ class ObservedResearchApplication:
             annotations=analysis['annotations'],annotationWindowStart=analysis['annotationWindowStart'],
             provenance=analysis['provenance'])
 
-    def _durable_analytics_page(self,session_id,state,offset,limit):
+    def _durable_analytics_page(self,session_id,state,offset,limit,*,cursor=None):
         """Serve a bounded page from the transactionally maintained aggregate."""
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
@@ -583,15 +595,33 @@ class ObservedResearchApplication:
                 aggregate.get('eventHead')==state['eventHash'] and
                 aggregate.get('tradeCount')==head[1],'analyticsProjectionHead','CORRUPT_RECORD')
             total=head[1]
-            require(offset<=total,'offset','INVALID_CURSOR')
-            rows=db.execute('SELECT order_id,payload,content_hash FROM btl.tick_journal_order_projection '
-                'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
-                'ORDER BY last_sequence OFFSET %s LIMIT %s',
-                (self.scope.workspace_id,session_id,offset,limit+1)).fetchall()
+            if cursor is None:
+                require(offset<=total,'offset','INVALID_CURSOR')
+                rows=db.execute('SELECT last_sequence,order_id,payload,content_hash FROM btl.tick_journal_order_projection '
+                    'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
+                    'ORDER BY last_sequence,order_id COLLATE "C" OFFSET %s LIMIT %s',
+                    (self.scope.workspace_id,session_id,offset,limit+1)).fetchall()
+            else:
+                after_sequence,after_order_id=cursor
+                require(type(after_sequence) is int and 0<=after_sequence<state['nextEventIndex'],
+                    'cursor','INVALID_CURSOR')
+                prior=db.execute('SELECT order_id FROM btl.tick_journal_order_projection '
+                    'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
+                    'AND last_sequence=%s AND order_id=%s COLLATE "C"',
+                    (self.scope.workspace_id,session_id,after_sequence,after_order_id)).fetchone()
+                require(prior is not None,'cursor','INVALID_CURSOR')
+                rows=db.execute('SELECT last_sequence,order_id,payload,content_hash FROM btl.tick_journal_order_projection '
+                    'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
+                    'AND (last_sequence,order_id COLLATE "C")>(%s,%s::text COLLATE "C") '
+                    'ORDER BY last_sequence,order_id COLLATE "C" LIMIT %s',
+                    (self.scope.workspace_id,session_id,after_sequence,after_order_id,limit+1)).fetchall()
             more=len(rows)>limit;rows=rows[:limit]
-            require(len(rows)==min(limit,total-offset),'analyticsOrderProjection','CORRUPT_RECORD')
+            if cursor is None:
+                require(len(rows)==min(limit,total-offset),'analyticsOrderProjection','CORRUPT_RECORD')
+            else:
+                require(len(rows)<=limit and total>=len(rows),'analyticsOrderProjection','CORRUPT_RECORD')
             completed=[]
-            for order_id,blob,sha in rows:
+            for _last_sequence,order_id,blob,sha in rows:
                 wire=unpack(blob,sha)
                 require(wire.get('artifact')=='BTL-TICK-JOURNAL-ORDER-PROJECTION-1' and
                     wire.get('sessionId')==session_id and wire.get('orderId')==order_id and
@@ -599,9 +629,13 @@ class ObservedResearchApplication:
                     'analyticsOrderProjection','CORRUPT_RECORD')
                 completed.append(completed_trade_row(order_id,wire['order'],wire['history']))
             view=analytics_view(aggregate,state)
+            next_cursor=None
+            if more and rows:
+                next_cursor=encode_trade_cursor(session_id,state['revision'],rows[-1][0],rows[-1][1])
             return dict(schemaVersion=1,artifact='BTL-OBSERVED-ANALYTICS-PAGE-1',sessionId=session_id,
                 revision=state['revision'],status='COMPLETE',metrics=view['metrics'],completed=completed,
-                nextTradeOffset=offset+len(completed) if offset+len(completed)<total else None,
+                nextTradeOffset=(offset+len(completed) if cursor is None and offset+len(completed)<total else None),
+                nextCursor=next_cursor,
                 account=view['account'],equity=view['equity'],equityWindowStart=view['equityWindowStart'],
                 annotations=view['annotations'],annotationWindowStart=view['annotationWindowStart'],
                 provenance=view['provenance'])

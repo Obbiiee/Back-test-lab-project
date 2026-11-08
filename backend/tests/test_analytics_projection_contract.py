@@ -1,12 +1,32 @@
 """Synthetic durable analytics projection contracts without a database."""
 import unittest
 from fractions import Fraction
+from pathlib import Path
+from contracts.primitives import ContractError
 
 from execution.analytics_projection import (initial_projection,advance_projection,analytics_view,
-    completed_trade_row)
+    completed_trade_row,encode_trade_cursor,decode_trade_cursor)
 
 
 class AnalyticsProjectionContractTests(unittest.TestCase):
+    def test_analytics_cursor_is_session_revision_and_order_bound(self):
+        token=encode_trade_cursor('session:analytics',42,128,'trade:128')
+        self.assertEqual(decode_trade_cursor(token,'session:analytics'),(42,128,'trade:128'))
+        for invalid in (('session:other',token),('session:analytics','not-a-cursor')):
+            with self.subTest(invalid=invalid), self.assertRaises(ContractError):
+                decode_trade_cursor(invalid[1],invalid[0])
+        with self.assertRaises(ContractError):
+            encode_trade_cursor('session:analytics',42,-1,'trade:128')
+
+    def test_migration_adds_a_partial_keyset_index_without_rewriting_history(self):
+        migration=Path(__file__).parents[1]/'infrastructure'/'migrations'/\
+            '031_tick_analytics_closed_order_keyset.sql'
+        sql=migration.read_text(encoding='utf-8')
+        self.assertIn('CREATE INDEX tick_journal_order_projection_analytics_c',sql)
+        self.assertIn('(workspace_id, session_id, last_sequence, (order_id COLLATE "C"))',sql)
+        self.assertIn("WHERE order_status = 'CLOSED'",sql)
+        self.assertNotIn('DROP ',sql.upper())
+
     def test_closed_trade_projection_matches_existing_analytics_response_shape(self):
         order=dict(side='SHORT',quantity='2',entryPrice='20',sl='21',tp='18',grossPosted='4')
         history=dict(entryTimeNs='200',entryFillRef='a'*64,exitTimeNs='240',exitPrice='18',

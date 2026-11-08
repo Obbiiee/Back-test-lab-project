@@ -1,12 +1,14 @@
 """Durable, bounded aggregates for the Observed committed-event analytics API."""
 import base64
+import binascii
 import json
+import re
 import zlib
 from copy import deepcopy
 from fractions import Fraction
 
 from contracts.canonical import canonical_bytes
-from contracts.primitives import require
+from contracts.primitives import identifier, require, revision
 from .analysis import RESEARCH_VERSION
 from .contracts import text
 from .observed_profile import MODEL
@@ -14,6 +16,40 @@ from .observed_profile import MODEL
 ARTIFACT='BTL-TICK-SESSION-ANALYTICS-PROJECTION-1'
 WINDOW_ARTIFACT='BTL-TICK-SESSION-ANALYTICS-WINDOW-1'
 MAX_PROJECTION_BYTES=65536
+ANALYTICS_CURSOR_ARTIFACT='BTL-OBSERVED-ANALYTICS-CURSOR-1'
+
+
+def encode_trade_cursor(session_id,session_revision,after_sequence,after_order_id):
+    identifier(session_id,'sessionId');revision(session_revision)
+    require(type(after_sequence) is int and 0<=after_sequence<=2**53-1,
+            'cursor','INVALID_CURSOR')
+    identifier(after_order_id,'afterOrderId')
+    value=dict(schemaVersion=1,artifact=ANALYTICS_CURSOR_ARTIFACT,sessionId=session_id,
+        revision=session_revision,afterSequence=after_sequence,afterOrderId=after_order_id)
+    return base64.urlsafe_b64encode(canonical_bytes(value)).decode('ascii').rstrip('=')
+
+
+def decode_trade_cursor(token,session_id):
+    identifier(session_id,'sessionId')
+    require(type(token) is str and 1<=len(token)<=2048 and
+        re.fullmatch(r'[A-Za-z0-9_-]+',token) is not None,'cursor','INVALID_CURSOR')
+    try:
+        raw=base64.urlsafe_b64decode(token+'='*(-len(token)%4));value=json.loads(raw)
+    except (ValueError,UnicodeError,binascii.Error):
+        require(False,'cursor','INVALID_CURSOR')
+    try:
+        canonical=type(value) is dict and canonical_bytes(value)==raw
+    except (TypeError,ValueError):
+        canonical=False
+    require(canonical and set(value)==
+        {'schemaVersion','artifact','sessionId','revision','afterSequence','afterOrderId'} and
+        value.get('schemaVersion')==1 and value.get('artifact')==ANALYTICS_CURSOR_ARTIFACT and
+        value.get('sessionId')==session_id,'cursor','INVALID_CURSOR')
+    revision(value.get('revision'),'revision')
+    require(type(value.get('afterSequence')) is int and
+        0<=value['afterSequence']<=2**53-1,'cursor','INVALID_CURSOR')
+    identifier(value.get('afterOrderId'),'afterOrderId')
+    return value['revision'],value['afterSequence'],value['afterOrderId']
 
 
 def ratio(value):

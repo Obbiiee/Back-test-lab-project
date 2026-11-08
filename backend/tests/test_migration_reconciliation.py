@@ -25,6 +25,7 @@ INTEGRATION_ONLY = frozenset((
     '025_tick_compact_recovery_bases.sql', '026_tick_journal_order_index.sql',
     '027_tick_session_analytics_counts.sql', '028_tick_session_metric_projection.sql',
     '029_tick_session_analytics_coverage.sql', '030_tick_journal_c_keyset_order.sql',
+    '031_tick_analytics_closed_order_keyset.sql',
 ))
 DSN = os.getenv('BTL_MIGRATION_RECONCILIATION_DSN')
 

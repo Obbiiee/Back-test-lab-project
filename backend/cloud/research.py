@@ -395,9 +395,11 @@ def install(app):
     @app.get(prefix + '/sessions/{session_id}/analytics/pages')
     async def analytics_page(workspace_id: uuid.UUID, session_id: str, limit: int = 32,
                              offset: int = 0, revision: int | None = None,
+                             cursor: str | None = Query(None, max_length=2048),
                              user: User = Depends(current)):
-        return await execute(user, workspace_id, 'analytics_page', session_id,
-            {'limit': limit, 'offset': offset, 'revision': revision})
+        request={'limit': limit, 'offset': offset, 'revision': revision}
+        if cursor is not None:request['cursor']=cursor
+        return await execute(user, workspace_id, 'analytics_page', session_id,request)
 
     @app.post(prefix + '/sessions/{session_id}/replay-to')
     async def replay_to(workspace_id: uuid.UUID, session_id: str, request: Request,
