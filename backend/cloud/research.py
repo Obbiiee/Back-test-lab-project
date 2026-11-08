@@ -16,6 +16,7 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import require, ContractError
 from execution.local_api import body
 from execution.research import ResearchApplication
+from .research_routing import observed_route as _observed_route
 from identity.store import User
 from infrastructure.database import connect
 from workspace.policy import owner
@@ -169,16 +170,13 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             from execution.session_storage_metrics import collect
             return collect(db, str(workspace_id), args[0])
         catalog=_operator_catalog(dsn)
-        observed=False;session_id=None
+        observed=_observed_route(operation,args,catalog);session_id=None
         if catalog is not None:
-            if operation in ('catalog','create_method'):
-                observed=True
-            elif operation=='create_session':
-                observed=bool(args and type(args[0]) is dict and 'sourceKey' in args[0])
-            elif operation=='replay_to':
+            if operation=='replay_to':
                 session_id=args[0] if args else None
-                observed=True
-            elif operation in ('summary','inspect','journal','journal_page','terminal_order_page','save_note','confirm','apply','bootstrap','workspace','chart_history','review','command_result'):
+            elif operation in ('catalog','create_method','create_session'):
+                pass
+            else:
                 if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
                 elif operation in ('confirm','apply','workspace','chart_history','bootstrap','inspect','summary','journal','journal_page','terminal_order_page','save_note','command_result') and args:session_id=args[0]
                 if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
