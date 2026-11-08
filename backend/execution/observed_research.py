@@ -118,6 +118,75 @@ class ObservedResearchApplication:
         identifier(method_id,'methodId');row=db.execute('SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s AND method_id=%s',(self.scope.workspace_id,method_id)).fetchone()
         require(row is not None,'method','RESOURCE_UNAVAILABLE');value=unpack(*row);method_policy(value);require(value['id']==method_id,'method','CORRUPT_RECORD');return value
 
+    def method_analytics(self,method_id):
+        """Pool committed per-Session aggregates without reading order history.
+
+        The catalog currently bounds a workspace to 128 Sessions. Each indexed
+        Session contributes one fixed-size projection row, so this path is
+        bounded by catalog size rather than lifetime events or terminal orders.
+        Older Sessions without the durable projection are reported as excluded
+        until a verified projection rebuild is available.
+        """
+        from .analytics_projection import ANALYTICS_PROJECTION_ARTIFACT
+        from .method_analytics_projection import summarize
+        identifier(method_id,'methodId')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            method=self._method(db,method_id);policy=method_policy(method)
+            rows=db.execute('SELECT session_id,payload,content_hash FROM btl.tick_research_sessions '
+                'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id LIMIT 129',
+                (self.scope.workspace_id,method_id)).fetchall()
+            require(len(rows)<=128,'methodSessions','REFUSED_METHOD_ANALYSIS_LIMIT')
+            included=[];excluded=[];units=set()
+            for session_id,session_blob,session_hash in rows:
+                session_meta=unpack(session_blob,session_hash)
+                if session_meta.get('artifact')=='BTL-LOCAL-SESSION-1':
+                    tag(session_meta,'BTL-LOCAL-SESSION-1',
+                        'id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance')
+                    require(session_meta.get('id')==session_id and
+                        session_meta.get('methodId')==method_id and
+                        session_meta.get('methodHash')==policy.definition_hash,
+                        'methodSession','CORRUPT_RECORD')
+                    excluded.append(dict(sessionId=session_id,
+                        reason='LEGACY_METHOD_ANALYTICS_PROJECTION_NOT_READY'))
+                    continue
+                require(session_meta.get('artifact')==META and
+                    session_meta.get('id')==session_id and
+                    session_meta.get('methodId')==method_id,
+                    'methodSession','CORRUPT_RECORD')
+                meta,_stored_method,state,_checkpoint=self._session(db,session_id)
+                require(meta.get('methodHash')==policy.definition_hash,
+                    'methodSession','CORRUPT_RECORD')
+                unit=(state['profileHash'],state['engineVersion'],
+                      state['profile']['accountCurrency'])
+                units.add(unit)
+                head=db.execute('SELECT analytics_format_version,closed_order_count '
+                    'FROM btl.tick_journal_projection_heads '
+                    'WHERE workspace_id=%s AND session_id=%s',
+                    (self.scope.workspace_id,session_id)).fetchone()
+                if head is None or head[0]!=1:
+                    excluded.append(dict(sessionId=session_id,reason='ANALYTICS_PROJECTION_NOT_READY'))
+                    continue
+                projection_row=db.execute('SELECT payload,content_hash '
+                    'FROM btl.tick_session_metric_projections '
+                    'WHERE workspace_id=%s AND session_id=%s',
+                    (self.scope.workspace_id,session_id)).fetchone()
+                require(projection_row is not None,'analyticsProjection','CORRUPT_RECORD')
+                projection=unpack(*projection_row)
+                require(projection.get('artifact')==ANALYTICS_PROJECTION_ARTIFACT and
+                    projection.get('sessionId')==session_id and
+                    projection.get('revision')==state['revision'] and
+                    projection.get('eventHead')==state['eventHash'] and
+                    projection.get('tradeCount')==head[1],
+                    'analyticsProjectionHead','CORRUPT_RECORD')
+                included.append(dict(unit=unit,projection=projection,session=dict(
+                    sessionId=session_id,revision=state['revision'],datasetId=state['datasetId'],
+                    datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],
+                    engineVersion=state['engineVersion'],eventHead=state['eventHash'],
+                    tradeCount=projection['tradeCount'])))
+
+            return summarize(method_id,policy.definition_hash,units,included,excluded)
+
     def create_method(self,raw):
         from .research import ResearchApplication
         shell=object.__new__(ResearchApplication);shell.dsn=self.dsn;shell.scope=self.scope

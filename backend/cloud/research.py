@@ -162,10 +162,17 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
             return product_method_lifecycle.set_archived(db, str(workspace_id), args[0], args[1])
         if operation == 'method_analytics':
-            require(_operator_catalog(dsn) is None, 'methodAnalytics', 'REFUSED_ANALYSIS_SOURCE')
-            research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
-                                           synthetic_provider=_synthetic_monthly_provider(),
-                                           state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+            catalog = _operator_catalog(dsn)
+            scope = TrustedScope(str(workspace_id), str(actor_id))
+            if catalog is None:
+                research = ResearchApplication(dsn, scope,
+                    synthetic_provider=_synthetic_monthly_provider(),
+                    state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+            else:
+                from execution.observed_research import ObservedResearchApplication
+                research = ObservedResearchApplication(dsn, scope, catalog,
+                    state_storage_format='compact-v1',
+                    product_order_archive_v1=True)
             try:
                 return research.method_analytics(args[0])
             finally:
