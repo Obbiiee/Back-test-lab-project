@@ -20,6 +20,7 @@ from contracts.primitives import require,identifier,revision
 from ticks.contracts import keys,tag,uint
 from infrastructure.database import connect
 from .analysis import RESEARCH_VERSION,planned_risk
+from .analytics_page_query import closed_trade_rows
 from .contracts import exact,open_payload,policy_wire,text,risk_quantity
 from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
 from .journal_projection import journal_order_summary
@@ -595,31 +596,9 @@ class ObservedResearchApplication:
                 aggregate.get('eventHead')==state['eventHash'] and
                 aggregate.get('tradeCount')==head[1],'analyticsProjectionHead','CORRUPT_RECORD')
             total=head[1]
-            if cursor is None:
-                require(offset<=total,'offset','INVALID_CURSOR')
-                rows=db.execute('SELECT last_sequence,order_id,payload,content_hash FROM btl.tick_journal_order_projection '
-                    'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
-                    'ORDER BY last_sequence,order_id COLLATE "C" OFFSET %s LIMIT %s',
-                    (self.scope.workspace_id,session_id,offset,limit+1)).fetchall()
-            else:
-                after_sequence,after_order_id=cursor
-                require(type(after_sequence) is int and 0<=after_sequence<state['nextEventIndex'],
-                    'cursor','INVALID_CURSOR')
-                prior=db.execute('SELECT order_id FROM btl.tick_journal_order_projection '
-                    'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
-                    'AND last_sequence=%s AND order_id=%s COLLATE "C"',
-                    (self.scope.workspace_id,session_id,after_sequence,after_order_id)).fetchone()
-                require(prior is not None,'cursor','INVALID_CURSOR')
-                rows=db.execute('SELECT last_sequence,order_id,payload,content_hash FROM btl.tick_journal_order_projection '
-                    'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
-                    'AND (last_sequence,order_id COLLATE "C")>(%s,%s::text COLLATE "C") '
-                    'ORDER BY last_sequence,order_id COLLATE "C" LIMIT %s',
-                    (self.scope.workspace_id,session_id,after_sequence,after_order_id,limit+1)).fetchall()
-            more=len(rows)>limit;rows=rows[:limit]
-            if cursor is None:
-                require(len(rows)==min(limit,total-offset),'analyticsOrderProjection','CORRUPT_RECORD')
-            else:
-                require(len(rows)<=limit and total>=len(rows),'analyticsOrderProjection','CORRUPT_RECORD')
+            rows,more=closed_trade_rows(db,self.scope.workspace_id,session_id,
+                limit=limit,offset=offset,total=total,cursor=cursor,
+                event_count=state['nextEventIndex'])
             completed=[]
             for _last_sequence,order_id,blob,sha in rows:
                 wire=unpack(blob,sha)
