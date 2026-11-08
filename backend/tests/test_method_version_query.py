@@ -3,6 +3,7 @@ import unittest
 
 from contracts.primitives import ContractError
 from execution.method_version_query import version_rows
+from execution.method_version_cursor import decode, encode
 
 
 class FakeCursor:
@@ -50,6 +51,15 @@ class MethodVersionQueryTests(unittest.TestCase):
         with self.assertRaises(ContractError):
             version_rows(FakeDb([]),'workspace:one','family:one',
                          after_version=0,limit=51)
+
+    def test_cursor_is_canonical_and_bound_to_family_and_revision(self):
+        token=encode('family:one',9,50)
+        self.assertEqual(decode(token,'family:one'),(9,50))
+        for family,invalid in (('family:two',token),('family:one','not-a-cursor')):
+            with self.subTest(family=family),self.assertRaises(ContractError):
+                decode(invalid,family)
+        with self.assertRaises(ContractError):
+            encode('family:one',9,0)
 
 
 if __name__=='__main__':

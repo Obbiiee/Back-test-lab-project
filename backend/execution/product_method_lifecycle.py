@@ -3,6 +3,7 @@ from contracts.primitives import require, identifier, revision
 from .postgres import unpack, pack
 from .research import method_policy, label
 from .method_version_query import version_rows
+from .method_version_cursor import encode as encode_version_cursor, decode as decode_version_cursor
 
 MAX_METHODS = 128
 MAX_PAGE = 50
@@ -101,18 +102,16 @@ def detail(db, workspace_id, family_id):
             "family": _view(db, workspace_id, family_id)}
 
 
-def versions_page(db, workspace_id, family_id, *, limit=25, after_version=None,
-                  revision_pin=None):
+def versions_page(db, workspace_id, family_id, *, limit=25, cursor=None):
     """Read immutable Method versions with a family-revision-pinned keyset."""
     require(type(limit) is int and 1 <= limit <= MAX_VERSION_PAGE, "limit")
-    require(after_version is None or (type(after_version) is int and after_version >= 0),
-            "afterVersion", "INVALID_CURSOR")
-    require(revision_pin is None or (type(revision_pin) is int and revision_pin >= 1),
-            "revision", "INVALID_CURSOR")
+    require(cursor is None or type(cursor) is str,"cursor","INVALID_CURSOR")
     family, _current, _policy = _family(db, workspace_id, family_id)
-    require(revision_pin is None or revision_pin == family["revision"],
-            "revision", "STALE_REVISION")
-    after = 0 if after_version is None else after_version
+    if cursor is None:
+        after=0
+    else:
+        revision_pin,after=decode_version_cursor(cursor,family_id)
+        require(revision_pin==family["revision"],"cursor","STALE_REVISION")
     require(after<=family["latest_version"], "afterVersion", "INVALID_CURSOR")
     rows,more=version_rows(db,workspace_id,family_id,after_version=after,limit=limit)
     page=[]
@@ -129,7 +128,7 @@ def versions_page(db, workspace_id, family_id, *, limit=25, after_version=None,
                 "methodVersion", "CORRUPT_RECORD")
     return {"schemaVersion":1,"artifact":"BTL-METHOD-VERSION-PAGE-1",
             "familyId":family_id,"revision":family["revision"],"versions":page,
-            "nextCursor":{"revision":family["revision"],"afterVersion":page[-1]["version"]}
+            "nextCursor":encode_version_cursor(family_id,family["revision"],page[-1]["version"])
                 if more and page else None,"complete":not more}
 
 

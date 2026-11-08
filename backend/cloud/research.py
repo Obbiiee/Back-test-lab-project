@@ -347,11 +347,10 @@ def install(app):
     @app.get(prefix + '/method-families/{family_id}/versions')
     async def method_family_versions(workspace_id: uuid.UUID, family_id: str,
                                      limit: int = Query(25, ge=1, le=50),
-                                     after_version: int | None = Query(None, alias='afterVersion', ge=0),
-                                     revision_pin: int | None = Query(None, alias='revision', ge=1),
+                                     cursor: str | None = Query(None, max_length=2048),
                                      user: User = Depends(current)):
         return await execute(user, workspace_id, 'method_family_versions_page', family_id,
-            {'limit': limit, 'after_version': after_version, 'revision_pin': revision_pin})
+            {'limit': limit, 'cursor': cursor})
 
     @app.post(prefix + '/method-families/{family_id}/versions')
     async def method_version(workspace_id: uuid.UUID, family_id: str, request: Request,
