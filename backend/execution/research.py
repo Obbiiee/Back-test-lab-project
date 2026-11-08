@@ -208,16 +208,28 @@ class ResearchApplication:
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             meta, _method, state, _checkpoint = self._session(db, session_id)
-            completed_trades=0
-            # Terminal orders are compacted out of new hot snapshots. Their
-            # immutable EXIT_FILL events are the durable history authority.
-            rows=db.execute('SELECT payload,content_hash FROM btl.tick_events '
-                'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
-                (self.scope.workspace_id,session_id))
-            for raw,sha in rows:
-                event=unpack(raw,sha)
-                if event.get('kind')=='EXIT_FILL' and event.get('detail',{}).get('remaining')=='0':
-                    completed_trades+=1
+            head = db.execute(
+                'SELECT format_version,through_sequence,event_hash,closed_order_count '
+                'FROM btl.tick_journal_projection_heads '
+                'WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id, session_id),
+            ).fetchone()
+            if head is None:
+                completed_trades = 0
+                # Pre-index Sessions retain their historical version-dispatch
+                # path; new Sessions answer this count from the atomic projection.
+                rows=db.execute('SELECT payload,content_hash FROM btl.tick_events '
+                    'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
+                    (self.scope.workspace_id,session_id))
+                for raw,sha in rows:
+                    event=unpack(raw,sha)
+                    if event.get('kind')=='EXIT_FILL' and event.get('detail',{}).get('remaining')=='0':
+                        completed_trades+=1
+            else:
+                require(head[:3] == (1, state['nextEventIndex'], state['eventHash']) and
+                        type(head[3]) is int and head[3] >= 0,
+                        'sessionAnalyticsHead', 'CORRUPT_RECORD')
+                completed_trades = head[3]
             return dict(schemaVersion=1, artifact="BTL-SESSION-SUMMARY-1",
                         sessionId=meta["id"], revision=state["revision"],
                         throughNs=state["throughNs"], datasetId=state["datasetId"],

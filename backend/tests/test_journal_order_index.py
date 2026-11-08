@@ -110,7 +110,7 @@ class JournalOrderIndexTests(unittest.TestCase):
                   reason='MANUAL', evidence={'timeNs': '20', 'groupId': 'g:exit',
                                             'eventIds': ['tick:exit']}),
         ]
-        db = DB((7, 'b' * 64, 0))
+        db = DB((7, 'b' * 64, 0, 0))
         self.assertTrue(append(db, 'workspace:a', 'session:a', prior, following, rows))
         self.assertEqual(len(db.statements), 7)  # head, row lookup, three refs, projection, head advance
         projection_write = next(item for item in db.statements
@@ -123,9 +123,9 @@ class JournalOrderIndexTests(unittest.TestCase):
             {key: value for key, value in projection.items() if key != 'contentHash'}))
         self.assertEqual(canonical_bytes(projection), projection_write[1][6])
         self.assertIn('UPDATE btl.tick_journal_projection_heads', db.statements[-1][0])
-        self.assertEqual(db.statements[-1][1], (10, 'c' * 64, 1, 'workspace:a', 'session:a'))
+        self.assertEqual(db.statements[-1][1], (10, 'c' * 64, 1, 1, 'workspace:a', 'session:a'))
 
-        mismatched = DB((6, 'a' * 64, 0))
+        mismatched = DB((6, 'a' * 64, 0, 0))
         with self.assertRaises(ContractError):
             append(mismatched, 'workspace:a', 'session:a', prior, following, rows)
         self.assertEqual(len(mismatched.statements), 1)
@@ -163,7 +163,9 @@ class JournalOrderIndexTests(unittest.TestCase):
                 return self.rows
 
         class DB:
-            def execute(self, query, _params):
+            def execute(self, query, _params=()):
+                if query.startswith('SET TRANSACTION'):
+                    return Result()
                 if 'FROM btl.tick_journal_projection_heads' in query:
                     return Result((1, 2, cancelled['eventId'], 1))
                 if 'FROM btl.tick_journal_order_projection p' in query:
@@ -186,6 +188,40 @@ class JournalOrderIndexTests(unittest.TestCase):
         self.assertFalse(result['more'])
         expected_order = dict(order, excursionReason='POSITION_NOT_COMPLETED')
         self.assertEqual(result['analysis']['orders'], [expected_order])
+
+    def test_session_summary_uses_incremental_count_without_scanning_events(self):
+        app = ResearchApplication.__new__(ResearchApplication)
+        app.dsn = 'postgresql://isolated-journal-summary'
+        app.scope = SimpleNamespace(workspace_id='workspace:journal-summary')
+        state = dict(revision=9, nextEventIndex=14, eventHash='d' * 64,
+            throughNs='100', datasetId='dataset:a', datasetVersion='v1',
+            profileHash='f' * 64, profile={'accountCurrency': 'USD'},
+            initialBalance='100', balance='125', unresolved=False, ended=False)
+
+        class Result:
+            def fetchone(self):
+                return (1, 14, 'd' * 64, 3)
+
+        class DB:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def execute(self, query, _params=()):
+                if query.startswith('SET TRANSACTION'):
+                    return Result()
+                if 'FROM btl.tick_journal_projection_heads' in query:
+                    return Result()
+                raise AssertionError('indexed Session summary must not scan the event ledger')
+
+        with patch('execution.research.connect', return_value=DB()), \
+             patch.object(app, '_session', return_value=({'id': 'session:a'}, None, state, None)):
+            result = app.summary('session:a')
+
+        self.assertEqual(result['completedTrades'], 3)
+        self.assertEqual(result['netCashChange'], '25')
 
 
 if __name__ == '__main__':

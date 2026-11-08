@@ -133,7 +133,8 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
     full-ledger fallback until a verified backfill is implemented.
     """
     head = db.execute(
-        'SELECT through_sequence,event_hash,order_count FROM btl.tick_journal_projection_heads '
+        'SELECT through_sequence,event_hash,order_count,closed_order_count '
+        'FROM btl.tick_journal_projection_heads '
         'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
         (workspace_id, session_id),
     ).fetchone()
@@ -141,7 +142,8 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
         return False
     require(
         head[:2] == (prior_state['nextEventIndex'], prior_state['eventHash']) and
-        type(head[2]) is int and head[2] >= 0,
+        type(head[2]) is int and head[2] >= 0 and
+        type(head[3]) is int and head[3] >= 0,
         'journalIndexHead',
         'CORRUPT_RECORD',
     )
@@ -167,6 +169,7 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
         refs_by_sequence.setdefault(sequence, set()).add(order_id)
     latest = {}
     projection_hashes = {}
+    closed_order_delta = 0
     for event in events:
         for order_id in sorted(refs_by_sequence.get(event['sequence'], ())):
             row = current.get(order_id)
@@ -181,7 +184,10 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
                 else:
                     require(event.get('orderId') == order_id,
                             'journalProjectionOrderBinding', 'CORRUPT_RECORD')
+                was_closed = row['status'] == 'CLOSED'
                 row = _apply_order_event(row, event)
+                if not was_closed and row['status'] == 'CLOSED':
+                    closed_order_delta += 1
             current[order_id] = row
             latest[order_id] = _projection(session_id, order_id, row, event)
             projection_hashes[(order_id, event['sequence'])] = latest[order_id]['contentHash']
@@ -209,10 +215,12 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
         )
     db.execute(
         'UPDATE btl.tick_journal_projection_heads '
-        'SET through_sequence=%s,event_hash=%s,order_count=order_count+%s '
+        'SET through_sequence=%s,event_hash=%s,order_count=order_count+%s,'
+        'closed_order_count=closed_order_count+%s '
         'WHERE workspace_id=%s AND session_id=%s',
         (next_state['nextEventIndex'], next_state['eventHash'],
          sum(kind == 'ORDER_ACCEPTED' for _, _, _, kind in indexed),
+         closed_order_delta,
          workspace_id, session_id),
     )
     return True
