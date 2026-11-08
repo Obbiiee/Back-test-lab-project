@@ -18,16 +18,18 @@ REPLAY_FIELDS = ('revision', 'throughNs', 'nextGroupIndex', 'sourceCheckpointHas
                  'sourcePrefixHash', 'sourceCursorRevision', 'lastObservedNs', 'quoteBasis')
 
 
-def read_progress(db, scope, base, base_hash):
+def read_progress(db, scope, base, base_hash, *, order_retention_policy=None):
     """Return the effective snapshot, checking the row against its immutable base."""
-    snapshot, _ = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash)
+    snapshot, _ = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash,
+                                order_retention_policy=order_retention_policy)
     return snapshot
 
 
-def progress_receipt(db, scope, base, base_hash, raw_command):
+def progress_receipt(db, scope, base, base_hash, raw_command, *, order_retention_policy=None):
     command = command_wire(raw_command)
     require(command['sessionId'] == base['state']['sessionId'], 'session', 'RESOURCE_UNAVAILABLE')
-    snapshot, identity = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash)
+    snapshot, identity = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash,
+                                       order_retention_policy=order_retention_policy)
     return match_progress_receipt(snapshot, identity, command)
 
 
@@ -38,7 +40,7 @@ def match_progress_receipt(snapshot, identity, command):
     return _receipt(snapshot, identity)
 
 
-def load_progress(db, workspace, session, base, base_hash):
+def load_progress(db, workspace, session, base, base_hash, *, order_retention_policy=None):
     row = db.execute(
         'SELECT base_revision,base_hash,revision,through_ns,next_group_index,payload,content_hash '
         'FROM btl.observed_replay_progress WHERE workspace_id=%s AND session_id=%s',
@@ -57,7 +59,7 @@ def load_progress(db, workspace, session, base, base_hash):
             'replayProgressFormat', 'CORRUPT_RECORD')
     keys(wire['replay'], ' '.join(REPLAY_FIELDS))
     state = {**deepcopy(base_state), **wire['replay']}
-    restored = validate_snapshot(state, wire['controller'])
+    restored = validate_snapshot(state, wire['controller'], order_retention_policy=order_retention_policy)
     require(state['revision'] == stored_revision and stored_revision > base_revision and
             int(state['throughNs']) == through and int(state['nextGroupIndex']) == next_group,
             'replayProgressPointer', 'CORRUPT_RECORD')
@@ -97,7 +99,7 @@ def _check_transition(before, state, controller):
             'replayProgressFrontier', 'REFUSED_REPLAY_FRONTIER')
 
 
-def replace_progress(db, scope, base, base_hash, raw_command, proposed, events):
+def replace_progress(db, scope, base, base_hash, raw_command, proposed, events, *, order_retention_policy=None):
     """Replace a progress-only snapshot after locking the scoped Session row."""
     old_base = base['state']
     workspace, session = scoped(scope, old_base['sessionId'])
@@ -113,14 +115,15 @@ def replace_progress(db, scope, base, base_hash, raw_command, proposed, events):
     ).fetchone()
     require(row is not None and row[0] == old_base['revision'],
             'replayProgressBase', 'REFUSED_STALE_REVISION')
-    current, previous_identity = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash)
+    current, previous_identity = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash,
+                                               order_retention_policy=order_retention_policy)
     if previous_identity is not None and previous_identity['id'] == identity['id']:
         require(previous_identity == identity, 'commandId', 'REFUSED_IDEMPOTENCY_CONFLICT')
         return _receipt(current, identity)
     require(current['state']['revision'] == expected_revision, 'revision', 'REFUSED_STALE_REVISION')
 
     state, controller = deepcopy(proposed['state']), proposed['controller']
-    validate_snapshot(state, controller)
+    validate_snapshot(state, controller, order_retention_policy=order_retention_policy)
     # Only the reducer's single bookkeeping event can be omitted. Any
     # limitation, unresolved evidence or financial event stays immutable.
     prior_state = current['state']
