@@ -169,6 +169,18 @@ export async function loadMoreProductCatalog(catalog,kind){
   throw Error('Unknown workspace page.');
 }
 
+export async function loadJournalPage(sessionId,cursor=null){
+  if(typeof sessionId!=='string'||!sessionId)throw Error('Journal Session is unavailable.');
+  const query=new URLSearchParams({limit:'32'});if(cursor)query.set('cursor',cursor);
+  const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`);
+  if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
+      !Number.isSafeInteger(page.totalOrders)||typeof page.complete!=='boolean')
+    throw Error('Unsupported Journal page; no state was imported.');
+  if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===cursor))
+    throw Error('Journal pagination did not advance.');
+  return page;
+}
+
 export async function createMethodVersion(family,method){
   if(!accountTransport())throw Error('Method versioning requires an authenticated workspace.');
   if(!family||typeof family.familyId!=='string'||!Number.isSafeInteger(family.revision))
@@ -198,10 +210,8 @@ export function noticeText(message){
     REFUSED_REWIND_REQUIRES_FORK:'This Session already has financial history. Create a separate Session to replay an earlier time.',
     REFUSED_STALE_REVISION:'The saved Session changed. Reload it and review the action again.',
     REFUSED_STALE_NOTE:'Another edit changed this note. Reload the journal, compare with your retained draft, then explicitly save again.',
-    REFUSED_JOURNAL_LIMIT:'This Session exceeds the complete journal snapshot budget (32 canonical orders). No partial export or reset was made.',
     PROTOCOL_BLOCKED:'Protocol rules blocked this order. Check the checklist and locked entry/exit rules.',
     LOCAL_BUSY:'The local service is busy. Wait for the current request, then retry.',
-    REFUSED_ANALYSIS_LIMIT:'Analysis exceeded its bounded event budget. No partial result is shown.',
   };
   return explanations[message]?`${explanations[message]} (${message})`:message;
 }

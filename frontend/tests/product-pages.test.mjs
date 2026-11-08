@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {loadProductCatalog,loadMoreProductCatalog,createMethodVersion,setMethodArchived} from '../src/tickAlpha/client.js';
+import {loadProductCatalog,loadMoreProductCatalog,loadJournalPage,createMethodVersion,setMethodArchived} from '../src/tickAlpha/client.js';
 import {setAccountTransport,clearAccountTransport} from '../src/tickAlpha/accountClient.js';
 import {readRoute,routeHref} from '../src/tickAlpha/productRoute.js';
 
@@ -24,6 +24,10 @@ const client={subject:()=>subject,request:async (path,options={})=>{
   if(path.endsWith('/sessions?limit=50'))return {schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',
     items:[{metadata:{id:'session:one',name:'Synthetic QA',methodId:'method:000',startPeriod:'2020-01',initialBalance:'10000'},
       revision:4,financialCountsStatus:'NOT_COMPUTED_ON_LIST'}],complete:true,nextCursor:null};
+  if(path.endsWith('/sessions/session%3Aone/journal/pages?limit=32&cursor=order%3A031'))return {
+    schemaVersion:1,artifact:'BTL-TICK-JOURNAL-PAGE-1',sessionId:'session:one',revision:8,
+    totalOrders:33,orders:[{id:'order:032',side:'LONG',orderType:'MARKET',status:'CLOSED'}],notes:[],
+    provenance:{revision:8},nextCursor:null,complete:true};
   if(path.includes('/method-families/method%3A050/versions'))return {schemaVersion:1,artifact:'BTL-METHOD-FAMILY-1'};
   if(path.includes('/method-families/method%3A050/lifecycle'))return {schemaVersion:1,artifact:'BTL-METHOD-FAMILY-1'};
   throw new Error(`Unexpected path ${path}`);
@@ -45,6 +49,10 @@ try{
     financialCountsStatus:'NOT_COMPUTED_ON_LIST'}]);
   assert.ok(calls.some(path=>path.includes('/method-families?includeArchived=true&limit=50&after=')));
   assert.ok(calls.some(path=>path.includes('/sessions?limit=50')));
+  const journal=await loadJournalPage('session:one','order:031');
+  assert.equal(journal.totalOrders,33);
+  assert.equal(journal.orders[0].id,'order:032');
+  assert.ok(calls.includes('/api/v1/workspaces/'+workspace+'/research/sessions/session%3Aone/journal/pages?limit=32&cursor=order%3A031'));
   const nextMethod={...method('method:051')};
   await createMethodVersion({familyId:'method:050',revision:7},nextMethod);
   await setMethodArchived({familyId:'method:050',revision:8},true);

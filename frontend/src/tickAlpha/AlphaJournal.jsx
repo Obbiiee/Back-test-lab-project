@@ -1,16 +1,18 @@
 import {useEffect,useRef,useState} from 'react';
-import {api,sessionPath,noticeText} from './client.js';
+import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
 
 export default function AlphaJournal({view}){
   const [journal,setJournal]=useState(null),[error,setError]=useState(''),[saving,setSaving]=useState(false),[drafts,setDrafts]=useState({});
-  const path=sessionPath(view.metadata.id)+'/journal';
+  const [loadingMore,setLoadingMore]=useState(false);
+  const sessionId=view.metadata.id;
+  const path=sessionPath(sessionId)+'/journal';
   const generation=useRef(0);
   useEffect(()=>{
     let active=true;
     const current=++generation.current;
-    api(path).then(value=>{if(active&&current===generation.current){setJournal(value);setError('');}},failure=>{if(active&&current===generation.current)setError(noticeText(failure.message));});
+    loadJournalPage(sessionId).then(value=>{if(active&&current===generation.current){setJournal(value);setError('');}},failure=>{if(active&&current===generation.current)setError(noticeText(failure.message));});
     return()=>{active=false;};
-  },[path,view.state.revision]);
+  },[path,sessionId,view.state.revision]);
   async function save(order,note){
     generation.current++;
     setSaving(true);setError('');
@@ -23,15 +25,33 @@ export default function AlphaJournal({view}){
   async function reloadJournal(){
     const current=++generation.current;
     setSaving(true);
-    try{const value=await api(path);if(current===generation.current){setJournal(value);setError('');}}
+    try{const value=await loadJournalPage(view.metadata.id);if(current===generation.current){setJournal(value);setError('');}}
     catch(failure){if(current===generation.current)setError(noticeText(failure.message));}
     finally{setSaving(false);}
+  }
+  async function loadMore(){
+    if(!journal?.nextCursor||loadingMore)return;
+    setLoadingMore(true);setError('');
+    try{
+      const page=await loadJournalPage(view.metadata.id,journal.nextCursor);
+      setJournal(previous=>{
+        if(!previous)return previous;
+        const orders=new Map(previous.orders.map(order=>[order.id,order]));
+        for(const order of page.orders)orders.set(order.id,order);
+        const notes=new Map(previous.notes.map(note=>[note.orderId,note]));
+        for(const note of page.notes)notes.set(note.orderId,note);
+        return {...page,orders:[...orders.values()],notes:[...notes.values()]};
+      });
+    }catch(failure){setError(noticeText(failure.message));}
+    finally{setLoadingMore(false);}
   }
   async function exportJournal(){
     setSaving(true);setError('');
     try{
       // Fetch a coherent committed snapshot; never mix browser drafts into financial rows.
-      const value=await api(path);
+      let page=await loadJournalPage(view.metadata.id),orders=new Map(page.orders.map(order=>[order.id,order])),notes=new Map(page.notes.map(note=>[note.orderId,note]));
+      while(!page.complete){page=await loadJournalPage(view.metadata.id,page.nextCursor);for(const order of page.orders)orders.set(order.id,order);for(const note of page.notes)notes.set(note.orderId,note);}
+      const value={...page,artifact:'BTL-TICK-JOURNAL-EXPORT-1',orders:[...orders.values()],notes:[...notes.values()]};
       const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
       const link=document.createElement('a');link.href=url;link.download='backtest-journal.json';link.click();
       setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -54,5 +74,6 @@ export default function AlphaJournal({view}){
         <button disabled={saving||!draft} onClick={()=>save(order,note)}>Save note</button><small>{note?`Saved revision ${note.noteRevision}`:'No saved note'}</small>
       </article>;
     })}
+    {journal&&!journal.complete&&<div><p>{journal.orders.length} of {journal.totalOrders} orders loaded.</p><button disabled={saving||loadingMore} onClick={loadMore}>{loadingMore?'Loading…':'Load more orders'}</button></div>}
   </div>;
 }
