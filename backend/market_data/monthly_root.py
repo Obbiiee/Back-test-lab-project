@@ -2,6 +2,7 @@
 
 import ipaddress
 import os
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 import posixpath
 import re
@@ -12,6 +13,14 @@ from contracts.primitives import require
 
 _BUCKET = re.compile(r"[a-z0-9](?:[a-z0-9.-]{1,61}[a-z0-9])?\Z")
 _SEGMENT = re.compile(r"[A-Za-z0-9._=-]+\Z")
+_S3_WORKER_ENV = frozenset({
+    "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
+    "AWS_REGION", "AWS_DEFAULT_REGION", "AWS_PROFILE",
+    "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE",
+    "AWS_WEB_IDENTITY_TOKEN_FILE", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME",
+    "AWS_CA_BUNDLE", "AWS_EC2_METADATA_DISABLED", "AWS_STS_REGIONAL_ENDPOINTS",
+    "AWS_USE_FIPS_ENDPOINT", "AWS_USE_DUALSTACK_ENDPOINT",
+})
 
 
 def parse_s3_monthly_root(value):
@@ -69,6 +78,17 @@ def monthly_root_from_environment(values):
         return pin_monthly_root(root)
     require(os.path.isabs(root), "syntheticMonthlyRoot", "REFUSED_SOURCE")
     return root
+
+
+def s3_worker_environment(source_root, parent_environment):
+    """Pass only standard AWS auth/TLS settings to a worker using a pinned S3 root."""
+    require(type(source_root) is str and isinstance(parent_environment, Mapping),
+            "syntheticMonthlyRoot", "REFUSED_SOURCE")
+    if not source_root.startswith("s3://"):
+        return {}
+    parse_s3_monthly_root(source_root)
+    return {key: value for key, value in parent_environment.items()
+            if key in _S3_WORKER_ENV}
 
 
 def monthly_object_path(root, base_path, relative):

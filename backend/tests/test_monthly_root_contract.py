@@ -4,7 +4,8 @@ from pathlib import Path
 
 from contracts.primitives import ContractError
 from market_data.monthly_root import (monthly_object_path, monthly_root_from_environment,
-                                      parse_s3_monthly_root, pin_monthly_root)
+                                      parse_s3_monthly_root, pin_monthly_root,
+                                      s3_worker_environment)
 
 
 class MonthlyRootContractTests(unittest.TestCase):
@@ -63,6 +64,17 @@ class MonthlyRootContractTests(unittest.TestCase):
                         ("1", None, "synthetic:qa", "a" * 64, "b" * 64)):
             with self.subTest(values=invalid), self.assertRaises(ContractError):
                 monthly_root_from_environment(invalid)
+
+    def test_s3_worker_receives_only_standard_auth_and_region_settings(self):
+        parent = {"AWS_ACCESS_KEY_ID": "qa-access", "AWS_SECRET_ACCESS_KEY": "qa-secret",
+                  "AWS_SESSION_TOKEN": "qa-token", "AWS_REGION": "us-east-1",
+                  "AWS_ENDPOINT_URL": "http://127.0.0.1:9000", "UNRELATED_SECRET": "hidden"}
+        forwarded = s3_worker_environment("s3://btl-qa-data/monthly/ticks", parent)
+        self.assertEqual(set(forwarded), {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
+                                         "AWS_SESSION_TOKEN", "AWS_REGION"})
+        self.assertEqual(s3_worker_environment("C:\\qa\\monthly", parent), {})
+        with self.assertRaises(ContractError):
+            s3_worker_environment("s3://btl-qa-data/../outside", parent)
 
 
 if __name__ == "__main__":
