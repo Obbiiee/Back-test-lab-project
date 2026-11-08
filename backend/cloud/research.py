@@ -142,7 +142,8 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             owner(unit.role)
         if operation in ('method_page', 'method_detail', 'session_page',
                          'method_family_page', 'method_family_detail',
-                         'method_new_version', 'method_lifecycle'):
+                         'method_family_versions_page', 'method_new_version',
+                         'method_lifecycle'):
             from execution import product_read_model
             from execution import product_method_lifecycle
             if operation == 'method_page':
@@ -155,6 +156,9 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 return product_method_lifecycle.page(db, str(workspace_id), **args[0])
             if operation == 'method_family_detail':
                 return product_method_lifecycle.detail(db, str(workspace_id), args[0])
+            if operation == 'method_family_versions_page':
+                return product_method_lifecycle.versions_page(db, str(workspace_id),
+                    args[0], **args[1])
             if operation == 'method_new_version':
                 db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
                 return product_method_lifecycle.add_version(db, str(workspace_id), args[0], args[1])
@@ -339,6 +343,15 @@ def install(app):
     @app.get(prefix + '/method-families/{family_id}')
     async def method_family(workspace_id: uuid.UUID, family_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'method_family_detail', family_id)
+
+    @app.get(prefix + '/method-families/{family_id}/versions')
+    async def method_family_versions(workspace_id: uuid.UUID, family_id: str,
+                                     limit: int = Query(25, ge=1, le=50),
+                                     after_version: int | None = Query(None, alias='afterVersion', ge=0),
+                                     revision_pin: int | None = Query(None, alias='revision', ge=1),
+                                     user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_family_versions_page', family_id,
+            {'limit': limit, 'after_version': after_version, 'revision_pin': revision_pin})
 
     @app.post(prefix + '/method-families/{family_id}/versions')
     async def method_version(workspace_id: uuid.UUID, family_id: str, request: Request,

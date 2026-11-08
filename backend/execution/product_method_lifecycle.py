@@ -2,9 +2,11 @@
 from contracts.primitives import require, identifier, revision
 from .postgres import unpack, pack
 from .research import method_policy, label
+from .method_version_query import version_rows
 
 MAX_METHODS = 128
 MAX_PAGE = 50
+MAX_VERSION_PAGE = 50
 
 
 def register_first_version(db, workspace_id, method_id):
@@ -99,6 +101,38 @@ def detail(db, workspace_id, family_id):
             "family": _view(db, workspace_id, family_id)}
 
 
+def versions_page(db, workspace_id, family_id, *, limit=25, after_version=None,
+                  revision_pin=None):
+    """Read immutable Method versions with a family-revision-pinned keyset."""
+    require(type(limit) is int and 1 <= limit <= MAX_VERSION_PAGE, "limit")
+    require(after_version is None or (type(after_version) is int and after_version >= 0),
+            "afterVersion", "INVALID_CURSOR")
+    require(revision_pin is None or (type(revision_pin) is int and revision_pin >= 1),
+            "revision", "INVALID_CURSOR")
+    family, _current, _policy = _family(db, workspace_id, family_id)
+    require(revision_pin is None or revision_pin == family["revision"],
+            "revision", "STALE_REVISION")
+    after = 0 if after_version is None else after_version
+    require(after<=family["latest_version"], "afterVersion", "INVALID_CURSOR")
+    rows,more=version_rows(db,workspace_id,family_id,after_version=after,limit=limit)
+    page=[]
+    for row in rows:
+        value=unpack(row["payload"],row["content_hash"])
+        method_policy(value)
+        require(value["id"]==row["method_id"],
+                "methodVersion", "CORRUPT_RECORD")
+        page.append({"version":row["version"],"methodId":row["method_id"],"method":value})
+    require(bool(page) or after==family["latest_version"],
+            "methodVersion", "CORRUPT_RECORD")
+    if not more:
+        require(after+len(page)==family["latest_version"],
+                "methodVersion", "CORRUPT_RECORD")
+    return {"schemaVersion":1,"artifact":"BTL-METHOD-VERSION-PAGE-1",
+            "familyId":family_id,"revision":family["revision"],"versions":page,
+            "nextCursor":{"revision":family["revision"],"afterVersion":page[-1]["version"]}
+                if more and page else None,"complete":not more}
+
+
 def add_version(db, workspace_id, family_id, raw):
     require(type(raw) is dict and set(raw) == {"expectedRevision", "method"}, "methodVersion")
     revision(raw["expectedRevision"], "expectedRevision")
@@ -127,11 +161,6 @@ def add_version(db, workspace_id, family_id, raw):
     require(family["revision"] == raw["expectedRevision"], "revision", "REFUSED_STALE_REVISION")
     require(not family["archived"], "methodFamily", "REFUSED_ARCHIVED")
     require(method["id"] != family_id and method["id"] != current["id"], "methodId", "REFUSED_IDENTITY_REUSE")
-    # The pre-existing 128-row catalog bound counts every immutable Method
-    # payload, including successors. Archive is lifecycle metadata and never
-    # frees a slot or makes historical version mappings unreadable.
-    count = db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s", (workspace_id,)).fetchone()[0]
-    require(count < MAX_METHODS, "methods", "REFUSED_CATALOG_LIMIT")
     db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",
                (workspace_id, method["id"], blob, sha))
     next_version = family["latest_version"] + 1

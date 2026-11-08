@@ -302,8 +302,6 @@ class ResearchApplication:
             if prior:
                 require(prior[0] == sha, "methodId", "REFUSED_IDEMPOTENCY_CONFLICT")
                 return self._method(db,raw["id"])
-            count = db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
-            require(count < 128, "methods", "REFUSED_CATALOG_LIMIT")
             db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],blob,sha))
             from .product_method_lifecycle import register_first_version
             register_first_version(db, self.scope.workspace_id, raw["id"])
