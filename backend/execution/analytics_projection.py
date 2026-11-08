@@ -21,6 +21,23 @@ def ratio(value):
     return dict(numerator=str(value.numerator),denominator=str(value.denominator))
 
 
+def completed_trade_row(order_id,order,history):
+    """Convert a closed indexed order into the frozen Analytics trade row."""
+    require(type(order) is dict and type(history) is dict and
+        history.get('entryTimeNs') is not None and history.get('exitTimeNs') is not None and
+        history.get('entryFillRef') is not None and history.get('exitFillRef') is not None,
+        'analyticsOrderHistory','CORRUPT_RECORD')
+    return dict(id=order_id,side=order['side'],status='CLOSED',quantity=order['quantity'],
+        remaining='0',entry=order['entryPrice'],entryPrice=order['entryPrice'],
+        entryTimeNs=history['entryTimeNs'],exitTimeNs=history['exitTimeNs'],
+        entryFillRef=history['entryFillRef'],sl=order['sl'],tp=order['tp'],
+        exitPrice=history['exitPrice'],exitFillRef=history['exitFillRef'],
+        exitReason=history['exitReason'],gross=history['exactGross'],commission='0',
+        net=order['grossPosted'],durationNs=str(int(history['exitTimeNs'])-int(history['entryTimeNs'])),
+        mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',
+        rMultiple=None,rReason='PREENTRY_REVIEW_RISK_NOT_JOINED')
+
+
 def _encode_windows(curve,annotations):
     wire=dict(schemaVersion=1,artifact=WINDOW_ARTIFACT,curve=curve[-256:],annotations=annotations[-512:])
     return base64.b64encode(zlib.compress(canonical_bytes(wire),6)).decode('ascii')

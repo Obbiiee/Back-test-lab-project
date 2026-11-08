@@ -6,6 +6,27 @@ from contracts.primitives import require
 from .contracts import text
 
 
+def journal_order_summary(order_id,status,order,history):
+    """Convert one verified projection record to the frozen Journal row shape."""
+    completed=status=='CLOSED'
+    if completed:
+        require(type(history) is dict and history.get('entryTimeNs') is not None and
+            history.get('exitTimeNs') is not None and history.get('entryFillRef') is not None and
+            history.get('exitFillRef') is not None,'journalProjectionHistory','CORRUPT_RECORD')
+    row=dict(id=order_id,side=order['side'],status=status,quantity=order['quantity'],
+        remaining=order['remaining'],entry=order['entry'],entryPrice=order['entryPrice'],
+        entryTimeNs=history['entryTimeNs'] if completed else None,
+        entryFillRef=history['entryFillRef'] if completed else None,sl=order['sl'],tp=order['tp'],
+        exitRequested=order['exitRequest'] is not None,
+        exitPrice=history['exitPrice'] if completed else None,
+        exitFillRef=history['exitFillRef'] if completed else None,
+        exitReason=history['exitReason'] if completed else None,
+        gross=order['grossPosted'],commission='0',net=order['grossPosted'],
+        netCashChange=order['grossPosted'],unrealizedIndicative=None,mae=None,mfe=None,
+        excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED')
+    return row
+
+
 def journal_projection_changes(events, state, archive_records=None, prior_history=None):
     """Build final per-order rows touched by a committed command.
 

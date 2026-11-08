@@ -22,6 +22,7 @@ from infrastructure.database import connect
 from .analysis import RESEARCH_VERSION,planned_risk
 from .contracts import exact,open_payload,policy_wire,text,risk_quantity
 from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
+from .journal_projection import journal_order_summary
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
 from .observed_kernel import command_wire, seed_state, PRODUCT_ORDER_RETENTION_V1
@@ -29,7 +30,8 @@ from .observed_session_dispatch import dispatch_observed_session
 from .observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
 from .observed_profile import ENGINE_VERSION,MODEL,ObservedExecutionProfile
 from .observed_analysis import ObservedStatistics
-from .analytics_projection import initial_projection,analytics_view,ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT
+from .analytics_projection import (initial_projection,analytics_view,completed_trade_row,
+    ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT)
 from .postgres import pack,unpack
 from .research import method_policy,label
 from .bootstrap import bootstrap as descriptive_bootstrap,validate_seed
@@ -492,37 +494,11 @@ class ObservedResearchApplication:
                     (session_id,order_id,status,sequence,event_id),'journalProjection','CORRUPT_RECORD')
                 order=wire.get('order');history=wire.get('history')
                 require(type(order) is dict and type(history) is dict,'journalProjection','CORRUPT_RECORD')
-                completed=None
-                if status=='CLOSED':
-                    require(history.get('entryTimeNs') is not None and history.get('exitTimeNs') is not None and
-                        history.get('entryFillRef') is not None and history.get('exitFillRef') is not None,
-                        'journalProjectionHistory','CORRUPT_RECORD')
-                    completed=dict(id=order_id,side=order['side'],status='CLOSED',quantity=order['quantity'],
-                        remaining='0',entry=order['entryPrice'],entryPrice=order['entryPrice'],
-                        entryTimeNs=history['entryTimeNs'],exitTimeNs=history['exitTimeNs'],
-                        entryFillRef=history['entryFillRef'],sl=order['sl'],tp=order['tp'],
-                        exitPrice=history['exitPrice'],exitFillRef=history['exitFillRef'],
-                        exitReason=history['exitReason'],gross=history['exactGross'],commission='0',
-                        net=order['grossPosted'],durationNs=str(int(history['exitTimeNs'])-int(history['entryTimeNs'])),
-                        mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',
-                        rMultiple=None,rReason='PREENTRY_REVIEW_RISK_NOT_JOINED')
-                orders.append(dict(id=order_id,side=order['side'],status=status,quantity=order['quantity'],
-                    remaining=order['remaining'],entry=order['entry'],entryPrice=order['entryPrice'],
-                    entryTimeNs=None if completed is None else completed['entryTimeNs'],
-                    entryFillRef=None if completed is None else completed['entryFillRef'],
-                    sl=order['sl'],tp=order['tp'],exitRequested=order['exitRequest'] is not None,
-                    exitPrice=None if completed is None else completed['exitPrice'],
-                    exitFillRef=None if completed is None else completed['exitFillRef'],
-                    exitReason=None if completed is None else completed['exitReason'],
-                    gross=order['grossPosted'],commission='0',net=order['grossPosted'],
-                    netCashChange=order['grossPosted'],unrealizedIndicative=None,mae=None,mfe=None,
-                    excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED'))
-                if completed is not None:orders[-1]['_completed']=completed
+                orders.append(journal_order_summary(order_id,status,order,history))
             return orders,more,total
 
     def _journal_projection_notes(self,session_id,state,projection_page):
         orders,more,total=projection_page
-        completed=[row.pop('_completed') for row in orders if '_completed' in row]
         indexed={row['id']:row for row in orders}
         notes=[]
         if orders:
@@ -621,18 +597,7 @@ class ObservedResearchApplication:
                     wire.get('sessionId')==session_id and wire.get('orderId')==order_id and
                     wire.get('status')=='CLOSED' and type(wire.get('history')) is dict,
                     'analyticsOrderProjection','CORRUPT_RECORD')
-                order=wire['order'];history=wire['history']
-                require(history.get('entryTimeNs') is not None and history.get('exitTimeNs') is not None,
-                    'analyticsOrderHistory','CORRUPT_RECORD')
-                completed.append(dict(id=order_id,side=order['side'],status='CLOSED',quantity=order['quantity'],
-                    remaining='0',entry=order['entryPrice'],entryPrice=order['entryPrice'],
-                    entryTimeNs=history['entryTimeNs'],exitTimeNs=history['exitTimeNs'],
-                    entryFillRef=history['entryFillRef'],sl=order['sl'],tp=order['tp'],
-                    exitPrice=history['exitPrice'],exitFillRef=history['exitFillRef'],
-                    exitReason=history['exitReason'],gross=history['exactGross'],commission='0',
-                    net=order['grossPosted'],durationNs=str(int(history['exitTimeNs'])-int(history['entryTimeNs'])),
-                    mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',
-                    rMultiple=None,rReason='PREENTRY_REVIEW_RISK_NOT_JOINED'))
+                completed.append(completed_trade_row(order_id,wire['order'],wire['history']))
             view=analytics_view(aggregate,state)
             return dict(schemaVersion=1,artifact='BTL-OBSERVED-ANALYTICS-PAGE-1',sessionId=session_id,
                 revision=state['revision'],status='COMPLETE',metrics=view['metrics'],completed=completed,

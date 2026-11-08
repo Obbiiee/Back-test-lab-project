@@ -1,10 +1,23 @@
 """Synthetic contracts for the bounded Journal projection fold."""
 import unittest
 
-from execution.journal_projection import journal_projection_changes
+from execution.journal_projection import journal_projection_changes,journal_order_summary
 
 
 class JournalProjectionContractTests(unittest.TestCase):
+    def test_closed_and_active_order_rows_keep_the_existing_journal_shape(self):
+        order=dict(side='LONG',status='CLOSED',quantity='1',remaining='0',entry='10',entryPrice='10',
+            entryCost='0',exitRequest=None,grossPosted='2',sl='9',tp='12')
+        history=dict(entryTimeNs='100',entryFillRef='a'*64,exitTimeNs='130',exitPrice='12',
+            exitFillRef='b'*64,exitReason='TP',exactGross='2',exitFills=1)
+        closed=journal_order_summary('trade:one','CLOSED',order,history)
+        self.assertEqual(set(closed),{'id','side','status','quantity','remaining','entry','entryPrice',
+            'entryTimeNs','entryFillRef','sl','tp','exitRequested','exitPrice','exitFillRef','exitReason',
+            'gross','commission','net','netCashChange','unrealizedIndicative','mae','mfe','excursionReason'})
+        self.assertEqual(closed['entryTimeNs'],'100')
+        active=journal_order_summary('trade:one','ACTIVE',dict(order,status='ACTIVE',remaining='1'),history)
+        self.assertIsNone(active['entryTimeNs']);self.assertIsNone(active['exitFillRef'])
+
     def test_latest_status_and_trade_history_are_folded_from_incremental_events(self):
         order=dict(side='LONG',status='CLOSED',quantity='1',remaining='0',entry='10',
             entryPrice='10',entryFillRef='entry-ref',entryCost='0',exitRequest=None,

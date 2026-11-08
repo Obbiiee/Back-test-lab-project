@@ -2,10 +2,22 @@
 import unittest
 from fractions import Fraction
 
-from execution.analytics_projection import initial_projection,advance_projection,analytics_view
+from execution.analytics_projection import (initial_projection,advance_projection,analytics_view,
+    completed_trade_row)
 
 
 class AnalyticsProjectionContractTests(unittest.TestCase):
+    def test_closed_trade_projection_matches_existing_analytics_response_shape(self):
+        order=dict(side='SHORT',quantity='2',entryPrice='20',sl='21',tp='18',grossPosted='4')
+        history=dict(entryTimeNs='200',entryFillRef='a'*64,exitTimeNs='240',exitPrice='18',
+            exitFillRef='b'*64,exitReason='TP',exactGross='4')
+        row=completed_trade_row('trade:two',order,history)
+        self.assertEqual(set(row),{'id','side','status','quantity','remaining','entry','entryPrice',
+            'entryTimeNs','exitTimeNs','entryFillRef','sl','tp','exitPrice','exitFillRef','exitReason',
+            'gross','commission','net','durationNs','mae','mfe','excursionReason','rMultiple','rReason'})
+        self.assertEqual((row['side'],row['status'],row['gross'],row['net'],row['durationNs']),
+                         ('SHORT','CLOSED','4','4','40'))
+
     def test_exact_financial_aggregate_matches_bounded_windows(self):
         initial=dict(sessionId='session:analytics',revision=0,eventHash='a'*64,
             initialBalance='100',balance='100')
