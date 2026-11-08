@@ -661,6 +661,21 @@ class MonthlyParquetProvider:
                 "dataset", "VERSION_MISMATCH")
         return deepcopy(self._source_manifest)
 
+    def first_time_for_month(self, month):
+        """Return the pinned first event time in one configured UTC month."""
+        require(type(month) is str and
+                re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month) is not None,
+                "month", "INVALID_INPUT")
+        entry = self._file_for_month(month)
+        require(entry is not None, "month", "REFUSED_SOURCE_NOT_AVAILABLE")
+        path = self._location(entry["path"])
+        require(self._is_file(path), "file", "MISSING_CHILD")
+        group = entry["rowGroups"][0]
+        events, _timestamps, _indices = self._read_row_group(path, entry, group)
+        require(events and events[0]["timeNs"] == entry["firstTimeNs"],
+                "monthStart", "CORRUPT_INDEX_POINTER")
+        return int(events[0]["timeNs"])
+
     def read_page(self, dataset_id, dataset_version, after_token=None, max_events=64):
         self.describe(dataset_id, dataset_version)
         require(type(max_events) is int and 1 <= max_events <= 64, "max_events", "ARTIFACT_LIMIT")

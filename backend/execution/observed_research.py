@@ -103,8 +103,10 @@ class ObservedResearchApplication:
                 if meta.get('artifact')==META:
                     self._session(db,meta['id']);sessions.append(meta)
                 elif meta.get('artifact')=='BTL-LOCAL-SESSION-1':
-                    tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance')
-                    require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id);sessions.append(meta)
+                    tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance'+
+                        (' sourceKey monthlyManifestHash' if 'sourceKey' in meta or 'monthlyManifestHash' in meta else ''))
+                    require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id)
+                    sessions.append({key:value for key,value in meta.items() if key!='monthlyManifestHash'})
             return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,
                 datasets=self.catalog.public(),model=MODEL,methodsComplete=len(method_rows)<=128,sessionsComplete=len(rows)<=128)
 

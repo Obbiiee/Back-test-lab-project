@@ -111,7 +111,7 @@ class JournalOrderIndexTests(unittest.TestCase):
                   reason='MANUAL', evidence={'timeNs': '20', 'groupId': 'g:exit',
                                             'eventIds': ['tick:exit']}),
         ]
-        db = DB((7, 'b' * 64, 0, 0))
+        db = DB((7, 'b' * 64, 0, 0, 0))
         self.assertTrue(append(db, 'workspace:a', 'session:a', prior, following, rows))
         self.assertEqual(len(db.statements), 8)  # head, row lookup, three refs, projection, analytics, head advance
         projection_write = next(item for item in db.statements
@@ -126,7 +126,7 @@ class JournalOrderIndexTests(unittest.TestCase):
         self.assertIn('UPDATE btl.tick_journal_projection_heads', db.statements[-1][0])
         self.assertEqual(db.statements[-1][1], (10, 'c' * 64, 1, 1, 'workspace:a', 'session:a'))
 
-        mismatched = DB((6, 'a' * 64, 0, 0))
+        mismatched = DB((6, 'a' * 64, 0, 0, 0))
         with self.assertRaises(ContractError):
             append(mismatched, 'workspace:a', 'session:a', prior, following, rows)
         self.assertEqual(len(mismatched.statements), 1)
@@ -184,13 +184,18 @@ class JournalOrderIndexTests(unittest.TestCase):
             datasetId='dataset:a', datasetVersion='v1', engineVersion='engine:v1',
             profileHash='f' * 64, policy={'definitionHash': 'e' * 64},
             profile={'contractSize': '1'}, orders={}, parent=None)
+        db = DB()
         with patch.object(app, '_quote', return_value=None), \
              patch.object(app, '_research_risk'), \
              patch('execution.research.project', side_effect=AssertionError('full ledger fold')):
-            result = app._indexed_journal_page(DB(), state, None, None, 32)
+            result = app._indexed_journal_page(db, state, None, None, 32)
 
         self.assertEqual(result['total'], 1)
         self.assertFalse(result['more'])
+        page_query = next(query for query in db.queries
+                          if 'FROM btl.tick_journal_order_projection p' in query)
+        self.assertIn('p.order_id COLLATE "C">%s', page_query)
+        self.assertIn('ORDER BY p.order_id COLLATE "C"', page_query)
         expected_order = dict(order, excursionReason='POSITION_NOT_COMPLETED')
         self.assertEqual(result['analysis']['orders'], [expected_order])
         exact_db = DB()
@@ -288,7 +293,7 @@ class JournalOrderIndexTests(unittest.TestCase):
             def execute(self, query, params):
                 self.statements.append((query, params))
                 if 'SELECT through_sequence,event_hash,order_count' in query:
-                    return Result((7, 'b' * 64, 1, 0))
+                    return Result((7, 'b' * 64, 1, 0, 1))
                 if 'FROM btl.tick_journal_order_projection ' in query:
                     return Result(rows=[])
                 if 'FROM btl.tick_session_metric_projections' in query:

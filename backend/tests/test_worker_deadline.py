@@ -73,6 +73,50 @@ class WorkerDeadlineTests(unittest.TestCase):
                 self.assertRaises(ContractError):
             worker._environment('private-dsn')
 
+    def test_monthly_catalog_pin_and_s3_reader_config_reach_isolated_worker(self):
+        values = {
+            'BTL_MONTHLY_PARQUET_CATALOG': '/srv/riksora/monthly-catalog.json',
+            'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64,
+            'RIKSORA_S3_REGION': 'auto',
+            'RIKSORA_S3_ENDPOINT': 'https://objects.example.test',
+            'RIKSORA_S3_SCHEME': 'https',
+            'RIKSORA_S3_ACCESS_KEY': 'qa-access-key',
+            'RIKSORA_S3_SECRET_KEY': 'qa-secret-key',
+            'RIKSORA_S3_SESSION_TOKEN': 'qa-session-token',
+        }
+        with patch.dict(os.environ, values, clear=True):
+            child_env = worker._environment('private-dsn')
+        self.assertEqual({name: child_env[name] for name in values}, values)
+        self.assertNotIn('BTL_WORKER_DATABASE', values)
+
+    def test_monthly_catalog_pin_and_s3_credentials_refuse_partial_or_invalid_values(self):
+        with patch.dict(os.environ, {'BTL_MONTHLY_PARQUET_CATALOG': '/srv/catalog.json'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': 'relative/catalog.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'RIKSORA_S3_ACCESS_KEY': 'only-half'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'RIKSORA_S3_SCHEME': 'ftp'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
+    def test_s3_credentials_require_tls_but_anonymous_http_is_supported(self):
+        with patch.dict(os.environ, {'RIKSORA_S3_SCHEME': 'http',
+                                     'RIKSORA_S3_ACCESS_KEY': 'access',
+                                     'RIKSORA_S3_SECRET_KEY': 'secret'}, clear=True), \
+                self.assertRaisesRegex(ContractError, 'REFUSED_SOURCE'):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'RIKSORA_S3_SCHEME': 'http'}, clear=True):
+            self.assertEqual(worker._environment('private-dsn')['RIKSORA_S3_SCHEME'], 'http')
+        with patch.dict(os.environ, {'RIKSORA_S3_SESSION_TOKEN': 'token'}, clear=True), \
+                self.assertRaisesRegex(ContractError, 'REFUSED_SOURCE'):
+            worker._environment('private-dsn')
+
     def test_actual_serve_crosses_4096_and_recycles_at_propagated_parent_limit(self):
         # Exercise the production serve loop, with only DB/source work replaced
         # by authored replies. A child silently retaining 4096 exits early.
@@ -111,6 +155,19 @@ worker.serve()
             first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
         with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), \
                 patch.dict(os.environ, {'BTL_QA_TIMELINE_LOG_CODEC': 'zlib-1'}):
+            second = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        self.assertNotEqual(first['pid'], second['pid'])
+
+    def test_pooled_worker_restarts_when_monthly_catalog_or_s3_pin_changes(self):
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': '/srv/catalog-a.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64,
+                'RIKSORA_S3_ENDPOINT': 'https://objects-a.example.test'}, clear=True):
+            first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': '/srv/catalog-b.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'b' * 64,
+                'RIKSORA_S3_ENDPOINT': 'https://objects-b.example.test'}, clear=True):
             second = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
         self.assertNotEqual(first['pid'], second['pid'])
 
@@ -169,6 +226,15 @@ worker.serve()
             self.assertNotEqual(recycled['pid'],process.pid)
             self.assertEqual(start_slot.call_count,2)
             self.assertTrue(all(call.args[2]==worker.STARTUP_WARMUP_DEADLINE for call in start_slot.call_args_list))
+
+    def test_monthly_catalog_source_warms_worker_before_jobs(self):
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': '/private/monthly-catalog.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64}):
+            self.assertTrue(worker.warm_sources('authored-not-a-database'))
+            process = worker._slots[0].process
+            result = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+            self.assertEqual(result['pid'], process.pid)
 
     def test_native_process_is_reaped_after_deadline(self):
         entry='import json,os,sys,time; p=json.loads(sys.stdin.buffer.read()); open(p["pidPath"],"w").write(str(os.getpid())); time.sleep(300)'

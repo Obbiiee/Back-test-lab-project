@@ -49,7 +49,8 @@ def method_policy(record):
 class ResearchApplication:
     """Single-user local operator; no public identity/tenant composition."""
     def __init__(self, dsn, scope=None, *, historical_source=None, synthetic_provider=None,
-                 state_storage_format="compact-v1"):
+                 state_storage_format="compact-v1", monthly_catalog=None,
+                 monthly_source_key=None, monthly_period=None):
         require(historical_source is None or synthetic_provider is None, 'source', 'IDENTITY_CONFLICT')
         if synthetic_provider is not None:
             manifest = TickManifest.from_wire(
@@ -62,6 +63,19 @@ class ResearchApplication:
         self.scope = scope or TrustedScope("local:exness:"+historical_source.version if historical_source else "fixture:local-alpha", "fixture:local-operator")
         self.__historical = historical_source
         self.__provider = historical_source or synthetic_provider or research_provider()
+        self.__monthly_catalog = monthly_catalog
+        self.__monthly_source_key = monthly_source_key
+        self.__monthly_period = monthly_period
+        require((monthly_source_key is None) == (monthly_period is None) and
+                (monthly_source_key is None or monthly_catalog is not None),
+                'monthlySource', 'REFUSED_SOURCE')
+        if monthly_source_key is not None:
+            selected = monthly_catalog.selection(monthly_source_key, monthly_period)
+            require(selected['eligibility'] == 'SYNTHETIC' and
+                    selected['manifestSha256'] == self.__provider.manifest_hash and
+                    (selected['datasetId'], selected['datasetVersion']) ==
+                    (self.__provider.dataset_id, self.__provider.dataset_version),
+                    'monthlySource', 'REFUSED_SOURCE')
         self.__profile = historical_source.profile if historical_source else research_profile()
         self.__label = historical_source.label if historical_source else "SYNTHETIC / TEST ONLY"
         self.__start = historical_source.start_ns if historical_source else START_NS
@@ -98,7 +112,9 @@ class ResearchApplication:
                               (self.scope.workspace_id, session_id)).fetchone()
         require(meta_row is not None, "session", "RESOURCE_UNAVAILABLE")
         meta = unpack(*meta_row[:2])
-        tag(meta, "BTL-LOCAL-SESSION-1", "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance")
+        monthly = 'sourceKey' in meta or 'monthlyManifestHash' in meta
+        tag(meta, "BTL-LOCAL-SESSION-1", "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance" +
+            (" sourceKey monthlyManifestHash" if monthly else ""))
         require(meta["id"] == session_id and meta["methodId"] == meta_row[2], "session", "CORRUPT_RECORD")
         method = self._method(db, meta["methodId"])
         policy = method_policy(method)
@@ -112,8 +128,20 @@ class ResearchApplication:
                 state["policy"] == policy_wire(policy) and meta["methodHash"] == policy.definition_hash and
                 (meta["datasetId"],meta["datasetVersion"],meta["profileHash"],meta["initialBalance"]) ==
                 (state["datasetId"],state["datasetVersion"],state["profileHash"],state["initialBalance"]), "sessionPins", "CORRUPT_RECORD")
-        require(state["datasetId"] == self.__provider.dataset_id and state["datasetVersion"] == self.__provider.dataset_version,
-                "dataset", "REFUSED_DATASET_VERSION")
+        if monthly:
+            require(self.__monthly_catalog is not None,
+                    'monthlySource', 'REFUSED_SOURCE_NOT_AVAILABLE')
+            selected = self.__monthly_catalog.selection(meta['sourceKey'], meta['startPeriod'])
+            require(selected['eligibility'] == 'SYNTHETIC' and
+                    selected['manifestSha256'] == meta['monthlyManifestHash'] and
+                    (meta['datasetId'], meta['datasetVersion']) ==
+                    (selected['datasetId'], selected['datasetVersion']) and
+                    (state['datasetId'], state['datasetVersion']) ==
+                    (selected['datasetId'], selected['datasetVersion']),
+                    'monthlySource', 'REFUSED_SOURCE')
+        else:
+            require(state["datasetId"] == self.__provider.dataset_id and state["datasetVersion"] == self.__provider.dataset_version,
+                    "dataset", "REFUSED_DATASET_VERSION")
         return meta, method, state, checkpoint
 
     def catalog(self):
@@ -128,9 +156,12 @@ class ResearchApplication:
             metas = [unpack(*row) for row in sessions[:128]]
             for meta in metas:
                 self._session(db, meta["id"])
-            return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=metas,
+            public_metas = [{key: value for key, value in meta.items()
+                             if key != 'monthlyManifestHash'} for meta in metas]
+            return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=public_metas,
                         label=self.__label, profile=self.__profile, startPeriod=self.__period,
                         availability=self.availability(),
+                        monthlySources=[] if self.__monthly_catalog is None else self.__monthly_catalog.public(),
                         methodsComplete=methods_complete,sessionsComplete=sessions_complete)
 
     def availability(self):
@@ -321,14 +352,20 @@ class ResearchApplication:
 
     def _durable_session_metrics(self, db, state):
         row = db.execute(
-            'SELECT a.payload,a.content_hash,h.closed_order_count '
-            'FROM btl.tick_session_metric_projections a '
-            'JOIN btl.tick_journal_projection_heads h '
-            'ON (h.workspace_id,h.session_id)=(a.workspace_id,a.session_id) '
-            'WHERE a.workspace_id=%s AND a.session_id=%s',
+            'SELECT a.payload,a.content_hash,h.closed_order_count,h.analytics_format_version '
+            'FROM btl.tick_journal_projection_heads h '
+            'LEFT JOIN btl.tick_session_metric_projections a '
+            'ON (a.workspace_id,a.session_id)=(h.workspace_id,h.session_id) '
+            'WHERE h.workspace_id=%s AND h.session_id=%s',
             (self.scope.workspace_id, state['sessionId']),
         ).fetchone()
         if row is None:
+            return None
+        require(type(row[3]) is int and row[3] in (0, 1),
+                'sessionAnalyticsProjection', 'CORRUPT_RECORD')
+        if row[0] is None:
+            require(row[3] == 0,
+                    'sessionAnalyticsProjection', 'CORRUPT_RECORD')
             return None
         projection = verify_session_metric_projection(row[0], row[1],
             session_id=state['sessionId'], through_sequence=state['nextEventIndex'],
@@ -356,10 +393,18 @@ class ResearchApplication:
         return raw
 
     def create_session(self, raw):
-        keys(raw, "id name methodId initialBalance startPeriod")
+        monthly = self.__monthly_source_key is not None
+        keys(raw, "id name methodId initialBalance startPeriod" + (" sourceKey period" if monthly else ""))
         identifier(raw["id"], "sessionId"); label(raw["name"])
         if self.__historical:
             start = self.__historical.start_for_period(raw["startPeriod"])
+            warmup = start + 1800*1000000000
+        elif monthly:
+            require(raw['sourceKey'] == self.__monthly_source_key and
+                    raw['period'] == self.__monthly_period and
+                    raw['startPeriod'] == self.__monthly_period,
+                    'monthlySource', 'REFUSED_SOURCE')
+            start = self.__provider.first_time_for_month(raw['startPeriod'])
             warmup = start + 1800*1000000000
         else:
             require(raw["startPeriod"] == self.__period, "period", "REFUSED_FIXTURE_PERIOD")
@@ -378,6 +423,9 @@ class ResearchApplication:
                 meta = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-1", id=raw["id"], name=label(raw["name"]), methodId=raw["methodId"],
                             methodHash=policy.definition_hash, datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
                             profileHash=state["profileHash"], startPeriod=raw["startPeriod"], initialBalance=state["initialBalance"])
+                if monthly:
+                    meta.update(sourceKey=self.__monthly_source_key,
+                                monthlyManifestHash=self.__provider.manifest_hash)
                 blob, sha = pack(meta)
                 prior = db.execute("SELECT content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s", (self.scope.workspace_id,raw["id"])).fetchone()
                 if prior:
@@ -414,9 +462,11 @@ class ResearchApplication:
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             meta, method, state, checkpoint = self._session(db,session_id)
+            public_meta = {key: value for key, value in meta.items()
+                           if key != 'monthlyManifestHash'}
             rows = db.execute("SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 256",
                               (self.scope.workspace_id,session_id)).fetchall()
-            view = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=meta, method=method, state=state,
+            view = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=public_meta, method=method, state=state,
                         events=[unpack(*row) for row in reversed(rows)], eventWindowStart=max(0,state["nextEventIndex"]-256),
                         quote=self._quote(state,checkpoint), label=self.__label)
             if self.__historical:
@@ -561,8 +611,8 @@ class ResearchApplication:
                 'JOIN btl.tick_events e '
                 'ON (e.workspace_id,e.session_id,e.sequence,e.event_id)='
                 '(p.workspace_id,p.session_id,p.last_sequence,p.event_id) '
-                'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id>%s '
-                'ORDER BY p.order_id LIMIT %s',
+                'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id COLLATE "C">%s '
+                'ORDER BY p.order_id COLLATE "C" LIMIT %s',
                 (self.scope.workspace_id, state['sessionId'], after_order_id or '', limit + 1),
             ).fetchall()
         else:

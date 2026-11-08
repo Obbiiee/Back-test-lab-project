@@ -136,7 +136,7 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
     full-ledger fallback until a verified backfill is implemented.
     """
     head = db.execute(
-        'SELECT through_sequence,event_hash,order_count,closed_order_count '
+        'SELECT through_sequence,event_hash,order_count,closed_order_count,analytics_format_version '
         'FROM btl.tick_journal_projection_heads '
         'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
         (workspace_id, session_id),
@@ -146,7 +146,8 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
     require(
         head[:2] == (prior_state['nextEventIndex'], prior_state['eventHash']) and
         type(head[2]) is int and head[2] >= 0 and
-        type(head[3]) is int and head[3] >= 0,
+        type(head[3]) is int and head[3] >= 0 and
+        type(head[4]) is int and head[4] in (0, 1),
         'journalIndexHead',
         'CORRUPT_RECORD',
     )
@@ -224,6 +225,9 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
         'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
         (workspace_id, session_id),
     ).fetchone()
+    if head[4] == 1:
+        require(metric_row is not None,
+                'sessionAnalyticsProjection', 'CORRUPT_RECORD')
     if metric_row is not None:
         aggregate = verify_metric_record(metric_row[0], metric_row[1],
             session_id=session_id, through_sequence=prior_state['nextEventIndex'],

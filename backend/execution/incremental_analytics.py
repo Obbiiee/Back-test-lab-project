@@ -65,10 +65,9 @@ def add_trade(value, order):
 
 def metrics(value):
     totals = value['totals']
+    _validate_totals(totals)
     count, wins, losses, eligible = (totals['tradeCount'], totals['wins'],
                                      totals['losses'], totals['rEligible'])
-    require(count == wins + losses + totals['breakeven'] and 0 <= eligible <= count,
-            'sessionAnalyticsTotals', 'CORRUPT_RECORD')
     positive, negative = Fraction(totals['positive']), Fraction(totals['negative'])
     return dict(tradeCount=count, wins=wins, losses=losses,
         breakeven=totals['breakeven'],
@@ -87,6 +86,39 @@ def metrics(value):
                         eligible=eligible, exclusions=count - eligible, minimum=30))
 
 
+def _validate_totals(totals):
+    fields = {'tradeCount', 'wins', 'losses', 'breakeven', 'rEligible', 'totalNet',
+        'positive', 'negative', 'totalR', 'totalDuration', 'durationCount',
+        'maxWinStreak', 'maxLossStreak', 'winTail', 'lossTail'}
+    require(type(totals) is dict and set(totals) == fields,
+            'sessionAnalyticsTotals', 'CORRUPT_RECORD')
+    counters = fields - {'totalNet', 'positive', 'negative', 'totalR', 'totalDuration'}
+    require(all(type(totals[name]) is int and totals[name] >= 0 for name in counters),
+            'sessionAnalyticsTotals', 'CORRUPT_RECORD')
+    count, wins, losses = totals['tradeCount'], totals['wins'], totals['losses']
+    require(count == wins + losses + totals['breakeven'] and
+            totals['rEligible'] <= count and totals['durationCount'] <= count and
+            totals['maxWinStreak'] <= wins and totals['maxLossStreak'] <= losses and
+            totals['winTail'] <= totals['maxWinStreak'] and
+            totals['lossTail'] <= totals['maxLossStreak'] and
+            not (totals['winTail'] and totals['lossTail']),
+            'sessionAnalyticsTotals', 'CORRUPT_RECORD')
+    try:
+        amounts = {name: Fraction(totals[name])
+                   for name in ('totalNet', 'positive', 'negative', 'totalR')}
+        duration = totals['totalDuration']
+        duration_value = int(duration)
+    except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+        require(False, 'sessionAnalyticsTotals', 'CORRUPT_RECORD')
+    require(all(type(totals[name]) is str and text(amounts[name]) == totals[name]
+                for name in ('totalNet', 'positive', 'negative', 'totalR')) and
+            amounts['positive'] >= 0 and amounts['negative'] >= 0 and
+            amounts['totalNet'] == amounts['positive'] - amounts['negative'] and
+            type(duration) is str and duration_value >= 0 and str(duration_value) == duration and
+            (totals['durationCount'] > 0 or duration_value == 0),
+            'sessionAnalyticsTotals', 'CORRUPT_RECORD')
+
+
 def verify(raw, digest, *, session_id, through_sequence, event_head):
     value = json.loads(raw)
     require(canonical_bytes(value) == raw and content_hash(value) == digest and
@@ -98,4 +130,5 @@ def verify(raw, digest, *, session_id, through_sequence, event_head):
         (value['sessionId'], value['throughSequence'], value['eventHead']) ==
             (session_id, through_sequence, event_head),
         'sessionAnalyticsProjection', 'CORRUPT_RECORD')
+    _validate_totals(value['totals'])
     return value

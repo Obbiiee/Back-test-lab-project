@@ -141,7 +141,7 @@ class TickExecutionPostgresTests(unittest.TestCase):
         h.call('CANCEL', dict(orderId=order_id), name='journal:cancel')
         with connect(DSN) as db:
             head = db.execute(
-                'SELECT format_version,through_sequence,event_hash,order_count,closed_order_count '
+                'SELECT format_version,through_sequence,event_hash,order_count,closed_order_count,analytics_format_version '
                 'FROM btl.tick_journal_projection_heads '
                 'WHERE workspace_id=%s AND session_id=%s',
                 (self.scope.workspace_id, session),
@@ -169,7 +169,7 @@ class TickExecutionPostgresTests(unittest.TestCase):
                 'WHERE workspace_id=%s AND session_id=%s',
                 (self.scope.workspace_id, session),
             ).fetchone()
-        self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1, 0))
+        self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1, 0, 1))
         events = [unpack(row[3], row[4]) for row in indexed]
         self.assertEqual([row[2] for row in indexed], [event['kind'] for event in events])
         self.assertEqual(events[0]['kind'], 'ORDER_ACCEPTED')

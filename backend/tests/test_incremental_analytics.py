@@ -37,6 +37,16 @@ class IncrementalAnalyticsTests(unittest.TestCase):
             verify(raw, '0' * 64, session_id='session:analytics',
                 through_sequence=4, event_head='a' * 64)
 
+    def test_projection_rejects_semantically_invalid_totals_even_with_recomputed_hash(self):
+        value = record('session:analytics', 4, 'a' * 64)
+        value['totals']['wins'] = 1
+        value['contentHash'] = content_hash({key: item for key, item in value.items()
+                                             if key != 'contentHash'})
+        raw = canonical_bytes(value)
+        with self.assertRaises(ContractError):
+            verify(raw, content_hash(value), session_id='session:analytics',
+                   through_sequence=4, event_head='a' * 64)
+
     def test_incremental_aggregate_matches_every_frozen_golden_scenario(self):
         for case in goldens()['scenarios']:
             with self.subTest(case=case['id']):

@@ -8,6 +8,14 @@
 
 ### Current verified engineering evidence — use to avoid redo
 
+### Latest Codex checkpoint — 2026-11-08
+
+DONE/PARTIAL: pinned synthetic Monthly Parquet routes through API admission, durable queue, worker reads, and persisted Session pins; ledger-only operations validate pins without opening Parquet. Durable analytics coverage now fails closed for missing aggregates on new Sessions, retaining the legacy fallback.
+CODE: Monthly Parquet catalog/worker route and REQ-04; analytics coverage migration 029; worker rejects credentialed HTTP object-store settings.
+TESTS: focused route/analytics/admission/execution/coverage-marker 32/32 PASS; compact storage 10/10 PASS; 3 worker config regressions PASS; compile/diff checks PASS. Arrow tests NOT RUN (`pyarrow` missing); PostgreSQL/migration/API-worker E2E NOT RUN (`psycopg` and isolated PostgreSQL missing).
+COMMIT: local source commits `38f3c2f`, `0dbface`, `98d8f03`, `5882d4f`, `73d811d` plus handoff checkpoints. Changes remain local. Push rejected by automatic review: publishing private repository code lacked specific authorization; no workaround attempted.
+NEXT: continue P0-A lifetime-safe history/read-model gaps; require PostgreSQL migration and atomicity acceptance before marking complete.
+
 - Main tick cumulative-order tests reach **240**, hot terminal orders are pruned, and risk-pin lookup can address >128 records. This proves selected synthetic reducer paths, **not complete PostgreSQL archive/restart acceptance**. Active-order bounds remain valid. Do not reintroduce a lifetime cap.
 - New eligible observed compositions select \`shared-source-v2\`; new Session composition can select \`compact-v1\` with periodic recovery bases and legacy version dispatch. Real PostgreSQL crash/frontier/receipt parity remains unaccepted in this workspace.
 - Journal migration **026** adds a durable order/event reference index, per-order projection and coverage head; eligible indexed pages and note lookup are implemented. Migration and atomic commit acceptance with PostgreSQL are **NOT RUN**. Older/fork-lineage sessions retain a compatible fallback. An incremental exact Session analytics projection is implemented, but this still needs integration/long-history proof.

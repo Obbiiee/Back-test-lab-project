@@ -84,3 +84,11 @@ Only local API validation refusals (400/409/413/415) are definitive after the se
 - Catalog visibility does not grant data rights or financial eligibility. Source rights remain fail-closed and limitations must remain visible.
 
 **Acceptance.** Frontend account-transport tests should cover the observed catalog artifact, selecting a dataset, the exact `sourceKey`/`period`/`day` payload, and preserving the selection across a definitive refusal. The authenticated UI → queue → worker → replay → receipt → Journal → Analytics → resume journey still needs integration evidence.
+
+## REQ-04: select a configured synthetic Monthly Parquet fixture
+
+**Backend contract:** when an operator-pinned Monthly Parquet catalog is configured, the research catalog response includes `monthlySources`. Each entry contains `key`, `period`, `label`, `layout`, `eligibility: SYNTHETIC`, and `model: SYNTHETIC_FIXTURE`. These entries are generated fixtures for exercising the hosted API → PostgreSQL queue → worker → V1 Session path. They are not historical market data, broker fills, or evidence of commercial rights. Non-synthetic Monthly Parquet entries are not publicly listed and are rejected before queue admission until a separately accepted source family exists.
+
+For a selected entry, `POST /sessions` includes its exact `sourceKey`, `period`, and the same `startPeriod`, along with `id`, `name`, `methodId`, and `initialBalance`. Do not send the catalog path, manifest hash, object-store URI, credentials, or a provider handle. The Session stores the selection pin server-side; list/detail responses expose the public key/period but not the manifest hash. Missing, stale, mismatched-period, or non-synthetic selections fail closed.
+
+**Acceptance still open:** frontend source-selector integration and authenticated browser coverage are pending. This route does not enable non-synthetic historical data or change data rights.

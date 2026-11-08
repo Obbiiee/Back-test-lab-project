@@ -275,8 +275,8 @@ class PostgresExecutionStore:
                    (workspace, session, state["datasetVersion"], state["profileHash"], state["revision"], raw, sha))
         db.execute(
             "INSERT INTO btl.tick_journal_projection_heads "
-            "(workspace_id,session_id,format_version,through_sequence,event_hash) "
-            "VALUES (%s,%s,1,%s,%s)",
+            "(workspace_id,session_id,format_version,through_sequence,event_hash,analytics_format_version) "
+            "VALUES (%s,%s,1,%s,%s,1)",
             (workspace, session, state["nextEventIndex"], state["eventHash"]),
         )
         metric_projection = initial_metric_projection(

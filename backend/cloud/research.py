@@ -16,7 +16,8 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import require, ContractError
 from execution.local_api import body
 from execution.research import ResearchApplication
-from .research_routing import observed_route as _observed_route, validate_source_selection
+from .research_routing import (observed_route as _observed_route, validate_source_selection,
+                               monthly_provider_required)
 from identity.store import User
 from infrastructure.database import connect
 from workspace.policy import owner
@@ -28,6 +29,7 @@ _OPERATOR_CATALOGS=OrderedDict()
 _MONTHLY_LOCK=RLock()
 _MONTHLY_PROVIDER=None
 _MONTHLY_PIN=None
+_MONTHLY_CATALOGS=OrderedDict()
 
 
 def _operator_catalog(dsn):
@@ -45,6 +47,25 @@ def _operator_catalog(dsn):
         # A single configured catalog per DB process; changing its pin requires
         # a clean worker restart, which also closes the exact old capability.
         require(len(_OPERATOR_CATALOGS)<=1,'operatorCatalog','SOURCE_PIN_CHANGED')
+        return catalog
+
+
+def _monthly_catalog(dsn):
+    path=os.environ.get('BTL_MONTHLY_PARQUET_CATALOG')
+    sha=os.environ.get('BTL_MONTHLY_PARQUET_CATALOG_SHA256')
+    require((path is None)==(sha is None),'monthlyCatalog','REFUSED_OPERATOR_CATALOG')
+    if path is None:return None
+    require(len(path)<=4096 and os.path.isabs(path),'monthlyCatalog','REFUSED_OPERATOR_CATALOG')
+    from contracts.primitives import digest
+    digest(sha,'monthlyCatalogHash')
+    from market_data.monthly_catalog import MonthlyParquetCatalog
+    key=(hashlib.sha256(dsn.encode()).hexdigest(),path,sha)
+    with _OPERATOR_LOCK:
+        catalog=_MONTHLY_CATALOGS.get(key)
+        if catalog is None:
+            catalog=MonthlyParquetCatalog(path,sha);_MONTHLY_CATALOGS[key]=catalog
+        _MONTHLY_CATALOGS.move_to_end(key)
+        require(len(_MONTHLY_CATALOGS)<=1,'monthlyCatalog','SOURCE_PIN_CHANGED')
         return catalog
 
 
@@ -85,7 +106,23 @@ def warm_worker_sources(dsn):
         for profile_hash in sorted(catalog._profiles):
             catalog.resolve(profile_hash)
     monthly = _synthetic_monthly_provider()
-    return catalog is not None or monthly is not None
+    monthly_catalog=_monthly_catalog(dsn)
+    if monthly_catalog is not None:
+        # The current authenticated Monthly Session route mounts only bounded
+        # synthetic fixtures. A rights evidence pin alone is not permission to
+        # run the V1 financial engine.
+        roots={(entry['root'],entry['datasetId'],entry['datasetVersion'],entry['manifestSha256'])
+               for entry in monthly_catalog._entries.values()}
+        require(len(roots)<=16,
+                'monthlyCatalog','REFUSED_OPERATOR_CATALOG')
+        for entry in monthly_catalog._entries.values():
+            require(entry['eligibility']=='SYNTHETIC','monthlyEligibility','REFUSED_SOURCE')
+        for key,period in sorted(monthly_catalog._entries):
+            provider=monthly_catalog.resolve(key,period,verify_file=False)
+            require(provider.manifest['sourceRights']['class']=='SYNTHETIC' and
+                    provider.manifest['sourceManifest']['evidenceClass']=='SYNTHETIC_CONTRACT_ONLY',
+                    'monthlyEligibility','REFUSED_SOURCE')
+    return catalog is not None or monthly is not None or monthly_catalog is not None
 
 
 def close_operator_catalogs():
@@ -93,6 +130,8 @@ def close_operator_catalogs():
     with _OPERATOR_LOCK:
         for catalog in _OPERATOR_CATALOGS.values():catalog.close()
         _OPERATOR_CATALOGS.clear()
+        for catalog in _MONTHLY_CATALOGS.values():catalog.close()
+        _MONTHLY_CATALOGS.clear()
     with _MONTHLY_LOCK:
         _MONTHLY_PROVIDER = None
         _MONTHLY_PIN = None
@@ -142,6 +181,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             return product_method_lifecycle.set_archived(db, str(workspace_id), args[0], args[1])
         if operation == 'method_analytics':
             catalog=_operator_catalog(dsn)
+            monthly_catalog=_monthly_catalog(dsn)
             observed_method=False
             if catalog is not None:
                 with connect(dsn) as db:
@@ -150,8 +190,22 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                         'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id',
                         (str(workspace_id),args[0])).fetchall()
                 from execution.postgres import unpack
-                observed_method=any(unpack(row['payload'],row['content_hash']).get('artifact')==
-                    'BTL-OBSERVED-RESEARCH-SESSION-1' for row in candidates)
+                analytics_sessions=[]
+                method_hash=None
+                for row in candidates:
+                    metadata=unpack(row['payload'],row['content_hash'])
+                    analytics_sessions.append((metadata.get('id'),metadata.get('artifact')))
+                    method_hash=method_hash or metadata.get('methodHash')
+                from .research_routing import method_analytics_family
+                family=method_analytics_family(analytics_sessions)
+                if family=='mixed':
+                    return dict(schemaVersion=1,artifact='BTL-METHOD-ANALYTICS-1',methodId=args[0],
+                        methodHash=method_hash,aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
+                        balancesCombined=False,financialAuthority='COMMITTED_EVENTS_ONLY',status='UNAVAILABLE',
+                        reason='MIXED_SESSION_ENGINE',includedSessions=[],
+                        excludedSessions=[dict(sessionId=session_id,reason='MIXED_SESSION_ENGINE')
+                                           for session_id,_artifact in analytics_sessions],metrics=None)
+                observed_method=family=='observed'
             if catalog is not None and observed_method:
                 from execution.observed_research import ObservedResearchApplication
                 research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog,
@@ -159,6 +213,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             else:
                 research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
                     synthetic_provider=_synthetic_monthly_provider(),
+                    monthly_catalog=monthly_catalog,
                     state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'compact-v1')
             try:
                 return research.method_analytics(args[0])
@@ -170,24 +225,49 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             from execution.session_storage_metrics import collect
             return collect(db, str(workspace_id), args[0])
         catalog=_operator_catalog(dsn)
-        observed=_observed_route(operation,args,catalog);session_id=None
-        if catalog is not None:
-            if operation=='replay_to':
-                session_id=args[0] if args else None
-            elif operation in ('catalog','create_method','create_session'):
-                pass
+        monthly_catalog=_monthly_catalog(dsn)
+        if operation=='create_session':
+            require(len(args)==1 and type(args[0]) is dict,'sessionRequest','INVALID_INPUT')
+            validate_source_selection(args[0],catalog,monthly_catalog)
+        observed=_observed_route(operation,args,catalog,monthly_catalog);session_id=None
+        session_metadata=None
+        if operation=='replay_to':
+            session_id=args[0] if args else None
+        elif operation not in ('catalog','create_method','create_session'):
+            if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
+            elif operation in ('confirm','apply','replay','workspace','chart_history','bootstrap','inspect','summary','journal','journal_page','terminal_order_page','save_note','command_result') and args:session_id=args[0]
+            if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
+        if type(session_id) is str:
+            row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
+            if row is not None:
+                try:
+                    from execution.postgres import unpack
+                    session_metadata=unpack(row['payload'],row['content_hash'])
+                    observed=session_metadata.get('artifact')=='BTL-OBSERVED-RESEARCH-SESSION-1'
+                except (TypeError,ValueError,UnicodeError):
+                    raise ContractError('CORRUPT_RECORD','session')
+        if monthly_catalog is not None and operation=='create_session' and args and type(args[0]) is dict:
+            request=args[0]
+            if 'sourceKey' in request:
+                selection=monthly_catalog.selection(request['sourceKey'],request.get('period'))
+                require(selection['eligibility']=='SYNTHETIC','monthlyEligibility','REFUSED_SOURCE')
+                monthly_provider=monthly_catalog.resolve(request['sourceKey'],request['period'])
+                monthly_source_key,monthly_period=request['sourceKey'],request['period']
             else:
-                if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
-                elif operation in ('confirm','apply','workspace','chart_history','bootstrap','inspect','summary','journal','journal_page','terminal_order_page','save_note','command_result') and args:session_id=args[0]
-                if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
-                if type(session_id) is str:
-                    row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
-                    if row is not None:
-                        try:
-                            from execution.postgres import unpack
-                            meta=unpack(row['payload'],row['content_hash']);observed=meta.get('artifact')=='BTL-OBSERVED-RESEARCH-SESSION-1'
-                        except (TypeError,ValueError,UnicodeError):
-                            raise ContractError('CORRUPT_RECORD','session')
+                monthly_provider=None;monthly_source_key=monthly_period=None
+        elif monthly_catalog is not None and type(session_metadata) is dict and 'sourceKey' in session_metadata:
+            monthly_source_key=session_metadata['sourceKey'];monthly_period=session_metadata['startPeriod']
+            selection=monthly_catalog.selection(monthly_source_key,monthly_period)
+            require(selection['eligibility']=='SYNTHETIC' and
+                    selection['manifestSha256']==session_metadata.get('monthlyManifestHash'),
+                    'monthlySource','REFUSED_SOURCE')
+            monthly_provider=(monthly_catalog.resolve(monthly_source_key,monthly_period)
+                              if monthly_provider_required(operation) else None)
+            # Existing Session pins are checked against catalog metadata in
+            # _session. Only source-reading operations open the Parquet data.
+            monthly_source_key=monthly_period=None
+        else:
+            monthly_provider=None;monthly_source_key=monthly_period=None
         if operation=='replay_to':
             require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
         monthly = None if observed else _synthetic_monthly_provider()
@@ -197,10 +277,16 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'compact-v1')
         else:
             research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),
-                synthetic_provider=monthly,
+                synthetic_provider=monthly_provider or monthly,
+                monthly_catalog=monthly_catalog,
+                monthly_source_key=monthly_source_key,monthly_period=monthly_period,
                 state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'compact-v1')
         try:
-            return research.catalog_view() if observed and operation=='catalog' else getattr(research,operation)(*args)
+            if observed and operation=='catalog':
+                result=research.catalog_view()
+                if monthly_catalog is not None:result['monthlySources']=monthly_catalog.public()
+                return result
+            return getattr(research,operation)(*args)
         finally:
             research.close()
 
@@ -352,7 +438,8 @@ def install(app):
                 require(False, 'jobId')
         raw = await json_body(request)
         catalog = await anyio.to_thread.run_sync(_operator_catalog, app.state.dsn, limiter=limiter)
-        validate_source_selection(raw, catalog)
+        monthly_catalog = await anyio.to_thread.run_sync(_monthly_catalog, app.state.dsn, limiter=limiter)
+        validate_source_selection(raw, catalog, monthly_catalog)
         return await execute(user, workspace_id, 'create_session', raw, write=True, job_id=job_id)
 
     @app.post(prefix + '/reviews')
