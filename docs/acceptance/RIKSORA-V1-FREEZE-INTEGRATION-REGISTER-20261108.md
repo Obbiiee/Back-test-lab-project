@@ -36,6 +36,10 @@ The public entry now mounts the existing RIKSORA landing, with account sign-in a
 
 Verified on the integration candidate: route and account transport regression, Local Tick Review, prototype isolation, confirm/receipt outcome, product pagination, repository boundaries, changed-file ESLint, production build, rendered landing CTA/source disclosure and independent Node golden vectors. Full authenticated browser → worker → receipt → Journal/analytics → logout/resume remains pending a small isolated synthetic integration check. Commercial-source acceptance, live provider verification, deployment and capacity acceptance were outside this checkpoint.
 
+### P0-1 checkpoint — observed replay receipt persistence (PARTIAL)
+
+The scoped implementation now routes observed `command_result` lookups, reconciles exact retries against replaceable replay-progress receipts, validates progress-format review/confirm input, and checks the observed result artifact in the frontend receipt path. The nine pre-existing implementation changes were reviewed as P0-1 work, tested and published to PR #48 (`c27e8a001075130ed26dfffc59b917b247f2120e`; local commit `d0dc78ef67e74bffeb42607b9c8c295628282257`). Focused frontend receipt/TickAlpha tests, lint/build, Python compilation, observed-finance goldens (6/6) and execution goldens (2/2) passed. Native PostgreSQL worker/receipt integration remains NOT RUN because the test dependencies and isolated test database are unavailable. The authenticated hosted browser → API/worker/PostgreSQL → Journal/analytics → logout/resume path remains open.
+
 ### P0-1 checkpoint — current Session reads and sign-out (PARTIAL)
 
 Hosted view, bootstrap and chart-history reads now use a fresh queue identity per request. The queue retains completed results by ID, so a reused read ID could restore an old committed revision after replay or sign-in. A single read still polls its original job; mutation retries retain their deterministic ID and unexpected results remain explicitly uncertain. Hosted transport refuses local fallback, and sign-out only confirms server revocation after a successful server response.
