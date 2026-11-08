@@ -177,8 +177,6 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                             raise ContractError('CORRUPT_RECORD','session')
         if operation=='replay_to':
             require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
-        if operation=='command_result':
-            require(not observed,'commandResult','REFUSED_OBSERVED_OPERATION')
         monthly = None if observed else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication

@@ -20,22 +20,25 @@ REPLAY_FIELDS = ('revision', 'throughNs', 'nextGroupIndex', 'sourceCheckpointHas
 
 def read_progress(db, scope, base, base_hash):
     """Return the effective snapshot, checking the row against its immutable base."""
-    snapshot, _ = _load_progress(db, scope, base, base_hash)
+    snapshot, _ = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash)
     return snapshot
 
 
 def progress_receipt(db, scope, base, base_hash, raw_command):
     command = command_wire(raw_command)
     require(command['sessionId'] == base['state']['sessionId'], 'session', 'RESOURCE_UNAVAILABLE')
-    snapshot, identity = _load_progress(db, scope, base, base_hash)
+    snapshot, identity = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash)
+    return match_progress_receipt(snapshot, identity, command)
+
+
+def match_progress_receipt(snapshot, identity, command):
     if identity is None or identity['id'] != command['commandId']:
         return None
     require(identity['hash'] == content_hash(command), 'commandId', 'REFUSED_IDEMPOTENCY_CONFLICT')
     return _receipt(snapshot, identity)
 
 
-def _load_progress(db, scope, base, base_hash):
-    workspace, session = scoped(scope, base['state']['sessionId'])
+def load_progress(db, workspace, session, base, base_hash):
     row = db.execute(
         'SELECT base_revision,base_hash,revision,through_ns,next_group_index,payload,content_hash '
         'FROM btl.observed_replay_progress WHERE workspace_id=%s AND session_id=%s',
@@ -110,7 +113,7 @@ def replace_progress(db, scope, base, base_hash, raw_command, proposed, events):
     ).fetchone()
     require(row is not None and row[0] == old_base['revision'],
             'replayProgressBase', 'REFUSED_STALE_REVISION')
-    current, previous_identity = _load_progress(db, scope, base, base_hash)
+    current, previous_identity = load_progress(db, *scoped(scope, base['state']['sessionId']), base, base_hash)
     if previous_identity is not None and previous_identity['id'] == identity['id']:
         require(previous_identity == identity, 'commandId', 'REFUSED_IDEMPOTENCY_CONFLICT')
         return _receipt(current, identity)

@@ -20,6 +20,9 @@ assert.equal(classifyConfirmError(err('')).code,'NO_RESPONSE');
 // Receipt.
 const ok={artifact:'BTL-TICK-EXECUTION-RESULT-1',commandId:'order:a',durable:true};
 assert.equal(committedReceipt(ok,'order:a'),true);
+const observedArtifact='BTL-OBSERVED-EXECUTION-RESULT-1';
+assert.equal(committedReceipt({...ok,artifact:observedArtifact},'order:a',observedArtifact),true);
+assert.equal(committedReceipt({...ok,artifact:observedArtifact},'order:a'),false);
 assert.equal(committedReceipt({...ok,commandId:'order:b'},'order:a'),false);
 assert.equal(committedReceipt({...ok,durable:false},'order:a'),false);
 assert.equal(committedReceipt({schemaVersion:1},'order:a'),false);
@@ -33,6 +36,11 @@ const status=(status,extra={})=>({schemaVersion:1,artifact:'BTL-TICK-COMMAND-STA
   sessionId:'session:a',commandId:'order:a',reviewHash:pending.reviewHash,currentRevision:5,
   status,...extra});
 assert.deepEqual(classifyCommandResult(status('COMMITTED',{receipt}),pending),{outcome:'COMMITTED',code:'DURABLE_RECEIPT'});
+const observedPending={...pending,receiptArtifact:observedArtifact};
+const observedReceipt={...receipt,artifact:observedArtifact};
+assert.deepEqual(classifyCommandResult(status('COMMITTED',{receipt:observedReceipt}),observedPending),
+  {outcome:'COMMITTED',code:'DURABLE_RECEIPT'});
+assert.equal(classifyCommandResult(status('COMMITTED',{receipt}),observedPending).outcome,'UNKNOWN');
 assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,durable:false}}),pending).outcome,'UNKNOWN');
 assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,commandId:'order:b'}}),pending).outcome,'UNKNOWN');
 assert.equal(classifyCommandResult(status('COMMITTED',{receipt:{...receipt,commandHash:'bad'}}),pending).outcome,'UNKNOWN');

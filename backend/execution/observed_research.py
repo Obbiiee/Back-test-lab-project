@@ -24,8 +24,8 @@ from .contracts import exact,open_payload,policy_wire,text,risk_quantity
 from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
-from .observed_kernel import seed_state
-from .observed_postgres import ObservedExecutionStore
+from .observed_kernel import command_wire, seed_state
+from .observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
 from .observed_profile import ENGINE_VERSION,MODEL,ObservedExecutionProfile
 from .observed_analysis import ObservedStatistics
 from .postgres import pack,unpack
@@ -37,6 +37,7 @@ VIEW='BTL-OBSERVED-RESEARCH-VIEW-1'
 _STATS_LOCK=RLock()
 _STATS_BY_DSN=OrderedDict()
 REVIEW='BTL-OBSERVED-ORDER-REVIEW-1'
+PROGRESS_REVIEW='BTL-OBSERVED-ORDER-REVIEW-PROGRESS-1'
 REPLAY_TO_CHUNKS=8
 
 
@@ -44,7 +45,7 @@ class ObservedResearchApplication:
     """One workspace-scoped Method/Session adapter for the observed family."""
     def __init__(self,dsn,scope,catalog,*,state_storage_format='snapshot-v1'):
         require(type(scope) is TrustedScope,'scope','SCOPE_REQUIRED');require(type(catalog) is ObservedCatalog,'catalog')
-        require(state_storage_format in ('snapshot-v1','compact-v1'),'stateStorageFormat','REFUSED_STATE_VERSION')
+        require(state_storage_format in ('snapshot-v1','compact-v1',PROGRESS_FORMAT),'stateStorageFormat','REFUSED_STATE_VERSION')
         self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(dsn,state_storage_format=state_storage_format)
         self.controller=ObservedExecutionController(self.store,catalog.resolve)
         key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',
@@ -106,7 +107,7 @@ class ObservedResearchApplication:
                     require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id);sessions.append(meta)
             return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,datasets=self.catalog.public(),model=MODEL)
 
-    def _session(self,db,session_id,*,lock=False):
+    def _session(self,db,session_id,*,lock=False,include_format=False):
         identifier(session_id,'sessionId')
         row=db.execute('SELECT payload,content_hash,method_id FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,session_id)).fetchone()
         require(row is not None,'session','RESOURCE_UNAVAILABLE');meta=unpack(*row[:2])
@@ -114,12 +115,14 @@ class ObservedResearchApplication:
         require(meta['id']==session_id and meta['methodId']==row[2] and meta['model']==MODEL and meta['engineVersion']==ENGINE_VERSION,'session','CORRUPT_RECORD')
         method=self._method(db,meta['methodId']);policy=method_policy(method);scoped_row=db.execute('SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s'+(' FOR UPDATE' if lock else ''),(self.scope.workspace_id,session_id)).fetchone()
         require(scoped_row is not None,'state','CORRUPT_RECORD')
-        saved=self.store._read(db,self.scope.workspace_id,session_id,lock=lock,include_format=True)[0];state,cp=saved['state'],saved['controller']
-        require(state['sessionId']==session_id and state['policy']==policy_wire(policy) and state['revision']==scoped_row[2] and (state['datasetVersion'],state['profileHash'])==tuple(scoped_row[3:]),'state','CORRUPT_RECORD')
+        saved, storage_format, _ = self.store._read(db,self.scope.workspace_id,session_id,lock=lock,include_format=True)
+        state,cp=saved['state'],saved['controller']
+        same_revision = state['revision'] >= scoped_row[2] if storage_format==PROGRESS_FORMAT else state['revision']==scoped_row[2]
+        require(state['sessionId']==session_id and state['policy']==policy_wire(policy) and same_revision and (state['datasetVersion'],state['profileHash'])==tuple(scoped_row[3:]),'state','CORRUPT_RECORD')
         require((meta['methodHash'],meta['datasetId'],meta['datasetVersion'],meta['profileHash'],meta['startNs'],meta['initialBalance'])==(policy.definition_hash,state['datasetId'],state['datasetVersion'],state['profileHash'],state['startNs'],state['initialBalance']),'sessionPins','CORRUPT_RECORD')
         # The storage adapter verifies the full snapshot or compact hash-chain
         # tip against the immutable checkpoint for both new and legacy Sessions.
-        return meta,method,state,cp
+        return (meta,method,state,cp,storage_format) if include_format else (meta,method,state,cp)
 
     def create_session(self,raw):
         keys(raw,'id name methodId initialBalance sourceKey period day')
@@ -397,7 +400,7 @@ class ObservedResearchApplication:
         require(raw['planId'] is None or type(raw['planId']) is str,'planId');require(raw['planRevision'] is None or type(raw['planRevision']) is int,'planRevision')
         req_hash=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-REVIEW-REQUEST-1',**raw));
         with connect(self.dsn) as db:
-            meta,method,state,cp=self._session(db,raw['sessionId'],lock=True);prior=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s AND review_id=%s',(self.scope.workspace_id,raw['sessionId'],raw['requestId'])).fetchone()
+            meta,method,state,cp,storage_format=self._session(db,raw['sessionId'],lock=True,include_format=True);prior=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s AND review_id=%s',(self.scope.workspace_id,raw['sessionId'],raw['requestId'])).fetchone()
             if prior:
                 saved=unpack(*prior);require(saved['requestHash']==req_hash,'requestId','REFUSED_IDEMPOTENCY_CONFLICT');return dict(review=saved,reviewHash=prior[1])
             require(raw['expectedRevision']==state['revision'] and not state['ended'] and not state['unresolved'],'revision','REFUSED_STALE_REVISION')
@@ -421,26 +424,74 @@ class ObservedResearchApplication:
                 require(draft['sl'] is not None,'quantity','REFUSED_QUANTITY_WITHOUT_STOP')
                 draft['quantity']=risk_quantity(text(Fraction(state['balance'])*exact(draft['riskPercent'],'riskPercent',True)/100),draft['entry'],draft['sl'],p.wire)
             payload=open_payload(draft,p.wire,policy,state['balance'])
-            basis_row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(self.scope.workspace_id,raw['sessionId'],state['revision'])).fetchone();require(basis_row is not None,'checkpoint','CORRUPT_RECORD');basis_sha=basis_row[1];basis_hash=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-REVIEW-BASIS-1',snapshotHash=basis_sha,quote=deepcopy(basis)))
+            review_artifact = PROGRESS_REVIEW if storage_format == PROGRESS_FORMAT else REVIEW
+            if review_artifact == PROGRESS_REVIEW:
+                basis_sha = content_hash(state)
+            else:
+                basis_row=db.execute('SELECT content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(self.scope.workspace_id,raw['sessionId'],state['revision'])).fetchone()
+                require(basis_row is not None,'checkpoint','CORRUPT_RECORD')
+                basis_sha=basis_row[0]
+            basis_hash=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-REVIEW-BASIS-1',snapshotHash=basis_sha,quote=deepcopy(basis)))
             command=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',sessionId=raw['sessionId'],commandId=raw['requestId'],expectedRevision=state['revision'],kind='OPEN',payload=payload)
             risk=planned_risk(state,command);ctx=SessionContext(self.scope.workspace_id,raw['sessionId'],policy,'XAUUSD',p.wire['primary']['feedId'],state['profileHash'],state['revision'],state['revision'],datetime.fromtimestamp(int(state['throughNs'])//10**9,timezone.utc),Decimal(basis['ask'] if payload['side']=='LONG' else basis['bid']))
             request=Command(self.scope.workspace_id,raw['sessionId'],raw['requestId'],policy.method_id,policy.definition_hash,'XAUUSD',ctx.feed_id,state['profileHash'],state['revision'],state['revision'],payload['workflow'],'BUY' if payload['side']=='LONG' else 'SELL',payload['orderType'],Decimal(payload['entry']),Decimal(payload['quantity']),Decimal(payload['riskPercent']),None if payload['sl'] is None else Decimal(payload['sl']),None if payload['tp'] is None else Decimal(payload['tp']),raw['planId'],raw['planRevision'],tuple(Observation(o['conditionId'],o['outcome']) for o in payload['observations']))
             validate_command(request,ctx)
-            reviewed=dict(schemaVersion=1,artifact=REVIEW,requestHash=req_hash,command=command,contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=state['policy']['definitionHash'],profileHash=state['profileHash'],throughNs=state['throughNs'],riskBasis=state['balance'],model=MODEL,basisCheckpointHash=basis_sha,basisHash=basis_hash,researchRisk=risk)
+            reviewed=dict(schemaVersion=1,artifact=review_artifact,requestHash=req_hash,command=command,contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=state['policy']['definitionHash'],profileHash=state['profileHash'],throughNs=state['throughNs'],riskBasis=state['balance'],model=MODEL,basisCheckpointHash=basis_sha,basisHash=basis_hash,researchRisk=risk)
             count=db.execute('SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,raw['sessionId'])).fetchone()[0];require(count<256,'reviews','REFUSED_REVIEW_LIMIT');blob,sha=pack(reviewed);db.execute('INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['sessionId'],raw['requestId'],blob,sha))
         return dict(review=reviewed,reviewHash=sha)
 
     def confirm(self,session_id,raw):
         keys(raw,'reviewId reviewHash');identifier(raw['reviewId'],'reviewId');from contracts.primitives import digest;digest(raw['reviewHash'],'reviewHash')
         with connect(self.dsn) as db:
-            meta,method,state,cp=self._session(db,session_id);row=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s AND review_id=%s',(self.scope.workspace_id,session_id,raw['reviewId'])).fetchone();require(row is not None,'review','RESOURCE_UNAVAILABLE');reviewed=unpack(*row);command=reviewed.get('command',{});require(row[1]==raw['reviewHash'] and reviewed.get('artifact')==REVIEW and command.get('sessionId')==session_id and command.get('commandId')==raw['reviewId'],'reviewHash','REFUSED_IDEMPOTENCY_CONFLICT')
+            meta,method,state,cp=self._session(db,session_id);row=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s AND review_id=%s',(self.scope.workspace_id,session_id,raw['reviewId'])).fetchone();require(row is not None,'review','RESOURCE_UNAVAILABLE');reviewed=unpack(*row);command=reviewed.get('command',{});require(row[1]==raw['reviewHash'] and reviewed.get('artifact') in (REVIEW,PROGRESS_REVIEW) and command.get('sessionId')==session_id and command.get('commandId')==raw['reviewId'],'reviewHash','REFUSED_IDEMPOTENCY_CONFLICT')
             require(reviewed['methodHash']==state['policy']['definitionHash'] and reviewed['profileHash']==state['profileHash'],'review','CORRUPT_RECORD')
-            basis_row=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(self.scope.workspace_id,session_id,command.get('expectedRevision'))).fetchone();require(basis_row is not None and basis_row[1]==reviewed.get('basisCheckpointHash'),'reviewBasis','CORRUPT_RECORD')
-            basis=self.store.historical_checkpoint(db,self.scope,session_id,command.get('expectedRevision'))['state'];require(basis['sessionId']==session_id and basis['profileHash']==reviewed['profileHash'] and basis['policy']['definitionHash']==reviewed['methodHash'] and basis['throughNs']==reviewed['throughNs'],'reviewBasis','CORRUPT_RECORD')
-            quote=basis.get('quoteBasis');require(quote is not None and reviewed.get('basisHash')==content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-REVIEW-BASIS-1',snapshotHash=basis_row[1],quote=deepcopy(quote))),'reviewBasis','CORRUPT_RECORD')
+            if reviewed['artifact']==PROGRESS_REVIEW:
+                prior=self.store._prior(db,self.scope.workspace_id,session_id,command_wire(command))
+                if prior is not None:return prior
+                require(state['revision']==command['expectedRevision'],'reviewBasis','REFUSED_STALE_REVISION')
+                basis=state
+                basis_sha=content_hash(basis)
+            else:
+                basis_row=db.execute('SELECT content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(self.scope.workspace_id,session_id,command.get('expectedRevision'))).fetchone()
+                require(basis_row is not None,'reviewBasis','CORRUPT_RECORD')
+                basis_sha=basis_row[0]
+                basis=self.store.historical_checkpoint(db,self.scope,session_id,command.get('expectedRevision'))['state']
+            require(basis_sha==reviewed.get('basisCheckpointHash') and basis['sessionId']==session_id and
+                    basis['profileHash']==reviewed['profileHash'] and basis['policy']['definitionHash']==reviewed['methodHash'] and
+                    basis['throughNs']==reviewed['throughNs'],'reviewBasis','CORRUPT_RECORD')
+            quote=basis.get('quoteBasis');require(quote is not None and reviewed.get('basisHash')==content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-REVIEW-BASIS-1',snapshotHash=basis_sha,quote=deepcopy(quote))),'reviewBasis','CORRUPT_RECORD')
             p=ObservedExecutionProfile.from_wire(basis['profile']);payload=open_payload(command['payload'],p.wire,method_policy(method),basis['balance']);require(payload==command['payload'],'reviewPayload','CORRUPT_RECORD')
             if payload['orderType']=='MARKET':require(payload['entry']==quote['ask' if payload['side']=='LONG' else 'bid'],'reviewQuote','CORRUPT_RECORD')
             require(reviewed['researchRisk']==planned_risk(basis,command),'reviewRisk','CORRUPT_RECORD')
         return self.controller.apply(self.scope,reviewed['command'])
+
+    def command_result(self,session_id,command_id):
+        identifier(command_id,'commandId')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            _,_,state,_=self._session(db,session_id)
+            result=dict(schemaVersion=1,artifact='BTL-TICK-COMMAND-STATUS-1',sessionId=session_id,
+                        commandId=command_id,currentRevision=state['revision'],status='UNKNOWN',
+                        reason='REVIEW_OR_COMMAND_NOT_VISIBLE')
+            row=db.execute('SELECT payload,content_hash FROM btl.tick_order_reviews '
+                           'WHERE workspace_id=%s AND session_id=%s AND review_id=%s',
+                           (self.scope.workspace_id,session_id,command_id)).fetchone()
+            if row is None:return result
+            reviewed=unpack(*row)
+            command=command_wire(reviewed['command'])
+            require(reviewed['artifact'] in (REVIEW,PROGRESS_REVIEW) and command['kind']=='OPEN' and
+                    command['sessionId']==session_id and command['commandId']==command_id,
+                    'review','CORRUPT_RECORD')
+            result.update(reviewHash=row[1],expectedRevision=command['expectedRevision'])
+            receipt=self.store._prior(db,self.scope.workspace_id,session_id,command)
+            if receipt is not None:
+                require(receipt['state']['revision']==command['expectedRevision']+1<=state['revision'],
+                        'receipt','CORRUPT_RECORD')
+                result.pop('reason')
+                return dict(result,status='COMMITTED',receipt=receipt)
+            require(command_id not in state['orders'],'receipt','CORRUPT_RECORD')
+            if state['revision']>command['expectedRevision']:
+                return dict(result,status='NOT_COMMITTED',reason='SESSION_REVISION_ADVANCED')
+            return dict(result,reason='NO_DURABLE_COMMAND_AT_REVIEW_REVISION')
 
     def inspect_statistics(self,session_id,trade_offset=0):return self.statistics.inspect(self.scope,session_id,trade_offset,64)

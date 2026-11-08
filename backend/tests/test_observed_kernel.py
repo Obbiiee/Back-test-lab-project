@@ -3,6 +3,8 @@ from copy import deepcopy
 from pathlib import Path
 import json
 import hashlib
+import os
+from uuid import uuid4
 import tempfile
 import unittest
 
@@ -94,6 +96,66 @@ class ObservedKernelTests(unittest.TestCase):
         basis=self.state['quoteBasis'];entry=basis['ask' if side=='LONG' else 'bid'] if basis else '2300.1'
         payload=dict(side=side,orderType='MARKET',workflow='QUICK',entry=entry,quantity=size,sl=None,tp=None,riskPercent='1',observations=[]);payload.update(changes)
         self.command('OPEN',payload,command='order:z');return payload
+
+    @unittest.skipUnless(os.environ.get('BTL_TEST_DATABASE_URL'), 'Requires isolated PostgreSQL')
+    def test_progress_store_consolidates_two_advances_and_recovers_financial_retry(self):
+        from application.models import TrustedScope
+        from execution.observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
+        from infrastructure.database import connect, migrate
+
+        dsn = os.environ['BTL_TEST_DATABASE_URL']
+        migrate(dsn)
+        self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
+        provider = self.provider
+        version = provider.dataset_version
+        root = provider.describe_v2(provider.dataset_id,version)['root']
+        pin = dict(schemaVersion=1, artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+                   datasetId=provider.dataset_id, datasetVersion=version,
+                   manifestHash=version, rootHash=version, indexContentHash=root['indexContentHash'],
+                   archiveSha256='a'*64, qualificationReceiptSha256='b'*64)
+        timeline = IndexedTickTimeline(provider,provider.dataset_id,version,'0',
+                                       log_folder=self.root/'shared',storage_mode='shared-source-v2',source_pin=pin)
+        self.handles.append(timeline)
+        scope = TrustedScope('workspace:'+uuid4().hex,'actor:qa')
+        checkpoint = timeline.checkpoint()
+        self.state = seed_state('session:qa',self.profile,self.policy,checkpoint)
+        store = ObservedExecutionStore(dsn,state_storage_format=PROGRESS_FORMAT)
+        store.create(scope,self.state,checkpoint)
+
+        for target in ('0',str(S)):
+            command = self.raw('ADVANCE',{'targetNs':target})
+            before, prior = store.prepare(scope,command)
+            self.assertIsNone(prior)
+            frame = timeline.advance_through(target,timeline.cursor)
+            checkpoint = timeline.checkpoint()
+            proposed, events = apply(before['state'],command,reveal=frame,checkpoint=checkpoint)
+            receipt = store.commit(scope,command,before,proposed,checkpoint,events,
+                replay={'throughNs':frame['throughNs'],'exhaustedThroughBoundary':frame['exhaustedThroughBoundary']})
+            self.assertEqual(receipt['eventCount'],0)
+            self.state = receipt['state']
+            self.assertEqual(ObservedExecutionStore(dsn).prepare(scope,command)[1],receipt)
+
+        params = (scope.workspace_id,'session:qa')
+        with connect(dsn) as db:
+            self.assertEqual(db.execute('SELECT revision FROM btl.observed_replay_progress WHERE workspace_id=%s AND session_id=%s',params).fetchall(),[(2,)])
+            self.assertEqual(db.execute('SELECT revision FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s',params).fetchall(),[(0,)])
+            self.assertIsNone(db.execute('SELECT revision FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s',params).fetchone())
+
+        plan = dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2301.1',
+                    quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])
+        order = self.raw('OPEN',plan)
+        before, prior = store.prepare(scope,order)
+        self.assertIsNone(prior)
+        proposed, events = apply(before['state'],order)
+        receipt = store.commit(scope,order,before,proposed,checkpoint,events)
+        self.assertEqual(receipt['state']['revision'],3)
+        self.assertEqual(receipt['events'][0]['kind'],'ORDER_ACCEPTED')
+        cold = ObservedExecutionStore(dsn)
+        self.assertEqual(cold.prepare(scope,order)[1],receipt)
+        self.assertEqual(cold.inspect(scope,'session:qa')['state'],receipt['state'])
+        with connect(dsn) as db:
+            self.assertIsNone(db.execute('SELECT revision FROM btl.observed_replay_progress WHERE workspace_id=%s AND session_id=%s',params).fetchone())
+            self.assertEqual(db.execute('SELECT revision FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s ORDER BY revision',params).fetchall(),[(0,),(3,)])
 
     def test_replaceable_progress_round_trips_without_changing_financial_state(self):
         from unittest.mock import MagicMock

@@ -11,7 +11,7 @@ from execution.observed_profile import ObservedExecutionProfile,MODEL
 from execution.observed_finance import exit_amount
 from execution.observed_kernel import validate_state
 from execution.analysis import metrics as committed_metrics
-from execution.observed_postgres import check_events,QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE
+from execution.observed_postgres import check_events,QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE,PROGRESS_BASE
 from collections import OrderedDict
 from threading import RLock
 from infrastructure.database import connect
@@ -117,7 +117,7 @@ class ObservedStatistics:
             seed=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
             require(seed is not None,'genesis','CORRUPT_RECORD')
             seed_wire=unpack(*seed)
-            if seed_wire.get('artifact') in (QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE):
+            if seed_wire.get('artifact') in (QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE,PROGRESS_BASE):
                 genesis,_=self.store._qa_reconstruct(db,workspace,session,upto_revision=0)
             else:genesis=read_snapshot(*seed)['state']
             key=(workspace,session,content_hash(genesis));prior=self._folds.get(key)

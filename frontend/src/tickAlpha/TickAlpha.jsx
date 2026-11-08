@@ -109,7 +109,9 @@ export default function TickAlpha(){
   const confirm=async()=>{
     if(flight.current)return {outcome:'NOT_SENT',code:'LOCAL_BUSY'};
     const sessionId=view.metadata.id,command=review.review.command;
-    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision,reviewHash:review.reviewHash};
+    const receiptArtifact=view.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'
+      ?'BTL-OBSERVED-EXECUTION-RESULT-1':'BTL-TICK-EXECUTION-RESULT-1';
+    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision,reviewHash:review.reviewHash,receiptArtifact};
     flight.current=true;setBusy(true);setNotice('');
     // While the confirmation is in flight, in-app navigation and Back are held and
     // a page unload asks first; the sheet says to keep it open.
@@ -124,7 +126,7 @@ export default function TickAlpha(){
         if(outcome.outcome==='UNKNOWN'){setUnverified(identity);return {...outcome,identity};}
         return outcome;
       }
-      if(!committedReceipt(result,command.commandId)){setUnverified(identity);return {outcome:'UNKNOWN',code:'UNRECOGNISED_RESPONSE',identity};}
+      if(!committedReceipt(result,command.commandId,receiptArtifact)){setUnverified(identity);return {outcome:'UNKNOWN',code:'UNRECOGNISED_RESPONSE',identity};}
       emitLocal('order_command_submitted');
       return await refreshAfterCommit(sessionId);
     }finally{release();flight.current=false;setBusy(false);}
