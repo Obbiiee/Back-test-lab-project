@@ -1,0 +1,108 @@
+/* RIKSORA laptop look (canvas L5–L8): navy panels, yellow accents, white replay pill.
+   Presentation only: every drawing tool, indicator, order and terminal control keeps its markup and behaviour. */
+@media (min-width:761px){
+ .tick-alpha{--lp-ink:#061a3c;--lp-panel:#0c2655;--lp-line:#1d3560;--lp-line-2:#2b4878;--lp-muted:#a9bddb;--lp-ice:#d9eafe;--lp-yellow:#ffce55;--lp-blue:#0f67d8;--lp-blue-deep:#0b3f8a;--lp-red:#c9474f;--lp-red-deep:#7a2a30;--lp-chart:#0b0f17;background:var(--lp-ink)}
+ .tick-alpha:has(.alpha-chart-workspace){padding:10px;gap:10px;box-sizing:border-box}
+ .tick-alpha:has(.alpha-chart-workspace)>*{margin-inline:0}
+
+ /* Header: one rounded navy bar with the session in the middle. */
+ .tick-alpha:has(.alpha-chart-workspace)>header{background:var(--lp-panel);border:2px solid var(--lp-line);border-radius:22px;padding:8px 12px;min-height:60px;box-sizing:border-box}
+ .tick-alpha:has(.alpha-chart-workspace)>header nav a{min-height:38px;padding:0 14px;background:transparent;color:var(--lp-muted)}
+ .tick-alpha:has(.alpha-chart-workspace)>header nav a:first-child{color:#fff}
+ .tick-alpha:has(.alpha-chart-workspace)>header nav a:hover{background:#12305e;color:#fff}
+ .tick-alpha .alpha-session-menu>summary{border-radius:999px;border:2px solid var(--lp-line-2);background:transparent;color:#fff;font-weight:700;padding:9px 16px}
+ .tick-alpha>.alpha-session{background:var(--lp-panel);border:2px solid var(--lp-line);border-radius:18px;padding:8px 14px}
+ .tick-alpha>.alpha-session h1{color:#fff;font-weight:900;font-size:14px}
+ .tick-alpha>.alpha-session button{border-radius:999px}
+
+ /* Workspace: drawing tools · chart · action rail, each its own rounded panel. */
+ .tick-alpha .alpha-workspace{gap:10px;background:transparent}
+ .tick-alpha .alpha-chart-workspace{background:transparent;gap:10px}
+ .tick-alpha .alpha-chart-header{background:var(--lp-panel);border:2px solid var(--lp-line);border-radius:18px;padding:6px 10px;gap:8px}
+ .tick-alpha .alpha-chart-header button,.tick-alpha .alpha-chart-header .nav-action{border-radius:999px;border:2px solid var(--lp-line-2);background:#0e1a33;color:#fff;font-weight:700;min-height:34px;padding:0 14px}
+ .tick-alpha .alpha-chart-header button:hover{background:#12305e;border-color:#3d5f95}
+ .tick-alpha .alpha-chart-header select{border-radius:999px;border:0;background:#fff;color:var(--lp-ink);padding:0 8px;min-height:32px}
+ .tick-alpha .alpha-chart-header label{font-weight:700;color:var(--lp-muted)}
+ .tick-alpha .alpha-chart-body{background:var(--lp-chart);border:2px solid #1e2633;border-radius:26px;overflow:visible;gap:0}
+ .tick-alpha .alpha-chart-host{border-radius:0 24px 24px 0;overflow:hidden}
+ .tick-alpha .alpha-drawing-tools{width:52px;background:var(--lp-panel);border:0;border-right:2px solid var(--lp-line);border-radius:24px 0 0 24px;padding:8px 6px;gap:4px;overflow:visible}
+ .tick-alpha .alpha-drawing-tools button,.tick-alpha .alpha-drawing-group summary{border-radius:13px;color:var(--lp-muted)}
+ .tick-alpha .alpha-drawing-tools [aria-pressed=true],.tick-alpha .alpha-drawing-group[open] summary{background:var(--lp-yellow);color:var(--lp-ink);border-color:transparent}
+ .tick-alpha .alpha-drawing-group summary:hover{background:#12305e;color:#fff}
+ .tick-alpha .alpha-drawing-group>div{background:var(--lp-panel);border:2px solid var(--lp-line-2);border-radius:18px;padding:8px}
+ .tick-alpha .alpha-drawing-group>div button{border-radius:12px;color:#fff}
+ .tick-alpha .alpha-drawing-group>div button:hover{background:#12305e}
+ .tick-alpha .alpha-drawing-group>div [aria-pressed=true]{background:var(--lp-yellow);color:var(--lp-ink)}
+ .tick-alpha .alpha-workspace .alpha-action-rail{width:64px;background:var(--lp-panel);border:2px solid var(--lp-line);border-radius:22px;padding:8px 0;gap:6px}
+ .tick-alpha .alpha-action-rail button{width:48px;border-radius:16px;color:var(--lp-muted)}
+ .tick-alpha .alpha-action-rail button:hover{background:#12305e;color:#fff}
+ .tick-alpha .alpha-action-rail [aria-pressed=true],.tick-alpha .alpha-action-rail [aria-expanded=true]{background:var(--lp-yellow);color:var(--lp-ink)}
+
+ /* Replay: white pill with a blue shadow, play button stays the hero. */
+ .tick-alpha .alpha-replay-controls.is-docked,.tick-alpha .alpha-replay-controls.is-floating{align-self:center;width:max-content;max-width:100%;background:#fff;color:var(--lp-ink);border:0;border-radius:999px;padding:6px 10px;box-shadow:0 6px 0 #1378f5;margin:2px 0 8px}
+ .tick-alpha .alpha-replay-controls label{color:#52627a;font-weight:700}
+ .tick-alpha .alpha-replay-controls select,.tick-alpha .alpha-replay-controls input{border-radius:999px;border:0;background:#eaf2fd;color:var(--lp-ink)}
+ .tick-alpha .alpha-replay-controls button{border-radius:999px;color:var(--lp-ink);font-weight:700}
+ .tick-alpha .alpha-replay-controls button:hover{background:#eaf2fd;border-color:#d9eafe}
+ .tick-alpha .alpha-replay-controls button[aria-keyshortcuts="Space"]{background:var(--lp-blue);color:#fff;border-color:var(--lp-blue);box-shadow:0 4px 0 var(--lp-blue-deep);min-width:46px}
+ .tick-alpha .alpha-replay-controls button[aria-keyshortcuts="Space"]:hover{background:#0b56b9}
+ .tick-alpha .alpha-replay-controls .alpha-seek>summary{color:var(--lp-blue);font-weight:800}
+ .tick-alpha .alpha-replay-controls .alpha-step-target{color:#fff;background:var(--lp-ink);border-radius:999px;padding:5px 10px}
+ .tick-alpha .alpha-replay-controls .alpha-replay-grip{color:#8a9ab3}
+ .tick-alpha .alpha-chart-disclosures summary{border-radius:999px;background:var(--lp-panel);padding:4px 12px;color:var(--lp-muted);font-weight:700}
+
+ /* Order bar: Sell / Buy as chunky pills, New order as the light pill. */
+ .tick-alpha>.alpha-order-bar{background:transparent;border:0;padding:0 2px;gap:8px}
+ .tick-alpha .alpha-order-bar .alpha-quick-side{border-radius:999px;border:0;min-height:48px;min-width:128px;padding:0 18px;justify-content:center;align-items:center;color:#fff;font-weight:900;letter-spacing:.04em}
+ .tick-alpha .alpha-order-bar .alpha-quick-side strong{font:500 13px var(--rk-font-data);letter-spacing:0}
+ .tick-alpha .alpha-order-bar .alpha-quick-sell{background:var(--lp-red);box-shadow:0 4px 0 var(--lp-red-deep)}
+ .tick-alpha .alpha-order-bar .alpha-quick-sell:hover{background:#b53c44}
+ .tick-alpha .alpha-order-bar .alpha-quick-buy{background:var(--lp-blue);box-shadow:0 4px 0 var(--lp-blue-deep)}
+ .tick-alpha .alpha-order-bar .alpha-quick-buy:hover{background:#0b56b9}
+ .tick-alpha .alpha-order-bar>button:not(.alpha-quick-side){border-radius:999px;border:0;min-height:48px;padding:0 20px;background:#f3f8ff;color:var(--lp-ink);font-weight:800;box-shadow:0 4px 0 #1378f5}
+ .tick-alpha .alpha-order-bar>button:not(.alpha-quick-side):hover{background:#fff}
+ .tick-alpha .alpha-order-bar .alpha-quick-side:active,.tick-alpha .alpha-order-bar>button:active{transform:translateY(3px);box-shadow:none}
+
+ /* Terminal: rounded navy panel, white pill for the active tab. */
+ .tick-alpha>.alpha-terminal{background:var(--lp-panel);border:2px solid var(--lp-line);border-radius:22px;margin:0}
+ .tick-alpha .alpha-terminal-resize{background:transparent;border:0;color:#6b7a90}
+ .tick-alpha .alpha-terminal-tabs button{border:0;border-radius:999px;color:var(--lp-muted);font-weight:700;padding:0 14px}
+ .tick-alpha .alpha-terminal-tabs button:hover{background:#12305e;color:#fff}
+ .tick-alpha .alpha-terminal-tabs [aria-pressed=true]{background:#fff;color:var(--lp-ink);font-weight:800;border:0}
+ .tick-alpha .alpha-terminal table tbody tr{background:var(--lp-ink)}
+ .tick-alpha .alpha-terminal td,.tick-alpha .alpha-terminal th{border-bottom:3px solid var(--lp-panel)}
+ .tick-alpha .alpha-terminal th{color:#6b7a90;font-weight:700}
+ .tick-alpha .alpha-terminal td button{border-radius:999px;background:#fff;color:var(--lp-ink);border:0;font-weight:800}
+ .tick-alpha .alpha-kpis li{border-radius:22px}
+ .tick-alpha .alpha-equity-plot{border-radius:18px}
+ .tick-alpha>footer{background:transparent;border:0;color:#6b7a90}
+
+ /* Dialogs and the docked order panel: light cards with a blue lip (canvas L7/L8). */
+ .tick-alpha .dialog-backdrop>.alpha-dialog,.tick-alpha .alpha-panel-surface,.tick-alpha .alpha-panel-surface>.alpha-dialog{background:#f3f8ff;color:var(--rk-navy);border:0}
+ .tick-alpha .dialog-backdrop>.alpha-dialog{border-radius:32px;box-shadow:0 10px 0 #1378f5}
+ .tick-alpha .alpha-panel-surface{border-left:4px solid #1378f5}
+ .tick-alpha .alpha-panel-surface>.alpha-dialog{box-shadow:none}
+ .tick-alpha .alpha-panel-handle{background:transparent;color:var(--rk-muted);border-bottom:2px solid var(--rk-ice)}
+ .tick-alpha .alpha-panel-handle button{background:transparent;color:var(--rk-navy);border:0;font-weight:700}
+ .tick-alpha .alpha-dialog h2{color:var(--rk-navy);font-weight:900}
+ .tick-alpha .alpha-dialog p,.tick-alpha .alpha-dialog small,.tick-alpha .alpha-dialog legend{color:var(--rk-muted)}
+ .tick-alpha .alpha-dialog label{color:var(--rk-navy);font-weight:700}
+ .tick-alpha .alpha-dialog :is(input:not([type=radio]):not([type=checkbox]),select,textarea){background:#fff;color:var(--rk-navy);border:2px solid var(--rk-ice);border-radius:14px;min-height:44px;box-sizing:border-box}
+ .tick-alpha .alpha-dialog button{background:#fff;color:var(--rk-navy);border:2px solid var(--rk-ice);border-radius:999px;font-weight:800;min-height:44px}
+ .tick-alpha .alpha-dialog button:hover:not(:disabled){border-color:#9ec5fb}
+ .tick-alpha .alpha-dialog button:disabled{opacity:.6}
+ .tick-alpha .alpha-dialog fieldset{border:2px solid var(--rk-ice);border-radius:18px}
+ .tick-alpha .alpha-ticket-guide{background:#fff;border:0;border-radius:14px;color:var(--rk-muted)}
+ .tick-alpha .alpha-dialog .alpha-primary-action,.tick-alpha .alpha-ticket>button:last-of-type,.tick-alpha .alpha-dialog>button:last-of-type{background:var(--rk-blue-strong);color:#fff;border:0;box-shadow:0 5px 0 var(--rk-blue-pressed)}
+ .tick-alpha .alpha-dialog .alpha-ticket-chips button[aria-pressed=true],.tick-alpha .alpha-dialog .alpha-workflow-tabs button[aria-pressed=true]{background:var(--rk-yellow);border-color:var(--rk-yellow);color:var(--rk-navy)}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes button{border-radius:20px;background:#fff;box-shadow:none}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-buy{color:var(--rk-blue-pressed);border-color:#9ec5fb}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-sell{color:#9e2b33;border-color:#ffb3b3}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes button strong{color:var(--rk-navy)}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes button small{color:var(--rk-muted)}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-buy[aria-pressed=true]{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff;box-shadow:0 4px 0 var(--rk-blue-pressed)}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-sell[aria-pressed=true]{background:#c9474f;border-color:#c9474f;color:#fff;box-shadow:0 4px 0 #7a2a30}
+ .tick-alpha .alpha-dialog .alpha-direction-quotes [aria-pressed=true] :is(strong,small){color:#fff}
+ .tick-alpha .alpha-ticket-estimate{background:var(--rk-navy);color:#fff;border-radius:18px}
+ .tick-alpha .alpha-ticket-estimate p{color:#a9bddb}
+}

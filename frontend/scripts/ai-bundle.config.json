@@ -82,6 +82,7 @@
     "frontend/src/tickAlpha/TickAlphaEntry.jsx",
     "frontend/src/tickAlpha/tickAlpha.css",
     "frontend/src/tickAlpha/alphaPhone.css",
+    "frontend/src/tickAlpha/alphaLaptop.css",
     "backend/execution/__init__.py",
     "backend/execution/contracts.py",
     "backend/execution/engine.py",

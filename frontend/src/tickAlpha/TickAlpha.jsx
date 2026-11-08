@@ -18,6 +18,7 @@ import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
 import './tickAlpha.css';
 import './alphaPhone.css';
+import './alphaLaptop.css';
 import {isAccountPage} from './accountClient.js';
 
 // Only XAUUSD is admitted for replay today; the others are shown as upcoming, never selectable.
