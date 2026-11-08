@@ -9,6 +9,29 @@ This register tracks the gap between the **agreed target** and **verified code**
 
 ## ACTIVE execution pointer — repo-only Product V1 (2026-11-08)
 
+### PR #48 / PR #44 reconciliation checkpoint (2026-11-08)
+
+Live GitHub heads examined: #44 `32c75e7c3518f09f9ad3a3e122cd0a388a1954cd`, #48 `5c4e8d47913ddf6a5fbebb88aadd01f102987148`. Compared recursive trees and pinned source, not stale local tracking refs. GitHub comparison is divergent (25 commits on #48, 46 on #44); its file list is relative to the merge base, so it is not a complete direct tree comparison.
+
+Reconciled the **migration file set only**, on P0-1: retained all original 023–025 filenames/bytes from #48 and added #44's eight original 023–030 files. The runner keys `public.btl_migrations` by full filename and LF-normalized SHA256, not the numeric prefix. Renaming or editing an applied migration causes `MIGRATION_DRIFT`. The pinned Git blob manifest is `backend/tests/fixtures/migration_reconciliation_heads.json`; the regression checks every published migration against it. No migration was renumbered, existing ledger rewritten, account linked, or production database accessed. Actual deployed migration history remains UNKNOWN; the two published histories are tested upgrade fixtures, not evidence of a deployed ledger.
+
+The progress-consolidation migration replaces `guard_tick_session`; both histories retain its dependency on `observed_replay_progress` and its restricted-role legacy behavior. #44's terminal archive (`btl.tick_terminal_orders`) and #48's (`btl.tick_terminal_order_archive_v1`) are separate tables with different wire artifacts. They are retained independently; this checkpoint does not convert archive evidence or dispatch one artifact through the other implementation.
+
+Remaining #48 deltas absent/different in #44 source:
+
+| Slice | Reconciliation disposition |
+| --- | --- |
+| `observed_replay_progress.py`, migrations 023/024, progress receipt/retry + Review/Confirm dispatch in observed store/research/cloud/client | Missing on #44; retain #48, needs composition with #44 runtime and transaction tests |
+| `observed_state_delta_v3.py`, `observed_postgres.py` compact progress deltas and inline recovery bases | Different from #44's separate recovery-base table and chain contract; do not replace #44 wholesale |
+| `ticks/timeline_v2.py` interrupted-target resume, genesis/group bounds, read-only probe close | Missing on #44; scoped recovery changes eligible for later transplant with their regressions |
+| `cloud/queue.py` fresh replay-to aging versus cross-actor interactive jobs | Missing on #44; preserve FIFO and fair-turn behavior when composing |
+| Hosted `AppEntry`/`entryRoute`, fresh read IDs, uncertain sign-out, observed receipt/client checks | #48 deltas require comparison with Claude presentation; no frontend presentation copied in this checkpoint |
+| Product archive policy/state, revision-pinned order/analytics response pages and client loaders | Parallel #48 implementation, not a replacement for #44's newer Journal/Analytics. Response pagination does not bound full-history folding |
+
+#44's `journal_order_index`, `incremental_analytics`, coverage markers, compact recovery bases, Monthly catalog/Parquet, worker routing, identity and Claude frontend remain untouched on GitHub. **The branches are not yet runtime-reconciled or merge-ready.** Importing migrations does not import those implementations.
+
+Validation: all 33 migration files and original Git blob identities passed embedded PostgreSQL for fresh → union, #44 → union, and #48 → union, including retained nonempty archive/recovery payloads, migration retry/drift refusal, least-privilege legacy update, progress receipt commit/rollback, and immutable-table truncation refusal. Thirteen pure/kernel financial/archive tests passed, including 240 terminal orders and financial goldens. Native psycopg/PostgreSQL integration is NOT RUN successfully: no native test DSN; disposable PGlite socket failed with `ECONNRESET`. Direct embedded SQL is narrower evidence. Native opt-in regression remains in `test_migration_reconciliation.py`.
+
 **Use the CURRENT state of the code, not the age of a test report.** This is the existing Product V1 implementation register, not an architecture replacement. Agent permissions are in root AGENTS.md and active phase is the newest AI_CONTEXT/04_CURRENT_PHASE.md entry. **No VPS, SSH, deployment, historical replay, data ingestion, storage/performance/load/concurrency benchmark or big evidence generation during coding.** A new owner approval is required for those actions.
 
 ### Deterministic next-work queue (check actual code before claiming complete)
