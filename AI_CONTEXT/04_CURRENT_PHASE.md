@@ -3,6 +3,12 @@ Total output lines: 599
 
 # Current Product V1 implementation update — source routing and cumulative analytics (2026-11-08)
 
+## 2026-11-08 Monthly Parquet reader follow-up
+
+Committed `cdc9f233e59753d7ed7cc93543ff3615d8098ef9` to PR #44. Monthly Parquet row groups now use `ParquetFile.iter_batches()` with an 8,192-row Arrow batch bound instead of materializing an entire Arrow row-group table. Canonical row hashing, event order, provenance/source identity, Bid/Ask and global-index checks still run across the complete row group before its results are returned. Added a synthetic test that forbids the unbounded `read_row_group()` path. Monthly Parquet suite: 10/10 PASS; connected synthetic reducer test SKIPPED because isolated PostgreSQL is unavailable; compilation and `git diff --check` PASS.
+
+This establishes bounded Arrow-side batch reads, while the verified Python event/index result remains row-group-sized. It does not complete the eligible-source catalog, S3-compatible provider, or API/queue/worker integration. Product V1 remains IN PROGRESS; no rights promotion, historical data, VPS, or deployment work was performed.
+
 ## 2026-11-08 observed projection cache follow-up
 
 Committed `3a64acf63f9bdfd12c8f1bf5f159d9cf38989025` to PR #44. `ObservedStatistics` now reuses its already-current bounded in-process ledger fold for page reads and only copies the fold when new committed events must be consumed. Extension still happens on a private copy, so corrupt-tail validation cannot mutate an accepted cached prefix. Added a regression for current-prefix reuse, stale-prefix isolation, and event-regression refusal. Observed-analysis suite: 6 runnable tests PASS; 3 PostgreSQL integration tests SKIPPED (isolated PostgreSQL unavailable); Python compilation and `git diff --check` PASS.
