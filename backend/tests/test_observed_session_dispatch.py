@@ -87,4 +87,133 @@ class ObservedSessionDispatchTests(unittest.TestCase):
         self.assertEqual(archived['artifact'], 'BTL-OBSERVED-TERMINAL-ORDER-ARCHIVE-1-SUMMARY')
         self.assertEqual(verify_complete([record], archived, collect=True)['orders']['order:integration'], order)
 
-    def test_integration_session_terminal_
+    def test_integration_session_terminal_order_transition_uses_p44_archive_codec(self):
+        from execution.observed_kernel import apply
+        fx = kernel_fixtures.ObservedKernelTests(); fx.setUp()
+        self.addCleanup(fx.tearDown)
+        fx.setup_stream([(0, '2300', '2300.1')])
+        state = seed_state('session:integration-lifecycle', fx.profile, fx.policy,
+            fx.timeline.checkpoint(), order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+            terminal_order_archive_v1=True)
+        base = encode_compact_base(state)
+        chain_hash = base['stateHash']
+        deltas = []
+
+        def persist_delta(previous, current):
+            nonlocal chain_hash
+            delta = encode_compact_delta(previous, current, chain_hash)
+            deltas.append(delta)
+            chain_hash = delta['body']['recordHash']
+
+        def command(kind, payload, command_id):
+            return dict(schemaVersion=1, artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                sessionId=state['sessionId'], commandId=command_id,
+                expectedRevision=state['revision'], kind=kind, payload=payload)
+
+        frame = fx.timeline.advance_through('0', fx.timeline.cursor)
+        before = state
+        state, _, _ = apply(state, command('ADVANCE', {'targetNs': '0'}, 'integration:advance'),
+            reveal=frame, checkpoint=fx.timeline.checkpoint(),
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1, terminal_order_archive_v1=True,
+            archived_order_lookup=lambda oid: None)
+        persist_delta(before, state)
+        plan = dict(side='LONG', orderType='LIMIT', workflow='PLANNED', entry='2290',
+            quantity='0.01', sl='2289', tp='2291', riskPercent='1', observations=[])
+        before = state
+        state, _, rows = apply(state, command('OPEN', plan, 'order:integration-lifecycle'),
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1, terminal_order_archive_v1=True,
+            archived_order_lookup=lambda oid: None)
+        persist_delta(before, state)
+        self.assertEqual(rows, [])
+        before = state
+        cancel = command('CANCEL', {'orderId': 'order:integration-lifecycle'}, 'integration:cancel')
+        state, events, rows = apply(state, cancel, order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+            terminal_order_archive_v1=True, archived_order_lookup=lambda oid: None)
+        persist_delta(before, state)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(state['orders'], {})
+        self.assertEqual(state['orderArchive']['artifact'],
+            'BTL-OBSERVED-TERMINAL-ORDER-ARCHIVE-1-SUMMARY')
+        self.assertEqual(verify_complete(rows, state['orderArchive'], collect=True)['count'], 1)
+        validate_state(state, order_retention_policy=PRODUCT_ORDER_RETENTION_V1)
+        recovered = reconstruct_complete(base, deltas, state['revision'])
+        self.assertEqual(recovered, state)
+        checked = checked_result_value(dict(schemaVersion=1,
+            artifact='BTL-OBSERVED-EXECUTION-RESULT-1', commandId=cancel['commandId'],
+            commandHash=content_hash(cancel), state=state, events=events, eventCount=len(events),
+            eventFromSequence=state['nextEventIndex']-len(events), eventsComplete=True,
+            nextEventSequence=None, replay=None, durable=True, model=state['model']), cancel,
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1)
+        receipt = compact_receipt_v1(checked, content_hash(state), chain_hash)
+        expanded = expand_compact_receipt_v1(receipt, cancel, recovered, chain_hash,
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1)
+        self.assertEqual(expanded['state'], state)
+        self.assertEqual(expanded['events'], events)
+
+    def test_product_store_routes_each_persisted_codec_and_verifies_its_records(self):
+        store = ObservedExecutionStore('synthetic-dsn', order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+            product_order_archive_v1=True, state_storage_format='compact-v1')
+        p0_state = {'artifact': P0_PRODUCT_ARCHIVE, 'orderArchive': {}}
+        integration_state = {'artifact': INTEGRATION_PRODUCT_ARCHIVE, 'orderArchive': {}}
+        self.assertEqual(store._archive_table(p0_state), 'btl.tick_terminal_order_archive_v1')
+        self.assertEqual(store._archive_table(integration_state), 'btl.tick_terminal_orders')
+        p0_order = {'status': 'CANCELLED', 'grossPosted': '0'}
+        p0_record = p0_append(p0_summary(artifact='BTL-TERMINAL-ORDER-ARCHIVE-1'),
+            session_id='session:p0', revision=1, order_id='order:p0', order=p0_order,
+            artifact='BTL-TERMINAL-ORDER-ARCHIVE-1')
+        integration_order = {'status': 'CANCELLED', 'grossPosted': '0'}
+        integration_record = append(summary(), session_id='session:integration', revision=1,
+            order_id='order:integration', order=integration_order)
+        store._verify_archive_record(p0_state, p0_record, expected_sequence=0)
+        store._verify_archive_record(integration_state, integration_record, expected_sequence=0)
+
+    def test_integration_archive_history_pages_keep_cursor_and_revision_binding(self):
+        store = ObservedExecutionStore('synthetic-dsn', order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+            product_order_archive_v1=True, state_storage_format='compact-v1')
+        summary_state = summary()
+        records = []
+        for sequence in range(3):
+            record = append(summary_state, session_id='session:pages', revision=sequence+1,
+                order_id=f'order:pages:{sequence}',
+                order={'status': 'CANCELLED', 'grossPosted': str(sequence)})
+            records.append(record)
+            summary_state = advance(summary_state, [record])
+        state = {'artifact': INTEGRATION_PRODUCT_ARCHIVE, 'sessionId': 'session:pages',
+            'revision': 9, 'orderArchive': summary_state}
+
+        class FakeCursor:
+            def __init__(self, rows=()): self.rows = list(rows)
+            def fetchone(self): return self.rows[0] if self.rows else None
+            def fetchall(self): return self.rows
+
+        class FakeDb:
+            def execute(self, query, params=()):
+                if 'ORDER BY sequence DESC LIMIT 1' in query:
+                    return FakeCursor([(2, records[-1]['recordHash'])])
+                if 'AND sequence=%s' in query:
+                    record = records[params[-1]]
+                    raw, sha = pack(record)
+                    return FakeCursor([(record['sequence'], record['orderId'],
+                        record['finalizedRevision'], record['recordHash'], raw, sha)])
+                if 'sequence>%s ORDER BY sequence LIMIT' in query:
+                    return FakeCursor([(r['sequence'], r['recordHash'], *pack(r)) for r in records
+                        if r['sequence'] > params[-2]][:params[-1]])
+                return FakeCursor()
+            def __enter__(self): return self
+            def __exit__(self, *_args): return False
+
+        with patch('execution.observed_postgres.connect', return_value=FakeDb()), \
+             patch.object(store, '_read', return_value={'state': state}), \
+             patch.object(store, '_verify_order_archive'):
+            scope = TrustedScope('workspace:pages', 'actor:pages')
+            first = store.order_history_page(scope, 'session:pages', maximum=2)
+            self.assertEqual([row['sequence'] for row in first['records']], [0, 1])
+            self.assertEqual(first['nextCursor'], {'revision': 9, 'afterSequence': 1})
+            second = store.order_history_page(scope, 'session:pages', after_sequence=1,
+                revision_pin=9, maximum=2)
+            self.assertEqual([row['sequence'] for row in second['records']], [2])
+            self.assertIsNone(second['nextCursor'])
+
+
+if __name__ == '__main__':
+    unittest.main()
