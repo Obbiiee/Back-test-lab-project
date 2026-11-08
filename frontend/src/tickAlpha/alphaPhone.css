@@ -1,0 +1,205 @@
+/* RIKSORA phone layer (approved canvas P1–P6, 2026-11-09).
+   Loaded after tickAlpha.css. Phone rules live inside the 760px query; the few shared
+   pieces (workflow tabs, pair list, tools sheet, wide mode) are presentation only and
+   never change orders, fills or Session state. */
+
+/* Shared: controls that only exist for the phone stay out of the laptop layout. */
+.tick-alpha .alpha-pair-pill,.tick-alpha .alpha-phone-bar,.tick-alpha .alpha-draw-toggle,.tick-alpha .alpha-notice-dismiss{display:none}
+.tick-alpha .alpha-chart-body{position:relative}
+.tick-alpha .alpha-wide-toggle{position:absolute;top:8px;right:72px;z-index:30;width:40px;height:40px;min-height:40px;padding:0;border-radius:50%;border:0;background:#131a27e6;color:var(--rk-white);display:flex;align-items:center;justify-content:center}
+.tick-alpha .alpha-wide-toggle[aria-pressed=true]{background:var(--rk-yellow);color:var(--rk-navy)}
+
+/* Order ticket: Quick | Plan tabs and the draw-on-chart entry point. */
+.tick-alpha .alpha-workflow-tabs{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:4px;border-radius:999px;background:var(--rk-ice)}
+.tick-alpha .alpha-workflow-tabs button{min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--rk-navy);font:800 14px var(--rk-font-ui)}
+.tick-alpha .alpha-workflow-tabs button[aria-pressed=true]{background:var(--rk-navy);color:var(--rk-white)}
+.tick-alpha .alpha-workflow-tabs button:disabled{opacity:.75}
+.tick-alpha .alpha-draw-rr-row{display:flex}
+.tick-alpha .alpha-draw-rr-row .alpha-draw-rr{flex:1;min-height:46px;border-radius:999px;border:2px dashed var(--rk-blue);background:var(--rk-ice-soft);color:var(--rk-blue-pressed);font:800 14px var(--rk-font-ui)}
+
+/* Pair options (Create Session) and the pair sheet. */
+.tick-alpha .alpha-pair-options{display:flex;flex-direction:column;gap:6px;border:0;padding:0;margin:0}
+.tick-alpha .alpha-pair-options legend{font-weight:800;margin-bottom:6px}
+.tick-alpha .alpha-pair-options label,.tick-alpha .alpha-pair-list button{display:flex;align-items:center;gap:12px;min-height:56px;padding:6px 12px;border-radius:16px;border:2px solid var(--rk-ice);background:var(--rk-white);color:var(--rk-navy);text-align:left;width:100%;box-sizing:border-box}
+.tick-alpha .alpha-pair-options label.is-ready{border-color:var(--rk-blue)}
+.tick-alpha .alpha-pair-options label.is-soon,.tick-alpha .alpha-pair-list button:disabled{opacity:.62}
+.tick-alpha .alpha-pair-options input{width:20px;height:20px;accent-color:var(--rk-blue)}
+.tick-alpha .alpha-pair-options span:not(.alpha-pair-badge),.tick-alpha .alpha-pair-list span:not(.alpha-pair-badge){flex:1;display:flex;flex-direction:column}
+.tick-alpha .alpha-pair-options strong,.tick-alpha .alpha-pair-list strong{font:500 16px var(--rk-font-data)}
+.tick-alpha .alpha-pair-options small,.tick-alpha .alpha-pair-list small{color:var(--rk-muted);font-size:12px}
+.tick-alpha .alpha-pair-options em,.tick-alpha .alpha-pair-list em{font-style:normal;font-size:11px;font-weight:900;border-radius:999px;padding:4px 9px;background:var(--rk-ice);color:var(--rk-muted)}
+.tick-alpha .alpha-pair-badge{width:38px;height:38px;flex:none;border-radius:13px;background:var(--rk-yellow);color:var(--rk-navy);font:900 13px var(--rk-font-ui);display:flex;align-items:center;justify-content:center}
+.tick-alpha .alpha-pair-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.tick-alpha .alpha-pair-list button[aria-current=true]{border-color:var(--rk-blue);box-shadow:0 4px 0 var(--rk-blue)}
+.tick-alpha .alpha-pair-list button[aria-current=true] em{background:var(--rk-yellow);color:var(--rk-navy)}
+
+/* Tools sheet (⋯ More). */
+.tick-alpha .alpha-tools-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.tick-alpha .alpha-tools-grid button{min-height:84px;border-radius:20px;border:0;background:var(--rk-ice-soft);color:var(--rk-navy);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font:800 12px var(--rk-font-ui)}
+.tick-alpha .alpha-tools-grid button[aria-pressed=true]{background:var(--rk-yellow)}
+.tick-alpha .alpha-tools-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tick-alpha .alpha-tools-links>*{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;border-radius:999px;border:2px solid var(--rk-ice);background:var(--rk-white);color:var(--rk-navy);font:700 13px var(--rk-font-ui);text-decoration:none}
+
+/* Wide chart: everything except chart, replay and Sell / Buy steps aside. */
+.tick-alpha.is-wide>header,.tick-alpha.is-wide .alpha-session,.tick-alpha.is-wide .alpha-chart-header,.tick-alpha.is-wide .alpha-action-rail,
+.tick-alpha.is-wide .alpha-terminal,.tick-alpha.is-wide>footer,.tick-alpha.is-wide .alpha-chart-disclosures,.tick-alpha.is-wide .alpha-phone-bar,
+.tick-alpha.is-wide .alpha-history-context,.tick-alpha.is-wide .alpha-order-bar>span{display:none}
+.tick-alpha.is-wide .alpha-workspace{flex:1 1 auto;min-height:0;margin:0}
+.tick-alpha.is-wide .alpha-chart-body{flex:1 1 auto;height:calc(100dvh - 150px);min-height:0}
+.tick-alpha.is-wide .alpha-chart-host{height:100%;min-height:0}
+
+@media (max-width:760px){
+  .tick-alpha{padding-bottom:calc(78px + env(safe-area-inset-bottom));background:#0b0f17;color:var(--rk-white)}
+  .tick-alpha input,.tick-alpha select,.tick-alpha textarea{font-size:16px}
+
+  /* Header: brand + Session settings only; links live in ⋯ More. */
+  .tick-alpha>header{padding:10px 12px;gap:8px;border-radius:0;background:#0b0f17;border:0}
+  .tick-alpha .alpha-badge{display:none}
+  .tick-alpha>header nav{display:none}
+
+  /* Session line: pair pill instead of source text. */
+  .tick-alpha .alpha-session{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:4px 12px 8px;background:transparent;border:0;color:var(--rk-white)}
+  .tick-alpha .alpha-session h1,.tick-alpha .alpha-session>p:first-of-type{display:none}
+  .tick-alpha .alpha-pair-pill{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px 0 6px;border-radius:999px;border:0;background:#131a27;color:var(--rk-white);font:500 16px var(--rk-font-data)}
+  .tick-alpha .alpha-pair-pill>span:first-child{width:32px;height:32px;border-radius:11px;background:var(--rk-yellow);color:var(--rk-navy);font:900 12px var(--rk-font-ui);display:flex;align-items:center;justify-content:center}
+  .tick-alpha .alpha-pair-pill>span:last-child{color:#a9bddb;font-size:12px}
+  .tick-alpha .alpha-session>p{margin:0;font-size:12px;color:#a9bddb}
+  .tick-alpha .alpha-session>p strong{color:var(--rk-white);font-family:var(--rk-font-data)}
+  .tick-alpha .alpha-session>p:first-of-type>strong:first-child{display:none}
+  .tick-alpha .alpha-source-credit{display:none}
+
+  /* Chart: full width, tools hidden behind the pencil. */
+  .tick-alpha .alpha-workspace{margin:0;min-height:0;flex:0 0 auto}
+  .tick-alpha .alpha-chart-workspace{gap:6px}
+  .tick-alpha .alpha-chart-header{gap:6px;padding:0 12px;flex-wrap:wrap;background:transparent;border:0}
+  .tick-alpha .alpha-chart-header>span{display:none}
+  .tick-alpha .alpha-chart-header label{color:#a9bddb;font-size:12px}
+  .tick-alpha .alpha-chart-header>label:first-child{font-size:0;gap:0}
+  .tick-alpha .alpha-chart-header>label:first-child select{font-size:15px;font-family:var(--rk-font-data)}
+  .tick-alpha .alpha-chart-header>label:has(input[type=checkbox]){display:none}
+  .tick-alpha .alpha-chart-body:not(.is-tools-open) .chart-tools{display:none}
+  .tick-alpha .alpha-chart-header select,.tick-alpha .alpha-chart-header>button,.tick-alpha .alpha-chart-header .nav-action{min-height:40px;border-radius:999px;border:0;background:#131a27;color:var(--rk-white);padding:0 12px}
+  .tick-alpha .alpha-chart-body{flex:0 0 auto;flex-direction:row;height:clamp(260px,calc(100dvh - 470px),560px);min-height:260px;margin:0}
+  .tick-alpha .alpha-chart-host{flex:1 1 auto;height:100%;min-height:0;border-radius:0}
+  .tick-alpha .alpha-chart-body:not(.is-tools-open) .alpha-drawing-tools{display:none}
+  .tick-alpha>footer{background:transparent;border:0;color:#a9bddb;padding:8px 14px}
+  .tick-alpha>footer.has-notice .alpha-notice-dismiss{display:flex;position:absolute;top:6px;right:6px;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:50%;background:#061a3c1a;color:var(--rk-navy);font:900 18px var(--rk-font-ui);align-items:center;justify-content:center}
+  .tick-alpha>footer.has-notice{position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));z-index:60;padding:12px 46px 12px 14px;border-radius:18px;background:var(--rk-yellow);color:var(--rk-navy);font-size:13px;font-weight:700;line-height:1.4;box-shadow:0 5px 0 #c99a1e}
+  .tick-alpha .alpha-chart-body.is-tools-open .alpha-drawing-tools{position:absolute;left:10px;top:70px;z-index:31;width:auto;max-height:calc(100% - 80px);flex-direction:column;overflow:auto;padding:6px;border-radius:20px;border:2px solid #2b4878;background:#131a27}
+  .tick-alpha .alpha-drawing-tools button,.tick-alpha .alpha-drawing-group summary{width:48px;height:48px;min-height:48px}
+  .tick-alpha .alpha-draw-toggle{display:flex;position:absolute;left:12px;top:12px;z-index:32;width:52px;height:52px;min-height:52px;padding:0;border-radius:50%;border:0;background:#131a27;color:var(--rk-white);align-items:center;justify-content:center;box-shadow:0 4px 12px #0006}
+  .tick-alpha .alpha-draw-toggle[aria-expanded=true]{background:var(--rk-yellow);color:var(--rk-navy)}
+  .tick-alpha .alpha-wide-toggle{top:12px;right:64px;width:48px;height:48px;min-height:48px}
+  .tick-alpha .alpha-chart-body.is-tools-open .chart-tools{position:absolute;left:72px;right:60px;top:12px;z-index:31;flex-wrap:wrap}
+  .tick-alpha .alpha-object-panel{top:10px;right:10px;bottom:auto;max-height:calc(100% - 20px);border-radius:20px;border:2px solid #2b4878;background:#131a27;color:var(--rk-white)}
+
+  /* Replay: one white pill. */
+  .tick-alpha .alpha-replay-controls{margin:0 12px;display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:center;justify-content:flex-start;gap:6px;padding:6px 8px;border-radius:24px;background:var(--rk-white);color:var(--rk-navy);box-shadow:0 5px 0 var(--rk-blue)}
+  .tick-alpha .alpha-replay-controls>button{min-height:44px;border-radius:999px;border:0;background:var(--rk-ice);color:var(--rk-navy);font-weight:800;padding:0 14px}
+  .tick-alpha .alpha-replay-controls>button:disabled{color:var(--rk-muted);opacity:.7}
+  .tick-alpha .alpha-replay-controls summary{min-height:44px;display:flex;align-items:center;padding:0 12px;border-radius:999px;color:var(--rk-blue-pressed);font-weight:800}
+  .tick-alpha .alpha-replay-controls>button[aria-keyshortcuts=Space]{background:var(--rk-blue-strong);color:var(--rk-white);border:0;padding:0 18px}
+  .tick-alpha .alpha-replay-controls>*{flex:none}
+  .tick-alpha .alpha-replay-controls label{flex-direction:row;align-items:center;font-size:0;gap:0}
+  .tick-alpha .alpha-replay-controls select{min-height:44px;max-width:150px;border-radius:999px;font-size:13px}
+  .tick-alpha .alpha-step-target{display:none}
+  .tick-alpha .alpha-chart-disclosures{padding:0 12px;color:#a9bddb}
+
+  /* Laptop rail steps aside; ⋯ More and the session bar replace it. */
+  .tick-alpha .alpha-action-rail{display:none}
+
+  /* Sell | Buy: sticky split button above the session bar. */
+  .tick-alpha .alpha-order-bar{position:sticky;bottom:calc(64px + env(safe-area-inset-bottom));z-index:40;display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0;padding:8px 10px;background:#0b0f17}
+  .tick-alpha .alpha-order-bar>button:not(.alpha-quick-side){display:none}
+  .tick-alpha .alpha-order-bar>span{grid-column:1 / -1;order:3;margin:2px 0 0;text-align:center;font-size:10px;line-height:1.2;color:#a9bddb}
+  .tick-alpha .alpha-order-bar .alpha-quick-side{min-height:58px;border:0;color:var(--rk-white);display:flex;flex-direction:column;align-items:center;justify-content:center;font:900 12px var(--rk-font-ui);letter-spacing:.06em;text-transform:uppercase}
+  .tick-alpha .alpha-order-bar .alpha-quick-side strong{font:500 16px var(--rk-font-data);letter-spacing:0}
+  .tick-alpha .alpha-order-bar .alpha-quick-sell{background:#c9474f;border-radius:18px 0 0 18px}
+  .tick-alpha .alpha-order-bar .alpha-quick-buy{background:var(--rk-blue-strong);border-radius:0 18px 18px 0}
+
+  /* Session bar. */
+  .tick-alpha .alpha-phone-bar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:45;padding:6px 6px calc(8px + env(safe-area-inset-bottom));background:#0b0f17;border-top:1px solid #1d3560}
+  .tick-alpha .alpha-phone-bar button{min-height:54px;border:0;background:transparent;color:#a9bddb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:800 11px var(--rk-font-ui)}
+  .tick-alpha .alpha-phone-bar button:active{color:var(--rk-yellow)}
+  .tick-alpha.is-wide{padding-bottom:env(safe-area-inset-bottom)}
+  .tick-alpha.is-wide .alpha-order-bar{bottom:0}
+  .tick-alpha.is-wide .alpha-chart-body{height:calc(100dvh - 190px)}
+
+  /* Terminal: one column of light cards, tabs scroll sideways. */
+  .tick-alpha .alpha-terminal{margin:12px 10px;border-radius:24px;background:var(--rk-ice-soft);color:var(--rk-navy);scroll-margin-top:8px}
+  .tick-alpha .alpha-terminal-tabs{flex-wrap:nowrap;overflow-x:auto;gap:6px}
+  .tick-alpha .alpha-terminal-tabs button{flex:none;min-height:42px;border-radius:999px;padding:0 14px}
+
+  /* Dialogs become bottom sheets. */
+  .tick-alpha .dialog-backdrop{align-items:flex-end;justify-content:stretch}
+  .tick-alpha .dialog-backdrop>.alpha-dialog,.tick-alpha .dialog-backdrop>.alpha-panel-surface{width:100%;max-width:none;max-height:92dvh;overflow:auto;margin:0;box-sizing:border-box;border-radius:28px 28px 0 0;padding:18px 16px calc(22px + env(safe-area-inset-bottom))}
+  .tick-alpha .alpha-panel-surface>.alpha-dialog{border-radius:0;max-height:none;box-shadow:none;padding:4px 0 0}
+  .tick-alpha .dialog-backdrop .alpha-dialog,.tick-alpha .alpha-panel-surface{overflow-x:hidden}
+  .tick-alpha .alpha-dialog.alpha-ticket>button{margin:6px 0;width:100%;box-sizing:border-box}
+  .tick-alpha .alpha-panel-handle{display:none}
+  /* Light, playful sheets (approved P5/P6). */
+  .tick-alpha .dialog-backdrop>.alpha-dialog,.tick-alpha .alpha-panel-surface,.tick-alpha .alpha-panel-surface>.alpha-dialog{background:var(--rk-white);color:var(--rk-navy);border:0}
+  .tick-alpha .dialog-backdrop>.alpha-dialog::before,.tick-alpha .alpha-panel-surface::before{content:"";display:block;width:44px;height:5px;margin:0 auto 10px;border-radius:999px;background:var(--rk-ice)}
+  .tick-alpha .alpha-dialog h2{color:var(--rk-navy);font-size:22px;font-weight:900}
+  .tick-alpha .alpha-dialog p,.tick-alpha .alpha-dialog small,.tick-alpha .alpha-dialog legend{color:var(--rk-muted)}
+  .tick-alpha .alpha-dialog label{color:var(--rk-navy)}
+  .tick-alpha .alpha-dialog :is(input:not([type=radio]):not([type=checkbox]),select,textarea){background:var(--rk-ice-soft);color:var(--rk-navy);border:2px solid var(--rk-ice)}
+  .tick-alpha .alpha-dialog button{background:var(--rk-white);color:var(--rk-navy);border:2px solid var(--rk-ice);font-weight:800}
+  .tick-alpha .alpha-dialog button:disabled{opacity:.6}
+  .tick-alpha .alpha-dialog fieldset{border:2px solid var(--rk-ice);border-radius:18px}
+  .tick-alpha .alpha-ticket-guide{background:var(--rk-ice-soft);border:0;border-radius:14px;color:var(--rk-muted)}
+  .tick-alpha .alpha-dialog .alpha-primary-action,.tick-alpha .alpha-ticket>button:last-of-type,.tick-alpha .alpha-dialog>button:last-of-type{background:var(--rk-blue-strong);color:var(--rk-white);border:0;box-shadow:0 5px 0 var(--rk-blue-pressed)}
+  .tick-alpha .alpha-dialog .alpha-ticket-chips button[aria-pressed=true]{background:var(--rk-yellow);border-color:var(--rk-yellow)}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes button{border-radius:20px;min-height:72px;padding:8px 12px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;background:var(--rk-white);box-shadow:none;aspect-ratio:auto;width:auto;height:auto}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-buy{color:var(--rk-blue-pressed);border-color:#9ec5fb}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-sell{color:#9e2b33;border-color:#ffb3b3}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes button strong{font:500 18px var(--rk-font-data);color:var(--rk-navy)}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes button small{font-size:10px;color:var(--rk-muted)}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-buy[aria-pressed=true]{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:var(--rk-white);box-shadow:0 4px 0 var(--rk-blue-pressed)}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes .alpha-sell[aria-pressed=true]{background:#c9474f;border-color:#c9474f;color:var(--rk-white);box-shadow:0 4px 0 #7a2a30}
+  .tick-alpha .alpha-dialog .alpha-direction-quotes [aria-pressed=true] :is(strong,small){color:var(--rk-white)}
+  .tick-alpha .alpha-ticket-estimate{background:var(--rk-navy);color:var(--rk-white);border-radius:18px;padding:10px 12px}
+  .tick-alpha .alpha-ticket-estimate p{color:#a9bddb}
+  .tick-alpha .alpha-dialog label{display:flex;flex-direction:column;gap:6px;font-weight:700}
+  .tick-alpha .alpha-dialog input:not([type=radio]):not([type=checkbox]),.tick-alpha .alpha-dialog select,.tick-alpha .alpha-dialog textarea{min-height:48px;border-radius:14px;box-sizing:border-box;width:100%}
+  .tick-alpha .alpha-dialog .alpha-pair-options label{flex-direction:row}
+  .tick-alpha .alpha-dialog button{min-height:48px;border-radius:999px}
+  .tick-alpha .alpha-ticket .alpha-ticket-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .tick-alpha .alpha-ticket .alpha-ticket-chips button{flex:1 1 0;min-width:60px}
+  .tick-alpha .alpha-ticket>button:last-of-type{min-height:56px;font-size:16px;font-weight:900}
+  .tick-alpha .alpha-tools-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .tick-alpha .alpha-dialog .alpha-tools-grid button{border-radius:20px;border:0;background:var(--rk-ice-soft);min-height:84px;padding:6px 4px}
+  .tick-alpha .alpha-dialog .alpha-tools-grid button[aria-pressed=true]{background:var(--rk-yellow)}
+  .tick-alpha .alpha-dialog .alpha-pair-list button{border-radius:16px;justify-content:flex-start}
+  .tick-alpha .alpha-dialog .alpha-pair-list button[aria-current=true]{border-color:var(--rk-blue)}
+
+  /* Sessions hub: no data-source text; full-width actions. */
+  .tick-alpha .alpha-hub-actions{display:grid;grid-template-columns:1fr;gap:8px}
+  .tick-alpha .alpha-hub-actions>button{width:100%;min-height:50px}
+  .tick-alpha .alpha-hub-actions>.alpha-primary-action{min-height:56px}
+}
+
+/* Sign in and workspace picker (?page=account). */
+@media (max-width:760px){
+  .alpha-identity{background:var(--rk-navy);color:var(--rk-white);min-height:100dvh}
+  .alpha-identity-nav{background:var(--rk-navy);color:var(--rk-white);border:0;padding:18px 20px}
+  .alpha-identity-nav>span{color:#a9bddb}
+  .alpha-identity-content{padding:8px 0 0;display:flex;flex-direction:column}
+  .alpha-identity-content>.alpha-eyebrow{padding:0 22px;color:#a9bddb}
+  .alpha-identity-content>h1{margin:8px 22px 6px;font-size:36px;line-height:1.05;letter-spacing:-.03em;color:var(--rk-white)}
+  .alpha-identity-content>p{margin:0 22px 18px;color:#c3d6f2;font-size:15px}
+  .alpha-identity-content>a{margin:8px 22px;min-height:56px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--rk-white);color:var(--rk-navy);font-weight:900;text-decoration:none;box-shadow:0 5px 0 var(--rk-blue)}
+  .alpha-identity-content>form{margin:0;padding:24px 20px;background:var(--rk-white);color:var(--rk-navy);border-radius:30px 30px 0 0;display:flex;flex-direction:column;gap:14px}
+  .alpha-identity-content>form label{display:flex;flex-direction:column;gap:8px;font-weight:800}
+  .alpha-identity-content>form input{min-height:54px;border-radius:18px;border:2px solid var(--rk-ice);background:var(--rk-ice-soft);padding:0 16px;font-size:17px}
+  .alpha-identity-content>form button{min-height:58px;border:0;border-radius:999px;background:var(--rk-blue-strong);color:var(--rk-white);font:900 17px var(--rk-font-ui);box-shadow:0 6px 0 var(--rk-blue-pressed)}
+  .alpha-identity-content>nav{margin:0;padding:12px 20px 24px;background:var(--rk-white);display:flex;flex-wrap:wrap;gap:8px}
+  .alpha-identity-content>nav button{min-height:44px;border-radius:999px;border:2px solid var(--rk-ice);background:var(--rk-white);color:var(--rk-navy);padding:0 14px;font-weight:700}
+  .alpha-identity-content>ul{list-style:none;margin:0 16px 14px;padding:0;display:flex;flex-direction:column;gap:12px}
+  .alpha-identity-content>ul button{width:100%;min-height:96px;border:0;border-radius:26px;background:var(--rk-blue-strong);color:var(--rk-white);text-align:left;padding:0 20px;font:900 19px var(--rk-font-ui);box-shadow:0 6px 0 var(--rk-blue-pressed)}
+  .alpha-identity-content>ul li:nth-child(even) button{background:var(--rk-yellow);color:var(--rk-navy);box-shadow:0 6px 0 #c99a1e}
+  .alpha-identity-actions{margin:0 16px 16px;flex-wrap:wrap}
+  .alpha-identity-actions button{min-height:44px;border-radius:999px}
+  .alpha-identity-content [role=status]{margin:12px 22px;color:#c3d6f2}
+}
