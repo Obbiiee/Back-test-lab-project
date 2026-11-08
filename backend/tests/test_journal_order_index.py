@@ -164,7 +164,11 @@ class JournalOrderIndexTests(unittest.TestCase):
                 return self.rows
 
         class DB:
+            def __init__(self):
+                self.queries = []
+
             def execute(self, query, _params=()):
+                self.queries.append(query)
                 if query.startswith('SET TRANSACTION'):
                     return Result()
                 if 'FROM btl.tick_journal_projection_heads' in query:
@@ -189,6 +193,14 @@ class JournalOrderIndexTests(unittest.TestCase):
         self.assertFalse(result['more'])
         expected_order = dict(order, excursionReason='POSITION_NOT_COMPLETED')
         self.assertEqual(result['analysis']['orders'], [expected_order])
+        exact_db = DB()
+        with patch.object(app, '_quote', return_value=None), \
+             patch.object(app, '_research_risk'), \
+             patch('execution.research.project', side_effect=AssertionError('full ledger fold')):
+            exact = app._indexed_journal_page(exact_db, state, None, None, 1,
+                                              exact_order_id=order_id)
+        self.assertEqual(exact['analysis']['orders'], [expected_order])
+        self.assertTrue(any('p.order_id=%s LIMIT 1' in query for query in exact_db.queries))
 
     def test_session_summary_uses_incremental_count_without_scanning_events(self):
         app = ResearchApplication.__new__(ResearchApplication)

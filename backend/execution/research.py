@@ -536,7 +536,8 @@ class ResearchApplication:
         self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
         return analysis
 
-    def _indexed_journal_page(self, db, state, checkpoint, after_order_id, limit):
+    def _indexed_journal_page(self, db, state, checkpoint, after_order_id, limit,
+                               exact_order_id=None):
         if state['parent'] is not None:
             return None
         head = db.execute(
@@ -549,20 +550,36 @@ class ResearchApplication:
             return None
         total = int(head[3])
 
-        rows = db.execute(
-            'SELECT p.order_id,p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
-            'i.event_kind,i.projection_hash,e.payload,e.content_hash '
-            'FROM btl.tick_journal_order_projection p '
-            'JOIN btl.tick_journal_order_events i '
-            'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
-            '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
-            'JOIN btl.tick_events e '
-            'ON (e.workspace_id,e.session_id,e.sequence,e.event_id)='
-            '(p.workspace_id,p.session_id,p.last_sequence,p.event_id) '
-            'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id>%s '
-            'ORDER BY p.order_id LIMIT %s',
-            (self.scope.workspace_id, state['sessionId'], after_order_id or '', limit + 1),
-        ).fetchall()
+        if exact_order_id is None:
+            rows = db.execute(
+                'SELECT p.order_id,p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
+                'i.event_kind,i.projection_hash,e.payload,e.content_hash '
+                'FROM btl.tick_journal_order_projection p '
+                'JOIN btl.tick_journal_order_events i '
+                'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
+                '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
+                'JOIN btl.tick_events e '
+                'ON (e.workspace_id,e.session_id,e.sequence,e.event_id)='
+                '(p.workspace_id,p.session_id,p.last_sequence,p.event_id) '
+                'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id>%s '
+                'ORDER BY p.order_id LIMIT %s',
+                (self.scope.workspace_id, state['sessionId'], after_order_id or '', limit + 1),
+            ).fetchall()
+        else:
+            identifier(exact_order_id, 'orderId')
+            rows = db.execute(
+                'SELECT p.order_id,p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
+                'i.event_kind,i.projection_hash,e.payload,e.content_hash '
+                'FROM btl.tick_journal_order_projection p '
+                'JOIN btl.tick_journal_order_events i '
+                'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
+                '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
+                'JOIN btl.tick_events e '
+                'ON (e.workspace_id,e.session_id,e.sequence,e.event_id)='
+                '(p.workspace_id,p.session_id,p.last_sequence,p.event_id) '
+                'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id=%s LIMIT 1',
+                (self.scope.workspace_id, state['sessionId'], exact_order_id),
+            ).fetchall()
         page_rows = rows[:limit]
         quote = self._quote(state, checkpoint)
         mark_available = not state['unresolved'] and quote is not None and \
@@ -688,7 +705,10 @@ class ResearchApplication:
         journal_request(raw)
         with connect(self.dsn) as db:
             _, _, state, checkpoint = self._session(db,session_id,lock=True)
-            analysis = self._journal_projection(db,state,checkpoint)
+            indexed = self._indexed_journal_page(db, state, checkpoint, None, 1,
+                exact_order_id=raw['orderId'])
+            analysis = indexed['analysis'] if indexed is not None else \
+                self._journal_projection(db,state,checkpoint)
             orders = {row['id']:row for row in analysis['orders']}
             require(raw['orderId'] in orders,'order','RESOURCE_UNAVAILABLE')
             prior = db.execute('SELECT payload,content_hash,note_revision FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s AND order_id=%s FOR UPDATE',
