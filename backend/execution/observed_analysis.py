@@ -111,7 +111,7 @@ class ObservedStatistics:
 
     def inspect(self,scope,session_id,offset=0,maximum=64):
         workspace,session=scoped(scope,session_id)
-        require(type(offset) is int and 0<=offset<=128 and type(maximum) is int and 1<=maximum<=64,'pagination')
+        require(type(offset) is int and offset>=0 and type(maximum) is int and 1<=maximum<=64,'pagination')
         with self._lock,connect(self.store.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self.store._read(db,workspace,session)['state']

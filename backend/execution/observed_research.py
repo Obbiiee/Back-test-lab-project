@@ -24,7 +24,8 @@ from .contracts import exact,open_payload,policy_wire,text,risk_quantity
 from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
-from .observed_kernel import command_wire, seed_state
+from .observed_kernel import command_wire, seed_state, PRODUCT_ORDER_RETENTION_V1
+from .observed_order_archive_v1 import is_product_state
 from .observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
 from .observed_profile import ENGINE_VERSION,MODEL,ObservedExecutionProfile
 from .observed_analysis import ObservedStatistics
@@ -41,15 +42,40 @@ PROGRESS_REVIEW='BTL-OBSERVED-ORDER-REVIEW-PROGRESS-1'
 REPLAY_TO_CHUNKS=8
 
 
+def _stored_observed_state(db,workspace_id,session_id):
+    row=db.execute('SELECT payload,content_hash FROM btl.tick_sessions '
+                   'WHERE workspace_id=%s AND session_id=%s',(workspace_id,session_id)).fetchone()
+    require(row is not None,'state','CORRUPT_RECORD')
+    stored=unpack(row['payload'],row['content_hash']);state=stored.get('state')
+    if state is None:
+        base=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                        'WHERE workspace_id=%s AND session_id=%s AND revision=0',
+                        (workspace_id,session_id)).fetchone()
+        require(base is not None,'genesis','CORRUPT_RECORD')
+        state=unpack(base['payload'],base['content_hash']).get('state')
+    require(type(state) is dict and type(state.get('artifact')) is str,
+            'sessionFormat','CORRUPT_RECORD')
+    return state
+
+
 class ObservedResearchApplication:
     """One workspace-scoped Method/Session adapter for the observed family."""
-    def __init__(self,dsn,scope,catalog,*,state_storage_format='snapshot-v1'):
+    def __init__(self,dsn,scope,catalog,*,state_storage_format='snapshot-v1',
+                 product_order_archive_v1=False):
         require(type(scope) is TrustedScope,'scope','SCOPE_REQUIRED');require(type(catalog) is ObservedCatalog,'catalog')
         require(state_storage_format in ('snapshot-v1','compact-v1',PROGRESS_FORMAT),'stateStorageFormat','REFUSED_STATE_VERSION')
-        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(dsn,state_storage_format=state_storage_format)
-        self.controller=ObservedExecutionController(self.store,catalog.resolve)
+        require(type(product_order_archive_v1) is bool,'productOrderArchive')
+        if product_order_archive_v1:
+            require(state_storage_format in ('compact-v1',PROGRESS_FORMAT),
+                    'productOrderArchive','REFUSED_STATE_VERSION')
+        retention=PRODUCT_ORDER_RETENTION_V1 if product_order_archive_v1 else None
+        self.dsn=dsn;self.scope=scope;self.catalog=catalog
+        self.store=ObservedExecutionStore(dsn,order_retention_policy=retention,
+            state_storage_format=state_storage_format,product_order_archive_v1=product_order_archive_v1)
+        self.controller=ObservedExecutionController(self.store,catalog.resolve,order_retention_policy=retention)
         key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',
-                              dsnHash=content_hash({'schemaVersion':1,'dsn':dsn}),stateStorageFormat=state_storage_format))
+                              dsnHash=content_hash({'schemaVersion':1,'dsn':dsn}),stateStorageFormat=state_storage_format,
+                              productOrderArchiveV1=product_order_archive_v1))
         with _STATS_LOCK:
             self.statistics=_STATS_BY_DSN.get(key)
             if self.statistics is None:self.statistics=ObservedStatistics(self.store);_STATS_BY_DSN[key]=self.statistics
@@ -101,13 +127,20 @@ class ObservedResearchApplication:
             for raw,sha,method_id in rows:
                 meta=unpack(raw,sha)
                 if meta.get('artifact')==META:
-                    self._session(db,meta['id']);sessions.append(meta)
+                    stored_state=_stored_observed_state(db,self.scope.workspace_id,meta['id'])
+                    if is_product_state(stored_state):
+                        session_store=ObservedExecutionStore(self.dsn,
+                            order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+                            product_order_archive_v1=True,state_storage_format='compact-v1')
+                    else:
+                        session_store=ObservedExecutionStore(self.dsn,state_storage_format='snapshot-v1')
+                    self._session(db,meta['id'],store=session_store);sessions.append(meta)
                 elif meta.get('artifact')=='BTL-LOCAL-SESSION-1':
                     tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance')
                     require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id);sessions.append(meta)
             return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,datasets=self.catalog.public(),model=MODEL)
 
-    def _session(self,db,session_id,*,lock=False,include_format=False):
+    def _session(self,db,session_id,*,lock=False,include_format=False,store=None):
         identifier(session_id,'sessionId')
         row=db.execute('SELECT payload,content_hash,method_id FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,session_id)).fetchone()
         require(row is not None,'session','RESOURCE_UNAVAILABLE');meta=unpack(*row[:2])
@@ -115,7 +148,8 @@ class ObservedResearchApplication:
         require(meta['id']==session_id and meta['methodId']==row[2] and meta['model']==MODEL and meta['engineVersion']==ENGINE_VERSION,'session','CORRUPT_RECORD')
         method=self._method(db,meta['methodId']);policy=method_policy(method);scoped_row=db.execute('SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s'+(' FOR UPDATE' if lock else ''),(self.scope.workspace_id,session_id)).fetchone()
         require(scoped_row is not None,'state','CORRUPT_RECORD')
-        saved, storage_format, _ = self.store._read(db,self.scope.workspace_id,session_id,lock=lock,include_format=True)
+        selected_store=store or self.store
+        saved, storage_format, _ = selected_store._read(db,self.scope.workspace_id,session_id,lock=lock,include_format=True)
         state,cp=saved['state'],saved['controller']
         same_revision = state['revision'] >= scoped_row[2] if storage_format==PROGRESS_FORMAT else state['revision']==scoped_row[2]
         require(state['sessionId']==session_id and state['policy']==policy_wire(policy) and same_revision and (state['datasetVersion'],state['profileHash'])==tuple(scoped_row[3:]),'state','CORRUPT_RECORD')

@@ -107,6 +107,26 @@ def warm_operator_sources(dsn):
     return True
 
 
+def _observed_session_uses_product_archive(db,workspace_id,session_id):
+    """Select a validator from the persisted Session version, never from HTTP."""
+    row=db.execute('SELECT payload,content_hash FROM btl.tick_sessions '
+                   'WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
+    if row is None:return None
+    from execution.postgres import unpack
+    stored=unpack(row['payload'],row['content_hash'])
+    state=stored.get('state')
+    if state is None:
+        base=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                        'WHERE workspace_id=%s AND session_id=%s AND revision=0',
+                        (str(workspace_id),session_id)).fetchone()
+        require(base is not None,'sessionFormat','CORRUPT_RECORD')
+        state=unpack(base['payload'],base['content_hash']).get('state')
+    require(type(state) is dict and type(state.get('artifact')) is str,
+            'sessionFormat','CORRUPT_RECORD')
+    from execution.observed_order_archive_v1 import is_product_state
+    return is_product_state(state)
+
+
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
     # Keep verified-user/membership locks through the INNER service commit.
     # The external source selector is an operator catalog; HTTP supplies only
@@ -160,6 +180,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 observed=True
             elif operation=='create_session':
                 observed=bool(args and type(args[0]) is dict and 'sourceKey' in args[0])
+                if observed:session_id=args[0].get('id')
             elif operation=='replay_to':
                 session_id=args[0] if args else None
                 observed=True
@@ -180,8 +201,16 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
         monthly = None if observed else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication
+            product_archive=False
+            if operation=='create_session':
+                selected=_observed_session_uses_product_archive(db,workspace_id,session_id)
+                product_archive=selected is not False
+            elif session_id is not None:
+                product_archive=_observed_session_uses_product_archive(db,workspace_id,session_id) is True
+            storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or (
+                'compact-v1' if product_archive else 'snapshot-v1')
             research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog,
-                state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
+                state_storage_format=storage_format,product_order_archive_v1=product_archive)
         else:
             research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),
                 synthetic_provider=monthly,

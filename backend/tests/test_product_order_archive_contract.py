@@ -8,6 +8,7 @@ from execution.observed_order_archive_v1 import (
     PRODUCT_ARTIFACT,
     advance,
     append,
+    is_product_state,
     summary,
     verify_complete,
     verify_record,
@@ -61,6 +62,12 @@ class ProductOrderArchiveContractTests(unittest.TestCase):
 
     def test_qa_artifact_version_is_unchanged(self):
         self.assertEqual(summary()['artifact'], ARTIFACT + '-SUMMARY')
+
+    def test_session_mode_is_selected_from_persisted_state_artifact(self):
+        self.assertTrue(is_product_state({'artifact': 'BTL-OBSERVED-EXECUTION-STATE-PRODUCT-ORDER-ARCHIVE-1'}))
+        self.assertFalse(is_product_state({'artifact': 'BTL-OBSERVED-EXECUTION-STATE-1'}))
+        with self.assertRaises(ContractError):
+            is_product_state({'artifact': None})
 
 
 if __name__ == '__main__':

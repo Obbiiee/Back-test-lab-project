@@ -15,6 +15,13 @@ from .contracts import text
 
 ARTIFACT = 'BTL-QA-TERMINAL-ORDER-ARCHIVE-1'
 PRODUCT_ARTIFACT = 'BTL-TERMINAL-ORDER-ARCHIVE-1'
+PRODUCT_STATE_ARTIFACT = 'BTL-OBSERVED-EXECUTION-STATE-PRODUCT-ORDER-ARCHIVE-1'
+
+
+def is_product_state(state):
+    require(type(state) is dict and type(state.get('artifact')) is str,
+            'sessionFormat','CORRUPT_RECORD')
+    return state['artifact']==PRODUCT_STATE_ARTIFACT
 
 
 def _artifact(value):

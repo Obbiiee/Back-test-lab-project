@@ -20,7 +20,8 @@ from .engine import crossing, protective, can_change
 from .observed_profile import ENGINE_VERSION, MODEL, MODEL_V2, ObservedExecutionProfile
 from .observed_finance import exit_amount
 from .observed_order_archive_v1 import (ARTIFACT as QA_ORDER_ARCHIVE_ARTIFACT,
-    PRODUCT_ARTIFACT as PRODUCT_ORDER_ARCHIVE_ARTIFACT, append as archive_append,
+    PRODUCT_ARTIFACT as PRODUCT_ORDER_ARCHIVE_ARTIFACT,
+    PRODUCT_STATE_ARTIFACT as STATE_PRODUCT_ARCHIVE_V1, append as archive_append,
     advance as archive_advance, summary as archive_summary)
 
 MAX_EVENTS, MAX_ORDERS = 256, 128
@@ -38,7 +39,6 @@ STATE_FIELDS = ('sessionId datasetId datasetVersion engineVersion model profile 
                 'eventHash sourceCheckpointHash sourcePrefixHash sourceCursorRevision lastObservedNs quoteBasis orders unresolved ended financial parent')
 STATE_FIELDS_QA_ARCHIVE_V1 = STATE_FIELDS+' orderArchive'
 STATE_QA_ARCHIVE_V1 = 'BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
-STATE_PRODUCT_ARCHIVE_V1 = 'BTL-OBSERVED-EXECUTION-STATE-PRODUCT-ORDER-ARCHIVE-1'
 PLAN_FIELDS = 'side orderType workflow entry quantity sl tp riskPercent observations'
 ORDER_FIELDS = PLAN_FIELDS+' status availableNs remaining entryPrice entryFillRef entryCost exitRequest grossPosted riskBalance riskBasisHash'
 
