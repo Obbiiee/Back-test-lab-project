@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import pyarrow.parquet as pq
 
@@ -67,6 +68,35 @@ class MonthlyParquetTests(unittest.TestCase):
             parquet = pq.ParquetFile(self.root / item["path"])
             self.assertTrue(all(parquet.metadata.row_group(0).column(i).compression == "ZSTD"
                                 for i in range(parquet.metadata.row_group(0).num_columns)))
+
+    def test_provider_streams_arrow_batches_instead_of_materializing_row_group(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+                                         expected_version=self.source.dataset_version, row_group_size=4)
+        provider = MonthlyParquetProvider(self.root, expected_manifest_hash=manifest["manifestHash"])
+        real_parquet_file = pq.ParquetFile
+        requested_batch_sizes = []
+
+        class StreamingOnlyParquetFile:
+            def __init__(self, path):
+                self.inner = real_parquet_file(path)
+                self.metadata = self.inner.metadata
+                self.schema_arrow = self.inner.schema_arrow
+
+            def iter_batches(self, **kwargs):
+                requested_batch_sizes.append(kwargs["batch_size"])
+                yield from self.inner.iter_batches(**kwargs)
+
+            def read_row_group(self, *args, **kwargs):
+                raise AssertionError("provider must use bounded Arrow batch iteration")
+
+        entry = manifest["files"][0]
+        group = entry["rowGroups"][0]
+        path = self.root / entry["path"]
+        with patch("market_data.monthly_parquet.pq.ParquetFile", StreamingOnlyParquetFile):
+            events, _times, _indices = provider._read_row_group(path, entry, group)
+        self.assertEqual(events, self.wire_events[:group["eventCount"]])
+        self.assertTrue(requested_batch_sizes)
+        self.assertTrue(all(size == 8192 for size in requested_batch_sizes))
 
     def test_monthly_provider_replays_original_pages_and_timeline(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
