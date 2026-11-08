@@ -463,15 +463,15 @@ class ObservedResearchApplication:
         return self.store.command_result(self.scope,session_id,command_id)
 
     def method_analytics(self,method_id):
-        """Pool only committed completed positions for observed Sessions."""
-        from .analysis import metrics
+        """Pool exact per-Session aggregates without materializing trade history."""
+        from .observed_analysis import pool_metrics
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             method=self._method(db,method_id);policy=method_policy(method)
             rows=db.execute('SELECT session_id FROM btl.tick_research_sessions '
                 'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id',
                 (self.scope.workspace_id,method_id)).fetchall()
-        included=[];completed=[];units=set()
+        included=[];session_metrics=[];completed_net=Fraction();units=set()
         for (session_id,) in rows:
             with connect(self.dsn) as db:
                 db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
@@ -479,17 +479,20 @@ class ObservedResearchApplication:
             if meta.get('artifact')!=META or meta.get('methodHash')!=policy.definition_hash:
                 continue
             units.add((state['profileHash'],state['engineVersion'],'USD'))
-            projection=self._complete_statistics(session_id,state)
+            # One bounded trade page is enough: LedgerFold computes its exact
+            # lifetime aggregates independently of the response page size.
+            projection=self.statistics.inspect(self.scope,session_id,0,1)
             if projection['status']!='COMPLETE' or not self._same_projection(projection,state):
                 return dict(schemaVersion=1,artifact='BTL-METHOD-ANALYTICS-1',methodId=method_id,
                     methodHash=policy.definition_hash,aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
                     balancesCombined=False,financialAuthority='COMMITTED_EVENTS_ONLY',status='BUILDING',
                     includedSessions=[],excludedSessions=[],metrics=None)
-            completed.extend(dict(row,net=row['netPosted']) for row in projection['completed'])
+            session_metrics.append(projection['metrics'])
+            completed_net+=Fraction(projection['metrics']['realizedNetCompleted'])
             included.append(dict(sessionId=session_id,revision=state['revision'],datasetId=state['datasetId'],
                 datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],
                 engineVersion=state['engineVersion'],eventHead=state['eventHash'],
-                tradeCount=len(projection['completed'])))
+                tradeCount=projection['metrics']['tradeCount']))
         common=dict(schemaVersion=1,artifact='BTL-METHOD-ANALYTICS-1',methodId=method_id,
             methodHash=policy.definition_hash,aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
             balancesCombined=False,financialAuthority='COMMITTED_EVENTS_ONLY')
@@ -497,7 +500,7 @@ class ObservedResearchApplication:
             return dict(**common,status='UNAVAILABLE',reason='INCOMPATIBLE_FINANCIAL_UNITS',
                 includedSessions=[],excludedSessions=[dict(sessionId=row['sessionId'],
                 reason='MULTIPLE_FINANCIAL_UNITS') for row in included],metrics=None)
-        aggregate=metrics(completed);aggregate.pop('maxWinStreak',None);aggregate.pop('maxLossStreak',None)
+        aggregate=pool_metrics(session_metrics)
         return dict(**common,status='COMPLETE',accountCurrency='USD',
-            completedTradeNet=text(sum((Fraction(row['net']) for row in completed),Fraction())),
+            completedTradeNet=text(completed_net),
             includedSessions=included,excludedSessions=[],metrics=aggregate)

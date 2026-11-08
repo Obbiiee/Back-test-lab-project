@@ -22,6 +22,50 @@ from execution.observed_postgres import read_snapshot
 def ratio(v):return dict(numerator=str(v.numerator),denominator=str(v.denominator))
 
 
+def pool_metrics(session_metrics):
+    """Pool exact observed trade summaries without loading every trade row.
+
+    Session boundaries have no shared chronology, so cross-session streaks are
+    intentionally omitted. All money, rate, duration, and risk averages are
+    recombined from exact rational aggregates emitted by ``LedgerFold``.
+    """
+    def value(raw):
+        return None if raw is None else Fraction(int(raw['numerator']),int(raw['denominator']))
+
+    trades=wins=losses=breakeven=r_eligible=0
+    net=positive=negative=total_r=total_duration=Fraction()
+    for item in session_metrics:
+        count=int(item['tradeCount']);win_count=int(item['wins']);loss_count=int(item['losses'])
+        be_count=int(item['breakeven']);r_count=int(item['rEligible'])
+        require(count==win_count+loss_count+be_count and 0<=r_count<=count,
+                'analyticsMetrics','CORRUPT_RECORD')
+        trades+=count;wins+=win_count;losses+=loss_count;breakeven+=be_count;r_eligible+=r_count
+        average_win=value(item['averageWin']);average_loss=value(item['averageLoss'])
+        average_net=value(item['expectancy']);average_r=value(item['averageR'])
+        average_duration=value(item['averageDurationNs'])
+        require((win_count==0)==(average_win is None) and (loss_count==0)==(average_loss is None)
+                and (count==0)==(average_net is None) and (r_count==0)==(average_r is None)
+                and (count==0)==(average_duration is None),
+                'analyticsMetrics','CORRUPT_RECORD')
+        positive+=Fraction() if average_win is None else average_win*win_count
+        negative+=Fraction() if average_loss is None else -average_loss*loss_count
+        net+=Fraction() if average_net is None else average_net*count
+        total_r+=Fraction() if average_r is None else average_r*r_count
+        total_duration+=Fraction() if average_duration is None else average_duration*count
+    return dict(tradeCount=trades,wins=wins,losses=losses,breakeven=breakeven,
+        winRate=ratio(Fraction(wins,trades)) if trades else None,
+        averageWin=ratio(positive/wins) if wins else None,
+        averageLoss=ratio(-negative/losses) if losses else None,
+        expectancy=ratio(net/trades) if trades else None,
+        profitFactor=ratio(positive/negative) if negative else None,
+        rEligible=r_eligible,rExcluded=trades-r_eligible,
+        rReason=None if r_eligible else 'PREENTRY_R0_NOT_PINNED',
+        averageR=ratio(total_r/r_eligible) if r_eligible else None,
+        averageDurationNs=ratio(total_duration/trades) if trades else None,
+        monteCarlo=dict(status='INSUFFICIENT_SAMPLE' if r_eligible<30 else 'NOT_COMPUTED',
+                        eligible=r_eligible,exclusions=trades-r_eligible,minimum=30))
+
+
 class LedgerFold:
     """Independent event projection; finance curve is bounded, order history is complete.
 
