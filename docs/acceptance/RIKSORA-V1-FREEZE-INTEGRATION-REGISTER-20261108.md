@@ -125,11 +125,13 @@ The claim query lets another actor's interactive job pass a fresh multi-chunk re
 ### C. User, trade and Session persistence — P0
 **Existing code:** `backend/execution/observed_postgres.py`; `backend/execution/postgres.py`; `backend/execution/observed_kernel.py`; `backend/execution/observed_order_archive_v1.py`; `backend/execution/observed_state_delta_v3.py`; `backend/execution/session_storage_metrics.py`.
 
-**Gap:** default Session storage is `snapshot-v1`; `compact-v1` is gated to new Sessions. Normal observed Session has **128 cumulative lifetime orders**; terminal archive is QA-only. Cold compact reconstruction scans deltas since genesis.
+**Gap:** default observed Session storage is still `snapshot-v1`; Product archive mode is implemented but not selected by the hosted app, so ordinary observed Sessions still have **128 cumulative lifetime orders**. Product archive requires its migration and compact/progress state format. Cold compact reconstruction and analytics still need bounded verified projections.
 
 **Deliverable:** production-versioned compact storage for new Sessions, compatible legacy read, append-only financial event truth, active order hot-state only, versioned committed closed-order archive/read model, indexed paginated history and periodic verified compact recovery base to bound reconstruction. Keep exact idempotent retry and immutable record semantics, protect financial history and money.
 
 **Done when:** a long-lived Session is not blocked after 128 lifetime completed orders, previous fills still reconcile, cold recovery reads a bounded tail rather than all revisions, and physical per-trade/Session disk accounting can detect growth including indexes/TOAST/WAL separately.
+
+**Latest checkpoint (PARTIAL, 2026-11-08):** `8715e11` / PR #48 commit `1f2b81882c898a21b68cbe53d0bf71ec27a8b162` adds Product-only unlimited cumulative retention with a bounded active set, an immutable indexed terminal-order table, and revision-pinned sequence pages. Pure archive checks cover 4,097 records and reject tampering; legacy QA archive wire remains unchanged. Hosted Session format selection and PostgreSQL lifecycle tests are NOT RUN / NOT WIRED. Next: session-aware legacy/Product policy selection and bounded analytics/journal projection before enabling this format by default.
 
 ### D. Analytical projections, journal and catalog scaling — P1 before public V1
 **Existing code:** `backend/execution/observed_analysis.py`; `backend/execution/observed_research.py`; `backend/execution/product_read_model.py`; `backend/execution/product_method_lifecycle.py`; `frontend/src/tickAlpha/client.js`.
