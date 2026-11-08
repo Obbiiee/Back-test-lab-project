@@ -3,6 +3,12 @@ Total output lines: 599
 
 # Current Product V1 implementation update — source routing and cumulative analytics (2026-11-08)
 
+## 2026-11-08 Method Analytics memory pooling
+
+Code commit `192419b2cc8935cbc4326c93753532729bc09dcd` is on PR #44. The shared exact-rational `pool_metrics()` now combines per-Session metric summaries for both observed and V1 Method Analytics. Each analytics path avoids retaining completed trade rows from every Session at once; observed analytics requests only one bounded trade page per Session. A cross-calculator regression confirms pooled metrics match the existing all-trades calculation, with cross-Session streaks omitted. The stale 4,097-event test was changed to assert no lifetime event cap. Focused Method Analytics + observed analysis: 10 runnable tests PASS; 17 PostgreSQL-backed tests SKIPPED (isolated DB unavailable); compile and diff check PASS.
+
+This is a memory/aggregation improvement; V1 projection still constructs each Session's complete event analysis, and durable indexed Journal/analytics read models remain incomplete. Product V1 is still IN PROGRESS.
+
 ## 2026-11-08 observed Method Analytics pooling
 
 Code commit `598664117860955a9e4a9512e5c338a9fae426aa` is on PR #44. Observed Method Analytics now reads one bounded completed-trade page per Session and combines the exact lifetime metrics emitted by each committed ledger fold, rather than collecting all completed trade rows in application memory. Rational sums/weighted averages are preserved exactly; streaks remain omitted across Sessions because there is no shared chronology. A regression verifies pooled output against the existing all-trades calculator. Observed-analysis suite: 7 runnable tests PASS; 3 PostgreSQL tests SKIPPED (isolated database unavailable); compile and diff check PASS.
