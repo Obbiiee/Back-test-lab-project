@@ -617,8 +617,6 @@ class ResearchApplication:
                             throughNs=state["throughNs"],riskBasis=state["balance"],model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
             reviewed['researchRisk'] = planned_risk(state,command)
             blob, sha = pack(reviewed)
-            count = db.execute("SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s",(self.scope.workspace_id,raw["sessionId"])).fetchone()[0]
-            require(count < 256,"reviews","REFUSED_REVIEW_LIMIT")
             db.execute("INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["sessionId"],raw["requestId"],blob,sha))
         return dict(review=reviewed,reviewHash=sha)
 

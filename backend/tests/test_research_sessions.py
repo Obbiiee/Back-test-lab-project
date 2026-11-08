@@ -139,6 +139,19 @@ class ResearchSessionTests(unittest.TestCase):
         self.assertEqual(len(collected),129)
         self.assertEqual(set(collected),set(created))
 
+    def test_product_review_history_has_no_256_item_lifetime_cap(self):
+        record=method();self.app.create_method(record)
+        view=self.app.create_session({'id':'session:review-limit:'+uuid.uuid4().hex,'name':'Review capacity',
+            'methodId':record['id'],'initialBalance':'10000','startPeriod':'2020-01'})
+        for index in range(257):
+            raw=review_request(view)
+            raw['requestId']='order:review-cap:'+str(index)+':'+uuid.uuid4().hex
+            self.app.review(raw)
+        with connect(DSN) as db:
+            count=db.execute('SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id,view['metadata']['id'])).fetchone()[0]
+        self.assertEqual(count,257)
+
     def test_summary_is_scoped_read_only_and_never_reconstructs_market(self):
         from unittest.mock import patch
         view, _ = self.create()

@@ -146,7 +146,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 with connect(dsn) as db:
                     db.row_factory=dict_row
                     candidates=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions '
-                        'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id LIMIT 128',
+                        'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id',
                         (str(workspace_id),args[0])).fetchall()
                 from execution.postgres import unpack
                 observed_method=any(unpack(row['payload'],row['content_hash']).get('artifact')==

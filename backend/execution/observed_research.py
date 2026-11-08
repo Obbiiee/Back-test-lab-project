@@ -441,7 +441,7 @@ class ObservedResearchApplication:
             request=Command(self.scope.workspace_id,raw['sessionId'],raw['requestId'],policy.method_id,policy.definition_hash,'XAUUSD',ctx.feed_id,state['profileHash'],state['revision'],state['revision'],payload['workflow'],'BUY' if payload['side']=='LONG' else 'SELL',payload['orderType'],Decimal(payload['entry']),Decimal(payload['quantity']),Decimal(payload['riskPercent']),None if payload['sl'] is None else Decimal(payload['sl']),None if payload['tp'] is None else Decimal(payload['tp']),raw['planId'],raw['planRevision'],tuple(Observation(o['conditionId'],o['outcome']) for o in payload['observations']))
             validate_command(request,ctx)
             reviewed=dict(schemaVersion=1,artifact=REVIEW,requestHash=req_hash,command=command,contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=state['policy']['definitionHash'],profileHash=state['profileHash'],throughNs=state['throughNs'],riskBasis=state['balance'],model=MODEL,basisCheckpointHash=basis_sha,basisHash=basis_hash,researchRisk=risk)
-            count=db.execute('SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,raw['sessionId'])).fetchone()[0];require(count<256,'reviews','REFUSED_REVIEW_LIMIT');blob,sha=pack(reviewed);db.execute('INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['sessionId'],raw['requestId'],blob,sha))
+            blob,sha=pack(reviewed);db.execute('INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['sessionId'],raw['requestId'],blob,sha))
         return dict(review=reviewed,reviewHash=sha)
 
     def confirm(self,session_id,raw):
