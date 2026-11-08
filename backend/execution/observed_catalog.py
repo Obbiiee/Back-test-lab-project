@@ -11,7 +11,6 @@ from threading import RLock
 from contracts.primitives import require,identifier,digest
 from ticks.contracts import keys
 from execution.observed_profile import ObservedExecutionProfile,MODEL
-from execution.observed_admission import AdmittedObservedSource
 from market_data.context_archive import ContextFilePin,PinnedContextArchive
 
 
@@ -22,8 +21,15 @@ class ObservedCatalog:
         with os.fdopen(fd,'rb') as stream:
             f=os.fstat(stream.fileno());require(stat.S_ISREG(f.st_mode) and stat.S_IMODE(f.st_mode)==0o400 and f.st_size<=1048576,'catalog','REFUSED_OPERATOR_CATALOG');raw=stream.read(1048577)
         require(len(raw)<=1048576 and hashlib.sha256(raw).hexdigest()==sha256,'catalog','SOURCE_PIN_CHANGED');value=json.loads(raw)
-        require(type(value) is dict and set(value) in (set('schemaVersion artifact sources'.split()),set('schemaVersion artifact sources referenceContext'.split())),'catalog','REFUSED_OPERATOR_CATALOG')
+        allowed={frozenset('schemaVersion artifact sources'.split()),
+                 frozenset('schemaVersion artifact sources referenceContext'.split()),
+                 frozenset('schemaVersion artifact sources timelineStorageMode'.split()),
+                 frozenset('schemaVersion artifact sources referenceContext timelineStorageMode'.split())}
+        require(type(value) is dict and frozenset(value) in allowed,'catalog','REFUSED_OPERATOR_CATALOG')
         require(type(value['schemaVersion']) is int and value['schemaVersion']==1 and value['artifact']=='BTL-OBSERVED-OPERATOR-CATALOG-1' and type(value['sources']) is list and 1<=len(value['sources'])<=24,'catalog','REFUSED_OPERATOR_CATALOG')
+        self.timeline_storage_mode=value.get('timelineStorageMode','session-log-v2')
+        require(self.timeline_storage_mode in ('session-log-v2','shared-source-v2'),
+                'timelineStorageMode','REFUSED_OPERATOR_CATALOG')
         self._entries={};self._profiles={};self._cache=OrderedDict();self._lock=RLock();self.config_hash=sha256
         self._reference_archive=None;self._reference_info=None
         if 'referenceContext' in value:
@@ -69,7 +75,11 @@ class ObservedCatalog:
         with self._lock:
             r=self._profiles.get(profile_hash);require(r is not None,'source','REFUSED_OBSERVED_SOURCE_IDENTITY')
             if profile_hash not in self._cache:
-                p=ObservedExecutionProfile.from_wire(r['profile']);source=AdmittedObservedSource(r['folder'],p,receipt_path=r['receiptPath'],receipt_sha256=r['receiptSha256'],log_root=r['logRoot']);self._cache[profile_hash]=source
+                from execution.observed_admission import AdmittedObservedSource
+                p=ObservedExecutionProfile.from_wire(r['profile']);source=AdmittedObservedSource(
+                    r['folder'],p,receipt_path=r['receiptPath'],receipt_sha256=r['receiptSha256'],
+                    log_root=r['logRoot'],timeline_storage_mode=self.timeline_storage_mode,
+                    allow_product_shared_source_v2=self.timeline_storage_mode=='shared-source-v2');self._cache[profile_hash]=source
                 # At most24 configured profiles. Keep admitted sources until
                 # service shutdown; never evict a handle leased by another call.
             self._cache.move_to_end(profile_hash);source=self._cache[profile_hash];source.assert_current();return source

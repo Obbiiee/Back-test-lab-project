@@ -26,7 +26,8 @@ def _sha(path):
 
 class AdmittedObservedSource:
     """Private model capability, not strict financial/source-quality eligibility."""
-    def __init__(self,folder,profile,*,receipt_path,receipt_sha256,log_root,timeline_storage_mode='session-log-v2'):
+    def __init__(self,folder,profile,*,receipt_path,receipt_sha256,log_root,
+                 timeline_storage_mode='session-log-v2',allow_product_shared_source_v2=False):
         require(type(profile) is ObservedExecutionProfile,'profile');digest(receipt_sha256,'receiptHash')
         self.profile=profile;self._folder=Path(folder);self._archive=self._folder/'archive.sqlite';proof=Path(receipt_path)
         require(not proof.is_symlink() and proof.stat().st_size<=1048576,'receipt','REFUSED_QUALIFICATION_PROOF')
@@ -67,14 +68,18 @@ class AdmittedObservedSource:
         self.dataset_id=p['datasetId'];self.version=p['datasetVersion'];self.log_root=Path(log_root);self.qualification_hash=receipt_sha256
         require(timeline_storage_mode in ('session-log-v2','shared-source-v1','shared-source-v2'),
                 'timelineStorageMode','INVALID_INPUT')
+        require(type(allow_product_shared_source_v2) is bool and
+                (not allow_product_shared_source_v2 or timeline_storage_mode=='shared-source-v2'),
+                'timelineStorageMode','INVALID_INPUT')
         if timeline_storage_mode == 'shared-source-v1':
             require(bool(os.environ.get('BTL_HISTORICAL_QA_ROOT')) and
                     os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V1')=='1',
                     'timelineStorageMode','REFUSED_QA_ONLY_MODE')
         elif timeline_storage_mode == 'shared-source-v2':
-            require(bool(os.environ.get('BTL_HISTORICAL_QA_ROOT')) and
-                    os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V2')=='1',
-                    'timelineStorageMode','REFUSED_QA_ONLY_MODE')
+            if not allow_product_shared_source_v2:
+                require(bool(os.environ.get('BTL_HISTORICAL_QA_ROOT')) and
+                        os.environ.get('BTL_QA_SHARED_CANONICAL_SOURCE_V2')=='1',
+                        'timelineStorageMode','REFUSED_QA_ONLY_MODE')
         self.timeline_storage_mode=timeline_storage_mode
         self.source_archive_sha256=archive_hash
         self.source_pin=dict(schemaVersion=1,artifact='BTL-QA-SHARED-SOURCE-PIN-1',
