@@ -25,7 +25,7 @@ export default function AlphaSessions({catalog,busy,onOpen,onCreate,onSource}){
       <div className="alpha-hub-actions">
         <button className="alpha-primary-action" disabled={busy} onClick={event=>onCreate(hasMethods?'session':'method',event)}>{hasMethods?'New Session':'Create a strategy'}</button>
         {hasMethods&&<button disabled={busy} onClick={event=>onCreate('method',event)}>New strategy</button>}
-        <button onClick={onSource}>Data source</button>
+        <button className="alpha-source-credit" onClick={onSource}>Data source</button>
       </div>
     </div>
     {!hasSessions&&<ol className="alpha-hub-steps" aria-label="Getting started">{steps.map(([title,text,done],index)=><li key={title} className={done?'done':''}><span aria-hidden="true">{done?'✓':index+1}</span><div><strong>{title}</strong><p>{text}</p></div>{done&&<span className="alpha-visually-hidden">Done</span>}</li>)}</ol>}
@@ -43,7 +43,7 @@ export default function AlphaSessions({catalog,busy,onOpen,onCreate,onSource}){
           <div><dt>Start month</dt><dd>{session.startPeriod}</dd></div>
           <div><dt>Strategy</dt><dd>{method?.name||'Unavailable'}</dd></div>
         </dl>
-        <footer><span>{source}</span><button className="alpha-primary-action" disabled={busy} onClick={()=>onOpen(session.id)} aria-label={`Open ${session.name}`}>Open</button></footer>
+        <footer><span className="alpha-source-credit">{source}</span><button className="alpha-primary-action" disabled={busy} onClick={()=>onOpen(session.id)} aria-label={`Open ${session.name}`}>Open</button></footer>
       </article></li>;})}</ul>:<p className="alpha-hub-none">No Session matches this search.</p>)}
     {hasMethods&&<section className="alpha-hub-strategies" aria-labelledby="alpha-hub-strategies"><h2 id="alpha-hub-strategies">Strategies</h2><ul>{catalog.methods.map(m=><li key={m.id}><strong>{m.name}</strong><span>{kindLabel(m.kind)}{m.kind==='PROTOCOL'&&m.riskPercent?` · risk ${m.riskPercent}%`:''}{m.kind==='PROTOCOL'&&m.rr?` · R:R ${m.rr}`:''}</span><span>{catalog.sessions.filter(s=>s.methodId===m.id).length} Sessions</span></li>)}</ul></section>}
   </section>;

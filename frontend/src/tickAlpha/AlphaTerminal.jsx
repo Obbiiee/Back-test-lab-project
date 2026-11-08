@@ -11,8 +11,11 @@ import {accountStorageKey} from './accountClient.js';
 
 const shown=value=>value??'Unavailable';
 
-export default function AlphaTerminal({view,busy,onAction,onFeedback}){
+export default function AlphaTerminal({view,busy,onAction,onFeedback,focus=null}){
   const [tab,setTab]=useState('Open positions'),[quantities,setQuantities]=useState({});
+  // The phone session bar can ask for a tab (Positions, Results) without owning terminal state.
+  const [seenFocus,setSeenFocus]=useState(focus);
+  if(focus!==seenFocus){setSeenFocus(focus);if(focus?.tab)setTab(focus.tab);}
   const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);

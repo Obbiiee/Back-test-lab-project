@@ -1,6 +1,7 @@
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {createAccountClient,setAccountTransport,clearAccountTransport} from './accountClient.js';
 import './tickAlpha.css';
+import './alphaPhone.css';
 import AlphaBrand from './AlphaBrand.jsx';
 const Workspace=lazy(()=>import('./TickAlpha.jsx'));
 const modes={login:'Sign in',register:'Create account',verify:'Verify email',resend:'Request verification',forgot:'Request recovery',reset:'Reset password'};

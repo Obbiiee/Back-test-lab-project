@@ -10,13 +10,16 @@ import {api,sessionPath} from './client.js';
 import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
 
-export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen}){
+export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen,drawRequest=null,wide=false,onWide}){
   const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
   const [savedIndicators]=useState(()=>{
     const store=new IndicatorPreferences(()=>globalThis.localStorage,workspaceKey,productionRegistry);
     return {store,instances:store.load()};
   });
   const [mode,setMode]=useState('none'),[instances,setInstances]=useState(savedIndicators.instances);
+  // Phone layout keeps drawing tools behind the pencil button until asked for.
+  const [toolsOpen,setToolsOpen]=useState(false),[seenDraw,setSeenDraw]=useState(drawRequest);
+  if(drawRequest!==seenDraw){setSeenDraw(drawRequest);if(drawRequest){setMode(drawRequest.type);setToolsOpen(true);}}
   const [preferences,setPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const [speed,setSpeed]=useState(4),[playToken,setPlayToken]=useState(null);
   const seekInput=useRef(null);
@@ -112,7 +115,9 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     </div>
     {savedIndicators.store.status&&<p className="alpha-chart-note" role="alert">{savedIndicators.store.status}</p>}
     {past.key===historyKey&&past.status&&<details className="alpha-display-details alpha-history-context"><summary>Earlier candle context</summary><div><p role="status">{past.status}</p><button onClick={()=>setHistoryRetry(value=>value+1)}>Retry earlier candles</button></div></details>}
-    <div className="alpha-chart-body">
+    <div className={`alpha-chart-body${toolsOpen||mode!=='none'?' is-tools-open':''}`}>
+      <button type="button" className="alpha-draw-toggle" aria-expanded={toolsOpen||mode!=='none'} aria-label={toolsOpen||mode!=='none'?'Hide drawing tools':'Show drawing tools'} onClick={()=>{if(toolsOpen||mode!=='none'){setMode('none');setToolsOpen(false);}else setToolsOpen(true);}}><Icon name={toolsOpen||mode!=='none'?'cursor':'brush'}/></button>
+      {onWide&&<button type="button" className="alpha-wide-toggle" aria-pressed={wide} aria-label={wide?'Exit wide chart':'Wide chart'} onClick={()=>onWide(!wide)}><Icon name="expand"/></button>}
       <nav className="alpha-drawing-tools" aria-label="Drawing tools">
         <button aria-pressed={mode==='none'} onClick={()=>{setPlayToken(null);setMode('none');}} aria-label="Cursor / Select" title="Cursor / Select"><Icon name="cursor"/></button>
         {[
