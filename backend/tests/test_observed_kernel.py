@@ -103,6 +103,36 @@ class ObservedKernelTests(unittest.TestCase):
         self.assertEqual(exit_[0]['model'],'CONDITIONAL_OBSERVED_TICK_SIMULATION')
         with self.assertRaises(ValueError):old_validate_state(self.state)
 
+    def test_product_archive_keeps_unbounded_cumulative_orders_out_of_hot_state(self):
+        from execution.observed_order_archive_product_v1 import verify_complete
+        self.setup_stream([(0,'2300','2300.1')])
+        state=seed_state('session:archive-product',self.profile,self.policy,self.timeline.checkpoint(),
+                         terminal_order_archive_v1=True)
+        frame=self.timeline.advance_through('0',self.timeline.cursor);checkpoint=self.timeline.checkpoint()
+        command=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+            sessionId=state['sessionId'],commandId='archive:advance',expectedRevision=0,
+            kind='ADVANCE',payload=dict(targetNs='0'))
+        state,_,_=apply(state,command,reveal=frame,checkpoint=checkpoint,terminal_order_archive_v1=True,
+                      archived_order_lookup=lambda _:None)
+        archived=[]
+        for index in range(240):
+            order_id=f'archive:order:{index}'
+            opened=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                sessionId=state['sessionId'],commandId=order_id,expectedRevision=state['revision'],
+                kind='OPEN',payload=dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',
+                    quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]))
+            state,_,_=apply(state,opened,terminal_order_archive_v1=True,archived_order_lookup=lambda _:None)
+            cancelled=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                sessionId=state['sessionId'],commandId=f'archive:cancel:{index}',expectedRevision=state['revision'],
+                kind='CANCEL',payload=dict(orderId=order_id))
+            state,_,records=apply(state,cancelled,terminal_order_archive_v1=True,archived_order_lookup=lambda _:None)
+            self.assertEqual(len(records),1)
+            self.assertEqual(state['orders'],{})
+            archived.extend(records)
+        verified=verify_complete(iter(archived),state['orderArchive'])
+        self.assertEqual(state['orderArchive']['count'],240)
+        self.assertEqual(verified['count'],240)
+
     def test_historical_v2_records_gap_then_evaluates_only_actual_resumption_quote(self):
         self.setup_stream([(0,'2300','2300.1'),(120*S,'2299','2299.1')])
         raw=historical_technical_profile(self.profile.wire,'a'*64);self.profile=ObservedExecutionProfile.from_wire(raw)
@@ -153,6 +183,15 @@ class ObservedKernelTests(unittest.TestCase):
         changed=deepcopy(QA_ORDER_RETENTION_V4);changed['maxActiveOrders']=129
         with self.assertRaisesRegex(ValueError,'REFUSED_POLICY'):
             order_limits(changed)
+
+    def test_compact_v1_default_accepts_versioned_qa_archive_without_legacy_delta_mode(self):
+        from unittest.mock import patch
+        from execution.observed_postgres import ObservedExecutionStore
+        with patch.dict('os.environ',{'BTL_ENABLE_QA_ORDER_ARCHIVE_V1':'1'}):
+            store=ObservedExecutionStore('authored:unused',qa_order_archive_v1=True)
+        self.assertEqual(store.state_storage_format,'compact-v1')
+        self.assertFalse(store.qa_state_delta_v3)
+        self.assertTrue(store.qa_order_archive_v1)
 
     def setup_v2_state(self,quotes,*,gap_kinds=None):
         self.setup_stream(quotes,gap_kinds=gap_kinds)

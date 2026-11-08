@@ -667,6 +667,16 @@ class DiskTickProvider:
             require(int(predecessor["timeNs"]) < int(time), "boundary", "INCOMPLETE_ATOMIC_BOUNDARY")
         return dict(position=position, groupTimeNs=time)
 
+    def locate_ordinal_v2(self, dataset_id, version, raw_ordinal):
+        """Locate the atomic timestamp group containing a raw event ordinal."""
+        self._identity(dataset_id, version)
+        ordinal = uint(raw_ordinal)
+        count = int(self.__root["eventCount"])
+        if ordinal >= count:
+            return None
+        event = self._by_ordinal(ordinal)
+        return self.locate_v2(dataset_id, version, event["timeNs"])["position"]
+
     def _by_ordinal(self, ordinal):
         ds = self.__root["directories"]
         di = bisect_left([int(d["lastOrdinal"]) for d in ds], ordinal)

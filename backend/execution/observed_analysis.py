@@ -10,7 +10,7 @@ from execution.engine import protective
 from execution.observed_profile import ObservedExecutionProfile,MODEL
 from execution.observed_finance import exit_amount
 from execution.observed_kernel import validate_state
-from execution.analysis import metrics as committed_metrics
+from execution.analysis import metrics as committed_metrics,pool_metrics
 from execution.observed_postgres import check_events,QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE
 from collections import OrderedDict
 from threading import RLock
@@ -72,7 +72,8 @@ class LedgerFold:
 
     def project(self,state,offset=0,maximum=64,archive_orders=None):
         validate_state(state,order_retention_policy=self.order_retention_policy);require(all(state[k]==self.genesis[k] for k in ('sessionId','datasetId','datasetVersion','profileHash','profile','policy','initialBalance','startNs','parent')),'context','CORRUPT_RECORD')
-        if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
+        if state['artifact'] in ('BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1',
+                                 'BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1'):
             active={oid:o for oid,o in self.orders.items() if o['status'] in ('PENDING','ACTIVE')}
             terminal={oid:o for oid,o in self.orders.items() if o['status'] not in ('PENDING','ACTIVE')}
             require(type(archive_orders) is dict and terminal==archive_orders and active==state['orders'],
@@ -108,9 +109,25 @@ class ObservedStatistics:
     def __init__(self,store):
         self.store=store;self._folds=OrderedDict();self._lock=RLock()
 
+    @staticmethod
+    def _working_fold(prior,target_event_count):
+        """Reuse an already-current immutable projection; copy only to extend it.
+
+        ``LedgerFold.project`` is read-only. Copying a complete cached fold for
+        every page request needlessly duplicates its retained order index, even
+        when no new events have arrived. A stale prefix still gets a private
+        copy before consuming events, so a failed extension cannot poison the
+        previously accepted cache entry.
+        """
+        require(prior.next<=target_event_count,'eventRegression','CORRUPT_RECORD')
+        return prior if prior.next==target_event_count else deepcopy(prior)
+
     def inspect(self,scope,session_id,offset=0,maximum=64):
         workspace,session=scoped(scope,session_id)
-        require(type(offset) is int and 0<=offset<=128 and type(maximum) is int and 1<=maximum<=64,'pagination')
+        # The response page remains bounded, but an archive can contain more
+        # than 128 completed trades. Offsets are positions in that durable
+        # history and must not inherit the legacy hot-state order limit.
+        require(type(offset) is int and offset>=0 and type(maximum) is int and 1<=maximum<=64,'pagination')
         with self._lock,connect(self.store.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self.store._read(db,workspace,session)['state']
@@ -121,8 +138,8 @@ class ObservedStatistics:
                 genesis,_=self.store._qa_reconstruct(db,workspace,session,upto_revision=0)
             else:genesis=read_snapshot(*seed)['state']
             key=(workspace,session,content_hash(genesis));prior=self._folds.get(key)
-            fold=deepcopy(prior) if prior is not None else LedgerFold(genesis,self.store.order_retention_policy)
-            require(fold.next<=state['nextEventIndex'],'eventRegression','CORRUPT_RECORD')
+            fold=(self._working_fold(prior,state['nextEventIndex']) if prior is not None
+                  else LedgerFold(genesis,self.store.order_retention_policy))
             for _ in range(16):
                 if fold.next==state['nextEventIndex']:break
                 rows=db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence>=%s AND sequence<%s ORDER BY sequence LIMIT 64',(workspace,session,fold.next,state['nextEventIndex'])).fetchall()
@@ -133,6 +150,9 @@ class ObservedStatistics:
                 if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
                     self.store._verify_order_archive(db,workspace,session,state,full=True)
                     archive_orders={row['orderId']:row['order'] for row in self.store._archive_rows(db,workspace,session)}
+                elif state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1':
+                    self.store._verify_product_archive(db,workspace,session,state,full=True)
+                    archive_orders={row['orderId']:row['order'] for row in self.store._product_archive_rows(db,workspace,session)}
                 result=fold.project(state,offset,maximum,archive_orders=archive_orders)
             else:
                 result=dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='BUILDING',sessionId=session,revision=state['revision'],processedEvents=fold.next,totalEvents=state['nextEventIndex'],metrics=None,completed=[],nextTradeOffset=None)

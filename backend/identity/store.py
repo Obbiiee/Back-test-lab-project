@@ -60,6 +60,13 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
             row = await (await db.execute("SELECT * FROM btl.users WHERE email=%s", (email.lower(),))).fetchone()
             return User(**row) if row else None
 
+    async def identity_providers(self, user_id):
+        async with connection(self.dsn) as db:
+            rows = await (await db.execute(
+                "SELECT provider FROM btl.account_identities WHERE user_id=%s ORDER BY provider", (user_id,)
+            )).fetchall()
+            return [row["provider"] for row in rows]
+
     async def create(self, create_dict):
         try:
             async with connection(self.dsn) as db:
@@ -91,6 +98,16 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
                 raise exceptions.UserNotExists()
             if "hashed_password" in values or values.get("is_active") is False:
                 await db.execute("DELETE FROM btl.auth_sessions WHERE user_id=%s", (user.id,))
+            if row["is_verified"] and row["password_enabled"]:
+                # A verified email/password identity is recorded under the
+                # canonical account map in the same transaction as verification.
+                await db.execute("INSERT INTO btl.account_identities(provider,provider_subject,user_id,linked_by) "
+                                 "VALUES ('EMAIL_PASSWORD',lower(%s),%s,'EMAIL_VERIFICATION') "
+                                 "ON CONFLICT (provider,provider_subject) DO NOTHING", (row["email"], user.id))
+                identity = await (await db.execute("SELECT user_id FROM btl.account_identities "
+                    "WHERE provider='EMAIL_PASSWORD' AND provider_subject=lower(%s)", (row["email"],))).fetchone()
+                if identity is None or identity["user_id"] != user.id:
+                    raise ValueError("Verified email identity is already assigned")
             await audit(db, "IDENTITY_UPDATED", user.id)
             return User(**row)
 

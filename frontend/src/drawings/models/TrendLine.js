@@ -1,14 +1,10 @@
-import { canonicalPoint, TREND_LINE } from '../DrawingTypes.js';
+import { TREND_LINE } from '../DrawingTypes.js';
+import { CoreDrawing } from './CoreDrawing.js';
 
-export function TrendLine({ id, points, options = {}, visible = true, locked = false, metadata = {} }) {
-  if (typeof id !== 'string' || !id) throw new TypeError('Drawing requires an id');
-  if (!Array.isArray(points) || points.length !== 2) throw new TypeError('Trend Line requires exactly two anchors');
-  const width = options.lineWidth ?? 2;
-  if (!Number.isFinite(width) || width < 1 || width > 10) throw new TypeError('Invalid line width');
-  return Object.freeze({
-    id, type: TREND_LINE, points: Object.freeze(points.map(canonicalPoint)),
-    options: Object.freeze({ color: typeof options.color === 'string' ? options.color : '#58a6ff', lineWidth: width }),
-    visible: Boolean(visible), locked: Boolean(locked),
-    metadata: Object.freeze(typeof metadata.createdOnTimeframe === 'string' ? { createdOnTimeframe: metadata.createdOnTimeframe } : {}),
-  });
+export function TrendLine(input) {
+  if (!Array.isArray(input?.points) || input.points.length !== 2) {
+    if (typeof input?.id !== 'string' || !input.id) throw new TypeError('Drawing requires an id');
+    throw new TypeError('Trend Line requires exactly two anchors');
+  }
+  return CoreDrawing(TREND_LINE, input);
 }

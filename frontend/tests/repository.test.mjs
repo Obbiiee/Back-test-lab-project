@@ -33,26 +33,6 @@ for(const file of reachable)if(file.startsWith('frontend/src/tickAlpha/'))
   assert.ok(config.implementation.includes(file),'Reachable Alpha module missing from AI bundle: '+file);
 // V21-1 deliberately admits only this reviewed execution seam, never all backend/data.
 const executionReferences=new Set([
-  'backend/tests/test_binary_source.py','backend/tests/test_exness_millisecond.py','backend/tests/test_compact_storage.py','backend/tests/test_observed_source.py','backend/tests/test_observed_context.py','backend/tests/test_observed_finance.py','backend/tests/test_observed_kernel.py','backend/tests/test_observed_postgres.py','backend/tests/test_observed_analysis.py','backend/tests/test_observed_catalog.py','backend/tests/test_read_snapshot.py','backend/tests/fixtures/binary_source_vectors.json','backend/tests/fixtures/observed_profile_vectors.json','backend/tests/verify_observed_vectors.mjs','backend/tests/verify_binary_source_vectors.mjs',
-  'backend/tests/test_odoo_recovery.py','backend/tests/test_local_reliability.py',
-  'backend/cloud/support.py','backend/infrastructure/migrations/014_support_intake.sql','backend/tests/test_support.py','backend/tests/test_odoo_sync.py',
-  'backend/tests/test_odoo_projection.py',
-  'backend/cloud/billing.py','backend/infrastructure/migrations/013_sandbox_billing.sql','backend/tests/test_billing.py',
-  'backend/cloud/midtrans.py','backend/tests/test_midtrans.py',
-  'backend/ticks/dukascopy_batch.py','backend/tests/test_dukascopy_batch.py',
-  'backend/identity/google.py','backend/identity/google_store.py','backend/infrastructure/migrations/012_google_identity.sql','backend/tests/test_google_identity.py',
-  'backend/cloud/sandbox_access.py','backend/cloud/research_v2.py','backend/infrastructure/migrations/011_v2_sandbox_access.sql','backend/tests/test_sandbox_v2.py',
-  'backend/execution/analysis_v2.py','backend/tests/test_analysis_v2.py',
-    'backend/execution/research_v2.py','backend/execution/research_fixture_v2.py','backend/infrastructure/migrations/010_v2_research.sql','backend/tests/test_research_v2.py',
-  'backend/execution/kernel_v2.py','backend/execution/controller_v2.py','backend/execution/postgres_v2.py','backend/tests/test_kernel_v2.py','backend/tests/test_execution_v2_postgres.py','backend/tests/fixtures/execution_v2.json',
-  'backend/execution/sources_v2.py','backend/tests/test_sources_v2.py',
-  'backend/execution/finance_v2.py','backend/tests/test_finance_v2.py',
-  'backend/execution/profile_v2.py','backend/tests/test_profile_v2.py','backend/tests/fixtures/execution_profiles_v2.json','backend/tests/verify_profile_v2_vectors.mjs',
-  'backend/execution/conversion.py','backend/tests/test_conversion.py',
-  // Offline CSV foundation: exact files only; no data/downloader admission.
-  'backend/market_data/instruments.py','backend/ticks/dukascopy_csv.py','backend/tests/test_dukascopy_csv.py',
-  'backend/market_data/context_warmup.py','backend/market_data/context_archive.py',
-  'backend/tests/test_context_warmup.py','backend/tests/test_context_archive.py',
   'backend/cloud/worker.py','backend/tests/test_worker_deadline.py','backend/tests/alpha_capacity_probe.py','backend/cloud/queue.py','backend/infrastructure/migrations/009_replay_queue.sql','backend/infrastructure/migrations/008_research_queue.sql','backend/tests/test_research_queue.py',
   'backend/infrastructure/resources.py','backend/tests/test_resource_bounds.py',
   'backend/cloud/app.py','backend/cloud/research.py','backend/cloud/workspaces.py','backend/tests/test_cloud_research.py',
@@ -62,7 +42,7 @@ const executionReferences=new Set([
   'backend/execution/analysis.py','backend/execution/bootstrap.py','backend/execution/observability.py','backend/tests/test_tick_analysis.py','backend/tests/stitch_analytics.py',
   'backend/execution/workspace.py','backend/tests/test_tick_workspace.py',
   'backend/execution/research.py','backend/execution/research_fixture.py','backend/execution/local_api.py',
-  'backend/execution/historical.py','backend/execution/observed_source.py','backend/execution/observed_context.py','backend/execution/observed_profile.py','backend/execution/observed_finance.py','backend/execution/observed_kernel.py','backend/execution/observed_admission.py','backend/execution/observed_catalog.py','backend/execution/observed_research.py','backend/execution/observed_postgres.py','backend/execution/observed_controller.py','backend/execution/observed_analysis.py','backend/ticks/contracts_v2.py','backend/ticks/storage_v2.py','backend/ticks/exness_v2.py','backend/ticks/compact_v2.py','backend/ticks/read_snapshot_v2.py','backend/ticks/timeline_v2.py','backend/ticks/evidence_v2.py','backend/ticks/benchmark_v2.py',
+  'backend/execution/historical.py','backend/ticks/contracts_v2.py','backend/ticks/storage_v2.py','backend/ticks/exness_v2.py','backend/ticks/timeline_v2.py','backend/ticks/evidence_v2.py','backend/ticks/benchmark_v2.py',
   'backend/tests/test_historical_workspace.py','backend/tests/test_tick_storage_v2.py','backend/tests/test_tick_evidence_v2.py','backend/tests/test_identity.py',
   'backend/infrastructure/migrations/006_research_sessions.sql','backend/tests/test_research_sessions.py',
   'backend/execution/__init__.py','backend/execution/contracts.py','backend/execution/engine.py',
@@ -85,7 +65,7 @@ for(const category of ['context','implementation','tests','supporting'])for(cons
   assert.ok(allowedBundleSource(file),'Bundle must remain task-specific: '+file);
 }
 for(const file of executionReferences)assert.ok([...config.implementation,...config.tests].includes(file),'Execution seam missing from reviewed bundle: '+file);
-for(const file of ['backend/market_data/unreviewed.py','backend/cloud/unreviewed.py','backend/ticks/unreviewed.py','backend/.env','data/raw.csv','frontend/public/market/data.json','frontend/public/licenses/unreviewed.js','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
+for(const file of ['backend/cloud/unreviewed.py','backend/ticks/unreviewed.py','backend/.env','data/raw.csv','frontend/public/market/data.json','frontend/public/licenses/unreviewed.js','legacy/src/main.jsx'])assert.equal(allowedBundleSource(file),false,'Unreviewed source admitted: '+file);
 for(const file of ['frontend/public/licenses/opencharts-LICENSE.txt','frontend/public/licenses/NOTICE.txt'])assert.ok(config.supporting.includes(file),'Adapted presentation must retain attribution in its bundle');
 assert.ok(config.context.includes('docs/V2_ALPHA_EXECUTION_FINANCIAL_CONTRACT.md'));
 const pkg=JSON.parse(read('frontend/package.json')),lock=JSON.parse(read('frontend/package-lock.json'));

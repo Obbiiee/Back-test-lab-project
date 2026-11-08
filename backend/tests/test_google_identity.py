@@ -14,7 +14,7 @@ from fastapi_users.jwt import generate_jwt
 from cloud.app import create_app
 from contracts.primitives import ContractError
 from infrastructure.database import connect,migrate,backup,restore
-from identity.google import GoogleConfig,GoogleVerifier,BROWSER_COOKIE,HANDOFF_COOKIE,COOKIE_PATH
+from identity.google import GoogleConfig,GoogleVerifier,BROWSER_COOKIE,HANDOFF_COOKIE,COOKIE_PATH,_threaded
 from identity.google_store import key,grant_google_runtime
 from tests.test_identity import client,RecordingDelivery,PASSWORD
 
@@ -31,6 +31,11 @@ class GoogleConfigurationTests(unittest.TestCase):
             with self.assertRaises(ContractError):GoogleConfig(CLIENT,SECRET,url)
         with self.assertRaises(ValueError):create_app('authored:no-db','x'*64,RecordingDelivery(),google_client_id=CLIENT)
         with self.assertRaises(ValueError):create_app('authored:no-db','x'*64,RecordingDelivery(),google_client_id=CLIENT,google_client_secret='x'*64,google_redirect_uri=REDIRECT)
+    def test_blocking_google_store_calls_forward_keyword_arguments(self):
+        import anyio
+        def record(*,purpose,target_user_id):return purpose,target_user_id
+        async def invoke():return await _threaded(record,purpose='LINK',target_user_id='user:owner')
+        self.assertEqual(anyio.run(invoke),('LINK','user:owner'))
 
 @unittest.skipUnless(DSN,'Requires isolated native PostgreSQL; skip is not acceptance')
 class GoogleIdentityTests(unittest.TestCase):
@@ -123,6 +128,33 @@ class GoogleIdentityTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/v1/auth/reset-password',json=dict(token=recovery,password=PASSWORD+'-new')).status_code,200)
         self.assertEqual(self.client.post('/api/v1/auth/login',data=dict(username=self.email,password=PASSWORD+'-new')).status_code,200)
         with connect(DSN) as db:self.assertEqual(db.execute('SELECT count(*) FROM btl.google_identities WHERE subject=%s',(self.subject,)).fetchone()[0],0)
+    def test_password_account_can_explicitly_link_google_and_login_with_same_identity(self):
+        registered=self.client.post('/api/v1/auth/register',json=dict(email=self.email,password=PASSWORD))
+        self.assertEqual(registered.status_code,201,registered.text)
+        verified=self.client.post('/api/v1/auth/verify',json=dict(token=self.delivery.token(self.email,'verification')))
+        self.assertEqual(verified.status_code,200,verified.text)
+        login=self.client.post('/api/v1/auth/login',data=dict(username=self.email,password=PASSWORD))
+        self.assertEqual(login.status_code,200,login.text)
+        header={'Authorization':'Bearer '+login.json()['access_token']}
+        started=self.client.post('/api/v1/auth/google/link/start',headers={**header,'Origin':'https://testserver',
+            'X-BTL-Google-Link':'1'},json={'password':PASSWORD})
+        self.assertEqual(started.status_code,200,started.text)
+        query=parse_qs(urlsplit(started.json()['authorizationUrl']).query)
+        self.nonce=query['nonce'][0]
+        callback=self.callback(query)
+        self.assertIn('auth=google-linked',callback.headers['location'])
+        linked=self.exchange()
+        self.assertEqual(linked.json(),{'schemaVersion':1,'linked':True,'userId':registered.json()['id']})
+        providers=self.client.get('/api/v1/auth/identities',headers=header)
+        self.assertEqual(providers.status_code,200,providers.text)
+        self.assertEqual(providers.json()['providers'],['EMAIL_PASSWORD','GOOGLE'])
+
+        # The linked subject authenticates the original user on a new login.
+        query=self.start();self.callback(query)
+        signed_in=self.exchange()
+        me=self.client.get('/api/v1/auth/me',headers={'Authorization':'Bearer '+signed_in.json()['access_token']})
+        self.assertEqual(me.status_code,200,me.text)
+        self.assertEqual(me.json()['id'],registered.json()['id'])
     def test_google_only_recovery_and_even_signed_reset_cannot_enable_password(self):
         header=self.login();uid=self.client.get('/api/v1/auth/me',headers=header).json()['id'];before=len(self.delivery.messages)
         self.assertEqual(self.client.post('/api/v1/auth/forgot-password',json=dict(email=self.email)).status_code,202)

@@ -69,6 +69,7 @@ def grant_identity_runtime(dsn, role):
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE,DELETE ON btl.auth_rate_limits TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT INSERT ON btl.security_events TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT USAGE ON SEQUENCE btl.security_events_id_seq TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.account_identities TO {}").format(sql.Identifier(role)))
 
 
 def grant_workspace_runtime(dsn, role):

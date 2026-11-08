@@ -191,7 +191,8 @@ def validate_state(state):
     require(profile_wire(state["profile"]) == state["profile"] and
             content_hash(dict(schemaVersion=1, artifact="BTL-EXECUTION-PROFILE-1", profile=state["profile"])) == state["profileHash"], "profile", "CORRUPT_RECORD")
     policy_from_wire(state["policy"])
-    require(type(state["orders"]) is dict and len(state["orders"]) <= MAX_ORDERS, "orders", "REFUSED_STATE_LIMIT")
+    require(type(state["orders"]) is dict and len(state["orders"]) <= MAX_ORDERS,
+            "orders", "REFUSED_STATE_LIMIT")
     require(all(type(state[k]) is bool for k in ("unresolved", "ended", "financial")), "stateFlags")
     require(Fraction(state["balance"]) == Fraction(state["initialBalance"]) + Fraction(state["realizedGross"]) - Fraction(state["commission"]), "account", "CORRUPT_RECORD")
     canonical_bytes(state)

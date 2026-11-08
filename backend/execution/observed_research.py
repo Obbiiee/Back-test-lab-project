@@ -21,7 +21,7 @@ from ticks.contracts import keys,tag,uint
 from infrastructure.database import connect
 from .analysis import RESEARCH_VERSION,planned_risk
 from .contracts import exact,open_payload,policy_wire,text,risk_quantity
-from .journal import validate_note,request as journal_request,MAX_JOURNAL_ORDERS
+from .journal import validate_note,request as journal_request
 from .observed_catalog import ObservedCatalog
 from .observed_controller import ObservedExecutionController
 from .observed_kernel import seed_state
@@ -42,10 +42,11 @@ REPLAY_TO_CHUNKS=8
 
 class ObservedResearchApplication:
     """One workspace-scoped Method/Session adapter for the observed family."""
-    def __init__(self,dsn,scope,catalog,*,state_storage_format='snapshot-v1'):
+    def __init__(self,dsn,scope,catalog,*,state_storage_format='compact-v1',terminal_order_archive_v1=True):
         require(type(scope) is TrustedScope,'scope','SCOPE_REQUIRED');require(type(catalog) is ObservedCatalog,'catalog')
         require(state_storage_format in ('snapshot-v1','compact-v1'),'stateStorageFormat','REFUSED_STATE_VERSION')
-        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(dsn,state_storage_format=state_storage_format)
+        self.dsn=dsn;self.scope=scope;self.catalog=catalog;self.store=ObservedExecutionStore(
+            dsn,state_storage_format=state_storage_format,terminal_order_archive_v1=terminal_order_archive_v1)
         self.controller=ObservedExecutionController(self.store,catalog.resolve)
         key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',
                               dsnHash=content_hash({'schemaVersion':1,'dsn':dsn}),stateStorageFormat=state_storage_format))
@@ -92,19 +93,22 @@ class ObservedResearchApplication:
     def catalog_view(self):
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
-            methods=[unpack(*row) for row in db.execute('SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129',(self.scope.workspace_id,)).fetchall()]
-            require(len(methods)<=128,'catalog','REFUSED_CATALOG_LIMIT')
+            method_rows=db.execute('SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
+            methods=[unpack(*row) for row in method_rows[:128]]
             for method in methods:method_policy(method)
             rows=db.execute('SELECT payload,content_hash,method_id FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
-            require(len(rows)<=128,'catalog','REFUSED_CATALOG_LIMIT');sessions=[]
-            for raw,sha,method_id in rows:
+            sessions=[]
+            for raw,sha,method_id in rows[:128]:
                 meta=unpack(raw,sha)
                 if meta.get('artifact')==META:
                     self._session(db,meta['id']);sessions.append(meta)
                 elif meta.get('artifact')=='BTL-LOCAL-SESSION-1':
-                    tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance')
-                    require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id);sessions.append(meta)
-            return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,datasets=self.catalog.public(),model=MODEL)
+                    tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance'+
+                        (' sourceKey monthlyManifestHash' if 'sourceKey' in meta or 'monthlyManifestHash' in meta else ''))
+                    require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id)
+                    sessions.append({key:value for key,value in meta.items() if key!='monthlyManifestHash'})
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,
+                datasets=self.catalog.public(),model=MODEL,methodsComplete=len(method_rows)<=128,sessionsComplete=len(rows)<=128)
 
     def _session(self,db,session_id,*,lock=False):
         identifier(session_id,'sessionId')
@@ -139,6 +143,8 @@ class ObservedResearchApplication:
                     old=unpack(*previous);require(old.get('artifact')==META and old.get('creationRequestHash')==request_hash,'sessionId','REFUSED_IDEMPOTENCY_CONFLICT')
                     self._session(db,raw['id'])
                     return self.inspect(raw['id'])
+                from .product_method_lifecycle import require_active_method
+                require_active_method(db,self.scope.workspace_id,raw['methodId'])
                 method=self._method(db,raw['methodId']);policy=method_policy(method)
                 start=source.start_for_period(raw['period'],day=raw['day']);timeline=source.cache.new_timeline(self.scope,raw['id'],start);cp=timeline.checkpoint()
                 state=seed_state(raw['id'],profile,policy,cp,initial)
@@ -161,7 +167,35 @@ class ObservedResearchApplication:
     def summary(self,session_id):
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');meta,method,state,cp=self._session(db,session_id)
-            return dict(schemaVersion=1,artifact='BTL-OBSERVED-SESSION-SUMMARY-1',sessionId=meta['id'],revision=state['revision'],throughNs=state['throughNs'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],accountCurrency='USD',initialBalance=state['initialBalance'],balance=state['balance'],netCashChange=text(Fraction(state['balance'])-Fraction(state['initialBalance'])),completedTrades=sum(o['status']=='CLOSED' for o in state['orders'].values()),unresolved=state['unresolved'],ended=state['ended'],model=MODEL)
+            completed=sum(o['status']=='CLOSED' for o in state['orders'].values())
+            if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1':
+                completed+=db.execute('SELECT count(*) FROM btl.tick_terminal_orders '
+                    "WHERE workspace_id=%s AND session_id=%s AND terminal_status='CLOSED'",
+                    (self.scope.workspace_id,session_id)).fetchone()[0]
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-SESSION-SUMMARY-1',sessionId=meta['id'],revision=state['revision'],throughNs=state['throughNs'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],accountCurrency='USD',initialBalance=state['initialBalance'],balance=state['balance'],netCashChange=text(Fraction(state['balance'])-Fraction(state['initialBalance'])),completedTrades=completed,unresolved=state['unresolved'],ended=state['ended'],model=MODEL)
+
+    def terminal_order_page(self,session_id,raw):
+        keys(raw,'afterSequence limit')
+        after=raw['afterSequence'];limit=raw['limit']
+        require(after is None or (type(after) is int and after>=0),'afterSequence','INVALID_INPUT')
+        require(type(limit) is int and 1<=limit<=128,'limit','INVALID_INPUT')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            self._session(db,session_id)
+        if self.store.terminal_order_archive_v1:
+            page=self.store.product_order_history(self.scope,session_id,after_sequence=after,maximum=limit)
+            return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
+                sessionId=session_id,status='COMPLETE',**page)
+        if not self.store.qa_order_archive_v1:
+            return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
+                sessionId=session_id,status='UNAVAILABLE',reason='OBSERVED_TERMINAL_ARCHIVE_NOT_ENABLED',
+                records=[],nextCursor=None,complete=False)
+        offset=0 if after is None else after+1
+        page=self.store.order_history(self.scope,session_id,offset=offset,maximum=limit)
+        records=page['records'];next_cursor=records[-1]['sequence'] if page['nextOffset'] is not None and records else None
+        return dict(schemaVersion=1,artifact='BTL-TICK-TERMINAL-ORDER-PAGE-1',
+            sessionId=session_id,status='COMPLETE',records=records,nextCursor=next_cursor,
+            complete=page['nextOffset'] is None,total=page['total'])
 
     def inspect(self,session_id,timeframe='1m',*,trade_offset=0):
         # Workspace/chart is a controller operation; only prior observed groups
@@ -291,7 +325,6 @@ class ObservedResearchApplication:
     def journal(self,session_id):
         # Reuse the immutable committed analysis projection. Notes are held
         # separately and cannot affect financial results.
-        from .journal import MAX_JOURNAL_ORDERS
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self._session(db,session_id)[2]
@@ -300,14 +333,12 @@ class ObservedResearchApplication:
         analysis=self._view_analysis(state,projection)
         require(analysis['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
         orders=analysis['orders']
-        require(len(orders)<=MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         notes=[]
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             live=self._session(db,session_id)[2]
             require(live['revision']==state['revision'] and live['eventHash']==state['eventHash'],'journal','REFUSED_STALE_REVISION')
-            saved=db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id LIMIT %s',(self.scope.workspace_id,session_id,MAX_JOURNAL_ORDERS+1)).fetchall()
-            require(len(saved)<=MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+            saved=db.execute('SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s ORDER BY order_id',(self.scope.workspace_id,session_id)).fetchall()
             indexed={order['id']:order for order in orders}
             for blob,sha,note_revision,order_id in saved:
                 value=validate_note(unpack(blob,sha),state,indexed)
@@ -316,7 +347,7 @@ class ObservedResearchApplication:
                     financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
 
     def journal_page(self, session_id, raw):
-        from .journal import (MAX_JOURNAL_PAGE_SIZE, MAX_JOURNAL_READ_ORDERS,
+        from .journal import (MAX_JOURNAL_PAGE_SIZE,
                               encode_cursor, decode_cursor, validate_note)
         keys(raw, 'limit cursor')
         limit=raw['limit']
@@ -337,7 +368,6 @@ class ObservedResearchApplication:
         for row in analysis['completed']:
             by_id[row['id']]=row
         all_orders=sorted(by_id.values(),key=lambda row:row['id'])
-        require(len(all_orders)<=MAX_JOURNAL_READ_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
         orders=[row for row in all_orders if after_order_id is None or row['id']>after_order_id]
         page=orders[:limit];more=len(orders)>len(page);indexed={row['id']:row for row in page};notes=[]
         with connect(self.dsn) as db:
@@ -413,7 +443,7 @@ class ObservedResearchApplication:
             request=Command(self.scope.workspace_id,raw['sessionId'],raw['requestId'],policy.method_id,policy.definition_hash,'XAUUSD',ctx.feed_id,state['profileHash'],state['revision'],state['revision'],payload['workflow'],'BUY' if payload['side']=='LONG' else 'SELL',payload['orderType'],Decimal(payload['entry']),Decimal(payload['quantity']),Decimal(payload['riskPercent']),None if payload['sl'] is None else Decimal(payload['sl']),None if payload['tp'] is None else Decimal(payload['tp']),raw['planId'],raw['planRevision'],tuple(Observation(o['conditionId'],o['outcome']) for o in payload['observations']))
             validate_command(request,ctx)
             reviewed=dict(schemaVersion=1,artifact=REVIEW,requestHash=req_hash,command=command,contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=state['policy']['definitionHash'],profileHash=state['profileHash'],throughNs=state['throughNs'],riskBasis=state['balance'],model=MODEL,basisCheckpointHash=basis_sha,basisHash=basis_hash,researchRisk=risk)
-            count=db.execute('SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,raw['sessionId'])).fetchone()[0];require(count<256,'reviews','REFUSED_REVIEW_LIMIT');blob,sha=pack(reviewed);db.execute('INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['sessionId'],raw['requestId'],blob,sha))
+            blob,sha=pack(reviewed);db.execute('INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['sessionId'],raw['requestId'],blob,sha))
         return dict(review=reviewed,reviewHash=sha)
 
     def confirm(self,session_id,raw):
@@ -430,3 +460,49 @@ class ObservedResearchApplication:
         return self.controller.apply(self.scope,reviewed['command'])
 
     def inspect_statistics(self,session_id,trade_offset=0):return self.statistics.inspect(self.scope,session_id,trade_offset,64)
+
+    def command_result(self,session_id,command_id):
+        return self.store.command_result(self.scope,session_id,command_id)
+
+    def method_analytics(self,method_id):
+        """Pool exact per-Session aggregates without materializing trade history."""
+        from .observed_analysis import pool_metrics
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            method=self._method(db,method_id);policy=method_policy(method)
+            rows=db.execute('SELECT session_id FROM btl.tick_research_sessions '
+                'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id',
+                (self.scope.workspace_id,method_id)).fetchall()
+        included=[];session_metrics=[];completed_net=Fraction();units=set()
+        for (session_id,) in rows:
+            with connect(self.dsn) as db:
+                db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+                meta,_method,state,_cp=self._session(db,session_id)
+            if meta.get('artifact')!=META or meta.get('methodHash')!=policy.definition_hash:
+                continue
+            units.add((state['profileHash'],state['engineVersion'],'USD'))
+            # One bounded trade page is enough: LedgerFold computes its exact
+            # lifetime aggregates independently of the response page size.
+            projection=self.statistics.inspect(self.scope,session_id,0,1)
+            if projection['status']!='COMPLETE' or not self._same_projection(projection,state):
+                return dict(schemaVersion=1,artifact='BTL-METHOD-ANALYTICS-1',methodId=method_id,
+                    methodHash=policy.definition_hash,aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
+                    balancesCombined=False,financialAuthority='COMMITTED_EVENTS_ONLY',status='BUILDING',
+                    includedSessions=[],excludedSessions=[],metrics=None)
+            session_metrics.append(projection['metrics'])
+            completed_net+=Fraction(projection['metrics']['realizedNetCompleted'])
+            included.append(dict(sessionId=session_id,revision=state['revision'],datasetId=state['datasetId'],
+                datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],
+                engineVersion=state['engineVersion'],eventHead=state['eventHash'],
+                tradeCount=projection['metrics']['tradeCount']))
+        common=dict(schemaVersion=1,artifact='BTL-METHOD-ANALYTICS-1',methodId=method_id,
+            methodHash=policy.definition_hash,aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
+            balancesCombined=False,financialAuthority='COMMITTED_EVENTS_ONLY')
+        if len(units)>1:
+            return dict(**common,status='UNAVAILABLE',reason='INCOMPATIBLE_FINANCIAL_UNITS',
+                includedSessions=[],excludedSessions=[dict(sessionId=row['sessionId'],
+                reason='MULTIPLE_FINANCIAL_UNITS') for row in included],metrics=None)
+        aggregate=pool_metrics(session_metrics)
+        return dict(**common,status='COMPLETE',accountCurrency='USD',
+            completedTradeNet=text(completed_net),
+            includedSessions=included,excludedSessions=[],metrics=aggregate)

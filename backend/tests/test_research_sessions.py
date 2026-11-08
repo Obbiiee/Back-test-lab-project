@@ -77,7 +77,7 @@ class FixturePageTests(unittest.TestCase):
 class SessionSummaryProjectionTests(unittest.TestCase):
     def test_exact_committed_cash_count_and_no_market_capabilities(self):
         from unittest.mock import patch, MagicMock
-        app=ResearchApplication.__new__(ResearchApplication);app.dsn='authored:no-database'
+        app=ResearchApplication.__new__(ResearchApplication);app.dsn='authored:no-database';app.scope=TrustedScope('workspace:summary','actor:summary')
         state=dict(sessionId='session:summary',revision=7,throughNs='123',datasetId='fixture:summary',
                    datasetVersion='a'*64,profileHash='b'*64,profile={'accountCurrency':'USD'},
                    initialBalance='10000',balance='9999.12345678',
@@ -86,18 +86,23 @@ class SessionSummaryProjectionTests(unittest.TestCase):
                    unresolved=True,ended=False)
         app._session=MagicMock(return_value=({'id':state['sessionId']},{},state,{}))
         before=deepcopy(state)
-        with patch('execution.research.connect') as connect_mock:
+        with patch('execution.research.connect') as connect_mock, \
+             patch('execution.research.unpack',return_value={'kind':'EXIT_FILL','detail':{'remaining':'0'}}):
+            missing_head=MagicMock();missing_head.fetchone.return_value=None
+            connect_mock.return_value.__enter__.return_value.execute.side_effect=[None,missing_head,[('payload','hash')]]
             result=app.summary(state['sessionId'])
         self.assertEqual((result['balance'],result['netCashChange'],result['completedTrades']),('9999.12345678','-0.87654322',1))
         self.assertEqual((result['revision'],result['throughNs'],result['unresolved']),(7,'123',True))
         self.assertEqual(state,before)
         self.assertFalse({'orders','controller','quote'} & result.keys())
-        connect_mock.return_value.__enter__.return_value.execute.assert_called_once_with(
-            'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+        calls=connect_mock.return_value.__enter__.return_value.execute.call_args_list
+        self.assertEqual(calls[0].args,('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',))
+        self.assertIn('FROM btl.tick_journal_projection_heads',calls[1].args[0])
+        self.assertIn('FROM btl.tick_events',calls[2].args[0])
 
     def test_missing_or_corrupt_scoped_snapshot_is_not_a_fabricated_summary(self):
         from unittest.mock import patch, MagicMock
-        app=ResearchApplication.__new__(ResearchApplication);app.dsn='authored:no-database'
+        app=ResearchApplication.__new__(ResearchApplication);app.dsn='authored:no-database';app.scope=TrustedScope('workspace:summary','actor:summary')
         for code in ('RESOURCE_UNAVAILABLE','CORRUPT_RECORD','REFUSED_DATASET_VERSION'):
             app._session=MagicMock(side_effect=ContractError(code,'session'))
             with patch('execution.research.connect'),self.assertRaises(ContractError) as error:
@@ -114,6 +119,40 @@ class ResearchSessionTests(unittest.TestCase):
     def setUp(self):
         self.scope=TrustedScope('researchqa:'+uuid.uuid4().hex,'fixture:operator')
         self.app=ResearchApplication(DSN,self.scope)
+
+    def test_product_session_catalog_has_no_128_lifetime_creation_cap(self):
+        record=method();self.app.create_method(record)
+        created=[]
+        for index in range(129):
+            session_id=f'session:lifetime:{index}:'+uuid.uuid4().hex
+            view=self.app.create_session({'id':session_id,'name':f'Session {index+1}',
+                'methodId':record['id'],'initialBalance':'10000','startPeriod':'2020-01'})
+            created.append(view['metadata']['id'])
+        from execution.product_read_model import sessions
+        with connect(DSN) as db:
+            db.row_factory=__import__('psycopg.rows',fromlist=['dict_row']).dict_row
+            first=sessions(db,self.scope.workspace_id,limit=50)
+            collected=[item['metadata']['id'] for item in first['items']]
+            cursor=first['nextCursor']
+            while cursor is not None:
+                page=sessions(db,self.scope.workspace_id,limit=50,after=cursor)
+                collected.extend(item['metadata']['id'] for item in page['items'])
+                cursor=page['nextCursor']
+        self.assertEqual(len(collected),129)
+        self.assertEqual(set(collected),set(created))
+
+    def test_product_review_history_has_no_256_item_lifetime_cap(self):
+        record=method();self.app.create_method(record)
+        view=self.app.create_session({'id':'session:review-limit:'+uuid.uuid4().hex,'name':'Review capacity',
+            'methodId':record['id'],'initialBalance':'10000','startPeriod':'2020-01'})
+        for index in range(257):
+            raw=review_request(view)
+            raw['requestId']='order:review-cap:'+str(index)+':'+uuid.uuid4().hex
+            self.app.review(raw)
+        with connect(DSN) as db:
+            count=db.execute('SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id,view['metadata']['id'])).fetchone()[0]
+        self.assertEqual(count,257)
 
     def test_summary_is_scoped_read_only_and_never_reconstructs_market(self):
         from unittest.mock import patch

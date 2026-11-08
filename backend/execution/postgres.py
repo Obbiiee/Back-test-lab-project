@@ -14,12 +14,17 @@ from infrastructure.database import connect
 from .contracts import MAX_EVENTS, command_wire, validate_state
 from .engine import emit
 from .observed_state_delta_v3 import encode_compact_base, encode_compact_delta, reconstruct_complete
+from .terminal_order_archive import GENESIS as ORDER_ARCHIVE_GENESIS, record as terminal_record
+from .terminal_order_archive import terminal_orders, verify as verify_terminal_record
+from .journal_order_index import append as append_journal_order_index
+from .incremental_analytics import record as initial_metric_projection
 
 
 COMPACT_BASE = "BTL-TICK-EXECUTION-COMPACT-BASE-1"
 COMPACT_POINTER = "BTL-TICK-EXECUTION-COMPACT-POINTER-1"
 COMPACT_DELTA = "BTL-TICK-EXECUTION-COMPACT-DELTA-1"
 COMPACT_RECEIPT = "BTL-TICK-EXECUTION-COMPACT-RESULT-1"
+COMPACT_RECOVERY_INTERVAL = 128
 _COMPACT_CACHE = OrderedDict()
 _COMPACT_CACHE_LOCK = RLock()
 _COMPACT_CACHE_MAX = 4
@@ -55,7 +60,7 @@ def scoped(scope, session_id):
 
 class PostgresExecutionStore:
     """One connection/row lock per bounded local command; not public composition."""
-    def __init__(self, dsn, *, state_storage_format="snapshot-v1"):
+    def __init__(self, dsn, *, state_storage_format="compact-v1"):
         require(state_storage_format in ("snapshot-v1", "compact-v1"),
                 "stateStorageFormat", "REFUSED_STATE_VERSION")
         self.dsn = dsn
@@ -85,18 +90,57 @@ class PostgresExecutionStore:
             while len(_COMPACT_CACHE) > _COMPACT_CACHE_MAX:
                 _COMPACT_CACHE.popitem(last=False)
 
+    @staticmethod
+    def _recovery_base(state, controller, chain_hash):
+        value=dict(schemaVersion=1,formatVersion=1,artifact=COMPACT_BASE,
+            sessionId=state['sessionId'],revision=state['revision'],state=deepcopy(state),
+            stateHash=content_hash(state),chainHash=chain_hash,controller=deepcopy(controller))
+        value['recordHash']=content_hash(value)
+        return value
+
+    def _write_recovery_base(self, db, workspace, session, state, controller, chain_hash):
+        base=self._recovery_base(state,controller,chain_hash)
+        raw,digest=pack(base)
+        db.execute('INSERT INTO btl.tick_recovery_bases '
+            '(workspace_id,session_id,revision,state_hash,chain_hash,record_hash,payload,content_hash) '
+            'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+            (workspace,session,state['revision'],base['stateHash'],chain_hash,base['recordHash'],raw,digest))
+
     def _reconstruct_compact(self, db, workspace, session, target_revision, *, require_tip=False):
         revision(target_revision)
-        base_row = db.execute("SELECT payload,content_hash FROM btl.tick_checkpoints "
-                              "WHERE workspace_id=%s AND session_id=%s AND revision=0",
-                              (workspace, session)).fetchone()
-        require(base_row is not None, "compactBase", "CORRUPT_RECORD")
-        base = unpack(*base_row)
-        require(set(base) == {"schemaVersion", "formatVersion", "artifact", "revision", "state", "stateHash", "chainHash", "controller"} and
-                base.get("schemaVersion") == 1 and base.get("formatVersion") == 1 and
-                base.get("artifact") == COMPACT_BASE and base.get("revision") == 0 and
-                base.get("stateHash") == content_hash(base.get("state")) == base.get("chainHash"),
-                "compactBase", "CORRUPT_RECORD")
+        recovery_row=db.execute("SELECT revision,state_hash,chain_hash,record_hash,payload,content_hash "
+            "FROM btl.tick_recovery_bases WHERE workspace_id=%s AND session_id=%s AND revision<=%s "
+            "ORDER BY revision DESC LIMIT 1",(workspace,session,target_revision)).fetchone()
+        if recovery_row is not None:
+            base_revision,state_hash,chain_hash,record_hash,raw,sha=recovery_row
+            base=unpack(raw,sha)
+            require(base.get("schemaVersion")==1 and base.get("formatVersion")==1 and
+                base.get("artifact")==COMPACT_BASE and base.get("sessionId")==session and
+                base.get("revision")==base_revision and base.get("stateHash")==state_hash==content_hash(base.get("state")) and
+                base.get("chainHash")==chain_hash and base.get("recordHash")==record_hash and
+                record_hash==content_hash({k:v for k,v in base.items() if k!="recordHash"}),
+                "compactRecoveryBase","CORRUPT_RECORD")
+            if base_revision==0:
+                require(chain_hash==state_hash,"compactRecoveryBase","CORRUPT_RECORD")
+            else:
+                linked=db.execute("SELECT payload,content_hash FROM btl.tick_checkpoints "
+                    "WHERE workspace_id=%s AND session_id=%s AND revision=%s",
+                    (workspace,session,base_revision)).fetchone()
+                require(linked is not None,"compactRecoveryBase","CORRUPT_RECORD")
+                delta_pointer=unpack(*linked)
+                require(delta_pointer.get("artifact")==COMPACT_DELTA and
+                    delta_pointer.get("stateHash")==state_hash and delta_pointer.get("chainHash")==chain_hash and
+                    delta_pointer.get("controller")==base.get("controller"),
+                    "compactRecoveryBase","CORRUPT_RECORD")
+        else:
+            base_row=db.execute("SELECT payload,content_hash FROM btl.tick_checkpoints "
+                "WHERE workspace_id=%s AND session_id=%s AND revision=0",(workspace,session)).fetchone()
+            require(base_row is not None,"compactBase","CORRUPT_RECORD")
+            base=unpack(*base_row);base_revision=0
+            require(set(base)=={"schemaVersion","formatVersion","artifact","revision","state","stateHash","chainHash","controller"} and
+                base.get("schemaVersion")==1 and base.get("formatVersion")==1 and base.get("artifact")==COMPACT_BASE and
+                base.get("revision")==0 and base.get("stateHash")==content_hash(base.get("state"))==base.get("chainHash"),
+                "compactBase","CORRUPT_RECORD")
         if require_tip:
             tip = db.execute("SELECT revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s",
                              (workspace, session)).fetchone()
@@ -106,19 +150,21 @@ class PostgresExecutionStore:
                 (workspace, session)).fetchone()
             require(count == target_revision and maximum == (target_revision or None),
                     "compactTip", "CORRUPT_RECORD")
-        count = db.execute("SELECT count(*) FROM btl.tick_checkpoints WHERE workspace_id=%s "
-                           "AND session_id=%s AND revision>0 AND revision<=%s",
-                           (workspace, session, target_revision)).fetchone()[0]
-        require(count == target_revision, "compactChain", "CORRUPT_RECORD")
+        count,maximum = db.execute("SELECT count(*),max(revision) FROM btl.tick_checkpoints WHERE workspace_id=%s "
+                           "AND session_id=%s AND revision>%s AND revision<=%s",
+                           (workspace, session,base_revision,target_revision)).fetchone()
+        expected_count=target_revision-base_revision
+        require(count==expected_count and maximum==(target_revision if expected_count else None),
+                "compactChain","CORRUPT_RECORD")
         previous = base["chainHash"]
         current_controller = [base["controller"]]
         def deltas():
             nonlocal previous
             with db.cursor(name="btl_tick_delta_" + uuid4().hex) as rows:
                 rows.execute("SELECT revision,payload,content_hash FROM btl.tick_checkpoints "
-                             "WHERE workspace_id=%s AND session_id=%s AND revision>0 AND revision<=%s "
-                             "ORDER BY revision", (workspace, session, target_revision))
-                for expected, (rev, payload, sha) in enumerate(rows, 1):
+                             "WHERE workspace_id=%s AND session_id=%s AND revision>%s AND revision<=%s "
+                             "ORDER BY revision", (workspace, session,base_revision,target_revision))
+                for expected, (rev, payload, sha) in enumerate(rows, base_revision+1):
                     checkpoint = unpack(payload, sha)
                     require(set(checkpoint) == {"schemaVersion", "formatVersion", "artifact", "revision",
                                 "stateHash", "chainHash", "previousHash", "delta", "controller"} and
@@ -133,7 +179,8 @@ class PostgresExecutionStore:
                     yield checkpoint["delta"]
         def validate_each(state, _rev):
             snapshot(state, current_controller[0])
-        state = reconstruct_complete(base, deltas(), target_revision, state_callback=validate_each)
+        state = reconstruct_complete(base, deltas(), target_revision, base_revision=base_revision,
+                                     state_callback=validate_each)
         return state, previous, current_controller[0]
 
     def _load_row(self, db, workspace, session, row, *, require_tip=False):
@@ -226,12 +273,54 @@ class PostgresExecutionStore:
             raw, sha = pack(snap)
         db.execute("INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,%s,%s,%s)",
                    (workspace, session, state["datasetVersion"], state["profileHash"], state["revision"], raw, sha))
+        db.execute(
+            "INSERT INTO btl.tick_journal_projection_heads "
+            "(workspace_id,session_id,format_version,through_sequence,event_hash,analytics_format_version) "
+            "VALUES (%s,%s,1,%s,%s,1)",
+            (workspace, session, state["nextEventIndex"], state["eventHash"]),
+        )
+        metric_projection = initial_metric_projection(
+            session, state["nextEventIndex"], state["eventHash"])
+        db.execute(
+            "INSERT INTO btl.tick_session_metric_projections "
+            "(workspace_id,session_id,payload,content_hash) VALUES (%s,%s,%s,%s)",
+            (workspace, session, canonical_bytes(metric_projection), content_hash(metric_projection)),
+        )
         if self.state_storage_format == "compact-v1":
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                        (workspace, session, state["revision"], raw_base, sha_base))
+            self._write_recovery_base(db,workspace,session,state,checkpoint,base['chainHash'])
         else:
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                        (workspace, session, state["revision"], raw, sha))
+
+    @staticmethod
+    def _append_terminal_orders(db, workspace, session, revision_value, finalized):
+        if not finalized:
+            return
+        last = db.execute("SELECT sequence,record_hash,payload,content_hash FROM btl.tick_terminal_orders "
+                          "WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 1",
+                          (workspace, session)).fetchone()
+        if last is None:
+            sequence, previous_hash = 0, ORDER_ARCHIVE_GENESIS
+        else:
+            prior = unpack(last[2], last[3])
+            verify_terminal_record(prior, session_id=session, sequence=last[0])
+            require(prior["recordHash"] == last[1], "terminalArchiveHead", "CORRUPT_RECORD")
+            sequence, previous_hash = last[0] + 1, last[1]
+        for order_id in sorted(finalized):
+            item = finalized[order_id]
+            value = terminal_record(session_id=session, sequence=sequence,
+                revision=revision_value, order_id=order_id, order=item["order"],
+                events=item["events"], previous_hash=previous_hash)
+            raw, digest = pack(value)
+            db.execute("INSERT INTO btl.tick_terminal_orders "
+                "(workspace_id,session_id,sequence,order_id,terminal_status,finalized_revision,record_hash,payload,content_hash) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (workspace, session, sequence, order_id, item["order"]["status"], revision_value,
+                 value["recordHash"], raw, digest))
+            sequence += 1
+            previous_hash = value["recordHash"]
 
     def create(self, scope, state, checkpoint):
         with connect(self.dsn) as db:
@@ -273,6 +362,7 @@ class PostgresExecutionStore:
                 previous_hash, sequence = event["eventId"], sequence+1
             require(next_state["eventHash"] == previous_hash and next_state["nextEventIndex"] == sequence, "eventHead", "CORRUPT_RECORD")
             next_state["revision"] += 1
+            finalized_orders = terminal_orders(state, next_state, events)
             logical_snapshot = snapshot(next_state, next_checkpoint)
             compact_mode = unpack(row[0], row[1]).get("artifact") == COMPACT_POINTER
             if compact_mode:
@@ -307,9 +397,13 @@ class PostgresExecutionStore:
                 event_raw, event_hash = pack(event)
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace, session, command["commandId"], event["eventId"], event["sequence"], event_raw, event_hash))
+            self._append_terminal_orders(db, workspace, session, next_state["revision"], finalized_orders)
+            append_journal_order_index(db, workspace, session, state, next_state, events)
             if compact_mode:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                            (workspace, session, next_state["revision"], checkpoint_raw, checkpoint_hash))
+                if next_state['revision'] % COMPACT_RECOVERY_INTERVAL == 0:
+                    self._write_recovery_base(db,workspace,session,next_state,next_checkpoint,next_chain)
             else:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                            (workspace, session, next_state["revision"], state_raw, state_hash))
@@ -319,6 +413,56 @@ class PostgresExecutionStore:
         if compact_mode:
             self._cache_write(workspace, session, next_state, next_checkpoint, next_chain)
         return deepcopy(result)
+
+    def archive_order(self, scope, session_id, order_id):
+        workspace, session = scoped(scope, session_id)
+        identifier(order_id, "orderId")
+        with connect(self.dsn) as db:
+            row = db.execute("SELECT payload,content_hash,record_hash,sequence,terminal_status FROM btl.tick_terminal_orders "
+                "WHERE workspace_id=%s AND session_id=%s AND order_id=%s",
+                (workspace, session, order_id)).fetchone()
+            if row is None:
+                return None
+            value = unpack(row[0], row[1])
+            verify_terminal_record(value, session_id=session, sequence=row[3])
+            require(value["recordHash"] == row[2] and value["orderId"] == order_id and value["order"]["status"]==row[4],
+                    "terminalArchiveLookup", "CORRUPT_RECORD")
+            return deepcopy(value)
+
+    def order_history(self, scope, session_id, *, after_sequence=None, limit=64):
+        workspace, session = scoped(scope, session_id)
+        require(after_sequence is None or (type(after_sequence) is int and after_sequence >= -1), "cursor")
+        require(type(limit) is int and 1 <= limit <= 128, "limit")
+        with connect(self.dsn) as db:
+            if after_sequence is None or after_sequence < 0:
+                previous_hash = ORDER_ARCHIVE_GENESIS
+                start = 0
+            else:
+                prior = db.execute("SELECT payload,content_hash,record_hash,terminal_status FROM btl.tick_terminal_orders "
+                    "WHERE workspace_id=%s AND session_id=%s AND sequence=%s",
+                    (workspace, session, after_sequence)).fetchone()
+                require(prior is not None, "cursor", "REFUSED_STALE_CURSOR")
+                value = unpack(prior[0], prior[1])
+                verify_terminal_record(value, session_id=session, sequence=after_sequence)
+                require(value["recordHash"] == prior[2] and value["order"]["status"]==prior[3], "terminalArchiveCursor", "CORRUPT_RECORD")
+                previous_hash, start = prior[2], after_sequence + 1
+            rows = db.execute("SELECT payload,content_hash,record_hash,sequence,terminal_status FROM btl.tick_terminal_orders "
+                "WHERE workspace_id=%s AND session_id=%s AND sequence >= %s "
+                "ORDER BY sequence LIMIT %s", (workspace, session, start, limit + 1)).fetchall()
+            values = []
+            for raw, digest, record_hash, sequence, terminal_status in rows:
+                value = unpack(raw, digest)
+                verify_terminal_record(value, session_id=session, sequence=sequence,
+                                       previous_hash=previous_hash)
+                require(value["recordHash"] == record_hash, "terminalArchiveLookup", "CORRUPT_RECORD")
+                require(value["order"]["status"] == terminal_status, "terminalArchiveStatus", "CORRUPT_RECORD")
+                values.append(value)
+                previous_hash = record_hash
+            page = values[:limit]
+            return dict(schemaVersion=1, artifact="BTL-TICK-TERMINAL-ORDER-PAGE-1",
+                sessionId=session, records=page,
+                nextCursor=page[-1]["sequence"] if len(values) > limit and page else None,
+                complete=len(values) <= limit)
 
     def inspect(self, scope, session_id, after_sequence=0, maximum=64):
         workspace, session = scoped(scope, session_id)
@@ -376,6 +520,7 @@ class PostgresExecutionStore:
             state.update(sessionId=child_session, revision=0, nextEventIndex=0, parent=parent,
                          eventHash=content_hash(dict(schemaVersion=1, artifact="BTL-TICK-FORK-SEED-1", parent=parent, childSessionId=child_session)))
             self._insert(db, scope, state, checkpoint)
+            fork_base_state = deepcopy(state)
             events = []
             emit(state,events,"SESSION_FORKED",classification="ACCEPTED_COMMAND",parent=parent)
             state["revision"] = 1
@@ -410,6 +555,7 @@ class PostgresExecutionStore:
                 event_raw,event_hash=pack(event)
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace,child_session,command["commandId"],event["eventId"],event["sequence"],event_raw,event_hash))
+            append_journal_order_index(db, workspace, child_session, fork_base_state, state, events)
             if compact_mode:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",(workspace,child_session,1,checkpoint_raw,checkpoint_hash))
             else:
@@ -424,5 +570,11 @@ def grant_execution_runtime(dsn, role):
     """Explicit operator action; no automatic role creation or credentials."""
     with connect(dsn) as db:
         db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
-        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints,btl.tick_terminal_orders,btl.tick_recovery_bases TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_events TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT UPDATE(order_status,last_sequence,event_id,payload,content_hash) ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT UPDATE(payload,content_hash) ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}").format(sql.Identifier(role)))

@@ -82,6 +82,9 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
     @app.get("/api/v1/auth/me", response_model=UserRead)
     async def me(user: User = Depends(current)):
         return user
+    @app.get("/api/v1/auth/identities")
+    async def identities(user: User = Depends(current)):
+        return {"schemaVersion": 1, "providers": await user_store.identity_providers(user.id)}
     @app.post("/api/v1/auth/logout-all", status_code=204)
     async def logout_all(user: User = Depends(current)):
         await token_store.revoke_all(user.id)
@@ -91,6 +94,11 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
         return JSONResponse({"detail": "INVALID_REQUEST"}, status_code=422)
     app.state.current_user = current
     app.state.dsn = dsn
+    app.state.product_provider_status = {
+        "emailPasswordConfigured": True,
+        "googleConfigured": google_config is not None,
+        "billingConfigured": sandbox_billing is not None,
+    }
     from .support import install as install_support
     install_support(app)
     from .workspaces import install

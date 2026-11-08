@@ -13,7 +13,7 @@ from infrastructure.database import migrate, connect
 from execution.research import ResearchApplication
 from application.models import TrustedScope
 from tests.test_identity import RecordingDelivery, client, PASSWORD
-from tests.test_research_sessions import method, review_request
+from tests.test_research_sessions import method, review_request, STEP_NS
 from tests.virtual_traders import COHORT_SIZES, build_stages
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
@@ -58,6 +58,15 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(response.headers['cache-control'],'no-store')
         self.assertNotIn('controller',response.json())
         self.assertNotIn('quote',response.json())
+        capabilities = self.client.get('/api/v1/workspaces/' + self.workspace + '/capabilities',
+                                       headers=self.headers)
+        self.assertEqual(capabilities.status_code, 200, capabilities.text)
+        capability = capabilities.json()
+        self.assertEqual(capability['artifact'], 'BTL-WORKSPACE-CAPABILITIES-1')
+        self.assertEqual(capability['role'], 'OWNER')
+        self.assertTrue(capability['capabilities']['createSession'])
+        self.assertEqual(capability['entitlement']['status'], 'NOT_CONFIGURED')
+        self.assertFalse(capability['entitlement']['productionEntitlement'])
         self.assertEqual(self.client.get(path).status_code,401)
         foreign_actor,foreign_headers=self.account()
         self.assertNotEqual(foreign_actor,self.actor)
@@ -66,6 +75,320 @@ class CloudResearchTests(unittest.TestCase):
         foreign_path='/api/v1/workspaces/'+other+'/research/sessions/'+session+'/summary'
         self.assertEqual(self.client.get(foreign_path,headers=foreign_headers).status_code,404)
         app.close()
+
+    def test_product_method_and_session_pages_are_authenticated_bounded_metadata(self):
+        app = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
+        methods = [method() for _ in range(2)]
+        methods.sort(key=lambda item: item['id'])
+        for record in methods:
+            app.create_method(record)
+        session_ids = []
+        for index, record in enumerate(methods):
+            session_id = 'session:product-page-' + uuid.uuid4().hex
+            session_ids.append(session_id)
+            app.create_session({'id': session_id, 'name': f'Product page {index}',
+                                'methodId': record['id'], 'initialBalance': '10000',
+                                'startPeriod': '2020-01'})
+
+        method_page = self.client.get(self.root + '/methods?limit=1', headers=self.headers)
+        self.assertEqual(method_page.status_code, 200, method_page.text)
+        first = method_page.json()
+        self.assertEqual(first['artifact'], 'BTL-METHOD-PAGE-1')
+        self.assertEqual(len(first['items']), 1)
+        self.assertFalse(first['complete'])
+        detail = self.client.get(self.root + '/methods/' + first['items'][0]['id'], headers=self.headers)
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()['method'], first['items'][0])
+        second = self.client.get(self.root + '/methods?limit=1&after=' + first['nextCursor'], headers=self.headers)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertTrue(second.json()['complete'])
+        self.assertNotEqual(first['items'][0]['id'], second.json()['items'][0]['id'])
+
+        sessions = self.client.get(self.root + '/sessions?limit=1&methodId=' + methods[0]['id'],
+                                   headers=self.headers)
+        self.assertEqual(sessions.status_code, 200, sessions.text)
+        page = sessions.json()
+        self.assertEqual(page['artifact'], 'BTL-SESSION-PAGE-1')
+        self.assertEqual(len(page['items']), 1)
+        item = page['items'][0]
+        self.assertEqual(item['metadata']['id'], session_ids[0])
+        self.assertEqual(item['metadata']['methodId'], methods[0]['id'])
+        self.assertEqual(item['metadata']['startPeriod'], '2020-01')
+        self.assertEqual(item['revision'], 0)
+        self.assertEqual(item['financialCountsStatus'], 'NOT_COMPUTED_ON_LIST')
+        self.assertNotIn('orders', item)
+        analytics = self.client.get(self.root + '/methods/' + methods[0]['id'] + '/analytics',
+                                    headers=self.headers)
+        self.assertEqual(analytics.status_code, 200, analytics.text)
+        aggregate = analytics.json()
+        self.assertEqual(aggregate['artifact'], 'BTL-METHOD-ANALYTICS-1')
+        self.assertEqual(aggregate['status'], 'COMPLETE')
+        self.assertEqual(aggregate['aggregation'], 'POOLED_COMMITTED_COMPLETED_POSITIONS')
+        self.assertEqual(aggregate['includedSessions'][0]['sessionId'], session_ids[0])
+        self.assertEqual(aggregate['metrics']['tradeCount'], 0)
+        self.assertFalse(aggregate['balancesCombined'])
+        self.assertNotIn('balance', aggregate)
+        self.assertEqual(self.client.get(self.root + '/sessions').status_code, 401)
+        self.assertEqual(self.client.get(self.root + '/methods/' + methods[0]['id'] + '/analytics').status_code, 401)
+
+        _foreign_actor, foreign_headers = self.account()
+        self.assertEqual(self.client.get(self.root + '/methods', headers=foreign_headers).status_code, 404)
+        self.assertEqual(self.client.get(self.root + '/methods/' + methods[0]['id'],
+                                         headers=foreign_headers).status_code, 404)
+        self.assertEqual(self.client.get(self.root + '/methods/' + methods[0]['id'] + '/analytics',
+                                         headers=foreign_headers).status_code, 404)
+        self.assertEqual(self.client.get(self.root + '/sessions?limit=51', headers=self.headers).status_code, 422)
+        app.close()
+
+    def test_method_analytics_pools_positive_committed_synthetic_trades_only(self):
+        from fractions import Fraction
+        from execution.contracts import text
+
+        app = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
+        record = method()
+        saved_method = self.client.post(self.root + '/methods', headers=self.headers, json=record)
+        self.assertEqual(saved_method.status_code, 200, saved_method.text)
+
+        def advance(session_id, steps):
+            state = app.inspect(session_id)['state']
+            command = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                       'sessionId': session_id, 'commandId': 'analytics-advance:' + uuid.uuid4().hex,
+                       'expectedRevision': state['revision'], 'kind': 'ADVANCE',
+                       'payload': {'targetNs': str(int(state['throughNs']) + steps * STEP_NS)}}
+            return app.apply(session_id, command)
+
+        def completed_trade(label, *, pre_advance, post_fill_advance, side='LONG'):
+            session_id = 'session:analytics-' + label + '-' + uuid.uuid4().hex
+            session_payload = {'id': session_id, 'name': 'Analytics ' + label,
+                               'methodId': record['id'], 'initialBalance': '10000',
+                               'startPeriod': '2020-01'}
+            created = self.client.post(self.root + '/sessions', headers=self.headers,
+                                       json=session_payload)
+            self.assertEqual(created.status_code, 200, created.text)
+            view = created.json()
+            if pre_advance:
+                view = advance(session_id, pre_advance)
+            request = review_request(view)
+            request['draft']['side'] = side
+            review_response = self.client.post(self.root + '/reviews', headers=self.headers, json=request)
+            self.assertEqual(review_response.status_code, 200, review_response.text)
+            reviewed = review_response.json()
+            confirmed = self.client.post(self.root + '/sessions/' + session_id + '/confirm',
+                headers=self.headers,
+                json={'reviewId': request['requestId'], 'reviewHash': reviewed['reviewHash']})
+            self.assertEqual(confirmed.status_code, 200, confirmed.text)
+            self.assertTrue(confirmed.json()['durable'])
+            receipt = self.client.get(self.root + '/sessions/' + session_id + '/commands/' + request['requestId'],
+                                      headers=self.headers)
+            self.assertEqual(receipt.status_code, 200, receipt.text)
+            self.assertEqual(receipt.json()['status'], 'COMMITTED')
+            self.assertTrue(receipt.json()['receipt']['durable'])
+            journal_after_confirm = self.client.get(self.root + '/sessions/' + session_id + '/journal',
+                                                     headers=self.headers)
+            self.assertEqual(journal_after_confirm.status_code, 200, journal_after_confirm.text)
+            self.assertEqual([order['id'] for order in journal_after_confirm.json()['orders']],
+                             [request['requestId']])
+            advance(session_id, 1)  # the pending market order is filled from the next authored quote
+            if post_fill_advance:
+                advance(session_id, post_fill_advance)
+            state = app.inspect(session_id)['state']
+            order_id = next(iter(state['orders']))
+            close = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                     'sessionId': session_id, 'commandId': 'analytics-close:' + uuid.uuid4().hex,
+                     'expectedRevision': state['revision'], 'kind': 'CLOSE',
+                     'payload': {'orderId': order_id, 'quantity': None}}
+            app.apply(session_id, close)
+            advance(session_id, 1)  # close at a later committed quote
+            final = app.inspect(session_id)['state']
+            self.assertEqual(final['orders'][order_id]['status'], 'CLOSED')
+            journal = self.client.get(self.root + '/sessions/' + session_id + '/journal',
+                                      headers=self.headers)
+            self.assertEqual(journal.status_code, 200, journal.text)
+            self.assertEqual(journal.json()['financialAuthority'], 'COMMITTED_EVENTS_ONLY')
+            self.assertEqual([order['id'] for order in journal.json()['orders']], [order_id])
+            analysis = app.workspace(session_id, {'timeframe': '1m'})['analysis']
+            self.assertEqual(analysis['status'], 'COMPLETE')
+            self.assertEqual(len(analysis['completed']), 1)
+            return session_id, Fraction(analysis['completed'][0]['net'])
+
+        # The fixture rises from its low at phase zero and falls from its high
+        # at phase 120. Timed close requests produce authored positive, negative,
+        # and exactly flat committed outcomes without injecting ledger rows.
+        positions = [
+            completed_trade('win', pre_advance=120, post_fill_advance=3),
+            completed_trade('loss', pre_advance=0, post_fill_advance=0),
+            completed_trade('breakeven', pre_advance=120, post_fill_advance=1),
+        ]
+        observed_nets = [net for _session, net in positions]
+        self.assertGreater(observed_nets[0], 0)
+        self.assertLess(observed_nets[1], 0)
+        self.assertEqual(observed_nets[2], 0)
+
+        analytics = self.client.get(self.root + '/methods/' + record['id'] + '/analytics',
+                                    headers=self.headers)
+        self.assertEqual(analytics.status_code, 200, analytics.text)
+        result = analytics.json()
+        self.assertEqual(result['status'], 'COMPLETE')
+        self.assertEqual((result['metrics']['tradeCount'], result['metrics']['wins'],
+                          result['metrics']['losses'], result['metrics']['breakeven']), (3, 1, 1, 1))
+        self.assertEqual(result['completedTradeNet'], text(sum(observed_nets, Fraction())))
+        self.assertEqual({item['sessionId'] for item in result['includedSessions']},
+                         {session for session, _net in positions})
+        self.assertFalse(result['balancesCombined'])
+        self.assertNotIn('maxWinStreak', result['metrics'])
+        self.assertNotIn('maxLossStreak', result['metrics'])
+        app.close()
+
+    def test_method_family_versions_are_immutable_session_pinned_and_cas_archived(self):
+        import copy
+
+        original = method()
+        created = self.client.post(self.root + '/methods', headers=self.headers, json=original)
+        self.assertEqual(created.status_code, 200, created.text)
+        family_id = original['id']
+        # The registered migration runner must be safe to invoke again: its
+        # version/checksum record makes this a no-op, not a duplicate backfill.
+        migrate(DSN)
+        rerun = self.client.get(self.root + '/method-families/' + family_id, headers=self.headers)
+        self.assertEqual(rerun.status_code, 200, rerun.text)
+        self.assertEqual(len(rerun.json()['family']['versions']), 1)
+        session_id = 'session:method-version-' + uuid.uuid4().hex
+        app = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
+        saved = app.create_session({'id': session_id, 'name': 'Pinned old version',
+                                     'methodId': original['id'], 'initialBalance': '10000',
+                                     'startPeriod': '2020-01'})
+        old_hash = saved['metadata']['methodHash']
+
+        detail_path = self.root + '/method-families/' + family_id
+        initial = self.client.get(detail_path, headers=self.headers)
+        self.assertEqual(initial.status_code, 200, initial.text)
+        family = initial.json()['family']
+        self.assertEqual((family['familyId'], family['revision'], family['latestVersion']),
+                         (family_id, 1, 1))
+        self.assertEqual(family['versions'][0]['methodId'], original['id'])
+
+        successor = copy.deepcopy(original)
+        successor['id'] = 'method-version:' + uuid.uuid4().hex
+        successor['name'] += ' revised'
+        changed = self.client.post(self.root + '/method-families/' + family_id + '/versions',
+                                   headers=self.headers,
+                                   json={'expectedRevision': 1, 'method': successor})
+        self.assertEqual(changed.status_code, 200, changed.text)
+        current = changed.json()['family']
+        self.assertEqual((current['revision'], current['latestVersion'], current['latestMethodId']),
+                         (2, 2, successor['id']))
+        self.assertEqual([item['version'] for item in current['versions']], [1, 2])
+        self.assertEqual(current['versions'][0]['method']['id'], original['id'])
+        self.assertEqual(current['versions'][1]['method']['id'], successor['id'])
+        retried = self.client.post(self.root + '/method-families/' + family_id + '/versions',
+                                   headers=self.headers,
+                                   json={'expectedRevision': 1, 'method': successor})
+        self.assertEqual(retried.status_code, 200, retried.text)
+        self.assertEqual(retried.json()['family']['latestMethodId'], successor['id'])
+        self.assertEqual(len(retried.json()['family']['versions']), 2,
+                         'exact successor retry must not create another immutable version')
+
+        concurrent = []
+        for suffix in ('left', 'right'):
+            candidate = copy.deepcopy(original)
+            candidate['id'] = 'method-version:' + uuid.uuid4().hex
+            candidate['name'] += ' ' + suffix
+            concurrent.append(candidate)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(lambda candidate: self.client.post(
+                self.root + '/method-families/' + family_id + '/versions', headers=self.headers,
+                json={'expectedRevision': 2, 'method': candidate}), concurrent))
+        self.assertEqual(sorted(response.status_code for response in outcomes), [200, 409])
+        current = self.client.get(detail_path, headers=self.headers).json()['family']
+        self.assertEqual((current['revision'], current['latestVersion']), (3, 3))
+        self.assertEqual(len(current['versions']), 3, 'stale concurrent successor must leave no partial version')
+
+        stale = self.client.post(self.root + '/method-families/' + family_id + '/versions',
+                                 headers=self.headers,
+                                 json={'expectedRevision': 1, 'method': {
+                                     **successor, 'id': 'method-version:' + uuid.uuid4().hex}})
+        self.assertEqual(stale.status_code, 409, stale.text)
+        pinned = self.client.get(self.root + '/sessions/' + session_id, headers=self.headers)
+        self.assertEqual(pinned.status_code, 200, pinned.text)
+        self.assertEqual(pinned.json()['metadata']['methodId'], original['id'])
+        self.assertEqual(pinned.json()['metadata']['methodHash'], old_hash)
+
+        archived = self.client.post(self.root + '/method-families/' + family_id + '/lifecycle',
+                                    headers=self.headers,
+                                    json={'expectedRevision': 3, 'archived': True})
+        self.assertEqual(archived.status_code, 200, archived.text)
+        self.assertTrue(archived.json()['family']['archived'])
+        self.assertEqual(archived.json()['family']['revision'], 4)
+        from contracts.primitives import ContractError
+        with self.assertRaises(ContractError) as refused:
+            app.create_session({'id': 'session:archived-method-' + uuid.uuid4().hex,
+                                'name': 'Cannot start from archived Method',
+                                'methodId': successor['id'], 'initialBalance': '10000',
+                                'startPeriod': '2020-01'})
+        self.assertEqual(refused.exception.code, 'REFUSED_ARCHIVED')
+        hidden = self.client.get(self.root + '/method-families', headers=self.headers)
+        self.assertNotIn(family_id, [item['familyId'] for item in hidden.json()['items']])
+        included = self.client.get(self.root + '/method-families?includeArchived=true', headers=self.headers)
+        self.assertIn(family_id, [item['familyId'] for item in included.json()['items']])
+        old_detail = self.client.get(self.root + '/sessions/' + session_id, headers=self.headers)
+        self.assertEqual(old_detail.status_code, 200, old_detail.text)
+        self.assertEqual(old_detail.json()['metadata']['methodHash'], old_hash)
+        stale_unarchive = self.client.post(self.root + '/method-families/' + family_id + '/lifecycle',
+                                           headers=self.headers,
+                                           json={'expectedRevision': 3, 'archived': False})
+        self.assertEqual(stale_unarchive.status_code, 409, stale_unarchive.text)
+        unarchive = self.client.post(self.root + '/method-families/' + family_id + '/lifecycle',
+                                     headers=self.headers,
+                                     json={'expectedRevision': 4, 'archived': False})
+        self.assertEqual(unarchive.status_code, 200, unarchive.text)
+        self.assertEqual(unarchive.json()['family']['revision'], 5)
+        self.assertFalse(unarchive.json()['family']['archived'])
+
+        page = self.client.get(self.root + '/method-families', headers=self.headers)
+        self.assertEqual(page.status_code, 200, page.text)
+        self.assertIn(family_id, [item['familyId'] for item in page.json()['items']])
+        other_actor, other_headers = self.account()
+        self.assertNotEqual(other_actor, self.actor)
+        self.assertEqual(self.client.get(detail_path, headers=other_headers).status_code, 404)
+        self.assertEqual(self.client.post(self.root + '/method-families/' + family_id + '/lifecycle',
+                                          headers=other_headers,
+                                          json={'expectedRevision': 4, 'archived': True}).status_code, 404)
+        app.close()
+
+    def test_method_family_version_history_exceeds_128_and_is_keyset_paginated(self):
+        from psycopg.rows import dict_row
+        from execution.product_method_lifecycle import add_version
+        from infrastructure.database import connect
+        original=method()
+        created=self.client.post(self.root+'/methods',headers=self.headers,json=original)
+        self.assertEqual(created.status_code,200,created.text)
+        expected=[original['id']]
+        revision=1
+        with connect(DSN) as db:
+            db.row_factory=dict_row
+            for index in range(128):
+                successor=dict(original,id='method-version:'+uuid.uuid4().hex,name=f'Version {index+2}')
+                add_version(db,self.workspace,original['id'],{'expectedRevision':revision,'method':successor})
+                expected.append(successor['id']);revision+=1
+        first=self.client.get(self.root+'/method-families/'+original['id']+'?version_limit=50',headers=self.headers)
+        self.assertEqual(first.status_code,200,first.text)
+        family=first.json()['family']
+        self.assertEqual(family['latestVersion'],129)
+        self.assertEqual([row['version'] for row in family['versions']],list(range(1,51)))
+        self.assertEqual(family['nextVersionCursor'],50)
+        second=self.client.get(self.root+'/method-families/'+original['id']+
+            '?version_limit=50&after_version=50',headers=self.headers)
+        self.assertEqual(second.status_code,200,second.text)
+        second_family=second.json()['family']
+        self.assertEqual([row['version'] for row in second_family['versions']],list(range(51,101)))
+        self.assertEqual(second_family['nextVersionCursor'],100)
+        final=self.client.get(self.root+'/method-families/'+original['id']+
+            '?version_limit=50&after_version=100',headers=self.headers)
+        self.assertEqual(final.status_code,200,final.text)
+        final_family=final.json()['family']
+        self.assertEqual([row['methodId'] for row in final_family['versions']],expected[100:])
+        self.assertIsNone(final_family['nextVersionCursor'])
+        self.assertTrue(final_family['versionsComplete'])
 
     def test_paginated_journal_route_keeps_workspace_authority_and_financial_projection(self):
         app=ResearchApplication(DSN,TrustedScope(self.workspace,self.actor))
@@ -276,6 +599,8 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(args[3:5],(uuid.UUID(job_id),'replay_to'));self.assertEqual(args[5],(session,request))
 
     def test_member_read_only_then_revocation_and_logout(self):
+        import copy
+
         member, header = self.account()
         record = method()
         self.assertEqual(self.client.post(self.root + '/methods', headers=self.headers, json=record).status_code, 200)
@@ -286,11 +611,26 @@ class CloudResearchTests(unittest.TestCase):
         target = '/api/v1/workspaces/' + self.workspace + '/members'
         self.assertEqual(self.client.post(target, headers=self.headers, json={'userId': member}).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=header).status_code, 200)
+        member_capability = self.client.get('/api/v1/workspaces/' + self.workspace + '/capabilities', headers=header)
+        self.assertEqual(member_capability.status_code, 200, member_capability.text)
+        self.assertEqual(member_capability.json()['role'], 'MEMBER')
+        self.assertFalse(member_capability.json()['capabilities']['createSession'])
         self.assertEqual(self.client.post(self.root + '/methods', headers=header, json=method()).status_code, 403)
+        successor = copy.deepcopy(record)
+        successor['id'] = 'method-version:' + uuid.uuid4().hex
+        self.assertEqual(self.client.post(self.root + '/method-families/' + record['id'] + '/versions',
+                                          headers=header,
+                                          json={'expectedRevision': 1, 'method': successor}).status_code, 403)
+        self.assertEqual(self.client.post(self.root + '/method-families/' + record['id'] + '/lifecycle',
+                                          headers=header,
+                                          json={'expectedRevision': 1, 'archived': True}).status_code, 403)
         self.assertEqual(self.client.get(self.root + '/sessions/' + session_id + '/metering/storage',
                                          headers=header).status_code, 403)
         self.assertEqual(self.client.delete(target + '/' + member, headers=self.headers).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=header).status_code, 404)
+        self.assertEqual(self.client.post(self.root + '/method-families/' + record['id'] + '/versions',
+                                          headers=header,
+                                          json={'expectedRevision': 1, 'method': successor}).status_code, 404)
         self.assertEqual(self.client.post('/api/v1/auth/logout-all', headers=self.headers).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=self.headers).status_code, 401)
 

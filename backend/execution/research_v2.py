@@ -102,6 +102,8 @@ class ResearchApplicationV2:
                 require(prior[0]==sha,"methodId","REFUSED_IDEMPOTENCY_CONFLICT");return self._method(db,raw["id"])
             require(db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]<128,"methods","REFUSED_CATALOG_LIMIT")
             db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],blob,sha))
+            from .product_method_lifecycle import register_first_version
+            register_first_version(db,self.scope.workspace_id,raw["id"])
         return raw
     def _session(self,db,sid,*,lock=False):
         identifier(sid,"sessionId")
@@ -136,6 +138,8 @@ class ResearchApplicationV2:
         with connect(self.dsn) as db:
             old=prior(db)
             if old:return old
+            from .product_method_lifecycle import require_active_method
+            require_active_method(db,self.scope.workspace_id,raw["methodId"])
             policy=method_policy(self._method(db,raw["methodId"]))
         source=SourceJoinV2(b.profile,b.primary,start_ns=str(START_NS),conversion_provider=b.conversion)
         cp=source.checkpoint();state=seed_state(raw["id"],b.profile,policy,cp,raw["initialBalance"])
@@ -146,6 +150,7 @@ class ResearchApplicationV2:
             with connect(self.dsn) as db:
                 self._catalog_lock(db);old=prior(db)
                 if old:return old
+                require_active_method(db,self.scope.workspace_id,raw["methodId"])
                 require(method_policy(self._method(db,raw["methodId"])).definition_hash==policy.definition_hash,"method")
                 require(db.execute("SELECT count(*) FROM btl.tick_v2_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]<128,"sessions","REFUSED_CATALOG_LIMIT")
                 self.store._insert(db,self.scope,state,cp)

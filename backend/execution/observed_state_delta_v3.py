@@ -91,8 +91,8 @@ def reconstruct(base,deltas,*,state_callback=None):
                  COMPACT_BASE,'BTL-OBSERVED-EXECUTION-CHECKPOINT-BASE-COMPACT-1',
                  'BTL-TICK-EXECUTION-COMPACT-BASE-1'))),
             'base','CORRUPT_RECORD')
-    state=deepcopy(base['state']);prev=base['stateHash']
-    require(hashlib.sha256(canonical_bytes(state)).hexdigest()==prev,'baseHash','CORRUPT_RECORD')
+    state=deepcopy(base['state']);state_hash=base['stateHash'];prev=base.get('chainHash',state_hash)
+    require(hashlib.sha256(canonical_bytes(state)).hexdigest()==state_hash,'baseHash','CORRUPT_RECORD')
     if state_callback is not None:state_callback(state,0)
     for row in deltas:
         core=row.get('body',{})
@@ -132,17 +132,22 @@ def reconstruct(base,deltas,*,state_callback=None):
     return state
 
 
-def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None):
-    require(type(expected_revision) is int and expected_revision>=0,'deltaCount','CORRUPT_RECORD')
+def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None,base_revision=0):
+    require(type(expected_revision) is int and expected_revision>=0 and
+            type(base_revision) is int and 0<=base_revision<=expected_revision and
+            type(base.get('state')) is dict and base['state'].get('revision')==base_revision,
+            'deltaCount','CORRUPT_RECORD')
     count=0
     def counted():
         nonlocal count
         for row in deltas:
             count+=1
-            require(count<=expected_revision,'deltaCount','CORRUPT_RECORD')
+            require(count<=expected_revision-base_revision,'deltaCount','CORRUPT_RECORD')
             yield row
-    state=reconstruct(base,counted(),state_callback=state_callback)
-    require(count==expected_revision,'deltaCount','CORRUPT_RECORD')
+    callback=(None if state_callback is None else
+              lambda state, relative_revision: state_callback(state, base_revision+relative_revision))
+    state=reconstruct(base,counted(),state_callback=callback)
+    require(count==expected_revision-base_revision,'deltaCount','CORRUPT_RECORD')
     require(state['revision']==expected_revision,'deltaRevision','CORRUPT_RECORD')
     return state
 

@@ -3,6 +3,7 @@ from copy import deepcopy
 import os, unittest, uuid
 from unittest.mock import patch
 from contracts.primitives import ContractError
+from contracts.canonical import content_hash
 from execution.analysis_v2 import project, MAX_ANALYSIS_EVENTS
 from tests.test_kernel_v2 import fixture, scene_system, opening
 
@@ -58,10 +59,19 @@ class AnalysisV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError,"CORRUPT_RECORD"):project(h.state,bad,g)
         bad=deepcopy(g);bad["sessionId"]="foreign"
         with self.assertRaisesRegex(ContractError,"CORRUPT_RECORD"):project(h.state,h.events,bad)
-    def test_limit_refuses_before_consuming_stream_and_curve_is_cash(self):
-        h,g=self.complete(fixture()["scenes"][0]);bad=deepcopy(h.state);bad["nextEventIndex"]=MAX_ANALYSIS_EVENTS+1
-        def forbidden():raise AssertionError("stream consumed");yield
-        self.assertEqual(project(bad,forbidden(),g)["reason"],"REFUSED_ANALYSIS_LIMIT")
+    def test_unbounded_noop_history_and_curve_is_cash(self):
+        h,g=self.complete(fixture()["scenes"][0]);large=deepcopy(h.state);extended=deepcopy(h.events)
+        previous=large["eventHash"]
+        for sequence in range(large["nextEventIndex"],MAX_ANALYSIS_EVENTS+1):
+            event=dict(schemaVersion=1,artifact="BTL-TICK-EXECUTION-EVENT-2",
+                engineVersion=large["engineVersion"],sessionId=large["sessionId"],datasetId=large["datasetId"],
+                datasetVersion=large["datasetVersion"],profileHash=large["profileHash"],
+                methodHash=large["policy"]["definitionHash"],sequence=sequence,previousHash=previous,
+                kind="CHRONOLOGY_LIMITATION",classification="OBSERVED_FEED_EVENT",orderId=None,detail={})
+            event["eventId"]=content_hash(event);previous=event["eventId"];extended.append(event)
+        large["nextEventIndex"]=len(extended);large["eventHash"]=previous
+        self.assertEqual(project(large,extended,g)["status"],"COMPLETE")
+        self.assertGreater(large["nextEventIndex"],MAX_ANALYSIS_EVENTS)
         r=project(h.state,h.events,g);self.assertEqual(r["curveBasis"],"COMMITTED_CASH_POSTINGS")
         self.assertNotIn("quote",r);self.assertNotIn("controller",r)
 

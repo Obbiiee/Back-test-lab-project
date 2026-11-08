@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath,landingWorkspacePath} from '../src/tickAlpha/client.js';
+import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
-import {displayBars,historyPage,referencePage,replayTarget,nextReplayTarget,seekTarget} from '../src/tickAlpha/display.js';
+import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
 import {createAccountClient,setAccountTransport,clearAccountTransport,accountStorageKey} from '../src/tickAlpha/accountClient.js';
 
@@ -31,34 +31,29 @@ const queuedCalls=[];
 let queuedId;
 const queuedAccount={subject:()=> '22222222-2222-4222-8222-222222222222',request:async(path,options={})=>{
   queuedCalls.push([path,options]);
-  if(path.endsWith('/view')||path.endsWith('/chart-history')){queuedId=options.jobId;return {schemaVersion:1,jobId:queuedId,state:'QUEUED',result:null};}
+  if(path.endsWith('/view')){queuedId=options.jobId;return {schemaVersion:1,jobId:queuedId,state:'QUEUED',result:null};}
   return {schemaVersion:1,jobId:queuedId,state:'SUCCEEDED',result:{schemaVersion:1,label:'Bounded queued read'}};
 }};
 setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
 const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
-queuedCalls.length=0;
-const queuedHistory=await api('/sessions/session:queue/chart-history',{timeframe:'1m',offset:0});
-assert.equal(queuedHistory.label,'Bounded queued read');
-assert.equal(queuedCalls.length,2);
-assert.match(queuedCalls[0][0],/\/chart-history$/);
-assert.match(queuedId,/^[0-9a-f-]{36}$/);
+assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+const readRetryIds=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(_path,options={})=>{readRetryIds.push(options.jobId);return {schemaVersion:1,label:'done'};}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions/session:queue/view',{timeframe:'1m'});
+assert.equal(readRetryIds[0],queuedId,'same read request keeps durable identity after retry');
 assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
-const createCalls=[];let createJob;
-const queuedCreateAccount={subject:queuedAccount.subject,request:async(path,options={})=>{
-  createCalls.push([path,options]);
-  if(path.endsWith('/sessions')){createJob=options.jobId;return {schemaVersion:1,jobId:createJob,state:'QUEUED',result:null};}
-  return {schemaVersion:1,jobId:createJob,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:2024-01'}}};
-}};
-setAccountTransport(queuedCreateAccount,'11111111-1111-4111-8111-111111111111');
-const createRequest={id:'session:2024-01',name:'January 2024',methodId:'method:2024',initialBalance:'10000',sourceKey:'source:2024-01',period:'2024-01',day:'2024-01-02'};
-const createdSession=await api('/sessions',createRequest);
-assert.equal(createdSession.metadata.id,createRequest.id);
-assert.equal(createCalls.length,2);
-assert.equal(createCalls[0][1].body,createRequest,'Queued Session creation preserves exact request identity');
-assert.match(createJob,/^[0-9a-f-]{36}$/);
-assert.ok(createCalls[1][0].endsWith('/jobs/'+createJob),'Poll the existing Session creation job; never resend');
+const additionalQueued=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  additionalQueued.push([path,options]);
+  return path.endsWith('/chart-history')||path.endsWith('/replay-to')
+    ?{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,artifact:'BTL-SYNTHETIC-RESULT-1'}}
+    :{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:created'}}};
+}},'11111111-1111-4111-8111-111111111111');
+assert.equal((await api('/sessions/session:queued/chart-history',{timeframe:'1m',offset:0})).artifact,'BTL-SYNTHETIC-RESULT-1');
+assert.equal((await api('/sessions/session:queued/replay-to',{requestId:'request:stable'})).artifact,'BTL-SYNTHETIC-RESULT-1');
+assert.ok(additionalQueued.every(([,options])=>options.jobId),'chart-history and replay-to use durable queue IDs');
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
@@ -72,28 +67,57 @@ const reconciliation={subject:queuedAccount.subject,request:async(path,options={
 setAccountTransport(reconciliation,'11111111-1111-4111-8111-111111111111');
 const replayBody={kind:'ADVANCE',commandId:'command:retained'};
 await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>
-  error.message.includes('Reload committed Session evidence')&&!error.message.includes('unchanged'));
+  error.code==='UNKNOWN'&&error.jobId===replayJob);
 assert.equal(replayCalls.length,2,'Uncertain replay polls its existing job; never silently resubmits a financial command');
 assert.equal(replayCalls[0][1].body,replayBody,'Preserve canonical financial command identity');
-let replayToJob;
-const replayToCalls=[];
-setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
-  replayToCalls.push([path,options]);
-  if(path.endsWith('/replay-to')){replayToJob=options.jobId;return {schemaVersion:1,jobId:replayToJob,state:'QUEUED',result:null};}
-  return {schemaVersion:1,jobId:replayToJob,state:'RECONCILE_REQUIRED',result:null};
-}},'11111111-1111-4111-8111-111111111111');
-const replayToBody={schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-1',requestId:'a'.repeat(32),targetNs:'1700000000000000000'};
-await assert.rejects(()=>api('/sessions/session:queue/replay-to',replayToBody),/Reload committed Session evidence/);
-assert.equal(replayToCalls.length,2,'A failed target replay is reconciled as possibly committed work');
-assert.equal(replayToCalls[0][1].body,replayToBody);
 const lostReplayCalls=[];
+let lostId;
 setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
   lostReplayCalls.push([path,options]);
+  lostId=options.jobId;
   throw new DOMException('Response lost after possible commit','TimeoutError');
 }},'11111111-1111-4111-8111-111111111111');
-await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),/Reload committed Session evidence/);
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===lostId);
 assert.equal(lostReplayCalls.filter(([path])=>path.endsWith('/commands')).length,1);
-assert.ok(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),'Best-effort stop never asserts that an earlier attempt did not commit');
+assert.equal(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),false,'do not cancel an uncertain financial mutation');
+const retried=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  retried.push([path,options]);
+  return path.endsWith('/commands')?{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,revision:8}}:{schemaVersion:1};
+}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions/session:queue/commands',replayBody);
+assert.equal(retried[0][1].jobId,lostId,'retry reuses the durable financial job ID');
+const createCalls=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  createCalls.push([path,options]);
+  return {schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:new'}}};
+}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions',{id:'session:new',name:'Synthetic'});
+assert.ok(createCalls[0][1].jobId,'POST /sessions is submitted with a durable job identity');
+setAccountTransport({subject:queuedAccount.subject,request:async()=>{throw Object.assign(Error('definitive stale request'),{status:409});}},
+  '11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{id:'session:stale',name:'Synthetic'}),error=>error.status===409&&error.code!=='UNKNOWN');
+setAccountTransport({subject:queuedAccount.subject,request:async()=>({schemaVersion:1,state:'QUEUED'})},
+  '11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{id:'session:missing-job',name:'Synthetic'}),error=>error.code==='UNKNOWN');
+const cancelUncertainty=[];
+let cancelJob;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  cancelUncertainty.push([path,options]);
+  if(path.endsWith('/commands')){cancelJob=options.jobId;return {schemaVersion:1,jobId:cancelJob,state:'QUEUED',result:null};}
+  return {schemaVersion:1,jobId:cancelJob,state:'RECONCILE_REQUIRED',cancellation:'RECONCILE_REQUIRED',result:null};
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN');
+assert.equal(cancelUncertainty.length,2,'cancellation race remains an explicit unknown until reconciliation');
+const pollTimeout=[];
+let timeoutJob;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  pollTimeout.push([path,options]);
+  if(path.endsWith('/commands')){timeoutJob=options.jobId;return {schemaVersion:1,jobId:timeoutJob,state:'QUEUED',result:null};}
+  throw new DOMException('poll response timed out','TimeoutError');
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===timeoutJob);
+assert.equal(pollTimeout.length,2,'poll timeout preserves the durable job for later reconciliation');
 setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);
@@ -173,11 +197,15 @@ const optionalReadController=new AbortController();
 await api('/measurement/operational',undefined,{signal:optionalReadController.signal});
 assert.equal(calls[2].options.signal,optionalReadController.signal,'Optional observation timeout must abort the actual request');
 assert.equal(sessionPath('session:α'),'/sessions/session%3A%CE%B1');
-const raw=command({metadata:{id:'session:one'},state:{revision:7}},'ADVANCE',{targetNs:'1577838600000000000'});
-assert.equal(raw.expectedRevision,7);assert.equal(raw.payload.targetNs,'1577838600000000000');
+const localView={metadata:{id:'session:one',artifact:'BTL-LOCAL-SESSION-1'},state:{revision:7}};
+const observedView={metadata:{id:'session:observed',artifact:'BTL-OBSERVED-RESEARCH-SESSION-1'},state:{revision:7}};
+const raw=command(localView,'ADVANCE',{targetNs:'1577838600000000000'});
 assert.equal(raw.artifact,'BTL-TICK-EXECUTION-COMMAND-1');
-assert.equal(command({metadata:{id:'session:observed',model:'CONDITIONAL_OBSERVED_TICK_SIMULATION'},state:{revision:2}},'ADVANCE',{targetNs:'1577838600000000000'}).artifact,'BTL-OBSERVED-EXECUTION-COMMAND-1');
-assert.notEqual(raw.commandId,command({metadata:{id:'session:one'},state:{revision:7}},'ADVANCE',raw.payload).commandId);
+assert.equal(command(observedView,'ADVANCE',{targetNs:'1577838600000000000'}).artifact,'BTL-OBSERVED-EXECUTION-COMMAND-1');
+assert.throws(()=>command(observedView,'SEEK',{targetNs:'1577838600000000000'}),/do not support SEEK/);
+assert.throws(()=>command({metadata:{id:'ambiguous'}},'ADVANCE',{}),/ambiguous Session model/);
+assert.equal(raw.expectedRevision,7);assert.equal(raw.payload.targetNs,'1577838600000000000');
+assert.notEqual(raw.commandId,command(localView,'ADVANCE',raw.payload).commandId);
 globalThis.fetch=async()=>({ok:false,json:async()=>({detail:'REFUSED_STALE_REVISION'})});
 await assert.rejects(()=>api('/reviews',{}),/REFUSED_STALE_REVISION/);
 globalThis.fetch=async()=>({ok:true,json:async()=>({schemaVersion:2})});
@@ -198,10 +226,6 @@ assert.equal(bars[0].open,2000.015);assert.ok(!Object.hasOwn(bars[0],'volume'));
 assert.deepEqual(Object.keys(bars[0]),['time','open','high','low','close']);
 assert.equal(view.chart.candles[0].open,'2000.015');
 assert.equal(replayTarget(view,4),'1577838660000000000');
-assert.equal(nextReplayTarget(view,4,'1577838700000000000'),'1577838700000000000','A partially processed forward target must resume unchanged');
-assert.equal(nextReplayTarget({...view,state:{throughNs:'1577838700000000000'}},4,'1577838700000000000'),'1577838760000000000','A completed target advances to the next interval');
-assert.throws(()=>nextReplayTarget(view,4,'-1'),/pending replay target/);
-assert.throws(()=>nextReplayTarget(view,4,'10000000000000000000001'),/pending replay target/,'Out-of-contract persisted target is rejected before Date conversion');
 assert.equal(seekTarget('2020-01-01T00:30'),'1577838600000000000');
 assert.equal(seekTarget('2020-02-29T12:34:56'),'1582979696000000000');
 assert.equal(seekTarget('2000-02-29T00:00'),'951782400000000000');
@@ -273,7 +297,10 @@ assert.ok(noticeText('REFUSED_HISTORICAL_PERIOD').includes('no fallback feed'));
 const observed={state:{throughNs:'1439166600000000000'},replayStepNs:'1000000000'};
 assert.equal(replayTarget(observed,4),'1439166604000000000');
 for(const invalid of ['0','-1','1000000000000',1,true,'1e9'])assert.throws(()=>replayTarget({...observed,replayStepNs:invalid},1));
-assert.ok(ui.includes('name="startPeriod"')&&ui.includes('Start month (UTC)'));
+// The Start month field moved from the old Create Session dialog into the New Session wizard.
+const wizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
+assert.ok(wizard.includes('name="startPeriod"')&&wizard.includes('Start month (UTC)'));
+assert.ok(ui.includes("api('/sessions',{id:creationId.current"),'Session creation still sends the existing POST /sessions payload');
 assert.ok(ui.includes("dialog==='ticket'"));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
 console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');
@@ -283,21 +310,3 @@ assert.equal(historyPage(historyView,pastPage,'1m',0)[0].open,1.001);
 for(const change of [{datasetId:'foreign'},{datasetVersion:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{endTime:1441065660},{nextOffset:256},{endOfDataset:true},{status:'BUILDING'},{candles:[{...pastPage.candles[0],time:1441065600}]},{candles:[{...pastPage.candles[0],time:1439164801}]}])assert.throws(()=>historyPage(historyView,{...pastPage,...change},'1m',0));
 assert.deepEqual(historyPage(historyView,{...pastPage,candles:[],status:'BUILDING'},'1m',0),[]);
 console.log('PASS past OHLC context identity, exact price display, Session boundary, timeframe alignment, bounded pagination and future metadata refusal.');
-const observedStart=String(Date.parse('2024-01-02T00:00:30Z')*1000000),referenceView={state:{startNs:observedStart,datasetId:'exness:xauusd:2024',datasetVersion:'a'.repeat(64)}};
-const reference={schemaVersion:1,artifact:'BTL-OBSERVED-REFERENCE-OHLC-1',datasetId:referenceView.state.datasetId,datasetVersion:referenceView.state.datasetVersion,
-  reference:{providerId:'HistData.com',priceType:'BID',timezone:'UTC',sourceTimezone:'EST_FIXED_UTC-5',manifestSha256:'b'.repeat(64),fileName:'2023-12-1m.json',fileSha256:'c'.repeat(64),executionAuthority:false,coverage:'UNKNOWN',rights:'UNKNOWN'},
-  timeframe:'1m',period:'2023-12',startTime:1701388800,endTime:1704067200,trustedStartNs:observedStart,priceBasis:'HISTDATA_BID_REFERENCE_ONLY',volumeAvailable:false,coverage:'UNKNOWN',executionAuthority:false,status:'READY',candles:[{time:1704067140,open:'2062.1',high:'2062.2',low:'2061.9',close:'2062.0'}],nextOffset:null};
-assert.equal(referencePage(referenceView,reference,'1m',0)[0].close,2062.0);
-for(const change of [{datasetId:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY'},
-  {reference:{...reference.reference,priceType:'ASK'}},{reference:{...reference.reference,rights:'GRANTED'}},{trustedStartNs:'0'},
-  {candles:[{...reference.candles[0],time:1704067200}]},{candles:[{...reference.candles[0],high:'2061.99'}]}])
-  assert.throws(()=>referencePage(referenceView,{...reference,...change},'1m',0));
-assert.deepEqual(referencePage(referenceView,{...reference,reference:null,status:'UNAVAILABLE',candles:[]},'1m',0),[]);
-assert.throws(()=>referencePage(referenceView,{...reference,reference:null,status:'READY'},'1m',0));
-assert.throws(()=>referencePage(referenceView,{...reference,reference:{...reference.reference,hiddenManifest:[]}},'1m',0));
-console.log('PASS reference OHLC source identity, immutable hash provenance, explicit unknown rights/coverage, complete-bar clipping and no execution authority.');
-
-for(const href of ['https://localhost:5443/?page=home','https://example.com/','http://localhost.example.com/','https://127.0.0.1/'])assert.equal(landingWorkspacePath(href),'/?page=account');
-assert.equal(landingWorkspacePath('http://127.0.0.1:5173/?tick-alpha=local&page=home'),'/?tick-alpha=local');
-assert.equal(landingWorkspacePath('http://localhost:5174/?page=home'),'/');
-console.log('PASS landing account admission: public/HTTPS enters accounts; private HTTP loopback preserves explicit source.');

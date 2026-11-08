@@ -322,7 +322,98 @@ class ObservedPostgresTests(unittest.TestCase):
             if previous_gate is None:os.environ.pop('BTL_ENABLE_QA_ORDER_ARCHIVE_V1',None)
             else:os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']=previous_gate
 
+    def test_product_compact_session_archives_terminal_orders_without_qa_flag(self):
+        scope=TrustedScope('observedqa:product-archive:'+uuid.uuid4().hex,'authored:actor')
+        sid='session:product-archive:'+uuid.uuid4().hex
+        store=ObservedExecutionStore(DSN,terminal_order_archive_v1=True,state_storage_format='compact-v1')
+        controller=ObservedExecutionController(store,lambda _:self.source)
+        created=controller.create(scope,sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+        self.assertEqual(created['artifact'],'BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1')
+        quote=controller.apply(scope,command(sid,'product:quote',0,'ADVANCE',dict(targetNs='0')))
+        plan=dict(side='LONG',orderType='LIMIT',workflow='PLANNED',entry='2290',quantity='0.01',
+            sl='2289',tp='2291',riskPercent='1',observations=[])
+        opened=controller.apply(scope,command(sid,'product:open',quote['state']['revision'],'OPEN',plan))
+        cancelled=controller.apply(scope,command(sid,'product:cancel',opened['state']['revision'],'CANCEL',
+            dict(orderId='product:open')))
+        self.assertEqual(cancelled['state']['orders'],{})
+        self.assertEqual(cancelled['state']['orderArchive']['count'],1)
+        self.assertEqual(store.archive_order(scope,sid,'product:open')['status'],'CANCELLED')
+        first=store.product_order_history(scope,sid,maximum=1)
+        self.assertEqual(first['records'][0]['orderId'],'product:open')
+        cold=ObservedExecutionController(ObservedExecutionStore(DSN,terminal_order_archive_v1=True,
+            state_storage_format='compact-v1'),lambda _:self.source)
+        self.assertEqual(cold.inspect(scope,sid)['state'],cancelled['state'])
+
+    def test_product_compact_session_cold_recovers_from_verified_periodic_base(self):
+        from unittest.mock import patch
+        from execution.observed_postgres import COMPACT_RECOVERY_INTERVAL
+        scope=TrustedScope('observedqa:recovery-base:'+uuid.uuid4().hex,'authored:actor')
+        sid='session:recovery-base:'+uuid.uuid4().hex
+        store=ObservedExecutionStore(DSN,state_storage_format='compact-v1')
+        controller=ObservedExecutionController(store,lambda _:self.source)
+        state=controller.create(scope,sid,self.fx.profile,self.fx.policy,period='1970-01')['state']
+        state=controller.apply(scope,command(sid,'recovery:quote',state['revision'],'ADVANCE',dict(targetNs='0')))['state']
+        for index in range(COMPACT_RECOVERY_INTERVAL//2):
+            order_id=f'recovery:open:{index}'
+            plan=dict(side='LONG',orderType='LIMIT',workflow='PLANNED',entry='2290',quantity='0.01',
+                sl='2289',tp='2291',riskPercent='1',observations=[])
+            opened=controller.apply(scope,command(sid,f'recovery:open-command:{index}',state['revision'],'OPEN',plan))
+            state=opened['state']
+            cancelled=controller.apply(scope,command(sid,f'recovery:cancel-command:{index}',state['revision'],'CANCEL',
+                dict(orderId=f'recovery:open-command:{index}')))
+            state=cancelled['state']
+        self.assertGreaterEqual(state['revision'],COMPACT_RECOVERY_INTERVAL)
+        with connect(DSN) as db:
+            row=db.execute('SELECT revision FROM btl.tick_recovery_bases '
+                'WHERE workspace_id=%s AND session_id=%s ORDER BY revision DESC LIMIT 1',
+                (scope.workspace_id,sid)).fetchone()
+        self.assertEqual(row[0],COMPACT_RECOVERY_INTERVAL)
+        used=[]
+        import execution.observed_state_delta_v3 as delta_module
+        original=delta_module.reconstruct_complete
+        def track(base,deltas,target_revision,**kwargs):
+            used.append(kwargs.get('base_revision',0))
+            return original(base,deltas,target_revision,**kwargs)
+        cold=ObservedExecutionStore(DSN,state_storage_format='compact-v1')
+        with patch('execution.observed_postgres.reconstruct_complete',side_effect=track):
+            self.assertEqual(cold.inspect(scope,sid)['state'],state)
+        self.assertIn(COMPACT_RECOVERY_INTERVAL,used)
+
     def opening(self):return dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2300.1',quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])
+
+    def test_compact_v1_keeps_versioned_qa_order_archive_compatible(self):
+        from execution.observed_kernel import QA_ORDER_RETENTION_V3
+        prior=os.environ.get('BTL_ENABLE_QA_ORDER_ARCHIVE_V1')
+        os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']='1'
+        suffix=uuid.uuid4().hex[:10];session='session:compact-archive:'+suffix
+        scope=TrustedScope('observedqa:compact-archive:'+suffix,'authored:actor')
+        try:
+            dsn=isolated_database(DSN,'compactarch_'+suffix)
+            store=ObservedExecutionStore(dsn,state_storage_format='compact-v1',
+                qa_order_archive_v1=True,order_retention_policy=QA_ORDER_RETENTION_V3)
+            controller=ObservedExecutionController(store,lambda _:self.source,
+                order_retention_policy=QA_ORDER_RETENTION_V3)
+            controller.create(scope,session,self.fx.profile,self.fx.policy,period='1970-01')
+            opened=controller.apply(scope,command(session,'compact:open',0,'OPEN',self.opening()))
+            cancelled=controller.apply(scope,command(session,'compact:cancel',1,'CANCEL',
+                dict(orderId='compact:open')))
+            self.assertEqual(opened['state']['revision'],1)
+            self.assertEqual(cancelled['state']['orders'],{})
+            self.assertEqual(cancelled['state']['orderArchive']['count'],1)
+            archived=store.archive_order(scope,session,'compact:open')
+            self.assertEqual(archived['status'],'CANCELLED')
+            self.assertEqual(store.order_history(scope,session)['total'],1)
+
+            # A fresh store proves persisted-format dispatch and cold recovery.
+            cold=ObservedExecutionStore(dsn,state_storage_format='compact-v1',
+                qa_order_archive_v1=True,order_retention_policy=QA_ORDER_RETENTION_V3)
+            self.assertEqual(cold.archive_order(scope,session,'compact:open'),archived)
+            prior_result=cold.prepare(scope,command(session,'compact:cancel',1,'CANCEL',
+                dict(orderId='compact:open')))[1]
+            self.assertEqual(prior_result['state']['revision'],2)
+        finally:
+            if prior is None:os.environ.pop('BTL_ENABLE_QA_ORDER_ARCHIVE_V1',None)
+            else:os.environ['BTL_ENABLE_QA_ORDER_ARCHIVE_V1']=prior
 
     def test_actual_transactions_cold_source_and_source_outage_receipt_and_journal(self):
         self.call('ADVANCE',dict(targetNs='0'));self.call('OPEN',self.opening(),cid='order:one');self.call('ADVANCE',dict(targetNs=str(S)));self.source.cache.close()
@@ -735,12 +826,19 @@ class ObservedPostgresTests(unittest.TestCase):
             reviewed=app.review(request);accepted=app.confirm(app_sid,dict(reviewId='app:order',reviewHash=reviewed['reviewHash']))
             self.assertTrue(accepted['durable'])
             self.assertEqual(app.confirm(app_sid,dict(reviewId='app:order',reviewHash=reviewed['reviewHash'])),accepted)
+            reconciled=app.command_result(app_sid,'app:order')
+            self.assertEqual(reconciled['status'],'COMMITTED')
+            self.assertEqual(reconciled['receipt'],accepted)
             latest=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:1',latest['revision'],'ADVANCE',dict(targetNs=str(S))))
             current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:close',current['revision'],'CLOSE',dict(orderId='app:order',quantity=None)))
             current=app.summary(app_sid);app.apply(app_sid,command(app_sid,'app:advance:2',current['revision'],'ADVANCE',dict(targetNs=str(2*S))))
             result=app.inspect(app_sid);self.assertEqual(result['analysis']['metrics']['tradeCount'],1)
             self.assertEqual(result['analysis']['completed'][0]['id'],'app:order')
             self.assertEqual(result['analysis']['completed'][0]['exitTimeNs'],str(2*S))
+            aggregate=app.method_analytics(method['id'])
+            self.assertEqual(aggregate['status'],'COMPLETE')
+            self.assertEqual(aggregate['metrics']['tradeCount'],1)
+            self.assertEqual(aggregate['includedSessions'][0]['sessionId'],app_sid)
             saved=app.save_note(app_sid,dict(orderId='app:order',expectedNoteRevision=0,text='Observed app acceptance',tags=['qa']))
             self.assertEqual(saved['noteRevision'],1)
             with patch.object(catalog,'resolve',side_effect=AssertionError('Journal must not admit market archives')):

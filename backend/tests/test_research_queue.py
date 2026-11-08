@@ -79,6 +79,34 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'],cancel=True)['state'], 'CANCELLED')
         self.assertEqual(self.submit()['state'], 'QUEUED')
 
+    def test_replay_queue_dialect_is_bound_to_persisted_session_model(self):
+        service = ResearchApplication(self.dsn, TrustedScope(str(self.workspace), str(self.actor)))
+        record = method()
+        service.create_method(record)
+        session_id = 'session:queue-dialect-' + uuid.uuid4().hex
+        view = service.create_session({'id': session_id, 'name': 'Queue dialect QA',
+                                       'methodId': record['id'], 'initialBalance': '10000',
+                                       'startPeriod': '2020-01'})
+        legacy = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                  'sessionId': session_id, 'commandId': 'command:' + uuid.uuid4().hex,
+                  'expectedRevision': view['state']['revision'], 'kind': 'ADVANCE',
+                  'payload': {'targetNs': view['state']['throughNs']}}
+        accepted_id = uuid.uuid4()
+        self.ids.append(accepted_id)
+        accepted = queue.submit(self.dsn, self.actor, self.workspace, accepted_id,
+                                'replay', (session_id, legacy))
+        self.assertEqual(accepted['state'], 'QUEUED')
+        observed_dialect = dict(legacy, artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                                commandId='command:' + uuid.uuid4().hex)
+        refused_id = uuid.uuid4()
+        with self.assertRaises(ContractError) as error:
+            queue.submit(self.dsn, self.actor, self.workspace, refused_id,
+                         'replay', (session_id, observed_dialect))
+        self.assertEqual(error.exception.code, 'REFUSED_COMMAND_DIALECT')
+        with connect(self.dsn) as db:
+            self.assertIsNone(db.execute('SELECT id FROM btl.research_jobs WHERE id=%s', (refused_id,)).fetchone())
+        service.close()
+
     def test_claims_rotate_between_users_before_revisiting_backlog(self):
         first = self.submit(args=('session:fair-a1', {'timeframe': '1m'}))
         second = self.submit(args=('session:fair-a2', {'timeframe': '1m'}))

@@ -7,9 +7,9 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import require, identifier, revision
 from ticks.contracts import keys, tag
 
-MAX_JOURNAL_ORDERS = 32  # Complete JSON snapshot stays below the transport's 1MiB budget.
+# Legacy v2 snapshot compatibility. Product journal reads use keyset pages.
+MAX_JOURNAL_ORDERS = 32
 MAX_JOURNAL_PAGE_SIZE = 32
-MAX_JOURNAL_READ_ORDERS = 4096
 
 
 def encode_cursor(session_id, session_revision, after_order_id):
