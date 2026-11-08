@@ -2,6 +2,7 @@
 from copy import deepcopy
 from fractions import Fraction
 import os,unittest
+from types import SimpleNamespace
 from contracts.canonical import canonical_bytes,content_hash
 from execution.observed_analysis import LedgerFold,ObservedStatistics
 from tests import test_observed_kernel as kernel_fixtures
@@ -26,6 +27,17 @@ class ObservedAnalysisTests(unittest.TestCase):
     def opening(self,cid="order:z",**change):
         p=dict(side='LONG',orderType='MARKET',workflow='QUICK',entry=self.fx.state['quoteBasis']['ask'],quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]);p.update(change);self.call('OPEN',p,cid)
     def project(self):return self.fold.project(self.fx.state)
+
+    def test_current_cached_fold_is_reused_but_stale_prefix_is_copied(self):
+        prior=SimpleNamespace(next=12,orders={'order:one':{'status':'CLOSED'}})
+        current=ObservedStatistics._working_fold(prior,12)
+        self.assertIs(current,prior)
+        extended=ObservedStatistics._working_fold(prior,13)
+        self.assertIsNot(extended,prior)
+        extended.orders['order:one']['status']='CHANGED_IN_PRIVATE_COPY'
+        self.assertEqual(prior.orders['order:one']['status'],'CLOSED')
+        with self.assertRaisesRegex(ValueError,'eventRegression'):
+            ObservedStatistics._working_fold(prior,11)
 
     def test_exact_partial_closed_trade_never_infers_retrospective_risk(self):
         self.start([(0,'2300','2300.1'),(S,'2300.9','2301'),(2*S,'2302','2302.1'),(3*S,'2303','2303.1')]);self.advance(0);self.opening(quantity='0.02',sl='2299');self.advance(S)

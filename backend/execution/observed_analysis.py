@@ -109,6 +109,19 @@ class ObservedStatistics:
     def __init__(self,store):
         self.store=store;self._folds=OrderedDict();self._lock=RLock()
 
+    @staticmethod
+    def _working_fold(prior,target_event_count):
+        """Reuse an already-current immutable projection; copy only to extend it.
+
+        ``LedgerFold.project`` is read-only. Copying a complete cached fold for
+        every page request needlessly duplicates its retained order index, even
+        when no new events have arrived. A stale prefix still gets a private
+        copy before consuming events, so a failed extension cannot poison the
+        previously accepted cache entry.
+        """
+        require(prior.next<=target_event_count,'eventRegression','CORRUPT_RECORD')
+        return prior if prior.next==target_event_count else deepcopy(prior)
+
     def inspect(self,scope,session_id,offset=0,maximum=64):
         workspace,session=scoped(scope,session_id)
         # The response page remains bounded, but an archive can contain more
@@ -125,8 +138,8 @@ class ObservedStatistics:
                 genesis,_=self.store._qa_reconstruct(db,workspace,session,upto_revision=0)
             else:genesis=read_snapshot(*seed)['state']
             key=(workspace,session,content_hash(genesis));prior=self._folds.get(key)
-            fold=deepcopy(prior) if prior is not None else LedgerFold(genesis,self.store.order_retention_policy)
-            require(fold.next<=state['nextEventIndex'],'eventRegression','CORRUPT_RECORD')
+            fold=(self._working_fold(prior,state['nextEventIndex']) if prior is not None
+                  else LedgerFold(genesis,self.store.order_retention_policy))
             for _ in range(16):
                 if fold.next==state['nextEventIndex']:break
                 rows=db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence>=%s AND sequence<%s ORDER BY sequence LIMIT 64',(workspace,session,fold.next,state['nextEventIndex'])).fetchall()
