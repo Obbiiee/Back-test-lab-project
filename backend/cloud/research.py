@@ -57,11 +57,13 @@ def _synthetic_monthly_provider():
     require(os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1' and all(values),
             'syntheticMonthly', 'REFUSED_SOURCE')
     root, dataset_id, dataset_version, manifest_hash = values
-    require(len(root) <= 4096 and os.path.isabs(root), 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    require(len(root) <= 4096, 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    from market_data.monthly_root import pin_monthly_root
+    pinned_root = pin_monthly_root(root)
     from contracts.primitives import digest
     digest(dataset_version, 'syntheticMonthlyVersion')
     digest(manifest_hash, 'syntheticMonthlyManifestHash')
-    pin = (os.path.realpath(root), dataset_id, dataset_version, manifest_hash)
+    pin = (pinned_root, dataset_id, dataset_version, manifest_hash)
     global _MONTHLY_PROVIDER, _MONTHLY_PIN
     with _MONTHLY_LOCK:
         require(_MONTHLY_PIN in (None, pin), 'syntheticMonthly', 'SOURCE_PIN_CHANGED')
