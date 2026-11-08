@@ -1,5 +1,19 @@
 """Source-family selection for the authenticated research service."""
-from contracts.primitives import require
+from contracts.primitives import require, ContractError
+
+
+def validate_source_selection(raw, catalog):
+    """Reject a missing or stale public source selector before queue admission."""
+    if catalog is None:
+        return
+    require(type(raw) is dict and type(raw.get('sourceKey')) is str and
+            type(raw.get('period')) is str, 'sourceKey', 'INVALID_INPUT')
+    try:
+        catalog.selection(raw['sourceKey'], raw['period'])
+    except ContractError as error:
+        if error.code == 'OBSERVED_PERIOD_UNAVAILABLE':
+            raise ContractError('INVALID_INPUT', 'sourceKey') from None
+        raise
 
 
 def observed_route(operation, args, catalog):
