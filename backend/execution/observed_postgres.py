@@ -27,6 +27,7 @@ from .observed_state_delta_v3 import (encode_base,encode_delta,encode_delta_v4,e
     encode_compact_delta,reconstruct_complete,COMPACT_DELTA,COMPACT_PROGRESS_DELTA)
 from .observed_replay_progress import CONTROLLER as PROGRESS_CONTROLLER, load_progress, match_progress_receipt, replace_progress
 from .journal_projection import journal_projection_changes
+from .analytics_projection import advance_projection,ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT
 from .observed_order_archive_v1 import (ARTIFACT as QA_ORDER_ARCHIVE_ARTIFACT,
     PRODUCT_ARTIFACT as PRODUCT_ORDER_ARCHIVE_ARTIFACT, advance as archive_advance,
     summary as archive_summary, verify_complete as verify_archive_complete,
@@ -926,10 +927,14 @@ class ObservedExecutionStore:
                     and Fraction(after['balance'])-Fraction(old['balance'])==sum((Fraction(e['detail']['balanceDelta']) for e in postings),Fraction(0))
                     and Fraction(after['realizedGross'])-Fraction(old['realizedGross'])==sum((Fraction(e['detail']['grossPosted']) for e in postings if e['kind']=='EXIT_FILL'),Fraction(0)),'cashPosting','CORRUPT_RECORD')
             validate_snapshot(after,checkpoint,order_retention_policy=self.order_retention_policy)
+            journal_head=db.execute('SELECT format_version,through_sequence,event_hash,order_count,'
+                'analytics_format_version,closed_order_count FROM btl.tick_journal_projection_heads '
+                'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',(workspace,session)).fetchone()
             if (progress and command['kind']=='ADVANCE' and not command['commandId'].startswith('command:replay-to:') and
                     not old['ended'] and not any(order['status'] in ('ACTIVE','PENDING') for order in old['orders'].values()) and
                     len(events)==1 and events[0]['kind']=='REPLAY_ADVANCED' and
-                    (after['throughNs'],after['nextGroupIndex']) != (old['throughNs'],old['nextGroupIndex'])):
+                    (after['throughNs'],after['nextGroupIndex']) != (old['throughNs'],old['nextGroupIndex']) and
+                    (journal_head is None or journal_head[0]!=1)):
                 return replace_progress(db,scope,progress['base'],progress['tip_hash'],command,
                                         dict(state=after,controller=checkpoint),events,
                                         order_retention_policy=self.order_retention_policy)
@@ -1028,11 +1033,8 @@ class ObservedExecutionStore:
             # Maintain the bounded Journal read model only for Sessions that
             # opted into the versioned projection at creation. Legacy Sessions
             # keep their existing verified compatibility path.
-            journal_head=db.execute('SELECT format_version,through_sequence,event_hash,order_count '
-                'FROM btl.tick_journal_projection_heads WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
-                (workspace,session)).fetchone()
             if journal_head is not None:
-                format_version,through_sequence,head_hash,order_count=journal_head
+                format_version,through_sequence,head_hash,order_count,analytics_format_version,closed_order_count=journal_head
                 require(format_version==1 and through_sequence==old['nextEventIndex'] and
                         head_hash==old['eventHash'],'journalProjectionHead','CORRUPT_RECORD')
                 touched_ids=set()
@@ -1078,6 +1080,20 @@ class ObservedExecutionStore:
                     'order_count=order_count+%s,closed_order_count=closed_order_count+%s '
                     'WHERE workspace_id=%s AND session_id=%s',
                     (after['nextEventIndex'],after['eventHash'],accepted_count,closed_delta,workspace,session))
+                if analytics_format_version==1:
+                    metric_row=db.execute('SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+                        'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',(workspace,session)).fetchone()
+                    require(metric_row is not None,'analyticsProjection','CORRUPT_RECORD')
+                    metric=unpack(*metric_row)
+                    require(metric.get('artifact')==ANALYTICS_PROJECTION_ARTIFACT and
+                        metric.get('sessionId')==session and metric.get('revision')==old['revision'] and
+                        metric.get('eventHead')==old['eventHash'] and
+                        metric.get('tradeCount')==closed_order_count and
+                        metric.get('tradeCount')+closed_delta>=0,'analyticsProjectionHead','CORRUPT_RECORD')
+                    metric=advance_projection(metric,events,after,projection_rows)
+                    metric_blob,metric_hash=pack(metric)
+                    db.execute('UPDATE btl.tick_session_metric_projections SET payload=%s,content_hash=%s '
+                        'WHERE workspace_id=%s AND session_id=%s',(metric_blob,metric_hash,workspace,session))
             db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,after['revision'],checkpoint_raw,checkpoint_hash))
             db.execute('UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s',(after['revision'],session_raw,session_hash,workspace,session))
             if legacy_delta_mode:

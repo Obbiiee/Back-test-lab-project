@@ -29,6 +29,7 @@ from .observed_session_dispatch import dispatch_observed_session
 from .observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
 from .observed_profile import ENGINE_VERSION,MODEL,ObservedExecutionProfile
 from .observed_analysis import ObservedStatistics
+from .analytics_projection import initial_projection,analytics_view,ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT
 from .postgres import pack,unpack
 from .research import method_policy,label
 from .bootstrap import bootstrap as descriptive_bootstrap,validate_seed
@@ -200,9 +201,13 @@ class ObservedResearchApplication:
                 # New Sessions start with an explicit empty keyset projection.
                 # Older Sessions without this marker retain their compatibility path.
                 db.execute('INSERT INTO btl.tick_journal_projection_heads '
-                    '(workspace_id,session_id,format_version,through_sequence,event_hash,order_count) '
-                    'VALUES (%s,%s,1,0,%s,0)',
+                    '(workspace_id,session_id,format_version,through_sequence,event_hash,order_count,analytics_format_version) '
+                    'VALUES (%s,%s,1,0,%s,0,1)',
                     (self.scope.workspace_id,raw['id'],state['eventHash']))
+                analytics_blob,analytics_hash=pack(initial_projection(state))
+                db.execute('INSERT INTO btl.tick_session_metric_projections '
+                    '(workspace_id,session_id,payload,content_hash) VALUES (%s,%s,%s,%s)',
+                    (self.scope.workspace_id,raw['id'],analytics_blob,analytics_hash))
                 db.execute('INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['id'],raw['methodId'],blob,sha))
             source.cache.seed(self.scope,raw['id'],timeline);timeline=None
             return self.inspect(raw['id'])
@@ -369,6 +374,15 @@ class ObservedResearchApplication:
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self._session(db,session_id)[2]
+            indexed=db.execute('SELECT format_version FROM btl.tick_journal_projection_heads '
+                'WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,session_id)).fetchone()
+        if indexed is not None and indexed[0]==1:
+            page=self.journal_page(session_id,dict(limit=MAX_JOURNAL_ORDERS,cursor=None))
+            require(page['totalOrders']<=MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+            return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',
+                provenance=page['provenance'],orders=page['orders'],notes=page['notes'],
+                financialAuthority='COMMITTED_EVENTS_ONLY',
+                notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
         projection=self._complete_statistics(session_id,state)
         require(self._same_projection(projection,state),'journal','REFUSED_STALE_REVISION')
         analysis=self._view_analysis(state,projection)
@@ -554,6 +568,8 @@ class ObservedResearchApplication:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             state=self._session(db,session_id)[2]
         require(revision_pin is None or revision_pin==state['revision'],'revision','STALE_REVISION')
+        durable=self._durable_analytics_page(session_id,state,offset,limit)
+        if durable is not None:return durable
         projection=self.statistics.inspect(self.scope,session_id,offset,limit)
         require(self._same_projection(projection,state),'analysisSnapshot','REFUSED_STALE_REVISION')
         if projection['status']=='BUILDING':
@@ -570,15 +586,85 @@ class ObservedResearchApplication:
             annotations=analysis['annotations'],annotationWindowStart=analysis['annotationWindowStart'],
             provenance=analysis['provenance'])
 
+    def _durable_analytics_page(self,session_id,state,offset,limit):
+        """Serve a bounded page from the transactionally maintained aggregate."""
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            live=self._session(db,session_id)[2]
+            require(live['revision']==state['revision'] and live['eventHash']==state['eventHash'],
+                    'analysisSnapshot','REFUSED_STALE_REVISION')
+            head=db.execute('SELECT analytics_format_version,closed_order_count FROM '
+                'btl.tick_journal_projection_heads WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id,session_id)).fetchone()
+            if head is None or head[0]!=1:return None
+            aggregate_row=db.execute('SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+                'WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id,session_id)).fetchone()
+            require(aggregate_row is not None,'analyticsProjection','CORRUPT_RECORD')
+            aggregate=unpack(*aggregate_row)
+            require(aggregate.get('artifact')==ANALYTICS_PROJECTION_ARTIFACT and
+                aggregate.get('sessionId')==session_id and aggregate.get('revision')==state['revision'] and
+                aggregate.get('eventHead')==state['eventHash'] and
+                aggregate.get('tradeCount')==head[1],'analyticsProjectionHead','CORRUPT_RECORD')
+            total=head[1]
+            require(offset<=total,'offset','INVALID_CURSOR')
+            rows=db.execute('SELECT order_id,payload,content_hash FROM btl.tick_journal_order_projection '
+                'WHERE workspace_id=%s AND session_id=%s AND order_status=\'CLOSED\' '
+                'ORDER BY last_sequence OFFSET %s LIMIT %s',
+                (self.scope.workspace_id,session_id,offset,limit+1)).fetchall()
+            more=len(rows)>limit;rows=rows[:limit]
+            require(len(rows)==min(limit,total-offset),'analyticsOrderProjection','CORRUPT_RECORD')
+            completed=[]
+            for order_id,blob,sha in rows:
+                wire=unpack(blob,sha)
+                require(wire.get('artifact')=='BTL-TICK-JOURNAL-ORDER-PROJECTION-1' and
+                    wire.get('sessionId')==session_id and wire.get('orderId')==order_id and
+                    wire.get('status')=='CLOSED' and type(wire.get('history')) is dict,
+                    'analyticsOrderProjection','CORRUPT_RECORD')
+                order=wire['order'];history=wire['history']
+                require(history.get('entryTimeNs') is not None and history.get('exitTimeNs') is not None,
+                    'analyticsOrderHistory','CORRUPT_RECORD')
+                completed.append(dict(id=order_id,side=order['side'],status='CLOSED',quantity=order['quantity'],
+                    remaining='0',entry=order['entryPrice'],entryPrice=order['entryPrice'],
+                    entryTimeNs=history['entryTimeNs'],exitTimeNs=history['exitTimeNs'],
+                    entryFillRef=history['entryFillRef'],sl=order['sl'],tp=order['tp'],
+                    exitPrice=history['exitPrice'],exitFillRef=history['exitFillRef'],
+                    exitReason=history['exitReason'],gross=history['exactGross'],commission='0',
+                    net=order['grossPosted'],durationNs=str(int(history['exitTimeNs'])-int(history['entryTimeNs'])),
+                    mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',
+                    rMultiple=None,rReason='PREENTRY_REVIEW_RISK_NOT_JOINED'))
+            view=analytics_view(aggregate,state)
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-ANALYTICS-PAGE-1',sessionId=session_id,
+                revision=state['revision'],status='COMPLETE',metrics=view['metrics'],completed=completed,
+                nextTradeOffset=offset+len(completed) if offset+len(completed)<total else None,
+                account=view['account'],equity=view['equity'],equityWindowStart=view['equityWindowStart'],
+                annotations=view['annotations'],annotationWindowStart=view['annotationWindowStart'],
+                provenance=view['provenance'])
+
     def save_note(self,session_id,raw):
         journal_request(raw)
         with connect(self.dsn) as db:
             meta,method,state,cp=self._session(db,session_id,lock=True)
-            projection=self._complete_statistics(session_id,state)
-            require(self._same_projection(projection,state),'journal','REFUSED_STALE_REVISION')
-            require(projection['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
-            orders={r['id']:r for r in projection['completed']}
-            require(raw['orderId'] in orders,'order','RESOURCE_UNAVAILABLE')
+            head=db.execute('SELECT format_version,through_sequence,event_hash FROM btl.tick_journal_projection_heads '
+                'WHERE workspace_id=%s AND session_id=%s',(self.scope.workspace_id,session_id)).fetchone()
+            if head is not None and head[0]==1:
+                require(head[1:]==(state['nextEventIndex'],state['eventHash']),
+                        'journalProjectionHead','CORRUPT_RECORD')
+                indexed=db.execute('SELECT order_status,payload,content_hash FROM '
+                    'btl.tick_journal_order_projection WHERE workspace_id=%s AND session_id=%s AND order_id=%s',
+                    (self.scope.workspace_id,session_id,raw['orderId'])).fetchone()
+                require(indexed is not None,'order','RESOURCE_UNAVAILABLE')
+                status,blob,sha=indexed;wire=unpack(blob,sha)
+                require(wire.get('artifact')=='BTL-TICK-JOURNAL-ORDER-PROJECTION-1' and
+                    (wire.get('sessionId'),wire.get('orderId'),wire.get('status'))==
+                    (session_id,raw['orderId'],status),'journalProjection','CORRUPT_RECORD')
+                orders={raw['orderId']:wire['order']}
+            else:
+                projection=self._complete_statistics(session_id,state)
+                require(self._same_projection(projection,state),'journal','REFUSED_STALE_REVISION')
+                require(projection['status']=='COMPLETE','journal','REFUSED_ANALYSIS_BUILDING')
+                orders={r['id']:r for r in projection['completed']}
+                require(raw['orderId'] in orders,'order','RESOURCE_UNAVAILABLE')
             prior=db.execute('SELECT payload,content_hash,note_revision FROM btl.tick_journal_notes WHERE workspace_id=%s AND session_id=%s AND order_id=%s FOR UPDATE',(self.scope.workspace_id,session_id,raw['orderId'])).fetchone()
             previous=validate_note(unpack(*prior[:2]),state,orders) if prior else None
             current=prior[2] if prior else 0
