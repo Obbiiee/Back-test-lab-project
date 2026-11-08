@@ -80,7 +80,7 @@ Only local API validation refusals (400/409/413/415) are definitive after the se
 - Use the catalog's public `key` as `sourceKey`; do not synthesize a key or infer it from a label.
 - Keep the selected key and period paired. The backend revalidates their membership and profile pin during creation.
 - Do not send filesystem paths, qualification receipt locations/hashes, provider handles, or profile overrides. These are operator-only capabilities and are not part of the request DTO.
-- If a configured catalog is active and `sourceKey` is absent, the queued creation resolves as `INVALID_INPUT`; it will not silently create a V1 synthetic Session. The API's durable queue may acknowledge admission before the worker returns this refusal.
+- If a configured catalog is active and `sourceKey` is absent or does not match its exact period, the API returns `422 INVALID_INPUT` before durable queue admission; it will not silently create a V1 synthetic Session.
 - Catalog visibility does not grant data rights or financial eligibility. Source rights remain fail-closed and limitations must remain visible.
 
 **Acceptance.** Frontend account-transport tests should cover the observed catalog artifact, selecting a dataset, the exact `sourceKey`/`period`/`day` payload, and preserving the selection across a definitive refusal. The authenticated UI → queue → worker → replay → receipt → Journal → Analytics → resume journey still needs integration evidence.
