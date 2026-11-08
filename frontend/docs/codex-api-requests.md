@@ -72,3 +72,13 @@ Only local API validation refusals (400/409/413/415) are definitive after the se
 **Acceptance.** Backend PostgreSQL race/idempotency tests plus `tests/confirm-outcome.test.mjs` and `tests/qa/confirm-outcome-qa.cjs` exercise receipt read, lost response, stale revision and exact retry.
 
 **Proof today.** See the CP6A-10 P0 local integration report and branch test evidence. The hosted account API remains a separate checkpoint; this local loopback API is not a production authentication contract.
+
+## REQ-03: revision-pinned terminal order history pages (P0, Product V1)
+
+**Why.** New archived Sessions must keep terminal orders out of hot state while preserving indexed, stable history beyond 128 lifetime orders. The client must not download or retain the complete historical ledger to display one page.
+
+**Published route.** `GET /api/v1/workspaces/{workspace_id}/research/sessions/{session_id}/orders/pages?limit=64&after_sequence=...&revision=...` is authenticated and workspace-scoped. `limit` is 1–256. Omit both cursor fields for the first page. Follow `nextCursor` by passing its `afterSequence` and `revision` values; a Session revision mismatch returns the standard stale-revision refusal. The backend reads `sequence > afterSequence` with a bounded `LIMIT`, verifies the page's archive hash links from its cursor predecessor, and returns only the requested records plus one bounded lookahead row.
+
+**Response.** `BTL-ORDER-HISTORY-PAGE-1` contains `sessionId`, pinned `revision`, archive `total`, `records` (`orderId`, complete terminal `order`, `sequence`, `finalizedRevision`, `recordHash`), `nextCursor` (`revision`, `afterSequence`) or `null`, and `complete`. It is a read-only archive view; committed financial events and immutable command receipts remain authoritative. This route applies to versioned archived Sessions. Legacy Sessions keep their existing reader and are not rewritten.
+
+**Current implementation boundary.** The route and indexed keyset reader are being wired to the new product archive format. Journal pages and analytics still use the bounded ledger projection path and have not yet been reconciled with this archive; do not expose a Product V1 UI path as complete until that work and the transaction/recovery integration tests pass.

@@ -9,7 +9,7 @@ from execution.contracts import open_payload,policy_from_wire,text
 from execution.engine import protective
 from execution.observed_profile import ObservedExecutionProfile,MODEL
 from execution.observed_finance import exit_amount
-from execution.observed_kernel import validate_state
+from execution.observed_kernel import validate_state,STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1
 from execution.analysis import metrics as committed_metrics
 from execution.observed_postgres import check_events,QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE,PROGRESS_BASE
 from collections import OrderedDict
@@ -72,7 +72,7 @@ class LedgerFold:
 
     def project(self,state,offset=0,maximum=64,archive_orders=None):
         validate_state(state,order_retention_policy=self.order_retention_policy);require(all(state[k]==self.genesis[k] for k in ('sessionId','datasetId','datasetVersion','profileHash','profile','policy','initialBalance','startNs','parent')),'context','CORRUPT_RECORD')
-        if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
+        if state['artifact'] in (STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1):
             active={oid:o for oid,o in self.orders.items() if o['status'] in ('PENDING','ACTIVE')}
             terminal={oid:o for oid,o in self.orders.items() if o['status'] not in ('PENDING','ACTIVE')}
             require(type(archive_orders) is dict and terminal==archive_orders and active==state['orders'],
@@ -93,7 +93,8 @@ class LedgerFold:
         # BE streak reset, duration and null-denominator semantics.
         metrics=committed_metrics([dict(row,net=row['netPosted']) for row in rows])
         metrics.update(closed=total,profitFactorReason='NO_REALIZED_LOSSES' if metrics['profitFactor'] is None else None,realizedNetCompleted=text(sum((Fraction(r['netPosted']) for r in rows),Fraction(0))),unresolved=sum(o['status']=='UNRESOLVED' for o in self.orders.values()),expired=sum(o['status']=='EXPIRED' for o in self.orders.values()),cancelled=sum(o['status']=='CANCELLED' for o in self.orders.values()),totalR=None,rAvailable=0,rReason='INCOMPLETE_R_COVERAGE',rBasis='IMMUTABLE_PREENTRY_CONFIRMED_RISK_REQUIRED',maxDrawdown=text(self.max_dd),maxDrawdownRate=ratio(self.max_dd_rate),unrealizedExcluded=True)
-        return dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='COMPLETE',provenance=dict(sessionId=state['sessionId'],revision=state['revision'],engineVersion=state['engineVersion'],model=MODEL,datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash']),metrics=metrics,completed=page,nextTradeOffset=offset+len(page) if offset+len(page)<total else None,account=dict(currency='USD',initialBalance=state['initialBalance'],balance=state['balance'],realizedGross=state['realizedGross'],commission='0'),balanceCurve=list(self.curve),curveWindowStart=max(0,self.financial_count-256),annotations=list(self.annotations),annotationWindowStart=max(0,self.financial_count-512),markToMarketAvailable=False)
+        order_details={row['id']:deepcopy(self.orders[row['id']]) for row in page}
+        return dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='COMPLETE',provenance=dict(sessionId=state['sessionId'],revision=state['revision'],engineVersion=state['engineVersion'],model=MODEL,datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash']),metrics=metrics,completed=page,orderDetails=order_details,nextTradeOffset=offset+len(page) if offset+len(page)<total else None,account=dict(currency='USD',initialBalance=state['initialBalance'],balance=state['balance'],realizedGross=state['realizedGross'],commission='0'),balanceCurve=list(self.curve),curveWindowStart=max(0,self.financial_count-256),annotations=list(self.annotations),annotationWindowStart=max(0,self.financial_count-512),markToMarketAvailable=False)
 
 
 class ObservedStatistics:
@@ -130,9 +131,9 @@ class ObservedStatistics:
                 for row in rows:fold.consume(unpack(*row))
             if fold.next==state['nextEventIndex']:
                 archive_orders=None
-                if state['artifact']=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
+                if state['artifact'] in (STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1):
                     self.store._verify_order_archive(db,workspace,session,state,full=True)
-                    archive_orders={row['orderId']:row['order'] for row in self.store._archive_rows(db,workspace,session)}
+                    archive_orders={row['orderId']:row['order'] for row in self.store._archive_rows(db,workspace,session,state)}
                 result=fold.project(state,offset,maximum,archive_orders=archive_orders)
             else:
                 result=dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='BUILDING',sessionId=session,revision=state['revision'],processedEvents=fold.next,totalEvents=state['nextEventIndex'],metrics=None,completed=[],nextTradeOffset=None)

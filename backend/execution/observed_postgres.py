@@ -16,7 +16,8 @@ from ticks.contracts import keys
 from infrastructure.database import connect
 from .postgres import pack,unpack,scoped
 from .observed_profile import ENGINE_VERSION,MODEL
-from .observed_kernel import command_wire,validate_state,validate_snapshot,order_limits,MAX_EVENTS
+from .observed_kernel import (command_wire,validate_state,validate_snapshot,order_limits,MAX_EVENTS,
+    STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1,PRODUCT_ORDER_RETENTION_V1)
 from .engine import crossing,protective
 from .observed_finance import exit_amount
 from .observed_profile import ObservedExecutionProfile
@@ -24,7 +25,9 @@ from .contracts import open_payload,policy_from_wire
 from .observed_state_delta_v3 import (encode_base,encode_delta,encode_delta_v4,encode_compact_base,
     encode_compact_delta,reconstruct_complete,COMPACT_DELTA,COMPACT_PROGRESS_DELTA)
 from .observed_replay_progress import CONTROLLER as PROGRESS_CONTROLLER, load_progress, match_progress_receipt, replace_progress
-from .observed_order_archive_v1 import (advance as archive_advance, summary as archive_summary, verify_complete as verify_archive_complete,
+from .observed_order_archive_v1 import (ARTIFACT as QA_ORDER_ARCHIVE_ARTIFACT,
+    PRODUCT_ARTIFACT as PRODUCT_ORDER_ARCHIVE_ARTIFACT, advance as archive_advance,
+    summary as archive_summary, verify_complete as verify_archive_complete,
     verify_record as verify_archive_record)
 from .contracts import text
 
@@ -161,6 +164,7 @@ def expand_compact_receipt_v1(record,command,state,chain_hash,*,order_retention_
 
 class ObservedExecutionStore:
     def __init__(self,dsn,*,order_retention_policy=None,qa_state_delta_v3=False,qa_order_archive_v1=False,
+                 product_order_archive_v1=False,
                  state_storage_format='snapshot-v1'):
         order_limits(order_retention_policy)
         require(type(qa_state_delta_v3) is bool,'qaStateDeltaV3')
@@ -169,11 +173,19 @@ class ObservedExecutionStore:
                 'stateStorageFormat','REFUSED_STATE_VERSION')
         require(type(qa_order_archive_v1) is bool and (not qa_order_archive_v1 or qa_state_delta_v3),
                 'qaOrderArchive','REFUSED_POLICY')
+        require(type(product_order_archive_v1) is bool and not (qa_order_archive_v1 and product_order_archive_v1),
+                'productOrderArchive','REFUSED_POLICY')
+        if product_order_archive_v1:
+            from .observed_kernel import PRODUCT_ORDER_RETENTION_V1
+            require(order_retention_policy==PRODUCT_ORDER_RETENTION_V1,'productOrderArchive','REFUSED_POLICY')
+            require(state_storage_format in ('compact-v1',PROGRESS_FORMAT),
+                    'productOrderArchive','REFUSED_STATE_VERSION')
         require(not qa_order_archive_v1 or os.environ.get('BTL_ENABLE_QA_ORDER_ARCHIVE_V1')=='1',
                 'qaOrderArchive','REFUSED_POLICY')
         self.dsn=dsn;self.order_retention_policy=deepcopy(order_retention_policy);self.qa_state_delta_v3=qa_state_delta_v3
         self.state_storage_format=state_storage_format
         self.qa_order_archive_v1=qa_order_archive_v1
+        self.product_order_archive_v1=product_order_archive_v1
         self._qa_state_cache=OrderedDict();self._qa_state_cache_lock=RLock();self._qa_state_cache_max=4
         self._qa_state_cache_stats=dict(hits=0,misses=0,fullReconstructions=0,evictions=0)
 
@@ -215,8 +227,26 @@ class ObservedExecutionStore:
         if db.execute("SELECT to_regclass('public.btl_qa_state_base_v3')").fetchone()[0] is None:return False
         return db.execute('SELECT 1 FROM public.btl_qa_state_base_v3 WHERE workspace_id=%s AND session_id=%s',(workspace,session)).fetchone() is not None
 
-    def _ensure_order_archive_schema(self,db):
-        require(self.qa_order_archive_v1,'qaOrderArchive','REFUSED_POLICY')
+    def _archive_table(self,state):
+        artifact=state.get('artifact')
+        if artifact==STATE_QA_ARCHIVE_V1:
+            require(self.qa_order_archive_v1,'qaOrderArchive','REFUSED_QA_SESSION_VERSION')
+            return 'public.btl_qa_terminal_order_archive_v1'
+        if artifact==STATE_PRODUCT_ARCHIVE_V1:
+            require(self.product_order_archive_v1,'productOrderArchive','REFUSED_SESSION_VERSION')
+            return 'btl.tick_terminal_order_archive_v1'
+        require(False,'orderArchive','REFUSED_SESSION_VERSION')
+
+    @staticmethod
+    def _is_archive_state(state):
+        return state.get('artifact') in (STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1)
+
+    def _ensure_order_archive_schema(self,db,state):
+        table=self._archive_table(state)
+        if state['artifact']==STATE_PRODUCT_ARCHIVE_V1:
+            require(db.execute("SELECT to_regclass('btl.tick_terminal_order_archive_v1')").fetchone()[0] is not None,
+                    'productOrderArchive','SCHEMA_NOT_READY')
+            return
         db.execute('''CREATE TABLE IF NOT EXISTS public.btl_qa_terminal_order_archive_v1 (
             workspace_id text NOT NULL, session_id text NOT NULL, sequence bigint NOT NULL,
             order_id text NOT NULL, finalized_revision bigint NOT NULL, record_hash text NOT NULL,
@@ -241,10 +271,10 @@ class ObservedExecutionStore:
             BEFORE TRUNCATE ON public.btl_qa_terminal_order_archive_v1
             FOR EACH STATEMENT EXECUTE FUNCTION public.btl_qa_terminal_archive_immutable_v1()''')
 
-    def _archive_rows(self,db,workspace,session):
+    def _archive_rows(self,db,workspace,session,state):
+        table=self._archive_table(state)
         cursor=db.execute('SELECT sequence,order_id,finalized_revision,record_hash,payload,content_hash '
-            'FROM public.btl_qa_terminal_order_archive_v1 WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
-            (workspace,session))
+            f'FROM {table} WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',(workspace,session))
         for sequence,order_id,finalized_revision,record_hash,raw,sha in cursor:
             row=unpack(raw,sha)
             require(row['sequence']==sequence and row['orderId']==order_id and
@@ -254,30 +284,28 @@ class ObservedExecutionStore:
             yield row
 
     def _verify_order_archive(self,db,workspace,session,state,*,full):
-        require(state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1',
-                'qaOrderArchive','REFUSED_STATE_VERSION')
+        table=self._archive_table(state)
         summary=state['orderArchive']
         if full:
-            verified=verify_archive_complete(self._archive_rows(db,workspace,session),summary)
+            verified=verify_archive_complete(self._archive_rows(db,workspace,session,state),summary)
             require(verified['count']==summary['count'],'archiveCount','CORRUPT_RECORD')
             self._verify_event_order_projection(db,workspace,session,state)
         else:
-            count=db.execute('SELECT count(*) FROM public.btl_qa_terminal_order_archive_v1 '
-                'WHERE workspace_id=%s AND session_id=%s',(workspace,session)).fetchone()[0]
-            tip=db.execute('SELECT sequence,record_hash FROM public.btl_qa_terminal_order_archive_v1 '
-                'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 1',(workspace,session)).fetchone()
+            tip=db.execute(f'SELECT sequence,record_hash FROM {table} WHERE workspace_id=%s AND session_id=%s ORDER BY sequence DESC LIMIT 1',
+                (workspace,session)).fetchone()
             maximum,head=(tip if tip else (None,None))
-            require(count==summary['count'] and maximum==(count-1 if count else None)
-                    and (head if count else archive_summary()['headHash'])==summary['headHash'],
+            artifact=(PRODUCT_ORDER_ARCHIVE_ARTIFACT if state['artifact']==STATE_PRODUCT_ARCHIVE_V1
+                      else QA_ORDER_ARCHIVE_ARTIFACT)
+            require(maximum==(summary['count']-1 if summary['count'] else None)
+                    and (head if summary['count'] else archive_summary(artifact=artifact)['headHash'])==summary['headHash'],
                     'archiveTip','CORRUPT_RECORD')
 
     def archive_order(self,scope,session_id,order_id):
-        require(self.qa_order_archive_v1,'qaOrderArchive','REFUSED_QA_SESSION_VERSION')
         workspace,session=scoped(scope,session_id)
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
-            self._read(db,workspace,session)
-            row=db.execute('SELECT record_hash,payload,content_hash FROM public.btl_qa_terminal_order_archive_v1 '
+            stored=self._read(db,workspace,session);state=stored['state'];table=self._archive_table(state)
+            row=db.execute(f'SELECT record_hash,payload,content_hash FROM {table} '
                 'WHERE workspace_id=%s AND session_id=%s AND order_id=%s',(workspace,session,order_id)).fetchone()
             if row is None:return None
             record=unpack(row[1],row[2]);verify_archive_record(record)
@@ -288,17 +316,19 @@ class ObservedExecutionStore:
         return self.archive_order(scope,session_id,order_id) is not None
 
     def order_history(self,scope,session_id,offset=0,maximum=64):
-        require(self.qa_order_archive_v1 and type(offset) is int and offset>=0
-                and type(maximum) is int and 1<=maximum<=256,'pagination')
+        require(type(offset) is int and offset>=0 and type(maximum) is int and 1<=maximum<=256,'pagination')
         workspace,session=scoped(scope,session_id)
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             stored=self._read(db,workspace,session);state=stored['state']
-            verify_archive_complete(self._archive_rows(db,workspace,session),state['orderArchive'])
-            prior=db.execute('SELECT record_hash FROM public.btl_qa_terminal_order_archive_v1 '
+            table=self._archive_table(state)
+            verify_archive_complete(self._archive_rows(db,workspace,session,state),state['orderArchive'])
+            prior=db.execute(f'SELECT record_hash FROM {table} '
                 'WHERE workspace_id=%s AND session_id=%s AND sequence=%s',(workspace,session,offset-1)).fetchone() if offset else None
-            expected_previous=prior[0] if prior else archive_summary()['headHash']
-            rows=db.execute('SELECT sequence,record_hash,payload,content_hash FROM public.btl_qa_terminal_order_archive_v1 '
+            artifact=(PRODUCT_ORDER_ARCHIVE_ARTIFACT if state['artifact']==STATE_PRODUCT_ARCHIVE_V1
+                      else QA_ORDER_ARCHIVE_ARTIFACT)
+            expected_previous=prior[0] if prior else archive_summary(artifact=artifact)['headHash']
+            rows=db.execute(f'SELECT sequence,record_hash,payload,content_hash FROM {table} '
                 'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence OFFSET %s LIMIT %s',
                 (workspace,session,offset,maximum+1)).fetchall()
             values=[]
@@ -309,15 +339,61 @@ class ObservedExecutionStore:
             return dict(records=[dict(orderId=r['orderId'],order=deepcopy(r['order']),
                 sequence=r['sequence'],finalizedRevision=r['finalizedRevision'],recordHash=r['recordHash'])
                 for r in values[:maximum]],nextOffset=offset+maximum if len(values)>maximum else None,
-                total=self._read_state_archive_count(db,workspace,session))
+                total=state['orderArchive']['count'])
 
-    @staticmethod
-    def _read_state_archive_count(db,workspace,session):
-        return int(db.execute('SELECT count(*) FROM public.btl_qa_terminal_order_archive_v1 WHERE workspace_id=%s AND session_id=%s',
-                              (workspace,session)).fetchone()[0])
+    def order_history_page(self,scope,session_id,*,after_sequence=None,revision_pin=None,maximum=64):
+        """Read a revision-pinned archive page with an indexed sequence cursor."""
+        require(after_sequence is None or (type(after_sequence) is int and after_sequence>=-1),
+                'cursor','INVALID_CURSOR')
+        require(revision_pin is None or (type(revision_pin) is int and revision_pin>=0),
+                'cursor','INVALID_CURSOR')
+        require(type(maximum) is int and 1<=maximum<=256,'maximum','INVALID_INPUT')
+        workspace,session=scoped(scope,session_id)
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            state=self._read(db,workspace,session)['state'];table=self._archive_table(state)
+            require(revision_pin is None or revision_pin==state['revision'],'cursor','STALE_REVISION')
+            self._verify_order_archive(db,workspace,session,state,full=False)
+            count=state['orderArchive']['count']
+            start=-1 if after_sequence is None else after_sequence
+            require(start<count,'cursor','INVALID_CURSOR')
+            artifact=(PRODUCT_ORDER_ARCHIVE_ARTIFACT if state['artifact']==STATE_PRODUCT_ARCHIVE_V1
+                      else QA_ORDER_ARCHIVE_ARTIFACT)
+            if start<0:
+                previous_hash=archive_summary(artifact=artifact)['headHash']
+            else:
+                prior=db.execute(f'SELECT sequence,order_id,finalized_revision,record_hash,payload,content_hash '
+                    f'FROM {table} WHERE workspace_id=%s AND session_id=%s AND sequence=%s',
+                    (workspace,session,start)).fetchone()
+                require(prior is not None,'cursor','INVALID_CURSOR')
+                prior_record=unpack(prior[4],prior[5])
+                verify_archive_record(prior_record,expected_sequence=start)
+                require(prior_record['sessionId']==session and prior_record['orderId']==prior[1]
+                        and prior_record['finalizedRevision']==prior[2]
+                        and prior_record['recordHash']==prior[3],
+                        'archiveRowBinding','CORRUPT_RECORD')
+                previous_hash=prior[3]
+            rows=db.execute(f'SELECT sequence,record_hash,payload,content_hash FROM {table} '
+                'WHERE workspace_id=%s AND session_id=%s AND sequence>%s ORDER BY sequence LIMIT %s',
+                (workspace,session,start,maximum+1)).fetchall()
+            records=[];expected=start+1
+            for sequence,record_hash,raw,sha in rows:
+                record=unpack(raw,sha)
+                verify_archive_record(record,expected_sequence=expected,previous_hash=previous_hash)
+                require(record['sessionId']==session and record['recordHash']==record_hash,
+                        'archiveLookup','CORRUPT_RECORD')
+                records.append(dict(orderId=record['orderId'],order=deepcopy(record['order']),
+                    sequence=sequence,finalizedRevision=record['finalizedRevision'],recordHash=record_hash))
+                expected+=1;previous_hash=record_hash
+            page=records[:maximum];more=len(records)>maximum
+            next_cursor=(dict(revision=state['revision'],afterSequence=page[-1]['sequence'])
+                         if more and page else None)
+            return dict(artifact='BTL-ORDER-HISTORY-PAGE-1',sessionId=session,revision=state['revision'],
+                total=count,records=page,nextCursor=next_cursor,complete=next_cursor is None)
 
     def _verify_event_order_projection(self,db,workspace,session,state):
         """Independent streaming event fold against active state and archive."""
+        table=self._archive_table(state)
         base,_=self._qa_reconstruct(db,workspace,session,upto_revision=0)
         previous=base['eventHash'];start=0;active={};seen_order_ids=set();archived_count=0
         profile=ObservedExecutionProfile.from_wire(state['profile']);event_gross=Fraction(0)
@@ -325,8 +401,8 @@ class ObservedExecutionStore:
 
         def archive_terminal(oid,order,command_revision):
             nonlocal archived_count
-            row=db.execute('SELECT sequence,finalized_revision,record_hash,payload,content_hash '
-                'FROM public.btl_qa_terminal_order_archive_v1 WHERE workspace_id=%s AND session_id=%s AND order_id=%s',
+            row=db.execute(f'SELECT sequence,finalized_revision,record_hash,payload,content_hash '
+                f'FROM {table} WHERE workspace_id=%s AND session_id=%s AND order_id=%s',
                 (workspace,session,oid)).fetchone()
             require(row is not None,'archiveMissing','CORRUPT_RECORD')
             sequence,finalized_revision,record_hash,raw,sha=row;record=unpack(raw,sha)
@@ -577,7 +653,7 @@ class ObservedExecutionStore:
                                 'qaCheckpointDelta','CORRUPT_RECORD')
                         current_controller[0]=checkpoint['controller'];previous_hash=checkpoint['chainHash']
                         yield delta
-            archive_format=base_record['state'].get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
+            archive_format=self._is_archive_state(base_record['state'])
             callback=(lambda restored,rev:validate_snapshot(restored,current_controller[0],
                 order_retention_policy=self.order_retention_policy)) if archive_format else None
             rebuilt=reconstruct_complete(base_record,delta_stream(),target_revision,state_callback=callback,base_chain_hash=recovery_chain)
@@ -623,6 +699,8 @@ class ObservedExecutionStore:
                     'progressScope', 'CORRUPT_RECORD')
             base = validate_snapshot(state, tip['controller'])
             effective, identity = load_progress(db, workspace, session, base, tip_hash)
+            if self._is_archive_state(effective):
+                self._verify_order_archive(db,workspace,session,effective,full=False)
             if progress_details is not None:
                 progress_details.update(base=base, tip=tip, tip_hash=tip_hash, identity=identity)
             return (effective, PROGRESS_FORMAT, chain) if include_format else effective
@@ -637,13 +715,11 @@ class ObservedExecutionStore:
             state=self._qa_state_cache_read(workspace,session,wire)
             if state is None:
                 state,chain_hash=self._qa_reconstruct(db,workspace,session,upto_revision=row[2],require_tip=True)
-                if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
-                    require(self.qa_order_archive_v1,'qaOrderArchive','REFUSED_QA_SESSION_VERSION')
+                if self._is_archive_state(state):
                     self._verify_order_archive(db,workspace,session,state,full=True)
             else:
                 chain_hash=wire['chainHash']
-                if state.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1':
-                    require(self.qa_order_archive_v1,'qaOrderArchive','REFUSED_QA_SESSION_VERSION')
+                if self._is_archive_state(state):
                     self._verify_order_archive(db,workspace,session,state,full=False)
             state_hash=content_hash(state)
             require(wire['stateHash']==state_hash and wire['chainHash']==chain_hash,'qaCheckpoint','CORRUPT_RECORD')
@@ -659,6 +735,7 @@ class ObservedExecutionStore:
                 require(canonical_bytes(rebuilt)==canonical_bytes(state),'qaDeltaState','CORRUPT_RECORD')
         s=stored['state']
         require(s['sessionId']==session and (s['revision'],s['datasetVersion'],s['profileHash'])==tuple(row[2:]),'state','CORRUPT_RECORD')
+        if self._is_archive_state(s):self._verify_order_archive(db,workspace,session,s,full=False)
         tip=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=%s',(workspace,session,s['revision'])).fetchone()
         require(tip is not None,'immutableTip','CORRUPT_RECORD')
         if storage_format in ('qa3','compact-v1'):
@@ -722,7 +799,7 @@ class ObservedExecutionStore:
 
     def create(self,scope,state,checkpoint):
         with connect(self.dsn) as db:
-            if self.qa_order_archive_v1:self._ensure_order_archive_schema(db)
+            if self._is_archive_state(state):self._ensure_order_archive_schema(db,state)
             self._insert(db,scope,state,checkpoint)
         if self.qa_state_delta_v3 or self.state_storage_format=='compact-v1':
             workspace,session=scoped(scope,state['sessionId'])
@@ -819,10 +896,10 @@ class ObservedExecutionStore:
                 return replace_progress(db,scope,progress['base'],progress['tip_hash'],command,
                                         dict(state=after,controller=checkpoint),events)
             compact_mode=storage_format in ('qa3','compact-v1',PROGRESS_FORMAT)
-            archive_mode=after.get('artifact')=='BTL-OBSERVED-EXECUTION-STATE-QA-ORDER-ARCHIVE-1'
+            archive_mode=self._is_archive_state(after)
             if archive_mode:
-                require(self.qa_order_archive_v1 and type(archive_records) is list,
-                        'qaOrderArchive','REFUSED_QA_SESSION_VERSION')
+                self._archive_table(after)
+                require(type(archive_records) is list,'orderArchive','REFUSED_SESSION_VERSION')
                 expected=archive_advance(old['orderArchive'],archive_records)
                 require(expected==after['orderArchive'],'archiveState','CORRUPT_RECORD')
                 terminal_events={}
@@ -898,9 +975,10 @@ class ObservedExecutionStore:
             result_raw,result_hash=pack(receipt_wire)
             db.execute('INSERT INTO btl.tick_commands VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,command['commandId'],after['revision'],content_hash(command),result_raw,result_hash))
             if archive_mode:
+                table=self._archive_table(after)
                 for row in archive_records:
                     archive_raw,archive_hash=pack(row)
-                    db.execute('INSERT INTO public.btl_qa_terminal_order_archive_v1 '
+                    db.execute(f'INSERT INTO {table} '
                         '(workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash) '
                         'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
                         (workspace,session,row['sequence'],row['orderId'],row['finalizedRevision'],

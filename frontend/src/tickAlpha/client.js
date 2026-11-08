@@ -88,6 +88,45 @@ export async function api(path,body,{signal}={}){
   return value;
 }
 export function sessionPath(session){return `/sessions/${encodeURIComponent(session)}`;}
+export function orderHistoryPagePath(sessionId,{limit=64,afterSequence=null,revision=null}={}){
+  if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>256)
+    throw Error('Invalid order history page request.');
+  if(afterSequence!==null&&(!Number.isSafeInteger(afterSequence)||afterSequence<0))
+    throw Error('Invalid order history cursor.');
+  if(revision!==null&&(!Number.isSafeInteger(revision)||revision<0))
+    throw Error('Invalid order history revision.');
+  const query=new URLSearchParams({limit:String(limit)});
+  if(afterSequence!==null)query.set('after_sequence',String(afterSequence));
+  if(revision!==null)query.set('revision',String(revision));
+  return `${sessionPath(sessionId)}/orders/pages?${query}`;
+}
+export function validateOrderHistoryPage(page,sessionId,{limit=64,afterSequence=null,revision=null}={}){
+  if(!page||page.artifact!=='BTL-ORDER-HISTORY-PAGE-1'||page.sessionId!==sessionId||
+     !Number.isSafeInteger(page.revision)||page.revision<0||!Number.isSafeInteger(page.total)||page.total<0||
+     !Array.isArray(page.records)||page.records.length>limit||typeof page.complete!=='boolean')
+    throw Error('Unsupported or incomplete order history page.');
+  if(revision!==null&&page.revision!==revision)throw Error('Order history revision changed; reload from the first page.');
+  let prior=afterSequence===null?-1:afterSequence;
+  for(const record of page.records){
+    if(!record||typeof record.orderId!=='string'||!record.order||typeof record.order!=='object'||
+       !Number.isSafeInteger(record.sequence)||record.sequence<=prior||
+       !Number.isSafeInteger(record.finalizedRevision)||record.finalizedRevision<1||
+       typeof record.recordHash!=='string'||!/^[a-f0-9]{64}$/.test(record.recordHash))
+      throw Error('Invalid order history record.');
+    prior=record.sequence;
+  }
+  const cursor=page.nextCursor;
+  if(cursor!==null&&(!cursor||cursor.revision!==page.revision||!Number.isSafeInteger(cursor.afterSequence)||
+     cursor.afterSequence!==prior||page.records.length===0))throw Error('Invalid order history cursor response.');
+  if(page.complete!==(cursor===null))throw Error('Inconsistent order history completion state.');
+  return page;
+}
+export async function loadOrderHistoryPage(sessionId,options={}){
+  if(!accountTransport())throw Error('Historical order pages require an authenticated workspace.');
+  const path=orderHistoryPagePath(sessionId,options);
+  const page=await api(path,undefined,{signal:options.signal});
+  return validateOrderHistoryPage(page,sessionId,options);
+}
 export function pagePath(page=null){
   if(page!==null&&page!=='home')throw Error('Unsupported workspace page');
   const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);

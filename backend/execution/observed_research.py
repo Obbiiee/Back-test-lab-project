@@ -199,8 +199,11 @@ class ObservedResearchApplication:
             row=next((item for item in rows if item['id']==oid),None)
             orders.append(dict(id=oid,side=o['side'],status=o['status'],quantity=o['quantity'],remaining=o['remaining'],entry=o['entry'],entryPrice=o['entryPrice'],entryTimeNs=None if row is None else row['entryTimeNs'],entryFillRef=None if row is None else row['entryFillRef'],sl=o['sl'],tp=o['tp'],exitRequested=o['exitRequest'] is not None,exitPrice=None if row is None else row['exitPrice'],exitFillRef=None if row is None else row['exitFillRef'],exitReason=None if row is None else row['exitReason'],gross=o['grossPosted'],commission='0',net=o['grossPosted'],netCashChange=o['grossPosted'],unrealizedIndicative=None,mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED'))
         completed=[]
+        order_details=projection.get('orderDetails',state['orders'])
         for r in rows:
-            completed.append(dict(id=r['id'],side=r['side'],status='CLOSED',quantity=r['quantity'],remaining='0',entry=r['entryPrice'],entryPrice=r['entryPrice'],entryTimeNs=r['entryTimeNs'],exitTimeNs=r['exitTimeNs'],entryFillRef=r['entryFillRef'],sl=state['orders'][r['id']]['sl'],tp=state['orders'][r['id']]['tp'],exitPrice=r['exitPrice'],exitFillRef=r['exitFillRef'],exitReason=r['exitReason'],gross=r['grossExact'],commission='0',net=r['netPosted'],durationNs=r['durationNs'],mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',rMultiple=r['rMultiple'],rReason=r['rReason']))
+            detail=order_details.get(r['id'])
+            require(detail is not None,'analysisOrder','CORRUPT_RECORD')
+            completed.append(dict(id=r['id'],side=r['side'],status='CLOSED',quantity=r['quantity'],remaining='0',entry=r['entryPrice'],entryPrice=r['entryPrice'],entryTimeNs=r['entryTimeNs'],exitTimeNs=r['exitTimeNs'],entryFillRef=r['entryFillRef'],sl=detail['sl'],tp=detail['tp'],exitPrice=r['exitPrice'],exitFillRef=r['exitFillRef'],exitReason=r['exitReason'],gross=r['grossExact'],commission='0',net=r['netPosted'],durationNs=r['durationNs'],mae=None,mfe=None,excursionReason='OBSERVED_EXCURSIONS_NOT_COMPUTED',rMultiple=r['rMultiple'],rReason=r['rReason']))
         provenance=deepcopy(projection['provenance']);provenance['analysisVersion']=RESEARCH_VERSION
         base.update(status='COMPLETE',provenance=provenance,metrics=metrics,orders=orders,completed=completed,equity=deepcopy(projection['balanceCurve']),annotations=deepcopy(projection['annotations']),annotationWindowStart=projection['annotationWindowStart'],analysisProjection=projection)
         return base
@@ -375,6 +378,16 @@ class ObservedResearchApplication:
                     revision=state['revision'],totalOrders=len(all_orders),orders=page,notes=notes,
                     nextCursor=next_cursor,complete=next_cursor is None,provenance=analysis['provenance'],
                     financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
+    def order_history_page(self,session_id,raw):
+        keys(raw,'limit afterSequence revision')
+        limit=raw['limit'];after=raw['afterSequence'];revision_pin=raw['revision']
+        require(type(limit) is int and 1<=limit<=256,'limit','INVALID_INPUT')
+        require(after is None or (type(after) is int and after>=-1),'afterSequence','INVALID_CURSOR')
+        require(revision_pin is None or (type(revision_pin) is int and revision_pin>=0),
+                'revision','INVALID_CURSOR')
+        return self.controller.order_history_page(self.scope,session_id,after_sequence=after,
+            revision_pin=revision_pin,maximum=limit)
 
     def save_note(self,session_id,raw):
         journal_request(raw)

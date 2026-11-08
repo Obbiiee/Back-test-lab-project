@@ -18,6 +18,7 @@
     "test:trading": "node tests/trading.test.mjs",
     "test:tick-review": "node tests/tick-review.test.mjs",
     "test:tick-alpha": "node tests/tick-alpha.test.mjs",
+    "test:order-history-page": "node tests/order-history-page.test.mjs",
     "test:order-estimate": "node tests/order-estimate.test.mjs",
     "test:trading-separation": "node tests/trading-separation.test.mjs",
     "history:download": "node scripts/download-history.mjs",
