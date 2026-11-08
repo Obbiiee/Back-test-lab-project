@@ -19,6 +19,8 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 from execution.controller import ExecutionController
 from execution.postgres import PostgresExecutionStore, grant_execution_runtime, unpack
+from execution.analysis import metrics as canonical_metrics, project
+from execution.incremental_analytics import metrics as durable_metrics
 from infrastructure.database import connect, migrate, backup, restore
 from tests.test_execution_goldens import goldens
 from tests.test_tick_execution import Harness, provider_for, profile_for, open_plan, command, exercise, assert_case
@@ -72,6 +74,18 @@ class TickExecutionPostgresTests(unittest.TestCase):
             with self.subTest(case=case["id"]):
                 h=exercise(case,self.store,self.scope,session=f"fixture:golden:{index}")
                 assert_case(self,case,h)
+                with connect(DSN) as db:
+                    row=db.execute('SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+                        'WHERE workspace_id=%s AND session_id=%s',
+                        (self.scope.workspace_id,h.session)).fetchone()
+                    event_rows=db.execute('SELECT payload,content_hash FROM btl.tick_events '
+                        'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
+                        (self.scope.workspace_id,h.session)).fetchall()
+                self.assertIsNotNone(row)
+                durable=unpack(*row)
+                events=[unpack(*event_row) for event_row in event_rows]
+                expected=project(h.state,events,None)
+                self.assertEqual(durable_metrics(durable),canonical_metrics(expected['completed']))
 
     def test_concurrent_identical_retry_stale_conflict_and_namespace(self):
         h=self.harness();h.call("OPEN",open_plan(self.case["open"]),name="order")
