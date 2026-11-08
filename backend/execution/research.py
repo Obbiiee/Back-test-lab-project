@@ -17,12 +17,13 @@ from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
-from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION
+from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, ANALYSIS_VERSION
 from .journal import (validate_note, request as journal_request, MAX_JOURNAL_PAGE_SIZE,
                       encode_cursor, decode_cursor)
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 from .availability import catalog_availability, eligible_start_month
 from .analysis_cache import COMMITTED_ANALYSIS_CACHE
+from .journal_order_index import verify_projection as verify_journal_order_projection
 
 
 def label(value):
@@ -500,6 +501,90 @@ class ResearchApplication:
         self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
         return analysis
 
+    def _indexed_journal_page(self, db, state, checkpoint, after_order_id, limit):
+        if state['parent'] is not None:
+            return None
+        head = db.execute(
+            'SELECT format_version,through_sequence,event_hash,order_count '
+            'FROM btl.tick_journal_projection_heads '
+            'WHERE workspace_id=%s AND session_id=%s',
+            (self.scope.workspace_id, state['sessionId']),
+        ).fetchone()
+        if head is None or head[:3] != (1, state['nextEventIndex'], state['eventHash']):
+            return None
+        total = int(head[3])
+
+        rows = db.execute(
+            'SELECT p.order_id,p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
+            'i.event_kind,i.projection_hash,e.payload,e.content_hash '
+            'FROM btl.tick_journal_order_projection p '
+            'JOIN btl.tick_journal_order_events i '
+            'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
+            '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
+            'JOIN btl.tick_events e '
+            'ON (e.workspace_id,e.session_id,e.sequence,e.event_id)='
+            '(p.workspace_id,p.session_id,p.last_sequence,p.event_id) '
+            'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id>%s '
+            'ORDER BY p.order_id LIMIT %s',
+            (self.scope.workspace_id, state['sessionId'], after_order_id or '', limit + 1),
+        ).fetchall()
+        page_rows = rows[:limit]
+        quote = self._quote(state, checkpoint)
+        mark_available = not state['unresolved'] and quote is not None and \
+            int(quote['timeNs']) <= int(state['throughNs'])
+        orders, completed = [], []
+        for (order_id, status, sequence, event_id, raw, digest, event_kind,
+             projection_hash, event_raw, event_digest) in page_rows:
+            require(sequence < state['nextEventIndex'], 'journalProjectionSequence', 'CORRUPT_RECORD')
+            projection = verify_journal_order_projection(raw, digest, session_id=state['sessionId'],
+                order_id=order_id, status=status, sequence=sequence, event_id=event_id)
+            require(projection['contentHash'] == projection_hash,
+                    'journalProjectionLedgerBinding', 'CORRUPT_RECORD')
+            event = unpack(event_raw, event_digest)
+            require(event['sequence'] == sequence and event['eventId'] == event_id and
+                    event['kind'] == event_kind and event['sessionId'] == state['sessionId'] and
+                    (event['datasetId'], event['datasetVersion'], event['profileHash'],
+                     event['methodHash'], event['engineVersion']) ==
+                    (state['datasetId'], state['datasetVersion'], state['profileHash'],
+                     state['policy']['definitionHash'], state['engineVersion']) and
+                    event['eventId'] == content_hash({key: value for key, value in event.items()
+                                                       if key != 'eventId'}) and
+                    (event.get('orderId') == order_id or
+                     event['kind'] == 'UNRESOLVED' and order_id in event['detail']['affectedOrderIds']),
+                    'journalProjectionEvent', 'CORRUPT_RECORD')
+            order = projection['order']
+            if status in ('PENDING', 'ACTIVE'):
+                stored = state['orders'].get(order_id)
+                require(stored is not None and all(order[key] == stored[key] for key in
+                    ('status','quantity','remaining','entryPrice','entryFillRef','side','entry','sl','tp',
+                     'orderType','workflow')), 'journalProjectionActiveOrder', 'CORRUPT_RECORD')
+                order['exitRequested'] = stored['exitRequest'] is not None
+                order['unrealizedIndicative'] = None
+                if status == 'ACTIVE' and mark_available:
+                    liquidation = Fraction(quote['bid'] if order['side'] == 'LONG' else quote['ask'])
+                    mark = (1 if order['side'] == 'LONG' else -1) * \
+                        (liquidation - Fraction(order['entryPrice'])) * \
+                        Fraction(state['profile']['contractSize']) * Fraction(order['remaining'])
+                    order['unrealizedIndicative'] = text(mark)
+            else:
+                require(order_id not in state['orders'], 'journalProjectionTerminalOrder', 'CORRUPT_RECORD')
+            orders.append(order)
+            if status == 'CLOSED':
+                completed.append(order)
+
+        analysis = dict(status='COMPLETE', orders=orders, completed=completed,
+            metrics=metrics(completed), provenance=dict(sessionId=state['sessionId'],
+                revision=state['revision'], datasetId=state['datasetId'],
+                datasetVersion=state['datasetVersion'], engineVersion=state['engineVersion'],
+                profileHash=state['profileHash'], methodHash=state['policy']['definitionHash'],
+                eventHead=state['eventHash'], researchVersion=RESEARCH_VERSION,
+                analysisVersion=ANALYSIS_VERSION,
+                model='SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION'))
+        self._research_risk(db, state, analysis)
+        groups = self.__timeline_cache.window(self.scope, state['sessionId'], checkpoint) if completed else []
+        self._research_excursions(state, analysis, groups)
+        return dict(analysis=analysis, total=total, more=len(rows) > limit)
+
     def journal(self, session_id):
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
@@ -529,12 +614,20 @@ class ResearchApplication:
             _meta, _method, state, checkpoint = self._session(db, session_id)
             if requested_revision is not None:
                 require(requested_revision == state['revision'], 'cursor', 'STALE_REVISION')
-            analysis = self._journal_projection(db, state, checkpoint)
-            orders = sorted(analysis['orders'], key=lambda row: row['id'])
-            if after_order_id is not None:
-                orders = [row for row in orders if row['id'] > after_order_id]
-            page = orders[:limit]
-            more = len(orders) > len(page)
+            indexed = self._indexed_journal_page(db, state, checkpoint, after_order_id, limit)
+            if indexed is None:
+                analysis = self._journal_projection(db, state, checkpoint)
+                orders = sorted(analysis['orders'], key=lambda row: row['id'])
+                if after_order_id is not None:
+                    orders = [row for row in orders if row['id'] > after_order_id]
+                page = orders[:limit]
+                more = len(orders) > len(page)
+                total_orders = len(analysis['orders'])
+            else:
+                analysis = indexed['analysis']
+                page = analysis['orders']
+                more = indexed['more']
+                total_orders = indexed['total']
             order_ids = [row['id'] for row in page]
             indexed = {row['id']: row for row in page}
             notes = []
@@ -551,7 +644,7 @@ class ResearchApplication:
                     notes.append(value)
             next_cursor = encode_cursor(session_id, state['revision'], page[-1]['id']) if more and page else None
             return dict(schemaVersion=1, artifact='BTL-TICK-JOURNAL-PAGE-1', sessionId=session_id,
-                        revision=state['revision'], totalOrders=len(analysis['orders']), orders=page,
+                        revision=state['revision'], totalOrders=total_orders, orders=page,
                         notes=notes, nextCursor=next_cursor, complete=next_cursor is None,
                         provenance=analysis['provenance'], financialAuthority='COMMITTED_EVENTS_ONLY',
                         notesAuthority='MUTABLE_RESEARCH_ANNOTATION')

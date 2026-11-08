@@ -16,6 +16,7 @@ from .engine import emit
 from .observed_state_delta_v3 import encode_compact_base, encode_compact_delta, reconstruct_complete
 from .terminal_order_archive import GENESIS as ORDER_ARCHIVE_GENESIS, record as terminal_record
 from .terminal_order_archive import terminal_orders, verify as verify_terminal_record
+from .journal_order_index import append as append_journal_order_index
 
 
 COMPACT_BASE = "BTL-TICK-EXECUTION-COMPACT-BASE-1"
@@ -271,6 +272,12 @@ class PostgresExecutionStore:
             raw, sha = pack(snap)
         db.execute("INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,%s,%s,%s)",
                    (workspace, session, state["datasetVersion"], state["profileHash"], state["revision"], raw, sha))
+        db.execute(
+            "INSERT INTO btl.tick_journal_projection_heads "
+            "(workspace_id,session_id,format_version,through_sequence,event_hash) "
+            "VALUES (%s,%s,1,%s,%s)",
+            (workspace, session, state["nextEventIndex"], state["eventHash"]),
+        )
         if self.state_storage_format == "compact-v1":
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                        (workspace, session, state["revision"], raw_base, sha_base))
@@ -383,6 +390,7 @@ class PostgresExecutionStore:
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace, session, command["commandId"], event["eventId"], event["sequence"], event_raw, event_hash))
             self._append_terminal_orders(db, workspace, session, next_state["revision"], finalized_orders)
+            append_journal_order_index(db, workspace, session, state, next_state, events)
             if compact_mode:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                            (workspace, session, next_state["revision"], checkpoint_raw, checkpoint_hash))
@@ -504,6 +512,7 @@ class PostgresExecutionStore:
             state.update(sessionId=child_session, revision=0, nextEventIndex=0, parent=parent,
                          eventHash=content_hash(dict(schemaVersion=1, artifact="BTL-TICK-FORK-SEED-1", parent=parent, childSessionId=child_session)))
             self._insert(db, scope, state, checkpoint)
+            fork_base_state = deepcopy(state)
             events = []
             emit(state,events,"SESSION_FORKED",classification="ACCEPTED_COMMAND",parent=parent)
             state["revision"] = 1
@@ -538,6 +547,7 @@ class PostgresExecutionStore:
                 event_raw,event_hash=pack(event)
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace,child_session,command["commandId"],event["eventId"],event["sequence"],event_raw,event_hash))
+            append_journal_order_index(db, workspace, child_session, fork_base_state, state, events)
             if compact_mode:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",(workspace,child_session,1,checkpoint_raw,checkpoint_hash))
             else:
@@ -553,4 +563,8 @@ def grant_execution_runtime(dsn, role):
     with connect(dsn) as db:
         db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints,btl.tick_terminal_orders,btl.tick_recovery_bases TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_events TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT UPDATE(order_status,last_sequence,event_id,payload,content_hash) ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}").format(sql.Identifier(role)))

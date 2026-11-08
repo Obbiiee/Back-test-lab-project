@@ -18,7 +18,7 @@ from application.models import TrustedScope
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 from execution.controller import ExecutionController
-from execution.postgres import PostgresExecutionStore, grant_execution_runtime
+from execution.postgres import PostgresExecutionStore, grant_execution_runtime, unpack
 from infrastructure.database import connect, migrate, backup, restore
 from tests.test_execution_goldens import goldens
 from tests.test_tick_execution import Harness, provider_for, profile_for, open_plan, command, exercise, assert_case
@@ -118,6 +118,48 @@ class TickExecutionPostgresTests(unittest.TestCase):
             count=db.execute('SELECT count(*) FROM btl.tick_terminal_orders WHERE workspace_id=%s AND session_id=%s',
                              (self.scope.workspace_id,h.session)).fetchone()[0]
         self.assertEqual(count,3)
+
+    def test_new_session_advances_journal_order_index_with_financial_events(self):
+        session = 'fixture:journal-index:' + uuid.uuid4().hex
+        h = self.harness(session=session)
+        order_id = 'journal:order:one'
+        h.call('OPEN', open_plan(self.case['open']), name=order_id)
+        h.call('CANCEL', dict(orderId=order_id), name='journal:cancel')
+        with connect(DSN) as db:
+            head = db.execute(
+                'SELECT format_version,through_sequence,event_hash,order_count '
+                'FROM btl.tick_journal_projection_heads '
+                'WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id, session),
+            ).fetchone()
+            indexed = db.execute(
+                'SELECT i.sequence,i.event_id,i.event_kind,e.payload,e.content_hash '
+                'FROM btl.tick_journal_order_events i JOIN btl.tick_events e '
+                'ON (e.workspace_id,e.session_id,e.sequence)='
+                '(i.workspace_id,i.session_id,i.sequence) '
+                'WHERE i.workspace_id=%s AND i.session_id=%s AND i.order_id=%s '
+                'ORDER BY i.sequence',
+                (self.scope.workspace_id, session, order_id),
+            ).fetchall()
+            projection_row = db.execute(
+                'SELECT p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
+                'i.projection_hash FROM btl.tick_journal_order_projection p '
+                'JOIN btl.tick_journal_order_events i '
+                'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
+                '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
+                'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id=%s',
+                (self.scope.workspace_id, session, order_id),
+            ).fetchone()
+        self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1))
+        events = [unpack(row[3], row[4]) for row in indexed]
+        self.assertEqual([row[2] for row in indexed], [event['kind'] for event in events])
+        self.assertEqual(events[0]['kind'], 'ORDER_ACCEPTED')
+        self.assertEqual(events[-1]['kind'], 'ORDER_CANCELLED')
+        self.assertEqual([event['sequence'] for event in events], [row[0] for row in indexed])
+        self.assertEqual(projection_row[:3], ('CANCELLED', indexed[-1][0], indexed[-1][1]))
+        projection = unpack(projection_row[3], projection_row[4])
+        self.assertEqual(projection['order']['status'], 'CANCELLED')
+        self.assertEqual(projection['contentHash'], projection_row[5])
 
     def test_compact_cold_recovery_uses_periodic_verified_base(self):
         from unittest.mock import patch

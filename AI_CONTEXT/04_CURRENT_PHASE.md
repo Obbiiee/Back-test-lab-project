@@ -3,6 +3,10 @@ Total output lines: 599
 
 # Current Product V1 implementation update — source routing and cumulative analytics (2026-11-08)
 
+## 2026-11-08 durable tick Journal order/event index — indexed page path
+
+Migration 026 adds an append-only `(workspace, Session, order, event-sequence)` reference index, current per-order Journal projection, and versioned per-Session coverage head. New/forked V1 Sessions initialize the head; validated event commits append order references and advance projections in the same PostgreSQL transaction as source events/receipts. Eligible indexed Journal pages now use SQL keyset reads and verify each selected projection against its immutable event anchor; legacy/fork-lineage Sessions retain the existing version-compatible full projection fallback. Focused golden/projection regressions: 25 PASS, 16 PostgreSQL integration cases SKIPPED because no isolated server/DSN is available; Python compilation and diff checks PASS. The migration/atomic PostgreSQL path remains unaccepted until run against an isolated PostgreSQL instance. Next: persist incremental Session analytics and make Journal note/export reads avoid full-session folds.
+
 ## 2026-11-08 streaming exact metric aggregation
 
 Refactored the canonical V1 `metrics()` calculator to consume any single-pass iterable using running exact-rational counts/sums/streaks, removing temporary lifetime-sized nets/wins/losses/R/duration lists. Financial formulas and result shape are unchanged. Added an iterator-only regression; frozen financial analysis/golden suite: 10/10 PASS; Python compilation and `git diff --check` PASS. This bounds calculator scratch memory only; the upstream V1 projector still materializes per-Session order/completed rows and Journal pages can still require a full event fold on cache miss. Next P0-A work remains a durable indexed Journal projection with legacy fallback.
