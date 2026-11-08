@@ -406,12 +406,8 @@ class ResearchApplication:
             return
         orders = {row['id']: row for row in analysis['orders']}
         if orders:
-            pins = db.execute('SELECT r.review_id,r.payload,r.content_hash,c.command_hash,c.revision '
-                'FROM btl.tick_order_reviews r JOIN btl.tick_commands c '
-                'ON r.workspace_id=c.workspace_id AND r.session_id=c.session_id AND r.review_id=c.command_id '
-                'WHERE r.workspace_id=%s AND r.session_id=%s AND r.review_id=ANY(%s) LIMIT 129',
-                (self.scope.workspace_id,state['sessionId'],list(orders))).fetchall()
-            require(len(pins)<=128,'riskPins','CORRUPT_RECORD')
+            from .research_risk import fetch_review_pins
+            pins = fetch_review_pins(db, self.scope.workspace_id, state['sessionId'], list(orders))
             for order_id, payload, sha, command_hash, committed_revision in pins:
                 reviewed = unpack(payload,sha)
                 command = reviewed['command']; order = orders[order_id]
