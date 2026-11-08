@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from application.models import TrustedScope
+from execution.analysis import metrics
 from execution.research import ResearchApplication, method_policy
 
 
@@ -29,8 +30,10 @@ class MethodAnalyticsProjectionTests(unittest.TestCase):
 
         def committed(_db, state):
             status = (analysis_status or {}).get(state['sessionId'], 'COMPLETE')
-            return {'status': status, 'reason': 'SYNTHETIC_INCOMPLETE' if status != 'COMPLETE' else None,
-                    'completed': completed_by_session.get(state['sessionId'], [])}
+            return {'status': status,
+                    'reason': 'SYNTHETIC_INCOMPLETE' if status != 'COMPLETE' else None,
+                    'metrics': metrics(completed_by_session.get(state['sessionId'], []))
+                    if status == 'COMPLETE' else None}
 
         app._committed_analysis = committed
         return app, policy, manager
@@ -69,7 +72,7 @@ class MethodAnalyticsProjectionTests(unittest.TestCase):
         self.assertEqual((result['status'], result['reason']), ('UNAVAILABLE', 'INCOMPATIBLE_FINANCIAL_UNITS'))
         self.assertIsNone(result['metrics'])
 
-    def test_incomplete_session_is_excluded_and_event_budget_overflow_is_unavailable(self):
+    def test_incomplete_session_is_excluded_and_lifetime_event_count_is_not_capped(self):
         incomplete = {'session:one': self.state('session:one'), 'session:two': self.state('session:two')}
         app, policy, manager = self.app(incomplete, {}, {'session:two': 'UNAVAILABLE'})
         with patch('execution.research.connect', return_value=manager):
@@ -81,8 +84,8 @@ class MethodAnalyticsProjectionTests(unittest.TestCase):
         app, policy, manager = self.app(overflow, {})
         with patch('execution.research.connect', return_value=manager):
             result = app.method_analytics(policy.method_id)
-        self.assertEqual((result['status'], result['reason']), ('UNAVAILABLE', 'REFUSED_METHOD_ANALYSIS_LIMIT'))
-        self.assertEqual(result['observedEventCount'], 4097)
+        self.assertEqual((result['status'], result['metrics']['tradeCount']), ('COMPLETE', 0))
+        self.assertEqual(result['includedSessions'][0]['tradeCount'], 0)
 
 
 if __name__ == '__main__':

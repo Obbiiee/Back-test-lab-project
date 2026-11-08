@@ -244,7 +244,7 @@ class ResearchApplication:
         This is a bounded read projection. It never combines account balances,
         runs a replay, or treats incomplete Sessions as zero-return samples.
         """
-        from .analysis import metrics
+        from .analysis import pool_metrics
         identifier(method_id, 'methodId')
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
@@ -276,7 +276,8 @@ class ResearchApplication:
                             includedSessions=[], excludedSessions=[
                                 {'sessionId': item[0], 'reason': 'MULTIPLE_FINANCIAL_UNITS'} for item in compatible],
                             metrics=None)
-            completed = []
+            session_metrics = []
+            completed_net = Fraction()
             included = []
             for session_id, revision_value, _current_unit in compatible:
                 _meta, _method, state, _checkpoint = self._session(db, session_id)
@@ -284,20 +285,20 @@ class ResearchApplication:
                 if analysis['status'] != 'COMPLETE':
                     excluded.append({'sessionId': session_id, 'reason': analysis.get('reason', 'ANALYSIS_UNAVAILABLE')})
                     continue
-                completed.extend(analysis['completed'])
+                session_metric = analysis['metrics']
+                session_metrics.append(session_metric)
+                if session_metric['expectancy'] is not None:
+                    completed_net += Fraction(int(session_metric['expectancy']['numerator']),
+                                              int(session_metric['expectancy']['denominator'])) * session_metric['tradeCount']
                 included.append({'sessionId': session_id, 'revision': revision_value,
                                  'datasetId': state['datasetId'], 'datasetVersion': state['datasetVersion'],
                                  'profileHash': state['profileHash'], 'engineVersion': state['engineVersion'],
-                                 'eventHead': state['eventHash'], 'tradeCount': len(analysis['completed'])})
+                                 'eventHead': state['eventHash'], 'tradeCount': session_metric['tradeCount']})
 
-            pooled = metrics(completed)
-            # Trade order across separate Sessions has no shared chronology, so
-            # cross-Session streaks and balances are intentionally not reported.
-            pooled.pop('maxWinStreak', None)
-            pooled.pop('maxLossStreak', None)
+            pooled = pool_metrics(session_metrics)
             unit = next(iter(units), None)
             return dict(**common, status='COMPLETE', accountCurrency=unit[2] if unit else None,
-                        completedTradeNet=text(sum((Fraction(row['net']) for row in completed), Fraction())),
+                        completedTradeNet=text(completed_net),
                         includedSessions=included, excludedSessions=excluded, metrics=pooled)
 
     def create_method(self, raw):
