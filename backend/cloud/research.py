@@ -16,7 +16,7 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import require, ContractError
 from execution.local_api import body
 from execution.research import ResearchApplication
-from .research_routing import observed_route as _observed_route
+from .research_routing import observed_route as _observed_route, validate_source_selection
 from identity.store import User
 from infrastructure.database import connect
 from workspace.policy import owner
@@ -350,8 +350,10 @@ def install(app):
                 job_id = uuid.UUID(job_id)
             except ValueError:
                 require(False, 'jobId')
-        return await execute(user, workspace_id, 'create_session', await json_body(request), write=True,
-                             job_id=job_id)
+        raw = await json_body(request)
+        catalog = await anyio.to_thread.run_sync(_operator_catalog, app.state.dsn, limiter=limiter)
+        validate_source_selection(raw, catalog)
+        return await execute(user, workspace_id, 'create_session', raw, write=True, job_id=job_id)
 
     @app.post(prefix + '/reviews')
     async def review(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):
