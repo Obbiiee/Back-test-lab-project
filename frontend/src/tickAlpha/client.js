@@ -127,6 +127,45 @@ export async function loadOrderHistoryPage(sessionId,options={}){
   const page=await api(path,undefined,{signal:options.signal});
   return validateOrderHistoryPage(page,sessionId,options);
 }
+export function analyticsPagePath(sessionId,{limit=32,offset=0,revision=null}={}){
+  if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>64||
+     !Number.isSafeInteger(offset)||offset<0)
+    throw Error('Invalid analytics page request.');
+  if(revision!==null&&(!Number.isSafeInteger(revision)||revision<0))
+    throw Error('Invalid analytics revision.');
+  const query=new URLSearchParams({limit:String(limit),offset:String(offset)});
+  if(revision!==null)query.set('revision',String(revision));
+  return `${sessionPath(sessionId)}/analytics/pages?${query}`;
+}
+export function validateAnalyticsPage(page,sessionId,{limit=32,offset=0,revision=null}={}){
+  if(!page||page.artifact!=='BTL-OBSERVED-ANALYTICS-PAGE-1'||page.sessionId!==sessionId||
+     !Number.isSafeInteger(page.revision)||page.revision<0||!Array.isArray(page.completed)||
+     page.completed.length>limit||!['BUILDING','COMPLETE'].includes(page.status))
+    throw Error('Unsupported or invalid analytics page.');
+  if(page.completed.some(row=>!row||typeof row.id!=='string'||row.status!=='CLOSED'))
+    throw Error('Invalid analytics trade row.');
+  if(revision!==null&&page.revision!==revision)
+    throw Error('Analytics revision changed; reload from the first page.');
+  if(page.status==='BUILDING'){
+    if(page.completed.length!==0||!Number.isSafeInteger(page.processedEvents)||
+       !Number.isSafeInteger(page.totalEvents)||page.processedEvents<0||
+       page.processedEvents>page.totalEvents||page.nextTradeOffset!==null)
+      throw Error('Invalid analytics build progress.');
+    return page;
+  }
+  if(!page.metrics||typeof page.metrics!=='object'||!page.account||typeof page.account!=='object'||
+     !page.provenance||typeof page.provenance!=='object'||
+     (page.nextTradeOffset!==null&&(!Number.isSafeInteger(page.nextTradeOffset)||
+       page.nextTradeOffset<offset+page.completed.length)))
+    throw Error('Invalid complete analytics page.');
+  return page;
+}
+export async function loadAnalyticsPage(sessionId,options={}){
+  if(!accountTransport())throw Error('Analytics pages require an authenticated workspace.');
+  const path=analyticsPagePath(sessionId,options);
+  const page=await api(path,undefined,{signal:options.signal});
+  return validateAnalyticsPage(page,sessionId,options);
+}
 export function pagePath(page=null){
   if(page!==null&&page!=='home')throw Error('Unsupported workspace page');
   const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);

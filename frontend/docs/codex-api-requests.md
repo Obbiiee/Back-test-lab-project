@@ -81,4 +81,12 @@ Only local API validation refusals (400/409/413/415) are definitive after the se
 
 **Response.** `BTL-ORDER-HISTORY-PAGE-1` contains `sessionId`, pinned `revision`, archive `total`, `records` (`orderId`, complete terminal `order`, `sequence`, `finalizedRevision`, `recordHash`), `nextCursor` (`revision`, `afterSequence`) or `null`, and `complete`. It is a read-only archive view; committed financial events and immutable command receipts remain authoritative. This route applies to versioned archived Sessions. Legacy Sessions keep their existing reader and are not rewritten.
 
-**Current implementation boundary.** The route and indexed keyset reader are being wired to the new product archive format. Journal pages and analytics still use the bounded ledger projection path and have not yet been reconciled with this archive; do not expose a Product V1 UI path as complete until that work and the transaction/recovery integration tests pass.
+**Current implementation boundary.** The hosted route now selects the Product archive by persisted Session version, and the indexed keyset endpoint is wired to that format. Journal still gathers the complete ledger projection, and analytics pages below bound response size but not the fold's in-memory lifetime history. PostgreSQL lifecycle/recovery tests remain NOT RUN; do not expose a Product V1 UI path as complete until those gaps are closed.
+
+## REQ-04: revision-pinned analytics pages (P0, Product V1)
+
+**Published route.** `GET /api/v1/workspaces/{workspace_id}/research/sessions/{session_id}/analytics/pages?limit=32&offset=0&revision=...` requires authenticated workspace scope. `limit` is 1–64; `offset` is a nonnegative completed-trade position. The first request may omit `revision`; every returned page pins the current Session revision. Reuse that revision for later pages or restart at offset 0 after a stale-revision refusal.
+
+**Response.** `BTL-OBSERVED-ANALYTICS-PAGE-1` returns one `completed` page, the complete aggregate `metrics` and bounded account/equity/annotation windows when `status` is `COMPLETE`; while the event fold is incomplete it returns only `processedEvents`, `totalEvents`, and `BUILDING`. The client must not merge pages across revisions or present BUILDING metrics as final.
+
+**Current implementation boundary.** The endpoint bounds response rows and removes the old 128-offset refusal. The current `LedgerFold` still reconstructs and retains per-order detail in process memory and the Journal route still assembles all rows; persistent incremental aggregates and keyset Journal pages remain open. Frontend calls this contract from `client.js`; presentation integration remains owned by Claude.

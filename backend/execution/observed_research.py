@@ -423,6 +423,34 @@ class ObservedResearchApplication:
         return self.controller.order_history_page(self.scope,session_id,after_sequence=after,
             revision_pin=revision_pin,maximum=limit)
 
+    def analytics_page(self,session_id,raw):
+        """Return one bounded completed-trade page with revision-pinned metrics."""
+        keys(raw,'limit offset revision')
+        limit=raw['limit'];offset=raw['offset'];revision_pin=raw['revision']
+        require(type(limit) is int and 1<=limit<=64,'limit','INVALID_INPUT')
+        require(type(offset) is int and offset>=0,'offset','INVALID_CURSOR')
+        require(revision_pin is None or (type(revision_pin) is int and revision_pin>=0),
+                'revision','INVALID_CURSOR')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            state=self._session(db,session_id)[2]
+        require(revision_pin is None or revision_pin==state['revision'],'revision','STALE_REVISION')
+        projection=self.statistics.inspect(self.scope,session_id,offset,limit)
+        require(self._same_projection(projection,state),'analysisSnapshot','REFUSED_STALE_REVISION')
+        if projection['status']=='BUILDING':
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-ANALYTICS-PAGE-1',sessionId=session_id,
+                revision=state['revision'],status='BUILDING',processedEvents=projection['processedEvents'],
+                totalEvents=projection['totalEvents'],completed=[],nextTradeOffset=None)
+        analysis=self._view_analysis(state,projection)
+        require(analysis['status']=='COMPLETE','analysis','CORRUPT_RECORD')
+        return dict(schemaVersion=1,artifact='BTL-OBSERVED-ANALYTICS-PAGE-1',sessionId=session_id,
+            revision=state['revision'],status='COMPLETE',metrics=analysis['metrics'],
+            completed=analysis['completed'],nextTradeOffset=projection['nextTradeOffset'],
+            account=analysis['account'],equity=analysis['equity'],
+            equityWindowStart=analysis['metrics']['equityWindowStart'],
+            annotations=analysis['annotations'],annotationWindowStart=analysis['annotationWindowStart'],
+            provenance=analysis['provenance'])
+
     def save_note(self,session_id,raw):
         journal_request(raw)
         with connect(self.dsn) as db:
