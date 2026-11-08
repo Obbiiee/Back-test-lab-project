@@ -3,6 +3,10 @@ Total output lines: 599
 
 # Current Product V1 implementation update — source routing and cumulative analytics (2026-11-08)
 
+## 2026-11-08 bounded committed-analysis projection cache
+
+Added a process-local byte-bounded LRU for checkpoint-independent committed-event projections used by analytics. Cache identity includes the database identity hash, workspace, Session, revision, and event head; canonical bytes are decoded into a fresh object on every hit. Quote-bearing projections bypass the cache; Journal excursion enrichment still runs against the current replay window on every request. Oversized values bypass storage. Five synthetic regressions cover cache identity, copy isolation, LRU bounds, oversized bypass, event-fold avoidance, and quote-context bypass. Focused Method + observed analytics suites: 15 PASS, 3 PostgreSQL tests SKIPPED because no isolated database is available; Python compilation and `git diff --check` PASS. This is a disposable same-process optimization, not a durable incremental read model. Product V1 remains IN PROGRESS; Journal still folds committed history when its Session projection is not cached.
+
 ## 2026-11-08 V1 Method Analytics pooling
 
 Code commit `192419b2cc8935cbc4326c93753532729bc09dcd` is on PR #44. The V1 Method Analytics path now combines exact per-Session metric summaries instead of retaining the completed trade lists from all Sessions simultaneously. A 4,097-event regression now asserts there is no lifetime event-count rejection. The same shared rational aggregator is used by observed analytics. Method Analytics + observed-analysis tests: 10 runnable PASS; 17 PostgreSQL-backed tests SKIPPED due to missing isolated DB; syntax and diff checks PASS.

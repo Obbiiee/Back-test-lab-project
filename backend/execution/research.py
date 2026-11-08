@@ -22,6 +22,7 @@ from .journal import (validate_note, request as journal_request, MAX_JOURNAL_PAG
                       encode_cursor, decode_cursor)
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 from .availability import catalog_availability, eligible_start_month
+from .analysis_cache import COMMITTED_ANALYSIS_CACHE
 
 
 def label(value):
@@ -453,6 +454,23 @@ class ResearchApplication:
         return self.inspect(session_id, raw['timeframe'])
 
     def _committed_analysis(self, db, state, quote=None):
+        # Only cache the checkpoint-independent committed-event projection.
+        # Journal quote marks bypass it; excursion enrichment runs afterward
+        # against the current replay window on a fresh returned object.
+        cache_key = None
+        if quote is None:
+            cache_key = COMMITTED_ANALYSIS_CACHE.key(
+                dsn=self.dsn,
+                workspace_id=self.scope.workspace_id,
+                session_id=state['sessionId'],
+                revision=state['revision'],
+                event_head=state['eventHash'],
+                quote=None,
+            )
+            cached = COMMITTED_ANALYSIS_CACHE.get(cache_key)
+            if cached is not None:
+                return cached
+
         def events():
             for offset in range(0,state['nextEventIndex'],256):
                 page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
@@ -461,6 +479,8 @@ class ResearchApplication:
                     yield unpack(*row)
         analysis = project(state, events(), quote)
         self._research_risk(db,state,analysis)
+        if cache_key is not None:
+            COMMITTED_ANALYSIS_CACHE.put(cache_key, analysis)
         return analysis
 
     def bootstrap(self, session_id, raw):
