@@ -17,6 +17,7 @@ from .observed_state_delta_v3 import encode_compact_base, encode_compact_delta, 
 from .terminal_order_archive import GENESIS as ORDER_ARCHIVE_GENESIS, record as terminal_record
 from .terminal_order_archive import terminal_orders, verify as verify_terminal_record
 from .journal_order_index import append as append_journal_order_index
+from .incremental_analytics import record as initial_metric_projection
 
 
 COMPACT_BASE = "BTL-TICK-EXECUTION-COMPACT-BASE-1"
@@ -277,6 +278,13 @@ class PostgresExecutionStore:
             "(workspace_id,session_id,format_version,through_sequence,event_hash) "
             "VALUES (%s,%s,1,%s,%s)",
             (workspace, session, state["nextEventIndex"], state["eventHash"]),
+        )
+        metric_projection = initial_metric_projection(
+            session, state["nextEventIndex"], state["eventHash"])
+        db.execute(
+            "INSERT INTO btl.tick_session_metric_projections "
+            "(workspace_id,session_id,payload,content_hash) VALUES (%s,%s,%s,%s)",
+            (workspace, session, canonical_bytes(metric_projection), content_hash(metric_projection)),
         )
         if self.state_storage_format == "compact-v1":
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
@@ -567,4 +575,6 @@ def grant_execution_runtime(dsn, role):
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(order_status,last_sequence,event_id,payload,content_hash) ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT UPDATE(payload,content_hash) ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}").format(sql.Identifier(role)))

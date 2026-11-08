@@ -24,6 +24,8 @@ from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 from .availability import catalog_availability, eligible_start_month
 from .analysis_cache import COMMITTED_ANALYSIS_CACHE
 from .journal_order_index import verify_projection as verify_journal_order_projection
+from .incremental_analytics import verify as verify_session_metric_projection
+from .incremental_analytics import metrics as session_metrics_from_projection
 
 
 def label(value):
@@ -295,11 +297,13 @@ class ResearchApplication:
             included = []
             for session_id, revision_value, _current_unit in compatible:
                 _meta, _method, state, _checkpoint = self._session(db, session_id)
-                analysis = self._committed_analysis(db, state)
-                if analysis['status'] != 'COMPLETE':
-                    excluded.append({'sessionId': session_id, 'reason': analysis.get('reason', 'ANALYSIS_UNAVAILABLE')})
-                    continue
-                session_metric = analysis['metrics']
+                session_metric = self._durable_session_metrics(db, state)
+                if session_metric is None:
+                    analysis = self._committed_analysis(db, state)
+                    if analysis['status'] != 'COMPLETE':
+                        excluded.append({'sessionId': session_id, 'reason': analysis.get('reason', 'ANALYSIS_UNAVAILABLE')})
+                        continue
+                    session_metric = analysis['metrics']
                 session_metrics.append(session_metric)
                 if session_metric['expectancy'] is not None:
                     completed_net += Fraction(int(session_metric['expectancy']['numerator']),
@@ -314,6 +318,25 @@ class ResearchApplication:
             return dict(**common, status='COMPLETE', accountCurrency=unit[2] if unit else None,
                         completedTradeNet=text(completed_net),
                         includedSessions=included, excludedSessions=excluded, metrics=pooled)
+
+    def _durable_session_metrics(self, db, state):
+        row = db.execute(
+            'SELECT a.payload,a.content_hash,h.closed_order_count '
+            'FROM btl.tick_session_metric_projections a '
+            'JOIN btl.tick_journal_projection_heads h '
+            'ON (h.workspace_id,h.session_id)=(a.workspace_id,a.session_id) '
+            'WHERE a.workspace_id=%s AND a.session_id=%s',
+            (self.scope.workspace_id, state['sessionId']),
+        ).fetchone()
+        if row is None:
+            return None
+        projection = verify_session_metric_projection(row[0], row[1],
+            session_id=state['sessionId'], through_sequence=state['nextEventIndex'],
+            event_head=state['eventHash'])
+        result = session_metrics_from_projection(projection)
+        require(result['tradeCount'] == row[2],
+                'sessionAnalyticsCount', 'CORRUPT_RECORD')
+        return result
 
     def create_method(self, raw):
         raw = deepcopy(raw)

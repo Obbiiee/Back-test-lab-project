@@ -7,6 +7,9 @@ from fractions import Fraction
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import identifier, require
 from .contracts import text
+from .analysis import planned_risk, ratio
+from .incremental_analytics import add_trade, metrics as aggregate_metrics
+from .incremental_analytics import record as metric_record, verify as verify_metric_record
 
 PROJECTION_ARTIFACT = 'BTL-TICK-JOURNAL-ORDER-PROJECTION-1'
 
@@ -170,6 +173,7 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
     latest = {}
     projection_hashes = {}
     closed_order_delta = 0
+    completed_rows = []
     for event in events:
         for order_id in sorted(refs_by_sequence.get(event['sequence'], ())):
             row = current.get(order_id)
@@ -188,6 +192,7 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
                 row = _apply_order_event(row, event)
                 if not was_closed and row['status'] == 'CLOSED':
                     closed_order_delta += 1
+                    completed_rows.append(deepcopy(row))
             current[order_id] = row
             latest[order_id] = _projection(session_id, order_id, row, event)
             projection_hashes[(order_id, event['sequence'])] = latest[order_id]['contentHash']
@@ -212,6 +217,73 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
             'event_id=EXCLUDED.event_id,payload=EXCLUDED.payload,content_hash=EXCLUDED.content_hash',
             (workspace_id, session_id, order_id, value['order']['status'],
              value['lastSequence'], value['eventId'], raw, digest),
+        )
+
+    metric_row = db.execute(
+        'SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+        'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
+        (workspace_id, session_id),
+    ).fetchone()
+    if metric_row is not None:
+        aggregate = verify_metric_record(metric_row[0], metric_row[1],
+            session_id=session_id, through_sequence=prior_state['nextEventIndex'],
+            event_head=prior_state['eventHash'])
+        require(aggregate['totals']['tradeCount'] == head[3],
+                'sessionAnalyticsPriorCount', 'CORRUPT_RECORD')
+        for order in completed_rows:
+            review_row = db.execute(
+                'SELECT payload,content_hash FROM btl.tick_order_reviews '
+                'WHERE workspace_id=%s AND session_id=%s AND review_id=%s',
+                (workspace_id, session_id, order['id']),
+            ).fetchone()
+            if review_row is not None:
+                reviewed = json.loads(review_row[0])
+                require(canonical_bytes(reviewed) == review_row[0] and
+                        content_hash(reviewed) == review_row[1],
+                        'sessionAnalyticsReview', 'CORRUPT_RECORD')
+                command = reviewed.get('command', {})
+                require(command.get('kind') == 'OPEN' and
+                        reviewed.get('artifact') == 'BTL-LOCAL-ORDER-REVIEW-1' and
+                        (command.get('commandId'), command.get('sessionId')) ==
+                        (order['id'], session_id) and
+                        (reviewed.get('methodHash'), reviewed.get('profileHash')) ==
+                        (prior_state['policy']['definitionHash'], prior_state['profileHash']) and
+                        all(order.get(key) == value for key, value in command['payload'].items()),
+                        'sessionAnalyticsReviewBinding', 'CORRUPT_RECORD')
+                command_row = db.execute(
+                    'SELECT revision,command_hash FROM btl.tick_commands '
+                    'WHERE workspace_id=%s AND session_id=%s AND command_id=%s',
+                    (workspace_id, session_id, order['id']),
+                ).fetchone()
+                require(command_row is not None and
+                        command_row[0] == command.get('expectedRevision') + 1 and
+                        command_row[0] <= prior_state['revision'] and
+                        command_row[1] == content_hash(command),
+                        'sessionAnalyticsCommandBinding', 'CORRUPT_RECORD')
+                if 'researchRisk' in reviewed:
+                    require(int(reviewed['throughNs']) <= int(prior_state['throughNs']) and
+                            order['entryTimeNs'] is not None and
+                            int(reviewed['throughNs']) <= int(order['entryTimeNs']),
+                            'sessionAnalyticsPreentryRisk', 'CORRUPT_RECORD')
+                    basis = deepcopy(prior_state)
+                    basis['throughNs'] = reviewed['throughNs']
+                    pin = reviewed['researchRisk']
+                    require(pin == planned_risk(basis, command),
+                            'sessionAnalyticsRiskPin', 'CORRUPT_RECORD')
+                    if pin['amount'] is not None:
+                        order['rMultiple'] = ratio(Fraction(order['net']) / Fraction(pin['amount']))
+            aggregate = add_trade(aggregate, order)
+        aggregate = metric_record(session_id, next_state['nextEventIndex'],
+                                  next_state['eventHash'], aggregate['totals'])
+        require(aggregate['totals']['tradeCount'] == head[3] + closed_order_delta,
+                'sessionAnalyticsNextCount', 'CORRUPT_RECORD')
+        raw = canonical_bytes(aggregate)
+        digest = content_hash(aggregate)
+        db.execute(
+            'UPDATE btl.tick_session_metric_projections '
+            'SET payload=%s,content_hash=%s '
+            'WHERE workspace_id=%s AND session_id=%s',
+            (raw, digest, workspace_id, session_id),
         )
     db.execute(
         'UPDATE btl.tick_journal_projection_heads '

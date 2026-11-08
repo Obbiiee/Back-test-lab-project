@@ -36,6 +36,7 @@ class MethodAnalyticsProjectionTests(unittest.TestCase):
                     if status == 'COMPLETE' else None}
 
         app._committed_analysis = committed
+        app._durable_session_metrics = lambda _db, _state: None
         return app, policy, manager
 
     def state(self, session_id, *, profile_hash='profile:stable', event_count=12, currency='USD'):
@@ -86,6 +87,23 @@ class MethodAnalyticsProjectionTests(unittest.TestCase):
             result = app.method_analytics(policy.method_id)
         self.assertEqual((result['status'], result['metrics']['tradeCount']), ('COMPLETE', 0))
         self.assertEqual(result['includedSessions'][0]['tradeCount'], 0)
+
+    def test_method_analytics_uses_durable_session_metrics_without_event_fold(self):
+        states = {'session:one': self.state('session:one', event_count=9001)}
+        app, policy, manager = self.app(states, {})
+        durable = metrics([{'net': '6', 'rMultiple': None, 'durationNs': '40'}])
+        app._durable_session_metrics = lambda _db, _state: durable
+
+        def no_fold(*_args):
+            raise AssertionError('durable Session metrics must bypass full event folding')
+
+        app._committed_analysis = no_fold
+        with patch('execution.research.connect', return_value=manager):
+            result = app.method_analytics(policy.method_id)
+
+        self.assertEqual(result['status'], 'COMPLETE')
+        self.assertEqual(result['completedTradeNet'], '6')
+        self.assertEqual(result['metrics']['tradeCount'], 1)
 
 
 if __name__ == '__main__':

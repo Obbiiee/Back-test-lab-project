@@ -5,7 +5,8 @@ from contracts.primitives import ContractError
 from execution.journal_order_index import (append, references, PROJECTION_ARTIFACT,
                                            _new_order, _apply_order_event)
 from contracts.canonical import canonical_bytes, content_hash
-from execution.analysis import project
+from execution.incremental_analytics import record as metric_record, metrics as aggregate_metrics
+from execution.analysis import planned_risk, project
 from execution.postgres import pack
 from execution.research import ResearchApplication
 from types import SimpleNamespace
@@ -112,7 +113,7 @@ class JournalOrderIndexTests(unittest.TestCase):
         ]
         db = DB((7, 'b' * 64, 0, 0))
         self.assertTrue(append(db, 'workspace:a', 'session:a', prior, following, rows))
-        self.assertEqual(len(db.statements), 7)  # head, row lookup, three refs, projection, head advance
+        self.assertEqual(len(db.statements), 8)  # head, row lookup, three refs, projection, analytics, head advance
         projection_write = next(item for item in db.statements
                                 if 'INSERT INTO btl.tick_journal_order_projection' in item[0])
         projection = json.loads(projection_write[1][6])
@@ -222,6 +223,81 @@ class JournalOrderIndexTests(unittest.TestCase):
 
         self.assertEqual(result['completedTrades'], 3)
         self.assertEqual(result['netCashChange'], '25')
+
+    def test_committed_close_advances_exact_trade_aggregate_with_pinned_risk(self):
+        session_id = 'session:analytics-close'
+        order_id = 'order:analytics-close'
+        plan = dict(quantity='1', side='LONG', entry='10', sl='9',
+                    orderType='LIMIT', workflow='PLANNED')
+        command = dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-COMMAND-1',
+            sessionId=session_id, commandId=order_id, expectedRevision=6,
+            kind='OPEN', payload=plan)
+        prior = dict(sessionId=session_id, nextEventIndex=7, eventHash='b' * 64,
+            revision=7, throughNs='8', profileHash='f' * 64,
+            datasetId='dataset:a', datasetVersion='v1', engineVersion='engine:v1',
+            policy={'definitionHash': 'e' * 64},
+            profile={'contractSize': '1', 'commissionPerLotSide': '0'})
+        risk_basis = dict(prior, throughNs='6')
+        reviewed = dict(schemaVersion=1, artifact='BTL-LOCAL-ORDER-REVIEW-1',
+            requestHash='a' * 64, command=command, methodHash='e' * 64,
+            profileHash='f' * 64, throughNs='6',
+            researchRisk=planned_risk(risk_basis, command))
+        review_raw = canonical_bytes(reviewed)
+        review_hash = content_hash(reviewed)
+        metric = metric_record(session_id, 7, 'b' * 64)
+        metric_raw = canonical_bytes(metric)
+        metric_hash = content_hash(metric)
+        accepted = event('ORDER_ACCEPTED', 7, order_id, plan=plan)
+        entered = event('ENTRY_FILL', 8, order_id, quantity='1', price='10',
+            commission='0', balanceDelta='0', evidence={'timeNs': '10',
+                'groupId': 'group:entry', 'eventIds': ['tick:entry']})
+        exited = event('EXIT_FILL', 9, order_id, entryFillRef=entered['eventId'],
+            quantity='1', price='10', remaining='0', gross='0', commission='0',
+            balanceDelta='0', reason='MANUAL', evidence={'timeNs': '20',
+                'groupId': 'group:exit', 'eventIds': ['tick:exit']})
+        accepted['sessionId'] = entered['sessionId'] = exited['sessionId'] = session_id
+        next_state = dict(nextEventIndex=10, eventHash='c' * 64)
+
+        class Result:
+            def __init__(self, row=None, rows=None):
+                self.row = row
+                self.rows = rows or []
+
+            def fetchone(self):
+                return self.row
+
+            def fetchall(self):
+                return self.rows
+
+        class DB:
+            def __init__(self):
+                self.statements = []
+
+            def execute(self, query, params):
+                self.statements.append((query, params))
+                if 'SELECT through_sequence,event_hash,order_count' in query:
+                    return Result((7, 'b' * 64, 1, 0))
+                if 'FROM btl.tick_journal_order_projection ' in query:
+                    return Result(rows=[])
+                if 'FROM btl.tick_session_metric_projections' in query:
+                    return Result((metric_raw, metric_hash))
+                if 'FROM btl.tick_order_reviews' in query:
+                    return Result((review_raw, review_hash))
+                if 'SELECT revision,command_hash FROM btl.tick_commands' in query:
+                    return Result((7, content_hash(command)))
+                return Result()
+
+        db = DB()
+        append(db, 'workspace:a', session_id, prior, next_state,
+               [accepted, entered, exited])
+        update = next(params for query, params in db.statements
+                      if 'UPDATE btl.tick_session_metric_projections' in query)
+        saved = json.loads(update[0])
+        exact = aggregate_metrics(saved)
+        self.assertEqual(exact['tradeCount'], 1)
+        self.assertEqual(exact['rEligible'], 1)
+        self.assertEqual(exact['averageR'], {'numerator': '0', 'denominator': '1'})
+        self.assertEqual((saved['throughSequence'], saved['eventHead']), (10, 'c' * 64))
 
 
 if __name__ == '__main__':

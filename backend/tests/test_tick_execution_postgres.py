@@ -150,6 +150,11 @@ class TickExecutionPostgresTests(unittest.TestCase):
                 'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id=%s',
                 (self.scope.workspace_id, session, order_id),
             ).fetchone()
+            metric_row = db.execute(
+                'SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+                'WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id, session),
+            ).fetchone()
         self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1, 0))
         events = [unpack(row[3], row[4]) for row in indexed]
         self.assertEqual([row[2] for row in indexed], [event['kind'] for event in events])
@@ -160,6 +165,10 @@ class TickExecutionPostgresTests(unittest.TestCase):
         projection = unpack(projection_row[3], projection_row[4])
         self.assertEqual(projection['order']['status'], 'CANCELLED')
         self.assertEqual(projection['contentHash'], projection_row[5])
+        metric_projection = unpack(*metric_row)
+        self.assertEqual((metric_projection['throughSequence'], metric_projection['eventHead']),
+                         (h.state['nextEventIndex'], h.state['eventHash']))
+        self.assertEqual(metric_projection['totals']['tradeCount'], 0)
 
     def test_compact_cold_recovery_uses_periodic_verified_base(self):
         from unittest.mock import patch
