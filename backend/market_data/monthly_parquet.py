@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+from urllib.parse import urlsplit
 
 import numpy as np
 import pyarrow as pa
@@ -385,9 +386,42 @@ def write_monthly_parquet(root, events, source_manifest, *, expected_version=Non
 class MonthlyParquetProvider:
     """Read only requested UTC months and row groups; verify canonical rows."""
     def __init__(self, root, *, expected_dataset_id=None, expected_dataset_version=None,
-                 expected_manifest_hash=None):
-        self.root = Path(root).resolve()
-        raw = (self.root / "manifest.json").read_bytes()
+                 expected_manifest_hash=None, filesystem=None):
+        root_text = os.fspath(root)
+        self._object_store = root_text.startswith('s3://')
+        if self._object_store:
+            parsed = urlsplit(root_text)
+            parts = parsed.path.strip('/').split('/') if parsed.path.strip('/') else []
+            require(parsed.scheme == 's3' and parsed.hostname is not None and
+                    parsed.netloc == parsed.hostname and
+                    parsed.username is None and parsed.password is None and not parsed.query and
+                    not parsed.fragment and re.fullmatch(r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]',
+                    parsed.hostname) is not None and
+                    all(part not in ('.', '..') for part in parts),
+                    'objectStoreUri', 'REFUSED_SOURCE')
+            if filesystem is None:
+                from pyarrow.fs import S3FileSystem
+                options = dict(
+                    region=os.environ.get('RIKSORA_S3_REGION'),
+                    endpoint_override=os.environ.get('RIKSORA_S3_ENDPOINT'),
+                    scheme=os.environ.get('RIKSORA_S3_SCHEME') or 'https',
+                    background_writes=False, allow_bucket_creation=False,
+                    allow_bucket_deletion=False,
+                )
+                for option, name in (('access_key', 'RIKSORA_S3_ACCESS_KEY'),
+                                     ('secret_key', 'RIKSORA_S3_SECRET_KEY'),
+                                     ('session_token', 'RIKSORA_S3_SESSION_TOKEN')):
+                    if os.environ.get(name):
+                        options[option] = os.environ[name]
+                filesystem = S3FileSystem(**{key: value for key, value in options.items()
+                                             if value is not None})
+            self._filesystem = filesystem
+            self.root = parsed.netloc + parsed.path.rstrip('/')
+            require(bool(self.root), 'objectStoreRoot', 'REFUSED_SOURCE')
+        else:
+            self.root = Path(root_text).resolve()
+            self._filesystem = filesystem
+        raw = self._read_file(self._location('manifest.json'))
         manifest = _json_object(raw, MANIFEST_FIELDS)
         require(manifest.get("schemaVersion") == SCHEMA_VERSION and
                 manifest.get("artifact") == MANIFEST_ARTIFACT and manifest.get("manifestVersion") == 2,
@@ -498,17 +532,55 @@ class MonthlyParquetProvider:
 
     def verify_file_hash(self, month):
         entry = self._file_for_month(month)
-        path = (self.root / entry["path"]).resolve()
-        require(path.parent.parent == self.root and path.is_file(), "file", "MISSING_CHILD")
-        require(path.stat().st_size == entry["bytes"] and _sha256_file(path) == entry["sha256"],
+        path = self._location(entry["path"])
+        require(self._is_file(path), "file", "MISSING_CHILD")
+        require(self._file_size(path) == entry["bytes"] and self._sha256_path(path) == entry["sha256"],
                 "fileHash", "CHILD_HASH_MISMATCH")
         return True
+
+    def _location(self, relative):
+        require(type(relative) is str and not relative.startswith('/') and
+                all(part not in ('', '.', '..') for part in relative.split('/')),
+                'objectPath', 'REFUSED_SOURCE')
+        if self._object_store:
+            return f'{self.root}/{relative}'
+        path = (self.root / relative).resolve()
+        require(path.parent == self.root or path.parent.parent == self.root,
+                'filePath', 'REFUSED_SOURCE')
+        return path
+
+    def _is_file(self, path):
+        if self._object_store:
+            from pyarrow.fs import FileType
+            return self._filesystem.get_file_info(path).type == FileType.File
+        return path.is_file()
+
+    def _file_size(self, path):
+        if self._object_store:
+            return self._filesystem.get_file_info(path).size
+        return path.stat().st_size
+
+    def _read_file(self, path):
+        if self._object_store:
+            with self._filesystem.open_input_file(path) as stream:
+                return stream.read()
+        return path.read_bytes()
+
+    def _sha256_path(self, path):
+        if not self._object_store:
+            return _sha256_file(path)
+        sha = hashlib.sha256()
+        with self._filesystem.open_input_file(path) as stream:
+            while block := stream.read(1_048_576):
+                sha.update(block)
+        return sha.hexdigest()
 
     def _file_for_month(self, month):
         return next((entry for entry in self._files if entry["month"] == month), None)
 
     def _read_row_group(self, path, file_entry, group_entry):
-        parquet = pq.ParquetFile(path)
+        parquet = pq.ParquetFile(path, **({'filesystem': self._filesystem}
+                                          if self._object_store else {}))
         require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()),
                 "parquetSchema", "SCHEMA_MISMATCH")
         index = group_entry["index"]
@@ -607,8 +679,8 @@ class MonthlyParquetProvider:
                     low = (group["firstSourceIndex"], int(group["firstOrdinal"]))
                     high = (group["lastSourceIndex"], int(group["lastOrdinal"]))
                     if low <= (source_index, ordinal) <= high:
-                        path = (self.root / entry["path"]).resolve()
-                        require(path.parent.parent == self.root and path.is_file(),
+                        path = self._location(entry["path"])
+                        require(self._is_file(path),
                                 "file", "MISSING_CHILD")
                         events, _times, indices = self._read_row_group(path, entry, group)
                         for event, global_index in zip(events, indices):
@@ -630,8 +702,8 @@ class MonthlyParquetProvider:
                     continue
                 if group["firstGlobalIndex"] >= stop:
                     break
-                path = (self.root / entry["path"]).resolve()
-                require(path.parent.parent == self.root and path.is_file(),
+                path = self._location(entry["path"])
+                require(self._is_file(path),
                         "file", "MISSING_CHILD")
                 events, _times, indices = self._read_row_group(path, entry, group)
                 selected.extend(event for event, index in zip(events, indices)
@@ -666,9 +738,10 @@ class MonthlyParquetProvider:
         for file_entry in self._files:
             if int(file_entry["lastTimeNs"]) < start_ns or int(file_entry["firstTimeNs"]) >= end_ns:
                 continue
-            path = (self.root / file_entry["path"]).resolve()
-            require(path.parent.parent == self.root and path.is_file(), "file", "MISSING_CHILD")
-            parquet = pq.ParquetFile(path)
+            path = self._location(file_entry["path"])
+            require(self._is_file(path), "file", "MISSING_CHILD")
+            parquet = pq.ParquetFile(path, **({'filesystem': self._filesystem}
+                                              if self._object_store else {}))
             require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()) and
                     parquet.metadata.num_rows == file_entry["eventCount"] and
                     parquet.metadata.num_row_groups == len(file_entry["rowGroups"]),

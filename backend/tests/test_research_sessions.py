@@ -88,7 +88,8 @@ class SessionSummaryProjectionTests(unittest.TestCase):
         before=deepcopy(state)
         with patch('execution.research.connect') as connect_mock, \
              patch('execution.research.unpack',return_value={'kind':'EXIT_FILL','detail':{'remaining':'0'}}):
-            connect_mock.return_value.__enter__.return_value.execute.side_effect=[None,[('payload','hash')]]
+            missing_head=MagicMock();missing_head.fetchone.return_value=None
+            connect_mock.return_value.__enter__.return_value.execute.side_effect=[None,missing_head,[('payload','hash')]]
             result=app.summary(state['sessionId'])
         self.assertEqual((result['balance'],result['netCashChange'],result['completedTrades']),('9999.12345678','-0.87654322',1))
         self.assertEqual((result['revision'],result['throughNs'],result['unresolved']),(7,'123',True))
@@ -96,7 +97,8 @@ class SessionSummaryProjectionTests(unittest.TestCase):
         self.assertFalse({'orders','controller','quote'} & result.keys())
         calls=connect_mock.return_value.__enter__.return_value.execute.call_args_list
         self.assertEqual(calls[0].args,('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',))
-        self.assertIn('FROM btl.tick_events',calls[1].args[0])
+        self.assertIn('FROM btl.tick_journal_projection_heads',calls[1].args[0])
+        self.assertIn('FROM btl.tick_events',calls[2].args[0])
 
     def test_missing_or_corrupt_scoped_snapshot_is_not_a_fabricated_summary(self):
         from unittest.mock import patch, MagicMock
