@@ -68,6 +68,7 @@ jobs:
           tests.test_observed_postgres.ObservedPostgresTests.test_replaceable_replay_progress_rejects_rewind_and_wrong_base
           tests.test_observed_postgres.ObservedPostgresTests.test_replay_progress_consumption_is_atomic_with_receipt
           tests.test_observed_postgres.ObservedPostgresTests.test_compact_v1_new_session_commit_cold_read_and_retry_parity
+          tests.test_observed_postgres.ObservedPostgresTests.test_integration_archive_write_populates_required_terminal_status_and_recovers
           tests.test_observed_postgres.ObservedPostgresTests.test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger
           tests.test_observed_postgres.ObservedPostgresTests.test_actual_transactions_cold_source_and_source_outage_receipt_and_journal
           tests.test_observed_postgres.ObservedPostgresTests.test_replay_to_uses_existing_durable_advances_and_recovers_idempotently
@@ -81,3 +82,21 @@ jobs:
           tests.test_observed_postgres.ObservedPostgresTests.test_nonempty_sidecar_is_not_admitted_by_empty_catalog_capability
           tests.test_observed_postgres.ObservedPostgresTests.test_observed_research_application_method_session_review_statistics_journal
           tests.test_migration_reconciliation
+      - name: Create isolated Product journey database
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+          admin = psycopg.conninfo.make_conninfo(os.environ['BTL_TEST_DATABASE_URL'], dbname='postgres')
+          with psycopg.connect(admin, autocommit=True) as db:
+              db.execute('CREATE DATABASE btl_v1_journey')
+          PY
+      - name: Run authenticated single-instrument Product V1 journey
+        working-directory: backend
+        env:
+          BTL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/btl_v1_journey
+          PYTHONPATH: ..:.
+        run: >-
+          python -m unittest -v
+          tests.test_functional_journey.FunctionalJourneyTests.test_single_instrument_product_v1_login_trade_journal_analytics_resume
