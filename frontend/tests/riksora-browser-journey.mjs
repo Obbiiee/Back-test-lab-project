@@ -132,7 +132,9 @@ try{
   await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
   phase='global_journal_select_session';await page.locator('.rk-toolbar .rk-combo-trigger').click();
   await page.getByRole('option',{name:/Synthetic browser session/}).click();
-  const journalRows=page.getByRole('list',{name:'Orders in Synthetic browser session'}).locator('li');
+  const journal=page.locator('.rk-journal');
+  await expect(journal).toHaveAttribute('aria-label','Orders in Synthetic browser session');
+  const journalRows=journal.locator('li');
   phase='global_journal_wait_for_committed_order';await expect(journalRows).toHaveCount(1);
   const journalRowCount=await journalRows.count();
   phase=`global_journal_order_count_${journalRowCount}`;
