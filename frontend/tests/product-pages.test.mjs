@@ -15,6 +15,8 @@ const versionHref=routeHref({screen:'method-new',family:'method:one'},'https://r
 assert.equal(readRoute('https://riksora.test'+versionHref).family,'method:one');
 const sessionWizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
 const terminal=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),'utf8');
+assert.match(terminal,/<a \{\.\.\.linkTo\(\{screen:'sessions'\}\)\}>All Sessions<\/a>/);
+assert.match(terminal,/isAccountPage\(\)\?linkTo\(\{screen:'account'\}\)/);
 assert.match(sessionWizard,/onCreate\(\{name:finalName,methodId:method\.id,symbol:instrument,/);
 assert.match(terminal,/api\('\/sessions',\{id:creationId\.current,name:fields\.name,methodId:fields\.methodId,\s*initialBalance:fields\.initialBalance,startPeriod:fields\.startPeriod\?\?catalog\.startPeriod\}\)/);
 assert.doesNotMatch(terminal,/api\('\/sessions',[^\n]*symbol:/);
