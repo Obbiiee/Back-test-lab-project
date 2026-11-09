@@ -22,45 +22,46 @@ const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'b
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
+let phase='proof';
 try{
   const proof=await context.request.get(new URL('/__qa/browser-proof/'+config.nonce,url).href,{maxRedirects:0});
   expect(proof.status()).toBe(200);expect(await proof.json()).toEqual({purpose:'RIKSORA_EXCLUSIVE_SYNTHETIC_QA',nonce:config.nonce});
   // Product API calls pass through to the local real backend unchanged. All other
   // network origins are refused; there is no route.fulfill with authored API data.
   await context.route('**/*',route=>new URL(route.request().url()).origin===url.origin?route.continue():route.abort());
-  await page.goto(config.url);
+  phase='login_page';await page.goto(config.url);
   await expect(page.getByRole('tab',{name:'Sign in',exact:true})).toBeVisible();step('login_screen');
-  await page.getByRole('tab',{name:'Create account',exact:true}).click();
+  phase='account_registration';await page.getByRole('tab',{name:'Create account',exact:true}).click();
   await page.getByLabel('Email',{exact:true}).fill(config.email);
   await page.getByLabel('Password',{exact:true}).fill(config.password);
   await page.getByRole('button',{name:'Create account',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Check your inbox'})).toBeVisible();
   process.stdout.write(JSON.stringify({need:'verification',email:config.email})+'\n');
-  await page.getByLabel('Verification code').fill((await read()).token);
+  phase='email_verification';await page.getByLabel('Verification code').fill((await read()).token);
   await page.getByRole('button',{name:'Verify email',exact:true}).click();
   await expect(page.getByText('Email verified. Sign in to start.')).toBeVisible();
-  await page.getByRole('tab',{name:'Sign in',exact:true}).click();
+  phase='password_login';await page.getByRole('tab',{name:'Sign in',exact:true}).click();
   await page.getByLabel('Email',{exact:true}).fill(config.email);await page.getByLabel('Password',{exact:true}).fill(config.password);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.getByLabel('New workspace name')).toBeVisible();
-  await page.getByLabel('New workspace name').fill('Synthetic browser acceptance');
+  phase='workspace_create';await page.getByLabel('New workspace name').fill('Synthetic browser acceptance');
   await page.getByRole('button',{name:'Create workspace',exact:true}).click();
   await page.getByRole('button',{name:/Synthetic browser acceptance/}).click();
   await expect(page.getByRole('heading',{name:'My Methods'})).toBeVisible();step('login_workspace');
-  await page.getByRole('link',{name:'Create your first Method'}).click();
+  phase='method_create';await page.getByRole('link',{name:'Create your first Method'}).click();
   await page.getByLabel('Method name').fill('Synthetic browser method');
   await page.getByRole('button',{name:'Save Method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method'})).toBeVisible();step('method');
-  await page.getByRole('button',{name:'New Session',exact:true}).click();
+  phase='session_create';await page.getByRole('button',{name:'New Session',exact:true}).click();
   for(let i=0;i<3;i++)await page.getByRole('button',{name:'Continue',exact:true}).click();
   await page.getByLabel('Session name').fill('Synthetic browser session');
   await page.getByRole('button',{name:'Continue',exact:true}).click();
   await page.getByRole('button',{name:'Create Session',exact:true}).click();
   await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:60000});step('session_replay');
-  await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled();
+  phase='replay';await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled();
   const stepButton=page.getByRole('button',{name:'Step ticks',exact:true});
   await stepButton.click();await expect(stepButton).toBeEnabled();
-  await page.getByRole('button',{name:/Buy at Ask/}).click();
+  phase='order_review';await page.getByRole('button',{name:/Buy at Ask/}).click();
   const ticket=page.getByRole('dialog',{name:'Plan an order'});
   await ticket.getByLabel('Quantity (lots)').fill('0.01');
   await ticket.getByRole('button',{name:'Review order',exact:true}).click();
@@ -82,7 +83,7 @@ try{
   expect(retry.status()).toBe(200);expect(await retry.json()).toEqual(receipt);
   await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible();
   step('order_receipt');
-  await stepButton.click();
+  phase='trade_close';await stepButton.click();
   const terminal=page.getByRole('region',{name:'Trading and Analysis'});
   await terminal.getByRole('button',{name:'Open positions',exact:true}).click();
   await expect(terminal.getByRole('table',{name:'Open positions'})).toBeVisible();
@@ -93,11 +94,11 @@ try{
   await stepButton.click();
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);step('committed_trade_journal_analytics');
-  await terminal.getByRole('button',{name:'Journal',exact:true}).click();
+  phase='journal_analytics';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
   await expect(terminal.getByText('No note yet.')).toBeVisible();
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
-  await page.getByRole('link',{name:'All Sessions',exact:true}).click();
+  phase='global_journal_analytics';await page.getByRole('link',{name:'All Sessions',exact:true}).click();
   await page.getByRole('link',{name:'Journal',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
   await expect(page.getByRole('list',{name:'Orders in Synthetic browser session'}).locator('li')).toHaveCount(1);
@@ -105,7 +106,7 @@ try{
   await page.getByRole('link',{name:'Analytics for Synthetic browser session',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Research analytics'})).toBeVisible();
   await expect(page.getByText('Synthetic browser session',{exact:true})).toBeVisible();
-  await page.getByRole('navigation',{name:'Account and help'}).getByRole('link',{name:'Account',exact:true}).click();
+  phase='logout_resume';await page.getByRole('navigation',{name:'Account and help'}).getByRole('link',{name:'Account',exact:true}).click();
   await page.getByRole('button',{name:'Sign out',exact:true}).click();
   await expect(page.getByRole('tab',{name:'Sign in',exact:true})).toBeVisible();
   await page.getByLabel('Email',{exact:true}).fill(config.email);await page.getByLabel('Password',{exact:true}).fill(config.password);
@@ -120,6 +121,7 @@ try{
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error'})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

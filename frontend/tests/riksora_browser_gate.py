@@ -55,7 +55,7 @@ def run(tools, browser_cache):
     evidence.chmod(0o700)
     report = dict(schemaVersion=1, artifact='RIKSORA-PRIVATE-SYNTHETIC-BROWSER-GATE-1', status='FAIL',
                   classification='SYNTHETIC_QA_NOT_HISTORICAL_OR_PRODUCTION_ACCEPTANCE',
-                  steps=[], certificate='LOCAL_SELF_SIGNED_VERIFICATION_BYPASSED',
+                  steps=[], progress=[], certificate='LOCAL_SELF_SIGNED_VERIFICATION_BYPASSED',
                   apiTransport='UNCHANGED_REAL_BACKEND_RESPONSES_FORWARDED', cleanup=False)
     report['qaHarnessSha256'] = digest_files(REPOSITORY, [Path(__file__),
         Path(__file__).with_name('riksora-browser-journey.mjs'),
@@ -90,7 +90,9 @@ def run(tools, browser_cache):
         (evidence/'report.json').write_text(json.dumps(report, indent=2)+'\n')
     print(json.dumps(dict(status=report['status'], evidence=str(evidence/'report.json'),
                           classification=report['classification'], cleanup=report['cleanup'],
-                          steps=report['steps'], failureType=report.get('failureType'))))
+                          steps=report['steps'], progress=report['progress'],
+                          failureType=report.get('failureType'),
+                          failurePhase=report.get('failurePhase'))))
     return 0 if report['status'] == 'PASS' else 1
 
 
@@ -115,6 +117,12 @@ def run_browser(environment, tools, browser_cache, evidence, report):
     migrate_and_grant(dsn)
     grant_google_demo_runtime(dsn)
     runtime = make_conninfo(**{**conninfo_to_dict(dsn), 'user': 'btl_app', 'password': password})
+    with psycopg.connect(runtime) as db:
+        report['runtimeMethodProjectionSelect'] = db.execute(
+            "SELECT has_table_privilege(current_user,'btl.tick_method_metric_projections','SELECT')"
+        ).fetchone()[0]
+        if not report['runtimeMethodProjectionSelect']:
+            raise PermissionError('QA_METHOD_PROJECTION_GRANT_MISSING')
     delivery = RecordingDelivery()
     app = create_app(runtime, secrets.token_urlsafe(48), delivery, rate_limit=1200,
                      sandbox_reset_timezone='UTC')
@@ -184,6 +192,14 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                             process.stdin.flush()
                         elif item.get('step') in STEPS:
                             report['steps'].append(item['step'])
+                        elif isinstance(item.get('progress'), str) and item['progress'].isidentifier():
+                            report['progress'].append(item['progress'])
+                        elif (isinstance(item.get('failurePhase'), str) and
+                              item['failurePhase'].isidentifier() and
+                              isinstance(item.get('failureType'), str) and
+                              item['failureType'].isidentifier()):
+                            report['failurePhase'] = item['failurePhase']
+                            report['browserFailureType'] = item['failureType']
                         elif item.get('complete') is True:
                             report['browserVersion'] = item['browserVersion']
                             complete = True
