@@ -207,6 +207,8 @@ def seed_state(session_id,profile,policy,checkpoint,balance='10000',*,order_rete
     require(type(product_order_archive_v1) is bool and type(terminal_order_archive_v1) is bool and
             sum((qa_order_archive_v1,product_order_archive_v1,terminal_order_archive_v1))<=1,
             'productOrderArchive')
+    if (product_order_archive_v1 or terminal_order_archive_v1) and order_retention_policy is None:
+        order_retention_policy=PRODUCT_ORDER_RETENTION_V1
     require(not qa_order_archive_v1 or order_retention_policy in
             (QA_ORDER_RETENTION_V2,QA_ORDER_RETENTION_V3,QA_ORDER_RETENTION_V4),
             'qaOrderArchive','REFUSED_POLICY')
@@ -360,6 +362,8 @@ def _advance(s,events,raw,frame,checkpoint):
 def apply(state,raw,*,reveal=None,checkpoint=None,order_retention_policy=None,
           qa_order_archive_v1=False,product_order_archive_v1=False,terminal_order_archive_v1=False,
           archived_order_lookup=None):
+    if (product_order_archive_v1 or terminal_order_archive_v1) and order_retention_policy is None:
+        order_retention_policy=PRODUCT_ORDER_RETENTION_V1
     validate_state(state,order_retention_policy=order_retention_policy);raw=command_wire(raw)
     state_artifact=state.get('artifact')
     archive_mode=state_artifact in (STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1,STATE_INTEGRATION_PRODUCT_ARCHIVE_V1)

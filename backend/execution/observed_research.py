@@ -65,21 +65,26 @@ def _stored_observed_state(db,workspace_id,session_id):
 class ObservedResearchApplication:
     """One workspace-scoped Method/Session adapter for the observed family."""
     def __init__(self,dsn,scope,catalog,*,state_storage_format='snapshot-v1',
-                 product_order_archive_v1=False):
+                 product_order_archive_v1=False,terminal_order_archive_v1=False):
         require(type(scope) is TrustedScope,'scope','SCOPE_REQUIRED');require(type(catalog) is ObservedCatalog,'catalog')
         require(state_storage_format in ('snapshot-v1','compact-v1',PROGRESS_FORMAT),'stateStorageFormat','REFUSED_STATE_VERSION')
         require(type(product_order_archive_v1) is bool,'productOrderArchive')
-        if product_order_archive_v1:
+        require(type(terminal_order_archive_v1) is bool,'terminalOrderArchive')
+        require(not (product_order_archive_v1 and terminal_order_archive_v1),
+                'orderArchive','REFUSED_STATE_VERSION')
+        if product_order_archive_v1 or terminal_order_archive_v1:
             require(state_storage_format in ('compact-v1',PROGRESS_FORMAT),
                     'productOrderArchive','REFUSED_STATE_VERSION')
-        retention=PRODUCT_ORDER_RETENTION_V1 if product_order_archive_v1 else None
+        retention=PRODUCT_ORDER_RETENTION_V1 if product_order_archive_v1 or terminal_order_archive_v1 else None
         self.dsn=dsn;self.scope=scope;self.catalog=catalog
         self.store=ObservedExecutionStore(dsn,order_retention_policy=retention,
-            state_storage_format=state_storage_format,product_order_archive_v1=product_order_archive_v1)
+            state_storage_format=state_storage_format,product_order_archive_v1=product_order_archive_v1,
+            terminal_order_archive_v1=terminal_order_archive_v1)
         self.controller=ObservedExecutionController(self.store,catalog.resolve,order_retention_policy=retention)
         key=content_hash(dict(schemaVersion=1,artifact='BTL-OBSERVED-STATS-SERVICE-KEY-1',
                               dsnHash=content_hash({'schemaVersion':1,'dsn':dsn}),stateStorageFormat=state_storage_format,
-                              productOrderArchiveV1=product_order_archive_v1))
+                              productOrderArchiveV1=product_order_archive_v1,
+                              terminalOrderArchiveV1=terminal_order_archive_v1))
         with _STATS_LOCK:
             self.statistics=_STATS_BY_DSN.get(key)
             if self.statistics is None:self.statistics=ObservedStatistics(self.store);_STATS_BY_DSN[key]=self.statistics
@@ -330,7 +335,8 @@ class ObservedResearchApplication:
                 start=source.start_for_period(raw['period'],day=raw['day']);timeline=source.cache.new_timeline(self.scope,raw['id'],start);cp=timeline.checkpoint()
                 state=seed_state(raw['id'],profile,policy,cp,initial,
                     order_retention_policy=self.store.order_retention_policy,
-                    product_order_archive_v1=self.store.product_order_archive_v1)
+                    product_order_archive_v1=self.store.product_order_archive_v1,
+                    terminal_order_archive_v1=self.store.terminal_order_archive_v1)
                 meta=dict(schemaVersion=1,artifact=META,id=raw['id'],name=name,methodId=raw['methodId'],methodHash=policy.definition_hash,datasetKey=raw['sourceKey'],period=raw['period'],day=raw['day'],datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],startNs=state['startNs'],initialBalance=state['initialBalance'],model=MODEL,engineVersion=ENGINE_VERSION,creationRequestHash=request_hash)
                 blob,sha=pack(meta);self.store._insert(db,self.scope,state,cp)
                 # New Sessions start with an explicit empty keyset projection.
@@ -674,6 +680,20 @@ class ObservedResearchApplication:
                 'revision','INVALID_CURSOR')
         return self.controller.order_history_page(self.scope,session_id,after_sequence=after,
             revision_pin=revision_pin,maximum=limit)
+
+    def terminal_order_page(self,session_id,raw):
+        """Compatibility route for PR #44 clients over the versioned archive dispatcher."""
+        keys(raw,'limit afterSequence')
+        require(raw['afterSequence'] is None or
+                (type(raw['afterSequence']) is int and raw['afterSequence'] >= -1),
+                'afterSequence','INVALID_CURSOR')
+        page=self.order_history_page(session_id,dict(limit=raw['limit'],
+            afterSequence=raw['afterSequence'],revision=None))
+        # Keep the historical route's response artifact and field names stable;
+        # the page contents were validated by the archive-version-aware reader.
+        page=dict(page)
+        page['artifact']='BTL-TERMINAL-ORDER-PAGE-1'
+        return page
 
     def analytics_page(self,session_id,raw):
         """Return one bounded completed-trade page with revision-pinned metrics."""

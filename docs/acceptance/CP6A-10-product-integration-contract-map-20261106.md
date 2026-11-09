@@ -1,6 +1,6 @@
 # CP6A-10 Product Integration V1 — Contract Map (working checkpoint)
 
-Date: 2026-11-06
+Date: 2026-11-07 (updated)
 Candidate branch: `codex/product-integration-v1-20261106`
 Base: `codex/integrated-backend-v1-20261106` at `992ae61f6671814348b85f0c3e3d605f91f37de9`
 Frontend input: PR #39 head `274d592e06a9a8afc2a7b7e2efdf09498da36a34`, based on PR #36 head `293c36b1209757e6ca79b736013aeeabffe18e5e`.
@@ -13,13 +13,13 @@ This is a working acceptance map, not a production-readiness claim. PR #42 is ad
 | Product area | Current contract / route | Status | Boundary or gap |
 |---|---|---|---|
 | Sign up, verify, password login/recovery | `/api/v1/auth/{register,login,me,verify,request-verify-token,forgot-password,reset-password,logout,logout-all,providers}` | IMPLEMENTED (fixture-backed) | SMTP delivery and hosted credentials/configuration are not live-verified here. Bearer token stays in frontend memory; frontend requires HTTPS. |
-| Google sign-in | `/api/v1/auth/google/*` when all Google settings are configured | CONFIG-GATED | It is opt-in. Existing Google identity flow rejects email collision with a password account; authenticated account linking is not implemented. A separate contract decision is recorded in `CP6A-10-account-linking-contract-decision-20261106.md`; no migration/cutover is authorized yet. |
+| Google sign-in and account linking | `/api/v1/auth/google/*` when all Google settings are configured | IMPLEMENTATION CANDIDATE; ACCEPTANCE PENDING | Link start requires an authenticated password account and fresh password proof; Google subject proof uses the existing OIDC/PKCE state. Matching email alone never links. Additive identity registry/migration and compatibility mirror are described in `CP6A-10-account-linking-contract-decision-20261106.md`; PostgreSQL migration/backfill, restricted-role and browser acceptance remain open. |
 | Workspace | `/api/v1/workspaces`, `/api/v1/workspaces/{id}`, membership and resource routes | IMPLEMENTED | Server derives user and workspace scope; owner-only writes and member reads. |
 | Workspace capability / entitlement status | `GET /api/v1/workspaces/{id}/capabilities` | IMPLEMENTED IN CANDIDATE | Authenticated DTO reports workspace role, role-gated product actions, configured providers, and NOT_CONFIGURED/SANDBOX_ONLY entitlement. Account UI displays the server status. It is informational; every operation rechecks authorization. No production entitlement is claimed. |
 | Product shell / frontend route | PR #39 `AlphaProduct`, `AlphaShell`, `productRoute`, `TickAlpha`; PR #36 terminal/drawing/indicator modules | INTEGRATED SNAPSHOT | Candidate uses pinned PR snapshots; original Claude branches remain unchanged. |
 | Method catalog/create | `GET /workspaces/{id}/research/catalog`, `POST .../methods` | IMPLEMENTED | Catalog is bounded to the existing 128-record catalog; Methods are immutable evidence. New family metadata binds a stable family ID to immutable versions without rewriting Method bytes or Session pins. |
 | Method page/detail/version/lifecycle | `GET .../method-families?limit=&after=&includeArchived=`, `GET .../method-families/{familyId}`, `POST .../{familyId}/versions`, `POST .../{familyId}/lifecycle` | IMPLEMENTED IN CANDIDATE; DB ACCEPTANCE HOLD | Additive family/version catalog, immutable version rows, expectedRevision CAS, archive metadata and Session creation refusal for archived families. Old Methods are mapped to self-family v1. Existing `/methods` and Session wire pins remain supported. PostgreSQL migration and integration regression have not been run because current host is below the 36 GiB disk and 10 GiB MemAvailable QA gates. |
-| Session create/replay/job | `POST .../sessions`, `POST .../sessions/{id}/commands`, replay/view/bootstrap/chart-history, `/jobs/{id}` and cancel | IMPLEMENTED (synthetic build) | Queue is persistent, one worker. Hosted source remains server-pinned; historical rights UNKNOWN / execution NOT_GRANTED. |
+| Session create/replay/job | `POST .../sessions`, `POST .../sessions/{id}/commands`, replay/view/bootstrap/chart-history, `/jobs/{id}` and cancel | IMPLEMENTED IN CANDIDATE (synthetic build) | Queue is persistent, one worker. New tick and observed Sessions default to compact-v1; stored legacy/snapshot formats remain readable. Source remains server-pinned; historical rights UNKNOWN / execution NOT_GRANTED. Integrated compact-default regression remains pending. |
 | Session list/detail/resume | `GET .../sessions?methodId=&limit=&after=`, `GET .../sessions/{id}`, `POST .../{id}/view` | IMPLEMENTED IN CANDIDATE | Hosted UI consumes cursor-bounded pages (hard 128-record ceiling); list returns metadata/revision and explicitly does not compute financial counts. Detail/view is the authoritative recovery path. No separate mutating resume action is required. |
 | Instrument availability | Catalog `availability` v1 for synthetic-only source; observed catalog is server-owned source catalog | IMPLEMENTED WITH SOURCE LIMIT | Historical eligibility remains fail-closed. Unknown, incomplete, or rights-ungranted sources cannot be selected for execution. No fabricated 16-instrument availability. |
 | Review / confirm / receipt | `POST .../reviews`, `POST .../sessions/{id}/confirm`, `GET .../sessions/{id}/commands/{commandId}` | IMPLEMENTED | Durable PostgreSQL receipt is authority. UNKNOWN stays UNKNOWN until receipt/status evidence resolves; retries do not create another command. |
@@ -39,6 +39,22 @@ This is a working acceptance map, not a production-readiness claim. PR #42 is ad
 - The endpoint implementation does not mount a provider, execute replay, modify evidence, or calculate financial truth.
 
 ## Verification and remaining gates
+
+### Account-linking candidate update — 2026-11-07
+
+- The implementation candidate now includes additive migration `023_account_identities.sql`, verified-email/Google-subject backfill, explicit password-reauthenticated link start, authenticated identity-provider listing, and same-user Google login resolution. Full contract and rollback notes: `CP6A-10-account-linking-contract-decision-20261106.md`.
+- `AlphaAccount` clears stale OAuth query parameters and in-memory credentials after a failed one-time exchange so the user can start again.
+- New Session constructors and cloud factory fallbacks now select `compact-v1`; `snapshot-v1` remains an explicit server override, and persisted format dispatch keeps existing Sessions unchanged.
+- Frontend `npm ci`, lint, production build, and the registered regression suite pass on the current workspace. Targeted observed-analysis unit tests pass 5/5; the changed backend journey test compiles. No PostgreSQL migration/backfill, role, concurrency, cold-recovery, or PostgreSQL-backed journey gate has run because the isolated PostgreSQL 16 binaries/cluster are unavailable. The Playwright product flow was updated to reconcile the exact durable receipt before Journal and Analytics, but was not run because its API/HTTPS test servers are unavailable.
+- The database and browser gates in the Google row above remain open. This change is local candidate code; no production, hosted configuration, OAuth credentials, or annual/historical evidence was changed.
+
+### Owner P0 implementation sequence — 2026-11-07
+
+- P0-1: expanded `test_method_analytics_pools_positive_committed_synthetic_trades_only` into one authenticated HTTP/service journey covering Method, Session, review, durable receipt lookup, Journal, closed trade, and committed Method Analytics. The product Playwright runner now checks the receipt before navigating to Journal and Analytics. Both are implementation coverage only until the PostgreSQL/browser gates run.
+- P0-2 code now covers both tick and newly created observed Sessions: migration 024 supplies the shared immutable indexed/hash-chained archive, atomic writes, status lookup, and keyset pages. Synthetic 129-order regressions pass for both reducers, including closed-fill detail retention and a no-lifetime-cap observed Session projection. PostgreSQL archive/retry/crash-recovery acceptance is authored but NOT RUN because no isolated DB is available; keep acceptance open until it runs.
+- P0-3 is partial: new Sessions default to `compact-v1`; eligible observed sources now default to `shared-source-v2`. Durable monotonic frontier/recovery and periodic verified compact recovery bases still need integration and PostgreSQL acceptance.
+- P0-4 remains open: Monthly Parquet is wired only through the server-pinned synthetic QA fixture, not a general rights-eligible source catalog/worker path.
+- P0-5 is partial: observed statistics no longer reject offsets above 128, but the main tick analytics/journal 4,096-event limits and complete lifetime pagination/aggregation are not removed. Payment remains out of scope per owner direction.
 
 - Frontend lint: PASS.
 - Frontend production build: PASS.

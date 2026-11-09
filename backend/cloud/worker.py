@@ -101,8 +101,12 @@ def close():
     for slot in _slots:
         with slot.lock:
             slot.close()
-    from .research import close_operator_catalogs
-    close_operator_catalogs()
+    # Do not import the full API/DB stack during process exit when this module
+    # was used only for worker configuration or timeout tests. If research was
+    # already loaded, its pinned source caches are owned by this lifecycle.
+    research = sys.modules.get('cloud.research')
+    if research is not None:
+        research.close_operator_catalogs()
 
 
 atexit.register(close)
@@ -116,11 +120,54 @@ def _environment(dsn):
     from market_data.monthly_root import (monthly_root_from_environment,
                                           s3_worker_environment)
     monthly_root = monthly_root_from_environment(monthly_values)
+    if any(monthly_values):
+        require(monthly_values[0] == '1' and all(monthly_values[1:]),
+                'syntheticMonthly', 'REFUSED_SOURCE')
+        require(len(monthly_values[1]) <= 4096 and os.path.isabs(monthly_values[1]),
+                'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    else:
+        require(monthly_values[0] is None, 'syntheticMonthly', 'REFUSED_SOURCE')
+    catalog_names = ('BTL_MONTHLY_PARQUET_CATALOG',
+                     'BTL_MONTHLY_PARQUET_CATALOG_SHA256')
+    catalog_values = tuple(os.environ.get(name) for name in catalog_names)
+    if any(catalog_values):
+        require(all(catalog_values) and len(catalog_values[0]) <= 4096 and
+                os.path.isabs(catalog_values[0]),
+                'monthlyCatalog', 'REFUSED_OPERATOR_CATALOG')
+        from contracts.primitives import digest
+        digest(catalog_values[1], 'monthlyCatalogHash')
+    s3_names = ('RIKSORA_S3_REGION', 'RIKSORA_S3_ENDPOINT', 'RIKSORA_S3_SCHEME',
+                'RIKSORA_S3_ACCESS_KEY', 'RIKSORA_S3_SECRET_KEY',
+                'RIKSORA_S3_SESSION_TOKEN')
+    s3_values = {name: os.environ.get(name) for name in s3_names}
+    if s3_values['RIKSORA_S3_SCHEME'] is not None:
+        require(s3_values['RIKSORA_S3_SCHEME'] in ('https', 'http'),
+                'objectStoreScheme', 'REFUSED_SOURCE')
+    for name in ('RIKSORA_S3_REGION', 'RIKSORA_S3_ENDPOINT'):
+        value = s3_values[name]
+        require(value is None or (1 <= len(value) <= 2048 and
+                not any(ord(char) < 32 for char in value)),
+                'objectStoreConfig', 'REFUSED_SOURCE')
+    for name in ('RIKSORA_S3_ACCESS_KEY', 'RIKSORA_S3_SECRET_KEY',
+                 'RIKSORA_S3_SESSION_TOKEN'):
+        value = s3_values[name]
+        require(value is None or 1 <= len(value) <= 8192,
+                'objectStoreCredential', 'REFUSED_SOURCE')
+    require((s3_values['RIKSORA_S3_ACCESS_KEY'] is None) ==
+            (s3_values['RIKSORA_S3_SECRET_KEY'] is None),
+            'objectStoreCredential', 'REFUSED_SOURCE')
+    require(s3_values['RIKSORA_S3_SESSION_TOKEN'] is None or
+            s3_values['RIKSORA_S3_ACCESS_KEY'] is not None,
+            'objectStoreCredential', 'REFUSED_SOURCE')
+    require(not (s3_values['RIKSORA_S3_SCHEME'] == 'http' and
+                 s3_values['RIKSORA_S3_ACCESS_KEY'] is not None),
+            'objectStoreScheme', 'REFUSED_SOURCE')
     environment = {k: v for k, v in os.environ.items()
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
-                            'BTL_TICK_SESSION_STORAGE_FORMAT', *monthly_names)}
+                            'BTL_TICK_SESSION_STORAGE_FORMAT', *monthly_names,
+                            *catalog_names, *s3_names)}
     if monthly_root is not None:
         environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
         environment.update(s3_worker_environment(monthly_root, os.environ))
@@ -181,7 +228,8 @@ def _start_slot(slot, dsn, timeout):
 def warm_sources(dsn, *, deadline=STARTUP_WARMUP_DEADLINE):
     """Admit configured sources before queued work starts, outside job deadlines."""
     require(type(deadline) in (int, float) and 0 < deadline <= STARTUP_WARMUP_DEADLINE, 'deadline')
-    has_monthly = os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1'
+    has_monthly = (os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1' or
+                   os.environ.get('BTL_MONTHLY_PARQUET_CATALOG') is not None)
     if not os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG') and not has_monthly:
         return False
     slot = _slots[0]

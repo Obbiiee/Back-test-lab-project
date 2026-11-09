@@ -751,6 +751,9 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 .alpha-sheet-search{display:block;margin:4px 0 8px}.tick-alpha .alpha-sheet-search input{width:100%;box-sizing:border-box;min-height:44px;border-radius:999px;padding:0 16px}
 .alpha-sheet-empty{margin:8px 0;color:var(--lab-text-secondary)}
 .alpha-local-only{margin:8px 0 0;font-size:12px;color:var(--lab-text-secondary)}
+.alpha-catalog-more{display:flex;justify-content:center;gap:10px;max-width:1120px;margin:0 auto;padding:12px 16px 28px}
+.alpha-catalog-more button{min-height:44px;padding:0 18px;border:1px solid var(--lab-border);border-radius:999px;background:var(--lab-surface-workspace);color:var(--lab-text-primary);font-weight:700}
+.alpha-catalog-more button:disabled{opacity:.55}
 /* C-14: phone landscape keeps the single-row, chart-first header (the C-13 two-row phone header is portrait only). */
 @media(max-height:500px) and (orientation:landscape) and (max-width:1000px){
   .tick-alpha.has-workspace .alpha-chart-header{flex-wrap:nowrap;overflow-x:auto;row-gap:0}

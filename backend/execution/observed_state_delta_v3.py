@@ -159,7 +159,17 @@ def reconstruct(base,deltas,*,state_callback=None,base_chain_hash=None,allow_pro
     return state
 
 
-def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None,base_chain_hash=None,allow_progress=False):
+def reconstruct_complete(base,deltas,expected_revision,*,state_callback=None,base_chain_hash=None,
+                        base_revision=None,allow_progress=False):
+    # Compatibility with the earlier checkpoint API. The revision remains
+    # pinned to the supplied base state; chainHash is still verified by the
+    # same recovery path and is never inferred from the caller.
+    if base_revision is not None:
+        require(type(base_revision) is int and base_revision == base.get('revision'),
+                'deltaCount','CORRUPT_RECORD')
+        require(base_chain_hash is None or base_chain_hash == base.get('chainHash'),
+                'deltaCount','CORRUPT_RECORD')
+        base_chain_hash=base.get('chainHash')
     require(type(expected_revision) is int and expected_revision>=0,'deltaCount','CORRUPT_RECORD')
     expected_count=expected_revision-(base['revision'] if base_chain_hash is not None else 0)
     require(expected_count>=0,'deltaCount','CORRUPT_RECORD')

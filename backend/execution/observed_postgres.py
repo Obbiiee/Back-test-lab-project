@@ -173,13 +173,20 @@ class ObservedExecutionStore:
     def __init__(self,dsn,*,order_retention_policy=None,qa_state_delta_v3=False,qa_order_archive_v1=False,
                  product_order_archive_v1=False,
                  terminal_order_archive_v1=False,
-                 state_storage_format='snapshot-v1'):
+                 state_storage_format=None):
+        if state_storage_format is None:
+            state_storage_format=('compact-v1' if qa_order_archive_v1 and not qa_state_delta_v3
+                                  else 'snapshot-v1')
+        if (product_order_archive_v1 or terminal_order_archive_v1) and order_retention_policy is None:
+            from .observed_kernel import PRODUCT_ORDER_RETENTION_V1
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1
         order_limits(order_retention_policy)
         require(type(qa_state_delta_v3) is bool,'qaStateDeltaV3')
         require(state_storage_format in ('snapshot-v1','compact-v1',PROGRESS_FORMAT),'stateStorageFormat','REFUSED_STATE_VERSION')
         require(not (qa_state_delta_v3 and state_storage_format!='snapshot-v1'),
                 'stateStorageFormat','REFUSED_STATE_VERSION')
-        require(type(qa_order_archive_v1) is bool and (not qa_order_archive_v1 or qa_state_delta_v3),
+        require(type(qa_order_archive_v1) is bool and (not qa_order_archive_v1 or
+                qa_state_delta_v3 or state_storage_format=='compact-v1'),
                 'qaOrderArchive','REFUSED_POLICY')
         require(type(product_order_archive_v1) is bool and type(terminal_order_archive_v1) is bool and
                 sum((qa_order_archive_v1,product_order_archive_v1,terminal_order_archive_v1))<=1,

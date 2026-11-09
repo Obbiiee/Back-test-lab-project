@@ -176,7 +176,11 @@ class AnalysisGoldenTests(unittest.TestCase):
                 out=project(state,iter(events),None)
                 self.assertEqual(out['account']['balance'],case['balance'])
                 self.assertEqual(Fraction(out['account']['netCashChange']),Fraction(case['balance'])-10000)
-                self.assertEqual(out['metrics']['tradeCount'],sum(o['status']=='CLOSED' for o in state['orders'].values()))
+                # Terminal orders are intentionally evicted from hot state; the
+                # immutable event ledger remains the authority for completed trades.
+                completed_ids={event['orderId'] for event in events
+                    if event['kind']=='EXIT_FILL' and event['detail']['remaining']=='0'}
+                self.assertEqual(out['metrics']['tradeCount'],len(completed_ids))
                 if out['completed']:
                     self.assertEqual(Fraction(out['completed'][0]['net']),Fraction(case['balance'])-10000)
                     self.assertIsNone(out['completed'][0]['rMultiple'])
@@ -228,20 +232,25 @@ class AnalysisGoldenTests(unittest.TestCase):
         quote['timeNs']=str(int(state['throughNs'])+1)
         self.assertIsNone(project(state,events,quote)['account']['unrealizedIndicative'])
 
-    def test_corrupt_missing_future_chain_and_over_budget_refuse_without_partial_success(self):
+    def test_corrupt_missing_future_chain_and_unbounded_history(self):
         h=exercise(goldens()['scenarios'][0]);state=h.state;events=h.store.events[(h.scope.workspace_id,h.session)]
         with self.assertRaises(ContractError):project(state,events[1:],None)
         wrong=deepcopy(events);wrong[-1]['detail']['balanceDelta']='999'
         with self.assertRaises(ContractError):project(state,wrong,None)
         future=deepcopy(state);future['throughNs']='0'
         with self.assertRaises(ContractError):project(future,events,None)
-        def must_not_read():
-            raise AssertionError('No event allocation above the analysis budget')
-            yield
-        large=deepcopy(state);large['nextEventIndex']=MAX_ANALYSIS_EVENTS+1
-        refused=project(large,must_not_read(),None)
-        self.assertEqual(refused['status'],'UNAVAILABLE')
-        self.assertNotIn('metrics',refused)
+        large=deepcopy(state);extended=list(events);previous=large['eventHash']
+        for sequence in range(large['nextEventIndex'],MAX_ANALYSIS_EVENTS+1):
+            event=dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-EVENT-1',engineVersion=large['engineVersion'],
+                sessionId=large['sessionId'],datasetId=large['datasetId'],datasetVersion=large['datasetVersion'],
+                profileHash=large['profileHash'],methodHash=large['policy']['definitionHash'],sequence=sequence,
+                previousHash=previous,kind='CHRONOLOGY_LIMITATION',classification='OBSERVED_FEED_EVENT',
+                orderId=None,detail={})
+            event['eventId']=content_hash(event);previous=event['eventId'];extended.append(event)
+        large['nextEventIndex']=len(extended);large['eventHash']=previous
+        result=project(large,extended,None)
+        self.assertEqual(result['status'],'COMPLETE')
+        self.assertGreater(large['nextEventIndex'],MAX_ANALYSIS_EVENTS)
 
 
 @unittest.skipUnless(DSN,'Actual isolated PostgreSQL required; skips are not PASS')

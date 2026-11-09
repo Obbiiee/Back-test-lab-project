@@ -9,7 +9,7 @@ from .kernel_v2 import validate_state, ratio as fraction
 from .contracts import text
 from .analysis import metrics, ratio
 
-MAX_ANALYSIS_EVENTS=4096
+MAX_ANALYSIS_EVENTS=4096  # Deprecated compatibility constant; no runtime lifetime cutoff.
 VERSION="BTL-COMMITTED-STATISTICS-2"
 EVENT_FIELDS="engineVersion sessionId datasetId datasetVersion profileHash methodHash sequence previousHash kind classification orderId detail eventId"
 
@@ -20,7 +20,6 @@ def project(state,events,genesis):
                     methodHash=state["policy"]["definitionHash"],eventHead=state["eventHash"],analysisVersion=VERSION,
                     model="AUTHORED_SYNTHETIC_ONLY")
     def unavailable(reason):return dict(schemaVersion=1,artifact=VERSION,status="UNAVAILABLE",reason=reason,provenance=provenance)
-    if state["nextEventIndex"]>MAX_ANALYSIS_EVENTS:return unavailable("REFUSED_ANALYSIS_LIMIT")
     if state["parent"] is not None:return unavailable("UNSUPPORTED_LINEAGE")
     validate_state(genesis)
     require(all(state[k]==genesis[k] for k in ("sessionId","engineVersion","datasetId","datasetVersion","profileHash","policy","startNs","initialBalance","parent"))
@@ -34,7 +33,6 @@ def project(state,events,genesis):
     orders={};entry_times={};completed=[];curve=deque(maxlen=256);last_time=int(state["startNs"])
     allowed={"ORDER_ACCEPTED","ORDER_CANCELLED","EXPIRED_NO_QUOTE","EXIT_REQUESTED","UNRESOLVED","ENTRY_FILL","EXIT_FILL","SESSION_ENDED","CHRONOLOGY_LIMITATION"}
     for event in events:
-        require(count<MAX_ANALYSIS_EVENTS,"events","REFUSED_ANALYSIS_LIMIT")
         tag(event,"BTL-TICK-EXECUTION-EVENT-2",EVENT_FIELDS)
         require(type(event["sequence"]) is int and event["sequence"]==count and event["previousHash"]==previous
                 and event["eventId"]==content_hash({k:v for k,v in event.items() if k!="eventId"})

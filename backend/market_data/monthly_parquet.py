@@ -544,6 +544,18 @@ class MonthlyParquetProvider:
     def _file_for_month(self, month):
         return next((entry for entry in self._files if entry["month"] == month), None)
 
+    def first_time_for_month(self, month):
+        """Return a pinned first timestamp without loading beyond one row group."""
+        require(type(month) is str and re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month) is not None,
+                "month", "INVALID_INPUT")
+        entry = self._file_for_month(month)
+        require(entry is not None, "month", "REFUSED_SOURCE_NOT_AVAILABLE")
+        group = entry["rowGroups"][0]
+        events, _timestamps, _indices = self._read_row_group(entry["path"], entry, group)
+        require(events and events[0]["timeNs"] == entry["firstTimeNs"],
+                "monthStart", "CORRUPT_INDEX_POINTER")
+        return int(events[0]["timeNs"])
+
     def _read_row_group(self, path, file_entry, group_entry):
         parquet = self._open_parquet(path)
         try:

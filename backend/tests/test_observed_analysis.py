@@ -2,8 +2,10 @@
 from copy import deepcopy
 from fractions import Fraction
 import os,unittest
+from types import SimpleNamespace
 from contracts.canonical import canonical_bytes,content_hash
-from execution.observed_analysis import LedgerFold,ObservedStatistics
+from execution.observed_analysis import LedgerFold,ObservedStatistics,pool_metrics
+from execution.analysis import metrics
 from tests import test_observed_kernel as kernel_fixtures
 S=kernel_fixtures.S
 from tests import test_observed_postgres as pg_fixtures
@@ -26,6 +28,28 @@ class ObservedAnalysisTests(unittest.TestCase):
     def opening(self,cid="order:z",**change):
         p=dict(side='LONG',orderType='MARKET',workflow='QUICK',entry=self.fx.state['quoteBasis']['ask'],quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[]);p.update(change);self.call('OPEN',p,cid)
     def project(self):return self.fold.project(self.fx.state)
+
+    def test_current_cached_fold_is_reused_but_stale_prefix_is_copied(self):
+        prior=SimpleNamespace(next=12,orders={'order:one':{'status':'CLOSED'}})
+        current=ObservedStatistics._working_fold(prior,12)
+        self.assertIs(current,prior)
+        extended=ObservedStatistics._working_fold(prior,13)
+        self.assertIsNot(extended,prior)
+        extended.orders['order:one']['status']='CHANGED_IN_PRIVATE_COPY'
+        self.assertEqual(prior.orders['order:one']['status'],'CLOSED')
+        with self.assertRaisesRegex(ValueError,'eventRegression'):
+            ObservedStatistics._working_fold(prior,11)
+
+    def test_method_metric_pool_matches_trade_fold_without_cross_session_streaks(self):
+        first=[dict(net='3',durationNs='10',rMultiple=dict(numerator='3',denominator='2')),
+               dict(net='-1',durationNs='20',rMultiple=None),
+               dict(net='0',durationNs='30',rMultiple=None)]
+        second=[dict(net='1',durationNs='50',rMultiple=dict(numerator='1',denominator='1')),
+                dict(net='-2',durationNs='70',rMultiple=None)]
+        expected=metrics(first+second)
+        expected.pop('maxWinStreak');expected.pop('maxLossStreak')
+        actual=pool_metrics([metrics(first),metrics(second)])
+        self.assertEqual(actual,expected)
 
     def test_exact_partial_closed_trade_never_infers_retrospective_risk(self):
         self.start([(0,'2300','2300.1'),(S,'2300.9','2301'),(2*S,'2302','2302.1'),(3*S,'2303','2303.1')]);self.advance(0);self.opening(quantity='0.02',sl='2299');self.advance(S)

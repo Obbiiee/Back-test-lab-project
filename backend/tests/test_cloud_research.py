@@ -146,7 +146,8 @@ class CloudResearchTests(unittest.TestCase):
 
         app = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
         record = method()
-        app.create_method(record)
+        saved_method = self.client.post(self.root + '/methods', headers=self.headers, json=record)
+        self.assertEqual(saved_method.status_code, 200, saved_method.text)
 
         def advance(session_id, steps):
             state = app.inspect(session_id)['state']
@@ -158,15 +159,35 @@ class CloudResearchTests(unittest.TestCase):
 
         def completed_trade(label, *, pre_advance, post_fill_advance, side='LONG'):
             session_id = 'session:analytics-' + label + '-' + uuid.uuid4().hex
-            view = app.create_session({'id': session_id, 'name': 'Analytics ' + label,
-                                       'methodId': record['id'], 'initialBalance': '10000',
-                                       'startPeriod': '2020-01'})
+            session_payload = {'id': session_id, 'name': 'Analytics ' + label,
+                               'methodId': record['id'], 'initialBalance': '10000',
+                               'startPeriod': '2020-01'}
+            created = self.client.post(self.root + '/sessions', headers=self.headers,
+                                       json=session_payload)
+            self.assertEqual(created.status_code, 200, created.text)
+            view = created.json()
             if pre_advance:
                 view = advance(session_id, pre_advance)
             request = review_request(view)
             request['draft']['side'] = side
-            reviewed = app.review(request)
-            app.confirm(session_id, {'reviewId': request['requestId'], 'reviewHash': reviewed['reviewHash']})
+            review_response = self.client.post(self.root + '/reviews', headers=self.headers, json=request)
+            self.assertEqual(review_response.status_code, 200, review_response.text)
+            reviewed = review_response.json()
+            confirmed = self.client.post(self.root + '/sessions/' + session_id + '/confirm',
+                headers=self.headers,
+                json={'reviewId': request['requestId'], 'reviewHash': reviewed['reviewHash']})
+            self.assertEqual(confirmed.status_code, 200, confirmed.text)
+            self.assertTrue(confirmed.json()['durable'])
+            receipt = self.client.get(self.root + '/sessions/' + session_id + '/commands/' + request['requestId'],
+                                      headers=self.headers)
+            self.assertEqual(receipt.status_code, 200, receipt.text)
+            self.assertEqual(receipt.json()['status'], 'COMMITTED')
+            self.assertTrue(receipt.json()['receipt']['durable'])
+            journal_after_confirm = self.client.get(self.root + '/sessions/' + session_id + '/journal',
+                                                     headers=self.headers)
+            self.assertEqual(journal_after_confirm.status_code, 200, journal_after_confirm.text)
+            self.assertEqual([order['id'] for order in journal_after_confirm.json()['orders']],
+                             [request['requestId']])
             advance(session_id, 1)  # the pending market order is filled from the next authored quote
             if post_fill_advance:
                 advance(session_id, post_fill_advance)
@@ -180,6 +201,11 @@ class CloudResearchTests(unittest.TestCase):
             advance(session_id, 1)  # close at a later committed quote
             final = app.inspect(session_id)['state']
             self.assertEqual(final['orders'][order_id]['status'], 'CLOSED')
+            journal = self.client.get(self.root + '/sessions/' + session_id + '/journal',
+                                      headers=self.headers)
+            self.assertEqual(journal.status_code, 200, journal.text)
+            self.assertEqual(journal.json()['financialAuthority'], 'COMMITTED_EVENTS_ONLY')
+            self.assertEqual([order['id'] for order in journal.json()['orders']], [order_id])
             analysis = app.workspace(session_id, {'timeframe': '1m'})['analysis']
             self.assertEqual(analysis['status'], 'COMPLETE')
             self.assertEqual(len(analysis['completed']), 1)
@@ -328,6 +354,41 @@ class CloudResearchTests(unittest.TestCase):
                                           headers=other_headers,
                                           json={'expectedRevision': 4, 'archived': True}).status_code, 404)
         app.close()
+
+    def test_method_family_version_history_exceeds_128_and_is_keyset_paginated(self):
+        from psycopg.rows import dict_row
+        from execution.product_method_lifecycle import add_version
+        from infrastructure.database import connect
+        original=method()
+        created=self.client.post(self.root+'/methods',headers=self.headers,json=original)
+        self.assertEqual(created.status_code,200,created.text)
+        expected=[original['id']]
+        revision=1
+        with connect(DSN) as db:
+            db.row_factory=dict_row
+            for index in range(128):
+                successor=dict(original,id='method-version:'+uuid.uuid4().hex,name=f'Version {index+2}')
+                add_version(db,self.workspace,original['id'],{'expectedRevision':revision,'method':successor})
+                expected.append(successor['id']);revision+=1
+        first=self.client.get(self.root+'/method-families/'+original['id']+'?version_limit=50',headers=self.headers)
+        self.assertEqual(first.status_code,200,first.text)
+        family=first.json()['family']
+        self.assertEqual(family['latestVersion'],129)
+        self.assertEqual([row['version'] for row in family['versions']],list(range(1,51)))
+        self.assertEqual(family['nextVersionCursor'],50)
+        second=self.client.get(self.root+'/method-families/'+original['id']+
+            '?version_limit=50&after_version=50',headers=self.headers)
+        self.assertEqual(second.status_code,200,second.text)
+        second_family=second.json()['family']
+        self.assertEqual([row['version'] for row in second_family['versions']],list(range(51,101)))
+        self.assertEqual(second_family['nextVersionCursor'],100)
+        final=self.client.get(self.root+'/method-families/'+original['id']+
+            '?version_limit=50&after_version=100',headers=self.headers)
+        self.assertEqual(final.status_code,200,final.text)
+        final_family=final.json()['family']
+        self.assertEqual([row['methodId'] for row in final_family['versions']],expected[100:])
+        self.assertIsNone(final_family['nextVersionCursor'])
+        self.assertTrue(final_family['versionsComplete'])
 
     def test_paginated_journal_route_keeps_workspace_authority_and_financial_projection(self):
         app=ResearchApplication(DSN,TrustedScope(self.workspace,self.actor))

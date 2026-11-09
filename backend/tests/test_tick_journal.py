@@ -111,7 +111,7 @@ class JournalTests(unittest.TestCase):
         self.assertIn(self.app.journal(self.session)['notes'][0]['text'],['first','second'])
         self.assertEqual(self.app.inspect(self.session)['state']['balance'],'10000')
 
-    def test_corrupt_note_does_not_reset_or_export_and_snapshot_budget_refuses(self):
+    def test_corrupt_note_does_not_reset_or_export_and_snapshot_has_no_lifetime_cap(self):
         self.app.save_note(self.session,self.raw)
         with connect(DSN) as db:
             db.execute('UPDATE btl.tick_journal_notes SET content_hash=%s WHERE workspace_id=%s AND session_id=%s',('0'*64,self.scope.workspace_id,self.session))
@@ -120,7 +120,7 @@ class JournalTests(unittest.TestCase):
         projection=deepcopy(self.app.workspace(self.session,{'timeframe':'1m'})['analysis'])
         projection['orders']*=MAX_JOURNAL_ORDERS+1
         with patch('execution.research.project',return_value=projection):
-            with self.assertRaisesRegex(ContractError,'REFUSED_JOURNAL_LIMIT'):self.app.journal(self.session)
+            self.assertEqual(len(self.app.journal(self.session)['orders']),MAX_JOURNAL_ORDERS+1)
 
     def test_revealed_fill_identity_and_atomic_rollback(self):
         view=self.app.inspect(self.session);self.advance(view)

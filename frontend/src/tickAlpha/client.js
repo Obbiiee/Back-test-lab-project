@@ -222,43 +222,77 @@ export function command(view,kind,payload){
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
-// Reads only; an obsolete StrictMode mount must not start another workspace read.
-async function collectProductPage(path,artifact,project=value=>value){
-  const items=[];let after=null;let pages=0;const cursors=new Set();
-  for(;;){
-    if(++pages>3)throw Error('Workspace pagination exceeded its published page bound.');
-    const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
-    const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
-    if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
-      throw Error('Unsupported workspace page; no state was imported.');
-    items.push(...page.items.map(project));
-    if(items.length>128)throw Error('Workspace list exceeded its published bound.');
-    if(page.complete)return items;
-    if(typeof page.nextCursor!=='string'||cursors.has(page.nextCursor))
-      throw Error('Workspace pagination did not advance.');
-    cursors.add(page.nextCursor);after=page.nextCursor;
-  }
+async function productPage(path,artifact,after=null,project=value=>value){
+  const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
+  const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
+  if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
+    throw Error('Unsupported workspace page; no state was imported.');
+  if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===after))
+    throw Error('Workspace pagination did not advance.');
+  return {...page,items:page.items.map(project)};
 }
 
 export async function loadProductCatalog(){
   const catalog=await api('/catalog');
   if(accountTransport()){
-    const [methodFamilies,sessions]=await Promise.all([
-      collectProductPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1'),
-      collectProductPage('/sessions','BTL-SESSION-PAGE-1',item=>({
+    const [families,sessions]=await Promise.all([
+      productPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1'),
+      productPage('/sessions','BTL-SESSION-PAGE-1',null,item=>({
         ...item.metadata,revision:item.revision,
         financialCountsStatus:item.financialCountsStatus,
       })),
     ]);
-    const methods=methodFamilies.flatMap(family=>family.versions.map(version=>({
-      ...version.method,methodFamilyId:family.familyId,methodVersion:version.version,
-      methodFamilyRevision:family.revision,methodArchived:family.archived,
-      methodLatest:version.version===family.latestVersion,
-    })));
-    if(methods.length>128)throw Error('Method version catalog exceeded its published bound.');
-    return {...catalog,methods,methodFamilies,sessions};
+    const methodFamilies=families.items.map(family=>({...family,versions:[{
+      version:family.latestVersion,methodId:family.latestMethodId,method:family.current,
+    }]}));
+    const methods=methodFamilies.map(family=>({
+      ...family.current,methodFamilyId:family.familyId,methodVersion:family.latestVersion,
+      methodFamilyRevision:family.revision,methodArchived:family.archived,methodLatest:true,
+    }));
+    return {...catalog,methods,methodFamilies,sessions:sessions.items,
+      productPagination:{methods:{cursor:families.nextCursor,complete:families.complete},
+        sessions:{cursor:sessions.nextCursor,complete:sessions.complete}}};
   }
   return catalog;
+}
+
+export async function loadMoreProductCatalog(catalog,kind){
+  if(!accountTransport()||!catalog?.productPagination?.[kind])
+    throw Error('Workspace pagination is unavailable. Reload the workspace.');
+  const state=catalog.productPagination[kind];
+  if(state.complete||typeof state.cursor!=='string')return catalog;
+  if(kind==='methods'){
+    const page=await productPage('/method-families?includeArchived=true','BTL-METHOD-FAMILY-PAGE-1',state.cursor);
+    const families=page.items.map(family=>({...family,versions:[{
+      version:family.latestVersion,methodId:family.latestMethodId,method:family.current,
+    }]}));
+    const methods=families.map(family=>({...family.current,methodFamilyId:family.familyId,
+      methodVersion:family.latestVersion,methodFamilyRevision:family.revision,
+      methodArchived:family.archived,methodLatest:true}));
+    return {...catalog,methods:[...catalog.methods,...methods],
+      methodFamilies:[...catalog.methodFamilies,...families],
+      productPagination:{...catalog.productPagination,methods:{cursor:page.nextCursor,complete:page.complete}}};
+  }
+  if(kind==='sessions'){
+    const page=await productPage('/sessions','BTL-SESSION-PAGE-1',state.cursor,item=>({
+      ...item.metadata,revision:item.revision,financialCountsStatus:item.financialCountsStatus,
+    }));
+    return {...catalog,sessions:[...catalog.sessions,...page.items],
+      productPagination:{...catalog.productPagination,sessions:{cursor:page.nextCursor,complete:page.complete}}};
+  }
+  throw Error('Unknown workspace page.');
+}
+
+export async function loadJournalPage(sessionId,cursor=null){
+  if(typeof sessionId!=='string'||!sessionId)throw Error('Journal Session is unavailable.');
+  const query=new URLSearchParams({limit:'32'});if(cursor)query.set('cursor',cursor);
+  const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`);
+  if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
+      !Number.isSafeInteger(page.totalOrders)||typeof page.complete!=='boolean')
+    throw Error('Unsupported Journal page; no state was imported.');
+  if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===cursor))
+    throw Error('Journal pagination did not advance.');
+  return page;
 }
 
 export async function createMethodVersion(family,method){
@@ -267,6 +301,28 @@ export async function createMethodVersion(family,method){
     throw Error('Method family revision is unavailable. Reload before creating a version.');
   return api(`/method-families/${encodeURIComponent(family.familyId)}/versions`,
     {expectedRevision:family.revision,method});
+}
+
+export async function loadMethodVersionPage(familyId,cursor=null){
+  if(typeof familyId!=='string'||!familyId)throw Error('Method family is unavailable.');
+  const query=new URLSearchParams({limit:'25'});if(cursor)query.set('cursor',cursor);
+  const page=await api(`/method-families/${encodeURIComponent(familyId)}/versions?${query}`);
+  if(page.artifact!=='BTL-METHOD-VERSION-PAGE-1'||page.familyId!==familyId||
+      !Number.isSafeInteger(page.revision)||!Array.isArray(page.versions)||typeof page.complete!=='boolean')
+    throw Error('Unsupported Method version page; no state was imported.');
+  if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===cursor))
+    throw Error('Method version pagination did not advance.');
+  return page;
+}
+
+export async function loadMethodFamily(familyId){
+  if(typeof familyId!=='string'||!familyId)throw Error('Method family is unavailable.');
+  const [detail,page]=await Promise.all([
+    api(`/method-families/${encodeURIComponent(familyId)}`),loadMethodVersionPage(familyId),
+  ]);
+  if(detail.artifact!=='BTL-METHOD-FAMILY-1'||detail.family?.familyId!==familyId)
+    throw Error('Unsupported Method family; no state was imported.');
+  return {...detail.family,versions:page.versions,nextVersionCursor:page.nextCursor,revision:page.revision};
 }
 
 export async function setMethodArchived(family,archived){
@@ -290,10 +346,8 @@ export function noticeText(message){
     REFUSED_REWIND_REQUIRES_FORK:'This Session already has financial history. Create a separate Session to replay an earlier time.',
     REFUSED_STALE_REVISION:'The saved Session changed. Reload it and review the action again.',
     REFUSED_STALE_NOTE:'Another edit changed this note. Reload the journal, compare with your retained draft, then explicitly save again.',
-    REFUSED_JOURNAL_LIMIT:'This Session exceeds the complete journal snapshot budget (32 canonical orders). No partial export or reset was made.',
     PROTOCOL_BLOCKED:'Protocol rules blocked this order. Check the checklist and locked entry/exit rules.',
     LOCAL_BUSY:'The local service is busy. Wait for the current request, then retry.',
-    REFUSED_ANALYSIS_LIMIT:'Analysis exceeded its bounded event budget. No partial result is shown.',
   };
   return explanations[message]?`${explanations[message]} (${message})`:message;
 }

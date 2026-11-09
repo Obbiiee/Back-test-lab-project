@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {api,sessionPath,noticeText} from './client.js';
+import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
 import {money,utc,lastSession} from './productData.js';
 import {linkTo,navigate,setLeaveGuard} from './productRoute.js';
 import {readDraft,writeDraft,clearDraft,isDirty,tagList,tagText} from './noteDrafts.js';
@@ -83,6 +83,8 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
   const [status,setStatus]=useState(null);
   const [query,setQuery]=useState('');
   const [dirty,setDirty]=useState(()=>new Map()); // orderId → 'kept' | 'lost'
+  const [loadingMore,setLoadingMore]=useState(false);
+  const [pageError,setPageError]=useState('');
   const [leaving,setLeaving]=useState(null);
   const stay=useRef(null),allow=useRef(false);
   // Open replay loads the Session before it changes the route, so ask before starting it.
@@ -107,14 +109,30 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
   const key=`${sessionId}:${attempt}`;
   const path=session?sessionPath(session.id)+'/journal':null;
   useEffect(()=>{
-    if(!path)return undefined;
+    if(!sessionId)return undefined;
     let live=true;
-    api(path).then(value=>{if(live)setResult({key,status:'ready',value});},failure=>{if(live)setResult({key,status:'error',message:noticeText(failure.message)});});
+    loadJournalPage(sessionId).then(value=>{if(live)setResult({key,status:'ready',value});},failure=>{if(live)setResult({key,status:'error',message:noticeText(failure.message)});});
     return()=>{live=false;};
-  },[path,key]);
+  },[sessionId,key]);
   // A reload after a stale-note refusal keeps the page (and open editors) mounted.
   const state=result.key===key?result:result.key?.startsWith(`${sessionId}:`)&&result.status==='ready'?result:{status:'loading'};
   const journal=state.status==='ready'?state.value:null;
+  const loadMore=async()=>{
+    if(!session||!journal?.nextCursor||loadingMore)return;
+    setLoadingMore(true);setPageError('');
+    try{
+      const page=await loadJournalPage(session.id,journal.nextCursor);
+      setResult(previous=>{
+        if(previous.key!==key||previous.status!=='ready')return previous;
+        const orders=new Map(previous.value.orders.map(order=>[order.id,order]));
+        for(const order of page.orders)orders.set(order.id,order);
+        const notes=new Map(previous.value.notes.map(note=>[note.orderId,note]));
+        for(const note of page.notes)notes.set(note.orderId,note);
+        return {...previous,value:{...page,orders:[...orders.values()],notes:[...notes.values()]}};
+      });
+    }catch(failure){setPageError(noticeText(failure.message));}
+    finally{setLoadingMore(false);}
+  };
   const statuses=useMemo(()=>[...new Set((journal?.orders??[]).map(order=>order.status))].sort(),[journal]);
   const rows=useMemo(()=>{
     if(!journal)return [];
@@ -153,7 +171,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
           <Segmented label="Side" options={SIDES} value={side} onChange={setSide}/>
           <div className="rk-toolbar-combo"><SearchableSelect label="Status" placeholder="All statuses" options={statuses.map(value=>({value,label:value.charAt(0)+value.slice(1).toLowerCase().replaceAll('_',' ')}))} value={status} onChange={setStatus} clearable/></div>
           <label className="rk-search"><span className="alpha-sr-only">Search notes and tags</span><Icon name="search" size={18}/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search notes and tags"/></label>
-          <span className="rk-count" role="status">{rows.length} of {journal.orders.length} orders</span>
+          <span className="rk-count" role="status">{rows.length} shown · {journal.orders.length} loaded of {journal.totalOrders}</span>
         </div>
         {rows.length?<ol className="rk-journal" aria-label={`Orders in ${session.name}`}>{rows.map(order=>{
           const note=journal.notes.find(item=>item.orderId===order.id);
@@ -170,6 +188,8 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
           </li>;})}</ol>
           :<StatePanel kind="filtered" title="No order matches" action={<button type="button" className="rk-btn" onClick={()=>{setSide('ALL');setStatus(null);setQuery('');}}>Clear filters</button>}><p>Try another side, status or search.</p></StatePanel>}
         {dirty.size>0&&<p className="rk-note rk-draft-flag" role="status">{dirty.size===1?'1 unsaved note draft':`${dirty.size} unsaved note drafts`} in this tab{lost?`; ${lost} not kept by this browser`:''}.</p>}
+        {!journal.complete&&<div className="rk-journal-more"><p className="rk-note">Search and filters apply to the loaded orders. Load another page to continue through this Session.</p>
+          {pageError&&<p role="alert">{pageError}</p>}<button type="button" className="rk-btn" disabled={loadingMore} onClick={loadMore}>{loadingMore?'Loading…':'Load more orders'}</button></div>}
         <p className="rk-main-note">Snapshot revision {journal.provenance.revision}. Financial values come from committed events only.</p>
       </>}
   </>;

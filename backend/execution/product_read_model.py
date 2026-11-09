@@ -83,7 +83,8 @@ def sessions(db, workspace_id, *, limit=25, after=None, method_id=None):
         artifact = meta.get("artifact")
         if artifact == "BTL-LOCAL-SESSION-1":
             from ticks.contracts import tag
-            tag(meta, artifact, "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance")
+            tag(meta, artifact, "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance" +
+                (" sourceKey monthlyManifestHash" if "sourceKey" in meta or "monthlyManifestHash" in meta else ""))
         elif artifact == "BTL-OBSERVED-RESEARCH-SESSION-1":
             from execution.observed_research import META
             from ticks.contracts import tag
@@ -106,6 +107,8 @@ def sessions(db, workspace_id, *, limit=25, after=None, method_id=None):
         }
         if "day" in meta:
             public_meta["day"] = meta["day"]
+        if "sourceKey" in meta:
+            public_meta["sourceKey"] = meta["sourceKey"]
         page.append({
             "metadata": public_meta,
             "revision": revision,

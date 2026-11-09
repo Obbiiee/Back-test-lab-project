@@ -18,7 +18,9 @@ from application.models import TrustedScope
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 from execution.controller import ExecutionController
-from execution.postgres import PostgresExecutionStore, grant_execution_runtime
+from execution.postgres import PostgresExecutionStore, grant_execution_runtime, unpack
+from execution.analysis import metrics as canonical_metrics, project
+from execution.incremental_analytics import metrics as durable_metrics
 from infrastructure.database import connect, migrate, backup, restore
 from tests.test_execution_goldens import goldens
 from tests.test_tick_execution import Harness, provider_for, profile_for, open_plan, command, exercise, assert_case
@@ -72,6 +74,18 @@ class TickExecutionPostgresTests(unittest.TestCase):
             with self.subTest(case=case["id"]):
                 h=exercise(case,self.store,self.scope,session=f"fixture:golden:{index}")
                 assert_case(self,case,h)
+                with connect(DSN) as db:
+                    row=db.execute('SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+                        'WHERE workspace_id=%s AND session_id=%s',
+                        (self.scope.workspace_id,h.session)).fetchone()
+                    event_rows=db.execute('SELECT payload,content_hash FROM btl.tick_events '
+                        'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
+                        (self.scope.workspace_id,h.session)).fetchall()
+                self.assertIsNotNone(row)
+                durable=unpack(*row)
+                events=[unpack(*event_row) for event_row in event_rows]
+                expected=project(h.state,events,None)
+                self.assertEqual(durable_metrics(durable),canonical_metrics(expected['completed']))
 
     def test_concurrent_identical_retry_stale_conflict_and_namespace(self):
         h=self.harness();h.call("OPEN",open_plan(self.case["open"]),name="order")
@@ -93,6 +107,110 @@ class TickExecutionPostgresTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError,"RESOURCE_UNAVAILABLE"):fresh.apply(outsider,raw)
         with self.assertRaisesRegex(ContractError,"RESOURCE_UNAVAILABLE"):fresh.inspect(outsider,h.session)
         self.assertEqual(self.records(),recorded)
+
+    def test_terminal_order_archive_is_indexed_immutable_and_keyset_paginated(self):
+        h=self.harness(session='fixture:terminal-archive:'+uuid.uuid4().hex)
+        for index in range(3):
+            order_id=f'archive:order:{index}'
+            opened=h.call('OPEN',open_plan(self.case['open']),name=order_id)
+            raw=command(h.session,f'archive:cancel:{index}',opened['state']['revision'],
+                        'CANCEL',{'orderId':order_id})
+            receipt=h.controller.apply(self.scope,raw)
+            self.assertEqual(receipt['state']['orders'],{})
+            self.assertEqual(h.controller.apply(self.scope,raw),receipt)
+        first=self.store.order_history(self.scope,h.session,limit=2)
+        self.assertEqual(len(first['records']),2)
+        self.assertFalse(first['complete'])
+        self.assertEqual(first['records'][0]['order']['status'],'CANCELLED')
+        second=self.store.order_history(self.scope,h.session,after_sequence=first['nextCursor'],limit=2)
+        self.assertEqual(len(second['records']),1)
+        self.assertTrue(second['complete'])
+        self.assertEqual(second['records'][0]['sequence'],2)
+        self.assertEqual(self.store.archive_order(self.scope,h.session,'archive:order:1')['order']['status'],
+                         'CANCELLED')
+        with connect(DSN) as db:
+            count=db.execute('SELECT count(*) FROM btl.tick_terminal_orders WHERE workspace_id=%s AND session_id=%s',
+                             (self.scope.workspace_id,h.session)).fetchone()[0]
+        self.assertEqual(count,3)
+
+    def test_new_session_advances_journal_order_index_with_financial_events(self):
+        session = 'fixture:journal-index:' + uuid.uuid4().hex
+        h = self.harness(session=session)
+        order_id = 'journal:order:one'
+        h.call('OPEN', open_plan(self.case['open']), name=order_id)
+        h.call('CANCEL', dict(orderId=order_id), name='journal:cancel')
+        with connect(DSN) as db:
+            head = db.execute(
+                'SELECT format_version,through_sequence,event_hash,order_count,closed_order_count,analytics_format_version '
+                'FROM btl.tick_journal_projection_heads '
+                'WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id, session),
+            ).fetchone()
+            indexed = db.execute(
+                'SELECT i.sequence,i.event_id,i.event_kind,e.payload,e.content_hash '
+                'FROM btl.tick_journal_order_events i JOIN btl.tick_events e '
+                'ON (e.workspace_id,e.session_id,e.sequence)='
+                '(i.workspace_id,i.session_id,i.sequence) '
+                'WHERE i.workspace_id=%s AND i.session_id=%s AND i.order_id=%s '
+                'ORDER BY i.sequence',
+                (self.scope.workspace_id, session, order_id),
+            ).fetchall()
+            projection_row = db.execute(
+                'SELECT p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
+                'i.projection_hash FROM btl.tick_journal_order_projection p '
+                'JOIN btl.tick_journal_order_events i '
+                'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
+                '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
+                'WHERE p.workspace_id=%s AND p.session_id=%s AND p.order_id=%s',
+                (self.scope.workspace_id, session, order_id),
+            ).fetchone()
+            metric_row = db.execute(
+                'SELECT payload,content_hash FROM btl.tick_session_metric_projections '
+                'WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id, session),
+            ).fetchone()
+        self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1, 0, 1))
+        events = [unpack(row[3], row[4]) for row in indexed]
+        self.assertEqual([row[2] for row in indexed], [event['kind'] for event in events])
+        self.assertEqual(events[0]['kind'], 'ORDER_ACCEPTED')
+        self.assertEqual(events[-1]['kind'], 'ORDER_CANCELLED')
+        self.assertEqual([event['sequence'] for event in events], [row[0] for row in indexed])
+        self.assertEqual(projection_row[:3], ('CANCELLED', indexed[-1][0], indexed[-1][1]))
+        projection = unpack(projection_row[3], projection_row[4])
+        self.assertEqual(projection['order']['status'], 'CANCELLED')
+        self.assertEqual(projection['contentHash'], projection_row[5])
+        metric_projection = unpack(*metric_row)
+        self.assertEqual((metric_projection['throughSequence'], metric_projection['eventHead']),
+                         (h.state['nextEventIndex'], h.state['eventHash']))
+        self.assertEqual(metric_projection['totals']['tradeCount'], 0)
+
+    def test_compact_cold_recovery_uses_periodic_verified_base(self):
+        from unittest.mock import patch
+        from execution.postgres import COMPACT_RECOVERY_INTERVAL
+        h=self.harness(session='fixture:recovery-base:'+uuid.uuid4().hex)
+        h.through(0)
+        for index in range(COMPACT_RECOVERY_INTERVAL//2):
+            order_id=f'recovery:order:{index}'
+            opened=h.call('OPEN',open_plan(self.case['open']),name=order_id)
+            h.call('CANCEL',dict(orderId=order_id),name=f'recovery:cancel:{index}')
+        self.assertGreaterEqual(h.state['revision'],COMPACT_RECOVERY_INTERVAL)
+        with connect(DSN) as db:
+            row=db.execute('SELECT revision,state_hash,chain_hash,record_hash,payload,content_hash '
+                'FROM btl.tick_recovery_bases WHERE workspace_id=%s AND session_id=%s '
+                'ORDER BY revision DESC LIMIT 1',(self.scope.workspace_id,h.session)).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row[0],COMPACT_RECOVERY_INTERVAL)
+        used=[]
+        from execution import observed_state_delta_v3
+        original=observed_state_delta_v3.reconstruct_complete
+        def track(base,deltas,target_revision,**kwargs):
+            used.append(kwargs.get('base_revision',0))
+            return original(base,deltas,target_revision,**kwargs)
+        with patch('execution.postgres.PostgresExecutionStore._cache_read',return_value=None), \
+             patch('execution.postgres.reconstruct_complete',side_effect=track):
+            cold=PostgresExecutionStore(DSN).inspect(self.scope,h.session)
+        self.assertEqual(cold['state'],h.state)
+        self.assertEqual(used,[COMPACT_RECOVERY_INTERVAL])
 
     def test_compact_v1_matches_snapshot_results_cold_recovery_and_idempotency(self):
         case = self.case
@@ -152,6 +270,10 @@ class TickExecutionPostgresTests(unittest.TestCase):
         self.assertEqual(len(self.records()["tick_events"]),3)
         self.assertEqual(len(self.records()["tick_commands"]),2)
         self.assertEqual(h.controller.apply(self.scope,raw),result)
+        if phase == 'after':
+            page=self.store.order_history(self.scope,h.session,limit=8)
+            self.assertEqual(len(page['records']),1)
+            self.assertEqual(page['records'][0]['order']['status'],'CLOSED')
 
     def test_real_worker_death_after_sql_before_commit(self):
         self._worker_death("before")

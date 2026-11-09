@@ -37,6 +37,14 @@ function mockAccount(page, state) {
     if (sub === '/methods' && method === 'POST') { const body = req.postDataJSON(); const r = await fetch(API + '/methods', { method: 'POST', headers, body: JSON.stringify(body) }); const v = await r.json(); if (r.ok) state.methods.push(body); return json(r.status, v); }
     const r = await fetch(API + sub, { method, headers, body: method === 'GET' ? undefined : req.postData() });
     const v = await r.json();
+    // Reconcile the exact command through the durable status endpoint after
+    // confirmation. The browser flow below then asserts the receipt before it
+    // continues into Journal and Analytics.
+    const confirmed = method === 'POST' && sub.match(/^\/sessions\/([^/]+)\/confirm$/);
+    if (confirmed && r.ok && v?.commandId) {
+      const status = await fetch(API + `/sessions/${encodeURIComponent(confirmed[1])}/commands/${encodeURIComponent(v.commandId)}`, { headers });
+      state.receipt = status.ok ? await status.json() : { status: 'UNAVAILABLE', httpStatus: status.status };
+    }
     if (sub === '/sessions' && method === 'POST' && r.ok) state.sessions.push(v.metadata);
     return json(r.status, v);
   });
@@ -151,6 +159,8 @@ function mockAccount(page, state) {
     await page.getByRole('button', { name: 'Confirm order' }).click(); await sleep(2000);
     const footer = await page.locator('footer').innerText();
     must(!/refused|error/i.test(footer), 'confirm refused: ' + footer);
+    must(state.receipt?.status === 'COMMITTED' && state.receipt?.receipt?.durable === true,
+      'durable command receipt was not readable after confirmation');
     return footer.slice(0, 90);
   });
   await step('Journal opens from the Session; refresh requires sign-in', async () => {
