@@ -187,7 +187,9 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                     process.stdin.write(json.dumps(config)+'\n')
                     process.stdin.flush()
                     for line in process.stdout:
-                        if len(line) > 2048:
+                        # The bounded API trace can include up to 64 sanitized
+                        # method/path/status tuples; keep a hard 16 KiB ceiling.
+                        if len(line) > 16384:
                             raise ValueError('QA_PROTOCOL_LIMIT')
                         item = json.loads(line)
                         if item.get('need') == 'verification' and item.get('email') == email:
