@@ -77,7 +77,6 @@ class BrowserGateSafetyTests(unittest.TestCase):
         self.assertIn('basic_auth {$BTL_STAGING_AUTH_USER} {$BTL_STAGING_AUTH_HASH}', caddy)
         self.assertIn('staging_database:/var/lib/postgresql/data', compose)
         self.assertIn('BTL_DOMAIN=staging.example.invalid', example)
-        self.assertIn('BTL_DOMAIN=staging.example.invalid', example)
         self.assertNotIn('BTL_DOMAIN=riksora.com', example)
 
 
