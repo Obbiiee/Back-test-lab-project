@@ -153,8 +153,54 @@ class ObservedResearchApplication:
                             session_meta.get('methodId')==method_id and
                             session_meta.get('methodHash')==policy.definition_hash,
                             'methodSession','CORRUPT_RECORD')
-                        aggregate.exclude(dict(sessionId=session_id,
-                            reason='LEGACY_METHOD_ANALYTICS_PROJECTION_NOT_READY'))
+                        # Rebuild old local Sessions from their persisted state and
+                        # committed event chain. The fold is capped at the legacy
+                        # analysis contract and streams event pages; it never loads
+                        # the Method's order history or trusts a cached projection.
+                        from .analysis import MAX_ANALYSIS_EVENTS
+                        from .method_analytics_projection import fold_legacy_session
+                        from .postgres import PostgresExecutionStore
+                        state_row=db.execute('SELECT payload,content_hash,revision,dataset_version,profile_hash '
+                            'FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                            (self.scope.workspace_id,session_id)).fetchone()
+                        require(state_row is not None,'methodSession','CORRUPT_RECORD')
+                        saved=PostgresExecutionStore(self.dsn,state_storage_format='compact-v1').read_session(
+                            db,self.scope,session_id,state_row)
+                        state=saved['state']
+                        require(state.get('sessionId')==session_id and
+                            state.get('policy',{}).get('definitionHash')==policy.definition_hash and
+                            (state.get('datasetId'),state.get('datasetVersion'),state.get('profileHash'))==
+                                (session_meta.get('datasetId'),session_meta.get('datasetVersion'),
+                                 session_meta.get('profileHash')) and
+                            state.get('revision')==state_row[2],
+                            'methodSession','CORRUPT_RECORD')
+                        unit=(state['profileHash'],state['engineVersion'],
+                              state['profile']['accountCurrency'])
+                        aggregate.observe_unit(unit)
+                        if state['nextEventIndex']>MAX_ANALYSIS_EVENTS:
+                            aggregate.exclude(dict(sessionId=session_id,
+                                reason='REFUSED_ANALYSIS_LIMIT'))
+                            continue
+                        def committed_events():
+                            offset=0
+                            while offset<state['nextEventIndex']:
+                                page=db.execute('SELECT payload,content_hash FROM btl.tick_events '
+                                    'WHERE workspace_id=%s AND session_id=%s AND sequence >= %s '
+                                    'ORDER BY sequence LIMIT 256',
+                                    (self.scope.workspace_id,session_id,offset)).fetchall()
+                                require(page,'events','CORRUPT_RECORD')
+                                for raw_event in page:
+                                    event=unpack(*raw_event)
+                                    require(event.get('sequence')==offset,
+                                        'eventSequence','CORRUPT_RECORD')
+                                    offset+=1
+                                    yield event
+                        folded=fold_legacy_session(state,committed_events())
+                        if folded['status']!='COMPLETE':
+                            aggregate.exclude(dict(sessionId=session_id,
+                                reason=folded.get('reason','ANALYSIS_UNAVAILABLE')))
+                            continue
+                        aggregate.include(folded['item'])
                         continue
                     require(session_meta.get('artifact')==META and
                         session_meta.get('id')==session_id and

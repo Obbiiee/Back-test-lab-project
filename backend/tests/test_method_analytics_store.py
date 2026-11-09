@@ -6,7 +6,9 @@ from unittest.mock import patch
 
 from contracts.primitives import ContractError
 from execution.method_analytics_projection import MethodAnalyticsAccumulator
-from execution.method_analytics_store import add_session, load_rollup, replace_session
+from execution.method_analytics_store import (
+    add_session, invalidate_local_session, load_rollup, replace_session,
+)
 
 
 def codec(value):
@@ -62,6 +64,36 @@ class FakeDb:
 
 
 class MethodAnalyticsStoreTests(unittest.TestCase):
+    def test_local_session_advance_invalidates_method_rollup_in_same_transaction(self):
+        class Db:
+            def __init__(self):
+                self.statements = []
+
+            def execute(self, sql, params):
+                self.statements.append((sql, params))
+                if sql.startswith('SELECT method_id'):
+                    return Cursor(('method:one',))
+                return Cursor()
+
+        db = Db()
+        self.assertTrue(invalidate_local_session(db, 'workspace:one', 'session:one'))
+        self.assertEqual(len(db.statements), 2)
+        self.assertIn("rollup_state='REBUILD_REQUIRED'", db.statements[1][0])
+        self.assertEqual(db.statements[1][1], ('workspace:one', 'method:one'))
+
+    def test_unregistered_session_does_not_invalidate_an_unrelated_method(self):
+        class Db:
+            def __init__(self):
+                self.statements = []
+
+            def execute(self, sql, params):
+                self.statements.append((sql, params))
+                return Cursor(None)
+
+        db = Db()
+        self.assertFalse(invalidate_local_session(db, 'workspace:one', 'session:orphan'))
+        self.assertEqual(len(db.statements), 1)
+
     def test_new_session_updates_ready_rollup_in_same_transaction(self):
         accumulator = MethodAnalyticsAccumulator('method:one', 'a' * 64)
         db = FakeDb(accumulator)

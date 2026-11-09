@@ -50,6 +50,16 @@ def legacy_session_item(state, completed):
 
 
 
+def fold_legacy_session(state, events):
+    """Verify one bounded legacy event chain and reduce its completed trades."""
+    from .analysis import project
+    analysis = project(state, events, None)
+    if analysis.get('status') != 'COMPLETE':
+        return dict(status=analysis.get('status', 'UNAVAILABLE'),
+            reason=analysis.get('reason', 'ANALYSIS_UNAVAILABLE'))
+    return dict(status='COMPLETE', item=legacy_session_item(state, analysis['completed']))
+
+
 class MethodAnalyticsAccumulator:
     """Pool Session summaries with bounded response detail memory."""
 

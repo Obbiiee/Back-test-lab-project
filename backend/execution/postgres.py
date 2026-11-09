@@ -315,6 +315,10 @@ class PostgresExecutionStore:
                            (workspace, session, next_state["revision"], state_raw, state_hash))
             db.execute("UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s",
                        (next_state["revision"], state_raw, state_hash, workspace, session))
+            # Invalidate legacy/local Method summaries atomically with the Session
+            # commit so cached totals and revision/event-head details cannot go stale.
+            from .method_analytics_store import invalidate_local_session
+            invalidate_local_session(db, workspace, session)
         # Publication follows successful COMMIT; an after-commit crash is handled by durable dedup.
         if compact_mode:
             self._cache_write(workspace, session, next_state, next_checkpoint, next_chain)

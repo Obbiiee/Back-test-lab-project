@@ -91,6 +91,21 @@ def require_rebuild(db, workspace_id, method_id):
     )
 
 
+def invalidate_local_session(db, workspace_id, session_id):
+    """Invalidate a Method snapshot when its legacy/local Session advances."""
+    row = db.execute(
+        'SELECT method_id FROM btl.tick_research_sessions '
+        'WHERE workspace_id=%s AND session_id=%s',
+        (workspace_id, session_id),
+    ).fetchone()
+    if row is None:
+        return False
+    require(type(row[0]) is str and row[0],
+        'methodSession', 'CORRUPT_RECORD')
+    require_rebuild(db, workspace_id, row[0])
+    return True
+
+
 def add_session(db, workspace_id, method_id, method_hash, item):
     stored = load_rollup(db, workspace_id, method_id, method_hash, lock=True)
     if stored['state'] != 'READY':
