@@ -422,9 +422,10 @@ class ResearchApplication:
                 start = max(0,int(state['nextGroupIndex'])-len(groups))
                 view['chart'] = display_candles(groups,state['throughNs'],timeframe,start)
                 def committed_events():
-                    # Small bounded pages from this same repeatable-read snapshot.
-                    # Refusal above the projection budget occurs before this generator runs.
-                    for offset in range(0, min(state['nextEventIndex'], MAX_ANALYSIS_EVENTS), 256):
+                    # Read the complete ledger in small bounded pages. Analysis is
+                    # lifetime-history capable; the compatibility constant is not
+                    # a session order/event cap.
+                    for offset in range(0, state['nextEventIndex'], 256):
                         page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
                             (self.scope.workspace_id,session_id,offset)).fetchall()
                         for row in page:
@@ -491,7 +492,7 @@ class ResearchApplication:
 
     def _committed_analysis(self, db, state, quote=None):
         def events():
-            for offset in range(0,min(state['nextEventIndex'],MAX_ANALYSIS_EVENTS),256):
+            for offset in range(0,state['nextEventIndex'],256):
                 page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
                                   (self.scope.workspace_id,state['sessionId'],offset)).fetchall()
                 for row in page:
