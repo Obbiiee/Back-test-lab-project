@@ -221,74 +221,46 @@ class ResearchApplication:
     def method_analytics(self, method_id):
         """Pool completed committed positions across compatible Sessions only.
 
-        This is a bounded read projection. It never combines account balances,
-        runs a replay, or treats incomplete Sessions as zero-return samples.
+        Session metadata is read in fixed-size keyset batches. One Session's
+        verified event fold is reduced immediately into exact aggregate totals;
+        completed rows are never retained across the Method's lifetime.
         """
-        from .analysis import MAX_ANALYSIS_EVENTS, metrics
+        from .method_analytics_projection import (MethodAnalyticsAccumulator,
+            METHOD_SESSION_BATCH, legacy_session_item)
         identifier(method_id, 'methodId')
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             method = self._method(db, method_id)
             policy = method_policy(method)
-            rows = db.execute(
-                'SELECT session_id FROM btl.tick_research_sessions WHERE workspace_id=%s AND method_id=%s '
-                'ORDER BY session_id LIMIT 129', (self.scope.workspace_id, method_id)).fetchall()
-            require(len(rows) <= 128, 'methodSessions', 'REFUSED_METHOD_ANALYSIS_LIMIT')
-
-            compatible = []
-            excluded = []
-            event_budget = 0
-            units = set()
-            for (session_id,) in rows:
-                meta, _method, state, _checkpoint = self._session(db, session_id)
-                require(meta.get('artifact') == 'BTL-LOCAL-SESSION-1' and
-                        meta.get('methodHash') == policy.definition_hash,
-                        'methodSession', 'CORRUPT_RECORD')
-                current_unit = (state['profileHash'], state['engineVersion'],
-                                state['profile']['accountCurrency'])
-                units.add(current_unit)
-                compatible.append((session_id, state['revision'], current_unit))
-                event_budget += state['nextEventIndex']
-
-            common = dict(schemaVersion=1, artifact='BTL-METHOD-ANALYTICS-1', methodId=method_id,
-                          methodHash=policy.definition_hash,
-                          aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
-                          balancesCombined=False, financialAuthority='COMMITTED_EVENTS_ONLY')
-            if len(units) > 1:
-                return dict(**common, status='UNAVAILABLE', reason='INCOMPATIBLE_FINANCIAL_UNITS',
-                            includedSessions=[], excludedSessions=[
-                                {'sessionId': item[0], 'reason': 'MULTIPLE_FINANCIAL_UNITS'} for item in compatible],
-                            metrics=None)
-            if event_budget > MAX_ANALYSIS_EVENTS:
-                return dict(**common, status='UNAVAILABLE', reason='REFUSED_METHOD_ANALYSIS_LIMIT',
-                            eventBudget=MAX_ANALYSIS_EVENTS, observedEventCount=event_budget,
-                            includedSessions=[], excludedSessions=excluded + [
-                                {'sessionId': item[0], 'reason': 'METHOD_EVENT_BUDGET'} for item in compatible],
-                            metrics=None)
-
-            completed = []
-            included = []
-            for session_id, revision_value, _current_unit in compatible:
-                _meta, _method, state, _checkpoint = self._session(db, session_id)
-                analysis = self._committed_analysis(db, state)
-                if analysis['status'] != 'COMPLETE':
-                    excluded.append({'sessionId': session_id, 'reason': analysis.get('reason', 'ANALYSIS_UNAVAILABLE')})
-                    continue
-                completed.extend(analysis['completed'])
-                included.append({'sessionId': session_id, 'revision': revision_value,
-                                 'datasetId': state['datasetId'], 'datasetVersion': state['datasetVersion'],
-                                 'profileHash': state['profileHash'], 'engineVersion': state['engineVersion'],
-                                 'eventHead': state['eventHash'], 'tradeCount': len(analysis['completed'])})
-
-            pooled = metrics(completed)
-            # Trade order across separate Sessions has no shared chronology, so
-            # cross-Session streaks and balances are intentionally not reported.
-            pooled.pop('maxWinStreak', None)
-            pooled.pop('maxLossStreak', None)
-            unit = next(iter(units), None)
-            return dict(**common, status='COMPLETE', accountCurrency=unit[2] if unit else None,
-                        completedTradeNet=text(sum((Fraction(row['net']) for row in completed), Fraction())),
-                        includedSessions=included, excludedSessions=excluded, metrics=pooled)
+            aggregate = MethodAnalyticsAccumulator(method_id, policy.definition_hash)
+            after = ''
+            while True:
+                rows = db.execute(
+                    'SELECT session_id FROM btl.tick_research_sessions '
+                    'WHERE workspace_id=%s AND method_id=%s AND session_id>%s '
+                    'ORDER BY session_id LIMIT %s',
+                    (self.scope.workspace_id, method_id, after,
+                     METHOD_SESSION_BATCH + 1)).fetchall()
+                more = len(rows) > METHOD_SESSION_BATCH
+                for (session_id,) in rows[:METHOD_SESSION_BATCH]:
+                    after = session_id
+                    meta, _method, state, _checkpoint = self._session(db, session_id)
+                    require(meta.get('artifact') == 'BTL-LOCAL-SESSION-1' and
+                            meta.get('methodHash') == policy.definition_hash,
+                            'methodSession', 'CORRUPT_RECORD')
+                    unit = (state['profileHash'], state['engineVersion'],
+                            state['profile']['accountCurrency'])
+                    aggregate.observe_unit(unit)
+                    analysis = self._committed_analysis(db, state)
+                    if analysis['status'] != 'COMPLETE':
+                        aggregate.exclude(dict(sessionId=session_id,
+                            reason=analysis.get('reason', 'ANALYSIS_UNAVAILABLE')))
+                        continue
+                    aggregate.include(legacy_session_item(state, analysis['completed']))
+                if not more:
+                    break
+                require(rows and after, 'methodSessions', 'CORRUPT_RECORD')
+            return aggregate.result()
 
     def create_method(self, raw):
         raw = deepcopy(raw)
