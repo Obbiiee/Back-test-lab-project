@@ -211,6 +211,10 @@ try{
   const resumedTerminal=page.getByRole('region',{name:'Trading and Analysis'});
   await resumedTerminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);
+  await Promise.allSettled(apiBodyReads);
+  expect(apiTrace.filter(entry=>entry.status===429)).toEqual([]);
+  const committedJournal=apiTrace.filter(entry=>entry.path.endsWith('/journal/pages')&&entry.status===200).at(-1);
+  expect(committedJournal?.journalPage?.firstOrderStatuses).toEqual(['CLOSED']);
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
