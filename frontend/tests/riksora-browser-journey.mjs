@@ -137,10 +137,12 @@ try{
   const journalRowCount=await journalRows.count();
   phase=`global_journal_order_count_${journalRowCount}`;
   expect(journalRowCount).toBe(1);
-  await page.getByRole('link',{name:'Sessions',exact:true}).first().click();
+  phase='global_sessions_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
+  phase='global_sessions_heading';await expect(page.getByRole('heading',{name:'Sessions',exact:true})).toBeVisible();
+  phase='global_analytics_link';
   await page.getByRole('link',{name:'Analytics for Synthetic browser session',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Research analytics'})).toBeVisible();
-  await expect(page.getByText('Synthetic browser session',{exact:true})).toBeVisible();
+  phase='global_analytics_heading';await expect(page.getByRole('heading',{name:'Research analytics'})).toBeVisible();
+  phase='global_analytics_session';await expect(page.getByText('Synthetic browser session',{exact:true})).toBeVisible();
   phase='logout_resume';await page.getByRole('navigation',{name:'Account and help'}).getByRole('link',{name:'Account',exact:true}).click();
   await page.getByRole('button',{name:'Sign out',exact:true}).click();
   await expect(page.getByRole('tab',{name:'Sign in',exact:true})).toBeVisible();
