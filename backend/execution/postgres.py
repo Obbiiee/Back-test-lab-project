@@ -430,3 +430,8 @@ def grant_execution_runtime(dsn, role):
         db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}").format(sql.Identifier(role)))
+        # Product Sessions maintain bounded, rebuildable Journal and analytics
+        # projections in the same transaction as their immutable event append.
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads,btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT INSERT ON btl.tick_journal_order_events TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,UPDATE ON btl.tick_session_metric_projections,btl.tick_method_metric_projections,btl.tick_research_sessions TO {}").format(sql.Identifier(role)))
