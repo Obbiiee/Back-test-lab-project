@@ -65,5 +65,19 @@ jobs:
         working-directory: backend
         run: >-
           python -m unittest -v
-          tests.test_observed_postgres
+          tests.test_observed_postgres.ObservedPostgresTests.test_replaceable_replay_progress_rejects_rewind_and_wrong_base
+          tests.test_observed_postgres.ObservedPostgresTests.test_replay_progress_consumption_is_atomic_with_receipt
+          tests.test_observed_postgres.ObservedPostgresTests.test_compact_v1_new_session_commit_cold_read_and_retry_parity
+          tests.test_observed_postgres.ObservedPostgresTests.test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger
+          tests.test_observed_postgres.ObservedPostgresTests.test_actual_transactions_cold_source_and_source_outage_receipt_and_journal
+          tests.test_observed_postgres.ObservedPostgresTests.test_replay_to_uses_existing_durable_advances_and_recovers_idempotently
+          tests.test_observed_postgres.ObservedPostgresTests.test_concurrent_duplicate_conflict_and_other_workspace_refused
+          tests.test_observed_postgres.ObservedPostgresTests.test_shared_source_checkpoint_survives_pg_sigkill_after_commit_and_retry
+          tests.test_observed_postgres.ObservedPostgresTests.test_before_commit_process_death_rolls_back_after_commit_death_retries_once
+          tests.test_observed_postgres.ObservedPostgresTests.test_mutated_session_tip_cannot_replace_immutable_checkpoint
+          tests.test_observed_postgres.ObservedPostgresTests.test_failed_write_transaction_keeps_state_and_then_source_orphan_recovers
+          tests.test_observed_postgres.ObservedPostgresTests.test_guarded_source_hash_permissions_and_exact_day_selection
+          tests.test_observed_postgres.ObservedPostgresTests.test_restricted_runtime_commits_but_cannot_modify_evidence
+          tests.test_observed_postgres.ObservedPostgresTests.test_nonempty_sidecar_is_not_admitted_by_empty_catalog_capability
+          tests.test_observed_postgres.ObservedPostgresTests.test_observed_research_application_method_session_review_statistics_journal
           tests.test_migration_reconciliation

@@ -344,7 +344,7 @@ class ObservedPostgresTests(unittest.TestCase):
             env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(worker_data,sort_keys=True),
                      BTL_TEST_DATABASE_URL=qa_dsn,BTL_ENABLE_QA_ORDER_ARCHIVE_V1='1')
             proc=subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],
-                cwd=Path(__file__).resolve().parents[2],env=env,capture_output=True,text=True,timeout=90)
+                cwd=Path(__file__).resolve().parents[1],env=env,capture_output=True,text=True,timeout=90)
             self.assertEqual(proc.returncode,-signal.SIGKILL,proc.stderr)
             after_kill=fresh.inspect(qa_scope,sid)['state']
             self.assertEqual(after_kill['orderArchive']['count'],2)
