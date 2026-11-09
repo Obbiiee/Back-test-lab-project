@@ -100,6 +100,9 @@ def run(tools, browser_cache):
                           workerFailureCode=report.get('workerFailureCode'),
                           failurePhase=report.get('failurePhase'),
                           browserFailureType=report.get('browserFailureType'),
+                          screenState=report.get('screenState', []),
+                          browserDiagnostics=report.get('browserDiagnostics'),
+                          pageErrorCount=report.get('pageErrorCount'),
                           apiTrace=report.get('apiTrace', []))))
     return 0 if report['status'] == 'PASS' else 1
 
