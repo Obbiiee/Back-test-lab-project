@@ -85,6 +85,9 @@ def run(tools, browser_cache):
     except Exception as error:
         # Detailed browser/build logs remain inside the private evidence folder.
         report['failureType'] = type(error).__name__
+        message = error.args[0] if error.args else None
+        if isinstance(message, str) and message.isascii() and message.isidentifier():
+            report['failureCode'] = message
     finally:
         report['seconds'] = str(time.monotonic()-began)
         (evidence/'report.json').write_text(json.dumps(report, indent=2)+'\n')
@@ -92,6 +95,7 @@ def run(tools, browser_cache):
                           classification=report['classification'], cleanup=report['cleanup'],
                           steps=report['steps'], progress=report['progress'],
                           failureType=report.get('failureType'),
+                          failureCode=report.get('failureCode'),
                           failurePhase=report.get('failurePhase'),
                           browserFailureType=report.get('browserFailureType'),
                           apiTrace=report.get('apiTrace', []))))
