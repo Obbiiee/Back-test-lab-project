@@ -209,6 +209,8 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                                     entry.get('method') in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') and
                                     isinstance(entry.get('path'), str) and len(entry['path']) <= 240 and
                                     type(entry.get('status')) is int and 100 <= entry['status'] <= 599 and
+                                    (entry.get('state') is None or entry.get('state') in
+                                     ('QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED')) and
                                     (entry.get('code') is None or
                                      isinstance(entry.get('code'), str) and
                                      entry['code'].isascii() and entry['code'].isupper() and

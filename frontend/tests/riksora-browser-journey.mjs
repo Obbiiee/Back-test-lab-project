@@ -26,8 +26,12 @@ const apiTrace=[];page.on('response',async response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
   const body=await response.json().catch(()=>null),detail=body?.detail;
-  if(pathname.startsWith('/api/v1/')&&apiTrace.length<64)apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
-    code:response.status()>=400&&typeof detail==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(detail)?detail:null});
+  if(pathname.startsWith('/api/v1/')&&apiTrace.length<64){
+    const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
+    apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
+      code:typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null,
+      state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
+  }
 });
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
 let phase='proof';
