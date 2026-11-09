@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {loadProductCatalog,loadMoreProductCatalog,loadJournalPage,createMethodVersion,setMethodArchived,
   loadMethodFamily,loadMethodVersionPage} from '../src/tickAlpha/client.js';
 import {setAccountTransport,clearAccountTransport} from '../src/tickAlpha/accountClient.js';
@@ -12,6 +13,10 @@ const family=id=>({familyId:id,revision:1,archived:false,latestVersion:1,latestM
   current:method(id),versions:[{version:1,methodId:id,method:method(id)}]});
 const versionHref=routeHref({screen:'method-new',family:'method:one'},'https://riksora.test/?page=account');
 assert.equal(readRoute('https://riksora.test'+versionHref).family,'method:one');
+const sessionWizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
+const terminal=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),'utf8');
+assert.match(sessionWizard,/onCreate\(\{name:finalName,methodId:method\.id,symbol:instrument,/);
+assert.match(terminal,/api\('\/sessions',\{id:creationId\.current,name:fields\.name,methodId:fields\.methodId,\s*symbol:fields\.symbol,/);
 const calls=[];
 const client={subject:()=>subject,request:async (path,options={})=>{
   calls.push(path);

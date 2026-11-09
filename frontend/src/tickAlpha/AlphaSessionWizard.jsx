@@ -44,7 +44,8 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
     event.preventDefault();
     if(step<4){if(ready[step])setStep(step+1);return;}
     if(!ready.every(Boolean)||busy)return;
-    onCreate({name:finalName,methodId:method.id,initialBalance:balance,startPeriod:availability.mode==='fixed'?catalog.startPeriod:period});
+    onCreate({name:finalName,methodId:method.id,symbol:instrument,initialBalance:balance,
+      startPeriod:availability.mode==='fixed'?catalog.startPeriod:period});
   };
   return <>
     <PageHead back={method?{label:method.name,to:{screen:'method',method:method.id}}:{label:'Sessions',to:{screen:'sessions'}}} eyebrow="New Session" title="Set up a replay"

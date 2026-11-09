@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 8377)
+Total output lines: 286
+
 import '../workspace/designTokens.css';
 import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
@@ -181,7 +184,7 @@ export default function TickAlpha(){
     run(async()=>{
      try{
       const saved=await api('/sessions',{id:creationId.current,name:fields.name,methodId:fields.methodId,
-        initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
+        symbol:fields.symbol,initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
       const workspace=await loadWorkspace(saved.metadata.id);
       setCatalog(await loadProductCatalog());setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
@@ -211,15 +214,7 @@ export default function TickAlpha(){
         setConnecting(true);try{const result=await loadResearchContext(route.screen==='replay'?route.session:null,{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button>}><p>{isAccountPage()?'Retry, or sign out and sign in again. Nothing was changed.':'Start the local alpha service and database, then retry. Saved Sessions are kept.'}</p></StatePanel>)
       :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='method-new'?<MethodNew key={route.family||'new'} catalog={catalog} route={route} onSaved={async methodId=>{setCatalog(await loadProductCatalog());setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice(route.family?'New immutable Method version saved.':'Method saved. Create a Session to start replay.');}}/>
-      :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onLifecycle={async()=>setCatalog(await loadProductCatalog())} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
-      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
-      :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>
-      :route.screen==='journal'?<AlphaJournalPage catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='analytics'?<Analytics catalog={catalog} route={route}/>
-      :route.screen==='replay'&&route.session?(busy||!notice?<StatePanel level={1} kind="loading" title="Opening Session…"/>:<StatePanel level={1} kind="unavailable" title="This Session could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
+      :route.screen==='method-new'?<MethodNew key={route.family||'new'} catalog={catalog} route={route} onSaved=…377 tokens truncated…could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
       :route.screen==='help'?<HelpPage catalog={catalog} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>
       :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
       :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
