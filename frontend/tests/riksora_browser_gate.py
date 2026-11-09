@@ -93,6 +93,7 @@ def run(tools, browser_cache):
                           steps=report['steps'], progress=report['progress'],
                           failureType=report.get('failureType'),
                           failurePhase=report.get('failurePhase'),
+                          browserFailureType=report.get('browserFailureType'),
                           apiTrace=report.get('apiTrace', []))))
     return 0 if report['status'] == 'PASS' else 1
 
