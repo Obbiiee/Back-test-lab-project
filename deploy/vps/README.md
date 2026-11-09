@@ -78,6 +78,25 @@ python deploy/vps/package.py --output /private/backtest-lab-vps-candidate.zip
 
 The archive reads selected committed Git blobs (not a mutable working-file snapshot) and includes source, Docker/config examples and licenses only, with `RELEASE_MANIFEST.json` mapping each file to SHA256 and the source commit. Files have0644 archive permissions. Existing output is never overwritten. Verify the archive SHA256 and per-file hashes after transfer. Install dependencies/build images on the host; no container binaries, private data or real credentials are included. The package's marker explicitly says untested-container staging candidate, not sales acceptance.
 
+## Isolated private staging overlay
+
+`compose.staging.yaml` is an explicit overlay for a **new, dedicated staging host/project**. It gives PostgreSQL a distinct `staging_database` volume and replaces the gateway Caddyfile with `Caddyfile.staging`, which applies HTTP Basic Auth to both the app and API paths before proxying. Do not run this overlay against a production Compose project or production database. The overlay deliberately does not set `BTL_DOMAIN`; use a separately owned staging hostname and never `riksora.com`.
+
+On the verified staging host, copy `.env.staging.example` to a private `.env.staging` file, fill only immutable image digests and the staging host values, and protect it with mode0600. Create separate staging-only runtime/database/owner secrets under the configured `BTL_SECRET_DIR`; do not copy production credentials or data. Generate a Caddy bcrypt password hash using the installed Caddy interactive command and store the hash and a staging-only username in that private env file. Never put the plaintext password in Git, a command argument, or chat. Validate the rendered Compose configuration locally without printing it:
+
+```sh
+docker compose -p riksora-staging --env-file deploy/vps/.env.staging \
+  -f deploy/vps/compose.yaml -f deploy/vps/compose.staging.yaml config --quiet
+```
+
+Build from the reviewed release archive/source on that host, start only the isolated staging database, provision its restricted roles, run the existing explicit migration operator, then start gateway/API using the same two Compose files and project name. `runtime.py health` is the API's existing healthcheck. Before handing over a URL, verify externally that the hostname is the staging host, unauthenticated requests to both `/` and `/api/v1/auth/providers` receive Basic Auth challenge, authenticated requests reach the app/API, and the product login still works. Use only synthetic test accounts/data. The Basic Auth gate is defense in depth; it does not certify application ownership, source rights, capacity, or production safety.
+
+For rollback, retain the previous staging release archive and image digests, staging config version, and encrypted staging-only database dump. Validate a restore into a separate disposable database before any staging restore. Roll back the staging project to the previous compatible app/API image and config; do not use `down -v`, reuse a production volume, or restore over a live database as a test. Existing backup commands above apply, but a successful command is not a restore drill. The staging overlay and host procedure are prepared only; no VPS access or deployment is implied by repository changes.
+
+## Synthetic browser acceptance
+
+The GitHub Actions workflow `Product V1 browser acceptance` installs Python dependencies from `backend/requirements.lock`, Playwright 1.64.1 from the committed lockfile, and Chromium plus its OS libraries with Playwright's `install --with-deps` on an ephemeral Ubuntu 24.04 runner. The browser gate starts its own Unix-socket-only PostgreSQL16 cluster and a loopback HTTPS backend with a restricted app role. It verifies a one-use challenge before browser actions, blocks external browser origins, forwards real same-origin API traffic, and uses `RecordingDelivery` only to deliver the generated synthetic verification token. Private screenshots and diagnostics stay in the runner's mode0700 test-artifact directory and are not uploaded as public Actions artifacts. This is synthetic functional evidence, not historical-market, source-rights, TLS-host, capacity, or production acceptance.
+
 ## Required acceptance before selling
 
 Keep existing rights/source completeness and canonical tick eligibility, UI/v2-only commercial quota, real Google/email/payment/refund/reconciliation, backup/restore, resource/reference capacity, telemetry/support and existing cohort/GO-HOLD gates. A static package test, working HTTPS page or sample payment is not final paid-Beta certification. No automatic public enrollment or live charges are enabled here.

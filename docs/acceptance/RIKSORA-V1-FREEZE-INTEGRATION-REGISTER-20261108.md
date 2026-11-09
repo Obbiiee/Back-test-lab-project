@@ -1,5 +1,13 @@
 # RIKSORA V1 — frozen-architecture integration register
 
+## Owner-authorized browser/staging checkpoint (2026-11-09)
+
+Added a version-pinned Playwright 1.64.1 browser acceptance lane on Ubuntu 24.04. It installs Chromium and its OS libraries using Playwright's official `install --with-deps` command, builds the checked-out frontend, starts the existing disposable Unix-socket PostgreSQL16 harness, starts the real HTTPS backend with a restricted runtime role, and drives the current account/Method/Session/replay/order/receipt/Journal/Analytics/logout/resume UI. The browser has same-origin-only egress; no authored API response mocks are installed. Synthetic verification delivery is supplied by the existing in-memory test delivery adapter. Browser evidence remains on the isolated runner and is not uploaded as a public workflow artifact.
+
+Added `deploy/vps/compose.staging.yaml`, `Caddyfile.staging`, and `.env.staging.example`. The dedicated Compose overlay uses a separate PostgreSQL volume and requires Caddy Basic Auth before any app/API route. Deployment remains **NOT TESTED / BLOCKED**: the configured SSH alias `sorabit` did not resolve from this environment, and no VPS identity/connection was verified. No staging URL exists. The top of `AI_CONTEXT/04_CURRENT_PHASE.md` remains an opaque binary blob; it was preserved and not overwritten. The owner addendum and this register contain the current authorized scope.
+
+Browser workflow execution and final-HEAD browser evidence are **PENDING CI** because this local environment has no Node/npm, Docker, PostgreSQL16 tools or project Python dependencies. Local browser E2E is therefore NOT TESTED at this checkpoint; do not infer PASS from the earlier API functional journey. Synthetic acceptance does not certify historical-source accuracy, licensing, capacity or production.
+
 **Recorded:** 2026-11-08
 **Authority:** [Product System Architecture Blueprint — owner freeze](../PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#owner-decision--riksora-product-v1-architecture-freeze-2026-11-08).
 **Scope:** Candidate Product V1 branch only. No automatic deployment, migration, deletion, data-rights promotion or re-run of the annual benchmark.

@@ -7,6 +7,7 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/product-v1-backend.yml"
+      - ".github/workflows/product-v1-browser.yml"
   push:
     branches:
       - codex/product-v1-p0-1

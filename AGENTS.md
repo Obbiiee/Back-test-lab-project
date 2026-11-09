@@ -1,5 +1,9 @@
 # Backtest Lab — Agent Instructions
 
+## OWNER ADDENDUM — PRIVATE BROWSER ACCEPTANCE (2026-11-09)
+
+The owner explicitly authorizes continuing PR #50 with a reproducible browser E2E in GitHub Actions, installing pinned browser dependencies on disposable CI runners, preparing the existing private-staging configuration, and checking SSH connectivity to the named Sorabit staging host if local SSH configuration supplies it. This supersedes the repository-only restriction above only for those actions and only against an isolated private staging target. No production domain/data, production deployment, historical datasets, annual replay, capacity benchmark, force push, or `main` changes are authorized. Do not print or request private credentials. Deploy only after positively verifying that the SSH target is the dedicated staging host and that the candidate configuration cannot affect production. The current-phase file is an opaque binary blob at this checkpoint and must be preserved; record this limitation in the integration register rather than replacing it speculatively.
+
 ## ACTIVE OWNER DIRECTIVE — REPOSITORY-ONLY PRODUCT V1 BUILD (2026-11-08)
 
 **Highest-priority operational instruction for Codex and other development agents.** The owner has stopped the old benchmark/QA-driven workflow. The current objective is to finish the complete RIKSORA Product V1 application **in the repository**, without assuming any VPS, old data disk, production service or QA environment still exists. A prior owner approval to benchmark, use SSH, run annual replay or clean a server is **not standing authorization**. Older roadmap, handoff and phase-history entries are historical when they conflict with this instruction. This section governs operational permission, not financial or causal semantics.
