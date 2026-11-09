@@ -27,8 +27,15 @@ class MethodAnalyticsAccumulator:
 
     @staticmethod
     def _bounded_append(rows, value):
-        if len(rows) < MAX_SESSION_DETAILS:
+        session_id = value.get('sessionId')
+        index = next((i for i, row in enumerate(rows)
+                      if row.get('sessionId') == session_id), None)
+        if index is not None:
+            rows[index] = value
+        else:
             rows.append(value)
+        rows.sort(key=lambda row: row.get('sessionId', ''))
+        del rows[MAX_SESSION_DETAILS:]
 
     def exclude(self, value):
         self.excluded_count += 1
@@ -159,6 +166,41 @@ class MethodAnalyticsAccumulator:
         self.totals['durationNs'] += duration
         self.included_count += 1
         self._bounded_append(self.included_sessions, item['session'])
+
+    def replace_session(self, previous, current):
+        """Replace one Session's contribution while keeping lifetime state bounded."""
+        require(type(previous) is dict and type(current) is dict and
+            type(previous.get('session')) is dict and type(current.get('session')) is dict and
+            previous['session'].get('sessionId') == current['session'].get('sessionId') and
+            previous.get('unit') == current.get('unit'),
+            'analyticsProjection', 'CORRUPT_RECORD')
+        prior = previous['projection']
+        require(type(prior) is dict and
+            set(prior) >= {'tradeCount','wins','losses','breakeven','positive',
+                           'negative','net','durationNs'},
+            'analyticsProjection', 'CORRUPT_RECORD')
+        for key in ('tradeCount','wins','losses','breakeven'):
+            count = prior.get(key)
+            require(type(count) is int and count >= 0 and self.totals[key] >= count,
+                'analyticsProjection', 'CORRUPT_RECORD')
+            self.totals[key] -= count
+        positive=Fraction(prior['positive']);negative=Fraction(prior['negative'])
+        net=Fraction(prior['net'])
+        require(positive>=0 and negative>=0 and net==positive-negative,
+            'analyticsProjection','CORRUPT_RECORD')
+        for key,value in (('positive',positive),('negative',negative),('net',net)):
+            self.totals[key] -= value
+        require(type(prior['durationNs']) is str and
+            prior['durationNs'].isdigit(), 'analyticsProjection', 'CORRUPT_RECORD')
+        duration = int(prior['durationNs'])
+        require(duration >= 0 and self.totals['durationNs'] >= duration and
+            self.included_count > 0, 'analyticsProjection', 'CORRUPT_RECORD')
+        self.totals['durationNs'] -= duration
+        self.included_count -= 1
+        session_id = previous['session']['sessionId']
+        self.included_sessions = [row for row in self.included_sessions
+                                  if row.get('sessionId') != session_id]
+        self.include(current)
 
     def result(self):
         common = self.common
