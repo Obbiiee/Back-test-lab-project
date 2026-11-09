@@ -250,6 +250,10 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                                     isinstance(entry.get('path'), str) and len(entry['path']) <= 240 and
                                     type(entry.get('status')) is int and 100 <= entry['status'] <= 599 and
                                     (entry.get('rows') is None or type(entry.get('rows')) is int and 0 <= entry['rows'] <= 128) and
+                                    (entry.get('journalPage') is None or isinstance(entry.get('journalPage'), dict) and
+                                     entry['journalPage'].get('artifact') in ('BTL-TICK-JOURNAL-PAGE-1','OTHER') and
+                                     (entry['journalPage'].get('schemaVersion') is None or type(entry['journalPage']['schemaVersion']) is int and 0 <= entry['journalPage']['schemaVersion'] <= 10) and
+                                     all(type(entry['journalPage'].get(key)) is bool for key in ('hasNotes','hasTotalOrders','hasComplete','paginationValid'))) and
                                     (entry.get('state') is None or entry.get('state') in
                                      ('QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED')) and
                                     (entry.get('code') is None or

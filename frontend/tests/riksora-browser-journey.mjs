@@ -31,6 +31,13 @@ const apiTrace=[];page.on('response',async response=>{
     apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
       code:typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null,
       rows:pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null,
+      journalPage:pathname.endsWith('/journal/pages')?{
+        artifact:body?.artifact==='BTL-TICK-JOURNAL-PAGE-1'?'BTL-TICK-JOURNAL-PAGE-1':'OTHER',
+        schemaVersion:Number.isSafeInteger(body?.schemaVersion)?body.schemaVersion:null,
+        hasNotes:Array.isArray(body?.notes),hasTotalOrders:Number.isSafeInteger(body?.totalOrders),
+        hasComplete:typeof body?.complete==='boolean',
+        paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
+      }:null,
       state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
   }
 });
