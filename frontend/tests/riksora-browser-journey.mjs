@@ -127,6 +127,10 @@ try{
   await expect(page.getByRole('heading',{name:'Synthetic browser method',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
   await page.waitForURL(current=>current.searchParams.get('screen')==='journal');
+  phase='global_journal_select_session';await page.locator('.rk-toolbar-combo-wide .rk-combo-trigger').click();
+  await expect(page.getByRole('dialog',{name:'Session'})).toBeVisible();
+  await page.getByRole('option',{name:/Synthetic browser session/}).click();
+  await page.waitForURL(current=>current.searchParams.get('of')===receipt.state.sessionId);
   phase='global_journal_content';
   const journal=page.locator('.rk-journal');
   await expect(journal).toHaveAttribute('aria-label','Orders in Synthetic browser session');
