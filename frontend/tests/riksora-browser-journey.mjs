@@ -159,7 +159,14 @@ try{
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
   await new Promise(resolve=>setTimeout(resolve,0));
-  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',apiTrace})+'\n');
+  const panelTitles=await page.locator('.rk-state h1,.rk-state h2').allTextContents().catch(()=>[]);
+  const panelKinds=new Map([['No orders yet','NO_ORDERS'],['No order matches','FILTERED_EMPTY'],
+    ['The journal could not load','JOURNAL_ERROR'],['Loading the journal…','JOURNAL_LOADING'],
+    ['Choose a Session','CHOOSE_SESSION'],['This Session is not in this workspace','SESSION_MISSING'],
+    ['Analytics could not load','ANALYTICS_ERROR'],['Loading committed analytics…','ANALYTICS_LOADING'],
+    ['Analytics unavailable for this Session','ANALYTICS_UNAVAILABLE']]);
+  const screenState=panelTitles.map(title=>panelKinds.get(title)).filter(Boolean).slice(0,8);
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,apiTrace})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

@@ -223,6 +223,13 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                               item['failureType'].isidentifier()):
                             report['failurePhase'] = item['failurePhase']
                             report['browserFailureType'] = item['failureType']
+                            screen_state = item.get('screenState', [])
+                            allowed_states = {'NO_ORDERS','FILTERED_EMPTY','JOURNAL_ERROR','JOURNAL_LOADING',
+                                              'CHOOSE_SESSION','SESSION_MISSING','ANALYTICS_ERROR',
+                                              'ANALYTICS_LOADING','ANALYTICS_UNAVAILABLE'}
+                            if isinstance(screen_state, list) and len(screen_state) <= 8 and all(
+                                    state in allowed_states for state in screen_state):
+                                report['screenState'] = screen_state
                             trace = item.get('apiTrace', [])
                             if isinstance(trace, list) and len(trace) <= 128:
                                 report['apiTrace'] = [entry for entry in trace if
