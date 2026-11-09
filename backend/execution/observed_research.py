@@ -130,10 +130,15 @@ class ObservedResearchApplication:
         from .analytics_projection import ANALYTICS_PROJECTION_ARTIFACT
         from .method_analytics_projection import MethodAnalyticsAccumulator
         from .method_session_query import method_session_batch
+        from .method_analytics_store import load_rollup,save_rollup
         identifier(method_id,'methodId')
         with connect(self.dsn) as db:
-            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')
             method=self._method(db,method_id);policy=method_policy(method)
+            stored=load_rollup(db,self.scope.workspace_id,method_id,
+                policy.definition_hash,lock=True)
+            if stored['state']=='READY':
+                return stored['accumulator'].result()
             aggregate=MethodAnalyticsAccumulator(method_id,policy.definition_hash)
             after=None
             while True:
@@ -189,6 +194,8 @@ class ObservedResearchApplication:
                 if not more:
                     break
                 require(rows and after is not None,'methodSessions','CORRUPT_RECORD')
+            save_rollup(db,self.scope.workspace_id,method_id,aggregate,
+                aggregate.included_count+aggregate.excluded_count)
             return aggregate.result()
 
     def create_method(self,raw):
@@ -286,11 +293,21 @@ class ObservedResearchApplication:
                     '(workspace_id,session_id,format_version,through_sequence,event_hash,order_count,analytics_format_version) '
                     'VALUES (%s,%s,1,0,%s,0,1)',
                     (self.scope.workspace_id,raw['id'],state['eventHash']))
-                analytics_blob,analytics_hash=pack(initial_projection(state))
+                analytics_projection=initial_projection(state)
+                analytics_blob,analytics_hash=pack(analytics_projection)
                 db.execute('INSERT INTO btl.tick_session_metric_projections '
                     '(workspace_id,session_id,payload,content_hash) VALUES (%s,%s,%s,%s)',
                     (self.scope.workspace_id,raw['id'],analytics_blob,analytics_hash))
                 db.execute('INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)',(self.scope.workspace_id,raw['id'],raw['methodId'],blob,sha))
+                from .method_analytics_store import add_session
+                add_session(db,self.scope.workspace_id,raw['methodId'],policy.definition_hash,
+                    dict(unit=(state['profileHash'],state['engineVersion'],
+                               state['profile']['accountCurrency']),
+                         projection=analytics_projection,session=dict(
+                            sessionId=raw['id'],revision=state['revision'],
+                            datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],
+                            profileHash=state['profileHash'],engineVersion=state['engineVersion'],
+                            eventHead=state['eventHash'],tradeCount=analytics_projection['tradeCount'])))
             source.cache.seed(self.scope,raw['id'],timeline);timeline=None
             return self.inspect(raw['id'])
         finally:
