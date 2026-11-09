@@ -89,7 +89,8 @@ def run(tools, browser_cache):
         report['seconds'] = str(time.monotonic()-began)
         (evidence/'report.json').write_text(json.dumps(report, indent=2)+'\n')
     print(json.dumps(dict(status=report['status'], evidence=str(evidence/'report.json'),
-                          classification=report['classification'], cleanup=report['cleanup'])))
+                          classification=report['classification'], cleanup=report['cleanup'],
+                          steps=report['steps'], failureType=report.get('failureType'))))
     return 0 if report['status'] == 'PASS' else 1
 
 
@@ -99,8 +100,9 @@ def run_browser(environment, tools, browser_cache, evidence, report):
     from psycopg.conninfo import make_conninfo, conninfo_to_dict
     import uvicorn
     from starlette.staticfiles import StaticFiles
-    from infrastructure.database import migrate, grant_identity_runtime, grant_workspace_runtime
+    from infrastructure.database import migrate, grant_workspace_runtime
     from deploy.vps.google_staging import grant_google_demo_runtime
+    from identity.google_store import grant_google_runtime
     from cloud.app import create_app
     from tests.test_identity import RecordingDelivery
     dsn = environment['BTL_TEST_DATABASE_URL']
@@ -110,7 +112,9 @@ def run_browser(environment, tools, browser_cache, evidence, report):
         db.execute('CREATE ROLE btl_owner NOLOGIN')
         db.execute(sql.SQL('CREATE ROLE btl_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE '
                            'NOREPLICATION NOBYPASSRLS PASSWORD {}').format(sql.Literal(password)))
-    grant_identity_runtime(dsn, 'btl_app')
+    # Match the least-privilege runtime grants used by the existing integrated
+    # functional journey. The browser creates/re-authenticates a real account.
+    grant_google_runtime(dsn, 'btl_app')
     grant_workspace_runtime(dsn, 'btl_app')
     grant_google_demo_runtime(dsn)
     runtime = make_conninfo(**{**conninfo_to_dict(dsn), 'user': 'btl_app', 'password': password})
