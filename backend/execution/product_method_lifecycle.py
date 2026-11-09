@@ -158,6 +158,8 @@ def add_version(db, workspace_id, family_id, raw):
     require(method["id"] != family_id and method["id"] != current["id"], "methodId", "REFUSED_IDENTITY_REUSE")
     db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",
                (workspace_id, method["id"], blob, sha))
+    from .method_analytics_store import initialize_rollup
+    initialize_rollup(db, workspace_id, method["id"], policy.definition_hash)
     next_version = family["latest_version"] + 1
     db.execute("INSERT INTO btl.product_method_versions VALUES (%s,%s,%s,%s)",
                (workspace_id, family_id, next_version, method["id"]))
