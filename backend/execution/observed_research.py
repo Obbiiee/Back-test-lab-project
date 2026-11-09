@@ -194,14 +194,16 @@ class ObservedResearchApplication:
         return ResearchApplication.create_method(shell,raw)
 
     def catalog_view(self):
+        from .catalog_window import catalog_window
         with connect(self.dsn) as db:
             db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
-            methods=[unpack(*row) for row in db.execute('SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129',(self.scope.workspace_id,)).fetchall()]
-            require(len(methods)<=128,'catalog','REFUSED_CATALOG_LIMIT')
+            method_rows=db.execute('SELECT method_id,payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
+            method_rows,methods_truncated=catalog_window(method_rows)
+            methods=[unpack(row[1],row[2]) for row in method_rows]
             for method in methods:method_policy(method)
-            rows=db.execute('SELECT payload,content_hash,method_id FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
-            require(len(rows)<=128,'catalog','REFUSED_CATALOG_LIMIT');sessions=[]
-            for raw,sha,method_id in rows:
+            rows=db.execute('SELECT session_id,payload,content_hash,method_id FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129',(self.scope.workspace_id,)).fetchall()
+            rows,sessions_truncated=catalog_window(rows);sessions=[]
+            for session_id,raw,sha,method_id in rows:
                 meta=unpack(raw,sha)
                 if meta.get('artifact')==META:
                     stored_state=_stored_observed_state(db,self.scope.workspace_id,meta['id'])
@@ -218,7 +220,11 @@ class ObservedResearchApplication:
                 elif meta.get('artifact')=='BTL-LOCAL-SESSION-1':
                     tag(meta,'BTL-LOCAL-SESSION-1','id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance')
                     require(meta['methodId']==method_id,'session','CORRUPT_RECORD');self._method(db,method_id);sessions.append(meta)
-            return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',methods=methods,sessions=sessions,datasets=self.catalog.public(),model=MODEL)
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-RESEARCH-CATALOG-1',
+                methods=methods,sessions=sessions,datasets=self.catalog.public(),model=MODEL,
+                methodsTruncated=methods_truncated,sessionsTruncated=sessions_truncated,
+                nextMethodsAfter=method_rows[-1][0] if methods_truncated and method_rows else None,
+                nextSessionsAfter=rows[-1][0] if sessions_truncated and rows else None)
 
     def _session(self,db,session_id,*,lock=False,include_format=False,store=None):
         identifier(session_id,'sessionId')
