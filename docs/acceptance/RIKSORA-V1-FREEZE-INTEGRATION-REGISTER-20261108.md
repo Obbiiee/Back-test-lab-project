@@ -21,6 +21,22 @@ Reconciled the **migration file set only**, on P0-1: retained all original 023â€
 
 The progress-consolidation migration replaces `guard_tick_session`; both histories retain its dependency on `observed_replay_progress` and its restricted-role legacy behavior. #44's terminal archive (`btl.tick_terminal_orders`) and #48's (`btl.tick_terminal_order_archive_v1`) are separate tables with different wire artifacts. They are retained independently; this checkpoint does not convert archive evidence or dispatch one artifact through the other implementation.
 
+**Archive/replay integration contract matrix (source-verified on the current #49 tree):**
+
+| Field/behavior | PR #44 integration archive | PR #48 native Product archive | Candidate handling |
+| --- | --- | --- | --- |
+| Session state identity | `BTL-OBSERVED-EXECUTION-STATE-ARCHIVE-1` | `BTL-OBSERVED-EXECUTION-STATE-PRODUCT-ORDER-ARCHIVE-1` | Dispatch by persisted artifact; no state rewrite |
+| Archive artifact / schema | `BTL-OBSERVED-TERMINAL-ORDER-ARCHIVE-1`, schema 1 | `BTL-TERMINAL-ORDER-ARCHIVE-1`, schema 1 | Keep distinct codec, genesis and summary hashes |
+| Record fields | `schemaVersion, artifact, sessionId, sequence, finalizedRevision, orderId, previousHash, order, orderHash, recordHash` | Same names/shapes | Same field set does not make the wire identity or hashes interchangeable |
+| Summary fields | `schemaVersion, artifact, count, grossPosted, headHash`; integration summary artifact | Same fields; native Product summary artifact | Validate exact summary artifact and chain head per codec |
+| PostgreSQL table | `btl.tick_terminal_orders`; adds required `terminal_status` column, scoped sequence PK and scoped order uniqueness | `btl.tick_terminal_order_archive_v1`; no `terminal_status` column, scoped sequence PK and scoped order uniqueness | Route reads/writes from state artifact; retain both migrations and table schemas. Fixed the combined writer to supply `terminal_status` only for the #44 table. |
+| Write/recovery | Append record and compact summary with the Session checkpoint/receipt transaction; recovery verifies archive records against persisted integration summary | Same transaction boundary using native Product archive codec; cold-read verifies archive tip/chain | Require atomicity and verification in the selected artifact family; do not copy rows across tables |
+| Receipt format | Not determined by archive family. The compact-v1 store encodes `BTL-OBSERVED-EXECUTION-RESULT-COMPACT-1` (`formatVersion=1`); snapshot-v1 stores the full `BTL-OBSERVED-EXECUTION-RESULT-1` | Same receipt formats, selected by persisted state-storage format | Decode only the receipt format selected by state storage; retries bind command ID/hash and recorded state/chain; no receipt promotion or fabricated committed result |
+| Replaceable replay | `compact-progress-v1` row is a PR #48 addition, anchored to immutable base/checkpoint revision and hash; exact latest retry is retained separately from financial receipts | Same PR #48 behavior | Keep replay progress replaceable and monotonic; financial receipt remains immutable and authoritative |
+| Migrations | Original `024_tick_terminal_order_archive.sql` | Original `025_product_terminal_order_archive.sql`, plus progress migration files with independent full filenames | Migration ledger keys full filename + normalized hash; never renumber/edit an applied file |
+
+Regression coverage checks both record schemas, proves each archive verifier rejects the other archive's record, and checks the writer emits the exact selected table columns. The #44 archive writer previously omitted its required `terminal_status`, which would fail that archive insert; this checkpoint fixes the column mapping. These tests do not prove PostgreSQL transaction behavior or the hosted end-to-end journey.
+
 Remaining #48 deltas absent/different in #44 source:
 
 | Slice | Reconciliation disposition |

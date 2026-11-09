@@ -10,6 +10,8 @@ from execution.observed_session_dispatch import (
 from execution.observed_kernel import PRODUCT_ORDER_RETENTION_V1, seed_state, validate_state
 from execution.observed_order_archive_product_v1 import append, advance, summary, verify_complete
 from execution.observed_order_archive_v1 import append as p0_append, summary as p0_summary
+from execution.observed_order_archive_v1 import verify_record as verify_p0_record
+from execution.observed_order_archive_product_v1 import verify_record as verify_integration_record
 from execution.observed_postgres import (ObservedExecutionStore, checked_result_value,
     compact_receipt_v1, expand_compact_receipt_v1)
 from execution.observed_state_delta_v3 import (encode_compact_base, encode_compact_delta,
@@ -166,6 +168,58 @@ class ObservedSessionDispatchTests(unittest.TestCase):
             order_id='order:integration', order=integration_order)
         store._verify_archive_record(p0_state, p0_record, expected_sequence=0)
         store._verify_archive_record(integration_state, integration_record, expected_sequence=0)
+
+    def test_archive_writer_supplies_only_the_selected_table_columns(self):
+        store = ObservedExecutionStore('synthetic-dsn', order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+            product_order_archive_v1=True, state_storage_format='compact-v1')
+        states = (
+            ({'artifact': P0_PRODUCT_ARCHIVE, 'orderArchive': {}},
+             p0_append(p0_summary(artifact='BTL-TERMINAL-ORDER-ARCHIVE-1'),
+                session_id='session:p0-write', revision=3, order_id='order:p0-write',
+                order={'status': 'CANCELLED', 'grossPosted': '0'},
+                artifact='BTL-TERMINAL-ORDER-ARCHIVE-1'), False),
+            ({'artifact': INTEGRATION_PRODUCT_ARCHIVE, 'orderArchive': {}},
+             append(summary(), session_id='session:integration-write', revision=3,
+                order_id='order:integration-write', order={'status': 'CANCELLED', 'grossPosted': '0'}), True),
+        )
+        for state, record, integration in states:
+            calls = []
+            class FakeDb:
+                def execute(self, query, params): calls.append((query, params))
+            store._insert_archive_record(FakeDb(), 'workspace:archive-write',
+                state['sessionId'] if 'sessionId' in state else record['sessionId'], state, record)
+            query, params = calls[0]
+            self.assertEqual('terminal_status' in query, integration)
+            self.assertEqual(len(params), 9 if integration else 8)
+            if integration:
+                self.assertEqual(params[4], 'CANCELLED')
+            self.assertIn(store._archive_table(state), query)
+
+    def test_archive_artifact_identity_and_hash_chain_are_not_interchangeable(self):
+        """The parallel archive wire formats stay versioned even with equal fields."""
+        order = {'status': 'CANCELLED', 'grossPosted': '0', 'reason': 'synthetic-contract-test'}
+        p0_head = p0_summary(artifact='BTL-TERMINAL-ORDER-ARCHIVE-1')
+        integration_summary = summary()
+        p0_record = p0_append(p0_head, session_id='session:contract', revision=3,
+            order_id='order:contract', order=order,
+            artifact='BTL-TERMINAL-ORDER-ARCHIVE-1')
+        integration_record = append(integration_summary, session_id='session:contract', revision=3,
+            order_id='order:contract', order=order)
+
+        expected_fields = {'schemaVersion', 'artifact', 'sessionId', 'sequence',
+            'finalizedRevision', 'orderId', 'previousHash', 'order', 'orderHash', 'recordHash'}
+        self.assertEqual(set(p0_record), expected_fields)
+        self.assertEqual(set(integration_record), expected_fields)
+        self.assertNotEqual(p0_record['artifact'], integration_record['artifact'])
+        self.assertNotEqual(p0_record['previousHash'], integration_record['previousHash'])
+        self.assertNotEqual(p0_record['orderHash'], integration_record['orderHash'])
+        self.assertNotEqual(p0_record['recordHash'], integration_record['recordHash'])
+        verify_p0_record(p0_record)
+        verify_integration_record(integration_record)
+        with self.assertRaises(ContractError):
+            verify_p0_record(integration_record)
+        with self.assertRaises(ContractError):
+            verify_integration_record(p0_record)
 
     def test_integration_archive_history_pages_keep_cursor_and_revision_binding(self):
         store = ObservedExecutionStore('synthetic-dsn', order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
