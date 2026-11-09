@@ -105,6 +105,8 @@ class ExnessParquetPipelineTests(unittest.TestCase):
         self.assertTrue(all(row["status"] == "VERIFIED" for row in resumed["partitions"]))
 
     def test_zip_member_pipeline_and_provider_rights_gate(self):
+        valid_result = self.run_fixture()
+        self.assertEqual(valid_result["status"], "COMPLETE")
         archive = self.root / "SYNTHETIC_ONLY.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
             output.writestr("folder/EURUSD.csv", self.csv.read_bytes())
@@ -116,6 +118,15 @@ class ExnessParquetPipelineTests(unittest.TestCase):
         self.assertEqual(json.loads(blocked_inventory.read_bytes())["partitionCount"], 544)
         self.assertTrue(all(row["status"] == "BLOCKED" for row in
                             json.loads(blocked_inventory.read_bytes())["partitions"].values()))
+
+        # Losing a rights-evidence file blocks new acquisition, without
+        # rewriting already verified evidence into a different data status.
+        reopened = process_zip_member(archive, "folder/EURUSD.csv", "EURUSD",
+            self.output, inventory_path=self.inventory_path)
+        self.assertEqual(reopened["status"], "BLOCKED")
+        inventory = json.loads(self.inventory_path.read_bytes())["partitions"]
+        self.assertEqual(inventory[ExnessInventory.key(partition_for("EURUSD", 2024, 1))]["status"], "VERIFIED")
+        self.assertEqual(inventory[ExnessInventory.key(partition_for("EURUSD", 2024, 2))]["status"], "VERIFIED")
 
         result = process_zip_member(archive, "folder/EURUSD.csv", "EURUSD",
             self.output, inventory_path=self.inventory_path, synthetic_fixture=True, row_group_size=2)

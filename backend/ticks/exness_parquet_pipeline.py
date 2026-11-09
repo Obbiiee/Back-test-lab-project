@@ -228,7 +228,8 @@ class ExnessInventory:
         return self.partitions[self.key(partition)]["status"]
 
     def block_all(self, reason):
-        self.partitions = {key: {**row, "status": "BLOCKED", "reason": reason}
+        self.partitions = {key: row if row["status"] == "VERIFIED" else
+                           {**row, "status": "BLOCKED", "reason": reason}
                            for key, row in self.partitions.items()}
         self._save()
 
@@ -237,7 +238,8 @@ class ExnessInventory:
         matched = False
         for key, row in self.partitions.items():
             if row["originalSymbol"] == symbol:
-                self.partitions[key] = {**row, **evidence, "status": status}
+                if row["status"] != "VERIFIED":
+                    self.partitions[key] = {**row, **evidence, "status": status}
                 matched = True
         require(matched, "symbol", "IDENTITY_CONFLICT")
         self._save()
