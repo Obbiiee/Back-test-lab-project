@@ -38,10 +38,15 @@ class IdentityBoundary:
         except Exception as error:
             if started or scope["type"] != "http":
                 raise
-            # SQLSTATE is safe diagnostic metadata and makes a privilege or
-            # schema failure actionable without logging request bodies/DSNs.
-            log.error("Identity boundary unavailable requestId=%s type=%s sqlstate=%s",
-                      correlation, type(error).__name__, getattr(error, "sqlstate", None))
+            # Database diagnostic text is retained only for permission errors;
+            # it identifies the denied object without request data or DSNs.
+            sqlstate = getattr(error, "sqlstate", None)
+            object_error = None
+            if sqlstate == "42501":
+                diagnostic = getattr(error, "diag", None)
+                object_error = getattr(diagnostic, "message_primary", None)
+            log.error("Identity boundary unavailable requestId=%s type=%s sqlstate=%s objectError=%s",
+                      correlation, type(error).__name__, sqlstate, object_error)
             await JSONResponse({"detail": "SERVICE_UNAVAILABLE"}, status_code=503,
                                headers={"Cache-Control": "no-store", "X-Request-ID": correlation})(scope, receive, send)
 
