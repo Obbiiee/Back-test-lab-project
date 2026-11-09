@@ -202,7 +202,7 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                     process.stdin.write(json.dumps(config)+'\n')
                     process.stdin.flush()
                     for line in process.stdout:
-                        # The bounded API trace can include up to 64 sanitized
+                        # The bounded API trace can include up to 128 sanitized
                         # method/path/status tuples; keep a hard 16 KiB ceiling.
                         if len(line) > 16384:
                             raise ValueError('QA_PROTOCOL_LIMIT')
@@ -224,12 +224,13 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                             report['failurePhase'] = item['failurePhase']
                             report['browserFailureType'] = item['failureType']
                             trace = item.get('apiTrace', [])
-                            if isinstance(trace, list) and len(trace) <= 64:
+                            if isinstance(trace, list) and len(trace) <= 128:
                                 report['apiTrace'] = [entry for entry in trace if
                                     isinstance(entry, dict) and
                                     entry.get('method') in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') and
                                     isinstance(entry.get('path'), str) and len(entry['path']) <= 240 and
                                     type(entry.get('status')) is int and 100 <= entry['status'] <= 599 and
+                                    (entry.get('rows') is None or type(entry.get('rows')) is int and 0 <= entry['rows'] <= 128) and
                                     (entry.get('state') is None or entry.get('state') in
                                      ('QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED')) and
                                     (entry.get('code') is None or

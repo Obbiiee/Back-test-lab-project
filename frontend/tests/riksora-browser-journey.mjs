@@ -26,10 +26,11 @@ const apiTrace=[];page.on('response',async response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
   const body=await response.json().catch(()=>null),detail=body?.detail;
-  if(pathname.startsWith('/api/v1/')&&apiTrace.length<64){
+  if(pathname.startsWith('/api/v1/')&&apiTrace.length<128){
     const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
     apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
       code:typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null,
+      rows:pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null,
       state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
   }
 });
