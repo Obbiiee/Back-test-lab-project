@@ -198,3 +198,8 @@ The claim query lets another actor's interactive job pass a fresh multi-chunk re
 ## Safe merge / owner decision
 
 Merge this freeze into the Product V1 integration branch only after comparing against current Codex/Claude changes and resolving actual conflicts without discarding either party's work. This register grants no authority to run destructive cleanup, change protected evidence, deploy, or bypass source licensing. The single source of architecture authority remains the existing Product System Architecture Blueprint.
+
+
+### GitHub follow-up — bounded Method Analytics and catalog compatibility (2026-11-09)
+
+**Partial, focused synthetic evidence:** PR #48 now uses 32-Session keyset batches to pool verified per-Session analytics projections without the former 128-Session route refusal. The accumulator's versioned exact-rational snapshot/restore contract is present, but is not yet stored or updated transactionally by the database runtime. Observed catalog compatibility returns a bounded 128-row prefix with explicit truncation and next keys instead of refusing larger workspaces. Focused local regression set: 43/43 PASS; Python compilation and diff check PASS. PostgreSQL route/lifecycle tests remain NOT RUN because this environment lacks `psycopg` and `BTL_TEST_DATABASE_URL`. Next: durable Method rollup schema/writes and rebuild path, followed by PostgreSQL compatibility acceptance. This does not certify PR #44/#48 integration or hosted completion.
