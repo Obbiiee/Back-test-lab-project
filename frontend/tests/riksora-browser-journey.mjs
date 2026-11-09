@@ -94,8 +94,13 @@ try{
   expect(response.status()).toBe(200);
   const receipt=await response.json();
   expect(receipt.durable).toBe(true);
-  expect(receipt.artifact).toBe('BTL-OBSERVED-EXECUTION-RESULT-1');
+  // This gate deliberately boots the local synthetic executor. Its committed
+  // receipt is the local Tick contract; observed-source receipts are tested by
+  // the PostgreSQL contract suite and must not be conflated here.
+  expect(receipt.artifact).toBe('BTL-TICK-EXECUTION-RESULT-1');
   expect(typeof receipt.commandId).toBe('string');
+  expect(receipt.commandHash).toMatch(/^[a-f0-9]{64}$/);
+  expect(receipt.state?.sessionId).toBe(decodeURIComponent(new URL(request.url()).pathname.split('/').at(-2)));
   const authorization=await request.headerValue('authorization');
   expect(authorization).toBeTruthy();
   const retry=await context.request.post(request.url(),{headers:{Authorization:authorization,'Content-Type':'application/json'},data:request.postDataJSON(),maxRedirects:0});
