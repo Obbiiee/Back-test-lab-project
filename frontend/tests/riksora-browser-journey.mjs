@@ -125,11 +125,8 @@ try{
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
   phase='workspace_method_back';await page.getByRole('link',{name:'Back to Synthetic browser method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method',exact:true})).toBeVisible();
-  phase='workspace_sessions_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Sessions',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
-  phase='global_journal_heading';
-  await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
+  phase='global_journal_heading';await expect(page.locator('.rk-page-title h1')).toHaveText('Journal');
   const journal=page.locator('.rk-journal');
   await expect(journal).toHaveAttribute('aria-label','Orders in Synthetic browser session');
   const journalRows=journal.locator('li');
@@ -141,7 +138,7 @@ try{
   phase='global_sessions_heading';await expect(page.getByRole('heading',{name:'Sessions',exact:true})).toBeVisible();
   phase='global_analytics_link';
   await page.getByRole('link',{name:'Analytics for Synthetic browser session',exact:true}).click();
-  phase='global_analytics_heading';await expect(page.getByRole('heading',{name:'Research analytics'})).toBeVisible();
+  phase='global_analytics_heading';await expect(page.locator('.rk-page-title h1')).toHaveText('Research analytics');
   phase='global_analytics_session';await expect(page.locator('.rk-scope dd').filter({hasText:'Synthetic browser session'})).toHaveCount(1);
   phase='logout_resume';await page.getByRole('navigation',{name:'Account and help'}).getByRole('link',{name:'Account',exact:true}).click();
   await page.getByRole('button',{name:'Sign out',exact:true}).click();
