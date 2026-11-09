@@ -100,22 +100,19 @@ def run_browser(environment, tools, browser_cache, evidence, report):
     from psycopg.conninfo import make_conninfo, conninfo_to_dict
     import uvicorn
     from starlette.staticfiles import StaticFiles
-    from infrastructure.database import migrate, grant_workspace_runtime
+    from deploy.vps.ops import migrate_and_grant
     from deploy.vps.google_staging import grant_google_demo_runtime
-    from identity.google_store import grant_google_runtime
     from cloud.app import create_app
     from tests.test_identity import RecordingDelivery
     dsn = environment['BTL_TEST_DATABASE_URL']
-    migrate(dsn)
     password = secrets.token_urlsafe(32)
     with psycopg.connect(dsn) as db:
         db.execute('CREATE ROLE btl_owner NOLOGIN')
         db.execute(sql.SQL('CREATE ROLE btl_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE '
                            'NOREPLICATION NOBYPASSRLS PASSWORD {}').format(sql.Literal(password)))
-    # Match the least-privilege runtime grants used by the existing integrated
-    # functional journey. The browser creates/re-authenticates a real account.
-    grant_google_runtime(dsn, 'btl_app')
-    grant_workspace_runtime(dsn, 'btl_app')
+    # Exercise the same restricted runtime grants as a staging migration,
+    # including existing Product V1 read-model and execution tables.
+    migrate_and_grant(dsn)
     grant_google_demo_runtime(dsn)
     runtime = make_conninfo(**{**conninfo_to_dict(dsn), 'user': 'btl_app', 'password': password})
     delivery = RecordingDelivery()

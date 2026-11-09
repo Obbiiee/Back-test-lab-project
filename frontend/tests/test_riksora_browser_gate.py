@@ -79,6 +79,11 @@ class BrowserGateSafetyTests(unittest.TestCase):
         self.assertIn('BTL_DOMAIN=staging.example.invalid', example)
         self.assertNotIn('BTL_DOMAIN=riksora.com', example)
 
+    def test_browser_uses_complete_staging_runtime_grants(self):
+        operator = (gate.REPOSITORY/'deploy/vps/ops.py').read_text()
+        self.assertIn('grant_execution_runtime', operator)
+        self.assertIn('migrate_and_grant(dsn)', (ROOT/'riksora_browser_gate.py').read_text())
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
