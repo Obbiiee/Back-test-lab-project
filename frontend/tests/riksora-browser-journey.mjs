@@ -176,11 +176,17 @@ try{
     ['Analytics could not load','ANALYTICS_ERROR'],['Loading committed analytics…','ANALYTICS_LOADING'],
     ['Analytics unavailable for this Session','ANALYTICS_UNAVAILABLE']]);
   const screenState=panelTitles.map(title=>panelKinds.get(title)).filter(Boolean).slice(0,8);
-  const browserDiagnostics=await page.evaluate(()=>({
-    routeScreen:new URL(location.href).searchParams.get('screen'),
-    journalLists:document.querySelectorAll('.rk-journal').length,
-    journalRows:document.querySelectorAll('.rk-journal li').length,
-  })).catch(()=>({routeScreen:null,journalLists:0,journalRows:0}));
+  const browserDiagnostics=await page.evaluate(()=>{
+    const error=document.querySelector('.rk-state-error .rk-state-body')?.textContent||'';
+    const journalError=error.includes('Unsupported Journal page')?'JOURNAL_SCHEMA':
+      error.includes('Journal pagination did not advance')?'JOURNAL_CURSOR':
+      error.includes('Unsupported workspace response')?'WORKSPACE_SCHEMA':
+      error.includes('REFUSED')||error.includes('CORRUPT_RECORD')?'BACKEND_REFUSAL':
+      document.querySelector('.rk-state-error')?'OTHER':'NONE';
+    return {routeScreen:new URL(location.href).searchParams.get('screen'),
+      journalLists:document.querySelectorAll('.rk-journal').length,
+      journalRows:document.querySelectorAll('.rk-journal li').length,journalError};
+  }).catch(()=>({routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'}));
   process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
     pageErrorCount:errors.length,browserDiagnostics,apiTrace})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});

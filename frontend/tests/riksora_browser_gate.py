@@ -239,6 +239,8 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                                         'sessions','session','session-new','analytics','journal','catalog','help','replay',None) and
                                     type(diagnostics.get('journalLists')) is int and 0 <= diagnostics['journalLists'] <= 10 and
                                     type(diagnostics.get('journalRows')) is int and 0 <= diagnostics['journalRows'] <= 128 and
+                                    diagnostics.get('journalError') in ('JOURNAL_SCHEMA','JOURNAL_CURSOR',
+                                        'WORKSPACE_SCHEMA','BACKEND_REFUSAL','OTHER','NONE','UNAVAILABLE') and
                                     type(item.get('pageErrorCount')) is int and 0 <= item['pageErrorCount'] <= 32):
                                 report['browserDiagnostics'] = diagnostics
                                 report['pageErrorCount'] = item['pageErrorCount']
