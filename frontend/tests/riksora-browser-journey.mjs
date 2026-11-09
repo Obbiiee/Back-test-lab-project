@@ -156,7 +156,11 @@ try{
   phase='journal_analytics_workspace_heading';
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
   phase='journal_analytics_trade_count_label';
-  await expect(terminal.getByText('Completed trades',{exact:true})).toBeVisible();
+  const completedLabel=terminal.locator('.alpha-analysis dt').filter({hasText:/^Completed trades$/});
+  // The chart precedes the definition list inside a bounded scroll panel. Bring
+  // the committed metric into the panel viewport before asserting visibility.
+  await completedLabel.scrollIntoViewIfNeeded();
+  await expect(completedLabel).toHaveText('Completed trades');
   phase='journal_analytics_trade_count_value';
   const completedMetric=terminal.locator('.alpha-analysis dl div').filter({hasText:'Completed trades'});
   await expect(completedMetric.locator('dd')).toHaveText('1');
