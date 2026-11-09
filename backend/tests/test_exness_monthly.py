@@ -93,14 +93,21 @@ class ExnessMonthlyTests(unittest.TestCase):
         partition = partition_for("EURUSD", 2024, 1)
         checkpoint_path = self.root / "checkpoint.json"
         checkpoint = Checkpoint(checkpoint_path)
-        hashes = {key: "a" * 64 for key in ("source_sha256", "parquet_sha256", "manifest_sha256")}
+        source = self.root / "source.zip"
+        parquet = self.root / "ticks.parquet"
+        manifest = self.root / "manifest.json"
+        source.write_bytes(b"synthetic source")
+        parquet.write_bytes(b"synthetic parquet payload")
+        manifest.write_bytes(b"synthetic manifest")
         self.assertEqual(checkpoint.status(partition), "PENDING")
-        checkpoint.mark_verified(partition, **hashes)
+        checkpoint.mark_verified(partition, source_path=source, parquet_path=parquet,
+                                 manifest_path=manifest)
         reloaded = Checkpoint(checkpoint_path)
-        self.assertTrue(reloaded.verified(partition, **hashes))
-        self.assertFalse(reloaded.verified(partition, source_sha256="b" * 64,
-                                            parquet_sha256="a" * 64,
-                                            manifest_sha256="a" * 64))
+        self.assertTrue(reloaded.verified(partition, source_path=source, parquet_path=parquet,
+                                         manifest_path=manifest))
+        source.write_bytes(b"changed source")
+        self.assertFalse(reloaded.verified(partition, source_path=source, parquet_path=parquet,
+                                           manifest_path=manifest))
 
     def test_zip_path_traversal_fails_closed_without_extraction(self):
         archive = self.root / "unsafe.zip"

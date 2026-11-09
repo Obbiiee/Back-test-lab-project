@@ -18,7 +18,7 @@ import re
 import tempfile
 import zipfile
 
-from contracts.primitives import require
+from contracts.primitives import ContractError, require
 from .exness_v2 import FIELDS, TICK_HISTORY_FIELDS
 
 
@@ -95,8 +95,10 @@ def _month_bounds_ns(year, month):
 
 
 def sha256_file(path):
+    path = Path(path)
+    require(not path.is_symlink() and path.is_file(), "source", "SOURCE_PATH_REFUSED")
     sha = hashlib.sha256()
-    with Path(path).open("rb") as stream:
+    with path.open("rb") as stream:
         while block := stream.read(1024 * 1024):
             sha.update(block)
     return sha.hexdigest()
@@ -194,16 +196,21 @@ class Checkpoint:
     def _key(partition):
         return f"{partition.original_symbol}/{partition.period}"
 
-    def verified(self, partition, *, source_sha256, parquet_sha256, manifest_sha256):
+    def verified(self, partition, *, source_path, parquet_path, manifest_path):
         row = self.rows.get(self._key(partition), {})
-        return row == {"status": "VERIFIED", "sourceSha256": source_sha256,
-                       "parquetSha256": parquet_sha256, "manifestSha256": manifest_sha256}
+        try:
+            hashes = {"sourceSha256": sha256_file(source_path),
+                      "parquetSha256": sha256_file(parquet_path),
+                      "manifestSha256": sha256_file(manifest_path)}
+        except (OSError, ContractError):
+            return False
+        return row == {"status": "VERIFIED", **hashes}
 
-    def mark_verified(self, partition, *, source_sha256, parquet_sha256, manifest_sha256):
-        for value in (source_sha256, parquet_sha256, manifest_sha256):
-            require(type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value), "hash", "INVALID_INPUT")
-        self.rows[self._key(partition)] = {"status": "VERIFIED", "sourceSha256": source_sha256,
-            "parquetSha256": parquet_sha256, "manifestSha256": manifest_sha256}
+    def mark_verified(self, partition, *, source_path, parquet_path, manifest_path):
+        paths = {"sourceSha256": source_path, "parquetSha256": parquet_path,
+                 "manifestSha256": manifest_path}
+        hashes = {key: sha256_file(path) for key, path in paths.items()}
+        self.rows[self._key(partition)] = {"status": "VERIFIED", **hashes}
         self._save()
 
     def status(self, partition):
