@@ -9,6 +9,7 @@ const input=createInterface({input:process.stdin})[Symbol.asyncIterator]();
 const read=async()=>JSON.parse((await input.next()).value);
 const config=await read();
 const url=new URL(config.url);
+const configOrigin=url.origin;
 if(url.protocol!=='https:'||url.hostname!=='127.0.0.1'||Number(url.port)<1024||url.username||url.password||url.pathname!=='/'||url.search!=='?page=account'||url.hash||!/^[a-f0-9]{64}$/.test(config.nonce))throw Error('EXCLUSIVE_QA_TARGET_REQUIRED');
 if(process.argv.includes('--check-config')){process.stdout.write('QA_TARGET_SYNTAX_ACCEPTED\n');process.exit(0);}
 const expected=realpathSync(join(ROOT,'frontend/tests/artifacts'));
@@ -21,6 +22,14 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
+const apiFailures=[];page.on('response',async response=>{
+  if(response.status()<400)return;
+  const url=new URL(response.url());if(url.origin!==configOrigin) return;
+  const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
+  const body=await response.json().catch(()=>null),detail=body?.detail;
+  apiFailures.push({method:response.request().method(),path:pathname,status:response.status(),
+    code:typeof detail==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(detail)?detail:null});
+});
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
 let phase='proof';
 try{
@@ -121,7 +130,8 @@ try{
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
-  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error'})+'\n');
+  await new Promise(resolve=>setTimeout(resolve,0));
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',apiFailures})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

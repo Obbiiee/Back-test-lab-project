@@ -92,7 +92,8 @@ def run(tools, browser_cache):
                           classification=report['classification'], cleanup=report['cleanup'],
                           steps=report['steps'], progress=report['progress'],
                           failureType=report.get('failureType'),
-                          failurePhase=report.get('failurePhase'))))
+                          failurePhase=report.get('failurePhase'),
+                          apiFailures=report.get('apiFailures', []))))
     return 0 if report['status'] == 'PASS' else 1
 
 
@@ -200,6 +201,17 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                               item['failureType'].isidentifier()):
                             report['failurePhase'] = item['failurePhase']
                             report['browserFailureType'] = item['failureType']
+                            failures = item.get('apiFailures', [])
+                            if isinstance(failures, list) and len(failures) <= 32:
+                                report['apiFailures'] = [entry for entry in failures if
+                                    isinstance(entry, dict) and
+                                    entry.get('method') in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') and
+                                    isinstance(entry.get('path'), str) and len(entry['path']) <= 240 and
+                                    type(entry.get('status')) is int and 400 <= entry['status'] <= 599 and
+                                    (entry.get('code') is None or
+                                     isinstance(entry.get('code'), str) and
+                                     entry['code'].isascii() and entry['code'].isupper() and
+                                     all(c.isalnum() or c == '_' for c in entry['code']))]
                         elif item.get('complete') is True:
                             report['browserVersion'] = item['browserVersion']
                             complete = True
