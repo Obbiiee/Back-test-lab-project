@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - codex/product-v1-p0-1
+      - codex/v1-p0-followup-20261109
     paths:
       - "backend/**"
       - ".github/workflows/product-v1-backend.yml"
@@ -55,6 +56,7 @@ jobs:
           tests.test_method_analytics_legacy
           tests.test_observed_method_analytics
           tests.test_method_analytics_projection
+          tests.test_tick_analysis.AnalysisGoldenTests
           tests.test_execution_goldens
           tests.test_observed_session_dispatch
           tests.test_observed_product_application

@@ -200,6 +200,23 @@ class AnalysisGoldenTests(unittest.TestCase):
             self.assertIsNone(metrics([])[key])
         self.assertIsNone(metrics([{'net':'10'}])['profitFactor'])
 
+    def test_metrics_accepts_single_pass_iterators_with_exact_results(self):
+        rows = [
+            {'net': '10', 'rMultiple': {'numerator': '3', 'denominator': '2'}, 'durationNs': '11'},
+            {'net': '-4', 'rMultiple': None, 'durationNs': '19'},
+            {'net': '0', 'rMultiple': None, 'durationNs': None},
+        ]
+        expected = metrics(rows)
+        consumed = []
+
+        def once():
+            for row in rows:
+                consumed.append(row['net'])
+                yield row
+
+        self.assertEqual(metrics(once()), expected)
+        self.assertEqual(consumed, ['10', '-4', '0'])
+
     def test_short_mark_uses_revealed_ask_and_future_mark_is_unavailable(self):
         case=next(c for c in goldens()['scenarios'] if c['id']=='market-short')
         h=Harness(provider_for(case));h.call('OPEN',open_plan(case['open']),name='short:mark')

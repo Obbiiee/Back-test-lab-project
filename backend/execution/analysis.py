@@ -101,31 +101,45 @@ def excursions(completed, groups, state):
 
 
 def metrics(completed):
-    nets = [Fraction(row['net']) for row in completed]
-    wins = [n for n in nets if n > 0]
-    losses = [n for n in nets if n < 0]
-    positive, negative = sum(wins, Fraction()), -sum(losses, Fraction())
-    r_values = [Fraction(int(row['rMultiple']['numerator']), int(row['rMultiple']['denominator']))
-                for row in completed if row.get('rMultiple') is not None]
-    durations = [int(row['durationNs']) for row in completed if row.get('durationNs') is not None]
+    trade_count = wins = losses = breakeven = r_eligible = duration_count = 0
+    total_net = positive = negative = total_r = total_duration = Fraction()
     streak_win = streak_loss = maximum_win = maximum_loss = 0
-    for net in nets:
+    for row in completed:
+        net = Fraction(row['net'])
+        trade_count += 1
+        total_net += net
+        if net > 0:
+            wins += 1
+            positive += net
+        elif net < 0:
+            losses += 1
+            negative -= net
+        else:
+            breakeven += 1
         streak_win = streak_win + 1 if net > 0 else 0
         streak_loss = streak_loss + 1 if net < 0 else 0
         maximum_win, maximum_loss = max(maximum_win, streak_win), max(maximum_loss, streak_loss)
-    return dict(tradeCount=len(nets), wins=len(wins), losses=len(losses), breakeven=sum(n == 0 for n in nets),
-        winRate=ratio(Fraction(len(wins), len(nets))) if nets else None,
-        averageWin=ratio(positive / len(wins)) if wins else None,
-        averageLoss=ratio(-negative / len(losses)) if losses else None,
-        expectancy=ratio(sum(nets, Fraction()) / len(nets)) if nets else None,
+        r_multiple = row.get('rMultiple')
+        if r_multiple is not None:
+            total_r += Fraction(int(r_multiple['numerator']), int(r_multiple['denominator']))
+            r_eligible += 1
+        duration = row.get('durationNs')
+        if duration is not None:
+            total_duration += int(duration)
+            duration_count += 1
+    return dict(tradeCount=trade_count, wins=wins, losses=losses, breakeven=breakeven,
+        winRate=ratio(Fraction(wins, trade_count)) if trade_count else None,
+        averageWin=ratio(positive / wins) if wins else None,
+        averageLoss=ratio(-negative / losses) if losses else None,
+        expectancy=ratio(total_net / trade_count) if trade_count else None,
         profitFactor=ratio(positive / negative) if negative else None,
         maxWinStreak=maximum_win, maxLossStreak=maximum_loss,
-        rEligible=len(r_values), rExcluded=len(nets)-len(r_values),
-        rReason=None if r_values else 'PREENTRY_R0_NOT_PINNED',
-        averageR=ratio(sum(r_values, Fraction()) / len(r_values)) if r_values else None,
-        averageDurationNs=ratio(Fraction(sum(durations), len(durations))) if durations else None,
-        monteCarlo=dict(status='INSUFFICIENT_SAMPLE' if len(r_values)<30 else 'NOT_COMPUTED',
-                        eligible=len(r_values), exclusions=len(nets)-len(r_values), minimum=30))
+        rEligible=r_eligible, rExcluded=trade_count-r_eligible,
+        rReason=None if r_eligible else 'PREENTRY_R0_NOT_PINNED',
+        averageR=ratio(total_r / r_eligible) if r_eligible else None,
+        averageDurationNs=ratio(Fraction(total_duration, duration_count)) if duration_count else None,
+        monteCarlo=dict(status='INSUFFICIENT_SAMPLE' if r_eligible<30 else 'NOT_COMPUTED',
+                        eligible=r_eligible, exclusions=trade_count-r_eligible, minimum=30))
 
 
 def project(state, events, quote):
