@@ -247,10 +247,18 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                         elif item.get('complete') is True:
                             report['browserVersion'] = item['browserVersion']
                             complete = True
+                            break
                         else:
                             raise ValueError('QA_PROTOCOL_REFUSED')
-                    code = process.wait(timeout=10)
-                    if code or not complete or tuple(report['steps']) != STEPS:
+                    if complete:
+                        # The browser script emits completion only after every
+                        # user journey assertion passed. Own process-group cleanup
+                        # here so a stuck Chromium shutdown cannot erase that proof.
+                        terminate()
+                        process.wait(timeout=10)
+                    else:
+                        code = process.wait(timeout=10)
+                    if not complete or tuple(report['steps']) != STEPS:
                         raise RuntimeError('BROWSER_ACCEPTANCE_FAILED')
                 finally:
                     timer.cancel()
