@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import pyarrow.parquet as pq
 
@@ -67,6 +68,39 @@ class MonthlyParquetTests(unittest.TestCase):
             parquet = pq.ParquetFile(self.root / item["path"])
             self.assertTrue(all(parquet.metadata.row_group(0).column(i).compression == "ZSTD"
                                 for i in range(parquet.metadata.row_group(0).num_columns)))
+
+    def test_row_group_reads_use_bounded_arrow_batches(self):
+        from market_data import monthly_parquet
+
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=len(self.wire_events))
+        provider = MonthlyParquetProvider(self.root, expected_manifest_hash=manifest["manifestHash"])
+        original = pq.ParquetFile
+        batch_calls = []
+
+        class BatchOnlyParquetFile:
+            def __init__(self, source):
+                self.inner = original(source)
+
+            def __getattr__(self, name):
+                return getattr(self.inner, name)
+
+            def iter_batches(self, **kwargs):
+                batch_calls.append(kwargs)
+                return self.inner.iter_batches(**kwargs)
+
+            def read_row_group(self, *args, **kwargs):
+                raise AssertionError("row-group materialization is not allowed")
+
+        with patch("market_data.monthly_parquet.pq.ParquetFile", BatchOnlyParquetFile), \
+             patch.object(monthly_parquet, "READ_BATCH_SIZE", 2):
+            actual = list(provider.iter_range(JAN_LAST - 3, FEB_FIRST + 1))
+
+        self.assertEqual(actual, self.wire_events)
+        self.assertTrue(batch_calls)
+        self.assertTrue(all(call["batch_size"] == 2 and call["use_threads"] is False
+                            for call in batch_calls))
+        self.assertGreaterEqual(len(batch_calls), 2)
 
     def test_monthly_provider_replays_original_pages_and_timeline(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
