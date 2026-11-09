@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 27422)
+Total output lines: 1404
+
 # Backtest Lab — master roadmap
 
 ```json
@@ -529,211 +532,7 @@ Phase 18.6 deliverable must include a sitemap and a Page vs Panel vs Modal/Drawe
 
 ### Phase 18.7 — TRADING WORKFLOW ARCHITECTURE & UX REDESIGN
 
-**Authority correction:** any earlier Phase 18.7 language that modeled FREE/PROTOCOL as a per-workflow Trading Mode is superseded by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol is a Trading Method type inherited by Sessions. Free Style supports Quick + Planned; Protocol is Planned-only with locked protocol validation.
-
-Current architecture contract: Sessions inherit `FREE_STYLE | PROTOCOL`. Free Style supports Quick and Planned; Protocol supports Planned pending Limit/Stop only, locked RR/risk and checklist evidence. Domain validation rejects forbidden actions; UI disabling is not enforcement. Position Tool planning must pass explicit Order confirmation before account mutation. Use the single [Method specification](TRADING_METHOD_SESSION_SPEC.md) for semantics.
-
-<details>
-<summary>Superseded Phase 18.7 draft — historical only</summary>
-
-Historical planning below may describe the earlier two-dimension model; treat conflicting portions as superseded and do not implement them.
-
-The earlier trading UX draft described **two independent dimensions** and must not collapse them into one concept.
-
-**Trading Mode**
-1. **Free Mode** — discretionary backtesting. Supported actions may be used freely and are still recorded for later analysis.
-2. **Protocol Mode** — trading is governed by the active Strategy Rules / Lab Protocol. Each governed action eventually resolves through one of:
-   - `ALLOW`
-   - `BLOCK`
-   - `TRACK_VIOLATION`
-
-**Order Method**
-1. **Quick Trade** — BUY/SELL first, immediate/appropriate order creation, then supported SL/TP and position-management actions. Its purpose is fast execution with minimal interaction.
-2. **Planned Trade** — evolution of the existing Long/Short Position workflow: define Entry + SL + TP on chart, choose/derive risk per trade, calculate position size and RR, review, then explicitly Place Order.
-
-Required matrix:
-
-| Trading mode | Quick Trade | Planned Trade |
-| --- | --- | --- |
-| Free | Fast BUY/SELL; supported SL/TP/intervention may follow | Entry/SL/TP → risk → size/RR → Place Order; later supported intervention remains available |
-| Protocol | Available only when protocol permits the required action/risk model | Primary research workflow; locked protocol values and action policies govern the plan and subsequent position |
-
-Architecture contract:
-- Free/Protocol are **not separate execution engines**.
-- Quick/Planned are **not separate execution engines**.
-- Both order methods must converge to the same canonical Order Request → Rules validation → Execution Engine path.
-- UI hiding/disabling is never the enforcement boundary; engine/domain validation must reject forbidden actions.
-- Protocol restrictions must explain why an action is unavailable rather than silently removing capability.
-- A `TRACK_VIOLATION` action remains executable but must be recorded with enough provenance for later compliant-vs-violation analysis.
-- Do not invent a third order workflow without an explicit roadmap decision.
-
-Protocol-governable actions/parameters should be designed to accommodate at least: setup/inclusion/exclusion context, entry, SL, TP, fixed or constrained RR, risk per trade, session, maximum orders, early close, partial close, move SL, move TP, cancel order and intervention policy. Full rule-engine enforcement belongs to the later strategy/research architecture and is not implied by this UX phase.
-
-
-</details>
-
-### Phase 18.8 — INTERACTIVE TRADING UX PROTOTYPE & POSITION-TOOL INTEGRATION PLAN
-
-Plan browser-interactive prototypes for the three permitted combinations and one refusal journey:
-- Free + Quick;
-- Free + Planned;
-- Protocol + Quick: refusal with a clear reason;
-- Protocol + Planned.
-
-Prototype requirements:
-- chart remains the primary workspace;
-- Quick Trade uses a compact contextual surface and minimizes clicks;
-- Planned Trade treats Long/Short Position as a future **Trade Planner + Risk Calculator + Order Creator**, not merely a decorative drawing;
-- Planned Trade exposes Entry, SL, TP, live RR, risk %, monetary risk, calculated position size and P&L/R preview where applicable;
-- changing Entry/SL/TP updates planning calculations consistently;
-- `PLACE ORDER` is an explicit boundary: the planning object produces a canonical order request; a drawing must never directly mutate account state;
-- show representative pending-order, active-position, modify/cancel, SL/TP, partial-close, close and execution-feedback states;
-- prototype `ALLOW`, `BLOCK` and `TRACK_VIOLATION` states without prematurely implementing the full future Strategy Rules Engine;
-- create multiple credible layout/interaction alternatives when useful so human approval can be based on actual interaction rather than verbal/Figma description alone.
-
-### Phase 18.9 — TRADING UX VALIDATION, SPECIFICATION FREEZE & IMPLEMENTATION GATE
-
-Validate the selected prototype with repeatable user journeys, including at minimum:
-1. Free + Quick: BUY/SELL → position → add/modify SL/TP → supported partial/manual close.
-2. Free + Planned: Long/Short Position → Entry/SL/TP → risk per trade → calculated size/RR → Place Order → supported modification.
-3. Protocol + Planned: locked risk/RR example → Place Order → attempt a `BLOCK` action and verify clear refusal/reason.
-4. Protocol violation example: perform an action configured as `TRACK_VIOLATION` and verify the intended ledger/journal provenance contract.
-5. Protocol + Quick: verify refusal; also verify direct Market entry and discretionary manual close are refused.
-
-Evaluate interaction count, speed, clarity, chart obstruction, accidental-action risk, error prevention, keyboard/touch implications and consistency.
-
-The human explicitly authorized sequential 18.7–18.9 completion including validation/freeze. The [existing Method/Session specification](TRADING_METHOD_SESSION_SPEC.md#frozen-trading-ux-specification-v1) now owns frozen **Trading UX Specification v1** and evidence; no separate owner is created. The planning contract is retained below as scope history. After explicit human approval, freeze **Trading UX Specification v1** as the implementation authority for later integration. Subsequent agents must not casually redesign the domain model. Any conflict with legacy implementation must be surfaced and resolved deliberately.
-
-Final domain direction:
-
-```text
-Trading Method: FREE_STYLE | PROTOCOL
-Session:        inherits Method
-                         ↓
-Order Method:   QUICK (Free Style only) | PLANNED
-                         ↓
-Canonical Order Request
-                         ↓
-Rules / Protocol Validation
-                         ↓
-Execution Engine
-                         ↓
-Canonical Trade/Event Ledger
-                         ↓
-Journal / Analysis / Research
-```
-
-**Quality/workflow gate for 18.5–18.9:** preserve v1 behavior outside authorized scope; apply relevant tests/regression, browser validation for interactive changes, lint/static/build checks, documentation and diff review. Every completed validated milestone receives a checkpoint commit and is pushed to GitHub before proceeding. When explicit authorization covers multiple consecutive phases and capacity remains, continue to the next dependency-safe phase rather than stopping merely because one phase number completed.
-
-## v2.0 — CLOUD & MULTI-USER
-
-### Phase 19 — BACKEND ARCHITECTURE
-
-Completion evidence: [existing system blueprint audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#3810-phase-19-completion-audit). Earlier planning paragraphs below describe historical checkpoints; subsequent unmounted intake fulfills the reviewed scope. Current status/authorization remains solely in AI_CONTEXT/04_CURRENT_PHASE.md. Production persistence/auth/deployment are later phases, not implied by architectural completion.
-
-The initial planning handoff is recorded in the [existing system architecture owner](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff). That checkpoint completed planning only; later authorized foundation and intake evidence extend it. No Phase 20 start is implied.
-
-The separately authorized first [foundation checkpoint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#387-authorized-foundation-checkpoint--implementation-evidence) implements unwired contracts/pure validation/golden tests only. That foundation milestone alone did not complete the phase; subsequent intake and the linked completion audit close the architectural scope. Persistence integration remains later work.
-
-[Application/API preparation](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#388-applicationapi-layer-preparation--planning-only) defines one proposed nonexecuting review/confirmation-intake checkpoint. Its historical planning completion did not grant implementation permission; subsequent explicit human authorization and the linked intake/audit evidence complete that reviewed scope.
-
-Plan:
-Establish production-oriented backend/service/API boundaries as a modular-monolith-first foundation. Preserve separable Product DB, Research Compute, Billing/Entitlement, AI Gateway and Integration/CRM boundaries without prematurely extracting microservices. Define trust boundaries, runtime validation and heavy-compute separation points.
-
-Formalize persistence-facing contracts for Experiment Passport identity/content hashes, append-only trial/strategy lineage, canonical event/trade logs and research-job boundaries. This does not require advanced research features yet.
-
-### Phase 20 — PRODUCTION DATABASE
-
-[Implemented persistence and recovery evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#391-implemented-persistence-and-acceptance-evidence). This is backend infrastructure, not deployment or browser data migration.
-
-Plan:
-PostgreSQL-oriented production persistence, migrations, indexing,
-backup/restore and schema lifecycle.
-
-Persist the provenance foundations introduced by Phase 19, including experiment/trial lineage and immutable/versioned research identity where applicable. Index from measured query patterns, not speculative future scale.
-
-### Phase 21 — AUTHENTICATION & IDENTITY
-
-[Implemented backend identity evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#401-implemented-identity-and-validation); email/password initial method, no login UI/public deployment implied.
-
-Plan:
-Secure user identity, authentication, session/token lifecycle,
-recovery and supported login methods.
-
-### Phase 22 — USER & WORKSPACE MODEL
-
-[Implemented ownership and final journey audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#411-implemented-ownership-and-final-journey-audit). Metadata/membership model and guarded intake are implemented; cloud object payloads, local data migration and UI remain separate later scopes.
-
-Plan:
-Formal user/workspace ownership model for Backtest Lab resources.
-
-Conceptual relationship may include:
-
-User
-→ Workspace
-→ Backtests
-→ Strategies
-→ Drawings
-→ Indicators
-→ Preferences
-
-This is conceptual planning, not a locked database schema.
-
-### Phase 23 — CLOUD MARKET DATA SERVICE (PLANNED)
-
-The human-selected local-first delivery foundation is implemented in [existing Section 42.13](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#4213-phase-23-local-first-historical-delivery-infrastructure). It supplies personal loopback infrastructure with portable storage/access ports. Public cloud launch/rights acceptance remain deferred; this does not declare the cloud milestone complete or authorize Phase 24.
-
-Human-authorized local-first fixture-only evidence foundation is recorded in [existing system owner Section 42.7](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#427-local-quote-evidence-foundation--implementation-checkpoint). It supports data preparation without shipping this cloud service or completing future Phase 41–43. Operational authorization remains in the current-phase authority; provider acquisition and runtime integration need separate bounded scope.
-
-[Existing system owner — preparation and proposed acceptance](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#42-phase-23--market-data-service-preparation-planning-only). Planning does not complete this milestone or grant implementation/deployment rights; finalized provider/product decisions remain required.
-
-The human separately authorized and completed the bounded [Phase 23 research/licensing/cost checkpoint](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#425-phase-23-authorized-research--provider-comparison), with canonical requirements in the existing [Market Data Standard](MARKET_DATA_STANDARD.md). This closes the supplied research scope only; the cloud delivery capability below remains PLANNED. No tick acquisition/pipeline, public deployment or Phase 24 is implicitly authorized.
-
-Plan:
-Serve historical market data through cloud infrastructure.
-
-Production launch is gated by verified rights for the intended acquisition, storage, display/redistribution, commercial use, retention and derived-data behavior. Provider access alone is not evidence of redistribution rights.
-
-### Phase 24 — MARKET DATA PIPELINE (PLANNED)
-
-Plan:
-Ingestion
-→ validation
-→ normalization
-→ aggregation
-→ storage
-→ delivery.
-
-Maintain consistent source relationships such as M1 to higher
-timeframes where applicable.
-
-### Phase 25 — CLOUD BACKTEST SESSIONS (PLANNED)
-
-Plan:
-Server-backed creation/save/resume of backtest sessions.
-
-### Phase 26 — CROSS-DEVICE SYNCHRONIZATION (PLANNED)
-
-Plan:
-Allow a user's validated workspace/session state to move across
-supported devices.
-
-### Phase 27 — USER DASHBOARD (PLANNED)
-
-Plan:
-Professional user-facing management of strategies, sessions,
-activity, statistics and workspace resources.
-
-### Phase 28 — CLOUD OBJECT PERSISTENCE (PLANNED)
-
-Plan:
-Cloud persistence for appropriate drawings, indicators, layouts and
-configuration.
-
-### Phase 29 — MULTI-TENANT SECURITY (PLANNED)
-
-Plan:
-Implement and validate the multi-user controls defined by the Security Architecture: deny-by-default tenant isolation, server-side authorization, trust-boundary validation, rate/resource controls, protected file/object access and cross-tenant negative tests. This phase deepens security for cloud multi-tenancy; it does not imply security was deferred until Phase 29.
+**Authority correction:** any earlier Phase 18.7 language that modeled FREE/PROTOCOL as a per-workflow Trading Mode is superseded by [Trading Method & Session Model Specification](TRADING_METHOD_SESSION_SPEC.md). Free Style/Protocol is a Trading Method type inherited by Sessions. Free Style supports Quick + Planned; Protocol is Planned-…3422 tokens truncated…lt tenant isolation, server-side authorization, trust-boundary validation, rate/resource controls, protected file/object access and cross-tenant negative tests. This phase deepens security for cloud multi-tenancy; it does not imply security was deferred until Phase 29.
 
 ### Phase 30 — CLOUD QA & MIGRATION / PRODUCT EVIDENCE GATE (PLANNED)
 
@@ -1381,11 +1180,11 @@ This subsection clarifies the existing **V2.2 Precision Beta** program and its d
 
 ### Exness 2024–2026 dataset preparation request — pending source and capacity gates (2026-11-09)
 
-Owner target inventory: the exact 16 symbols AUDUSD, EURGBP, NZDUSD, USDCHF, AUDJPY, CADJPY, EURUSD, GBPUSD, NZDJPY, USDCAD, CHFJPY, EURJPY, EURNZD, GBPJPY, USDJPY and XAUUSD for January 2024 through October 2026 (34 months, 544 logical instrument-month partitions). Original provider symbol is part of dataset identity: XAUUSD, XAUUSDm and other account suffixes are separate datasets and must never be aliased. The preparation code is `backend/ticks/exness_monthly.py`; it plans partitions, inspects ZIP directory metadata, streams explicitly supplied four-column Tick History or legacy five-column CSV validation, and stores hash-pinned checkpoints. `backend/ticks/exness_v2.py` now admits both header shapes into its existing V2 importer while retaining exact source-byte pinning. This code makes no network requests and grants no rights.
+Owner target inventory: the exact 16 symbols AUDUSD, EURGBP, NZDUSD, USDCHF, AUDJPY, CADJPY, EURUSD, GBPUSD, NZDJPY, USDCAD, CHFJPY, EURJPY, EURNZD, GBPJPY, USDJPY and XAUUSD for January 2024 through October 2026 (34 months, 544 logical instrument-month partitions). Original provider symbol is part of dataset identity: XAUUSD, XAUUSDm and other account suffixes are separate datasets and must never be aliased. `backend/ticks/exness_parquet_pipeline.py` now validates an explicitly supplied four-column Tick History or legacy five-column CSV, streams it into observed monthly partitions, and writes the existing canonical `BTL-CANONICAL-TICK-1` format through `MonthlyParquetProvider`. It records source/archive hashes, immutable revision roots, per-partition manifests, and PENDING/AVAILABLE/VERIFIED/FAILED/BLOCKED inventory states. The inventory maps the 544 logical instrument-month partitions to the frozen internal `YYYY-MM/ticks.parquet` layout; it is not a second canonical storage format. `backend/ticks/exness_v2.py` admits both source header shapes into its existing V2 importer while retaining exact source-byte pinning. The pipeline makes no network requests and grants no rights.
 
-Use the existing Exness CSV source contract and frozen canonical tick / Monthly Parquet storage contracts. Preserve exact price text, observed timestamp precision, source row order and untrusted equal-time ties; never infer complete-month coverage from observed rows. Existing `MonthlyParquetProvider` uses the frozen `YYYY-MM/ticks.parquet` internal layout. Mapping that layout to the requested `year=YYYY/month=MM` external tree requires an explicit compatibility design and must not create a second canonical encoding or change a pinned manifest. Do not admit data to the runtime catalog until provenance and usage rights are evidenced.
+Use the existing Exness CSV source contract and frozen canonical tick / Monthly Parquet storage contracts. Preserve exact price text, observed timestamp precision, source row order and untrusted equal-time ties; never infer complete-month coverage from observed rows. Existing `MonthlyParquetProvider` uses the frozen `YYYY-MM/ticks.parquet` internal layout. The pipeline maps each logical `year=YYYY/month=MM` partition to an immutable source-revision root containing that existing internal layout, without changing canonical encoding or pinned manifests. Do not admit data to the runtime catalog until provenance and usage rights are evidenced.
 
-**Blocked before any real acquisition or conversion:** automated download permission, private/commercial storage and use rights, authenticated source availability/period coverage, and measured local storage/RAM capacity are not verified. Do not perform bulk download, extraction, Parquet conversion, capacity benchmarking, or staging publication in the repository-only phase. Synthetic tests validate only the helper behavior, never Exness data availability, market fidelity, complete 544-partition coverage, commercial rights or capacity. When a new owner checkpoint updates operational authorization, first review source terms and available storage, then qualify one authorized forex month and one authorized XAUUSD month before scaling.
+**Blocked before any real acquisition or conversion:** automated download permission, private/commercial storage and use rights, authenticated source availability/period coverage, and measured local storage/RAM capacity are not verified. The pipeline intentionally has no downloader, and real-source conversion requires hash-pinned evidence granting automated acquisition, private storage, commercial computation, derived presentation, redistribution and retention. Do not perform bulk download, extraction, real-source Parquet conversion, capacity benchmarking, or staging publication in the repository-only phase. Synthetic tests and the isolated PyArrow CI workflow validate only implementation behavior, never Exness data availability, market fidelity, complete 544-partition coverage, commercial rights or capacity. `estimate_capacity` accepts measured, hash-pinned samples for all 16 symbols and is explicitly an estimate rather than a capacity certification. When a new owner checkpoint updates operational authorization, first review source terms and actual available storage, then qualify one authorized forex month and one authorized XAUUSD month before scaling.
 
 **Per-checkpoint delivery:** before coding, freeze objective, source baseline, inputs, in/out scope, owners, exact acceptance tests, quantitative budgets derived from measured baseline, migration and rollback, STOP conditions. Then VERIFY → bounded change → targeted tests and mandatory browser E2E for UI → full applicable regression/goldens → diff and authority review → existing-owner documentation → commit/push → verify actual remote equality and clean 0/0. Explicit human authorization is required before V2.2 implementation; do not auto-advance from this planning note. Defer expanded professional catalog, multi-chart, SaaS/login/public licensing or unrelated redesign unless separately authorized and accepted.
 
