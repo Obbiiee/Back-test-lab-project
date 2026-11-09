@@ -169,7 +169,13 @@ try{
     ['Analytics could not load','ANALYTICS_ERROR'],['Loading committed analytics…','ANALYTICS_LOADING'],
     ['Analytics unavailable for this Session','ANALYTICS_UNAVAILABLE']]);
   const screenState=panelTitles.map(title=>panelKinds.get(title)).filter(Boolean).slice(0,8);
-  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,apiTrace})+'\n');
+  const browserDiagnostics=await page.evaluate(()=>({
+    routeScreen:new URL(location.href).searchParams.get('screen'),
+    journalLists:document.querySelectorAll('.rk-journal').length,
+    journalRows:document.querySelectorAll('.rk-journal li').length,
+  })).catch(()=>({routeScreen:null,journalLists:0,journalRows:0}));
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
+    pageErrorCount:errors.length,browserDiagnostics,apiTrace})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

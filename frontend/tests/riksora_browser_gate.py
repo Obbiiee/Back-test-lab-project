@@ -230,6 +230,15 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                             if isinstance(screen_state, list) and len(screen_state) <= 8 and all(
                                     state in allowed_states for state in screen_state):
                                 report['screenState'] = screen_state
+                            diagnostics = item.get('browserDiagnostics')
+                            if (isinstance(diagnostics, dict) and
+                                    diagnostics.get('routeScreen') in ('account','methods','method','method-new',
+                                        'sessions','session','session-new','analytics','journal','catalog','help','replay',None) and
+                                    type(diagnostics.get('journalLists')) is int and 0 <= diagnostics['journalLists'] <= 10 and
+                                    type(diagnostics.get('journalRows')) is int and 0 <= diagnostics['journalRows'] <= 128 and
+                                    type(item.get('pageErrorCount')) is int and 0 <= item['pageErrorCount'] <= 32):
+                                report['browserDiagnostics'] = diagnostics
+                                report['pageErrorCount'] = item['pageErrorCount']
                             trace = item.get('apiTrace', [])
                             if isinstance(trace, list) and len(trace) <= 128:
                                 report['apiTrace'] = [entry for entry in trace if
