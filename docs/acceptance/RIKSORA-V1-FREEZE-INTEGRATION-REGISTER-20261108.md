@@ -1,10 +1,26 @@
 # RIKSORA V1 — frozen-architecture integration register
 
+## Owner checkpoint — V1 integration and authority recovery (2026-11-09)
+
+This register remains the implementation-gap tracker only. Agent permissions are defined in root `AGENTS.md`; technical architecture and frozen contracts remain in the Product System Architecture Blueprint; current authorization and status remain in `AI_CONTEXT/04_CURRENT_PHASE.md`. No second architecture or permission authority is introduced here.
+
+The owner authorized the existing PR #50/#51 product integration path, the recovery of the phase file from its last readable Git parent, a UTF-8 authority regression, and sequential ten-run browser stability CI on disposable backend/PostgreSQL infrastructure. The phase file is restored from the valid parent of first-corrupt commit `e38a0592bafee1e005e5777b9e4f3c89f5b59b3d`, with the latest owner checkpoint prepended; earlier phase history remains intact. CI has not yet rerun this modified tree.
+
+The prior PASS and FAIL browser artifacts were from equal source-tree, harness, and frontend-build digests; the failing trace showed successful server close/replay jobs and a one-row Journal response, but only broad phase `trade_close`. A definitive root cause is not yet established. The journey now waits for the terminal's committed revision to advance after both replay commands and for the close dialog to close, and labels its close substeps separately. The ten-run gate is pending execution on the final published SHA.
+
+PR #51 adds the resumable synthetic-tested pipeline atop PR #50's integration tree and reuses the frozen Monthly Parquet V2 writer/reader and server-side source catalog. A bounded PostgreSQL worker journey already exercises pinned Monthly Parquet through order confirmation, replay, durable receipt, Journal and summary. No real Exness partitions have been acquired (`0/544`); provider rights and capacity remain unverified, so historical acquisition and commercial eligibility stay blocked.
+
+Local validation after the authority recovery and browser-harness edits: `tests.test_authority_documents` passes 1/1; Python syntax compilation for the browser gate and authority test passes; `git diff --check` passes. PostgreSQL worker, Parquet pipeline, frontend, browser, and ten-run stability gates are **NOT RUN on this candidate** because the local environment lacks the pinned runtime tools; they must execute in CI after publication. This is not inherited PASS evidence.
+
+Private staging manifests exist, but deployment is not authorized by this repository-only checkpoint; no SSH/VPS access, active URL, or staging smoke test has been verified. Synthetic tests do not establish live staging, historical price accuracy, or production readiness.
+
+**Recorded:** 2026-11-09. **Baseline:** PR #50 `d8f5e12843fd84a7f23524b91c307b63a9b84138`; local PR #51 candidate `bdb4db8e19b452fc95e4be8fbd21f0b9b43bcb45` before this checkpoint's changes.
+
 ## Owner-authorized browser/staging checkpoint (2026-11-09)
 
 Added a version-pinned Playwright 1.64.1 browser acceptance lane on Ubuntu 24.04. It installs Chromium and its OS libraries using Playwright's official `install --with-deps` command, builds the checked-out frontend, starts the existing disposable Unix-socket PostgreSQL16 harness, starts the real HTTPS backend with a restricted runtime role, and drives the current account/Method/Session/replay/order/receipt/Journal/Analytics/logout/resume UI. The browser has same-origin-only egress; no authored API response mocks are installed. Synthetic verification delivery is supplied by the existing in-memory test delivery adapter. Browser evidence remains on the isolated runner and is not uploaded as a public workflow artifact.
 
-Added `deploy/vps/compose.staging.yaml`, `Caddyfile.staging`, and `.env.staging.example`. The dedicated Compose overlay uses a separate PostgreSQL volume and requires Caddy Basic Auth before any app/API route. Deployment remains **NOT TESTED / BLOCKED**: the configured SSH alias `sorabit` did not resolve from this environment, and no VPS identity/connection was verified. No staging URL exists. The top of `AI_CONTEXT/04_CURRENT_PHASE.md` remains an opaque binary blob; it was preserved and not overwritten. The owner addendum and this register contain the current authorized scope.
+Added `deploy/vps/compose.staging.yaml`, `Caddyfile.staging`, and `.env.staging.example`. The dedicated Compose overlay uses a separate PostgreSQL volume and requires Caddy Basic Auth before any app/API route. At the time this historical checkpoint was recorded, deployment was **NOT TESTED / BLOCKED**: the configured SSH alias `sorabit` did not resolve, and no VPS identity/connection was verified. No staging URL exists. The former statement that the phase file was intentionally preserved as binary is superseded by the newer owner recovery checkpoint above; it records the earlier handling and is not current permission.
 
 Browser workflow execution and final-HEAD browser evidence are **PENDING CI** because this local environment has no Node/npm, Docker, PostgreSQL16 tools or project Python dependencies. Local browser E2E is therefore NOT TESTED at this checkpoint; do not infer PASS from the earlier API functional journey. Synthetic acceptance does not certify historical-source accuracy, licensing, capacity or production.
 
