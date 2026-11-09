@@ -147,12 +147,17 @@ try{
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   phase='trade_close_committed_row';
   await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);step('committed_trade_journal_analytics');
-  phase='journal_analytics';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
+  phase='journal_analytics_workspace_note';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
   await expect(terminal.getByText('No saved note',{exact:true})).toBeVisible();
+  phase='journal_analytics_workspace_tab';
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
+  phase='journal_analytics_workspace_heading';
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
+  phase='journal_analytics_trade_count_label';
   await expect(terminal.getByText('Completed trades',{exact:true})).toBeVisible();
-  await expect(terminal.locator('dl').filter({has:page.getByText('Completed trades',{exact:true})}).locator('dd').first()).toHaveText('1');
+  phase='journal_analytics_trade_count_value';
+  const completedMetric=terminal.locator('.alpha-analysis dl div').filter({hasText:'Completed trades'});
+  await expect(completedMetric.locator('dd')).toHaveText('1');
   phase='workspace_method_back';await page.getByRole('link',{name:'Back to Synthetic browser method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
@@ -214,8 +219,12 @@ try{
       journalRows:document.querySelectorAll('.rk-journal li').length,journalError,
       sanitizedError:safeError};
   }).catch(()=>({routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'}));
+  const failureMessage=String(error?.message||error).split('\n')[0]
+    .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
+    .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
+    .slice(0,300);
   process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
-    pageErrorCount:errors.length,browserDiagnostics,apiTrace})+'\n');
+    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,apiTrace})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

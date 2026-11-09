@@ -100,6 +100,7 @@ def run(tools, browser_cache):
                           workerFailureCode=report.get('workerFailureCode'),
                           failurePhase=report.get('failurePhase'),
                           browserFailureType=report.get('browserFailureType'),
+                          browserFailureMessage=report.get('browserFailureMessage'),
                           screenState=report.get('screenState', []),
                           browserDiagnostics=report.get('browserDiagnostics'),
                           pageErrorCount=report.get('pageErrorCount'),
@@ -226,6 +227,10 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                               item['failureType'].isidentifier()):
                             report['failurePhase'] = item['failurePhase']
                             report['browserFailureType'] = item['failureType']
+                            failure_message = item.get('browserFailureMessage')
+                            if (isinstance(failure_message, str) and len(failure_message) <= 300 and
+                                    failure_message.isascii()):
+                                report['browserFailureMessage'] = failure_message
                             screen_state = item.get('screenState', [])
                             allowed_states = {'NO_ORDERS','FILTERED_EMPTY','JOURNAL_ERROR','JOURNAL_LOADING',
                                               'CHOOSE_SESSION','SESSION_MISSING','ANALYTICS_ERROR',
