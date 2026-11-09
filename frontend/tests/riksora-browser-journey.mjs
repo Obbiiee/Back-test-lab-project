@@ -131,8 +131,6 @@ try{
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
   phase='global_journal_heading';
   await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
-  phase='global_journal_select_session';await page.locator('.rk-toolbar .rk-combo-trigger').click();
-  await page.getByRole('option',{name:/Synthetic browser session/}).click();
   const journal=page.locator('.rk-journal');
   await expect(journal).toHaveAttribute('aria-label','Orders in Synthetic browser session');
   const journalRows=journal.locator('li');
