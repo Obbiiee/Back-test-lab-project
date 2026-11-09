@@ -303,6 +303,8 @@ class ResearchApplication:
                 require(prior[0] == sha, "methodId", "REFUSED_IDEMPOTENCY_CONFLICT")
                 return self._method(db,raw["id"])
             db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],blob,sha))
+            from .method_analytics_store import initialize_rollup
+            initialize_rollup(db, self.scope.workspace_id, raw["id"], policy.definition_hash)
             from .product_method_lifecycle import register_first_version
             register_first_version(db, self.scope.workspace_id, raw["id"])
         return raw
@@ -345,6 +347,8 @@ class ResearchApplication:
                     state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])
                     self.store._insert(db,self.scope,state,timeline.checkpoint())
                     db.execute("INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))
+                    from .method_analytics_store import require_rebuild
+                    require_rebuild(db, self.scope.workspace_id, raw["methodId"])
             if timeline is not None:
                 self.__timeline_cache.seed(self.scope, raw['id'], timeline)
                 seeded = True
