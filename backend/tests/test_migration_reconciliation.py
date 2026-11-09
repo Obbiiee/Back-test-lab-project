@@ -19,6 +19,7 @@ P0_ONLY = frozenset((
     '023_observed_replay_progress.sql',
     '024_observed_progress_consolidation.sql',
     '025_product_terminal_order_archive.sql',
+    '032_tick_method_metric_projections.sql',
 ))
 INTEGRATION_ONLY = frozenset((
     '023_account_identities.sql', '024_tick_terminal_order_archive.sql',
@@ -114,7 +115,7 @@ class MigrationReconciliationTests(unittest.TestCase):
                 self.assertEqual(set(after), {p.name for p in MIGRATIONS.glob('[0-9][0-9][0-9]_*.sql')})
                 for table in ('account_identities','tick_terminal_orders','tick_recovery_bases',
                               'tick_journal_order_projection','tick_session_metric_projections',
-                              'observed_replay_progress','tick_terminal_order_archive_v1'):
+                              'tick_method_metric_projections','observed_replay_progress','tick_terminal_order_archive_v1'):
                     self.assertIsNotNone(db.execute('SELECT to_regclass(%s)', ('btl.'+table,)).fetchone()[0])
                 if history == 'fresh':
                     db.execute("INSERT INTO btl.tick_sessions SELECT 'ws',id,repeat('a',64),repeat('a',64),0,decode('01','hex'),repeat('b',64) FROM unnest(ARRAY['legacy','progress']) id")
