@@ -636,5 +636,7 @@ def grant_execution_runtime(dsn, role):
         # projections in the same transaction as their immutable event append.
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads,btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT INSERT ON btl.tick_journal_order_events TO {}").format(sql.Identifier(role)))
-        db.execute(sql.SQL("GRANT SELECT,UPDATE ON btl.tick_session_metric_projections,btl.tick_method_metric_projections TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,UPDATE ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
+        # Method aggregates are created on first qualifying Session commit.
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_method_metric_projections TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT ON btl.tick_research_sessions TO {}").format(sql.Identifier(role)))
