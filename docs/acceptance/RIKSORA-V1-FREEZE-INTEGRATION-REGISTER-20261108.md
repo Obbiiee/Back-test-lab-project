@@ -222,3 +222,10 @@ Validation on the coding checkout: 46 focused synthetic aggregate, keyset, Journ
 
 
 Publication verification for legacy Method Analytics: the method accumulator, keyset read path and 130-Session regression were published to PR #48 and read back from `codex/product-v1-p0-1`. GitHub API commits: `bbf9752395df22e9032acdef09d2be086ec24e72`, `a670c33bcb95170acab7e854960058e9d8752b28`, and `c2db5a2fc71f912c8bdbb6a9d6873c85e3be19ba`. Verified PR #48 HEAD before this register update: `54f8bd570bf0f117ab371dd17d38c2bbb904608f`; PR #44 remains `32c75e7c3518f09f9ad3a3e122cd0a388a1954cd`. Both PRs remain open drafts; no merge or production action was taken.
+
+
+### P0-4 follow-up — bounded Monthly Parquet row-group reader (2026-11-09)
+
+The immutable Parquet reader now consumes each requested row group through PyArrow `iter_batches()` with an 8,192-row batch bound, while verifying the complete canonical row-group hash, source order/provenance, timestamp order, and global-index endpoints. It preallocates only the two bounded typed index arrays and avoids materializing a full Arrow Table. A regression forbids `read_row_group()` and forces multiple two-row batches over synthetic data.
+
+Python compilation and `git diff --check` PASS. The Monthly Parquet regression is NOT RUN because this checkout's Python 3.13 lacks `pyarrow` (and `numpy`); no test pass is claimed. GitHub API published the reader and regression to PR #48 as commits `f9563d21086cef61b7dd15159b78aed8d7332004` and `525fceec9806f77bd054ee91865d30ec51c4b7a4`. Remote readback verified the test and bounded batch implementation. PR #48 HEAD before this register update: `525fceec9806f77bd054ee91865d30ec51c4b7a4`; PR #44 remains unchanged. S3 integration and full API/queue/worker acceptance remain NOT RUN.
