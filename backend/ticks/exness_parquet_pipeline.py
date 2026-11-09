@@ -211,13 +211,27 @@ class ExnessInventory:
                     all(type(row) is dict and row.get("status") in STATUSES
                         for row in self.partitions.values()),
                     "inventory", "SCHEMA_MISMATCH")
+            for partition in required_partitions():
+                row = self.partitions[self.key(partition)]
+                row.setdefault("logicalPathTemplate", (
+                    f"datasets/exness/{partition.original_symbol}/year={partition.year:04d}/"
+                    f"month={partition.month:02d}/source={{sourceRevision}}/"
+                    f"{partition.period}/ticks.parquet"))
+                row.setdefault("providerRelativePath", f"{partition.period}/ticks.parquet")
+            self._save()
         else:
             initial = "PENDING" if rights_ready else "BLOCKED"
             reason = None if rights_ready else "PROVIDER_RIGHTS_NOT_VERIFIED"
             for row in required_partitions():
                 self.partitions[self.key(row)] = {"originalSymbol": row.original_symbol,
                     "canonicalInstrument": row.canonical_instrument, "year": row.year,
-                    "month": row.month, "status": initial, "reason": reason}
+                    "month": row.month,
+                    "logicalPathTemplate": (
+                        f"datasets/exness/{row.original_symbol}/year={row.year:04d}/"
+                        f"month={row.month:02d}/source={{sourceRevision}}/"
+                        f"{row.period}/ticks.parquet"),
+                    "providerRelativePath": f"{row.period}/ticks.parquet",
+                    "status": initial, "reason": reason}
             self._save()
 
     @staticmethod
@@ -261,7 +275,8 @@ class ExnessInventory:
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         value = {"schemaVersion": 1, "artifact": INVENTORY_ARTIFACT,
-            "layout": "EXISTING_MONTHLY_PARQUET_YYYY-MM_TICKS_PARQUET",
+            "layout": "LOGICAL_INSTRUMENT_MONTH_TO_EXISTING_MONTHLY_PARQUET",
+            "pathTemplate": "datasets/exness/{originalSymbol}/year={YYYY}/month={MM}/source={sourceRevision}/{YYYY-MM}/ticks.parquet",
             "rightsStatus": "VERIFIED" if self.rights_ready else "BLOCKED",
             "period": {"start": f"{START_YEAR:04d}-{START_MONTH:02d}",
                        "endInclusive": f"{END_YEAR:04d}-{END_MONTH:02d}"},

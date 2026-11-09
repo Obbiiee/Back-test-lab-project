@@ -52,6 +52,16 @@ class ExnessParquetPipelineTests(unittest.TestCase):
         self.assertEqual(rows["partitionCount"], 544)
         self.assertEqual(rows["partitions"][ExnessInventory.key(jan)]["status"], "VERIFIED")
         self.assertEqual(rows["partitions"][ExnessInventory.key(feb)]["status"], "VERIFIED")
+        self.assertEqual(rows["partitions"][ExnessInventory.key(jan)]["providerRelativePath"],
+                         "2024-01/ticks.parquet")
+        self.assertIn("source={sourceRevision}",
+                      rows["partitions"][ExnessInventory.key(jan)]["logicalPathTemplate"])
+        rows["partitions"][ExnessInventory.key(jan)].pop("logicalPathTemplate")
+        rows["partitions"][ExnessInventory.key(jan)].pop("providerRelativePath")
+        self.inventory_path.write_text(json.dumps(rows), encoding="utf-8")
+        upgraded_inventory = ExnessInventory(self.inventory_path, rights_ready=True)
+        self.assertEqual(upgraded_inventory.partitions[ExnessInventory.key(jan)]["providerRelativePath"],
+                         "2024-01/ticks.parquet")
 
         jan_result = next(row for row in result["partitions"] if row["period"] == "2024-01")
         provider = MonthlyParquetProvider(jan_root,
