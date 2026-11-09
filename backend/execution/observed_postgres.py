@@ -1090,10 +1090,17 @@ class ObservedExecutionStore:
                         metric.get('eventHead')==old['eventHash'] and
                         metric.get('tradeCount')==closed_order_count and
                         metric.get('tradeCount')+closed_delta>=0,'analyticsProjectionHead','CORRUPT_RECORD')
+                    prior_metric=deepcopy(metric)
                     metric=advance_projection(metric,events,after,projection_rows)
                     metric_blob,metric_hash=pack(metric)
                     db.execute('UPDATE btl.tick_session_metric_projections SET payload=%s,content_hash=%s '
                         'WHERE workspace_id=%s AND session_id=%s',(metric_blob,metric_hash,workspace,session))
+                    research_row=db.execute('SELECT method_id FROM btl.tick_research_sessions '
+                        'WHERE workspace_id=%s AND session_id=%s',(workspace,session)).fetchone()
+                    require(research_row is not None,'methodSession','CORRUPT_RECORD')
+                    from .method_analytics_store import replace_session,session_item
+                    replace_session(db,workspace,research_row[0],after['policy']['definitionHash'],
+                        session_item(old,prior_metric),session_item(after,metric))
             db.execute('INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)',(workspace,session,after['revision'],checkpoint_raw,checkpoint_hash))
             db.execute('UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s',(after['revision'],session_raw,session_hash,workspace,session))
             if legacy_delta_mode:
