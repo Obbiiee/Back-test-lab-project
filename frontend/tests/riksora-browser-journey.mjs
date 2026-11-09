@@ -61,6 +61,8 @@ try{
   await page.getByRole('button',{name:'Save Method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method'})).toBeVisible();step('method');
   phase='session_create';await page.getByRole('button',{name:'New Session',exact:true}).click();
+  await page.getByRole('button',{name:/Method.*Search or select Method/}).click();
+  await page.getByRole('option',{name:/Synthetic browser method/}).click();
   for(let i=0;i<3;i++)await page.getByRole('button',{name:'Continue',exact:true}).click();
   await page.getByLabel('Session name').fill('Synthetic browser session');
   await page.getByRole('button',{name:'Continue',exact:true}).click();
