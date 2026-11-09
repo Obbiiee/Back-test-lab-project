@@ -122,8 +122,10 @@ try{
   await expect(terminal.getByText('No saved note',{exact:true})).toBeVisible();
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
-  phase='global_journal_analytics';await page.getByRole('link',{name:'All Sessions',exact:true}).click();
-  await page.getByRole('link',{name:'Journal',exact:true}).click();
+  phase='return_to_workspace_index';await page.getByRole('link',{name:'All Sessions',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'My Methods'})).toBeVisible();
+  phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
+  phase='global_journal_load';
   await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
   await expect(page.getByRole('list',{name:'Orders in Synthetic browser session'}).locator('li')).toHaveCount(1);
   await page.getByRole('link',{name:'Sessions',exact:true}).first().click();
