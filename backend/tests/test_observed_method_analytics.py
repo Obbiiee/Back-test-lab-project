@@ -153,6 +153,37 @@ class MethodAnalyticsProjectionTests(unittest.TestCase):
             MethodAnalyticsAccumulator.restore(bad_window,
                 method_id='method:one', method_hash='a' * 64)
 
+    def test_session_contribution_can_be_replaced_without_growing_state(self):
+        accumulator = MethodAnalyticsAccumulator('method:one', 'a' * 64)
+        unit = ('profile:one', 'observed:v1', 'USD')
+        original = dict(unit=unit,
+            projection=projection(1, 1, 0, 0, '1', '0', '1', '10'),
+            session=session('session:000', 1))
+        accumulator.include(original)
+        replacement = dict(unit=unit,
+            projection=projection(2, 1, 1, 0, '4', '1', '3', '35'),
+            session={**session('session:000', 2), 'revision': 8, 'eventHead': 'f' * 64})
+        accumulator.replace_session(original, replacement)
+        result = accumulator.result()
+        self.assertEqual(accumulator.included_count, 1)
+        self.assertEqual(result['completedTradeNet'], '3')
+        self.assertEqual(result['metrics']['tradeCount'], 2)
+        self.assertEqual(result['metrics']['averageDurationNs'],
+                         {'numerator': '35', 'denominator': '2'})
+        self.assertEqual(result['includedSessions'][0]['revision'], 8)
+
+    def test_session_replacement_rejects_changed_financial_unit(self):
+        accumulator = MethodAnalyticsAccumulator('method:one', 'a' * 64)
+        prior = dict(unit=('profile:one', 'observed:v1', 'USD'),
+            projection=projection(1, 1, 0, 0, '1', '0', '1', '10'),
+            session=session('session:one', 1))
+        accumulator.include(prior)
+        next_item = dict(unit=('profile:two', 'observed:v1', 'EUR'),
+            projection=projection(1, 1, 0, 0, '1', '0', '1', '10'),
+            session=session('session:one', 1))
+        with self.assertRaises(ContractError):
+            accumulator.replace_session(prior, next_item)
+
 
 if __name__ == '__main__':
     unittest.main()
