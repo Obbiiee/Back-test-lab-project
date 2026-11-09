@@ -38,7 +38,10 @@ class IdentityBoundary:
         except Exception as error:
             if started or scope["type"] != "http":
                 raise
-            log.error("Identity boundary unavailable requestId=%s type=%s", correlation, type(error).__name__)
+            # SQLSTATE is safe diagnostic metadata and makes a privilege or
+            # schema failure actionable without logging request bodies/DSNs.
+            log.error("Identity boundary unavailable requestId=%s type=%s sqlstate=%s",
+                      correlation, type(error).__name__, getattr(error, "sqlstate", None))
             await JSONResponse({"detail": "SERVICE_UNAVAILABLE"}, status_code=503,
                                headers={"Cache-Control": "no-store", "X-Request-ID": correlation})(scope, receive, send)
 
