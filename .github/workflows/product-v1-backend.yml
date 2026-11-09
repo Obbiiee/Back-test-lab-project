@@ -1,0 +1,103 @@
+name: Product V1 backend contracts
+
+on:
+  pull_request:
+    branches:
+      - codex/product-integration-v1-20261106
+    paths:
+      - "backend/**"
+      - ".github/workflows/product-v1-backend.yml"
+      - ".github/workflows/product-v1-browser.yml"
+  push:
+    branches:
+      - codex/product-v1-p0-1
+      - codex/v1-p0-followup-20261109
+    paths:
+      - "backend/**"
+      - ".github/workflows/product-v1-backend.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  backend-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: btl_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d btl_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PYTHONPATH: .
+      BTL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/btl_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Install pinned backend dependencies
+        run: python -m pip install -r backend/requirements.lock
+      - name: Run Method Analytics and financial contracts
+        working-directory: backend
+        run: >-
+          python -m unittest -v
+          tests.test_method_analytics_store
+          tests.test_method_analytics_legacy
+          tests.test_observed_method_analytics
+          tests.test_method_analytics_projection
+          tests.test_tick_analysis.AnalysisGoldenTests
+          tests.test_execution_goldens
+          tests.test_observed_session_dispatch
+          tests.test_observed_product_application
+          tests.test_product_progress_compatibility
+      - name: Run isolated PostgreSQL recovery and migration contracts
+        working-directory: backend
+        run: >-
+          python -m unittest -v
+          tests.test_observed_postgres.ObservedPostgresTests.test_replaceable_replay_progress_rejects_rewind_and_wrong_base
+          tests.test_observed_postgres.ObservedPostgresTests.test_replay_progress_consumption_is_atomic_with_receipt
+          tests.test_observed_postgres.ObservedPostgresTests.test_compact_v1_new_session_commit_cold_read_and_retry_parity
+          tests.test_observed_postgres.ObservedPostgresTests.test_integration_archive_write_populates_required_terminal_status_and_recovers
+          tests.test_observed_postgres.ObservedPostgresTests.test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger
+          tests.test_observed_postgres.ObservedPostgresTests.test_actual_transactions_cold_source_and_source_outage_receipt_and_journal
+          tests.test_observed_postgres.ObservedPostgresTests.test_replay_to_uses_existing_durable_advances_and_recovers_idempotently
+          tests.test_observed_postgres.ObservedPostgresTests.test_concurrent_duplicate_conflict_and_other_workspace_refused
+          tests.test_observed_postgres.ObservedPostgresTests.test_shared_source_checkpoint_survives_pg_sigkill_after_commit_and_retry
+          tests.test_observed_postgres.ObservedPostgresTests.test_before_commit_process_death_rolls_back_after_commit_death_retries_once
+          tests.test_observed_postgres.ObservedPostgresTests.test_mutated_session_tip_cannot_replace_immutable_checkpoint
+          tests.test_observed_postgres.ObservedPostgresTests.test_failed_write_transaction_keeps_state_and_then_source_orphan_recovers
+          tests.test_observed_postgres.ObservedPostgresTests.test_guarded_source_hash_permissions_and_exact_day_selection
+          tests.test_observed_postgres.ObservedPostgresTests.test_restricted_runtime_commits_but_cannot_modify_evidence
+          tests.test_observed_postgres.ObservedPostgresTests.test_nonempty_sidecar_is_not_admitted_by_empty_catalog_capability
+          tests.test_observed_postgres.ObservedPostgresTests.test_observed_research_application_method_session_review_statistics_journal
+          tests.test_migration_reconciliation
+      - name: Create isolated Product journey database
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+          admin = psycopg.conninfo.make_conninfo(os.environ['BTL_TEST_DATABASE_URL'], dbname='postgres')
+          with psycopg.connect(admin, autocommit=True) as db:
+              db.execute('CREATE DATABASE btl_v1_journey')
+          PY
+      - name: Run authenticated single-instrument Product V1 journey
+        working-directory: backend
+        env:
+          BTL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/btl_v1_journey
+          PYTHONPATH: ..:.
+        run: >-
+          python -m unittest -v
+          tests.test_functional_journey.FunctionalJourneyTests.test_single_instrument_product_v1_login_trade_journal_analytics_resume

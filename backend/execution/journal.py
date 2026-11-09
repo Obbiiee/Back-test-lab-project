@@ -10,6 +10,8 @@ from ticks.contracts import keys, tag
 # Legacy v2 snapshot compatibility. Product journal reads use keyset pages.
 MAX_JOURNAL_ORDERS = 32
 MAX_JOURNAL_PAGE_SIZE = 32
+# Bound the legacy full Journal snapshot path. Keyset clients should use pages.
+MAX_JOURNAL_READ_ORDERS = 4096
 
 
 def encode_cursor(session_id, session_revision, after_order_id):

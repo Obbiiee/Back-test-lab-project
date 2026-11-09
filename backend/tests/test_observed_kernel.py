@@ -3,6 +3,8 @@ from copy import deepcopy
 from pathlib import Path
 import json
 import hashlib
+import os
+from uuid import uuid4
 import tempfile
 import unittest
 
@@ -94,6 +96,204 @@ class ObservedKernelTests(unittest.TestCase):
         basis=self.state['quoteBasis'];entry=basis['ask' if side=='LONG' else 'bid'] if basis else '2300.1'
         payload=dict(side=side,orderType='MARKET',workflow='QUICK',entry=entry,quantity=size,sl=None,tp=None,riskPercent='1',observations=[]);payload.update(changes)
         self.command('OPEN',payload,command='order:z');return payload
+
+    @unittest.skipUnless(os.environ.get('BTL_TEST_DATABASE_URL'), 'Requires isolated PostgreSQL')
+    def test_progress_store_consolidates_two_advances_and_recovers_financial_retry(self):
+        from application.models import TrustedScope
+        from execution.observed_postgres import ObservedExecutionStore, PROGRESS_FORMAT
+        from infrastructure.database import connect, migrate
+
+        dsn = os.environ['BTL_TEST_DATABASE_URL']
+        migrate(dsn)
+        self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
+        provider = self.provider
+        version = provider.dataset_version
+        root = provider.describe_v2(provider.dataset_id,version)['root']
+        pin = dict(schemaVersion=1, artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+                   datasetId=provider.dataset_id, datasetVersion=version,
+                   manifestHash=version, rootHash=version, indexContentHash=root['indexContentHash'],
+                   archiveSha256='a'*64, qualificationReceiptSha256='b'*64)
+        timeline = IndexedTickTimeline(provider,provider.dataset_id,version,'0',
+                                       log_folder=self.root/'shared',storage_mode='shared-source-v2',source_pin=pin)
+        self.handles.append(timeline)
+        scope = TrustedScope('workspace:'+uuid4().hex,'actor:qa')
+        checkpoint = timeline.checkpoint()
+        self.state = seed_state('session:qa',self.profile,self.policy,checkpoint)
+        store = ObservedExecutionStore(dsn,state_storage_format=PROGRESS_FORMAT)
+        store.create(scope,self.state,checkpoint)
+
+        for target in ('0',str(S)):
+            command = self.raw('ADVANCE',{'targetNs':target})
+            before, prior = store.prepare(scope,command)
+            self.assertIsNone(prior)
+            frame = timeline.advance_through(target,timeline.cursor)
+            checkpoint = timeline.checkpoint()
+            proposed, events = apply(before['state'],command,reveal=frame,checkpoint=checkpoint)
+            receipt = store.commit(scope,command,before,proposed,checkpoint,events,
+                replay={'throughNs':frame['throughNs'],'exhaustedThroughBoundary':frame['exhaustedThroughBoundary']})
+            self.assertEqual(receipt['eventCount'],0)
+            self.state = receipt['state']
+            self.assertEqual(ObservedExecutionStore(dsn).prepare(scope,command)[1],receipt)
+
+        params = (scope.workspace_id,'session:qa')
+        with connect(dsn) as db:
+            self.assertEqual(db.execute('SELECT revision FROM btl.observed_replay_progress WHERE workspace_id=%s AND session_id=%s',params).fetchall(),[(2,)])
+            self.assertEqual(db.execute('SELECT revision FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s',params).fetchall(),[(0,)])
+            self.assertIsNone(db.execute('SELECT revision FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s',params).fetchone())
+
+        plan = dict(side='LONG',orderType='MARKET',workflow='QUICK',entry='2301.1',
+                    quantity='0.01',sl=None,tp=None,riskPercent='1',observations=[])
+        order = self.raw('OPEN',plan)
+        before, prior = store.prepare(scope,order)
+        self.assertIsNone(prior)
+        proposed, events = apply(before['state'],order)
+        receipt = store.commit(scope,order,before,proposed,checkpoint,events)
+        self.assertEqual(receipt['state']['revision'],3)
+        self.assertEqual(receipt['events'][0]['kind'],'ORDER_ACCEPTED')
+        cold = ObservedExecutionStore(dsn)
+        self.assertEqual(cold.prepare(scope,order)[1],receipt)
+        self.assertEqual(cold.inspect(scope,'session:qa')['state'],receipt['state'])
+        with connect(dsn) as db:
+            self.assertIsNone(db.execute('SELECT revision FROM btl.observed_replay_progress WHERE workspace_id=%s AND session_id=%s',params).fetchone())
+            self.assertEqual(db.execute('SELECT revision FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s ORDER BY revision',params).fetchall(),[(0,),(3,)])
+
+    def test_replaceable_progress_round_trips_without_changing_financial_state(self):
+        from unittest.mock import MagicMock
+        from application.models import TrustedScope
+        from execution.observed_replay_progress import progress_receipt, read_progress, replace_progress
+
+        self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
+        provider = self.provider
+        version = provider.dataset_version
+        root = provider.describe_v2(provider.dataset_id,version)['root']
+        pin = dict(schemaVersion=1, artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+                   datasetId=provider.dataset_id, datasetVersion=version,
+                   manifestHash=version, rootHash=version, indexContentHash=root['indexContentHash'],
+                   archiveSha256='a'*64, qualificationReceiptSha256='b'*64)
+        timeline = IndexedTickTimeline(provider,provider.dataset_id,version,'0',
+                                       log_folder=self.root/'shared',storage_mode='shared-source-v2',source_pin=pin)
+        self.handles.append(timeline)
+        start = timeline.checkpoint()
+        self.state = seed_state('session:qa',self.profile,self.policy,start)
+        base = validate_snapshot(self.state,start)
+        scope = TrustedScope('workspace:qa','actor:qa')
+        frame = timeline.advance_through(str(S),timeline.cursor)
+        checkpoint = timeline.checkpoint()
+        command = self.raw('ADVANCE',{'targetNs':str(S)})
+        after, events = apply(self.state,command,reveal=frame,checkpoint=checkpoint)
+        proposal = validate_snapshot(after,checkpoint)
+        restored = validate_snapshot(dict(after,nextEventIndex=self.state['nextEventIndex'],
+                                          eventHash=self.state['eventHash']),checkpoint)
+        base_hash = 'a'*64
+
+        db = MagicMock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': None}), MagicMock()]
+        receipt = replace_progress(db,scope,base,base_hash,command,proposal,events)
+        sql, params = db.execute.call_args.args
+        self.assertIn('ON CONFLICT (workspace_id,session_id) DO UPDATE',sql)
+        self.assertEqual(params[:2],(scope.workspace_id,'session:qa'))
+
+        reader = MagicMock()
+        reader.execute.return_value.fetchone.return_value = params[2:]
+        self.assertEqual(read_progress(reader,scope,base,base_hash),restored)
+        self.assertEqual(progress_receipt(reader,scope,base,base_hash,command),receipt)
+        with self.assertRaisesRegex(ValueError,'REFUSED_IDEMPOTENCY_CONFLICT'):
+            progress_receipt(reader,scope,base,base_hash,dict(command,payload={'targetNs':str(S+1)}))
+
+        db.reset_mock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': params[2:]})]
+        self.assertEqual(replace_progress(db,scope,base,base_hash,command,proposal,events),receipt)
+        self.assertEqual(db.execute.call_count,2)
+
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            read_progress(reader,scope,base,'b'*64)
+
+        db.reset_mock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': None})]
+        changed = dict(proposal,state=dict(after,balance='10001',initialBalance='10001'))
+        with self.assertRaisesRegex(ValueError,'REFUSED_FINANCIAL_PROGRESS'):
+            replace_progress(db,scope,base,base_hash,command,changed,events)
+        self.assertEqual(db.execute.call_count,2)
+
+        db.reset_mock()
+        db.execute.side_effect = [MagicMock(**{'fetchone.return_value': (0,)}),
+                                  MagicMock(**{'fetchone.return_value': None})]
+        with self.assertRaisesRegex(ValueError,'REFUSED_FINANCIAL_PROGRESS'):
+            replace_progress(db,scope,base,base_hash,command,proposal,[dict(events[0],kind='STALE_QUOTE')])
+        self.assertEqual(db.execute.call_count,2)
+
+    def test_replay_to_retry_is_bound_to_the_original_target(self):
+        from unittest.mock import MagicMock, patch
+        from application.models import TrustedScope
+        from execution.observed_research import ObservedResearchApplication
+
+        app = object.__new__(ObservedResearchApplication)
+        app.dsn = 'unused'
+        app.scope = TrustedScope('workspace:qa','actor:qa')
+        app.controller = MagicMock()
+        session = 'session:qa'
+        request = dict(schemaVersion=1, artifact='BTL-OBSERVED-REPLAY-TO-1', requestId='a'*32,
+                       sessionId=session, expectedRevision=0, targetNs='200', timeframe='1m')
+        state = dict(revision=1, throughNs='200')
+        original = dict(schemaVersion=1, artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                        sessionId=session, commandId=f"command:replay-to:{request['requestId']}:r0",
+                        expectedRevision=0, kind='ADVANCE', payload={'targetNs':'200'})
+        app._session = lambda *_: (None,None,state,None)
+        app.inspect = lambda *_: {'state':state}
+
+        def database():
+            conn = MagicMock()
+            conn.__enter__.return_value.execute.side_effect = [
+                None, MagicMock(**{'fetchone.return_value':(1,)}),
+                MagicMock(**{'fetchone.return_value':(1,content_hash(original))}),
+            ]
+            return conn
+
+        with patch('execution.observed_research.connect', return_value=database()):
+            self.assertEqual(app.replay_to(session,request)['advances'],0)
+        with patch('execution.observed_research.connect', return_value=database()):
+            with self.assertRaisesRegex(ValueError,'REFUSED_IDEMPOTENCY_CONFLICT'):
+                app.replay_to(session,dict(request,targetNs='300'))
+        app.controller.apply.assert_not_called()
+
+    def test_shared_source_commit_refuses_rewind_before_writing(self):
+        from unittest.mock import MagicMock, patch
+        from application.models import TrustedScope
+        from execution.observed_postgres import ObservedExecutionStore
+
+        self.setup_stream([(0,'2300','2300.1'),(S,'2301','2301.1')])
+        root = self.provider.describe_v2(self.provider.dataset_id,self.provider.dataset_version)['root']
+        version = self.provider.dataset_version
+        pin = dict(schemaVersion=1, artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+                   datasetId=self.provider.dataset_id, datasetVersion=version,
+                   manifestHash=version, rootHash=version, indexContentHash=root['indexContentHash'],
+                   archiveSha256='a'*64, qualificationReceiptSha256='b'*64)
+        timeline = IndexedTickTimeline(self.provider,self.provider.dataset_id,version,'0',
+                                       log_folder=self.root/'shared',storage_mode='shared-source-v2',source_pin=pin)
+        self.handles.append(timeline)
+        genesis = timeline.checkpoint()
+        self.state = seed_state('session:qa',self.profile,self.policy,genesis)
+        before_start = deepcopy(self.state)
+        command = self.raw('ADVANCE',{'targetNs':str(S)})
+        frame = timeline.advance_through(str(S),timeline.cursor)
+        current = timeline.checkpoint()
+        self.state, _ = apply(self.state,command,reveal=frame,checkpoint=current)
+        before = dict(state=self.state,controller=current)
+        rewind = dict(before_start,revision=self.state['revision']+1)
+        validate_snapshot(rewind,genesis)
+
+        store = ObservedExecutionStore('unused')
+        db = MagicMock()
+        with patch('execution.observed_postgres.connect',return_value=db), \
+             patch.object(store,'_read',return_value=(before,'compact-v1','a'*64)), \
+             patch.object(store,'_prior',return_value=None):
+            with self.assertRaisesRegex(ValueError,'REFUSED_REPLAY_FRONTIER'):
+                store.commit(TrustedScope('workspace:qa','actor:qa'),
+                             self.raw('ADVANCE',{'targetNs':str(S)}),before,rewind,genesis,[])
+        db.__enter__.return_value.execute.assert_not_called()
 
     def test_long_uses_ask_then_bid_preserves_unknown_and_event_chain(self):
         self.setup_stream([(0,'2300','2300.1'),(S,'2300.9','2301'),(2*S,'2302','2302.1')]);self.advance(0);self.open();entry,frame=self.advance(S)

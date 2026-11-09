@@ -4,7 +4,8 @@ from contracts.primitives import require, ContractError
 
 LOCAL_SESSION = 'BTL-LOCAL-SESSION-1'
 OBSERVED_SESSION = 'BTL-OBSERVED-RESEARCH-SESSION-1'
-MONTHLY_PROVIDER_OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'replay'))
+MONTHLY_PROVIDER_OPERATIONS = frozenset((
+    'create_session', 'inspect', 'workspace', 'bootstrap', 'replay', 'chart_history'))
 
 
 def monthly_provider_required(operation):

@@ -5,7 +5,9 @@ import unittest
 from contracts.primitives import ContractError
 from execution.observed_order_archive_v1 import (append, advance, summary,
                                                  verify_complete)
-from execution.observed_kernel import QA_ORDER_RETENTION_V3,apply,seed_state,validate_state
+from execution.observed_order_archive_v1 import PRODUCT_ARTIFACT, verify_record
+from execution.observed_kernel import (QA_ORDER_RETENTION_V3,PRODUCT_ORDER_RETENTION_V1,
+    apply,seed_state,validate_state)
 from tests import test_observed_kernel as kernel_fixtures
 
 
@@ -147,6 +149,69 @@ class ObservedOrderArchiveV1Tests(unittest.TestCase):
             validate_state(archive_state,order_retention_policy=QA_ORDER_RETENTION_V3)
         finally:
             archive_fx.tearDown();legacy_fx.tearDown()
+
+    def test_product_archive_retains_240_terminal_orders_with_a_bounded_hot_summary(self):
+        current=summary(artifact=PRODUCT_ARTIFACT);rows=[]
+        for index in range(240):
+            order_id=f'order:product:{index:03d}'
+            order=dict(status='CLOSED',grossPosted='1.25',sourceAnchor=f'event:{index:03d}')
+            row=append(current,session_id='session:product:1',revision=index+1,
+                       order_id=order_id,order=order,artifact=PRODUCT_ARTIFACT)
+            rows.append(row);current=advance(current,[row])
+        verified=verify_complete(iter(rows),current,collect=True)
+        self.assertEqual(verified['count'],240)
+        self.assertEqual(verified['summary'],current)
+        self.assertEqual(len(verified['orders']),240)
+        self.assertEqual(current['grossPosted'],'300')
+        self.assertEqual(current['artifact'],PRODUCT_ARTIFACT+'-SUMMARY')
+
+    def test_product_archive_refuses_a_tampered_terminal_record(self):
+        current=summary(artifact=PRODUCT_ARTIFACT)
+        row=append(current,session_id='session:product:2',revision=1,
+                   order_id='order:product:tampered',
+                   order=dict(status='CANCELLED',grossPosted='0'),artifact=PRODUCT_ARTIFACT)
+        changed=dict(row,order=dict(row['order'],grossPosted='7.00'))
+        with self.assertRaises(ContractError):verify_record(changed)
+
+    def test_qa_archive_wire_version_remains_unchanged(self):
+        self.assertEqual(summary()['artifact'],'BTL-QA-TERMINAL-ORDER-ARCHIVE-1-SUMMARY')
+
+    def test_product_session_accepts_240_terminal_orders_with_active_only_state(self):
+        fx=kernel_fixtures.ObservedKernelTests();fx.setUp()
+        try:
+            fx.setup_stream([(0,'2300','2300.1')])
+            state=seed_state('session:product-archive-240',fx.profile,fx.policy,
+                fx.timeline.checkpoint(),order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+                product_order_archive_v1=True)
+            frame=fx.timeline.advance_through('0',fx.timeline.cursor);cp=fx.timeline.checkpoint()
+            state,_,_=apply(state,dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                sessionId=state['sessionId'],commandId='product:advance:0',expectedRevision=0,
+                kind='ADVANCE',payload={'targetNs':'0'}),reveal=frame,checkpoint=cp,
+                order_retention_policy=PRODUCT_ORDER_RETENTION_V1,product_order_archive_v1=True,
+                archived_order_lookup=lambda _:None)
+            plan=dict(side='LONG',orderType='LIMIT',workflow='PLANNED',entry='2290',quantity='0.01',
+                sl='2289',tp='2291',riskPercent='1',observations=[])
+            archived={};records=[]
+            for index in range(240):
+                order_id=f'order:product:{index:03d}'
+                opened,_,_=apply(state,dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                    sessionId=state['sessionId'],commandId=order_id,expectedRevision=state['revision'],
+                    kind='OPEN',payload=plan),order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+                    product_order_archive_v1=True,archived_order_lookup=lambda oid:archived.get(oid))
+                state=opened
+                state,_,new_rows=apply(state,dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-COMMAND-1',
+                    sessionId=state['sessionId'],commandId=f'cancel:product:{index:03d}',
+                    expectedRevision=state['revision'],kind='CANCEL',payload={'orderId':order_id}),
+                    order_retention_policy=PRODUCT_ORDER_RETENTION_V1,product_order_archive_v1=True,
+                    archived_order_lookup=lambda oid:archived.get(oid))
+                records.extend(new_rows);archived[order_id]=new_rows[0]['order']
+            validate_state(state,order_retention_policy=PRODUCT_ORDER_RETENTION_V1)
+            self.assertEqual(state['artifact'],'BTL-OBSERVED-EXECUTION-STATE-PRODUCT-ORDER-ARCHIVE-1')
+            self.assertEqual(state['orders'],{})
+            self.assertEqual(state['orderArchive']['count'],240)
+            self.assertEqual(len(records),240)
+            self.assertEqual(state['balance'],state['initialBalance'])
+        finally:fx.tearDown()
 
 
 if __name__ == '__main__':

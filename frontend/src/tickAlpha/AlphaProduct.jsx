@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {api,id,sessionPath,sourceContext,createMethodVersion,setMethodArchived} from './client.js';
+import {api,id,sessionPath,sourceContext,createMethodVersion,setMethodArchived,
+  loadMethodFamily,loadMethodVersionPage} from './client.js';
 import {money,kindLabel,utc,lastSession} from './productData.js';
 import {linkTo,navigate,METHOD_TABS} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
@@ -176,8 +177,8 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
   useEffect(()=>{
     if(!familyId||!accountTransport())return;
     let live=true;
-    api(`/method-families/${encodeURIComponent(familyId)}?version_limit=25`)
-      .then(result=>{if(live){setFamilyDetail(result.family);setVersionError('');}},error=>{if(live)setVersionError(error.message);});
+    loadMethodFamily(familyId)
+      .then(family=>{if(live){setFamilyDetail(family);setVersionError('');}},error=>{if(live)setVersionError(error.message);});
     return()=>{live=false;};
   },[familyId]);
   const family=familyDetail?.familyId===familyId?familyDetail:familySummary;
@@ -195,9 +196,9 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     if(!family?.nextVersionCursor||versionBusy)return;
     setVersionBusy(true);setVersionError('');
     try{
-      const result=await api(`/method-families/${encodeURIComponent(family.familyId)}?version_limit=25&after_version=${family.nextVersionCursor}`);
-      setFamilyDetail(current=>current?.familyId===result.family.familyId?{...result.family,
-        versions:[...current.versions,...result.family.versions]}:current);
+      const result=await loadMethodVersionPage(family.familyId,family.nextVersionCursor);
+      setFamilyDetail(current=>current?.familyId===family.familyId?{...current,
+        nextVersionCursor:result.nextCursor,versions:[...current.versions,...result.versions]}:current);
     }catch(error){setVersionError(error.message);}finally{setVersionBusy(false);}
   }
   const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};

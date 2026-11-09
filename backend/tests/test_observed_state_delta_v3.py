@@ -49,6 +49,75 @@ class ObservedStateDeltaV3Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
             reconstruct_complete(base,(item for item in corrupted),len(corrupted))
 
+    def test_progress_consolidation_preserves_financial_delta_and_refuses_gaps_by_default(self):
+        initial = state(0,{})
+        base = encode_compact_base(initial)
+        completed = state(5,{'closed:1':{'status':'CLOSED','grossPosted':'2'}},balance='10002')
+        consolidated = encode_compact_delta(initial,completed,base['stateHash'],progress_revision=4)
+        following = state(6,completed['orders'],balance='10002')
+        tail = encode_compact_delta(completed,following,consolidated['body']['recordHash'])
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,[consolidated,tail],6)
+        self.assertEqual(reconstruct_complete(base,[consolidated,tail],6,allow_progress=True),following)
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,[tail],6,allow_progress=True)
+        corrupt = json.loads(json.dumps(consolidated))
+        corrupt['body']['progressRevision'] = 3
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            reconstruct_complete(base,[corrupt,tail],6,allow_progress=True)
+
+    def test_compact_store_cold_recovery_reads_only_tail_and_checks_anchor(self):
+        from unittest.mock import MagicMock, patch
+        from execution.observed_postgres import (
+            COMPACT_CHECKPOINT_BASE, COMPACT_CHECKPOINT_DELTA, COMPACT_RECOVERY,
+            COMPACT_RECOVERY_INTERVAL, ObservedExecutionStore,
+        )
+        from execution.postgres import pack
+
+        genesis = encode_compact_base(state(0, {}))
+        genesis.update(artifact=COMPACT_CHECKPOINT_BASE, chainHash=genesis['stateHash'], controller={})
+        interval = COMPACT_RECOVERY_INTERVAL
+        base_state = state(interval, {'order:1': {'status': 'ACTIVE'}})
+        final_state = state(interval+1, {}, balance='10001')
+        prior_delta = encode_compact_delta(state(interval-2, {}), state(interval-1, {}), 'a'*64)
+        base_delta = encode_compact_delta(state(interval-1, {}), base_state, prior_delta['body']['recordHash'])
+        tail_delta = encode_compact_delta(base_state, final_state, base_delta['body']['recordHash'])
+
+        def checkpoint(artifact, delta):
+            body = delta['body']
+            return dict(schemaVersion=1, formatVersion=1, artifact=artifact, revision=body['revision'],
+                        stateHash=body['stateHash'], chainHash=body['recordHash'],
+                        previousHash=body['previousHash'], delta=delta, controller={})
+
+        anchor = checkpoint(COMPACT_RECOVERY, base_delta)
+        anchor['state'] = base_state
+        tail = checkpoint(COMPACT_CHECKPOINT_DELTA, tail_delta)
+        store = ObservedExecutionStore('unused')
+
+        def database(recovery):
+            db = MagicMock()
+            responses = [pack(genesis), pack(recovery), pack(checkpoint(COMPACT_CHECKPOINT_DELTA, prior_delta)), (interval+1,)]
+            db.execute.side_effect = [MagicMock(**{'fetchone.return_value': row}) for row in responses]
+            stream = db.cursor.return_value.__enter__.return_value
+            stream.__iter__.return_value = iter([(interval+1, *pack(tail))])
+            return db, stream
+
+        db, stream = database(anchor)
+        with patch('execution.observed_postgres.validate_snapshot') as validate:
+            restored, chain = store._qa_reconstruct(db, 'workspace:qa', 'session:qa',
+                                                  upto_revision=interval+1, require_tip=True)
+        self.assertEqual(restored, final_state)
+        self.assertEqual(chain, tail['chainHash'])
+        self.assertEqual(stream.execute.call_args.args[1], ('workspace:qa','session:qa',interval,interval+1))
+        self.assertEqual(db.execute.call_count, 4)
+        validate.assert_called_once()
+
+        corrupt = dict(anchor, state=dict(base_state, balance='0'))
+        db, stream = database(corrupt)
+        with self.assertRaisesRegex(ValueError, 'CORRUPT_RECORD'):
+            store._qa_reconstruct(db, 'workspace:qa', 'session:qa', upto_revision=interval+1)
+        stream.execute.assert_not_called()
+
     def test_snapshot_delta_exact_reconstruction_retry_and_corruption_detection(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=os.path.join(tmp,'qa.sqlite');store=QAStateDeltaStore(path);sid='session:qa-v3'

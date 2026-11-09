@@ -409,6 +409,10 @@ class PostgresExecutionStore:
                            (workspace, session, next_state["revision"], state_raw, state_hash))
             db.execute("UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s WHERE workspace_id=%s AND session_id=%s",
                        (next_state["revision"], state_raw, state_hash, workspace, session))
+            # Invalidate legacy/local Method summaries atomically with the Session
+            # commit so cached totals and revision/event-head details cannot go stale.
+            from .method_analytics_store import invalidate_local_session
+            invalidate_local_session(db, workspace, session)
         # Publication follows successful COMMIT; an after-commit crash is handled by durable dedup.
         if compact_mode:
             self._cache_write(workspace, session, next_state, next_checkpoint, next_chain)
@@ -463,6 +467,56 @@ class PostgresExecutionStore:
                 sessionId=session, records=page,
                 nextCursor=page[-1]["sequence"] if len(values) > limit and page else None,
                 complete=len(values) <= limit)
+
+    def order_history_page(self, scope, session_id, *, after_sequence=None,
+                           revision_pin=None, limit=64):
+        """Revision-pinned V1 page over the immutable terminal archive."""
+        workspace, session = scoped(scope, session_id)
+        require(after_sequence is None or (type(after_sequence) is int and after_sequence >= -1),
+                'afterSequence', 'INVALID_CURSOR')
+        require(revision_pin is None or (type(revision_pin) is int and revision_pin >= 0),
+                'revision', 'INVALID_CURSOR')
+        require(type(limit) is int and 1 <= limit <= 256, 'limit', 'INVALID_INPUT')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            session_row=db.execute('SELECT payload,content_hash,revision,dataset_version,profile_hash '
+                'FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s',
+                (workspace,session)).fetchone()
+            require(session_row is not None,'session','RESOURCE_UNAVAILABLE')
+            state=self._load_row(db,workspace,session,session_row,require_tip=True)['state']
+            require(revision_pin is None or revision_pin==state['revision'],
+                    'revision','STALE_REVISION')
+            total=db.execute('SELECT count(*) FROM btl.tick_terminal_orders '
+                'WHERE workspace_id=%s AND session_id=%s',(workspace,session)).fetchone()[0]
+            start=0 if after_sequence is None or after_sequence<0 else after_sequence+1
+            require(start<=total,'afterSequence','INVALID_CURSOR')
+            previous_hash=ORDER_ARCHIVE_GENESIS
+            if start:
+                prior=db.execute('SELECT payload,content_hash,record_hash,sequence FROM btl.tick_terminal_orders '
+                    'WHERE workspace_id=%s AND session_id=%s AND sequence=%s',
+                    (workspace,session,start-1)).fetchone()
+                require(prior is not None,'afterSequence','INVALID_CURSOR')
+                anchor=unpack(prior[0],prior[1])
+                verify_terminal_record(anchor,session_id=session,sequence=start-1)
+                require(anchor['recordHash']==prior[2],'terminalArchiveCursor','CORRUPT_RECORD')
+                previous_hash=prior[2]
+            rows=db.execute('SELECT payload,content_hash,record_hash,sequence FROM btl.tick_terminal_orders '
+                'WHERE workspace_id=%s AND session_id=%s AND sequence>=%s ORDER BY sequence LIMIT %s',
+                (workspace,session,start,limit+1)).fetchall()
+            records=[]
+            for raw,sha,record_hash,sequence in rows:
+                record=unpack(raw,sha)
+                verify_terminal_record(record,session_id=session,sequence=sequence,
+                                       previous_hash=previous_hash)
+                require(record['recordHash']==record_hash,'terminalArchiveRecord','CORRUPT_RECORD')
+                records.append(dict(orderId=record['orderId'],order=record['order'],sequence=sequence,
+                    finalizedRevision=record['finalizedRevision'],recordHash=record['recordHash']))
+                previous_hash=record_hash
+            page=records[:limit];more=len(records)>limit
+            cursor=(dict(revision=state['revision'],afterSequence=page[-1]['sequence'])
+                    if more and page else None)
+            return dict(schemaVersion=1,artifact='BTL-ORDER-HISTORY-PAGE-1',sessionId=session,
+                revision=state['revision'],total=total,records=page,nextCursor=cursor,complete=not more)
 
     def inspect(self, scope, session_id, after_sequence=0, maximum=64):
         workspace, session = scoped(scope, session_id)
@@ -578,3 +632,11 @@ def grant_execution_runtime(dsn, role):
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(payload,content_hash) ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}").format(sql.Identifier(role)))
+        # Product Sessions maintain bounded, rebuildable Journal and analytics
+        # projections in the same transaction as their immutable event append.
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads,btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT INSERT ON btl.tick_journal_order_events TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,UPDATE ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
+        # Method aggregates are created on first qualifying Session commit.
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_method_metric_projections TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT ON btl.tick_research_sessions TO {}").format(sql.Identifier(role)))

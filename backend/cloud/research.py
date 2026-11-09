@@ -79,11 +79,13 @@ def _synthetic_monthly_provider():
     require(os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1' and all(values),
             'syntheticMonthly', 'REFUSED_SOURCE')
     root, dataset_id, dataset_version, manifest_hash = values
-    require(len(root) <= 4096 and os.path.isabs(root), 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    require(len(root) <= 4096, 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    from market_data.monthly_root import pin_monthly_root
+    pinned_root = pin_monthly_root(root)
     from contracts.primitives import digest
     digest(dataset_version, 'syntheticMonthlyVersion')
     digest(manifest_hash, 'syntheticMonthlyManifestHash')
-    pin = (os.path.realpath(root), dataset_id, dataset_version, manifest_hash)
+    pin = (pinned_root, dataset_id, dataset_version, manifest_hash)
     global _MONTHLY_PROVIDER, _MONTHLY_PIN
     with _MONTHLY_LOCK:
         require(_MONTHLY_PIN in (None, pin), 'syntheticMonthly', 'SOURCE_PIN_CHANGED')
@@ -147,6 +149,26 @@ def warm_operator_sources(dsn):
     return True
 
 
+def _observed_session_uses_product_archive(db,workspace_id,session_id):
+    """Select a validator from the persisted Session version, never from HTTP."""
+    row=db.execute('SELECT payload,content_hash FROM btl.tick_sessions '
+                   'WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
+    if row is None:return None
+    from execution.postgres import unpack
+    stored=unpack(row['payload'],row['content_hash'])
+    state=stored.get('state')
+    if state is None:
+        base=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints '
+                        'WHERE workspace_id=%s AND session_id=%s AND revision=0',
+                        (str(workspace_id),session_id)).fetchone()
+        require(base is not None,'sessionFormat','CORRUPT_RECORD')
+        state=unpack(base['payload'],base['content_hash']).get('state')
+    require(type(state) is dict and type(state.get('artifact')) is str,
+            'sessionFormat','CORRUPT_RECORD')
+    from execution.observed_session_dispatch import dispatch_observed_session
+    return dispatch_observed_session(state).archive_codec
+
+
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
     # Keep verified-user/membership locks through the INNER service commit.
     # The external source selector is an operator catalog; HTTP supplies only
@@ -160,7 +182,8 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             owner(unit.role)
         if operation in ('method_page', 'method_detail', 'session_page',
                          'method_family_page', 'method_family_detail',
-                         'method_new_version', 'method_lifecycle'):
+                         'method_family_versions_page', 'method_new_version',
+                         'method_lifecycle'):
             from execution import product_read_model
             from execution import product_method_lifecycle
             if operation == 'method_page':
@@ -172,7 +195,10 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             if operation == 'method_family_page':
                 return product_method_lifecycle.page(db, str(workspace_id), **args[0])
             if operation == 'method_family_detail':
-                return product_method_lifecycle.detail(db, str(workspace_id), args[0], **args[1])
+                return product_method_lifecycle.detail(db, str(workspace_id), args[0])
+            if operation == 'method_family_versions_page':
+                return product_method_lifecycle.versions_page(db, str(workspace_id),
+                    args[0], **args[1])
             if operation == 'method_new_version':
                 db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
                 return product_method_lifecycle.add_version(db, str(workspace_id), args[0], args[1])
@@ -180,41 +206,50 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                 db.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (str(workspace_id),))
             return product_method_lifecycle.set_archived(db, str(workspace_id), args[0], args[1])
         if operation == 'method_analytics':
-            catalog=_operator_catalog(dsn)
-            monthly_catalog=_monthly_catalog(dsn)
-            observed_method=False
-            if catalog is not None:
-                with connect(dsn) as db:
-                    db.row_factory=dict_row
-                    candidates=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions '
-                        'WHERE workspace_id=%s AND method_id=%s ORDER BY session_id',
-                        (str(workspace_id),args[0])).fetchall()
-                from execution.postgres import unpack
-                analytics_sessions=[]
-                method_hash=None
-                for row in candidates:
+            catalog = _operator_catalog(dsn)
+            monthly_catalog = _monthly_catalog(dsn)
+            from .research_routing import method_analytics_family
+            from execution.postgres import unpack
+            family_rows=[]
+            after=''
+            method_hash=None
+            while True:
+                with connect(dsn) as analytics_db:
+                    analytics_db.row_factory=dict_row
+                    batch=analytics_db.execute(
+                        'SELECT session_id,payload,content_hash FROM btl.tick_research_sessions '
+                        'WHERE workspace_id=%s AND method_id=%s AND session_id>%s '
+                        'ORDER BY session_id LIMIT 65',
+                        (str(workspace_id),args[0],after)).fetchall()
+                more=len(batch)>64
+                for row in batch[:64]:
                     metadata=unpack(row['payload'],row['content_hash'])
-                    analytics_sessions.append((metadata.get('id'),metadata.get('artifact')))
+                    artifact=metadata.get('artifact')
+                    if all(existing_artifact!=artifact for _sid,existing_artifact in family_rows):
+                        family_rows.append((row['session_id'],artifact))
                     method_hash=method_hash or metadata.get('methodHash')
-                from .research_routing import method_analytics_family
-                family=method_analytics_family(analytics_sessions)
-                if family=='mixed':
+                    after=row['session_id']
+                selected_family=method_analytics_family(family_rows)
+                if selected_family=='mixed':
                     return dict(schemaVersion=1,artifact='BTL-METHOD-ANALYTICS-1',methodId=args[0],
                         methodHash=method_hash,aggregation='POOLED_COMMITTED_COMPLETED_POSITIONS',
                         balancesCombined=False,financialAuthority='COMMITTED_EVENTS_ONLY',status='UNAVAILABLE',
                         reason='MIXED_SESSION_ENGINE',includedSessions=[],
                         excludedSessions=[dict(sessionId=session_id,reason='MIXED_SESSION_ENGINE')
-                                           for session_id,_artifact in analytics_sessions],metrics=None)
-                observed_method=family=='observed'
-            if catalog is not None and observed_method:
+                                          for session_id,_artifact in family_rows],metrics=None)
+                if not more:
+                    break
+            scope = TrustedScope(str(workspace_id), str(actor_id))
+            if selected_family == 'observed' and catalog is not None:
                 from execution.observed_research import ObservedResearchApplication
-                research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog,
-                    state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'compact-v1')
+                research=ObservedResearchApplication(dsn,scope,catalog,
+                    state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'compact-v1',
+                    product_order_archive_v1=True)
             else:
-                research = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)),
+                research = ResearchApplication(dsn, scope,
                     synthetic_provider=_synthetic_monthly_provider(),
                     monthly_catalog=monthly_catalog,
-                    state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'compact-v1')
+                    state_storage_format=os.environ.get('BTL_TICK_SESSION_STORAGE_FORMAT') or 'snapshot-v1')
             try:
                 return research.method_analytics(args[0])
             finally:
@@ -263,9 +298,8 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                     'monthlySource','REFUSED_SOURCE')
             monthly_provider=(monthly_catalog.resolve(monthly_source_key,monthly_period)
                               if monthly_provider_required(operation) else None)
-            # Existing Session pins are checked against catalog metadata in
-            # _session. Only source-reading operations open the Parquet data.
-            monthly_source_key=monthly_period=None
+            # The pinned source identity stays attached to the adapter so
+            # _session can verify both metadata and replay/chart reads.
         else:
             monthly_provider=None;monthly_source_key=monthly_period=None
         if operation=='replay_to':
@@ -273,8 +307,19 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
         monthly = None if observed else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication
+            archive_codec='none'
+            if operation=='create_session':
+                selected=_observed_session_uses_product_archive(db,workspace_id,session_id)
+                archive_codec='p0-v1' if selected is None else selected
+            elif session_id is not None:
+                archive_codec=_observed_session_uses_product_archive(db,workspace_id,session_id)
+            product_archive=archive_codec=='p0-v1'
+            terminal_archive=archive_codec=='integration-v1'
+            storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or (
+                'compact-v1' if archive_codec!='none' else 'snapshot-v1')
             research=ObservedResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),catalog,
-                state_storage_format=os.environ.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') or 'compact-v1')
+                state_storage_format=storage_format,product_order_archive_v1=product_archive,
+                terminal_order_archive_v1=terminal_archive)
         else:
             research=ResearchApplication(dsn,TrustedScope(str(workspace_id),str(actor_id)),
                 synthetic_provider=monthly_provider or monthly,
@@ -405,6 +450,14 @@ def install(app):
         return await execute(user, workspace_id, 'method_family_detail', family_id,
                              {'version_limit': version_limit, 'after_version': after_version})
 
+    @app.get(prefix + '/method-families/{family_id}/versions')
+    async def method_family_versions(workspace_id: uuid.UUID, family_id: str,
+                                     limit: int = Query(25, ge=1, le=50),
+                                     cursor: str | None = Query(None, max_length=2048),
+                                     user: User = Depends(current)):
+        return await execute(user, workspace_id, 'method_family_versions_page', family_id,
+            {'limit': limit, 'cursor': cursor})
+
     @app.post(prefix + '/method-families/{family_id}/versions')
     async def method_version(workspace_id: uuid.UUID, family_id: str, request: Request,
                              user: User = Depends(current)):
@@ -459,6 +512,22 @@ def install(app):
                            cursor: str | None = None, user: User = Depends(current)):
         return await execute(user, workspace_id, 'journal_page', session_id,
                              {'limit': limit, 'cursor': cursor})
+
+    @app.get(prefix + '/sessions/{session_id}/orders/pages')
+    async def order_history_page(workspace_id: uuid.UUID, session_id: str, limit: int = 64,
+                                 after_sequence: int | None = None, revision: int | None = None,
+                                 user: User = Depends(current)):
+        return await execute(user, workspace_id, 'order_history_page', session_id,
+            {'limit': limit, 'afterSequence': after_sequence, 'revision': revision})
+
+    @app.get(prefix + '/sessions/{session_id}/analytics/pages')
+    async def analytics_page(workspace_id: uuid.UUID, session_id: str, limit: int = 32,
+                             offset: int = 0, revision: int | None = None,
+                             cursor: str | None = Query(None, max_length=2048),
+                             user: User = Depends(current)):
+        request={'limit': limit, 'offset': offset, 'revision': revision}
+        if cursor is not None:request['cursor']=cursor
+        return await execute(user, workspace_id, 'analytics_page', session_id,request)
 
     @app.get(prefix + '/sessions/{session_id}/terminal-orders')
     async def terminal_orders(workspace_id: uuid.UUID, session_id: str,

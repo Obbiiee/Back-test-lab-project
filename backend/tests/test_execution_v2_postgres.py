@@ -129,6 +129,9 @@ class ExecutionV2PostgresTests(unittest.TestCase):
         with psycopg.connect(DSN,autocommit=True) as db:
             db.execute(sql.SQL("CREATE ROLE {} NOLOGIN").format(sql.Identifier(role)))
         grant_execution_runtime(DSN,role)
+        with connect(DSN) as db:
+            self.assertTrue(db.execute("SELECT has_table_privilege(%s,'btl.tick_method_metric_projections','INSERT')",
+                                       (role,)).fetchone()[0])
         @contextmanager
         def restricted(dsn):
             with connect(dsn) as db:

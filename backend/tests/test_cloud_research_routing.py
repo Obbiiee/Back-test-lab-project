@@ -19,10 +19,10 @@ class ResearchRoutingTests(unittest.TestCase):
         self.assertEqual(method_analytics_family([('s1', 'BTL-OBSERVED-RESEARCH-SESSION-1')]), 'observed')
 
     def test_monthly_provider_is_opened_only_for_source_reading_operations(self):
-        for operation in ('create_session', 'workspace', 'bootstrap', 'replay'):
+        for operation in ('create_session', 'inspect', 'workspace', 'bootstrap', 'replay', 'chart_history'):
             with self.subTest(operation=operation):
                 self.assertTrue(monthly_provider_required(operation))
-        for operation in ('inspect', 'review', 'confirm', 'apply', 'summary', 'journal',
+        for operation in ('review', 'confirm', 'apply', 'summary', 'journal',
                           'journal_page', 'terminal_order_page', 'command_result', 'method_analytics'):
             with self.subTest(operation=operation):
                 self.assertFalse(monthly_provider_required(operation))

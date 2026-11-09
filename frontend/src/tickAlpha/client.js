@@ -1,6 +1,7 @@
-// Local transport only. Financial values stay exact strings; no browser settlement.
+// Financial values stay exact strings across hosted and loopback transports.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 import {accountTransport,isAccountPage} from './accountClient.js';
+import {isLocalReview} from '../tickReview/LocalOrigin.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
 function stableValue(value){
   if(Array.isArray(value))return value.map(stableValue);
@@ -24,9 +25,11 @@ export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
     const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const queued=replay||(/^\/sessions$/.test(path))||/\/sessions\/[^/]+\/(view|bootstrap|chart-history|replay-to)$/.test(path);
-    const mutating=replay||path==='/sessions'||/\/replay-to$/.test(path);
-    const jobId=queued?await durableJobId(account,path,body):undefined;
+    const mutating=replay||(path==='/sessions'&&body!==undefined)||/\/replay-to$/.test(path);
+    const queuedRead=/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
+    // The queue reuses completed results by job ID. A new read must see the
+    // current committed revision; only retries of a mutation reuse its ID.
+    const jobId=mutating?await durableJobId(account,path,body):queuedRead?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
     const uncertain=()=>Object.assign(Error('UNKNOWN: durable operation outcome is not yet known. Reconcile its job or authoritative Session/receipt before retrying.'),{code:'UNKNOWN',jobId});
     let value;
@@ -36,12 +39,15 @@ export async function api(path,body,{signal}={}){
       if(mutating&&!definitiveRefusal)throw uncertain();
       throw error;
     }
-    if(queued&&['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','EXPIRED','RECONCILE_REQUIRED'].includes(value?.state)&&!value?.jobId){
+    if(jobId&&['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','EXPIRED','RECONCILE_REQUIRED'].includes(value?.state)&&!value?.jobId){
       if(mutating)throw uncertain();
       throw Error('Queued research response omitted its durable job identity.');
     }
     while(value?.jobId){
-      if(value.jobId!==jobId)throw Error('Unexpected research job; no state was imported.');
+      if(value.jobId!==jobId){
+        if(mutating)throw uncertain();
+        throw Error('Unexpected research job; no state was imported.');
+      }
       if(value.state==='SUCCEEDED'){value=value.result;break;}
       if(!['QUEUED','RUNNING'].includes(value.state)){
         if(mutating)throw uncertain();
@@ -62,10 +68,15 @@ export async function api(path,body,{signal}={}){
         throw error;
       }
     }
-    if(value?.schemaVersion!==1)throw Error('Unsupported workspace response; no state was imported.');
+    if(value?.schemaVersion!==1){
+      if(mutating)throw uncertain();
+      throw Error('Unsupported workspace response; no state was imported.');
+    }
     return value;
   }
-  if(isAccountPage())throw Error('Sign in to continue. No private local fallback was requested.');
+  if(isAccountPage()||typeof window==='undefined'||!isLocalReview(new URL(window.location.href).hostname)){
+    throw Error('Sign in to continue. No private local fallback was requested.');
+  }
   const source=sourceContext();
   const response=await fetch(ROOT+path,{method:body===undefined?'GET':'POST',cache:'no-store',
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
@@ -77,6 +88,84 @@ export async function api(path,body,{signal}={}){
   return value;
 }
 export function sessionPath(session){return `/sessions/${encodeURIComponent(session)}`;}
+export function orderHistoryPagePath(sessionId,{limit=64,afterSequence=null,revision=null}={}){
+  if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>256)
+    throw Error('Invalid order history page request.');
+  if(afterSequence!==null&&(!Number.isSafeInteger(afterSequence)||afterSequence<0))
+    throw Error('Invalid order history cursor.');
+  if(revision!==null&&(!Number.isSafeInteger(revision)||revision<0))
+    throw Error('Invalid order history revision.');
+  const query=new URLSearchParams({limit:String(limit)});
+  if(afterSequence!==null)query.set('after_sequence',String(afterSequence));
+  if(revision!==null)query.set('revision',String(revision));
+  return `${sessionPath(sessionId)}/orders/pages?${query}`;
+}
+export function validateOrderHistoryPage(page,sessionId,{limit=64,afterSequence=null,revision=null}={}){
+  if(!page||page.artifact!=='BTL-ORDER-HISTORY-PAGE-1'||page.sessionId!==sessionId||
+     !Number.isSafeInteger(page.revision)||page.revision<0||!Number.isSafeInteger(page.total)||page.total<0||
+     !Array.isArray(page.records)||page.records.length>limit||typeof page.complete!=='boolean')
+    throw Error('Unsupported or incomplete order history page.');
+  if(revision!==null&&page.revision!==revision)throw Error('Order history revision changed; reload from the first page.');
+  let prior=afterSequence===null?-1:afterSequence;
+  for(const record of page.records){
+    if(!record||typeof record.orderId!=='string'||!record.order||typeof record.order!=='object'||
+       !Number.isSafeInteger(record.sequence)||record.sequence<=prior||
+       !Number.isSafeInteger(record.finalizedRevision)||record.finalizedRevision<1||
+       typeof record.recordHash!=='string'||!/^[a-f0-9]{64}$/.test(record.recordHash))
+      throw Error('Invalid order history record.');
+    prior=record.sequence;
+  }
+  const cursor=page.nextCursor;
+  if(cursor!==null&&(!cursor||cursor.revision!==page.revision||!Number.isSafeInteger(cursor.afterSequence)||
+     cursor.afterSequence!==prior||page.records.length===0))throw Error('Invalid order history cursor response.');
+  if(page.complete!==(cursor===null))throw Error('Inconsistent order history completion state.');
+  return page;
+}
+export async function loadOrderHistoryPage(sessionId,options={}){
+  if(!accountTransport())throw Error('Historical order pages require an authenticated workspace.');
+  const path=orderHistoryPagePath(sessionId,options);
+  const page=await api(path,undefined,{signal:options.signal});
+  return validateOrderHistoryPage(page,sessionId,options);
+}
+export function analyticsPagePath(sessionId,{limit=32,offset=0,revision=null}={}){
+  if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>64||
+     !Number.isSafeInteger(offset)||offset<0)
+    throw Error('Invalid analytics page request.');
+  if(revision!==null&&(!Number.isSafeInteger(revision)||revision<0))
+    throw Error('Invalid analytics revision.');
+  const query=new URLSearchParams({limit:String(limit),offset:String(offset)});
+  if(revision!==null)query.set('revision',String(revision));
+  return `${sessionPath(sessionId)}/analytics/pages?${query}`;
+}
+export function validateAnalyticsPage(page,sessionId,{limit=32,offset=0,revision=null}={}){
+  if(!page||page.artifact!=='BTL-OBSERVED-ANALYTICS-PAGE-1'||page.sessionId!==sessionId||
+     !Number.isSafeInteger(page.revision)||page.revision<0||!Array.isArray(page.completed)||
+     page.completed.length>limit||!['BUILDING','COMPLETE'].includes(page.status))
+    throw Error('Unsupported or invalid analytics page.');
+  if(page.completed.some(row=>!row||typeof row.id!=='string'||row.status!=='CLOSED'))
+    throw Error('Invalid analytics trade row.');
+  if(revision!==null&&page.revision!==revision)
+    throw Error('Analytics revision changed; reload from the first page.');
+  if(page.status==='BUILDING'){
+    if(page.completed.length!==0||!Number.isSafeInteger(page.processedEvents)||
+       !Number.isSafeInteger(page.totalEvents)||page.processedEvents<0||
+       page.processedEvents>page.totalEvents||page.nextTradeOffset!==null)
+      throw Error('Invalid analytics build progress.');
+    return page;
+  }
+  if(!page.metrics||typeof page.metrics!=='object'||!page.account||typeof page.account!=='object'||
+     !page.provenance||typeof page.provenance!=='object'||
+     (page.nextTradeOffset!==null&&(!Number.isSafeInteger(page.nextTradeOffset)||
+       page.nextTradeOffset<offset+page.completed.length)))
+    throw Error('Invalid complete analytics page.');
+  return page;
+}
+export async function loadAnalyticsPage(sessionId,options={}){
+  if(!accountTransport())throw Error('Analytics pages require an authenticated workspace.');
+  const path=analyticsPagePath(sessionId,options);
+  const page=await api(path,undefined,{signal:options.signal});
+  return validateAnalyticsPage(page,sessionId,options);
+}
 export function pagePath(page=null){
   if(page!==null&&page!=='home')throw Error('Unsupported workspace page');
   const url=new URL(typeof window==='undefined'?'http://localhost/':window.location.href);
@@ -97,6 +186,31 @@ export function selectSessionUrl(session){
   url.searchParams.set('session',session);
   window.history.replaceState(null,'',url);
 }
+export async function replayObservedTo(view,targetNs,timeframe){
+  const account=accountTransport();
+  if(!account||view.metadata.artifact!=='BTL-OBSERVED-RESEARCH-SESSION-1')throw Error('Forward jump requires a hosted observed Session.');
+  if(typeof targetNs!=='string'||!/^(0|[1-9][0-9]{0,19})$/.test(targetNs)||
+    BigInt(targetNs)<=BigInt(view.state.throughNs))throw Error('Choose a time after the saved replay position.');
+  if(view.pendingReplayTargetNs!=null&&view.pendingReplayTargetNs!==targetNs){
+    throw Error('Continue the saved replay target before choosing another time.');
+  }
+  const sessionId=view.metadata.id;
+  const path=sessionPath(sessionId)+'/replay-to';
+  const request={schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-1',sessionId,expectedRevision:view.state.revision,targetNs,timeframe};
+  const requestId=(await durableJobId(account,path,request)).replaceAll('-','');
+  if(accountTransport()!==account)throw Error('Account changed before replay could start.');
+  const result=await api(path,{...request,requestId});
+  if(accountTransport()!==account||result.artifact!=='BTL-OBSERVED-REPLAY-TO-RESULT-1'||result.requestId!==requestId||
+    result.sessionId!==sessionId||result.targetNs!==targetNs||result.view?.metadata?.id!==sessionId||
+    result.view?.state?.throughNs!==result.throughNs||!Number.isSafeInteger(result.view?.state?.revision)||
+    result.view.state.revision<request.expectedRevision||typeof result.throughNs!=='string'||
+    !/^(0|[1-9][0-9]{0,19})$/.test(result.throughNs)||BigInt(result.throughNs)<BigInt(view.state.throughNs)||
+    BigInt(result.throughNs)>BigInt(targetNs)||result.targetReached!==(result.throughNs===targetNs)){
+    throw Error('Replay result could not be verified. Reopen the saved Session before continuing.');
+  }
+  return result;
+}
+
 export function command(view,kind,payload){
   const artifact=view?.metadata?.artifact;
   const dialect=artifact==='BTL-LOCAL-SESSION-1'?'BTL-TICK-EXECUTION-COMMAND-1':
@@ -187,6 +301,28 @@ export async function createMethodVersion(family,method){
     throw Error('Method family revision is unavailable. Reload before creating a version.');
   return api(`/method-families/${encodeURIComponent(family.familyId)}/versions`,
     {expectedRevision:family.revision,method});
+}
+
+export async function loadMethodVersionPage(familyId,cursor=null){
+  if(typeof familyId!=='string'||!familyId)throw Error('Method family is unavailable.');
+  const query=new URLSearchParams({limit:'25'});if(cursor)query.set('cursor',cursor);
+  const page=await api(`/method-families/${encodeURIComponent(familyId)}/versions?${query}`);
+  if(page.artifact!=='BTL-METHOD-VERSION-PAGE-1'||page.familyId!==familyId||
+      !Number.isSafeInteger(page.revision)||!Array.isArray(page.versions)||typeof page.complete!=='boolean')
+    throw Error('Unsupported Method version page; no state was imported.');
+  if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===cursor))
+    throw Error('Method version pagination did not advance.');
+  return page;
+}
+
+export async function loadMethodFamily(familyId){
+  if(typeof familyId!=='string'||!familyId)throw Error('Method family is unavailable.');
+  const [detail,page]=await Promise.all([
+    api(`/method-families/${encodeURIComponent(familyId)}`),loadMethodVersionPage(familyId),
+  ]);
+  if(detail.artifact!=='BTL-METHOD-FAMILY-1'||detail.family?.familyId!==familyId)
+    throw Error('Unsupported Method family; no state was imported.');
+  return {...detail.family,versions:page.versions,nextVersionCursor:page.nextCursor,revision:page.revision};
 }
 
 export async function setMethodArchived(family,archived){

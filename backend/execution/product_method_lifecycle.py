@@ -2,8 +2,12 @@
 from contracts.primitives import require, identifier, revision
 from .postgres import unpack, pack
 from .research import method_policy, label
+from .method_version_query import version_rows, latest_version_window
+from .method_version_cursor import encode as encode_version_cursor, decode as decode_version_cursor
 
+MAX_METHODS = 128
 MAX_PAGE = 50
+MAX_VERSION_PAGE = 50
 
 
 def register_first_version(db, workspace_id, method_id):
@@ -51,34 +55,24 @@ def _family(db, workspace_id, family_id, *, lock=False):
     return row, current, policy
 
 
-def _view(db, workspace_id, family_id, *, version_limit=MAX_PAGE, after_version=None, include_versions=True):
+def _view(db, workspace_id, family_id):
     family, current, _ = _family(db, workspace_id, family_id)
-    require(type(version_limit) is int and 1 <= version_limit <= MAX_PAGE, "versionLimit")
-    require(after_version is None or (type(after_version) is int and after_version >= 1), "afterVersion")
-    rows = [] if not include_versions else db.execute(
-        "SELECT v.version,v.method_id,m.payload,m.content_hash "
-        "FROM btl.product_method_versions v JOIN btl.tick_methods m "
-        "ON m.workspace_id=v.workspace_id AND m.method_id=v.method_id "
-        "WHERE v.workspace_id=%s AND v.family_id=%s AND (%s::bigint IS NULL OR v.version>%s) "
-        "ORDER BY v.version LIMIT %s",
-        (workspace_id, family_id, after_version, after_version, version_limit + 1),
-    ).fetchall()
-    more = len(rows) > version_limit
-    rows = rows[:version_limit]
+    rows, truncated = latest_version_window(
+        db, workspace_id, family_id,
+        latest_version=family["latest_version"], limit=MAX_METHODS)
+    require(bool(rows), "methodVersions", "CORRUPT_RECORD")
     versions = []
     for row in rows:
         value = unpack(row["payload"], row["content_hash"])
         method_policy(value)
         require(value["id"] == row["method_id"], "method", "CORRUPT_RECORD")
         versions.append({"version": row["version"], "methodId": row["method_id"], "method": value})
-    require(current["id"] == family["latest_method_id"],
+    require(versions[-1]["version"] == family["latest_version"] and
+            versions[-1]["methodId"] == family["latest_method_id"] and current == versions[-1]["method"],
             "methodFamily", "CORRUPT_RECORD")
     return {"familyId": family_id, "revision": family["revision"], "archived": family["archived"],
             "latestVersion": family["latest_version"], "latestMethodId": family["latest_method_id"],
-            "current": current, "versions": versions,
-            "nextVersionCursor": versions[-1]["version"] if more and versions else None,
-            "versionsComplete": include_versions and not more and (after_version is None or not versions or
-                versions[-1]["version"] == family["latest_version"])}
+            "current": current, "versions": versions, "versionsTruncated": truncated}
 
 
 def page(db, workspace_id, *, limit=25, after=None, include_archived=False):
@@ -93,16 +87,45 @@ def page(db, workspace_id, *, limit=25, after=None, include_archived=False):
         "AND (%s OR NOT archived) ORDER BY family_id LIMIT %s",
         (workspace_id, after, after, include_archived, limit + 1),
     ).fetchall()
-    items = [_view(db, workspace_id, row["family_id"], include_versions=False) for row in rows[:limit]]
+    items = [_view(db, workspace_id, row["family_id"]) for row in rows[:limit]]
     more = len(rows) > limit
     return {"schemaVersion": 1, "artifact": "BTL-METHOD-FAMILY-PAGE-1", "items": items,
             "nextCursor": items[-1]["familyId"] if more and items else None, "complete": not more}
 
 
-def detail(db, workspace_id, family_id, *, version_limit=MAX_PAGE, after_version=None):
+def detail(db, workspace_id, family_id):
     return {"schemaVersion": 1, "artifact": "BTL-METHOD-FAMILY-1",
-            "family": _view(db, workspace_id, family_id, version_limit=version_limit,
-                            after_version=after_version)}
+            "family": _view(db, workspace_id, family_id)}
+
+
+def versions_page(db, workspace_id, family_id, *, limit=25, cursor=None):
+    """Read immutable Method versions with a family-revision-pinned keyset."""
+    require(type(limit) is int and 1 <= limit <= MAX_VERSION_PAGE, "limit")
+    require(cursor is None or type(cursor) is str,"cursor","INVALID_CURSOR")
+    family, _current, _policy = _family(db, workspace_id, family_id)
+    if cursor is None:
+        after=0
+    else:
+        revision_pin,after=decode_version_cursor(cursor,family_id)
+        require(revision_pin==family["revision"],"cursor","STALE_REVISION")
+    require(after<=family["latest_version"], "afterVersion", "INVALID_CURSOR")
+    rows,more=version_rows(db,workspace_id,family_id,after_version=after,limit=limit)
+    page=[]
+    for row in rows:
+        value=unpack(row["payload"],row["content_hash"])
+        method_policy(value)
+        require(value["id"]==row["method_id"],
+                "methodVersion", "CORRUPT_RECORD")
+        page.append({"version":row["version"],"methodId":row["method_id"],"method":value})
+    require(bool(page) or after==family["latest_version"],
+            "methodVersion", "CORRUPT_RECORD")
+    if not more:
+        require(after+len(page)==family["latest_version"],
+                "methodVersion", "CORRUPT_RECORD")
+    return {"schemaVersion":1,"artifact":"BTL-METHOD-VERSION-PAGE-1",
+            "familyId":family_id,"revision":family["revision"],"versions":page,
+            "nextCursor":encode_version_cursor(family_id,family["revision"],page[-1]["version"])
+                if more and page else None,"complete":not more}
 
 
 def add_version(db, workspace_id, family_id, raw):
@@ -135,6 +158,8 @@ def add_version(db, workspace_id, family_id, raw):
     require(method["id"] != family_id and method["id"] != current["id"], "methodId", "REFUSED_IDENTITY_REUSE")
     db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",
                (workspace_id, method["id"], blob, sha))
+    from .method_analytics_store import initialize_rollup
+    initialize_rollup(db, workspace_id, method["id"], policy.definition_hash)
     next_version = family["latest_version"] + 1
     db.execute("INSERT INTO btl.product_method_versions VALUES (%s,%s,%s,%s)",
                (workspace_id, family_id, next_version, method["id"]))

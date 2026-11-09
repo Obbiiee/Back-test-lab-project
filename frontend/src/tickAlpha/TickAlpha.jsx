@@ -3,8 +3,8 @@ import {useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
-import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,loadMoreProductCatalog,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
-import {command} from './client.js';
+import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,noticeText,sourceContext,pagePath} from './client.js';
+import {command,replayObservedTo} from './client.js';
 import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
@@ -109,7 +109,9 @@ export default function TickAlpha(){
   const confirm=async()=>{
     if(flight.current)return {outcome:'NOT_SENT',code:'LOCAL_BUSY'};
     const sessionId=view.metadata.id,command=review.review.command;
-    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision,reviewHash:review.reviewHash};
+    const receiptArtifact=view.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'
+      ?'BTL-OBSERVED-EXECUTION-RESULT-1':'BTL-TICK-EXECUTION-RESULT-1';
+    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision,reviewHash:review.reviewHash,receiptArtifact};
     flight.current=true;setBusy(true);setNotice('');
     // While the confirmation is in flight, in-app navigation and Back are held and
     // a page unload asks first; the sheet says to keep it open.
@@ -124,7 +126,7 @@ export default function TickAlpha(){
         if(outcome.outcome==='UNKNOWN'){setUnverified(identity);return {...outcome,identity};}
         return outcome;
       }
-      if(!committedReceipt(result,command.commandId)){setUnverified(identity);return {outcome:'UNKNOWN',code:'UNRECOGNISED_RESPONSE',identity};}
+      if(!committedReceipt(result,command.commandId,receiptArtifact)){setUnverified(identity);return {outcome:'UNKNOWN',code:'UNRECOGNISED_RESPONSE',identity};}
       emitLocal('order_command_submitted');
       return await refreshAfterCommit(sessionId);
     }finally{release();flight.current=false;setBusy(false);}
@@ -186,9 +188,6 @@ export default function TickAlpha(){
      }catch(error){setCreateError({code:error.message,text:noticeText(error.message)});return false;}
     });
   };
-  const loadMoreCatalog=kind=>run(async()=>{
-    setCatalog(await loadMoreProductCatalog(catalog,kind));
-  });
   const openCreation=(type,event)=>{
     returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);
     if(type==='method'){navigate({screen:'method-new'});return;}
@@ -206,7 +205,7 @@ export default function TickAlpha(){
     if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
     if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
   }}>
-    {showWorkspace&&<header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation">{view&&<a href={sessionsPath()}>All Sessions</a>}<a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav></header>}
+    {showWorkspace&&<header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation">{view&&<a {...linkTo({screen:'sessions'})}>All Sessions</a>}<a {...(isAccountPage()?linkTo({screen:'account'}):{href:pagePath('home')})}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav></header>}
     {!showWorkspace?<AlphaShell route={route} label={isAccountPage()?'Verified workspace':'Private local workspace'}>
       {!catalog?(connecting?<StatePanel level={1} kind="loading" title="Connecting to your workspace…"/>:<StatePanel level={1} kind={isAccountPage()?'unavailable':'offline'} title={isAccountPage()?'Workspace service unavailable':'Local service unavailable'} action={<button className="rk-btn rk-btn-primary" disabled={busy||connecting} onClick={()=>run(async()=>{
         setConnecting(true);try{const result=await loadResearchContext(route.screen==='replay'?route.session:null,{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
@@ -224,23 +223,26 @@ export default function TickAlpha(){
       :route.screen==='help'?<HelpPage catalog={catalog} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>
       :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
       :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
-      {isAccountPage()&&catalog?.productPagination&&
-        (!catalog.productPagination.methods.complete||!catalog.productPagination.sessions.complete)&&
-        <nav className="alpha-catalog-more" aria-label="Load more workspace records">
-          {!catalog.productPagination.methods.complete&&<button type="button" disabled={busy} onClick={()=>loadMoreCatalog('methods')}>Load more Methods</button>}
-          {!catalog.productPagination.sessions.complete&&<button type="button" disabled={busy} onClick={()=>loadMoreCatalog('sessions')}>Load more Sessions</button>}
-        </nav>}
     </AlphaShell>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
       <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
         trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         onReplay={(kind,targetNs)=>run(async()=>{
-          await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
-          const saved=await loadWorkspace(view.metadata.id);setView(saved);
+          let saved;
+          if(kind==='SEEK'&&isAccountPage()&&view.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'){
+            const result=await replayObservedTo(view,targetNs,timeframe);
+            saved=result.view;
+            if(!result.targetReached)setNotice('Replay saved a bounded part of the jump. Continue saved replay to reach the target.');
+          }else{
+            await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
+            saved=await loadWorkspace(view.metadata.id);
+          }
+          setView(saved);
           if(saved.state.nextGroupIndex!==view.state.nextGroupIndex)emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
           if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
-          if(saved.analysis.metrics.tradeCount>view.analysis.metrics.tradeCount)emitLocal('order_outcome_committed');
+          const tradeCount=saved.analysis?.metrics?.tradeCount, previousTradeCount=view.analysis?.metrics?.tradeCount;
+          if(tradeCount!=null&&previousTradeCount!=null&&tradeCount>previousTradeCount)emitLocal('order_outcome_committed');
           if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
           return true;
         })} onPriceSelect={price=>{setPauseToken(n=>n+1);setPicked({price,at:Date.now()});}} onPlanDrawing={drawing=>{

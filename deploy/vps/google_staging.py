@@ -187,6 +187,8 @@ def grant_google_demo_runtime(dsn):
         'GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints TO {}',
         'GRANT UPDATE(revision,payload,content_hash) ON btl.tick_sessions TO {}',
         'GRANT SELECT,INSERT ON btl.tick_methods,btl.tick_v2_research_sessions,btl.tick_v2_order_reviews TO {}',
+        'GRANT SELECT,INSERT,UPDATE ON btl.product_method_families TO {}',
+        'GRANT SELECT,INSERT ON btl.product_method_versions TO {}',
         'GRANT SELECT,INSERT,UPDATE ON btl.tick_v2_journal_notes TO {}',
         'GRANT SELECT,INSERT,UPDATE ON btl.v2_access_accounts,btl.v2_access_sessions TO {}',
         'GRANT SELECT,INSERT ON btl.v2_access_windows TO {}',

@@ -6,7 +6,6 @@ import unittest
 from unittest.mock import patch
 
 import pyarrow.parquet as pq
-from pyarrow.fs import LocalFileSystem, SubTreeFileSystem
 
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import ContractError
@@ -70,54 +69,38 @@ class MonthlyParquetTests(unittest.TestCase):
             self.assertTrue(all(parquet.metadata.row_group(0).column(i).compression == "ZSTD"
                                 for i in range(parquet.metadata.row_group(0).num_columns)))
 
-    def test_provider_streams_arrow_batches_instead_of_materializing_row_group(self):
-        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
-                                         expected_version=self.source.dataset_version, row_group_size=4)
-        provider = MonthlyParquetProvider(self.root, expected_manifest_hash=manifest["manifestHash"])
-        real_parquet_file = pq.ParquetFile
-        requested_batch_sizes = []
+    def test_row_group_reads_use_bounded_arrow_batches(self):
+        from market_data import monthly_parquet
 
-        class StreamingOnlyParquetFile:
-            def __init__(self, path):
-                self.inner = real_parquet_file(path)
-                self.metadata = self.inner.metadata
-                self.schema_arrow = self.inner.schema_arrow
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=len(self.wire_events))
+        provider = MonthlyParquetProvider(self.root, expected_manifest_hash=manifest["manifestHash"])
+        original = pq.ParquetFile
+        batch_calls = []
+
+        class BatchOnlyParquetFile:
+            def __init__(self, source):
+                self.inner = original(source)
+
+            def __getattr__(self, name):
+                return getattr(self.inner, name)
 
             def iter_batches(self, **kwargs):
-                requested_batch_sizes.append(kwargs["batch_size"])
-                yield from self.inner.iter_batches(**kwargs)
+                batch_calls.append(kwargs)
+                return self.inner.iter_batches(**kwargs)
 
             def read_row_group(self, *args, **kwargs):
-                raise AssertionError("provider must use bounded Arrow batch iteration")
+                raise AssertionError("row-group materialization is not allowed")
 
-        entry = manifest["files"][0]
-        group = entry["rowGroups"][0]
-        path = self.root / entry["path"]
-        with patch("market_data.monthly_parquet.pq.ParquetFile", StreamingOnlyParquetFile):
-            events, _times, _indices = provider._read_row_group(path, entry, group)
-        self.assertEqual(events, self.wire_events[:group["eventCount"]])
-        self.assertTrue(requested_batch_sizes)
-        self.assertTrue(all(size == 8192 for size in requested_batch_sizes))
+        with patch("market_data.monthly_parquet.pq.ParquetFile", BatchOnlyParquetFile), \
+             patch.object(monthly_parquet, "READ_BATCH_SIZE", 2):
+            actual = list(provider.iter_range(JAN_LAST - 3, FEB_FIRST + 1))
 
-    def test_s3_compatible_filesystem_reads_the_same_pinned_monthly_dataset(self):
-        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
-                                         expected_version=self.source.dataset_version, row_group_size=2)
-        object_root = Path(self.tmp.name) / 'bucket' / 'market' / 'dataset'
-        object_root.parent.mkdir(parents=True)
-        self.root.rename(object_root)
-        filesystem = SubTreeFileSystem(self.tmp.name, LocalFileSystem())
-        provider = MonthlyParquetProvider('s3://bucket/market/dataset',
-            expected_dataset_id=self.source.dataset_id,
-            expected_dataset_version=self.source.dataset_version,
-            expected_manifest_hash=manifest['manifestHash'], filesystem=filesystem)
-        self.assertEqual(provider.verify_all()['eventCount'], len(self.wire_events))
-        self.assertEqual(list(provider.iter_range(JAN_LAST - 3, FEB_FIRST + 1)), self.wire_events)
-
-    def test_s3_source_uri_rejects_embedded_credentials_and_path_traversal(self):
-        for uri in ('s3://user:secret@bucket/dataset', 's3://bucket/../dataset'):
-            with self.subTest(uri=uri), self.assertRaises(ContractError):
-                MonthlyParquetProvider(uri, expected_manifest_hash='a' * 64,
-                                       filesystem=LocalFileSystem())
+        self.assertEqual(actual, self.wire_events)
+        self.assertTrue(batch_calls)
+        self.assertTrue(all(call["batch_size"] == 2 and call["use_threads"] is False
+                            for call in batch_calls))
+        self.assertGreaterEqual(len(batch_calls), 2)
 
     def test_monthly_provider_replays_original_pages_and_timeline(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,

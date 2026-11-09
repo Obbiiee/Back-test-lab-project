@@ -14,14 +14,15 @@ import os
 from pathlib import Path
 import re
 import tempfile
-from urllib.parse import urlsplit
 
 import numpy as np
 import pyarrow as pa
+import pyarrow.fs as pafs
 import pyarrow.parquet as pq
 
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import digest, identifier, require
+from .monthly_root import monthly_object_path, parse_s3_monthly_root
 from ticks.contracts import CanonicalTick, TickManifest, validate_chunk, uint, tag
 
 SCHEMA_VERSION = 1
@@ -387,41 +388,21 @@ class MonthlyParquetProvider:
     """Read only requested UTC months and row groups; verify canonical rows."""
     def __init__(self, root, *, expected_dataset_id=None, expected_dataset_version=None,
                  expected_manifest_hash=None, filesystem=None):
-        root_text = os.fspath(root)
-        self._object_store = root_text.startswith('s3://')
-        if self._object_store:
-            parsed = urlsplit(root_text)
-            parts = parsed.path.strip('/').split('/') if parsed.path.strip('/') else []
-            require(parsed.scheme == 's3' and parsed.hostname is not None and
-                    parsed.netloc == parsed.hostname and
-                    parsed.username is None and parsed.password is None and not parsed.query and
-                    not parsed.fragment and re.fullmatch(r'[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]',
-                    parsed.hostname) is not None and
-                    all(part not in ('.', '..') for part in parts),
-                    'objectStoreUri', 'REFUSED_SOURCE')
+        require(isinstance(root, (str, Path)), "root", "REFUSED_SOURCE")
+        root_text = str(root)
+        if "://" in root_text:
+            self.root, bucket, prefix = parse_s3_monthly_root(root_text)
+            self._base_path = f"{bucket}/{prefix}"
             if filesystem is None:
-                from pyarrow.fs import S3FileSystem
-                options = dict(
-                    region=os.environ.get('RIKSORA_S3_REGION'),
-                    endpoint_override=os.environ.get('RIKSORA_S3_ENDPOINT'),
-                    scheme=os.environ.get('RIKSORA_S3_SCHEME') or 'https',
-                    background_writes=False, allow_bucket_creation=False,
-                    allow_bucket_deletion=False,
-                )
-                for option, name in (('access_key', 'RIKSORA_S3_ACCESS_KEY'),
-                                     ('secret_key', 'RIKSORA_S3_SECRET_KEY'),
-                                     ('session_token', 'RIKSORA_S3_SESSION_TOKEN')):
-                    if os.environ.get(name):
-                        options[option] = os.environ[name]
-                filesystem = S3FileSystem(**{key: value for key, value in options.items()
-                                             if value is not None})
-            self._filesystem = filesystem
-            self.root = parsed.netloc + parsed.path.rstrip('/')
-            require(bool(self.root), 'objectStoreRoot', 'REFUSED_SOURCE')
+                self._filesystem, self._base_path = pafs.FileSystem.from_uri(self.root)
+            else:
+                self._filesystem = filesystem
         else:
-            self.root = Path(root_text).resolve()
-            self._filesystem = filesystem
-        raw = self._read_file(self._location('manifest.json'))
+            self.root = Path(root).resolve()
+            self._base_path = str(self.root)
+            self._filesystem = filesystem or pafs.LocalFileSystem()
+        require(isinstance(self._filesystem, pafs.FileSystem), "filesystem", "REFUSED_SOURCE")
+        raw = self._read_object("manifest.json")
         manifest = _json_object(raw, MANIFEST_FIELDS)
         require(manifest.get("schemaVersion") == SCHEMA_VERSION and
                 manifest.get("artifact") == MANIFEST_ARTIFACT and manifest.get("manifestVersion") == 2,
@@ -530,57 +511,59 @@ class MonthlyParquetProvider:
             previous_month = entry["month"]
         require(total == manifest["eventCount"], "eventCount", "COUNT_CONFLICT")
 
+    def _object_path(self, relative):
+        return monthly_object_path(self.root, self._base_path, relative)
+
+    def _read_object(self, relative):
+        path = self._object_path(relative)
+        info = self._filesystem.get_file_info(path)
+        require(info.type == pafs.FileType.File, "file", "MISSING_CHILD")
+        with self._filesystem.open_input_file(path) as stream:
+            return stream.read()
+
+    def _open_parquet(self, relative):
+        path = self._object_path(relative)
+        info = self._filesystem.get_file_info(path)
+        require(info.type == pafs.FileType.File, "file", "MISSING_CHILD")
+        return pq.ParquetFile(self._filesystem.open_input_file(path))
+
     def verify_file_hash(self, month):
         entry = self._file_for_month(month)
-        path = self._location(entry["path"])
-        require(self._is_file(path), "file", "MISSING_CHILD")
-        require(self._file_size(path) == entry["bytes"] and self._sha256_path(path) == entry["sha256"],
-                "fileHash", "CHILD_HASH_MISMATCH")
-        return True
-
-    def _location(self, relative):
-        require(type(relative) is str and not relative.startswith('/') and
-                all(part not in ('', '.', '..') for part in relative.split('/')),
-                'objectPath', 'REFUSED_SOURCE')
-        if self._object_store:
-            return f'{self.root}/{relative}'
-        path = (self.root / relative).resolve()
-        require(path.parent == self.root or path.parent.parent == self.root,
-                'filePath', 'REFUSED_SOURCE')
-        return path
-
-    def _is_file(self, path):
-        if self._object_store:
-            from pyarrow.fs import FileType
-            return self._filesystem.get_file_info(path).type == FileType.File
-        return path.is_file()
-
-    def _file_size(self, path):
-        if self._object_store:
-            return self._filesystem.get_file_info(path).size
-        return path.stat().st_size
-
-    def _read_file(self, path):
-        if self._object_store:
-            with self._filesystem.open_input_file(path) as stream:
-                return stream.read()
-        return path.read_bytes()
-
-    def _sha256_path(self, path):
-        if not self._object_store:
-            return _sha256_file(path)
+        path = self._object_path(entry["path"])
+        info = self._filesystem.get_file_info(path)
+        require(info.type == pafs.FileType.File and info.size == entry["bytes"],
+                "file", "MISSING_CHILD")
         sha = hashlib.sha256()
         with self._filesystem.open_input_file(path) as stream:
-            while block := stream.read(1_048_576):
+            while block := stream.read(READ_BATCH_SIZE):
                 sha.update(block)
-        return sha.hexdigest()
+        require(sha.hexdigest() == entry["sha256"],
+                "fileHash", "CHILD_HASH_MISMATCH")
+        return True
 
     def _file_for_month(self, month):
         return next((entry for entry in self._files if entry["month"] == month), None)
 
+    def first_time_for_month(self, month):
+        """Return a pinned first timestamp without loading beyond one row group."""
+        require(type(month) is str and re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month) is not None,
+                "month", "INVALID_INPUT")
+        entry = self._file_for_month(month)
+        require(entry is not None, "month", "REFUSED_SOURCE_NOT_AVAILABLE")
+        group = entry["rowGroups"][0]
+        events, _timestamps, _indices = self._read_row_group(entry["path"], entry, group)
+        require(events and events[0]["timeNs"] == entry["firstTimeNs"],
+                "monthStart", "CORRUPT_INDEX_POINTER")
+        return int(events[0]["timeNs"])
+
     def _read_row_group(self, path, file_entry, group_entry):
-        parquet = pq.ParquetFile(path, **({'filesystem': self._filesystem}
-                                          if self._object_store else {}))
+        parquet = self._open_parquet(path)
+        try:
+            return self._read_row_group_file(parquet, file_entry, group_entry)
+        finally:
+            parquet.close()
+
+    def _read_row_group_file(self, parquet, file_entry, group_entry):
         require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()),
                 "parquetSchema", "SCHEMA_MISMATCH")
         index = group_entry["index"]
@@ -591,18 +574,23 @@ class MonthlyParquetProvider:
                 "compression", "SCHEMA_MISMATCH")
         sha = hashlib.sha256()
         events = []
-        timestamps = []
-        global_indices = []
+        timestamps = np.empty(group_entry["eventCount"], dtype=np.int64)
+        global_indices = np.empty(group_entry["eventCount"], dtype=np.int64)
+        offset = 0
         last_time = -1
         last_source = -1
         last_ordinal = -1
-        # Keep Arrow memory bounded to one small batch even when an operator
-        # configures the maximum 65,536-row group. The verified Python output
-        # remains one row group wide because downstream range pruning uses its
-        # NumPy timestamp index and the timeline contract returns canonical rows.
-        for batch in parquet.iter_batches(row_groups=[index], columns=SCHEMA.names,
-                                         batch_size=READ_BATCH_SIZE, use_threads=False):
-            for row in batch.to_pylist():
+        for batch in parquet.iter_batches(batch_size=READ_BATCH_SIZE,
+                row_groups=[index], columns=SCHEMA.names, use_threads=False):
+            rows = batch.to_pylist()
+            count = len(rows)
+            require(count > 0 and offset + count <= group_entry["eventCount"],
+                    "rowGroupCount", "CORRUPT_RECORD")
+            timestamps[offset:offset+count] = batch.column("timestamp_ns").to_numpy(
+                zero_copy_only=False)
+            global_indices[offset:offset+count] = batch.column("global_index").to_numpy(
+                zero_copy_only=False)
+            for row in rows:
                 event = _row_to_event(row)
                 require((event["datasetId"], event["datasetVersion"], event["providerId"],
                          event["feedId"], event["instrumentId"]) ==
@@ -625,9 +613,8 @@ class MonthlyParquetProvider:
                 last_time, last_source, last_ordinal = time_ns, source_index, ordinal
                 sha.update(canonical_bytes(event)); sha.update(b"\n")
                 events.append(event)
-                timestamps.append(row["timestamp_ns"])
-                global_indices.append(row["global_index"])
-        require(len(events) == group_entry["eventCount"], "rowGroupCount", "CORRUPT_RECORD")
+            offset += count
+        require(offset == group_entry["eventCount"], "rowGroupCount", "CORRUPT_RECORD")
         require(sha.hexdigest() == group_entry["canonicalEventHash"],
                 "canonicalEventHash", "CHILD_HASH_MISMATCH")
         require(events and events[0]["timeNs"] == group_entry["firstTimeNs"] and
@@ -637,12 +624,9 @@ class MonthlyParquetProvider:
                 self._source_indices[events[0]["provenance"]["sourceId"]] == group_entry["firstSourceIndex"] and
                 self._source_indices[events[-1]["provenance"]["sourceId"]] == group_entry["lastSourceIndex"],
                 "rowGroupBounds", "CORRUPT_INDEX_POINTER")
-        timestamps = np.asarray(timestamps, dtype=np.int64)
-        require(timestamps.ndim == 1 and len(timestamps) == len(events) and
-                np.all(timestamps[1:] >= timestamps[:-1]),
+        require(len(timestamps) == len(events) and np.all(timestamps[1:] >= timestamps[:-1]),
                 "timestampIndex", "ORDER_REVERSAL")
-        global_indices = np.asarray(global_indices, dtype=np.int64)
-        require(global_indices.ndim == 1 and len(global_indices) == len(events) and
+        require(len(global_indices) == len(events) and
                 int(global_indices[0]) == group_entry["firstGlobalIndex"] and
                 int(global_indices[-1]) == group_entry["lastGlobalIndex"],
                 "globalIndex", "CORRUPT_INDEX_POINTER")
@@ -660,21 +644,6 @@ class MonthlyParquetProvider:
         require((dataset_id, dataset_version) == (self.dataset_id, self.dataset_version),
                 "dataset", "VERSION_MISMATCH")
         return deepcopy(self._source_manifest)
-
-    def first_time_for_month(self, month):
-        """Return the pinned first event time in one configured UTC month."""
-        require(type(month) is str and
-                re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month) is not None,
-                "month", "INVALID_INPUT")
-        entry = self._file_for_month(month)
-        require(entry is not None, "month", "REFUSED_SOURCE_NOT_AVAILABLE")
-        path = self._location(entry["path"])
-        require(self._is_file(path), "file", "MISSING_CHILD")
-        group = entry["rowGroups"][0]
-        events, _timestamps, _indices = self._read_row_group(path, entry, group)
-        require(events and events[0]["timeNs"] == entry["firstTimeNs"],
-                "monthStart", "CORRUPT_INDEX_POINTER")
-        return int(events[0]["timeNs"])
 
     def read_page(self, dataset_id, dataset_version, after_token=None, max_events=64):
         self.describe(dataset_id, dataset_version)
@@ -694,10 +663,7 @@ class MonthlyParquetProvider:
                     low = (group["firstSourceIndex"], int(group["firstOrdinal"]))
                     high = (group["lastSourceIndex"], int(group["lastOrdinal"]))
                     if low <= (source_index, ordinal) <= high:
-                        path = self._location(entry["path"])
-                        require(self._is_file(path),
-                                "file", "MISSING_CHILD")
-                        events, _times, indices = self._read_row_group(path, entry, group)
+                        events, _times, indices = self._read_row_group(entry["path"], entry, group)
                         for event, global_index in zip(events, indices):
                             if (self._source_indices[event["provenance"]["sourceId"]],
                                     int(event["rawOrdinal"])) == (source_index, ordinal):
@@ -717,10 +683,7 @@ class MonthlyParquetProvider:
                     continue
                 if group["firstGlobalIndex"] >= stop:
                     break
-                path = self._location(entry["path"])
-                require(self._is_file(path),
-                        "file", "MISSING_CHILD")
-                events, _times, indices = self._read_row_group(path, entry, group)
+                events, _times, indices = self._read_row_group(entry["path"], entry, group)
                 selected.extend(event for event, index in zip(events, indices)
                                 if start <= int(index) < stop)
             if len(selected) >= max_events:
@@ -753,41 +716,39 @@ class MonthlyParquetProvider:
         for file_entry in self._files:
             if int(file_entry["lastTimeNs"]) < start_ns or int(file_entry["firstTimeNs"]) >= end_ns:
                 continue
-            path = self._location(file_entry["path"])
-            require(self._is_file(path), "file", "MISSING_CHILD")
-            parquet = pq.ParquetFile(path, **({'filesystem': self._filesystem}
-                                              if self._object_store else {}))
-            require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()) and
-                    parquet.metadata.num_rows == file_entry["eventCount"] and
-                    parquet.metadata.num_row_groups == len(file_entry["rowGroups"]),
-                    "parquetSchema", "SCHEMA_MISMATCH")
-            for group in file_entry["rowGroups"]:
-                if int(group["lastTimeNs"]) < start_ns or int(group["firstTimeNs"]) >= end_ns:
-                    continue
-                events, timestamps, _indices = self._read_row_group(path, file_entry, group)
-                # The row-group hash and chronology are verified before this
-                # index can prune candidates. Without the proof, use the
-                # chronological scan rather than granting the accelerator trust.
-                if self.manifest["ordering"]["timestamps"] == "VERIFIED_NONDECREASING":
-                    lo = int(np.searchsorted(timestamps, np.int64(start_ns), side="left"))
-                    hi = (len(timestamps) if end_ns == 2**63 else
-                          int(np.searchsorted(timestamps, np.int64(end_ns), side="left")))
-                    candidates = events[lo:hi]
-                else:  # Defensive fallback if a future manifest version allows unproven order.
-                    candidates = [event for event in events
-                                  if start_ns <= int(event["timeNs"]) < end_ns]
-                for event in candidates:
-                    moment = int(event["timeNs"])
-                    ordinal = int(event["rawOrdinal"])
-                    source_id = event["provenance"]["sourceId"]
-                    require(source_id in self._source_indices,
-                            "sourceIdentity", "IDENTITY_CONFLICT")
-                    source_index = self._source_indices[source_id]
-                    require(moment >= previous_time and source_index >= previous_source and
-                            (source_index != previous_source or ordinal > previous_ordinal),
-                            "datasetOrder", "ORDER_REVERSAL")
-                    previous_time, previous_source, previous_ordinal = moment, source_index, ordinal
-                    yield event
+            parquet = self._open_parquet(file_entry["path"])
+            try:
+                require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()) and
+                        parquet.metadata.num_rows == file_entry["eventCount"] and
+                        parquet.metadata.num_row_groups == len(file_entry["rowGroups"]),
+                        "parquetSchema", "SCHEMA_MISMATCH")
+                for group in file_entry["rowGroups"]:
+                    if int(group["lastTimeNs"]) < start_ns or int(group["firstTimeNs"]) >= end_ns:
+                        continue
+                    events, timestamps, _indices = self._read_row_group_file(parquet, file_entry, group)
+                    # Verify each row-group proof before using its index to prune candidates.
+                    if self.manifest["ordering"]["timestamps"] == "VERIFIED_NONDECREASING":
+                        lo = int(np.searchsorted(timestamps, np.int64(start_ns), side="left"))
+                        hi = (len(timestamps) if end_ns == 2**63 else
+                              int(np.searchsorted(timestamps, np.int64(end_ns), side="left")))
+                        candidates = events[lo:hi]
+                    else:  # Defensive fallback if a future manifest version allows unproven order.
+                        candidates = [event for event in events
+                                      if start_ns <= int(event["timeNs"]) < end_ns]
+                    for event in candidates:
+                        moment = int(event["timeNs"])
+                        ordinal = int(event["rawOrdinal"])
+                        source_id = event["provenance"]["sourceId"]
+                        require(source_id in self._source_indices,
+                                "sourceIdentity", "IDENTITY_CONFLICT")
+                        source_index = self._source_indices[source_id]
+                        require(moment >= previous_time and source_index >= previous_source and
+                                (source_index != previous_source or ordinal > previous_ordinal),
+                                "datasetOrder", "ORDER_REVERSAL")
+                        previous_time, previous_source, previous_ordinal = moment, source_index, ordinal
+                        yield event
+            finally:
+                parquet.close()
 
     def iter_groups(self, start_ns, end_ns):
         """Yield whole equal-timestamp groups, even across Arrow batches/groups."""

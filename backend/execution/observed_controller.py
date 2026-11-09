@@ -4,6 +4,7 @@ from copy import deepcopy
 from .observed_profile import ObservedExecutionProfile
 from .observed_admission import AdmittedObservedSource
 from .observed_kernel import apply,command_wire,seed_state,order_limits
+from .observed_session_dispatch import dispatch_observed_session
 
 
 class ObservedExecutionController:
@@ -23,6 +24,7 @@ class ObservedExecutionController:
             cp=timeline.checkpoint()
             state=seed_state(session_id,profile,policy,cp, balance,order_retention_policy=self.order_retention_policy,
                              qa_order_archive_v1=self.store.qa_order_archive_v1,
+                             product_order_archive_v1=self.store.product_order_archive_v1,
                              terminal_order_archive_v1=self.store.terminal_order_archive_v1)
             self.store.create(scope,state,cp);source.cache.seed(scope,session_id,timeline)
         except BaseException:timeline.close();raise
@@ -37,10 +39,12 @@ class ObservedExecutionController:
             frame,next_cp=source.cache.reveal(scope,state['sessionId'],cp,command['payload']['targetNs'])
             kwargs=dict(reveal=frame,checkpoint=next_cp);cp=next_cp
             replay=dict(throughNs=frame['throughNs'],exhaustedThroughBoundary=frame['exhaustedThroughBoundary'])
-        if self.store.qa_order_archive_v1 or self.store.terminal_order_archive_v1:
+        archive_codec=dispatch_observed_session(state).archive_codec
+        if archive_codec!='none':
             proposed,events,archive_records=apply(state,command,order_retention_policy=self.order_retention_policy,
-                qa_order_archive_v1=self.store.qa_order_archive_v1,
-                terminal_order_archive_v1=self.store.terminal_order_archive_v1,
+                qa_order_archive_v1=archive_codec=='qa-v1',
+                product_order_archive_v1=archive_codec=='p0-v1',
+                terminal_order_archive_v1=archive_codec=='integration-v1',
                 archived_order_lookup=lambda oid:self.store.archive_order(scope,state['sessionId'],oid),**kwargs)
             return self.store.commit(scope,command,before,proposed,cp,events,replay,archive_records=archive_records)
         proposed,events=apply(state,command,order_retention_policy=self.order_retention_policy,**kwargs)
@@ -52,6 +56,10 @@ class ObservedExecutionController:
     def order_history(self,scope,session_id,offset=0,maximum=64):
         """Paged historical orders; terminal records never inflate hot state."""
         return self.store.order_history(scope,session_id,offset,maximum)
+
+    def order_history_page(self,scope,session_id,*,after_sequence=None,revision_pin=None,maximum=64):
+        return self.store.order_history_page(scope,session_id,after_sequence=after_sequence,
+            revision_pin=revision_pin,maximum=maximum)
 
     def order(self,scope,session_id,order_id):
         """Retrieve one hot or archived order without reconstructing the ledger."""

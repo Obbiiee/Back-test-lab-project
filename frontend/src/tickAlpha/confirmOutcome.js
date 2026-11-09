@@ -34,8 +34,8 @@ export function classifyConfirmError(error){
 }
 
 // A 200 is a commit only when it is the durable result for this exact command.
-export function committedReceipt(result,commandId){
-  return result?.artifact==='BTL-TICK-EXECUTION-RESULT-1'&&result.commandId===commandId&&result.durable===true;
+export function committedReceipt(result,commandId,receiptArtifact='BTL-TICK-EXECUTION-RESULT-1'){
+  return result?.artifact===receiptArtifact&&result.commandId===commandId&&result.durable===true;
 }
 
 // A status response is trusted only when it names this exact Session, command,
@@ -46,7 +46,7 @@ export function classifyCommandResult(result,pending){
      result.reviewHash!==pending.reviewHash)return {outcome:'UNKNOWN',code:'UNBOUND_COMMAND_STATUS'};
   if(result.status==='COMMITTED'){
     const receipt=result.receipt;
-    if(committedReceipt(receipt,pending.commandId)&&/^[0-9a-f]{64}$/.test(receipt.commandHash||'')&&
+    if(committedReceipt(receipt,pending.commandId,pending.receiptArtifact)&&/^[0-9a-f]{64}$/.test(receipt.commandHash||'')&&
        receipt.state?.sessionId===pending.sessionId&&receipt.state.revision===pending.expectedRevision+1&&
        Number.isInteger(result.currentRevision)&&receipt.state.revision<=result.currentRevision)
       return {outcome:'COMMITTED',code:'DURABLE_RECEIPT'};

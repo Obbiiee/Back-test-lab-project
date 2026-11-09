@@ -117,6 +117,9 @@ def _environment(dsn):
                      'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID', 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION',
                      'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256')
     monthly_values = tuple(os.environ.get(name) for name in monthly_names)
+    from market_data.monthly_root import (monthly_root_from_environment,
+                                          s3_worker_environment)
+    monthly_root = monthly_root_from_environment(monthly_values)
     if any(monthly_values):
         require(monthly_values[0] == '1' and all(monthly_values[1:]),
                 'syntheticMonthly', 'REFUSED_SOURCE')
@@ -165,6 +168,9 @@ def _environment(dsn):
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
                             'BTL_TICK_SESSION_STORAGE_FORMAT', *monthly_names,
                             *catalog_names, *s3_names)}
+    if monthly_root is not None:
+        environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
+        environment.update(s3_worker_environment(monthly_root, os.environ))
     require(environment.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
             'stateStorageFormat','REFUSED_STATE_VERSION')
     require(environment.get('BTL_TICK_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
