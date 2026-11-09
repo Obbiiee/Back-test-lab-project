@@ -22,16 +22,24 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
-const apiTrace=[];page.on('response',async response=>{
+const requestFailures=[];page.on('requestfailed',request=>{
+  const url=new URL(request.url());if(url.origin!==configOrigin)return;
+  const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
+  if(pathname.startsWith('/api/v1/')&&requestFailures.length<32)
+    requestFailures.push({method:request.method(),path:pathname,error:request.failure()?.errorText||'NETWORK_ERROR'});
+});
+const apiTrace=[];page.on('response',response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
-  const body=await response.json().catch(()=>null),detail=body?.detail;
   if(pathname.startsWith('/api/v1/')&&apiTrace.length<128){
-    const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
-    apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
-      code:typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null,
-      rows:pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null,
-      journalPage:pathname.endsWith('/journal/pages')?{
+    const row={method:response.request().method(),path:pathname,status:response.status(),code:null,
+      rows:null,journalPage:null,state:null};
+    apiTrace.push(row);
+    void response.json().then(body=>{
+      const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
+      row.code=typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null;
+      row.rows=pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null;
+      row.journalPage=pathname.endsWith('/journal/pages')?{
         artifact:body?.artifact==='BTL-TICK-JOURNAL-PAGE-1'?'BTL-TICK-JOURNAL-PAGE-1':'OTHER',
         schemaVersion:Number.isSafeInteger(body?.schemaVersion)?body.schemaVersion:null,
         hasNotes:Array.isArray(body?.notes),hasTotalOrders:Number.isSafeInteger(body?.totalOrders),
@@ -42,8 +50,9 @@ const apiTrace=[];page.on('response',async response=>{
         firstOrderStatuses:Array.isArray(body?.orders)?body.orders.slice(0,4).map(order=>
           ['ACTIVE','PENDING','UNRESOLVED','CLOSED','EXPIRED'].includes(order?.status)?order.status:'OTHER'):null,
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
-      }:null,
-      state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
+      }:null;
+      row.state=['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null;
+    }).catch(()=>{});
   }
 });
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
@@ -239,7 +248,7 @@ try{
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
     .slice(0,300);
   process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
-    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,apiTrace})+'\n');
+    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,apiTrace,requestFailures})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));
