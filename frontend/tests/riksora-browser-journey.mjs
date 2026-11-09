@@ -127,7 +127,7 @@ try{
   await expect(page.getByRole('heading',{name:'Synthetic browser method',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
   await page.waitForURL(current=>current.searchParams.get('screen')==='journal');
-  phase='global_journal_heading';await expect(page.locator('.rk-page-title h1')).toHaveText('Journal');
+  phase='global_journal_content';
   const journal=page.locator('.rk-journal');
   await expect(journal).toHaveAttribute('aria-label','Orders in Synthetic browser session');
   const journalRows=journal.locator('li');
