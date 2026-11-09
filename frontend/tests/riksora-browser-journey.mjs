@@ -22,13 +22,12 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
-const apiFailures=[];page.on('response',async response=>{
-  if(response.status()<400)return;
+const apiTrace=[];page.on('response',async response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
   const body=await response.json().catch(()=>null),detail=body?.detail;
-  apiFailures.push({method:response.request().method(),path:pathname,status:response.status(),
-    code:typeof detail==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(detail)?detail:null});
+  if(pathname.startsWith('/api/v1/')&&apiTrace.length<64)apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
+    code:response.status()>=400&&typeof detail==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(detail)?detail:null});
 });
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
 let phase='proof';
@@ -131,7 +130,7 @@ try{
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
   await new Promise(resolve=>setTimeout(resolve,0));
-  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',apiFailures})+'\n');
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',apiTrace})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

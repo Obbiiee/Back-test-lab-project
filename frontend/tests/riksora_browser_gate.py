@@ -93,7 +93,7 @@ def run(tools, browser_cache):
                           steps=report['steps'], progress=report['progress'],
                           failureType=report.get('failureType'),
                           failurePhase=report.get('failurePhase'),
-                          apiFailures=report.get('apiFailures', []))))
+                          apiTrace=report.get('apiTrace', []))))
     return 0 if report['status'] == 'PASS' else 1
 
 
@@ -201,13 +201,13 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                               item['failureType'].isidentifier()):
                             report['failurePhase'] = item['failurePhase']
                             report['browserFailureType'] = item['failureType']
-                            failures = item.get('apiFailures', [])
-                            if isinstance(failures, list) and len(failures) <= 32:
-                                report['apiFailures'] = [entry for entry in failures if
+                            trace = item.get('apiTrace', [])
+                            if isinstance(trace, list) and len(trace) <= 64:
+                                report['apiTrace'] = [entry for entry in trace if
                                     isinstance(entry, dict) and
                                     entry.get('method') in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') and
                                     isinstance(entry.get('path'), str) and len(entry['path']) <= 240 and
-                                    type(entry.get('status')) is int and 400 <= entry['status'] <= 599 and
+                                    type(entry.get('status')) is int and 100 <= entry['status'] <= 599 and
                                     (entry.get('code') is None or
                                      isinstance(entry.get('code'), str) and
                                      entry['code'].isascii() and entry['code'].isupper() and
