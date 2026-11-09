@@ -7,6 +7,48 @@ from .contracts import text
 MAX_SESSION_DETAILS = 128
 METHOD_ROLLUP_ARTIFACT = 'BTL-METHOD-ANALYTICS-ROLLUP-1'
 
+METHOD_SESSION_BATCH = 32
+
+
+def legacy_session_item(state, completed):
+    """Summarize one verified legacy Session without pooling its trade rows."""
+    require(type(state) is dict and type(completed) is list and
+        type(state.get('profile')) is dict and
+        type(state['profile'].get('accountCurrency')) is str,
+        'methodAnalytics', 'CORRUPT_RECORD')
+    positive = Fraction()
+    negative = Fraction()
+    net = Fraction()
+    duration = 0
+    wins = losses = breakeven = 0
+    for row in completed:
+        require(type(row) is dict and type(row.get('net')) is str and
+                type(row.get('durationNs')) is str and row['durationNs'].isdigit(),
+                'methodAnalytics', 'CORRUPT_RECORD')
+        value = Fraction(row['net'])
+        net += value
+        duration += int(row['durationNs'])
+        if value > 0:
+            wins += 1
+            positive += value
+        elif value < 0:
+            losses += 1
+            negative -= value
+        else:
+            breakeven += 1
+    trade_count = len(completed)
+    session = dict(sessionId=state['sessionId'], revision=state['revision'],
+        datasetId=state['datasetId'], datasetVersion=state['datasetVersion'],
+        profileHash=state['profileHash'], engineVersion=state['engineVersion'],
+        eventHead=state['eventHash'], tradeCount=trade_count)
+    return dict(unit=(state['profileHash'], state['engineVersion'],
+                      state['profile']['accountCurrency']),
+        projection=dict(tradeCount=trade_count, wins=wins, losses=losses,
+            breakeven=breakeven, positive=text(positive), negative=text(negative),
+            net=text(net), durationNs=str(duration)), session=session)
+
+
+
 
 class MethodAnalyticsAccumulator:
     """Pool Session summaries with bounded response detail memory."""
