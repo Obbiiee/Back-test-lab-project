@@ -131,8 +131,10 @@ try{
   await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
   phase='global_journal_select_session';await page.locator('.rk-toolbar .rk-combo-trigger').click();
   await page.getByRole('option',{name:/Synthetic browser session/}).click();
-  phase='global_journal_load';
-  await expect(page.getByRole('list',{name:'Orders in Synthetic browser session'}).locator('li')).toHaveCount(1);
+  const journalRows=page.getByRole('list',{name:'Orders in Synthetic browser session'}).locator('li');
+  const journalRowCount=await journalRows.count();
+  phase=`global_journal_order_count_${journalRowCount}`;
+  expect(journalRowCount).toBe(1);
   await page.getByRole('link',{name:'Sessions',exact:true}).first().click();
   await page.getByRole('link',{name:'Analytics for Synthetic browser session',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Research analytics'})).toBeVisible();
