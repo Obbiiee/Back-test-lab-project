@@ -39,6 +39,8 @@ const apiTrace=[];page.on('response',async response=>{
         complete:typeof body?.complete==='boolean'?body.complete:null,
         totalOrders:Number.isSafeInteger(body?.totalOrders)?body.totalOrders:null,
         noteCount:Array.isArray(body?.notes)?body.notes.length:null,
+        firstOrderStatuses:Array.isArray(body?.orders)?body.orders.slice(0,4).map(order=>
+          ['ACTIVE','PENDING','UNRESOLVED','CLOSED','EXPIRED'].includes(order?.status)?order.status:'OTHER'):null,
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
       }:null,
       state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
@@ -214,10 +216,19 @@ try{
       error.includes('Unsupported workspace response')?'WORKSPACE_SCHEMA':
       error.includes('REFUSED')||error.includes('CORRUPT_RECORD')?'BACKEND_REFUSAL':
       document.querySelector('.rk-state-error')?'OTHER':'NONE';
+    const terminal=document.querySelector('[aria-label="Trading and Analysis"]');
+    const openTable=terminal?.querySelector('table[aria-label="Open positions"]');
+    const openRows=Array.from(openTable?.querySelectorAll('tr[data-order-id]')||[]).slice(0,4).map(row=>{
+      const cells=Array.from(row.querySelectorAll('td'));
+      const rawStatus=cells[2]?.textContent?.trim()||'';
+      const status=['ACTIVE','PENDING','UNRESOLVED'].find(value=>rawStatus.startsWith(value))||'OTHER';
+      return {status,side:['LONG','SHORT'].includes(cells[1]?.textContent?.trim())?cells[1].textContent.trim():'OTHER'};
+    });
     return {routeScreen:new URL(location.href).searchParams.get('screen'),
       journalLists:document.querySelectorAll('.rk-journal').length,
       journalRows:document.querySelectorAll('.rk-journal li').length,journalError,
-      sanitizedError:safeError};
+      sanitizedError:safeError,terminalRevision:Number.isSafeInteger(Number(terminal?.getAttribute('data-revision')))?
+        Number(terminal.getAttribute('data-revision')):null,openTableVisible:Boolean(openTable),openRows};
   }).catch(()=>({routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'}));
   const failureMessage=String(error?.message||error).split('\n')[0]
     .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
