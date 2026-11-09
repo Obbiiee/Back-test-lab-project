@@ -1,18 +1,19 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
 
-export default function AlphaJournal({view}){
+export default function AlphaJournal({view,active=true}){
   const [journal,setJournal]=useState(null),[error,setError]=useState(''),[saving,setSaving]=useState(false),[drafts,setDrafts]=useState({});
   const [loadingMore,setLoadingMore]=useState(false);
   const sessionId=view.metadata.id;
   const path=sessionPath(sessionId)+'/journal';
   const generation=useRef(0);
   useEffect(()=>{
-    let active=true;
+    if(!active)return;
+    let live=true;
     const current=++generation.current;
-    loadJournalPage(sessionId).then(value=>{if(active&&current===generation.current){setJournal(value);setError('');}},failure=>{if(active&&current===generation.current)setError(noticeText(failure.message));});
-    return()=>{active=false;};
-  },[path,sessionId,view.state.revision]);
+    loadJournalPage(sessionId).then(value=>{if(live&&current===generation.current){setJournal(value);setError('');}},failure=>{if(live&&current===generation.current)setError(noticeText(failure.message));});
+    return()=>{live=false;};
+  },[active,path,sessionId,view.state.revision]);
   async function save(order,note){
     generation.current++;
     setSaving(true);setError('');

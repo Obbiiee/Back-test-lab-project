@@ -22,23 +22,40 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
-const apiTrace=[];page.on('response',async response=>{
+const requestFailures=[];page.on('requestfailed',request=>{
+  const url=new URL(request.url());if(url.origin!==configOrigin)return;
+  const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
+  const rawFailure=request.failure()?.errorText||'';
+  const failure=/^net::ERR_[A-Z_]+$/.test(rawFailure)?rawFailure:'NETWORK_ERROR';
+  if(pathname.startsWith('/api/v1/')&&requestFailures.length<32)
+    requestFailures.push({method:request.method(),path:pathname,error:failure});
+});
+const apiBodyReads=[];const apiTrace=[];page.on('response',response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
-  const body=await response.json().catch(()=>null),detail=body?.detail;
   if(pathname.startsWith('/api/v1/')&&apiTrace.length<128){
-    const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
-    apiTrace.push({method:response.request().method(),path:pathname,status:response.status(),
-      code:typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null,
-      rows:pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null,
-      journalPage:pathname.endsWith('/journal/pages')?{
+    const row={method:response.request().method(),path:pathname,status:response.status(),code:null,
+      rows:null,journalPage:null,state:null};
+    apiTrace.push(row);
+    const parsed=response.json().then(body=>{
+      const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
+      row.code=typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null;
+      row.rows=pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null;
+      row.journalPage=pathname.endsWith('/journal/pages')?{
         artifact:body?.artifact==='BTL-TICK-JOURNAL-PAGE-1'?'BTL-TICK-JOURNAL-PAGE-1':'OTHER',
         schemaVersion:Number.isSafeInteger(body?.schemaVersion)?body.schemaVersion:null,
         hasNotes:Array.isArray(body?.notes),hasTotalOrders:Number.isSafeInteger(body?.totalOrders),
         hasComplete:typeof body?.complete==='boolean',
+        complete:typeof body?.complete==='boolean'?body.complete:null,
+        totalOrders:Number.isSafeInteger(body?.totalOrders)?body.totalOrders:null,
+        noteCount:Array.isArray(body?.notes)?body.notes.length:null,
+        firstOrderStatuses:Array.isArray(body?.orders)?body.orders.slice(0,4).map(order=>
+          ['ACTIVE','PENDING','UNRESOLVED','CLOSED','EXPIRED'].includes(order?.status)?order.status:'OTHER'):null,
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
-      }:null,
-      state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
+      }:null;
+      row.state=['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null;
+    });
+    apiBodyReads.push(parsed.catch(()=>{}));
   }
 });
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
@@ -94,7 +111,8 @@ try{
   await ticket.getByRole('button',{name:'Review order',exact:true}).click();
   const review=page.getByRole('dialog',{name:'Confirm reviewed order'});
   await expect(review.getByRole('heading',{name:'Confirm reviewed order'})).toBeVisible();
-  await page.waitForTimeout(700);
+  phase='order_review_wait_for_arm';
+  await expect(review.getByRole('button',{name:'Confirm order',exact:true})).toBeEnabled();
   const confirmRequest=page.waitForRequest(request=>request.method()==='POST'&&new URL(request.url()).pathname.endsWith('/confirm'));
   const confirmResponse=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname.endsWith('/confirm'));
   await review.getByRole('button',{name:'Confirm order',exact:true}).click();
@@ -115,21 +133,49 @@ try{
   expect(retry.status()).toBe(200);expect(await retry.json()).toEqual(receipt);
   await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible();
   step('order_receipt');
-  phase='trade_close';await stepButton.click();
   const terminal=page.getByRole('region',{name:'Trading and Analysis'});
+  phase='trade_close_advance_to_open_positions';
+  const beforeEntryRevision=Number(await terminal.getAttribute('data-revision'));
+  expect(Number.isSafeInteger(beforeEntryRevision)).toBeTruthy();
+  await stepButton.click();
+  await expect(terminal).toHaveAttribute('data-revision',String(beforeEntryRevision+1));
+  phase='trade_close_open_positions_tab';
   await terminal.getByRole('button',{name:'Open positions',exact:true}).click();
+  phase='trade_close_open_positions_table';
   await expect(terminal.getByRole('table',{name:'Open positions'})).toBeVisible();
+  phase='trade_close_find_open_position';
   const row=terminal.locator('tr[data-order-id]').first();
   await expect(row).toBeVisible();
+  phase='trade_close_open_confirmation';
   await row.getByRole('button',{name:'Close position',exact:true}).click();
-  await page.getByRole('dialog',{name:'Confirm position action'}).getByRole('button',{name:'Confirm action',exact:true}).click();
+  phase='trade_close_commit_confirmation';
+  const closeDialog=page.getByRole('dialog',{name:'Confirm position action'});
+  await closeDialog.getByRole('button',{name:'Confirm action',exact:true}).click();
+  await expect(closeDialog).toBeHidden();
+  phase='trade_close_advance_after_commit';
+  const beforeExitRevision=Number(await terminal.getAttribute('data-revision'));
+  expect(Number.isSafeInteger(beforeExitRevision)).toBeTruthy();
   await stepButton.click();
+  await expect(terminal).toHaveAttribute('data-revision',String(beforeExitRevision+1));
+  phase='trade_close_closed_trades_tab';
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
+  phase='trade_close_committed_row';
   await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);step('committed_trade_journal_analytics');
-  phase='journal_analytics';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
+  phase='journal_analytics_workspace_note';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
   await expect(terminal.getByText('No saved note',{exact:true})).toBeVisible();
+  phase='journal_analytics_workspace_tab';
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
+  phase='journal_analytics_workspace_heading';
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
+  phase='journal_analytics_trade_count_label';
+  const completedLabel=terminal.locator('.alpha-analysis dt').filter({hasText:/^Completed trades$/});
+  // The chart precedes the definition list inside a bounded scroll panel. Bring
+  // the committed metric into the panel viewport before asserting visibility.
+  await completedLabel.scrollIntoViewIfNeeded();
+  await expect(completedLabel).toHaveText('Completed trades');
+  phase='journal_analytics_trade_count_value';
+  const completedMetric=terminal.locator('.alpha-analysis dl div').filter({hasText:'Completed trades'});
+  await expect(completedMetric.locator('dd')).toHaveText('1');
   phase='workspace_method_back';await page.getByRole('link',{name:'Back to Synthetic browser method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
@@ -165,9 +211,14 @@ try{
   const resumedTerminal=page.getByRole('region',{name:'Trading and Analysis'});
   await resumedTerminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);
+  await Promise.allSettled(apiBodyReads);
+  expect(apiTrace.filter(entry=>entry.status===429)).toEqual([]);
+  const committedJournal=apiTrace.filter(entry=>entry.path.endsWith('/journal/pages')&&entry.status===200).at(-1);
+  expect(committedJournal?.journalPage?.firstOrderStatuses).toEqual(['CLOSED']);
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
+  await Promise.allSettled(apiBodyReads);
   await new Promise(resolve=>setTimeout(resolve,0));
   const panelTitles=await page.locator('.rk-state h1,.rk-state h2').allTextContents().catch(()=>[]);
   const panelKinds=new Map([['No orders yet','NO_ORDERS'],['No order matches','FILTERED_EMPTY'],
@@ -178,17 +229,34 @@ try{
   const screenState=panelTitles.map(title=>panelKinds.get(title)).filter(Boolean).slice(0,8);
   const browserDiagnostics=await page.evaluate(()=>{
     const error=document.querySelector('.rk-state-error .rk-state-body')?.textContent||'';
+    const safeError=error.replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
+      .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
+      .replace(/\s+/g,' ').trim().slice(0,180);
     const journalError=error.includes('Unsupported Journal page')?'JOURNAL_SCHEMA':
       error.includes('Journal pagination did not advance')?'JOURNAL_CURSOR':
       error.includes('Unsupported workspace response')?'WORKSPACE_SCHEMA':
       error.includes('REFUSED')||error.includes('CORRUPT_RECORD')?'BACKEND_REFUSAL':
       document.querySelector('.rk-state-error')?'OTHER':'NONE';
+    const terminal=document.querySelector('[aria-label="Trading and Analysis"]');
+    const openTable=terminal?.querySelector('table[aria-label="Open positions"]');
+    const openRows=Array.from(openTable?.querySelectorAll('tr[data-order-id]')||[]).slice(0,4).map(row=>{
+      const cells=Array.from(row.querySelectorAll('td'));
+      const rawStatus=cells[2]?.textContent?.trim()||'';
+      const status=['ACTIVE','PENDING','UNRESOLVED'].find(value=>rawStatus.startsWith(value))||'OTHER';
+      return {status,side:['LONG','SHORT'].includes(cells[1]?.textContent?.trim())?cells[1].textContent.trim():'OTHER'};
+    });
     return {routeScreen:new URL(location.href).searchParams.get('screen'),
       journalLists:document.querySelectorAll('.rk-journal').length,
-      journalRows:document.querySelectorAll('.rk-journal li').length,journalError};
+      journalRows:document.querySelectorAll('.rk-journal li').length,journalError,
+      sanitizedError:safeError,terminalRevision:Number.isSafeInteger(Number(terminal?.getAttribute('data-revision')))?
+        Number(terminal.getAttribute('data-revision')):null,openTableVisible:Boolean(openTable),openRows};
   }).catch(()=>({routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'}));
+  const failureMessage=String(error?.message||error).split('\n')[0]
+    .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
+    .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
+    .slice(0,300);
   process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
-    pageErrorCount:errors.length,browserDiagnostics,apiTrace})+'\n');
+    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,apiTrace,requestFailures})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));
