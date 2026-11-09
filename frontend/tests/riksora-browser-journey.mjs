@@ -127,8 +127,11 @@ try{
   phase='workspace_sessions_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Sessions',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
-  phase='global_journal_load';
+  phase='global_journal_heading';
   await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();
+  phase='global_journal_select_session';await page.locator('.rk-toolbar .rk-combo-trigger').click();
+  await page.getByRole('option',{name:/Synthetic browser session/}).click();
+  phase='global_journal_load';
   await expect(page.getByRole('list',{name:'Orders in Synthetic browser session'}).locator('li')).toHaveCount(1);
   await page.getByRole('link',{name:'Sessions',exact:true}).first().click();
   await page.getByRole('link',{name:'Analytics for Synthetic browser session',exact:true}).click();
