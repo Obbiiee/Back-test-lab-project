@@ -119,6 +119,7 @@ try{
   const terminal=page.getByRole('region',{name:'Trading and Analysis'});
   phase='trade_close_advance_to_open_positions';
   const beforeEntryRevision=Number(await terminal.getAttribute('data-revision'));
+  expect(Number.isSafeInteger(beforeEntryRevision)).toBeTruthy();
   await stepButton.click();
   await expect(terminal).toHaveAttribute('data-revision',String(beforeEntryRevision+1));
   phase='trade_close_open_positions_tab';
@@ -136,6 +137,7 @@ try{
   await expect(closeDialog).toBeHidden();
   phase='trade_close_advance_after_commit';
   const beforeExitRevision=Number(await terminal.getAttribute('data-revision'));
+  expect(Number.isSafeInteger(beforeExitRevision)).toBeTruthy();
   await stepButton.click();
   await expect(terminal).toHaveAttribute('data-revision',String(beforeExitRevision+1));
   phase='trade_close_closed_trades_tab';
