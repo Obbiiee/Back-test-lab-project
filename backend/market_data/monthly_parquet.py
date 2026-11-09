@@ -560,37 +560,49 @@ class MonthlyParquetProvider:
         require(meta.num_rows == group_entry["eventCount"], "rowGroupCount", "CORRUPT_RECORD")
         require(all(meta.column(i).compression == "ZSTD" for i in range(meta.num_columns)),
                 "compression", "SCHEMA_MISMATCH")
-        table = parquet.read_row_group(index, columns=SCHEMA.names, use_threads=False)
-        rows = table.to_pylist()
-        require(len(rows) == group_entry["eventCount"], "rowGroupCount", "CORRUPT_RECORD")
         sha = hashlib.sha256()
         events = []
+        timestamps = np.empty(group_entry["eventCount"], dtype=np.int64)
+        global_indices = np.empty(group_entry["eventCount"], dtype=np.int64)
+        offset = 0
         last_time = -1
         last_source = -1
         last_ordinal = -1
-        for row in rows:
-            event = _row_to_event(row)
-            require((event["datasetId"], event["datasetVersion"], event["providerId"],
-                     event["feedId"], event["instrumentId"]) ==
-                    (self.dataset_id, self.dataset_version, self.manifest["providerId"],
-                     self.manifest["feedId"], self.manifest["instrumentId"]),
-                    "eventIdentity", "IDENTITY_CONFLICT")
-            time_ns = int(event["timeNs"])
-            ordinal = int(event["rawOrdinal"])
-            source_index = row["source_index"]
-            require(type(source_index) is int and 0 <= source_index < len(self.manifest["sourceIdentity"]) and
-                    time_ns >= last_time and source_index >= last_source and
-                    (source_index != last_source or ordinal > last_ordinal),
-                    "eventOrder", "ORDER_REVERSAL")
-            source_record = self.manifest["sourceIdentity"][source_index]
-            require(event["provenance"]["sourceId"] == source_record["sourceId"] and
-                    event["provenance"]["memberHash"] == source_record["memberHash"] and
-                    event["resolutionNs"] == source_record["resolutionNs"],
-                    "provenance", "IDENTITY_CONFLICT")
-            require(_month(time_ns) == file_entry["month"], "month", "RANGE_CONFLICT")
-            last_time, last_source, last_ordinal = time_ns, source_index, ordinal
-            sha.update(canonical_bytes(event)); sha.update(b"\n")
-            events.append(event)
+        for batch in parquet.iter_batches(batch_size=READ_BATCH_SIZE,
+                row_groups=[index], columns=SCHEMA.names, use_threads=False):
+            rows = batch.to_pylist()
+            count = len(rows)
+            require(count > 0 and offset + count <= group_entry["eventCount"],
+                    "rowGroupCount", "CORRUPT_RECORD")
+            timestamps[offset:offset+count] = batch.column("timestamp_ns").to_numpy(
+                zero_copy_only=False)
+            global_indices[offset:offset+count] = batch.column("global_index").to_numpy(
+                zero_copy_only=False)
+            for row in rows:
+                event = _row_to_event(row)
+                require((event["datasetId"], event["datasetVersion"], event["providerId"],
+                         event["feedId"], event["instrumentId"]) ==
+                        (self.dataset_id, self.dataset_version, self.manifest["providerId"],
+                         self.manifest["feedId"], self.manifest["instrumentId"]),
+                        "eventIdentity", "IDENTITY_CONFLICT")
+                time_ns = int(event["timeNs"])
+                ordinal = int(event["rawOrdinal"])
+                source_index = row["source_index"]
+                require(type(source_index) is int and 0 <= source_index < len(self.manifest["sourceIdentity"]) and
+                        time_ns >= last_time and source_index >= last_source and
+                        (source_index != last_source or ordinal > last_ordinal),
+                        "eventOrder", "ORDER_REVERSAL")
+                source_record = self.manifest["sourceIdentity"][source_index]
+                require(event["provenance"]["sourceId"] == source_record["sourceId"] and
+                        event["provenance"]["memberHash"] == source_record["memberHash"] and
+                        event["resolutionNs"] == source_record["resolutionNs"],
+                        "provenance", "IDENTITY_CONFLICT")
+                require(_month(time_ns) == file_entry["month"], "month", "RANGE_CONFLICT")
+                last_time, last_source, last_ordinal = time_ns, source_index, ordinal
+                sha.update(canonical_bytes(event)); sha.update(b"\n")
+                events.append(event)
+            offset += count
+        require(offset == group_entry["eventCount"], "rowGroupCount", "CORRUPT_RECORD")
         require(sha.hexdigest() == group_entry["canonicalEventHash"],
                 "canonicalEventHash", "CHILD_HASH_MISMATCH")
         require(events and events[0]["timeNs"] == group_entry["firstTimeNs"] and
@@ -600,12 +612,9 @@ class MonthlyParquetProvider:
                 self._source_indices[events[0]["provenance"]["sourceId"]] == group_entry["firstSourceIndex"] and
                 self._source_indices[events[-1]["provenance"]["sourceId"]] == group_entry["lastSourceIndex"],
                 "rowGroupBounds", "CORRUPT_INDEX_POINTER")
-        timestamps = table.column("timestamp_ns").to_numpy(zero_copy_only=False)
-        require(timestamps.ndim == 1 and len(timestamps) == len(events) and
-                np.all(timestamps[1:] >= timestamps[:-1]),
+        require(len(timestamps) == len(events) and np.all(timestamps[1:] >= timestamps[:-1]),
                 "timestampIndex", "ORDER_REVERSAL")
-        global_indices = table.column("global_index").to_numpy(zero_copy_only=False)
-        require(global_indices.ndim == 1 and len(global_indices) == len(events) and
+        require(len(global_indices) == len(events) and
                 int(global_indices[0]) == group_entry["firstGlobalIndex"] and
                 int(global_indices[-1]) == group_entry["lastGlobalIndex"],
                 "globalIndex", "CORRUPT_INDEX_POINTER")
