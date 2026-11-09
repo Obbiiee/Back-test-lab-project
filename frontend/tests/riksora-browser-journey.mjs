@@ -25,17 +25,19 @@ const errors=[];page.on('pageerror',error=>errors.push(error.message));
 const requestFailures=[];page.on('requestfailed',request=>{
   const url=new URL(request.url());if(url.origin!==configOrigin)return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
+  const rawFailure=request.failure()?.errorText||'';
+  const failure=/^net::ERR_[A-Z_]+$/.test(rawFailure)?rawFailure:'NETWORK_ERROR';
   if(pathname.startsWith('/api/v1/')&&requestFailures.length<32)
-    requestFailures.push({method:request.method(),path:pathname,error:request.failure()?.errorText||'NETWORK_ERROR'});
+    requestFailures.push({method:request.method(),path:pathname,error:failure});
 });
-const apiTrace=[];page.on('response',response=>{
+const apiBodyReads=[];const apiTrace=[];page.on('response',response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
   if(pathname.startsWith('/api/v1/')&&apiTrace.length<128){
     const row={method:response.request().method(),path:pathname,status:response.status(),code:null,
       rows:null,journalPage:null,state:null};
     apiTrace.push(row);
-    void response.json().then(body=>{
+    const parsed=response.json().then(body=>{
       const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
       row.code=typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null;
       row.rows=pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null;
@@ -52,7 +54,8 @@ const apiTrace=[];page.on('response',response=>{
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
       }:null;
       row.state=['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null;
-    }).catch(()=>{});
+    });
+    apiBodyReads.push(parsed.catch(()=>{}));
   }
 });
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
@@ -211,6 +214,7 @@ try{
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
 }catch(error){
+  await Promise.allSettled(apiBodyReads);
   await new Promise(resolve=>setTimeout(resolve,0));
   const panelTitles=await page.locator('.rk-state h1,.rk-state h2').allTextContents().catch(()=>[]);
   const panelKinds=new Map([['No orders yet','NO_ORDERS'],['No order matches','FILTERED_EMPTY'],
