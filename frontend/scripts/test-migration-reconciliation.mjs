@@ -54,6 +54,7 @@ for (const history of ['fresh', 'pr44', 'pr48']) {
     const progress = "INSERT INTO btl.observed_replay_progress VALUES ('ws','progress',0,repeat('b',64),4,200,2,decode('01','hex'),repeat('b',64))"
     if (old.length) {
       await db.exec(seed)
+      if (history === 'pr44') await db.exec("INSERT INTO btl.tick_methods VALUES ('ws','method:existing',decode('01','hex'),repeat('a',64)); INSERT INTO btl.tick_research_sessions VALUES ('ws','legacy','method:existing',decode('02','hex'),repeat('b',64))")
       if (history === 'pr48') await db.exec(progress)
       // Retain nonempty evidence across the upgrade, not merely table names.
       if (history === 'pr44') await db.exec("INSERT INTO btl.tick_terminal_orders VALUES ('ws','legacy',0,'order:old','CANCELLED',1,repeat('a',64),decode('aabb','hex'),repeat('b',64)); INSERT INTO btl.tick_recovery_bases VALUES ('ws','legacy',0,repeat('a',64),repeat('b',64),repeat('c',64),decode('aabb','hex'),repeat('d',64))")
@@ -73,6 +74,11 @@ for (const history of ['fresh', 'pr44', 'pr48']) {
       if (history === 'pr44') assert.equal(await scalar("SELECT encode(payload,'hex') FROM btl.tick_recovery_bases"), 'aabb')
     }
     assert.equal(await scalar('SELECT revision::text FROM btl.observed_replay_progress'), '4')
+    assert.equal(await scalar("SELECT to_regclass('btl.tick_method_metric_projections') IS NOT NULL"), true)
+    if (history === 'pr44') {
+      assert.deepEqual((await db.query("SELECT rollup_state,session_count::text FROM btl.tick_method_metric_projections WHERE method_id='method:existing'")).rows[0],
+        { rollup_state: 'REBUILD_REQUIRED', session_count: '1' })
+    }
     await db.exec("CREATE ROLE migration_runtime; GRANT USAGE ON SCHEMA btl TO migration_runtime; GRANT SELECT,UPDATE ON btl.tick_sessions TO migration_runtime; SET ROLE migration_runtime; UPDATE btl.tick_sessions SET revision=1 WHERE session_id='legacy'; RESET ROLE")
     await assert.rejects(db.exec("UPDATE btl.tick_sessions SET revision=5 WHERE session_id='progress'"), error => error.code === '23000')
     await assert.rejects(db.exec('DELETE FROM btl.observed_replay_progress'), error => error.code === '23000')
