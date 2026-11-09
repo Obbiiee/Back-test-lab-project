@@ -36,6 +36,9 @@ const apiTrace=[];page.on('response',async response=>{
         schemaVersion:Number.isSafeInteger(body?.schemaVersion)?body.schemaVersion:null,
         hasNotes:Array.isArray(body?.notes),hasTotalOrders:Number.isSafeInteger(body?.totalOrders),
         hasComplete:typeof body?.complete==='boolean',
+        complete:typeof body?.complete==='boolean'?body.complete:null,
+        totalOrders:Number.isSafeInteger(body?.totalOrders)?body.totalOrders:null,
+        noteCount:Array.isArray(body?.notes)?body.notes.length:null,
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
       }:null,
       state:['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null});
@@ -148,6 +151,8 @@ try{
   await expect(terminal.getByText('No saved note',{exact:true})).toBeVisible();
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
+  await expect(terminal.getByText('Completed trades',{exact:true})).toBeVisible();
+  await expect(terminal.locator('dl').filter({has:page.getByText('Completed trades',{exact:true})}).locator('dd').first()).toHaveText('1');
   phase='workspace_method_back';await page.getByRole('link',{name:'Back to Synthetic browser method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method',exact:true})).toBeVisible();
   phase='global_journal_navigation';await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Journal',exact:true}).click();
