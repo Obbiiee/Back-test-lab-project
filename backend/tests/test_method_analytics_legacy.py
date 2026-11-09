@@ -1,4 +1,4 @@
-"""Bounded legacy Session fold contracts"""Bounded legacy Session fold contracts without a database."""
+"""Bounded legacy Session fold contracts without a database."""
 import unittest
 from unittest.mock import patch
 
