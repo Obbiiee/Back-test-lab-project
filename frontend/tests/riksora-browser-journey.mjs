@@ -119,7 +119,7 @@ try{
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);step('committed_trade_journal_analytics');
   phase='journal_analytics';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
-  await expect(terminal.getByText('No note yet.')).toBeVisible();
+  await expect(terminal.getByText('No saved note',{exact:true})).toBeVisible();
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
   await expect(terminal.getByRole('heading',{name:'Committed position Analysis'})).toBeVisible();
   phase='global_journal_analytics';await page.getByRole('link',{name:'All Sessions',exact:true}).click();
