@@ -36,6 +36,7 @@ const apiTrace=[];page.on('response',async response=>{
 });
 const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
 let phase='proof';
+let journeyPassed=false,browserVersion=null;
 try{
   const proof=await context.request.get(new URL('/__qa/browser-proof/'+config.nonce,url).href,{maxRedirects:0});
   expect(proof.status()).toBe(200);expect(await proof.json()).toEqual({purpose:'RIKSORA_EXCLUSIVE_SYNTHETIC_QA',nonce:config.nonce});
@@ -158,7 +159,7 @@ try{
   await resumedTerminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);
   expect(errors).toEqual([]);step('logout_login_resume');
-  process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
+  journeyPassed=true;browserVersion=browser.version();
 }catch(error){
   await new Promise(resolve=>setTimeout(resolve,0));
   const panelTitles=await page.locator('.rk-state h1,.rk-state h2').allTextContents().catch(()=>[]);
@@ -173,4 +174,13 @@ try{
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));
   throw error;
-}finally{await context.close();await browser.close();}
+}finally{
+  let cleanupFailed=false;
+  try{await context.close();}catch{cleanupFailed=true;}
+  try{await browser.close();}catch{cleanupFailed=true;}
+  if(cleanupFailed&&journeyPassed){
+    journeyPassed=false;process.stdout.write(JSON.stringify({failurePhase:'browser_cleanup',failureType:'BrowserCleanupError',screenState:[],apiTrace})+'\n');
+    process.exitCode=1;
+  }
+}
+if(journeyPassed)process.stdout.write(JSON.stringify({complete:true,browserVersion})+'\n');
