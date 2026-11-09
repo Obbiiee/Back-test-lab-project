@@ -181,7 +181,7 @@ export default function TickAlpha(){
     run(async()=>{
      try{
       const saved=await api('/sessions',{id:creationId.current,name:fields.name,methodId:fields.methodId,
-        symbol:fields.symbol,initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
+        initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
       const workspace=await loadWorkspace(saved.metadata.id);
       setCatalog(await loadProductCatalog());setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
