@@ -196,6 +196,9 @@ try{
   const screenState=panelTitles.map(title=>panelKinds.get(title)).filter(Boolean).slice(0,8);
   const browserDiagnostics=await page.evaluate(()=>{
     const error=document.querySelector('.rk-state-error .rk-state-body')?.textContent||'';
+    const safeError=error.replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
+      .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
+      .replace(/\s+/g,' ').trim().slice(0,180);
     const journalError=error.includes('Unsupported Journal page')?'JOURNAL_SCHEMA':
       error.includes('Journal pagination did not advance')?'JOURNAL_CURSOR':
       error.includes('Unsupported workspace response')?'WORKSPACE_SCHEMA':
@@ -203,7 +206,8 @@ try{
       document.querySelector('.rk-state-error')?'OTHER':'NONE';
     return {routeScreen:new URL(location.href).searchParams.get('screen'),
       journalLists:document.querySelectorAll('.rk-journal').length,
-      journalRows:document.querySelectorAll('.rk-journal li').length,journalError};
+      journalRows:document.querySelectorAll('.rk-journal li').length,journalError,
+      sanitizedError:safeError};
   }).catch(()=>({routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'}));
   process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
     pageErrorCount:errors.length,browserDiagnostics,apiTrace})+'\n');
