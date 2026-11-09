@@ -324,6 +324,22 @@ class ObservedExecutionStore:
                     'archiveRowBinding','CORRUPT_RECORD')
             yield row
 
+    def _insert_archive_record(self,db,workspace,session,state,row):
+        """Persist one record using the selected immutable table's column contract."""
+        table=self._archive_table(state)
+        if state['artifact']==STATE_INTEGRATION_PRODUCT_ARCHIVE_V1:
+            db.execute(f'INSERT INTO {table} '
+                '(workspace_id,session_id,sequence,order_id,terminal_status,finalized_revision,record_hash,payload,content_hash) '
+                'VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (workspace,session,row['sequence'],row['orderId'],row['order']['status'],
+                 row['finalizedRevision'],row['recordHash'],*pack(row)))
+            return
+        db.execute(f'INSERT INTO {table} '
+            '(workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash) '
+            'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+            (workspace,session,row['sequence'],row['orderId'],row['finalizedRevision'],
+             row['recordHash'],*pack(row)))
+
     def _verify_order_archive(self,db,workspace,session,state,*,full):
         table=self._archive_table(state)
         summary=state['orderArchive']
@@ -1020,14 +1036,8 @@ class ObservedExecutionStore:
             result_raw,result_hash=pack(receipt_wire)
             db.execute('INSERT INTO btl.tick_commands VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,command['commandId'],after['revision'],content_hash(command),result_raw,result_hash))
             if archive_mode:
-                table=self._archive_table(after)
                 for row in archive_records:
-                    archive_raw,archive_hash=pack(row)
-                    db.execute(f'INSERT INTO {table} '
-                        '(workspace_id,session_id,sequence,order_id,finalized_revision,record_hash,payload,content_hash) '
-                        'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
-                        (workspace,session,row['sequence'],row['orderId'],row['finalizedRevision'],
-                         row['recordHash'],archive_raw,archive_hash))
+                    self._insert_archive_record(db,workspace,session,after,row)
             for e in events:
                 eraw,esha=pack(e);db.execute('INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)',(workspace,session,command['commandId'],e['eventId'],e['sequence'],eraw,esha))
             # Maintain the bounded Journal read model only for Sessions that

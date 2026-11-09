@@ -141,6 +141,93 @@ class FunctionalJourneyTests(unittest.TestCase):
                 previous = root + path + '/statistics'
                 qa.client.close()
 
+    def test_single_instrument_product_v1_login_trade_journal_analytics_resume(self):
+        """One authored synthetic instrument covers the hosted API journey end-to-end."""
+        qa = google_fixture.GoogleIdentityTests(methodName='runTest')
+        qa.factory = lambda dsn: create_google_demo_app(
+            self.runtime, qa.auth_secret, rate_limit=1000,
+            google_client_id=google_fixture.CLIENT,
+            google_client_secret=google_fixture.SECRET,
+            google_redirect_uri=google_fixture.REDIRECT)
+        qa.setUp()
+        qa.client.close()
+        qa.client = TestClient(qa.app, base_url='https://testserver', client=('192.0.2.240', 50000))
+        headers = qa.login()
+        http = qa.client
+        me = http.get('/api/v1/auth/me', headers=headers).json()
+        self.assertTrue(me['is_verified'])
+        workspace = http.post('/api/v1/workspaces', headers=headers, json={'name': 'Single instrument synthetic V1'})
+        self.assertEqual(workspace.status_code, 201, workspace.text)
+        root = '/api/v1/workspaces/' + workspace.json()['id'] + '/research-v2'
+
+        def get(path):
+            response = http.get(root + path, headers=headers)
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        def post(path, body):
+            response = http.post(root + path, headers=headers, json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        catalog = get('/catalog')
+        eurusd = next(item for item in catalog['instruments'] if item['symbol'] == 'EURUSD')
+        self.assertEqual(eurusd['model'], 'AUTHORED_SYNTHETIC_ONLY')
+        trading_method = method()
+        post('/methods', trading_method)
+        sid = 'session:single-v1:' + uuid.uuid4().hex
+        path = '/sessions/' + sid
+        post('/sessions', dict(id=sid, name='Synthetic EURUSD V1', methodId=trading_method['id'],
+                               symbol='EURUSD', startPeriod='2020-01', initialBalance='10000'))
+        post(path + '/activate', {})
+        revision = 0
+
+        def call(kind, payload):
+            nonlocal revision
+            raw = command(sid, 'single-v1:' + str(revision), revision, kind, payload)
+            receipt = post(path + '/commands', raw)
+            self.assertTrue(receipt['durable'])
+            self.assertEqual(post(path + '/commands', raw), receipt)
+            revision = receipt['state']['revision']
+            return receipt
+
+        call('ADVANCE', {'targetNs': str(START_NS)})
+        review = post(path + '/review', dict(id='order:single-v1', expectedRevision=revision,
+                                             payload=opening(entry='999')))
+        confirm = dict(reviewId=review['id'], reviewHash=content_hash(review))
+        order_receipt = post(path + '/confirm', confirm)
+        self.assertTrue(order_receipt['durable'])
+        revision = order_receipt['state']['revision']
+        call('ADVANCE', {'targetNs': str(START_NS + STEP_NS)})
+        call('CLOSE', {'orderId': 'order:single-v1', 'quantity': None})
+        call('ADVANCE', {'targetNs': str(START_NS + 2 * STEP_NS)})
+        stats = get(path + '/statistics')
+        self.assertEqual(stats['metrics']['tradeCount'], 1)
+        self.assertEqual(stats['account']['balance'], '10000.03')
+        post(path + '/journal', dict(orderId='order:single-v1', expectedNoteRevision=0,
+                                     text='Single instrument API journey', tags=['synthetic']))
+        notes = get(path + '/journal')
+        self.assertEqual(len(notes['notes']), 1)
+        self.assertEqual(post(path + '/confirm', confirm), order_receipt)
+        self.assertEqual(http.post('/api/v1/auth/logout', headers=headers).status_code, 204)
+        self.assertEqual(http.get(root + path + '/statistics', headers=headers).status_code, 401)
+        http.close()
+
+        # New application instance and login prove the committed Session survives process refresh.
+        qa.app = qa.factory(self.runtime)
+        qa.client = TestClient(qa.app, base_url='https://testserver', client=('192.0.2.240', 50000))
+        qa.app.state.google_verifier.keys.fetch_data = lambda: {'keys': [qa.jwk]}
+        import httpx
+        qa.app.state.google_client.get_httpx_client = lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(qa.token_endpoint), follow_redirects=False, timeout=5)
+        headers = qa.login()
+        http = qa.client
+        self.assertEqual(http.get('/api/v1/auth/me', headers=headers).json()['id'], me['id'])
+        self.assertEqual(get(path + '/statistics'), stats)
+        self.assertEqual(get(path + '/journal'), notes)
+        self.assertEqual(get(path)['state']['revision'], revision)
+        qa.client.close()
+
     def test_demo_does_not_open_password_admin_support_billing_or_tier_write(self):
         qa = google_fixture.GoogleIdentityTests(methodName='runTest')
         qa.factory = lambda dsn: create_google_demo_app(

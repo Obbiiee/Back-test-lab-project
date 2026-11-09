@@ -209,6 +209,39 @@ class ObservedPostgresTests(unittest.TestCase):
         self.assertNotIn('state',receipt)
         self.assertEqual(receipt['stateHash'],content_hash(recovered))
 
+    def test_integration_archive_write_populates_required_terminal_status_and_recovers(self):
+        from execution.observed_kernel import PRODUCT_ORDER_RETENTION_V1
+        suffix=uuid.uuid4().hex[:12]
+        scope=TrustedScope('observedqa:p44-archive:'+suffix,'authored:actor')
+        sid='session:p44-archive:'+suffix
+        store=ObservedExecutionStore(DSN,order_retention_policy=PRODUCT_ORDER_RETENTION_V1,
+            terminal_order_archive_v1=True,state_storage_format='compact-v1')
+        controller=ObservedExecutionController(store,lambda _:self.source,
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1)
+        controller.create(scope,sid,self.fx.profile,self.fx.policy,period='1970-01',balance='10000')
+        advance=command(sid,'p44:advance',0,'ADVANCE',{'targetNs':'0'})
+        controller.apply(scope,advance)
+        open_order=command(sid,'p44:open',1,'OPEN',dict(side='LONG',orderType='LIMIT',
+            workflow='PLANNED',entry='2299',quantity='0.01',sl='2298',tp='2301',
+            riskPercent='1',observations=[]))
+        controller.apply(scope,open_order)
+        cancel=command(sid,'p44:cancel',2,'CANCEL',{'orderId':'p44:open'})
+        committed=controller.apply(scope,cancel)
+        self.assertEqual(committed['state']['orders'],{})
+        self.assertEqual(committed['state']['orderArchive']['artifact'],
+            'BTL-OBSERVED-TERMINAL-ORDER-ARCHIVE-1-SUMMARY')
+        with connect(DSN) as db:
+            row=db.execute('SELECT terminal_status,payload,content_hash FROM btl.tick_terminal_orders '
+                'WHERE workspace_id=%s AND session_id=%s AND order_id=%s',
+                (scope.workspace_id,sid,'p44:open')).fetchone()
+        self.assertEqual(row[0],'CANCELLED')
+        archive_record=unpack(row[1],row[2])
+        self.assertEqual(archive_record['artifact'],'BTL-OBSERVED-TERMINAL-ORDER-ARCHIVE-1')
+        recovered=ObservedExecutionController(store,lambda _:self.source,
+            order_retention_policy=PRODUCT_ORDER_RETENTION_V1)
+        self.assertEqual(recovered.inspect(scope,sid)['state'],committed['state'])
+        self.assertEqual(recovered.apply(scope,cancel),committed)
+
     def test_qa_order_archive_v1_integrates_kernel_postgres_recovery_and_ledger(self):
         from contextlib import contextmanager
         from execution.observed_kernel import QA_ORDER_RETENTION_V3
@@ -344,7 +377,7 @@ class ObservedPostgresTests(unittest.TestCase):
             env=dict(os.environ,BTL_OBSERVED_WORKER=json.dumps(worker_data,sort_keys=True),
                      BTL_TEST_DATABASE_URL=qa_dsn,BTL_ENABLE_QA_ORDER_ARCHIVE_V1='1')
             proc=subprocess.run([sys.executable,'-B','-m','tests.test_observed_postgres','--worker'],
-                cwd=Path(__file__).resolve().parents[2],env=env,capture_output=True,text=True,timeout=90)
+                cwd=Path(__file__).resolve().parents[1],env=env,capture_output=True,text=True,timeout=90)
             self.assertEqual(proc.returncode,-signal.SIGKILL,proc.stderr)
             after_kill=fresh.inspect(qa_scope,sid)['state']
             self.assertEqual(after_kill['orderArchive']['count'],2)
