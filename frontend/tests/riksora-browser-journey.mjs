@@ -60,7 +60,7 @@ try{
   await page.getByLabel('Method name').fill('Synthetic browser method');
   await page.getByRole('button',{name:'Save Method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method'})).toBeVisible();step('method');
-  phase='session_wizard_open';await page.getByRole('button',{name:'New Session',exact:true}).click();
+  phase='session_wizard_open';await page.getByRole('button',{name:'New Session',exact:true}).first().click();
   phase='session_method_select';await page.getByRole('button',{name:/^Method(?:\s|$)/}).first().click();
   await page.getByRole('option',{name:/Synthetic browser method/}).click();
   phase='session_instrument_continue';await page.getByRole('button',{name:'Continue',exact:true}).click();
