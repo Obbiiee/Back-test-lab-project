@@ -48,13 +48,16 @@ class ObservedProductApplicationTests(unittest.TestCase):
                     @contextmanager
                     def connection(_dsn):
                         yield db
-                    with patch('execution.observed_research.connect', connection), patch('execution.product_method_lifecycle.require_active_method'):
+                    with patch('execution.observed_research.connect', connection), \
+                            patch('execution.product_method_lifecycle.require_active_method'), \
+                            patch('execution.method_analytics_store.add_session') as add_rollup:
                         result = app.create_session(dict(id='session:test', name='Test', methodId='method:test',
                             initialBalance='10000', sourceKey='fixture', period='1970-01', day=None))
                     self.assertEqual(result, {'created': True})
                     inserts = [call.args[1] for call in db.execute.call_args_list
                                if call.args[0].startswith('INSERT INTO btl.tick_checkpoints')]
                     self.assertEqual(len(inserts), 1)
+                    add_rollup.assert_called_once()
                     genesis = unpack(*inserts[0][-2:])['state']
                     self.assertEqual(genesis['artifact'], PRODUCT_STATE_ARTIFACT if product else 'BTL-OBSERVED-EXECUTION-STATE-1')
                     self.assertEqual('orderArchive' in genesis, product)
