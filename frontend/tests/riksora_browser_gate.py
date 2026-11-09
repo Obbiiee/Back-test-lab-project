@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import secrets
@@ -96,6 +97,7 @@ def run(tools, browser_cache):
                           steps=report['steps'], progress=report['progress'],
                           failureType=report.get('failureType'),
                           failureCode=report.get('failureCode'),
+                          workerFailureCode=report.get('workerFailureCode'),
                           failurePhase=report.get('failurePhase'),
                           browserFailureType=report.get('browserFailureType'),
                           apiTrace=report.get('apiTrace', []))))
@@ -113,6 +115,19 @@ def run_browser(environment, tools, browser_cache, evidence, report):
     from cloud.app import create_app
     from tests.test_identity import RecordingDelivery
     dsn = environment['BTL_TEST_DATABASE_URL']
+    class SafeWorkerFailureCapture(logging.Handler):
+        def emit(self, record):
+            message = record.getMessage()
+            marker = 'error_code='
+            if 'research_job_failed ' in message and marker in message:
+                code = message.split(marker, 1)[1].split()[0]
+                if code.isascii() and code.isupper() and all(c.isalnum() or c == '_' for c in code):
+                    report['workerFailureCode'] = code
+    queue_logger = logging.getLogger('cloud.queue')
+    capture = SafeWorkerFailureCapture()
+    prior_level = queue_logger.level
+    queue_logger.setLevel(logging.WARNING)
+    queue_logger.addHandler(capture)
     password = secrets.token_urlsafe(32)
     with psycopg.connect(dsn) as db:
         db.execute('CREATE ROLE btl_owner NOLOGIN')
@@ -244,6 +259,8 @@ def run_browser(environment, tools, browser_cache, evidence, report):
                 if thread.is_alive():
                     raise RuntimeError('QA_HTTP_CLEANUP_FAILED')
             sock.close()
+            queue_logger.removeHandler(capture)
+            queue_logger.setLevel(prior_level)
 
 
 if __name__ == '__main__':
