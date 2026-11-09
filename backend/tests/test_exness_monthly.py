@@ -5,6 +5,7 @@ import unittest
 import zipfile
 
 from contracts.primitives import ContractError
+from ticks.exness_v2 import ExnessIngestion
 from ticks.exness_monthly import (
     Checkpoint, INSTRUMENTS, inspect_zip, partition_for, plan, required_partitions,
     validate_csv_month,
@@ -50,6 +51,23 @@ class ExnessMonthlyTests(unittest.TestCase):
         self.assertEqual(report["ties"], "UNTRUSTED")
         self.assertEqual(report["coverage"], "OBSERVED_ROWS_ONLY_NOT_COMPLETE_MONTH")
         self.assertEqual(report["rights"], "UNKNOWN")
+
+    def test_official_four_column_shape_validates_and_enters_existing_v2_importer(self):
+        path = self.root / "tick-history-fixture.csv"
+        path.write_text(
+            "Symbol,Timestamp,Bid,Ask\n"
+            "EURUSD,2024-01-03 00:00:00.000Z,1.083210,1.083230\n"
+            "EURUSD,2024-01-03 00:00:00.000Z,1.083220,1.083240\n",
+            encoding="utf-8")
+        report = validate_csv_month(path, original_symbol="EURUSD", year=2024, month=1)
+        self.assertEqual((report["recordCount"], report["equalTimestampAdjacentRows"]), (2, 1))
+        importer = ExnessIngestion(path, self.root / "v2-store", packing=(2, 1, 1))
+        try:
+            result = importer.run()
+        finally:
+            importer.builder.store.close()
+        self.assertEqual(result["acceptedRows"], 2)
+        self.assertEqual(result["provenance"], "UNVERIFIED")
 
     def test_csv_rejects_symbol_spoof_month_overflow_and_reversal(self):
         cases = (

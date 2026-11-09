@@ -19,7 +19,7 @@ import tempfile
 import zipfile
 
 from contracts.primitives import require
-from .exness_v2 import FIELDS
+from .exness_v2 import FIELDS, TICK_HISTORY_FIELDS
 
 
 INSTRUMENTS = (
@@ -139,10 +139,14 @@ def validate_csv_month(path, *, original_symbol: str, year: int, month: int):
     previous_row = None
     with Path(path).open("r", encoding="utf-8-sig", newline="") as stream:
         reader = csv.reader(stream, strict=True)
-        require(next(reader, None) == FIELDS, "header", "SCHEMA_MISMATCH")
-        for row in reader:
-            require(len(row) == 5, "record", "MALFORMED_RECORD")
-            feed, symbol, timestamp, bid_text, ask_text = row
+        header = next(reader, None)
+        require(header in (FIELDS, TICK_HISTORY_FIELDS), "header", "SCHEMA_MISMATCH")
+        for values in reader:
+            require(len(values) == len(header), "record", "MALFORMED_RECORD")
+            row = dict(zip(header, values))
+            if "Exness" not in row:
+                row["Exness"] = "exness"
+            feed, symbol, timestamp, bid_text, ask_text = (row[key] for key in FIELDS)
             require(feed == "exness" and symbol == partition.original_symbol,
                     "symbol", "IDENTITY_CONFLICT")
             require(STAMP.fullmatch(timestamp) is not None, "timestamp", "INVALID_TIMESTAMP")
@@ -159,7 +163,7 @@ def validate_csv_month(path, *, original_symbol: str, year: int, month: int):
             crossed += ask < bid
             if previous_ns == ns:
                 equal_times += 1
-            raw = tuple(row)
+            raw = tuple(row[key] for key in FIELDS)
             exact_duplicates += raw == previous_row
             previous_row = raw
             count += 1
