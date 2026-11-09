@@ -168,7 +168,11 @@ def project(state, events, quote):
         previous = event['eventId']; count += 1
         kind, order_id, detail = event['kind'], event['orderId'], event['detail']
         if kind == 'ORDER_ACCEPTED':
-            require(order_id in state['orders'] and order_id not in rows, 'acceptedOrder', 'CORRUPT_RECORD')
+            # The event ledger contains the full lifetime order history. Closed
+            # orders may have been evicted from the bounded hot-state map and
+            # retained in the immutable terminal archive, so membership in
+            # state['orders'] is not a prerequisite for reconstructing history.
+            require(order_id not in rows, 'acceptedOrder', 'CORRUPT_RECORD')
             row = dict(id=order_id, **deepcopy(detail['plan']), entryPrice=None, entryTimeNs=None, entryFillRef=None,
                 entryEvidence=None, exitSlices=[],
                 exitTimeNs=None, exitPrice=None, exitFillRef=None, exitReason=None, gross='0', commission='0', netCashChange='0',
@@ -216,15 +220,22 @@ def project(state, events, quote):
         annotations.append(dict(eventId=event['eventId'], orderId=order_id, kind=kind, timeNs=evidence['timeNs'],
             price=detail['price'], side=row['side'], reason=detail.get('reason'), chronologyLimited=evidence['chronologyLimited']))
     require(count == state['nextEventIndex'] and previous == state['eventHash'] and balance == Fraction(state['balance']) and
-        gross == Fraction(state['realizedGross']) and commission == Fraction(state['commission']) and set(rows) == set(state['orders']),
+        gross == Fraction(state['realizedGross']) and commission == Fraction(state['commission']) and set(state['orders']).issubset(rows),
         'analysisHead', 'CORRUPT_RECORD')
     indicative = Fraction()
     mark_available = not state['unresolved'] and quote is not None and int(quote['timeNs']) <= int(state['throughNs'])
     for order_id, row in rows.items():
-        stored = state['orders'][order_id]
-        require(all(row[k] == stored[k] for k in ('status','quantity','remaining','entryPrice','entryFillRef','side','entry','sl','tp','orderType','workflow')),
-            'orderProjection', 'CORRUPT_RECORD')
-        row['exitRequested'] = stored['exitRequest'] is not None
+        stored = state['orders'].get(order_id)
+        if stored is None:
+            # Only terminal records can be absent from hot state. Their exact
+            # committed outcome is reconstructed from the verified event chain.
+            require(row['status'] in ('CLOSED', 'CANCELLED', 'EXPIRED'),
+                    'orderProjection', 'CORRUPT_RECORD')
+            row['exitRequested'] = False
+        else:
+            require(all(row[k] == stored[k] for k in ('status','quantity','remaining','entryPrice','entryFillRef','side','entry','sl','tp','orderType','workflow')),
+                'orderProjection', 'CORRUPT_RECORD')
+            row['exitRequested'] = stored['exitRequest'] is not None
         row['unrealizedIndicative'] = None
         if row['status'] == 'ACTIVE' and mark_available:
             liquidation = Fraction(quote['bid'] if row['side'] == 'LONG' else quote['ask'])

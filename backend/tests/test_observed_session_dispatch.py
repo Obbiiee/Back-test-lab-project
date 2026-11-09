@@ -35,14 +35,14 @@ class ObservedSessionDispatchTests(unittest.TestCase):
                 self.row = {'payload': raw, 'content_hash': sha}
             def execute(self, *_args): return FakeCursor(self.row)
 
-        cases = ((LEGACY, False), (QA_ARCHIVE, False), (P0_PRODUCT_ARCHIVE, True),
-                 (INTEGRATION_PRODUCT_ARCHIVE, True))
-        for artifact, expected in cases:
+        cases = ((LEGACY, 'none'), (QA_ARCHIVE, 'qa-v1'),
+                 (P0_PRODUCT_ARCHIVE, 'p0-v1'), (INTEGRATION_PRODUCT_ARCHIVE, 'integration-v1'))
+        for artifact, expected_codec in cases:
             state = {'artifact': artifact}
             if artifact != LEGACY: state['orderArchive'] = {}
             with self.subTest(artifact=artifact):
-                self.assertIs(_observed_session_uses_product_archive(FakeDb(state),
-                    'workspace:test', 'session:test'), expected)
+                self.assertEqual(_observed_session_uses_product_archive(FakeDb(state),
+                    'workspace:test', 'session:test'), expected_codec)
 
     def test_legacy_session_has_no_archive_and_keeps_legacy_lifetime_contract(self):
         selected = dispatch_observed_session({'artifact': LEGACY})
