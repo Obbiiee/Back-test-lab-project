@@ -47,6 +47,29 @@ class BrowserGateSafetyTests(unittest.TestCase):
             'method': 'GET', 'path': '/api/v1/auth/login?email=private@example.com',
             'status': 200, 'durationMs': 1}}))
 
+    def test_api_telemetry_redacts_url_encoded_typed_ids(self):
+        result = gate.sanitize_api_event({'apiEvent': {
+            'method': 'POST',
+            'path': '/api/v1/workspaces/workspace%3A01234567-89ab-cdef-0123-456789abcdef/research/sessions/session%3Afedcba98-7654-3210-fedc-ba9876543210/confirm',
+            'status': 200, 'durationMs': 12.5}})
+        self.assertEqual(result['path'],
+            '/api/v1/workspaces/{id}/research/sessions/{id}/confirm')
+
+    def test_route_latency_summary_groups_ids_and_server_timing(self):
+        rows = [
+            {'method':'GET','path':'/api/v1/workspaces/{id}/research/sessions/session%3A01234567-89ab-cdef-0123-456789abcdef/journal/pages',
+             'durationMs':20.0,'serverTiming':'research-operation;dur=10.0, db-sql;dur=4.0'},
+            {'method':'GET','path':'/api/v1/workspaces/{id}/research/sessions/session%3Afedcba98-7654-3210-fedc-ba9876543210/journal/pages',
+             'durationMs':40.0,'serverTiming':'research-operation;dur=20.0, db-sql;dur=8.0'},
+        ]
+        routes, timings = gate.summarize_api_latencies(rows)
+        route = 'GET /api/v1/workspaces/{id}/research/sessions/{id}/journal/pages'
+        self.assertEqual(routes[route],
+            {'samples':2,'p50Ms':20.0,'p95Ms':40.0,'p99Ms':40.0,'maxMs':40.0})
+        self.assertEqual(timings[route+' :: research-operation'],
+            {'samples':2,'p50Ms':10.0,'p95Ms':20.0,'p99Ms':20.0,'maxMs':20.0})
+        self.assertEqual(timings[route+' :: db-sql']['p95Ms'],8.0)
+
     def test_demo_tick_fixture_has_pinned_synthetic_identity_and_hash(self):
         sys.path.insert(0, str(gate.REPOSITORY/'backend'))
         from contracts.canonical import canonical_bytes

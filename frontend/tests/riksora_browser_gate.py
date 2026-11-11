@@ -20,7 +20,7 @@ import tempfile
 import threading
 import time
 import traceback
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from unittest.mock import patch
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -95,6 +95,7 @@ def sanitize_api_event(item):
              not code.isascii() or not code.isupper() or
              not all(char.isalnum() or char == '_' for char in code)))):
         return None
+    path = sanitize_api_path(path)
     # Store only route/status/timing fields; response bodies and identity data
     # never cross the browser-parent QA protocol.
     if jump_status is not None and jump_status not in (
@@ -103,6 +104,22 @@ def sanitize_api_event(item):
     return {'method': method, 'path': path, 'status': status,
             'code': code, 'jumpStatus': jump_status, 'durationMs': duration,
             'serverTiming': server_timing}
+
+
+def sanitize_api_path(path):
+    """Redact typed and UUID path identities, including URL-encoded IDs."""
+    segments = []
+    for segment in path.split('/'):
+        try:
+            decoded = unquote(segment, errors='strict')
+        except (UnicodeError, ValueError):
+            decoded = segment
+        if (re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]*:[a-f0-9-]{24,}', decoded, re.IGNORECASE) or
+                re.fullmatch(r'[a-f0-9-]{24,}', decoded, re.IGNORECASE)):
+            segments.append('{id}')
+        else:
+            segments.append(segment)
+    return '/'.join(segments)
 
 
 def _queue_job_timeline(dsn):
@@ -667,6 +684,40 @@ def _nearest_rank(values, percentile):
     return ordered[max(0, math.ceil(percentile*len(ordered))-1)]
 
 
+def _latency_summary(values):
+    return {'samples': len(values), 'p50Ms': round(_nearest_rank(values,.50),3),
+            'p95Ms': round(_nearest_rank(values,.95),3),
+            'p99Ms': round(_nearest_rank(values,.99),3),
+            'maxMs': round(max(values),3)}
+
+
+def summarize_api_latencies(api_rows):
+    """Summarize sanitized endpoint and Server-Timing measurements only."""
+    routes = {}
+    timings = {}
+    for row in api_rows:
+        route = row['method']+' '+sanitize_api_path(row['path'])
+        routes.setdefault(route, []).append(float(row['durationMs']))
+        timing = row.get('serverTiming')
+        if not isinstance(timing,str):
+            continue
+        for entry in timing.split(', '):
+            name, separator, remainder = entry.partition(';')
+            if not separator:
+                continue
+            duration = next((part[4:] for part in remainder.split(';') if part.startswith('dur=')),None)
+            if duration is None:
+                continue
+            try:
+                value = float(duration)
+            except ValueError:
+                continue
+            if math.isfinite(value) and re.fullmatch(r'[a-z][a-z0-9-]*',name):
+                timings.setdefault(route+' :: '+name, []).append(value)
+    return ({route:_latency_summary(values) for route,values in sorted(routes.items())},
+            {stage:_latency_summary(values) for stage,values in sorted(timings.items())})
+
+
 def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, url, nonce,
                        delivery, cohort_size):
     """Run independent product browsers concurrently against one API/worker/PG."""
@@ -1000,6 +1051,7 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
     db_after=collect(dsn)
     api_rows=[row for user in users for row in user['apiTrace']]
     durations=[float(row['durationMs']) for row in api_rows]
+    api_latency_by_route,server_timing_by_route=summarize_api_latencies(api_rows)
     status_counts={}
     for row in api_rows:
         key=str(row['status'])
@@ -1021,6 +1073,8 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
             'one isolated Chromium process and Node harness process per trader'),
         transientBusyResponses=sum(user.get('transientBusyCount',0) for user in users),
         browserApiCalls=len(api_rows),apiStatusCounts=status_counts,
+        apiLatencyByRoute=api_latency_by_route,
+        serverTimingByRoute=server_timing_by_route,
         apiLatencyMs=dict(p50=_nearest_rank(durations,.50),p95=_nearest_rank(durations,.95),
                           p99=_nearest_rank(durations,.99),max=max(durations,default=None)),
         host=dict(memAvailableMinBytes=min((sample['memAvailableBytes'] for sample in period_samples),default=None),
