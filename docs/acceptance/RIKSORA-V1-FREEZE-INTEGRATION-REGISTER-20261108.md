@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 16839)
-Total output lines: 346
-
 # RIKSORA V1 — frozen-architecture integration register
 
 ## Follow-on engineering evidence — Jump and synthetic Monthly Parquet (2026-11-11)
@@ -143,7 +140,53 @@ Validation: all 33 migration files and original Git blob identities passed embed
 
 ### P0-1 checkpoint — hosted entry isolation (PARTIAL)
 
-The public entry now mounts the existing RIKSORA landing, with account sign-in as its workspace link. Explicit loopback routes retain the local workspace, legacy simulator, review and prototype. Hosted route selection never mounts those entries, even when a local selector is supplied. The signed-in workspace …1839 tokens truncated… replacement, checks the expected revision, verifies the pinned shared-source checkpoint, and stores only replay fields over the verified immutable base. The reader rechecks the persisted hash, base revision, scoped row and frontier. The writer refuses active or pending orders, changed financial state, and any event other than the reducer's exact replay bookkeeping event. No hosted caller selects the new adapter yet.
+The public entry now mounts the existing RIKSORA landing, with account sign-in as its workspace link. Explicit loopback routes retain the local workspace, legacy simulator, review and prototype. Hosted route selection never mounts those entries, even when a local selector is supplied. The signed-in workspace continues to use the existing account transport and server financial authority. The public landing identifies the preview and leaves source availability to the selected workspace.
+
+Verified on the integration candidate: route and account transport regression, Local Tick Review, prototype isolation, confirm/receipt outcome, product pagination, repository boundaries, changed-file ESLint, production build, rendered landing CTA/source disclosure and independent Node golden vectors. Full authenticated browser → worker → receipt → Journal/analytics → logout/resume remains pending a small isolated synthetic integration check. Commercial-source acceptance, live provider verification, deployment and capacity acceptance were outside this checkpoint.
+
+### P0-1 checkpoint — observed replay receipt persistence (PARTIAL)
+
+The scoped implementation now routes observed `command_result` lookups, reconciles exact retries against replaceable replay-progress receipts, validates progress-format review/confirm input, and checks the observed result artifact in the frontend receipt path. The nine pre-existing implementation changes were reviewed as P0-1 work, tested and published to PR #48 (`c27e8a001075130ed26dfffc59b917b247f2120e`; local commit `d0dc78ef67e74bffeb42607b9c8c295628282257`). Focused frontend receipt/TickAlpha tests, lint/build, Python compilation, observed-finance goldens (6/6) and execution goldens (2/2) passed. Native PostgreSQL worker/receipt integration remains NOT RUN because the test dependencies and isolated test database are unavailable. The authenticated hosted browser → API/worker/PostgreSQL → Journal/analytics → logout/resume path remains open.
+
+### P0-1 checkpoint — current Session reads and sign-out (PARTIAL)
+
+Hosted view, bootstrap and chart-history reads now use a fresh queue identity per request. The queue retains completed results by ID, so a reused read ID could restore an old committed revision after replay or sign-in. A single read still polls its original job; mutation retries retain their deterministic ID and unexpected results remain explicitly uncertain. Hosted transport refuses local fallback, and sign-out only confirms server revocation after a successful server response.
+
+A bounded client fixture that retains completed results by job ID verified revision 3 before sign-out and revision 4 after sign-in. The same suite verified stable mutation retries, local fallback refusal, and removal of the tab token when the logout response is lost. Full authenticated browser and isolated PostgreSQL worker verification remain open.
+
+### P0-3 checkpoint — direct replay recovery integrity (PARTIAL)
+
+Shared-source-v2 cold resume now refuses an altered genesis cursor and verifies that the revealed group count is consistent with the source ordinal bounds and the last revealed group is inside the Session interval. This preserves empty progress and atomic timestamp groups without rebuilding the historical prefix. The existing legacy replay-log reader now closes its read-only format probe deterministically.
+
+Focused validation: 31 tests passed for shared-source recovery, legacy replay-log compatibility, tick storage and sidecar contracts, and financial goldens. Independent Node golden vectors also passed. The regression reproduced acceptance of a corrupted genesis before the fix. PostgreSQL frontier persistence, periodic compact recovery bases, replaceable no-trade progress, and production source selection remain open. The next replay integration must use an eligible shared source and must not enable the legacy QA-only observed admission mode as a customer default.
+
+### P0-3 checkpoint — interrupted advance and monotonic commit (PARTIAL)
+
+A shared-source-v2 checkpoint can resume an interrupted bounded advance directly at the next atomic timestamp group. Recovery verifies the remaining target against the pinned source. At the observed store write boundary, under the existing Session lock, the proposed checkpoint cannot rewind the committed time/group frontier, change its source pin, skip its pending target, or move the frontier during a non-replay command.
+
+33 focused synthetic tests passed, including parity between uninterrupted and resumed advancement, refusal of invalid continuation targets and refusal of a rewind before any write through a mocked database boundary. PostgreSQL transaction integration, replaceable non-financial progress, periodic recovery bases and eligible production source selection remain open.
+
+### P0-3 checkpoint — periodic compact recovery bases (PARTIAL)
+
+The observed compact-v1 writer records a versioned recovery base every 64 revisions in the same immutable checkpoint row and transaction as the existing delta. The reader uses scoped indexed lookups to bind the base state and controller to its delta hash and predecessor, then validates at most 63 later deltas when a base is present. Older compact checkpoints fall back to the genesis reader. Receipt and checkpoint chain hashes retain their existing definitions.
+
+17 focused tests passed, including a mocked database test proving the selected tail range and corruption refusal. Six independent Node golden vectors passed. Live PostgreSQL integration, maximum-size base acceptance, replaceable non-financial progress and production shared-source selection remain open.
+
+### P0-1/P0-3 checkpoint — hosted forward jump and continuation (PARTIAL)
+
+Hosted observed Sessions use the existing bounded replay-to worker for forward UTC jumps. The authenticated view returns only the user's pending requested target, and the browser resumes that target with Step or Play before requesting a new one. The client verifies the result's Session, request identity, revision and frontier before rendering it. Server retries are bound to the original target and starting revision through the first immutable advance command hash.
+
+10 focused backend tests, frontend transport and receipt tests, repository checks, lint, build and six independent golden vectors passed. This covers synthetic controller and mocked transport/storage cases. Live PostgreSQL worker and interactive browser acceptance remain open. Replaceable non-financial progress still requires a new persistence contract rather than discarding existing immutable advances.
+
+### P0-3 checkpoint — replaceable replay frontier schema (PARTIAL)
+
+Migration 023 adds one replaceable progress row per scoped Session, anchored to an immutable checkpoint revision and content hash. The database refuses backward time, backward group index, stale revisions, a different workspace's checkpoint, and row removal. The table is additive and has no hosted runtime grants or writers in this checkpoint.
+
+All 23 migrations executed in a disposable embedded PostgreSQL engine. Synthetic SQL assertions verified a single row across updates, refusal cases and no new immutable command receipt. The isolated native PostgreSQL regression is authored and was skipped locally because no test database was configured. Next, wire versioned progress writes and reads under the existing Session lock, with immutable financial commits consuming the exact revealed frontier and legacy Session reads preserved.
+
+### P0-3 checkpoint — verified progress reader and writer (PARTIAL)
+
+The new internal progress adapter locks the scoped Session before replacement, checks the expected revision, verifies the pinned shared-source checkpoint, and stores only replay fields over the verified immutable base. The reader rechecks the persisted hash, base revision, scoped row and frontier. The writer refuses active or pending orders, changed financial state, and any event other than the reducer's exact replay bookkeeping event. No hosted caller selects the new adapter yet.
 
 17 focused synthetic tests and six independent Node golden vectors passed. The progress round-trip used real authored tick frames and a mocked database boundary. Next, add versioned hosted routing and make a financial commit atomically consume or consolidate the effective frontier, including durable command retries. The native PostgreSQL/browser gate remains open.
 
