@@ -52,6 +52,30 @@ def digest_files(root, paths):
     return digest.hexdigest()
 
 
+def sanitize_api_event(item):
+    """Validate the browser's bounded API telemetry frame for the parent protocol."""
+    event = item.get('apiEvent') if type(item) is dict else None
+    if type(event) is not dict:
+        return None
+    method, path, status, duration = (event.get('method'), event.get('path'),
+                                      event.get('status'), event.get('durationMs'))
+    code = event.get('code')
+    if (method not in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') or
+            not isinstance(path, str) or not path.startswith('/api/v1/') or
+            len(path) > 240 or '?' in path or '\n' in path or '\r' in path or
+            type(status) is not int or not 100 <= status <= 599 or
+            type(duration) not in (int, float) or not math.isfinite(duration) or
+            duration < 0 or duration > 120000 or
+            (code is not None and (not isinstance(code, str) or len(code) > 81 or
+             not code.isascii() or not code.isupper() or
+             not all(char.isalnum() or char == '_' for char in code)))):
+        return None
+    # Store only route/status/timing fields; response bodies and identity data
+    # never cross the browser-parent QA protocol.
+    return {'method': method, 'path': path, 'status': status,
+            'code': code, 'durationMs': duration}
+
+
 def _queue_job_timeline(dsn):
     """Private-QA-only durable queue timeline with no raw account/job/session IDs."""
     import json
@@ -388,6 +412,13 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                         elif item.get('need') == 'recovery' and item.get('email') == email:
                             process.stdin.write(json.dumps(dict(token=delivery.token(email, 'recovery')))+'\n')
                             process.stdin.flush()
+                        elif 'apiEvent' in item:
+                            event = sanitize_api_event(item)
+                            if event is None:
+                                raise ValueError('QA_PROTOCOL_REFUSED')
+                            api_trace = report.setdefault('apiTrace', [])
+                            if len(api_trace) < 128:
+                                api_trace.append(event)
                         elif item.get('step') in STEPS:
                             report['steps'].append(item['step'])
                         elif isinstance(item.get('progress'), str) and item['progress'].isidentifier():
@@ -459,7 +490,7 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                         # user journey assertion passed. Own process-group cleanup
                         # here so a stuck Chromium shutdown cannot erase that proof.
                         report['cohortResults'] = [dict(user=1, status='PASS',
-                            apiTrace=item.get('apiTrace', []), pageErrorCount=item.get('pageErrorCount', 0),
+                            apiTrace=report.get('apiTrace', []), pageErrorCount=item.get('pageErrorCount', 0),
                             failedRequests=item.get('failedRequests', 0), steps=item.get('steps', []))]
                         terminate()
                         process.wait(timeout=10)

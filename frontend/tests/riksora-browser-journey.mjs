@@ -337,11 +337,6 @@ try{
   expect(committedJournal?.journalPage?.firstOrderStatuses).toEqual(['CLOSED']);
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),
-    apiTrace:apiTrace.map(({method,path,status,code,atUnixMs,durationMs,serverTiming,jobDigest,sessionDigest,
-      rows,journalPage,state,sessionEvidence})=>({method,path,status,code,atUnixMs,durationMs,
-      ...(serverTiming?{serverTiming}:{}),
-      ...(jobDigest?{jobDigest}:{}),...(sessionDigest?{sessionDigest}:{}),rows,journalPage,state,
-      ...(sessionEvidence?{sessionEvidence}:{})})),
     transientBusyCount:busyResponses.length,
     apiResponseCount,pageErrorCount:errors.length,failedRequests:requestFailures.length,
     steps:completedSteps})+'\n');

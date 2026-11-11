@@ -17,6 +17,17 @@ spec.loader.exec_module(gate)
 
 
 class BrowserGateSafetyTests(unittest.TestCase):
+    def test_api_telemetry_frame_is_accepted_and_strips_untrusted_fields(self):
+        event = {'apiEvent': {'method': 'GET', 'path': '/api/v1/auth/providers',
+            'status': 200, 'code': None, 'durationMs': 12.5,
+            'email': 'private@example.com', 'responseBody': {'token': 'secret'}}}
+        self.assertEqual(gate.sanitize_api_event(event), {
+            'method': 'GET', 'path': '/api/v1/auth/providers', 'status': 200,
+            'code': None, 'durationMs': 12.5})
+        self.assertIsNone(gate.sanitize_api_event({'apiEvent': {
+            'method': 'GET', 'path': '/api/v1/auth/login?email=private@example.com',
+            'status': 200, 'durationMs': 1}}))
+
     def test_demo_tick_fixture_has_pinned_synthetic_identity_and_hash(self):
         sys.path.insert(0, str(gate.REPOSITORY/'backend'))
         from contracts.canonical import canonical_bytes
