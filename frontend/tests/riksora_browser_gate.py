@@ -55,6 +55,11 @@ def cohort_auth_start_spacing_ms(cohort_size):
     return min(20_000, max(minimum_ms, MAX_AUTH_START_DELAY_MS // max(1, cohort_size - 1)))
 
 
+def use_shared_browser_server(cohort_size):
+    """Keep concurrent browser lifetimes isolated in capacity cohorts."""
+    return type(cohort_size) is int and cohort_size == 1
+
+
 def digest_files(root, paths):
     digest = hashlib.sha256()
     for path in sorted(paths):
@@ -698,28 +703,35 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
             '</cachedir></fontconfig>\n', encoding='utf-8')
         host_font_config.chmod(0o600)
         child_environment['FONTCONFIG_FILE'] = str(host_font_config)
-    host_log = (evidence/'browser-host.log').open('x')
-    browser_host = subprocess.Popen(
-        ['node', str(Path(__file__).with_name('riksora-browser-host.mjs'))],
-        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=host_log,
-        text=True, env=child_environment, start_new_session=True)
-    if not select.select([browser_host.stdout], [], [], 30)[0]:
-        browser_host.kill(); browser_host.wait(timeout=10)
-        browser_host.stdout.close(); host_log.close()
-        raise RuntimeError('QA_BROWSER_HOST_TIMEOUT')
-    try:
-        browser_endpoint = json.loads(browser_host.stdout.readline())['wsEndpoint']
-        parsed_endpoint = urlsplit(browser_endpoint)
-        endpoint_valid = (parsed_endpoint.scheme == 'ws' and parsed_endpoint.hostname == '127.0.0.1'
-                          and parsed_endpoint.port is not None and parsed_endpoint.username is None
-                          and parsed_endpoint.password is None)
-    except (ValueError, TypeError, KeyError):
-        endpoint_valid = False
-    if not endpoint_valid:
-        browser_host.kill(); browser_host.wait(timeout=10)
-        browser_host.stdout.close(); host_log.close()
-        raise RuntimeError('QA_BROWSER_HOST_ENDPOINT_REFUSED')
-    child_environment['RIKSORA_BROWSER_WS'] = browser_endpoint
+    # A shared Chromium server is useful for a single journey, but concurrent
+    # capacity traders each get a separate browser process. This keeps browser
+    # lifetime/crash domains independent and lets the harness distinguish its
+    # CPU/RSS from the API/worker/PostgreSQL service group.
+    browser_host = None
+    host_log = None
+    if use_shared_browser_server(cohort_size):
+        host_log = (evidence/'browser-host.log').open('x')
+        browser_host = subprocess.Popen(
+            ['node', str(Path(__file__).with_name('riksora-browser-host.mjs'))],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=host_log,
+            text=True, env=child_environment, start_new_session=True)
+        if not select.select([browser_host.stdout], [], [], 30)[0]:
+            browser_host.kill(); browser_host.wait(timeout=10)
+            browser_host.stdout.close(); host_log.close()
+            raise RuntimeError('QA_BROWSER_HOST_TIMEOUT')
+        try:
+            browser_endpoint = json.loads(browser_host.stdout.readline())['wsEndpoint']
+            parsed_endpoint = urlsplit(browser_endpoint)
+            endpoint_valid = (parsed_endpoint.scheme == 'ws' and parsed_endpoint.hostname == '127.0.0.1'
+                              and parsed_endpoint.port is not None and parsed_endpoint.username is None
+                              and parsed_endpoint.password is None)
+        except (ValueError, TypeError, KeyError):
+            endpoint_valid = False
+        if not endpoint_valid:
+            browser_host.kill(); browser_host.wait(timeout=10)
+            browser_host.stdout.close(); host_log.close()
+            raise RuntimeError('QA_BROWSER_HOST_ENDPOINT_REFUSED')
+        child_environment['RIKSORA_BROWSER_WS'] = browser_endpoint
     events = thread_queue.Queue()
     processes = []
     logs = []
@@ -794,7 +806,9 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
     period_samples = []
     process_samples = []
     queue_samples = []
-    generator_groups = {browser_host.pid, *(process.pid for process in processes)}
+    generator_groups = {process.pid for process in processes}
+    if browser_host is not None:
+        generator_groups.add(browser_host.pid)
     process_before = _proc_snapshot(generator_groups,cgroup)
     next_sample = start
     active = set(range(cohort_size))
@@ -945,15 +959,16 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
             process.stdin.close()
             process.stdout.close()
             logs[index].close()
-        if browser_host.poll() is None:
+        if browser_host is not None and browser_host.poll() is None:
             browser_host.terminate()
             try:
                 browser_host.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 browser_host.kill()
                 browser_host.wait(timeout=10)
-        browser_host.stdout.close()
-        host_log.close()
+        if browser_host is not None:
+            browser_host.stdout.close()
+            host_log.close()
 
     if failure:
         report['cohortResults']=users
@@ -1001,7 +1016,9 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
     report['capacity']=dict(
         cohortSize=cohort_size,completedJourneys=sum(user['status']=='PASS' for user in users),
         completedClosedTrades=sum(1 for user in users if user['status']=='PASS'),
-        holdSeconds=round(elapsed,3),browserGenerator='shared local Chromium process with isolated browser context per trader; one Node harness process per trader',
+        holdSeconds=round(elapsed,3),browserGenerator=(
+            'shared local Chromium process for one trader; one Node harness process' if browser_host is not None else
+            'one isolated Chromium process and Node harness process per trader'),
         transientBusyResponses=sum(user.get('transientBusyCount',0) for user in users),
         browserApiCalls=len(api_rows),apiStatusCounts=status_counts,
         apiLatencyMs=dict(p50=_nearest_rank(durations,.50),p95=_nearest_rank(durations,.95),

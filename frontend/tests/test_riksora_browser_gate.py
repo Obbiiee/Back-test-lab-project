@@ -25,6 +25,11 @@ class BrowserGateSafetyTests(unittest.TestCase):
             self.assertGreaterEqual(spacing, 2_100)
             self.assertLessEqual(60_000 / spacing, 30)
 
+    def test_concurrent_capacity_traders_use_independent_browser_processes(self):
+        self.assertTrue(gate.use_shared_browser_server(1))
+        for size in (2, 5, 10, 20, 50, 100):
+            self.assertFalse(gate.use_shared_browser_server(size))
+
     def test_api_telemetry_frame_is_accepted_and_strips_untrusted_fields(self):
         event = {'apiEvent': {'method': 'GET', 'path': '/api/v1/auth/providers',
             'status': 200, 'code': None, 'durationMs': 12.5,
