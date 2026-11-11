@@ -2,6 +2,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 import os
+from pathlib import Path
+import tempfile
 import unittest
 import uuid
 from unittest.mock import patch
@@ -9,11 +11,14 @@ from unittest.mock import patch
 import psycopg
 from fastapi.testclient import TestClient
 
+from contracts.primitives import ContractError
 from execution.availability import catalog_availability, eligible_start_month
 from execution.local_api import create_local_app
 from execution.research import ResearchApplication
 from execution.research_fixture import STEP_NS
 from infrastructure.database import connect, migrate
+from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
+from ticks.provider import SyntheticTickProvider
 
 DSN = os.getenv("BTL_TEST_DATABASE_URL")
 ORIGIN = "http://127.0.0.1:5173"
@@ -234,6 +239,119 @@ class P0LocalIntegrationTests(unittest.TestCase):
                 count = db.execute('SELECT count(*) FROM btl.tick_commands '
                     'WHERE workspace_id=%s AND session_id=%s AND command_id LIKE %s',
                     (scope.workspace_id, session, 'jump:'+jump['requestId']+':r%')).fetchone()[0]
+            self.assertEqual(count, 1)
+        finally:
+            app.close()
+
+    def test_jump_reads_monthly_parquet_across_partition_boundary(self):
+        """A fill on the February partition is found through canonical Jump/ADVANCE."""
+        from datetime import datetime, timezone
+        from application.models import TrustedScope
+
+        jan_start = int(datetime(2020, 1, 1, 0, 30, 0, tzinfo=timezone.utc).timestamp() * 1_000_000_000)
+        jan = int(datetime(2020, 1, 31, 23, 59, 59, tzinfo=timezone.utc).timestamp() * 1_000_000_000)
+        feb = int(datetime(2020, 2, 1, 0, 0, 0, tzinfo=timezone.utc).timestamp() * 1_000_000_000)
+        source = SyntheticTickProvider([
+            dict(ordinal='0', timeNs=str(jan_start), bid='2000', ask='2000.1', sequence='0'),
+            dict(ordinal='1', timeNs=str(jan), bid='2000', ask='2000.1', sequence='1'),
+            dict(ordinal='2', timeNs=str(feb), bid='1998', ask='1998.1', sequence='2'),
+        ], dataset_id='synthetic:jump-month-boundary-v1', trusted=True,
+           execution_fixture=True, chunk_size=1)
+        source_manifest = source.describe(source.dataset_id, source.dataset_version)
+        def source_events():
+            token = None
+            while True:
+                page = source.read_page(source.dataset_id, source.dataset_version, token, 64)
+                yield from page['events']
+                if page['endOfDataset']:
+                    return
+                token = page['nextToken']
+        with tempfile.TemporaryDirectory(prefix='riksora-jump-month-') as temporary:
+            parquet_root = Path(temporary) / 'dataset'
+            manifest = write_monthly_parquet(parquet_root, source_events(), source_manifest,
+                expected_version=source.dataset_version, row_group_size=1)
+            provider = MonthlyParquetProvider(parquet_root,
+                expected_dataset_id=source.dataset_id,
+                expected_dataset_version=source.dataset_version,
+                expected_manifest_hash=manifest['manifestHash'])
+            self.assertEqual([item['month'] for item in manifest['files']], ['2020-01', '2020-02'])
+            scope = TrustedScope('fixture:jump-month:'+uuid.uuid4().hex,
+                                 'fixture:jump-month-owner:'+uuid.uuid4().hex)
+            app = ResearchApplication(DSN, scope, synthetic_provider=provider)
+            try:
+                record = new_method()
+                app.create_method(record)
+                session = 'session:jump-month:' + uuid.uuid4().hex
+                created = app.create_session(dict(id=session, name='Monthly boundary Jump',
+                    methodId=record['id'], initialBalance='10000', startPeriod='2020-01'))
+                quote = created['quote']
+                from decimal import Decimal
+                entry = Decimal(quote['ask']) - Decimal('1')
+                request = dict(sessionId=session, requestId='order:'+uuid.uuid4().hex,
+                    expectedRevision=created['state']['revision'], planId='plan:'+uuid.uuid4().hex,
+                    planRevision=0, draft=dict(side='LONG', orderType='LIMIT', workflow='PLANNED',
+                        entry=str(entry), quantity=None, sl=str(entry-Decimal('100')), tp=None,
+                        riskPercent='1', observations=[]))
+                reviewed = app.review(request)
+                app.confirm(session, dict(reviewId=request['requestId'],
+                                          reviewHash=reviewed['reviewHash']))
+                before = app.inspect(session)['state']
+                jump = dict(schemaVersion=1, artifact='BTL-JUMP-NEXT-EVENT-1',
+                    requestId=uuid.uuid4().hex, sessionId=session,
+                    expectedRevision=before['revision'], timeframe='1m')
+                result = app.jump_next_event(session, jump)
+                self.assertEqual(result['status'], 'EVENT_FOUND')
+                self.assertTrue(any(event['kind'] == 'ENTRY_FILL' for event in result['events']))
+                self.assertEqual(result['view']['state']['datasetId'], source.dataset_id)
+                self.assertEqual(result['view']['state']['datasetVersion'], source.dataset_version)
+                self.assertEqual(result['view']['state']['revision'], before['revision'] + 1)
+                self.assertEqual(result['view']['state']['throughNs'], str(feb))
+            finally:
+                app.close()
+
+    def test_concurrent_jump_requests_apply_one_session_revision_once(self):
+        """Distinct requests at one revision cannot duplicate a financial ADVANCE."""
+        from application.models import TrustedScope
+        scope = TrustedScope('fixture:jump-concurrent:'+uuid.uuid4().hex,
+                             'fixture:jump-concurrent-owner:'+uuid.uuid4().hex)
+        app = ResearchApplication(DSN, scope)
+        try:
+            record = new_method()
+            app.create_method(record)
+            session = 'session:jump-concurrent:' + uuid.uuid4().hex
+            created = app.create_session(dict(id=session, name='Concurrent Jump',
+                methodId=record['id'], initialBalance='10000', startPeriod='2020-01'))
+            review_id = 'order:'+uuid.uuid4().hex
+            reviewed = app.review(dict(sessionId=session, requestId=review_id,
+                expectedRevision=created['state']['revision'], planId='plan:concurrent', planRevision=0,
+                draft=dict(side='LONG', orderType='LIMIT', workflow='PLANNED', entry='2000',
+                    quantity=None, sl='1990', tp=None, riskPercent='1', observations=[])))
+            app.confirm(session, dict(reviewId=review_id,
+                                      reviewHash=reviewed['reviewHash']))
+            revision_now = app.inspect(session)['state']['revision']
+            requests = [dict(schemaVersion=1, artifact='BTL-JUMP-NEXT-EVENT-1',
+                requestId=uuid.uuid4().hex, sessionId=session,
+                expectedRevision=revision_now, timeframe='1m') for _ in range(2)]
+
+            def jump(raw):
+                try:
+                    return app.jump_next_event(session, raw)
+                except ContractError as error:
+                    return error
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(jump, requests))
+            committed = [value for value in results if isinstance(value, dict)]
+            refused = [value for value in results if isinstance(value, ContractError)]
+            self.assertEqual(len(committed), 1)
+            self.assertEqual(len(refused), 1)
+            self.assertEqual(refused[0].code, 'REFUSED_STALE_REVISION')
+            state = app.inspect(session)['state']
+            self.assertEqual(state['revision'], revision_now + 1)
+            with connect(DSN) as db:
+                count = db.execute('SELECT count(*) FROM btl.tick_commands '
+                    'WHERE workspace_id=%s AND session_id=%s AND command_id LIKE %s',
+                    (scope.workspace_id, session, 'jump:%:r'+str(revision_now))).fetchone()[0]
             self.assertEqual(count, 1)
         finally:
             app.close()
