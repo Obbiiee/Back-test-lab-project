@@ -17,13 +17,27 @@ spec.loader.exec_module(gate)
 
 
 class BrowserGateSafetyTests(unittest.TestCase):
+    def test_shared_ip_cohort_auth_pacing_stays_inside_limit_and_watchdog_window(self):
+        self.assertEqual(gate.cohort_auth_start_spacing_ms(5), 0)
+        for size in (10, 20, 50, 100):
+            spacing = gate.cohort_auth_start_spacing_ms(size)
+            self.assertLessEqual((size - 1) * spacing, gate.MAX_AUTH_START_DELAY_MS)
+            self.assertGreaterEqual(spacing, 2_100)
+            self.assertLessEqual(60_000 / spacing, 30)
+
     def test_api_telemetry_frame_is_accepted_and_strips_untrusted_fields(self):
         event = {'apiEvent': {'method': 'GET', 'path': '/api/v1/auth/providers',
             'status': 200, 'code': None, 'durationMs': 12.5,
             'email': 'private@example.com', 'responseBody': {'token': 'secret'}}}
         self.assertEqual(gate.sanitize_api_event(event), {
             'method': 'GET', 'path': '/api/v1/auth/providers', 'status': 200,
-            'code': None, 'jumpStatus': None, 'durationMs': 12.5})
+            'code': None, 'jumpStatus': None, 'durationMs': 12.5, 'serverTiming': None})
+        timed = {'apiEvent': {'method': 'POST', 'path': '/api/v1/workspaces/{id}/research/reviews',
+            'status': 200, 'code': None, 'durationMs': 25.0,
+            'serverTiming': 'research-admission;dur=0.1, research-operation;dur=20.0, db-sql;dur=5.0, fixture-timeline-resume;dur=4.2, db-sql-count;desc=8'}}
+        self.assertEqual(gate.sanitize_api_event(timed)['serverTiming'], timed['apiEvent']['serverTiming'])
+        timed['apiEvent']['serverTiming'] = 'research-operation;dur=20.0, SQL: SELECT secret'
+        self.assertIsNone(gate.sanitize_api_event(timed))
         self.assertIsNone(gate.sanitize_api_event({'apiEvent': {
             'method': 'GET', 'path': '/api/v1/auth/login?email=private@example.com',
             'status': 200, 'durationMs': 1}}))

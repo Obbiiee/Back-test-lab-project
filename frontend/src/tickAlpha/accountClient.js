@@ -29,12 +29,16 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
       if(response.ok)break;
       rejected=await Promise.resolve().then(()=>response.json()).catch(()=>null);
       const code=['RESEARCH_BUSY','QUEUE_CAPACITY','SERVICE_BUSY'].includes(rejected?.detail)?rejected.detail:undefined;
-      // Both codes are emitted before request work is accepted: the outer API
-      // budget rejects before routing, and research admission rejects before
-      // executing the operation. Retrying these explicit no-op refusals is
-      // safe for reads and commands alike; ambiguous transport failures are
-      // never retried here.
-      if(['RESEARCH_BUSY','SERVICE_BUSY'].includes(code)&&retries<8){
+      // These codes are emitted before request work is accepted: the outer
+      // API budget rejects before routing, research admission rejects before
+      // execution, and queue.submit checks capacity before inserting a job.
+      // Retrying those explicit no-op refusals is safe with the same job ID;
+      // ambiguous transport failures are never retried here.
+      // Queue capacity is a definitive pre-insert refusal (queue.submit checks
+      // the same X-BTL-Job before admission). Keep that ID stable while a slot
+      // frees; never apply this retry to transport errors or stale revisions.
+      const retryLimit=code==='QUEUE_CAPACITY'?45:8;
+      if(['RESEARCH_BUSY','SERVICE_BUSY','QUEUE_CAPACITY'].includes(code)&&retries<retryLimit){
         // These responses are explicit pre-admission refusals. Honor the
         // server's bounded Retry-After hint so a committed command's read-only
         // refresh can recover after a busy cohort without replaying a write.

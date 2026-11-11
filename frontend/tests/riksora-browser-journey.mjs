@@ -9,7 +9,7 @@ const TOOLS=resolve(process.env.RIKSORA_BROWSER_TOOLS||join(ROOT,'frontend/tests
 const input=createInterface({input:process.stdin})[Symbol.asyncIterator]();
 const read=async()=>JSON.parse((await input.next()).value);
 const config=await read();
-if(!Number.isSafeInteger(config.startDelayMs??0)||(config.startDelayMs??0)<0||(config.startDelayMs??0)>180000)
+if(!Number.isSafeInteger(config.startDelayMs??0)||(config.startDelayMs??0)<0||(config.startDelayMs??0)>240000)
   throw Error('COHORT_START_DELAY_INVALID');
 const url=new URL(config.url);
 const configOrigin=url.origin;
@@ -36,7 +36,15 @@ const safePath=pathname=>pathname.split('/').map(part=>{
 // was recovering from the explicit RESEARCH_BUSY backpressure response.
 const expect=baseExpect.configure({timeout:30000});
 if(config.startDelayMs)await new Promise(resolve=>setTimeout(resolve,config.startDelayMs));
-const browser=await chromium.launch({headless:true});
+const browserEndpoint=process.env.RIKSORA_BROWSER_WS;
+let browser;
+if(browserEndpoint){
+  let endpoint;
+  try{endpoint=new URL(browserEndpoint);}catch{throw Error('LOCAL_BROWSER_HOST_REQUIRED');}
+  if(endpoint.protocol!=='ws:'||endpoint.hostname!=='127.0.0.1'||endpoint.port===''||endpoint.username||endpoint.password)
+    throw Error('LOCAL_BROWSER_HOST_REQUIRED');
+  browser=await chromium.connect(browserEndpoint);
+}else browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -133,7 +141,10 @@ try{
   // network origins are refused; there is no route.fulfill with authored API data.
   await context.route('**/*',route=>new URL(route.request().url()).origin===url.origin?route.continue():route.abort());
   phase='login_page';await page.goto(config.url);
-  await expect(page.getByRole('tab',{name:'Sign in',exact:true})).toBeVisible();step('login_screen');
+  // This harness runs Playwright assertions outside the test runner. A failed
+  // `expect(...).toBeVisible()` can mask the actual timeout with an internal
+  // matcher error, so use the equivalent locator wait to preserve diagnostics.
+  await page.getByRole('tab',{name:'Sign in',exact:true}).waitFor({state:'visible',timeout:30000});step('login_screen');
   phase='account_registration';await page.getByRole('tab',{name:'Create account',exact:true}).click();
   await page.getByLabel('Email',{exact:true}).fill(config.email);
   await page.getByLabel('Password',{exact:true}).fill(config.password);
@@ -323,13 +334,13 @@ try{
   await resumedTerminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1,{timeout:95000});
   await Promise.allSettled(apiBodyReads);
-  const busyResponses=apiTrace.filter(entry=>(entry.status===429&&entry.code==='RESEARCH_BUSY')||
+  const busyResponses=apiTrace.filter(entry=>(entry.status===429&&['RESEARCH_BUSY','QUEUE_CAPACITY'].includes(entry.code))||
     (entry.status===503&&entry.code==='SERVICE_BUSY'));
   const unrecoveredBusy=busyResponses.filter(entry=>{
     const index=apiTrace.indexOf(entry);
     return !apiTrace.slice(index+1).some(next=>next.method===entry.method&&next.path===entry.path&&next.status>=200&&next.status<400);
   });
-  expect(apiTrace.filter(entry=>(entry.status===429&&entry.code!=='RESEARCH_BUSY')||
+  expect(apiTrace.filter(entry=>(entry.status===429&&!['RESEARCH_BUSY','QUEUE_CAPACITY'].includes(entry.code))||
     (entry.status===503&&entry.code!=='SERVICE_BUSY')||entry.status>=500&&entry.status!==503)).toEqual([]);
   expect(unrecoveredBusy).toEqual([]);
   expect(apiTrace.filter(entry=>entry.jumpStatus==='EVENT_FOUND').length).toBeGreaterThanOrEqual(2);
@@ -341,51 +352,23 @@ try{
     failedRequests:requestFailures.length,
     steps:completedSteps})+'\n');
 }catch(error){
-  await Promise.allSettled(apiBodyReads);
-  await new Promise(resolve=>setTimeout(resolve,0));
-  if(phase==='trade_close_committed_row')
-    await page.getByRole('region',{name:'Trading and Analysis'}).getByRole('button',{name:'Open positions',exact:true}).click().catch(()=>{});
-  const panelTitles=await page.locator('.rk-state h1,.rk-state h2').allTextContents().catch(()=>[]);
-  const panelKinds=new Map([['No orders yet','NO_ORDERS'],['No order matches','FILTERED_EMPTY'],
-    ['The journal could not load','JOURNAL_ERROR'],['Loading the journal…','JOURNAL_LOADING'],
-    ['Choose a Session','CHOOSE_SESSION'],['This Session is not in this workspace','SESSION_MISSING'],
-    ['Analytics could not load','ANALYTICS_ERROR'],['Loading committed analytics…','ANALYTICS_LOADING'],
-    ['Analytics unavailable for this Session','ANALYTICS_UNAVAILABLE']]);
-  const screenState=panelTitles.map(title=>panelKinds.get(title)).filter(Boolean).slice(0,8);
-  const browserDiagnostics=await page.evaluate(()=>{
-    const error=document.querySelector('.rk-state-error .rk-state-body')?.textContent||'';
-    const safeError=error.replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
-      .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
-      .replace(/\s+/g,' ').trim().slice(0,180);
-    const journalError=error.includes('Unsupported Journal page')?'JOURNAL_SCHEMA':
-      error.includes('Journal pagination did not advance')?'JOURNAL_CURSOR':
-      error.includes('Unsupported workspace response')?'WORKSPACE_SCHEMA':
-      error.includes('REFUSED')||error.includes('CORRUPT_RECORD')?'BACKEND_REFUSAL':
-      document.querySelector('.rk-state-error')?'OTHER':'NONE';
-    const terminal=document.querySelector('[aria-label="Trading and Analysis"]');
-    const openTable=terminal?.querySelector('table[aria-label="Open positions"]');
-    const openRows=Array.from(openTable?.querySelectorAll('tr[data-order-id]')||[]).slice(0,4).map(row=>{
-      const cells=Array.from(row.querySelectorAll('td'));
-      const rawStatus=cells[2]?.textContent?.trim()||'';
-      const status=['ACTIVE','PENDING','UNRESOLVED'].find(value=>rawStatus.startsWith(value))||'OTHER';
-      return {status,exitRequested:rawStatus.includes('exit requested'),
-        side:['LONG','SHORT'].includes(cells[1]?.textContent?.trim())?cells[1].textContent.trim():'OTHER'};
-    });
-    return {routeScreen:new URL(location.href).searchParams.get('screen'),
-      journalLists:document.querySelectorAll('.rk-journal').length,
-      journalRows:document.querySelectorAll('.rk-journal li').length,journalError,
-      sanitizedError:safeError,terminalRevision:Number.isSafeInteger(Number(terminal?.getAttribute('data-revision')))?
-        Number(terminal.getAttribute('data-revision')):null,openTableVisible:Boolean(openTable),openRows};
-  }).catch(()=>({routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'}));
   const failureMessage=String(error?.message||error).split('\n')[0]
     .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
     .slice(0,300);
-  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,consoleErrors,
-    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,
+  process.stderr.write(`QA_ORIGINAL_FAILURE phase=${phase} type=${error?.name||'Error'} message=${failureMessage}\n`);
+  // Report the original failure before any best-effort browser inspection. In
+  // cohort mode the parent must preserve this cause even if the browser is
+  // already disconnecting and screenshot/DOM diagnostics cannot complete.
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState:[],consoleErrors,
+    pageErrorCount:errors.length,browserDiagnostics:{routeScreen:null,journalLists:0,journalRows:0,journalError:'UNAVAILABLE'},
+    browserFailureMessage:failureMessage,
     requestFailures})+'\n');
-  await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
-  const body=await page.locator('body').innerText().catch(()=> '');
+  await Promise.allSettled(apiBodyReads);
+  await Promise.race([page.screenshot({path:join(evidence,'failure.png'),fullPage:true}),
+    new Promise(resolve=>setTimeout(resolve,1500))]);
+  const body=await Promise.race([page.locator('body').innerText({timeout:1000}).catch(()=>''),
+    new Promise(resolve=>setTimeout(()=>resolve(''),1100))]);
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));
   throw error;
 }finally{await context.close();await browser.close();}

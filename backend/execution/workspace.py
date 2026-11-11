@@ -6,12 +6,14 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from fractions import Fraction
 import json
-from threading import RLock
+from threading import Lock, RLock
+from time import perf_counter_ns
 
 from application.models import TrustedScope
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require, identifier
 from ticks.timeline import TickTimeline
+from qa_timing import record_qa_timing
 from .contracts import text, MAX_STEPS
 from .research_fixture import research_provider
 
@@ -27,6 +29,13 @@ TIMEFRAMES = {'1m':60, '3m':180, '5m':300, '15m':900, '30m':1800,
 # checkpoint; the cache remains a disposable controller-side accelerator.
 _FIXTURE_ENTRIES = OrderedDict()
 _FIXTURE_LOCK = RLock()
+_FIXTURE_RESTORE_GATES = {}
+
+
+@dataclass
+class _RestoreGate:
+    lock: Lock
+    users: int = 0
 
 
 @dataclass
@@ -61,6 +70,7 @@ class FixtureTimelineCache:
                 content_hash({'schemaVersion':1,'artifact':'BTL-PRIVATE-CACHE-KEY-1','checkpoint':checkpoint})), raw
 
     def _past(self, timeline):
+        started = perf_counter_ns()
         consumer = timeline.consumer()
         end = int(consumer.cursor['nextGroupIndex'])
         index = max(0, end-WINDOW_GROUPS)
@@ -69,7 +79,9 @@ class FixtureTimelineCache:
             page = consumer.read_revealed(str(index), min(64, end-index))
             require(bool(page), 'cacheWindow', 'CORRUPT_RECORD')
             values.extend(page); index += len(page)
-        return tuple(canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-PAST-GROUP-1','group':group}) for group in values)
+        result = tuple(canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-PAST-GROUP-1','group':group}) for group in values)
+        record_qa_timing('fixturePastReadNs', perf_counter_ns() - started)
+        return result
 
     def _publish(self, scope, session, timeline, groups):
         key, raw = self._key(scope, session, timeline.checkpoint())
@@ -80,33 +92,80 @@ class FixtureTimelineCache:
 
     def _entry(self, scope, session, checkpoint):
         key, raw = self._key(scope, session, checkpoint)
-        entry = self.__entries.get(key)
-        if entry is None:
-            timeline = TickTimeline.resume(self.__provider, checkpoint)
-            self._publish(scope, session, timeline, self._past(timeline))
-            entry = self.__entries[key]
-        require(entry.checkpoint == raw and entry.timeline.checkpoint() == checkpoint, 'cachePins', 'CORRUPT_RECORD')
-        self.__entries.move_to_end(key)
-        return key, entry
+        lock_started = perf_counter_ns()
+        with self.__lock:
+            record_qa_timing('fixtureCacheLockWaitNs', perf_counter_ns() - lock_started)
+            entry = self.__entries.get(key)
+            if entry is not None:
+                self.__entries.move_to_end(key)
+                require(entry.checkpoint == raw, 'cachePins', 'CORRUPT_RECORD')
+                return key, entry
+            gate = _FIXTURE_RESTORE_GATES.get(key)
+            if gate is None:
+                gate = _RestoreGate(Lock())
+                _FIXTURE_RESTORE_GATES[key] = gate
+            gate.users += 1
+
+        # Deduplicate an exact checkpoint restore without serializing unrelated Sessions.
+        acquired = False
+        try:
+            gate_started = perf_counter_ns()
+            gate.lock.acquire()
+            record_qa_timing('fixtureRestoreGateWaitNs', perf_counter_ns() - gate_started)
+            acquired = True
+            with self.__lock:
+                entry = self.__entries.get(key)
+                if entry is not None:
+                    self.__entries.move_to_end(key)
+            if entry is None:
+                resume_started = perf_counter_ns()
+                timeline = TickTimeline.resume(self.__provider, checkpoint)
+                record_qa_timing('fixtureTimelineResumeNs', perf_counter_ns() - resume_started)
+                try:
+                    groups = self._past(timeline)
+                except BaseException:
+                    timeline.close()
+                    raise
+                with self.__lock:
+                    entry = self.__entries.get(key)
+                    if entry is None:
+                        self._publish(scope, session, timeline, groups)
+                        entry = self.__entries[key]
+                    else:
+                        timeline.close()
+                    self.__entries.move_to_end(key)
+            require(entry.checkpoint == raw, 'cachePins', 'CORRUPT_RECORD')
+            return key, entry
+        finally:
+            if acquired:
+                gate.lock.release()
+            with self.__lock:
+                gate.users -= 1
+                if gate.users == 0 and _FIXTURE_RESTORE_GATES.get(key) is gate:
+                    del _FIXTURE_RESTORE_GATES[key]
 
     def seed(self, scope, session, timeline):
         # Called only after the actual seed transaction commits.
+        groups = self._past(timeline)
         with self.__lock:
-            self._publish(scope, session, timeline, self._past(timeline))
+            self._publish(scope, session, timeline, groups)
 
     def reveal(self, scope, session, checkpoint, target, *, seek=False):
+        key, entry = self._entry(scope, session, checkpoint)
         with self.__lock:
-            key, entry = self._entry(scope, session, checkpoint)
+            # The immutable group tuple may still be used by readers that got it
+            # immediately before removal. Timeline mutation stays outside this lock.
             del self.__entries[key]
-            timeline = entry.timeline
-            if seek:
-                ack = timeline.seek(target)
-                groups = self._past(timeline)
-            else:
-                ack = timeline.advance_through(target, timeline.cursor)
-                groups = entry.groups + tuple(canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-PAST-GROUP-1','group':group}) for group in ack['groups'])
+        timeline = entry.timeline
+        if seek:
+            ack = timeline.seek(target)
+            groups = self._past(timeline)
+        else:
+            ack = timeline.advance_through(target, timeline.cursor)
+            groups = entry.groups + tuple(canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-PAST-GROUP-1','group':group}) for group in ack['groups'])
+        with self.__lock:
             self._publish(scope, session, timeline, groups)
-            return ack, timeline.checkpoint()
+        return ack, timeline.checkpoint()
 
     def preview(self, checkpoint, target):
         """Read one bounded controller-private page without changing the accepted cache tip."""
@@ -114,13 +173,24 @@ class FixtureTimelineCache:
         return timeline.advance_through(target, timeline.cursor)
 
     def window(self, scope, session, checkpoint, *, last_only=False):
-        with self.__lock:
-            _, entry = self._entry(scope, session, checkpoint)
-            blobs = entry.groups[-1:] if last_only else entry.groups
-            groups = [json.loads(raw)['group'] for raw in blobs]
-            through = int(checkpoint['cursor']['throughNs'])
-            require(all(int(g['timeNs']) <= through for g in groups), 'futureWindow', 'UNREVEALED_INDEX')
+        indexed_reader = getattr(self.__provider, 'read_revealed_window', None)
+        if callable(indexed_reader):
+            # Monthly Parquet can seek to verified row groups and clip at the
+            # committed frontier. This is display-only; execution still uses
+            # TickTimeline and the canonical reducer.
+            groups = indexed_reader(int(checkpoint['cursor']['throughNs']),
+                                    1 if last_only else WINDOW_GROUPS)
+            require(len(groups) <= (1 if last_only else WINDOW_GROUPS) and
+                    all(int(group['timeNs']) <= int(checkpoint['cursor']['throughNs'])
+                        for group in groups),
+                    'futureWindow', 'UNREVEALED_INDEX')
             return groups
+        _, entry = self._entry(scope, session, checkpoint)
+        blobs = entry.groups[-1:] if last_only else entry.groups
+        groups = [json.loads(raw)['group'] for raw in blobs]
+        through = int(checkpoint['cursor']['throughNs'])
+        require(all(int(g['timeNs']) <= through for g in groups), 'futureWindow', 'UNREVEALED_INDEX')
+        return groups
 
 
 def display_candles(groups, through_ns, timeframe, window_start):

@@ -11,6 +11,7 @@ import queue as thread_queue
 import re
 import secrets
 import signal
+import select
 import shutil
 import socket
 import subprocess
@@ -19,10 +20,12 @@ import tempfile
 import threading
 import time
 import traceback
+from urllib.parse import urlsplit
 from unittest.mock import patch
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 VERSION = '1.64.1'
+MAX_AUTH_START_DELAY_MS = 240_000
 STEPS = ('login_screen', 'login_workspace', 'method', 'session_replay',
          'order_receipt', 'jump_entry_exit_journal_analytics', 'logout_login_resume')
 
@@ -40,6 +43,16 @@ def preflight(repository, tools):
         path = tools/'node_modules'/package/'package.json'
         if not path.is_file() or json.loads(path.read_text()).get('version') != VERSION:
             raise ValueError('PINNED_PLAYWRIGHT_REQUIRED')
+
+
+def cohort_auth_start_spacing_ms(cohort_size):
+    """Pace shared-IP logins below the product's 30/min sensitive-auth gate."""
+    if type(cohort_size) is not int or cohort_size < 1:
+        raise ValueError('COHORT_SIZE_INVALID')
+    if cohort_size < 10:
+        return 0
+    minimum_ms = 2_100  # 28.6 requests/minute, with a small sliding-window margin.
+    return min(20_000, max(minimum_ms, MAX_AUTH_START_DELAY_MS // max(1, cohort_size - 1)))
 
 
 def digest_files(root, paths):
@@ -61,6 +74,12 @@ def sanitize_api_event(item):
                                       event.get('status'), event.get('durationMs'))
     code = event.get('code')
     jump_status = event.get('jumpStatus')
+    server_timing = event.get('serverTiming')
+    if server_timing is not None and (type(server_timing) is not str or len(server_timing) > 1200 or
+            re.fullmatch(r'[a-z][a-z0-9-]*(?:;dur=[0-9]+(?:\.[0-9]{1,3})?)?(?:;desc=[0-9]+)?'
+                         r'(?:, [a-z][a-z0-9-]*(?:;dur=[0-9]+(?:\.[0-9]{1,3})?)?(?:;desc=[0-9]+)?)*',
+                         server_timing) is None):
+        return None
     if (method not in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') or
             not isinstance(path, str) or not path.startswith('/api/v1/') or
             len(path) > 240 or '?' in path or '\n' in path or '\r' in path or
@@ -77,7 +96,8 @@ def sanitize_api_event(item):
             'EVENT_FOUND', 'SEARCHING', 'NO_EVENT_UNTIL_SESSION_END', 'NO_ACTIVE_ORDERS'):
         return None
     return {'method': method, 'path': path, 'status': status,
-            'code': code, 'jumpStatus': jump_status, 'durationMs': duration}
+            'code': code, 'jumpStatus': jump_status, 'durationMs': duration,
+            'serverTiming': server_timing}
 
 
 def _queue_job_timeline(dsn):
@@ -150,6 +170,7 @@ def run(tools, browser_cache, cohort_size=1, capacity_test=False, worker_count=1
                   apiTransport='UNCHANGED_REAL_BACKEND_RESPONSES_FORWARDED', cleanup=False)
     report['qaHarnessSha256'] = digest_files(REPOSITORY, [Path(__file__),
         Path(__file__).with_name('riksora-browser-journey.mjs'),
+        Path(__file__).with_name('riksora-browser-host.mjs'),
         REPOSITORY/'deploy/vps/tests/run_private_pg.py'])
     report['playwrightVersion'] = VERSION
     began = time.monotonic()
@@ -664,12 +685,47 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
     db_before = collect(dsn)
     child_environment = {k: v for k, v in environment.items() if not k.startswith(('PG', 'BTL_'))}
     child_environment['PLAYWRIGHT_BROWSERS_PATH'] = str(browser_cache)
+    font_dir = os.environ.get('BTL_QA_FONT_DIR')
+    if font_dir:
+        font_path = Path(font_dir).resolve()
+        if not font_path.is_dir():
+            raise RuntimeError('QA_FONT_DIR_REQUIRED')
+        host_font_cache = evidence/'browser-host-font-cache'
+        host_font_cache.mkdir(mode=0o700)
+        host_font_config = evidence/'browser-host-fonts.conf'
+        host_font_config.write_text(
+            '<fontconfig><dir>'+str(font_path)+'</dir><cachedir>'+str(host_font_cache)+
+            '</cachedir></fontconfig>\n', encoding='utf-8')
+        host_font_config.chmod(0o600)
+        child_environment['FONTCONFIG_FILE'] = str(host_font_config)
+    host_log = (evidence/'browser-host.log').open('x')
+    browser_host = subprocess.Popen(
+        ['node', str(Path(__file__).with_name('riksora-browser-host.mjs'))],
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=host_log,
+        text=True, env=child_environment, start_new_session=True)
+    if not select.select([browser_host.stdout], [], [], 30)[0]:
+        browser_host.kill(); browser_host.wait(timeout=10)
+        browser_host.stdout.close(); host_log.close()
+        raise RuntimeError('QA_BROWSER_HOST_TIMEOUT')
+    try:
+        browser_endpoint = json.loads(browser_host.stdout.readline())['wsEndpoint']
+        parsed_endpoint = urlsplit(browser_endpoint)
+        endpoint_valid = (parsed_endpoint.scheme == 'ws' and parsed_endpoint.hostname == '127.0.0.1'
+                          and parsed_endpoint.port is not None and parsed_endpoint.username is None
+                          and parsed_endpoint.password is None)
+    except (ValueError, TypeError, KeyError):
+        endpoint_valid = False
+    if not endpoint_valid:
+        browser_host.kill(); browser_host.wait(timeout=10)
+        browser_host.stdout.close(); host_log.close()
+        raise RuntimeError('QA_BROWSER_HOST_ENDPOINT_REFUSED')
+    child_environment['RIKSORA_BROWSER_WS'] = browser_endpoint
     events = thread_queue.Queue()
     processes = []
     logs = []
     users = []
     cohort_ready = set()
-    auth_start_spacing_seconds = 20 if cohort_size >= 10 else 0
+    auth_start_spacing_ms = cohort_auth_start_spacing_ms(cohort_size)
     activity_ramp_seconds = 1.5 if cohort_size >= 10 else 0
     for ordinal in range(1, cohort_size+1):
         user_dir = evidence/f'user-{ordinal:03d}'
@@ -696,7 +752,7 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
         password = 'Synthetic Load passphrase 2026 only'
         config = dict(url=url, nonce=nonce, email=email, password=password,
                       tools=str(tools), evidence=str(user_dir),
-                      startDelayMs=(ordinal-1)*auth_start_spacing_seconds*1000,
+                      startDelayMs=(ordinal-1)*auth_start_spacing_ms,
                       cohortBarrier=cohort_size >= 10)
         log = (user_dir/'browser.log').open('x')
         process = subprocess.Popen(
@@ -709,7 +765,7 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
         logs.append(log)
         users.append({'ordinal':ordinal,'emailDigest':hashlib.sha256(email.encode()).hexdigest(),
                       'status':'RUNNING','steps':[],'stepTimeline':[],'apiTrace':[],
-                      'authStartDelaySeconds':(ordinal-1)*auth_start_spacing_seconds,
+                      'authStartDelaySeconds':(ordinal-1)*auth_start_spacing_ms/1000,
                       'activityRampDelaySeconds':(ordinal-1)*activity_ramp_seconds})
 
         def consume(index, child, account_email):
@@ -738,7 +794,7 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
     period_samples = []
     process_samples = []
     queue_samples = []
-    generator_groups = {process.pid for process in processes}
+    generator_groups = {browser_host.pid, *(process.pid for process in processes)}
     process_before = _proc_snapshot(generator_groups,cgroup)
     next_sample = start
     active = set(range(cohort_size))
@@ -800,7 +856,7 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
                     # account remains below the bounded protocol line size.
                     # The completion frame intentionally carries no full trace.
                     api=user['apiTrace']
-                    transient_busy=lambda row:(row.get('status')==429 and row.get('code')=='RESEARCH_BUSY') or (
+                    transient_busy=lambda row:(row.get('status')==429 and row.get('code') in ('RESEARCH_BUSY','QUEUE_CAPACITY')) or (
                         row.get('status')==503 and row.get('code')=='SERVICE_BUSY')
                     unrecovered_busy=[row for index,row in enumerate(api)
                         if transient_busy(row) and
@@ -889,6 +945,15 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
             process.stdin.close()
             process.stdout.close()
             logs[index].close()
+        if browser_host.poll() is None:
+            browser_host.terminate()
+            try:
+                browser_host.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                browser_host.kill()
+                browser_host.wait(timeout=10)
+        browser_host.stdout.close()
+        host_log.close()
 
     if failure:
         report['cohortResults']=users
@@ -936,7 +1001,7 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
     report['capacity']=dict(
         cohortSize=cohort_size,completedJourneys=sum(user['status']=='PASS' for user in users),
         completedClosedTrades=sum(1 for user in users if user['status']=='PASS'),
-        holdSeconds=round(elapsed,3),browserGenerator='one isolated Chromium process group per trader',
+        holdSeconds=round(elapsed,3),browserGenerator='shared local Chromium process with isolated browser context per trader; one Node harness process per trader',
         transientBusyResponses=sum(user.get('transientBusyCount',0) for user in users),
         browserApiCalls=len(api_rows),apiStatusCounts=status_counts,
         apiLatencyMs=dict(p50=_nearest_rank(durations,.50),p95=_nearest_rank(durations,.95),

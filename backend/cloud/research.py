@@ -20,7 +20,7 @@ from execution.research import ResearchApplication
 from .research_routing import (observed_route as _observed_route, validate_source_selection,
                                monthly_provider_required)
 from identity.store import User
-from infrastructure.database import connect
+from infrastructure.database import connect, capture_database_timing
 from workspace.policy import owner
 from workspace.store import WorkspaceUnit
 from . import queue
@@ -417,12 +417,17 @@ def install(app):
             if timing_enabled:
                 def measured_run():
                     started = time.monotonic()
-                    return run(app.state.dsn, user.id, workspace_id, operation, args, write=write), started
-                value, thread_started = await anyio.to_thread.run_sync(measured_run, limiter=limiter)
+                    cpu_started = time.thread_time_ns()
+                    with capture_database_timing() as database_timing:
+                        value = run(app.state.dsn, user.id, workspace_id, operation, args, write=write)
+                    thread_cpu_ns = time.thread_time_ns() - cpu_started
+                    return value, started, database_timing, thread_cpu_ns
+                value, thread_started, database_timing, thread_cpu_ns = await anyio.to_thread.run_sync(measured_run, limiter=limiter)
             else:
                 value = await anyio.to_thread.run_sync(
                     partial(run, app.state.dsn, user.id, workspace_id, operation, args, write=write),
                     limiter=limiter)
+            serialization_started = time.monotonic() if timing_enabled else None
             raw = canonical_bytes({'schemaVersion': 1, **value})
             require(len(raw) <= 8388608, 'response', 'REFUSED_RESPONSE_LIMIT')
             headers = {'X-Content-Type-Options': 'nosniff'}
@@ -431,7 +436,18 @@ def install(app):
                 headers['Server-Timing'] = (
                     f"research-admission;dur={(admitted_at-admission_started)*1000:.3f}, "
                     f"research-thread-wait;dur={(thread_started-admitted_at)*1000:.3f}, "
-                    f"research-operation;dur={(finished-thread_started)*1000:.3f}")
+                    f"research-operation;dur={(finished-thread_started)*1000:.3f}, "
+                    f"research-thread-cpu;dur={thread_cpu_ns/1_000_000:.3f}, "
+                    f"db-admission;dur={database_timing['admissionNs']/1_000_000:.3f}, "
+                    f"db-connect;dur={database_timing['connectNs']/1_000_000:.3f}, "
+                    f"db-sql;dur={database_timing['sqlNs']/1_000_000:.3f}, "
+                    f"db-transaction-exit;dur={database_timing['transactionExitNs']/1_000_000:.3f}, "
+                    f"fixture-cache-lock-wait;dur={database_timing['fixtureCacheLockWaitNs']/1_000_000:.3f}, "
+                    f"fixture-restore-gate-wait;dur={database_timing['fixtureRestoreGateWaitNs']/1_000_000:.3f}, "
+                    f"fixture-timeline-resume;dur={database_timing['fixtureTimelineResumeNs']/1_000_000:.3f}, "
+                    f"fixture-past-read;dur={database_timing['fixturePastReadNs']/1_000_000:.3f}, "
+                    f"db-sql-count;desc={database_timing['sqlCount']}, "
+                    f"research-serialization;dur={(time.monotonic()-serialization_started)*1000:.3f}")
             return Response(raw, media_type='application/json', headers=headers)
         finally:
             admission.release()
@@ -448,8 +464,10 @@ def install(app):
         if timing_enabled:
             def measured_inspect():
                 thread_started = time.monotonic()
-                return queue.inspect(app.state.dsn, user.id, workspace_id, job_id), thread_started
-            job, thread_started = await anyio.to_thread.run_sync(measured_inspect, limiter=job_status_limiter)
+                with capture_database_timing() as database_timing:
+                    value = queue.inspect(app.state.dsn, user.id, workspace_id, job_id)
+                return value, thread_started, database_timing
+            job, thread_started, database_timing = await anyio.to_thread.run_sync(measured_inspect, limiter=job_status_limiter)
         else:
             job = await anyio.to_thread.run_sync(partial(queue.inspect, app.state.dsn, user.id, workspace_id, job_id), limiter=job_status_limiter)
         response = Response(canonical_bytes(job), media_type='application/json')
@@ -457,7 +475,12 @@ def install(app):
             finished = time.monotonic()
             response.headers['Server-Timing'] = (
                 f"queue-thread-wait;dur={(thread_started-started)*1000:.3f}, "
-                f"queue-query;dur={(finished-thread_started)*1000:.3f}")
+                f"queue-query;dur={(finished-thread_started)*1000:.3f}, "
+                f"db-admission;dur={database_timing['admissionNs']/1_000_000:.3f}, "
+                f"db-connect;dur={database_timing['connectNs']/1_000_000:.3f}, "
+                f"db-sql;dur={database_timing['sqlNs']/1_000_000:.3f}, "
+                f"db-transaction-exit;dur={database_timing['transactionExitNs']/1_000_000:.3f}, "
+                f"db-sql-count;desc={database_timing['sqlCount']}")
         return response
 
     @app.post(prefix + '/jobs/{job_id}/cancel')

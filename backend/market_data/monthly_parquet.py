@@ -765,6 +765,60 @@ class MonthlyParquetProvider:
         if pending:
             yield {"timeNs": pending_time, "events": pending}
 
+    def read_revealed_window(self, through_ns, maximum_groups):
+        """Read a bounded, verified display window ending at committed time.
+
+        The manifest row-group index is used only to prune immutable Parquet
+        reads. Every returned row group is hash-checked, and the returned ticks
+        are clipped to ``through_ns`` before grouping. This is a controller-side
+        display projection; it cannot advance execution or expose future rows.
+        """
+        require(type(through_ns) is int and 0 <= through_ns <= 2**63 - 1,
+                "throughNs", "RANGE_CONFLICT")
+        require(type(maximum_groups) is int and 1 <= maximum_groups <= 1024,
+                "maximumGroups", "ARTIFACT_LIMIT")
+        from ticks.timeline import make_group
+
+        reverse_groups = []
+        for file_entry in reversed(self._files):
+            if int(file_entry["firstTimeNs"]) > through_ns:
+                continue
+            for group_entry in reversed(file_entry["rowGroups"]):
+                if int(group_entry["firstTimeNs"]) > through_ns:
+                    continue
+                events, _timestamps, _indices = self._read_row_group(
+                    file_entry["path"], file_entry, group_entry)
+                visible = [event for event in events if int(event["timeNs"]) <= through_ns]
+                if not visible:
+                    continue
+                forward_groups = []
+                current_time = None
+                current_events = []
+                for event in visible:
+                    stamp = event["timeNs"]
+                    if current_time is not None and stamp != current_time:
+                        forward_groups.append(make_group(current_events, self.dataset_version))
+                        current_events = []
+                    current_time = stamp
+                    current_events.append(event)
+                if current_events:
+                    forward_groups.append(make_group(current_events, self.dataset_version))
+                part = list(reversed(forward_groups))
+                if reverse_groups and part and part[0]["timeNs"] == reverse_groups[-1]["timeNs"]:
+                    older = part.pop(0)
+                    newer = reverse_groups.pop()
+                    merged = make_group(older["events"] + newer["events"], self.dataset_version)
+                    reverse_groups.append(merged)
+                reverse_groups.extend(part)
+                if (len(reverse_groups) > maximum_groups and
+                        reverse_groups[maximum_groups - 1]["timeNs"] !=
+                        reverse_groups[maximum_groups]["timeNs"]):
+                    break
+        selected = list(reversed(reverse_groups[:maximum_groups]))
+        require(all(int(group["timeNs"]) <= through_ns for group in selected),
+                "futureWindow", "UNREVEALED_INDEX")
+        return selected
+
     def verify_all(self):
         """Full, explicit integrity pass; never performed implicitly by a seek."""
         for entry in self._files:

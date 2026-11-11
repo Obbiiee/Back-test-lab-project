@@ -87,16 +87,24 @@ assert.equal((await retryAfterClient.request('/api/v1/workspaces/11111111-1111-4
   'Retry-After honored');
 assert.ok(performance.now()-retryAfterStart>=90,'explicit Retry-After is a minimum delay before a safe retry');
 let queueRefusalCalls=0;
-const queueRefusalAccount=createAccountClient({secure:()=>true,fetcher:async(path)=>{
+const queueRefusalJobIds=[];
+const queueRefusalAccount=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
   if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'QUEUE-TOKEN',token_type:'bearer'})};
   if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
-  if(path.endsWith('/sessions')){queueRefusalCalls++;return {ok:false,status:429,json:async()=>({detail:'QUEUE_CAPACITY'})};}
+  if(path.endsWith('/sessions')){
+    queueRefusalCalls++;
+    queueRefusalJobIds.push(options.headers['X-BTL-Job']);
+    if(queueRefusalCalls<3)return {ok:false,status:429,headers:{get:name=>name==='Retry-After'?'0':null},json:async()=>({detail:'QUEUE_CAPACITY'})};
+    return {ok:true,status:201,json:async()=>({schemaVersion:1,label:'Session admitted after capacity cleared'})};
+  }
   return {ok:true,status:200,json:async()=>({schemaVersion:1})};
 }});
 await queueRefusalAccount.login('qa@example.com','Test fixture passphrase only');
 setAccountTransport(queueRefusalAccount,'11111111-1111-4111-8111-111111111111');
-await assert.rejects(()=>api('/sessions',{name:'Queue refusal is not retried'}),error=>error.status===429);
-assert.equal(queueRefusalCalls,1,'queue capacity refusal does not resubmit a durable command');
+assert.equal((await api('/sessions',{name:'Queue refusal keeps the durable command identity'})).label,
+  'Session admitted after capacity cleared');
+assert.equal(queueRefusalCalls,3,'explicit pre-insert queue refusals are retried with a bounded wait');
+assert.equal(new Set(queueRefusalJobIds).size,1,'queue admission retries retain one durable job identity');
 setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 const queuedCalls=[];
 let queuedId;

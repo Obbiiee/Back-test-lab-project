@@ -2,7 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 import os
-from threading import Event
+from threading import Barrier, Event, local
 import unittest
 import uuid
 from unittest.mock import patch
@@ -54,6 +54,32 @@ class DisplayTests(unittest.TestCase):
         with patch('execution.workspace.TickTimeline.resume',side_effect=AssertionError('unexpected cold resume')):
             actual=second.window(scope,session,checkpoint,last_only=True)
         self.assertEqual(actual,expected)
+
+    def test_cold_restores_for_independent_sessions_do_not_hold_global_cache_lock(self):
+        base=research_provider()
+        rendezvous=Barrier(2, timeout=5)
+        per_thread=local()
+        class ConcurrentProvider:
+            dataset_id=base.dataset_id
+            dataset_version=base.dataset_version
+            def describe(self, dataset_id, dataset_version):
+                return base.describe(dataset_id, dataset_version)
+            def read_page(self, dataset_id, dataset_version, after_token=None, max_events=1024):
+                if not getattr(per_thread,'joined',False):
+                    per_thread.joined=True
+                    rendezvous.wait()
+                return base.read_page(dataset_id,dataset_version,after_token,max_events)
+        provider=ConcurrentProvider()
+        cache=FixtureTimelineCache(provider,allow_injected_synthetic=True)
+        timeline=TickTimeline(base,base.dataset_id,base.dataset_version,str(START_NS))
+        timeline.seek(str(WARMUP_NS))
+        checkpoint=timeline.checkpoint()
+        scopes=[TrustedScope('workspace:restore-parallel:'+uuid.uuid4().hex,'fixture:operator') for _ in range(2)]
+        sessions=['session:restore-parallel:'+uuid.uuid4().hex for _ in range(2)]
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures=[pool.submit(cache.window,scopes[i],sessions[i],checkpoint,last_only=True) for i in range(2)]
+            rows=[future.result(timeout=10) for future in futures]
+        self.assertEqual(rows[0],rows[1])
 
 
 @unittest.skipUnless(DSN,'Actual isolated PostgreSQL required; skips are not PASS')

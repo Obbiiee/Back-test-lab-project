@@ -188,6 +188,56 @@ class P0LocalIntegrationTests(unittest.TestCase):
         self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in result['events']))
         self.assertEqual(result['view']['state']['revision'],state['revision']+1)
 
+    def test_jump_preserves_pending_order_when_no_event_through_three_day_session_end(self):
+        from application.models import TrustedScope
+        from execution.research_fixture import START_NS
+        from ticks.provider import SyntheticTickProvider
+
+        day = 86_400_000_000_000
+        source = SyntheticTickProvider([
+            dict(ordinal=str(i), timeNs=str(START_NS + i * day),
+                 bid='2000', ask='2000.1', sequence=str(i))
+            for i in range(4)
+        ], dataset_id='synthetic:jump-three-day-no-event-v1', trusted=True,
+           execution_fixture=True, chunk_size=1)
+        scope = TrustedScope('fixture:jump-three-day:'+uuid.uuid4().hex,
+                             'fixture:jump-three-day-owner:'+uuid.uuid4().hex)
+        app = ResearchApplication(DSN, scope, synthetic_provider=source)
+        try:
+            record = new_method()
+            app.create_method(record)
+            session = 'session:jump-three-day:'+uuid.uuid4().hex
+            view = app.create_session(dict(id=session, name='Three day no event',
+                methodId=record['id'], initialBalance='10000', startPeriod='2020-01'))
+            request = dict(sessionId=session, requestId='order:'+uuid.uuid4().hex,
+                expectedRevision=view['state']['revision'], planId='plan:'+uuid.uuid4().hex,
+                planRevision=0, draft=dict(side='LONG', orderType='LIMIT', workflow='PLANNED',
+                    entry='1990', quantity=None, sl='1980', tp=None, riskPercent='1', observations=[]))
+            reviewed = app.review(request)
+            app.confirm(session, dict(reviewId=request['requestId'], reviewHash=reviewed['reviewHash']))
+            start = app.inspect(session)['state']
+            jump = dict(schemaVersion=1, artifact='BTL-JUMP-NEXT-EVENT-1',
+                requestId=uuid.uuid4().hex, sessionId=session,
+                expectedRevision=start['revision'], timeframe='1m')
+            result = app.jump_next_event(session, jump)
+            self.assertEqual(result['status'], 'NO_EVENT_UNTIL_SESSION_END')
+            self.assertEqual(result['view']['state']['orders'][request['requestId']]['status'], 'PENDING')
+            self.assertEqual(int(result['throughNs']), int(source.describe(
+                source.dataset_id, source.dataset_version)['range']['endNs']) - 1)
+            retried = app.jump_next_event(session, jump)
+            self.assertEqual((retried['status'], retried['throughNs'], retried['events']),
+                             (result['status'], result['throughNs'], result['events']))
+            self.assertEqual(retried['view']['state'], result['view']['state'])
+            journal = app.journal(session)
+            self.assertEqual([row['status'] for row in journal['orders']], ['PENDING'])
+            with connect(DSN) as db:
+                count = db.execute('SELECT count(*) FROM btl.tick_commands '
+                    'WHERE workspace_id=%s AND session_id=%s AND command_id LIKE %s',
+                    (scope.workspace_id, session, 'jump:'+jump['requestId']+':r%')).fetchone()[0]
+            self.assertEqual(count, 1)
+        finally:
+            app.close()
+
     def test_revision_advance_proves_not_committed_and_stale_confirm_refuses(self):
         reviewed = self.review()
         command_id = reviewed["review"]["command"]["commandId"]

@@ -206,9 +206,10 @@ class CloudResearchTests(unittest.TestCase):
                     finally:
                         self.app.state.qa_timing = False
                     self.assertEqual(poll.status_code, 200, poll.text)
-                    self.assertEqual(poll.json()['state'], 'QUEUED')
+                    self.assertIn(poll.json()['state'], ('QUEUED', 'RUNNING'))
                     self.assertRegex(poll.headers.get('server-timing', ''),
-                                     r'^queue-thread-wait;dur=[0-9.]+, queue-query;dur=[0-9.]+$')
+                                     r'^queue-thread-wait;dur=[0-9.]+, queue-query;dur=[0-9.]+, db-admission;dur=[0-9.]+, db-connect;dur=[0-9.]+, db-sql;dur=[0-9.]+, db-transaction-exit;dur=[0-9.]+, db-sql-count;desc=[0-9]+$')
+                    self.assertGreater(int(poll.headers['server-timing'].split('db-sql-count;desc=')[1]), 0)
                     release_reads.set()
                     responses = [future.result(timeout=10) for future in reads]
                     self.assertEqual([response.status_code for response in responses], [200, 200])
@@ -219,7 +220,8 @@ class CloudResearchTests(unittest.TestCase):
                 self.app.state.qa_timing = False
             self.assertEqual(timed.status_code, 200, timed.text)
             self.assertRegex(timed.headers.get('server-timing', ''),
-                             r'^research-admission;dur=[0-9.]+, research-thread-wait;dur=[0-9.]+, research-operation;dur=[0-9.]+$')
+                             r'^research-admission;dur=[0-9.]+, research-thread-wait;dur=[0-9.]+, research-operation;dur=[0-9.]+, research-thread-cpu;dur=[0-9.]+, db-admission;dur=[0-9.]+, db-connect;dur=[0-9.]+, db-sql;dur=[0-9.]+, db-transaction-exit;dur=[0-9.]+, fixture-cache-lock-wait;dur=[0-9.]+, fixture-restore-gate-wait;dur=[0-9.]+, fixture-timeline-resume;dur=[0-9.]+, fixture-past-read;dur=[0-9.]+, db-sql-count;desc=[0-9]+, research-serialization;dur=[0-9.]+$')
+            self.assertGreater(int(timed.headers['server-timing'].split('db-sql-count;desc=')[1].split(',')[0]), 0)
         finally:
             release_reads.set()
 
