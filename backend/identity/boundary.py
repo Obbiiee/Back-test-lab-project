@@ -6,14 +6,34 @@ import uuid
 import anyio
 from urllib.parse import parse_qs
 from starlette.responses import JSONResponse
+from contracts.primitives import ContractError
 from .store import connection, audit
 
 log = logging.getLogger(__name__)
 
+# IP-level protection is reserved for requests that can create, verify, recover,
+# or exchange credentials. Routine identity reads and sign-out are covered by
+# the global API budget instead, so legitimate users behind one NAT do not
+# exhaust a shared authentication bucket merely by opening their workspace.
+_SENSITIVE_AUTH_REQUESTS = {
+    ("POST", "/api/v1/auth/register"),
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/verify"),
+    ("POST", "/api/v1/auth/forgot-password"),
+    ("POST", "/api/v1/auth/request-verify-token"),
+    ("POST", "/api/v1/auth/reset-password"),
+    ("GET", "/api/v1/auth/google/start"),
+    ("POST", "/api/v1/auth/google/link/start"),
+    ("GET", "/api/v1/auth/google/callback"),
+    ("POST", "/api/v1/auth/google/exchange"),
+}
+
 
 class IdentityBoundary:
-    def __init__(self, app, dsn, limit=30, max_bytes=16384):
-        self.app, self.dsn, self.limit, self.max_bytes = app, dsn, limit, max_bytes
+    def __init__(self, app, dsn, limit=30, api_limit=600, max_bytes=16384):
+        if type(limit) is not int or not 1 <= limit <= 1200 or type(api_limit) is not int or not 1 <= api_limit <= 1200:
+            raise ValueError('BOUNDED_API_RATE_LIMIT_REQUIRED')
+        self.app, self.dsn, self.limit, self.api_limit, self.max_bytes = app, dsn, limit, api_limit, max_bytes
 
     async def _attempt(self, key, limit):
         key = hashlib.sha256(key.encode()).hexdigest()
@@ -38,6 +58,15 @@ class IdentityBoundary:
         except Exception as error:
             if started or scope["type"] != "http":
                 raise
+            if isinstance(error, ContractError) and error.code == "RESOURCE_CAPACITY":
+                # The identity database budget refused this request before a
+                # connection or route handler was entered. Tell clients this
+                # is an explicit no-op admission refusal so safe retries remain
+                # distinguishable from an ambiguous database failure.
+                await JSONResponse({"detail": "SERVICE_BUSY"}, status_code=503,
+                                   headers={"Cache-Control": "no-store", "Retry-After": "1",
+                                            "X-Request-ID": correlation})(scope, receive, send)
+                return
             # Database diagnostic text is retained only for permission errors;
             # it identifies the denied object without request data or DSNs.
             sqlstate = getattr(error, "sqlstate", None)
@@ -64,7 +93,9 @@ class IdentityBoundary:
         if scope["path"].startswith("/api/v1/"):
             # Never trust X-Forwarded-For. Configure a trusted proxy before deployment.
             ip = (scope.get("client") or ("unknown",))[0]
-            if not await self._attempt("ip:"+ip, self.limit):
+            if not await self._attempt("api-ip:"+ip, self.api_limit):
+                return await JSONResponse({"detail": "RATE_LIMITED"}, status_code=429, headers={"Retry-After": "60"})(scope, receive, protected_send)
+            if (scope["method"], scope["path"]) in _SENSITIVE_AUTH_REQUESTS and not await self._attempt('auth-ip:'+ip,self.limit):
                 return await JSONResponse({"detail": "RATE_LIMITED"}, status_code=429, headers={"Retry-After": "60"})(scope, receive, protected_send)
         total, messages = 0, []
         with anyio.fail_after(5):

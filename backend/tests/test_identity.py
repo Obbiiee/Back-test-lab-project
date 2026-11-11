@@ -4,7 +4,9 @@ import asyncio
 import secrets
 import unittest
 import uuid
+from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from cloud.app import create_app
@@ -13,6 +15,7 @@ from identity.store import TokenStore, UserStore, CredentialChanged
 import jwt
 import psycopg
 from psycopg import sql
+from contracts.primitives import ContractError
 
 DSN = os.getenv("BTL_TEST_DATABASE_URL")
 PASSWORD = "Test fixture passphrase 2026 only"
@@ -198,18 +201,18 @@ class IdentityTests(unittest.TestCase):
 
     def test_bounded_rate_tls_body_safe_errors_and_fail_closed_config(self):
         app = create_app(DSN, self.secret, self.delivery, rate_limit=3)
-        # Match the real fixed-minute reset, as in the account-rate vector above.
-        # Fresh client identity per attempt; never accept 401 as a rate refusal.
+        # Credential endpoints retain the strict IP bound. X-Forwarded-For is
+        # deliberately not trusted unless the ASGI server has trusted proxies.
         for _ in range(3):
             with connect(DSN) as db:
                 before = db.execute("SELECT floor(extract(epoch FROM clock_timestamp())/60)").fetchone()[0]
             with client(app) as caller:
-                statuses = [caller.get("/api/v1/auth/me").status_code for _index in range(3)]
-                refused = caller.get("/api/v1/auth/me", headers={"X-Forwarded-For": "different-ip"})
+                statuses = [caller.post("/api/v1/auth/login", data={"username": self.email, "password": "wrong"}).status_code for _index in range(3)]
+                refused = caller.post("/api/v1/auth/login", data={"username": self.email, "password": "wrong"}, headers={"X-Forwarded-For": "different-ip"})
             with connect(DSN) as db:
                 after = db.execute("SELECT floor(extract(epoch FROM clock_timestamp())/60)").fetchone()[0]
             if before == after:
-                self.assertEqual(statuses, [401]*3)
+                self.assertEqual(statuses, [400]*3)
                 self.assertEqual(refused.status_code, 429)
                 self.assertEqual(refused.headers["cache-control"], "no-store")
                 self.assertEqual(len(refused.headers["x-request-id"]), 32)
@@ -229,6 +232,61 @@ class IdentityTests(unittest.TestCase):
         with self.assertRaises(ValueError): create_app(DSN, self.secret, None)
         with connect(DSN) as db:
             self.assertGreater(db.execute("SELECT count(*) FROM btl.security_events").fetchone()[0], 0)
+
+    def test_authentication_rate_budget_does_not_block_product_api_namespace(self):
+        app=create_app(DSN,self.secret,self.delivery,rate_limit=3,api_rate_limit=8)
+        http=client(app)
+        for _ in range(3):
+            self.assertEqual(http.get('/api/v1/auth/providers').status_code,200)
+        # Routine auth reads/logout do not consume the sensitive credential
+        # budget; they remain inside the global API limit.
+        self.assertEqual(http.get('/api/v1/auth/providers').status_code,200)
+        self.assertEqual(http.get('/api/v1/auth/me').status_code,401)
+        self.assertEqual(http.get('/api/v1/auth/identities').status_code,401)
+        self.assertEqual(http.post('/api/v1/auth/logout').status_code,401)
+        self.assertEqual(http.get('/api/v1/workspaces').status_code,401)
+        refused_api=http.get('/api/v1/workspaces')
+        self.assertEqual(refused_api.status_code,429)
+        http.close()
+
+    def test_ten_legitimate_accounts_share_sensitive_auth_ip_budget(self):
+        app=create_app(DSN,self.secret,self.delivery,rate_limit=30,api_rate_limit=600)
+        shared_ip="198.51.100.210"
+        for index in range(10):
+            email=f"nat-{uuid.uuid4().hex}@example.com"
+            with TestClient(app,base_url="https://testserver",client=(shared_ip,51000+index)) as caller:
+                registered=caller.post('/api/v1/auth/register',json={"email":email,"password":PASSWORD})
+                self.assertEqual(registered.status_code,201,registered.text)
+                verified=caller.post('/api/v1/auth/verify',json={"token":self.delivery.token(email,"verification")})
+                self.assertEqual(verified.status_code,200,verified.text)
+                logged=caller.post('/api/v1/auth/login',data={"username":email,"password":PASSWORD})
+                self.assertEqual(logged.status_code,200,logged.text)
+                headers={"Authorization":"Bearer "+logged.json()["access_token"]}
+                self.assertEqual(caller.get('/api/v1/auth/me',headers=headers).status_code,200)
+                self.assertEqual(caller.get('/api/v1/auth/identities',headers=headers).status_code,200)
+                self.assertEqual(caller.post('/api/v1/auth/logout',headers=headers).status_code,204)
+
+    def test_sensitive_auth_ip_limit_is_not_bypassed_by_forwarded_header(self):
+        app=create_app(DSN,self.secret,self.delivery,rate_limit=2,api_rate_limit=600)
+        shared_ip="198.51.100.211"
+        with TestClient(app,base_url="https://testserver",client=(shared_ip,52000)) as caller:
+            self.assertEqual(caller.post('/api/v1/auth/login',data={"username":self.email,"password":"wrong"}).status_code,400)
+            self.assertEqual(caller.post('/api/v1/auth/login',data={"username":self.email,"password":"wrong"},headers={"X-Forwarded-For":"203.0.113.8"}).status_code,400)
+            refused=caller.post('/api/v1/auth/login',data={"username":self.email,"password":"wrong"},headers={"X-Forwarded-For":"203.0.113.9"})
+            self.assertEqual(refused.status_code,429)
+
+    def test_identity_database_budget_refusal_is_explicit_retryable_noop(self):
+        @asynccontextmanager
+        async def exhausted(_dsn):
+            raise ContractError('RESOURCE_CAPACITY','capacity')
+            yield
+        with patch('identity.boundary.connection',exhausted):
+            with client(self.app) as caller:
+                response=caller.get('/api/v1/auth/providers')
+        self.assertEqual(response.status_code,503)
+        self.assertEqual(response.json(),{'detail':'SERVICE_BUSY'})
+        self.assertEqual(response.headers['retry-after'],'1')
+        self.assertEqual(len(response.headers['x-request-id']),32)
 
 
 if __name__ == "__main__":

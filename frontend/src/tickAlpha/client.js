@@ -1,5 +1,10 @@
 // Financial values stay exact strings across hosted and loopback transports.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
+// Research jobs may use the repository's 60 s durable queue TTL and then its
+// 30 s worker deadline. Keep the client alive through both bounds plus one
+// 5 s polling/transport observation margin; a 30 s client abort orphaned
+// valid reads under concurrent traders and left the UI on a stale revision.
+const PRODUCT_JOB_DEADLINE_MS=95000;
 import {accountTransport,isAccountPage} from './accountClient.js';
 import {isLocalReview} from '../tickReview/LocalOrigin.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
@@ -30,9 +35,9 @@ export async function api(path,body,{signal}={}){
     // The queue reuses completed results by job ID. A new read must see the
     // current committed revision; only retries of a mutation reuse its ID.
     const jobId=mutating?await durableJobId(account,path,body):queuedRead?crypto.randomUUID():undefined;
-    const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
+    const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(PRODUCT_JOB_DEADLINE_MS)]):AbortSignal.timeout(PRODUCT_JOB_DEADLINE_MS);
     const uncertain=()=>Object.assign(Error('UNKNOWN: durable operation outcome is not yet known. Reconcile its job or authoritative Session/receipt before retrying.'),{code:'UNKNOWN',jobId});
-    let value;
+    let value,pollAttempt=0;
     try{value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal:bounded,jobId});}
     catch(error){
       const definitiveRefusal=[400,401,403,404,409,422,426,429].includes(error?.status);
@@ -54,10 +59,16 @@ export async function api(path,body,{signal}={}){
         throw Object.assign(Error(`Research job ended in ${value.state}.`),{code:value.state,jobId});
       }
       try{
+        // Queue wait can approach the explicit 60 s TTL. Fixed synchronized
+        // 1 s polling made each waiting browser issue dozens of redundant
+        // status reads and saturated API admission during concurrent cohorts.
+        // Spread read-only polls gradually, with a strict 3.25 s ceiling.
+        const pollDelay=Math.min(3000,1000+pollAttempt*500)+Math.floor(Math.random()*251);
+        pollAttempt++;
         await new Promise((resolve,reject)=>{
           if(bounded.aborted)return reject(bounded.reason);
           const abort=()=>{clearTimeout(timer);reject(bounded.reason);};
-          const timer=setTimeout(()=>{bounded.removeEventListener('abort',abort);resolve();},1000);
+          const timer=setTimeout(()=>{bounded.removeEventListener('abort',abort);resolve();},pollDelay);
           bounded.addEventListener('abort',abort,{once:true});
         });
         value=await account.client.request(account.root+'/jobs/'+jobId,{signal:bounded});

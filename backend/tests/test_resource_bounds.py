@@ -9,9 +9,20 @@ from contracts.primitives import ContractError
 from infrastructure.database import connect
 from infrastructure.resources import Budget, DATABASE, ApiAdmission
 from identity.store import connection
+from cloud.workspaces import domain_error_response
 
 
 class ResourceTests(unittest.TestCase):
+    def test_database_budget_refusal_is_retryable_but_unknown_failures_stay_unavailable(self):
+        busy=domain_error_response(ContractError('RESOURCE_CAPACITY','capacity'))
+        self.assertEqual(busy.status_code,503)
+        self.assertEqual(busy.headers['retry-after'],'1')
+        self.assertEqual(busy.body,b'{"detail":"SERVICE_BUSY","schemaVersion":1}')
+        unavailable=domain_error_response(ContractError('DATABASE_FAILURE','database'))
+        self.assertEqual(unavailable.status_code,503)
+        self.assertNotIn('retry-after',unavailable.headers)
+        self.assertEqual(unavailable.body,b'{"detail":"SERVICE_UNAVAILABLE","schemaVersion":1}')
+
     def test_budget_rejects_before_entry_and_releases_on_failure(self):
         budget = Budget(2)
         with budget.claim(), budget.claim():
@@ -77,7 +88,7 @@ class ResourceTests(unittest.TestCase):
             messages = []
             async def send(message):
                 messages.append(message)
-            boundary = ApiAdmission(application, limit=1)
+            boundary = ApiAdmission(application, limit=1, wait_limit=0)
             scope = dict(type='http', path='/api/v1/auth/login')
             first = asyncio.create_task(boundary(scope, receive, send))
             await entered.wait()
@@ -88,4 +99,40 @@ class ResourceTests(unittest.TestCase):
             release.set()
             await first
             self.assertEqual(boundary.budget.snapshot()['active'], 0)
+        asyncio.run(scenario())
+
+    def test_outer_gate_waits_bounded_fifo_without_reading_early_bodies(self):
+        async def scenario():
+            entered = []
+            first_entered = asyncio.Event()
+            release_first = asyncio.Event()
+            async def application(scope, receive, send):
+                entered.append(scope['path'])
+                if scope['path'] == '/api/v1/first':
+                    first_entered.set()
+                    await release_first.wait()
+                await send({'type':'http.response.start','status':200,'headers':[]})
+                await send({'type':'http.response.body','body':b''})
+            async def receive():
+                self.fail('Bodies must remain unread while waiting for admission')
+            async def send(_message):
+                return None
+            boundary = ApiAdmission(application, limit=1, wait_limit=1, wait_seconds=1)
+            def invoke(path):
+                return boundary(dict(type='http',path=path),receive,send)
+            first=asyncio.create_task(invoke('/api/v1/first'))
+            await first_entered.wait()
+            second=asyncio.create_task(invoke('/api/v1/second'))
+            await asyncio.sleep(.01)
+            refused=[]
+            async def record(message):
+                refused.append(message)
+            await boundary(dict(type='http',path='/api/v1/third'),receive,record)
+            self.assertEqual(refused[0]['status'],503)
+            self.assertEqual(entered,['/api/v1/first'])
+            release_first.set()
+            await asyncio.gather(first,second)
+            self.assertEqual(entered,['/api/v1/first','/api/v1/second'])
+            self.assertEqual(boundary.budget.snapshot()['active'],0)
+            self.assertEqual(boundary.pending,0)
         asyncio.run(scenario())

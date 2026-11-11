@@ -26,7 +26,7 @@ from ticks.contracts import tag, uint
 GLOBAL_LIMIT = 16
 USER_LIMIT = 2
 RETAINED_LIMIT = 32
-WORKERS = 1
+WORKERS = 2
 MAX_JOB_ATTEMPTS = 3
 LEASE_SECONDS = 30
 HEARTBEAT_SECONDS = 5
@@ -241,10 +241,40 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
 def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
     with connect(dsn) as db:
         scoped(db, actor_id, workspace_id)
-        _reap_expired_leases(db)
         row = db.execute('SELECT * FROM btl.research_jobs WHERE id=%s AND actor_id=%s AND workspace_id=%s',
                          (job_id, actor_id, workspace_id)).fetchone()
         require(row is not None, 'job', 'RESOURCE_UNAVAILABLE')
+        if not cancel and row['state'] == 'QUEUED':
+            # Status polling is a hot path. Do not run global recovery scans or
+            # lock a healthy queued row; reconcile only this job when its own
+            # durable deadline has actually elapsed.
+            state = ('RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS else 'EXPIRED')
+            recovered = db.execute("""
+                UPDATE btl.research_jobs SET state=%s,result=NULL,finished_at=clock_timestamp()
+                WHERE id=%s AND actor_id=%s AND workspace_id=%s AND state='QUEUED'
+                  AND expires_at <= clock_timestamp() RETURNING *
+            """, (state, job_id, actor_id, workspace_id)).fetchone()
+            return view(recovered or row)
+        if not cancel and row['state'] == 'RUNNING':
+            # Recover just this expired lease if it is the polled job. A
+            # heartbeat/finalizer racing this update wins by changing the
+            # lease predicate; mutating jobs remain reconciliation-required
+            # once cancellation/retry certainty is lost.
+            cancelled = row.get('cancel_requested_at') is not None
+            retry = not cancelled and row['attempts'] < MAX_JOB_ATTEMPTS
+            state = ('CANCELLED' if cancelled and row['operation'] not in MUTATING_OPERATIONS else
+                     'RECONCILE_REQUIRED' if cancelled or not retry and row['operation'] in MUTATING_OPERATIONS else
+                     'FAILED' if not retry else 'QUEUED')
+            recovered = db.execute("""
+                UPDATE btl.research_jobs SET state=%s,
+                    expires_at=CASE WHEN %s THEN clock_timestamp()+(%s*interval '1 second') ELSE expires_at END,
+                    result=NULL,finished_at=CASE WHEN %s THEN NULL ELSE clock_timestamp() END,
+                    lease_owner=NULL,lease_until=NULL,heartbeat_at=NULL
+                WHERE id=%s AND actor_id=%s AND workspace_id=%s AND state='RUNNING'
+                  AND lease_until <= clock_timestamp() RETURNING *
+            """, (state, state == 'QUEUED', QUEUE_TTL_SECONDS, state == 'QUEUED',
+                  job_id, actor_id, workspace_id)).fetchone()
+            return view(recovered or row)
         if row['state'] == 'QUEUED':
             # SKIP LOCKED: a claim that won the race is reported as RUNNING, never cancelled falsely.
             claimed = db.execute("SELECT * FROM btl.research_jobs WHERE id=%s FOR UPDATE SKIP LOCKED", (job_id,)).fetchone()

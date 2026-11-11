@@ -110,6 +110,77 @@ def _projection(session_id, order_id, row, event):
     return value
 
 
+def seed_fork_orders(db, workspace_id, parent_session, parent_event_count,
+                     child_session, child_state, fork_event):
+    """Seed the child Journal read model from verified parent projections.
+
+    A fork carries live positions in its committed checkpoint but intentionally
+    starts a new event chain. Link those read-model baselines to the durable
+    SESSION_FORKED event so subsequent child events can update them without
+    inventing an ORDER_ACCEPTED financial event.
+    """
+    orders = child_state['orders']
+    if not orders:
+        return
+    require(fork_event.get('kind') == 'SESSION_FORKED' and
+            fork_event.get('sessionId') == child_session,
+            'forkJournalEvent', 'CORRUPT_RECORD')
+    for order_id in sorted(orders):
+        indexed = db.execute(
+            'SELECT i.sequence,i.event_id,i.event_kind,i.projection_hash,e.payload,e.content_hash '
+            'FROM btl.tick_journal_order_events i JOIN btl.tick_events e '
+            'ON (e.workspace_id,e.session_id,e.sequence)=(i.workspace_id,i.session_id,i.sequence) '
+            'WHERE i.workspace_id=%s AND i.session_id=%s AND i.order_id=%s AND i.sequence<%s '
+            'ORDER BY i.sequence',
+            (workspace_id, parent_session, order_id, parent_event_count),
+        ).fetchall()
+        source_order = None
+        for sequence, event_id, kind, projection_hash, raw, digest in indexed:
+            event = json.loads(raw)
+            require(canonical_bytes(event) == raw and content_hash(event) == digest and
+                    event.get('sequence') == sequence and event.get('eventId') == event_id and
+                    event.get('kind') == kind,
+                    'forkJournalEvent', 'CORRUPT_RECORD')
+            if kind == 'ORDER_ACCEPTED':
+                require(source_order is None, 'forkJournalAcceptance', 'CORRUPT_RECORD')
+                source_order = _new_order(parent_session, order_id, event)
+            else:
+                require(source_order is not None and
+                        (event.get('orderId') == order_id or
+                         kind == 'UNRESOLVED' and order_id in event['detail'].get('affectedOrderIds', [])),
+                        'forkJournalEventBinding', 'CORRUPT_RECORD')
+                source_order = _apply_order_event(source_order, event)
+            require(_projection(parent_session, order_id, source_order, event)['contentHash'] == projection_hash,
+                    'forkJournalProjectionHash', 'CORRUPT_RECORD')
+        require(source_order is not None, 'forkJournalProjection', 'CORRUPT_RECORD')
+        checkpoint_order = orders[order_id]
+        require(all(source_order.get(key) == checkpoint_order.get(key) for key in
+                    ('side','orderType','workflow','entry','quantity','sl','tp','status',
+                     'remaining','entryPrice','entryFillRef')),
+                'forkJournalCheckpoint', 'CORRUPT_RECORD')
+        child_value = _projection(child_session, order_id, source_order, fork_event)
+        db.execute(
+            'INSERT INTO btl.tick_journal_order_events '
+            '(workspace_id,session_id,order_id,sequence,event_id,event_kind,projection_hash) '
+            'VALUES (%s,%s,%s,%s,%s,%s,%s)',
+            (workspace_id, child_session, order_id, fork_event['sequence'],
+             fork_event['eventId'], fork_event['kind'], child_value['contentHash']),
+        )
+        raw = canonical_bytes(child_value)
+        db.execute(
+            'INSERT INTO btl.tick_journal_order_projection '
+            '(workspace_id,session_id,order_id,order_status,last_sequence,event_id,payload,content_hash) '
+            'VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+            (workspace_id, child_session, order_id, source_order['status'],
+             fork_event['sequence'], fork_event['eventId'], raw, content_hash(child_value)),
+        )
+    db.execute(
+        'UPDATE btl.tick_journal_projection_heads SET order_count=order_count+%s '
+        'WHERE workspace_id=%s AND session_id=%s',
+        (len(orders), workspace_id, child_session),
+    )
+
+
 def verify_projection(raw, digest, *, session_id, order_id, status, sequence, event_id):
     value = json.loads(raw)
     require(canonical_bytes(value) == raw and content_hash(value) == digest and

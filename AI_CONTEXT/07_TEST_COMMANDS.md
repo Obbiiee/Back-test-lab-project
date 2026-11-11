@@ -1,5 +1,35 @@
 # Commands
 
+## Local synthetic Product acceptance (2026-11-10)
+
+The reproducible browser acceptance uses Python 3.12 with `backend/requirements.lock`, Node 22, Playwright 1.64.1 / Chromium, and PostgreSQL 16. It creates an owned temporary PostgreSQL cluster (Unix socket only, TCP disabled), runs the official migrations/grants, writes a temporary Parquet dataset from the authored `execution.research_fixture.research_provider`, builds the frontend, and runs an actual Chromium session against the unchanged FastAPI routes. It does not accept a caller DSN/URL and removes only its own database and tick directory when the gate exits. Password verification uses the in-memory test delivery adapter; this is not SMTP or Google OAuth acceptance.
+
+From a fresh Ubuntu checkout with PostgreSQL 16 available to the current unprivileged user:
+
+```sh
+python3.12 -m venv .qa-venv
+. .qa-venv/bin/activate
+python -m pip install --require-hashes -r backend/requirements.lock
+python -m pip check
+cd frontend && npm ci
+cd tests/browser-tools && npm ci
+npx playwright install --with-deps chromium
+cd ../../..
+export BTL_QA_PG_BIN=/usr/lib/postgresql/16/bin
+export BTL_QA_PG_SHAREDIR=/usr/share/postgresql/16
+export BTL_RESEARCH_PYTHON="$PWD/.qa-venv/bin/python"
+export PYTHONPATH=backend
+python -B frontend/tests/riksora_browser_gate.py \
+  --tools frontend/tests/browser-tools \
+  --browser-cache "$HOME/.cache/ms-playwright"
+```
+
+`playwright install --with-deps` uses Playwright's supported Linux dependency installer on that disposable local machine. The browser gate itself refuses root, external targets, DSN overrides, non-loopback hosts, missing pinned browser packages, and symlinked build/evidence paths. It starts the app on a random loopback HTTPS port and runs login/workspace → Method → Session/chart/tick replay → review/confirm/exact receipt retry → tick-driven close → committed Journal/Analytics → logout/login/resume. The gate is an automated acceptance harness; it does not leave the app or QA database running after exit. For a different PostgreSQL installation, set `BTL_QA_PG_BIN` and `BTL_QA_PG_SHAREDIR` to that PostgreSQL 16 package's own paths.
+
+Measured fixture used by the local browser gate: label `Synthetic/Test`; dataset `synthetic:local-alpha-v1`; version/source-manifest SHA-256 `e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32`; 2,048 canonical Bid/Ask tick rows; canonical row SHA-256 `5d2eefc52ceb9b613be7de7a11749dd479be267927268035fe991282699e1fad`; temporary Parquet manifest SHA-256 `8986f66ab61d1527a7fb37774e2d031ce3bc7faab62c7b3c63a5e180990b323c`; Parquet size 202,132 bytes. The fixture is authored engineering data, not market history or a price-accuracy claim.
+
+On the local KVM host at checkout `8faa9db8fb644819a212363f62d750d4930c57d1`, the final rerun passed all seven browser milestones in 101.57 seconds with cleanup confirmed. Targeted real-PostgreSQL checks passed exact concurrent receipt retry, immutable archive/keyset paging, compact cold reconstruction, worker death before/after commit, Method/Session and Journal paging, owner/member/cross-user isolation, and empty-target backup restore with exact receipt parity. The existing functional cohort runner passed 5 and 10 sequential authenticated synthetic users in 38.31 and 68.74 seconds wall time (maximum process-tree RSS 198,400 and 197,532 KiB respectively). It exercises functional isolation, not simultaneous users or capacity. See the current-phase checkpoint and V1 integration register for detailed scope and failure notes.
+
 PostgreSQL and operational job metrics (operator-only, read-only): `BTL_DATABASE_URL=... PYTHONPATH=backend python -m infrastructure.database metrics --job-sample-limit 128`; compare database/WAL snapshots with `... metrics --baseline /path/to/snapshot.json`. Job distributions cover only the bounded recent retained rows and disclose no user/Session identity. Database and relation sizes are scoped to the current database; `pg_stat_wal` is server-global cumulative generation and `pg_ls_waldir` retained bytes require permission. Neither provides per-Session/job WAL attribution. QA gate: `PYTHONPATH=. QA_PYTHON -B -m unittest tests.test_postgres_metrics -v` from `backend/` with `BTL_TEST_DATABASE_URL` set to an isolated PostgreSQL database.
 
 Lossless QA timeline codec (2026-10-30): `PYTHONPATH=backend QA_PYTHON -B -m unittest tests.test_tick_storage_v2 tests.test_worker_deadline -q` PASS53tests/26.472s, covering exact raw/compressed wires/checkpoints/revealed-only/cold parity, absent required history, tampered group/hash, inflate budget/truncation/trailing/prefix refusal, unchanged legacy DB on mixed-layout refusal and private flag propagation. Full exclusive PostgreSQL discovery from repository root PASS635tests/zero skips448.526s with owned cleanup. Full frontend regression with BTL_RESEARCH_PYTHON pointing to the established QA interpreter, TickAlpha/lint/build/release audit and all independent Node references PASS. Keep repository/bundle/full-diff/Git gates. No frontend/browser wire changed; actual authenticated API10m→1h gates run on existing Session, not another browser/year qualification.

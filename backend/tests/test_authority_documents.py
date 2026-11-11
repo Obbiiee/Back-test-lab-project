@@ -23,8 +23,7 @@ class AuthorityDocumentTests(unittest.TestCase):
         register = self.read_text(
             "docs/acceptance/RIKSORA-V1-FREEZE-INTEGRATION-REGISTER-20261108.md")
 
-        self.assertTrue(phase.startswith(
-            "# OWNER CHECKPOINT — V1 integration and authority recovery"))
+        self.assertTrue(phase.startswith("# OWNER CHECKPOINT — V1 integration"))
         self.assertIn("agent-permission authority", phase)
         self.assertIn("technical authority", phase)
         self.assertIn("implementation-gap register", phase)

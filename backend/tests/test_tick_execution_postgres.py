@@ -188,7 +188,9 @@ class TickExecutionPostgresTests(unittest.TestCase):
         from unittest.mock import patch
         from execution.postgres import COMPACT_RECOVERY_INTERVAL
         h=self.harness(session='fixture:recovery-base:'+uuid.uuid4().hex)
-        h.through(0)
+        # A canonical Session starts at the first fixture timestamp (1 here);
+        # advancing to 0 violates the frozen monotonic-frontier contract.
+        h.through(self.case['rows'][0][0])
         for index in range(COMPACT_RECOVERY_INTERVAL//2):
             order_id=f'recovery:order:{index}'
             opened=h.call('OPEN',open_plan(self.case['open']),name=order_id)

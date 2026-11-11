@@ -28,6 +28,70 @@ assert.equal(sourceContext(),'synthetic');
 await api('/catalog');
 assert.equal(accountCalls.at(-1)[0],'/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog');
 assert.equal(accountCalls.at(-1)[1].headers['X-BTL-Source'],undefined);
+const transientReadCalls=[];
+let transientMutationCalls=0;
+const transientReadAccount=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'RETRY-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  if(path.endsWith('/catalog')){
+    transientReadCalls.push(path);
+    if(transientReadCalls.length<3)return {ok:false,status:transientReadCalls.length===1?429:503,
+      json:async()=>({detail:transientReadCalls.length===1?'RESEARCH_BUSY':'SERVICE_BUSY'})};
+    return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Recovered bounded read'})};
+  }
+  if(path.endsWith('/methods')){
+    transientMutationCalls++;
+    if(transientMutationCalls===1)return {ok:false,status:429,json:async()=>({detail:'RESEARCH_BUSY'})};
+    return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Method accepted once'})};
+  }
+  if(path.endsWith('/sessions')){
+    return {ok:false,status:429,json:async()=>({detail:'QUEUE_CAPACITY'})};
+  }
+  return {ok:true,status:200,json:async()=>({schemaVersion:1})};
+}});
+await transientReadAccount.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(transientReadAccount,'11111111-1111-4111-8111-111111111111');
+assert.equal((await api('/catalog')).label,'Recovered bounded read');
+assert.equal(transientReadCalls.length,3,'explicit read-only research contention retries with bounded backoff');
+assert.equal((await api('/methods',{name:'One explicit no-op retry'})).label,'Method accepted once');
+assert.equal(transientMutationCalls,2,'a pre-admission RESEARCH_BUSY refusal may be retried before any operation executes');
+let extendedBusyCalls=0;
+const extendedBusyClient=createAccountClient({secure:()=>true,fetcher:async(path)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'BUSY-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  extendedBusyCalls++;
+  if(extendedBusyCalls<=6)return {ok:false,status:503,headers:{get:name=>name==='Retry-After'?'0':null},json:async()=>({detail:'SERVICE_BUSY'})};
+  return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Recovered after admission pressure'})};
+}});
+await extendedBusyClient.login('qa@example.com','Test fixture passphrase only');
+assert.equal((await extendedBusyClient.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog')).label,
+  'Recovered after admission pressure');
+assert.equal(extendedBusyCalls,7,'bounded SERVICE_BUSY retries can outlast a short admission-pressure burst');
+let retryAfterCalls=0;
+const retryAfterClient=createAccountClient({secure:()=>true,fetcher:async(path)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'RETRY-AFTER-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  retryAfterCalls++;
+  if(retryAfterCalls===1)return {ok:false,status:503,headers:{get:name=>name==='Retry-After'?'0.1':null},json:async()=>({detail:'SERVICE_BUSY'})};
+  return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Retry-After honored'})};
+}});
+await retryAfterClient.login('qa@example.com','Test fixture passphrase only');
+const retryAfterStart=performance.now();
+assert.equal((await retryAfterClient.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog')).label,
+  'Retry-After honored');
+assert.ok(performance.now()-retryAfterStart>=90,'explicit Retry-After is a minimum delay before a safe retry');
+let queueRefusalCalls=0;
+const queueRefusalAccount=createAccountClient({secure:()=>true,fetcher:async(path)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'QUEUE-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  if(path.endsWith('/sessions')){queueRefusalCalls++;return {ok:false,status:429,json:async()=>({detail:'QUEUE_CAPACITY'})};}
+  return {ok:true,status:200,json:async()=>({schemaVersion:1})};
+}});
+await queueRefusalAccount.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(queueRefusalAccount,'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{name:'Queue refusal is not retried'}),error=>error.status===429);
+assert.equal(queueRefusalCalls,1,'queue capacity refusal does not resubmit a durable command');
+setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 const queuedCalls=[];
 let queuedId;
 const queuedAccount={subject:()=> '22222222-2222-4222-8222-222222222222',request:async(path,options={})=>{
@@ -40,6 +104,22 @@ const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
 assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+const pollDelays=[];let pendingPolls=0;let pendingJobId;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  if(path.endsWith('/view')){pendingJobId=options.jobId;return {schemaVersion:1,jobId:pendingJobId,state:'QUEUED',result:null};}
+  pendingPolls++;
+  return pendingPolls<4?{schemaVersion:1,jobId:pendingJobId,state:'RUNNING',result:null}:
+    {schemaVersion:1,jobId:pendingJobId,state:'SUCCEEDED',result:{schemaVersion:1,label:'Backoff poll complete'}};
+}},'11111111-1111-4111-8111-111111111111');
+const nativeSetTimeout=globalThis.setTimeout;
+globalThis.setTimeout=(callback,delay,...args)=>{pollDelays.push(delay);queueMicrotask(()=>callback(...args));return pollDelays.length;};
+let backoffResult;
+try{backoffResult=await api('/sessions/session:poll/view',{timeframe:'1m'});}
+finally{globalThis.setTimeout=nativeSetTimeout;}
+assert.equal(backoffResult.label,'Backoff poll complete');
+assert.equal(pendingPolls,4);
+assert.ok(pollDelays.length===4&&pollDelays[0]>=1000&&pollDelays.every((delay,index)=>
+  delay<=3250&&(index===0||delay>pollDelays[index-1])), 'queued status polls back off with bounded jitter');
 const readRetryIds=[];
 setAccountTransport({subject:queuedAccount.subject,request:async(_path,options={})=>{readRetryIds.push(options.jobId);return {schemaVersion:1,label:'done'};}},'11111111-1111-4111-8111-111111111111');
 await api('/sessions/session:queue/view',{timeframe:'1m'});
@@ -183,6 +263,14 @@ const insecure=createAccountClient({fetcher:()=>{throw Error('Must not fetch');}
 await assert.rejects(()=>insecure.login('qa@example.com','password'),/HTTPS/);
 const refused=createAccountClient({fetcher:async()=>({ok:false,status:400,json:()=>{throw Error('SECRET');}}),secure:()=>true});
 await assert.rejects(()=>refused.login('qa@example.com','SECRET'),error=>!error.message.includes('SECRET'));
+let safeBusyCalls=0;
+const safeBusy=createAccountClient({secure:()=>true,fetcher:async()=>{
+  safeBusyCalls++;
+  return {ok:false,status:503,json:async()=>({detail:'SERVICE_BUSY',secret:'must not escape'})};
+}});
+await assert.rejects(()=>safeBusy.request('/api/v1/auth/providers',{authenticated:false}),error=>
+  error.status===503&&error.code==='SERVICE_BUSY'&&!error.message.includes('secret'));
+assert.equal(safeBusyCalls,9,'only eight bounded retries follow the original SERVICE_BUSY refusal');
 let resolveLogin;
 const obsolete=createAccountClient({fetcher:()=>new Promise(resolve=>{resolveLogin=resolve;}),secure:()=>true});
 const obsoleteLogin=obsolete.login('qa@example.com','password');
@@ -200,6 +288,15 @@ const callerAbort=new AbortController();
 const canceled=createAccountClient({secure:()=>true,fetcher:async(_path,options)=>{assert.equal(options.signal.aborted,true);throw Error('canceled');}});
 callerAbort.abort();
 await assert.rejects(()=>canceled.request('/api/v1/auth/verify',{authenticated:false,signal:callerAbort.signal}),/canceled/);
+const operationDeadline=new AbortController();let forwardedDeadline;
+const inheritedDeadline=createAccountClient({secure:()=>true,fetcher:async(_path,options)=>{
+  forwardedDeadline=options.signal;
+  return {ok:true,status:200,json:async()=>({schemaVersion:1})};
+}});
+await inheritedDeadline.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/journal/pages',
+  {authenticated:false,signal:operationDeadline.signal});
+assert.equal(forwardedDeadline,operationDeadline.signal,
+  'research transport must honor the caller’s bounded job deadline without imposing a shorter nested timeout');
 console.log('PASS account transport: HTTPS-only, memory-only token, strict verified identity, scoped preferences, logout/no local fallback, safe refusals and obsolete-login cancellation.');
 
 const localData=new Map(),localStore={getItem:key=>localData.get(key)??null,setItem:(key,value)=>localData.set(key,value)};

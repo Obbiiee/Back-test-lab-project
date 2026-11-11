@@ -16,8 +16,17 @@ from .contracts import text, MAX_STEPS
 from .research_fixture import research_provider
 
 WINDOW_GROUPS = 1024
+FIXTURE_CACHE_ENTRIES = 16
 TIMEFRAMES = {'1m':60, '3m':180, '5m':300, '15m':900, '30m':1800,
               '1h':3600, '2h':7200, '4h':14400, 'D':86400}
+
+# API requests construct short-lived ResearchApplication adapters. Keep the
+# small immutable synthetic timeline index across those adapters so each
+# request does not cold-resume and reread the same committed revealed prefix.
+# The key still includes workspace, Session, dataset identity, and exact
+# checkpoint; the cache remains a disposable controller-side accelerator.
+_FIXTURE_ENTRIES = OrderedDict()
+_FIXTURE_LOCK = RLock()
 
 
 @dataclass
@@ -28,7 +37,7 @@ class _Entry:
 
 
 class FixtureTimelineCache:
-    """Four private entries; exact durable checkpoint is always the lookup key.
+    """Bounded private entries; exact durable checkpoint is always the lookup key.
 
     Speculative mutation removes the prior key first. A transaction rollback
     cannot use its successor against the unchanged durable checkpoint. Readers
@@ -38,15 +47,18 @@ class FixtureTimelineCache:
         require(provider is research_provider() or allow_injected_synthetic,
                 'cacheProvider', 'REFUSED_NON_FIXTURE_MODE')
         self.__provider = provider
-        self.__entries = OrderedDict()
-        self.__lock = RLock()
+        self.__entries = _FIXTURE_ENTRIES
+        self.__lock = _FIXTURE_LOCK
+        self.__provider_identity = (provider.dataset_id, provider.dataset_version,
+            content_hash(provider.describe(provider.dataset_id, provider.dataset_version)))
 
     def _key(self, scope, session, checkpoint):
         require(type(scope) is TrustedScope, 'scope', 'SCOPE_REQUIRED')
         identifier(session, 'sessionId')
         require(len(checkpoint['advanceTargets']) <= MAX_STEPS, 'steps', 'REFUSED_RECOVERY_LIMIT')
         raw = canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-TIMELINE-CACHE-1','checkpoint':checkpoint})
-        return (scope.workspace_id, session, content_hash({'schemaVersion':1,'artifact':'BTL-PRIVATE-CACHE-KEY-1','checkpoint':checkpoint})), raw
+        return (self.__provider_identity, scope.workspace_id, session,
+                content_hash({'schemaVersion':1,'artifact':'BTL-PRIVATE-CACHE-KEY-1','checkpoint':checkpoint})), raw
 
     def _past(self, timeline):
         consumer = timeline.consumer()
@@ -63,7 +75,7 @@ class FixtureTimelineCache:
         key, raw = self._key(scope, session, timeline.checkpoint())
         self.__entries[key] = _Entry(timeline, raw, tuple(groups[-WINDOW_GROUPS:]))
         self.__entries.move_to_end(key)
-        while len(self.__entries) > 4:
+        while len(self.__entries) > FIXTURE_CACHE_ENTRIES:
             self.__entries.popitem(last=False)
 
     def _entry(self, scope, session, checkpoint):

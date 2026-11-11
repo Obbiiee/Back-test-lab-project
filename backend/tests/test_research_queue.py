@@ -11,7 +11,7 @@ from unittest.mock import patch
 import psycopg
 from psycopg import sql
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
+from threading import Barrier, Event, Lock
 
 from cloud import queue
 from cloud.research import run
@@ -51,7 +51,9 @@ class QueueTests(unittest.TestCase):
     def setUp(self):
         # Reuse real verified identity setup, not forged user/workspace fixtures.
         self.fixture = cloud_fixture.CloudResearchTests('test_member_read_only_then_revocation_and_logout')
-        self.fixture.setUp()
+        # Queue tests own claims directly. Starting the API lifespan worker in
+        # their identity fixture would race those fault-injection assertions.
+        self.fixture.setUp(start_workers=False)
         self.actor = uuid.UUID(self.fixture.actor)
         self.workspace = uuid.UUID(self.fixture.workspace)
         self.ids = []
@@ -189,6 +191,12 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(result['result'], {'schemaVersion': 1, 'value': 'bounded result'})
         self.assertNotIn('queueMetrics', result)
 
+    def test_healthy_job_status_poll_skips_global_lease_reconciliation(self):
+        job = self.submit()
+        with patch('cloud.queue._reap_expired_leases', side_effect=AssertionError('global reaper on poll')):
+            result = queue.inspect(self.dsn, self.actor, self.workspace, job['jobId'])
+        self.assertEqual(result['state'], 'QUEUED')
+
     def test_actual_process_exit_releases_claim_and_worker_slots(self):
         job=self.submit()
         script="from cloud.queue import work_one; import os; work_one(os.environ['BTL_TEST_DATABASE_URL'], lambda *args: os._exit(17))"
@@ -207,6 +215,50 @@ class QueueTests(unittest.TestCase):
                 db.execute('SELECT pg_advisory_xact_lock(2020,%s)',(310+i,))
             self.assertFalse(queue.work_one(self.dsn,lambda *args:self.fail('Third worker must not enter')))
         self.assertTrue(queue.work_one(self.dsn,lambda *args:{'value':'slots released'}))
+
+    def test_two_workers_run_distinct_actors_concurrently_and_keep_actor_fifo(self):
+        first = self.submit(args=('session:parallel-a1', {'timeframe': '1m'}))
+        second = self.submit(args=('session:parallel-a2', {'timeframe': '1m'}))
+        actor_b, headers_b = self.fixture.account()
+        workspace_b = self.fixture.client.post('/api/v1/workspaces', headers=headers_b,
+                                               json={'name': 'Parallel worker QA'}).json()['id']
+        third_id = uuid.uuid4()
+        self.ids.append(third_id)
+        third = queue.submit(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b), third_id,
+                             'workspace', ('session:parallel-b1', {'timeframe': '1m'}))
+        gate = Barrier(2)
+        lock = Lock()
+        running = 0
+        peak = 0
+        started = 0
+        claimed = []
+
+        def runner(_dsn, actor_id, _workspace_id, operation, args, **_kwargs):
+            nonlocal running, peak, started
+            with lock:
+                started += 1
+                wait_for_peer = started <= 2
+                running += 1
+                peak = max(peak, running)
+                claimed.append((str(actor_id), args[0]))
+            try:
+                if wait_for_peer:
+                    gate.wait(timeout=5)
+                return {'operation': operation, 'session': args[0]}
+            finally:
+                with lock:
+                    running -= 1
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(queue.work_one, self.dsn, runner) for _ in range(2)]
+            self.assertEqual([future.result(timeout=8) for future in futures], [True, True])
+        self.assertEqual(peak, 2)
+        self.assertEqual({session for _actor, session in claimed},
+                         {'session:parallel-a1', 'session:parallel-b1'})
+        self.assertTrue(queue.work_one(self.dsn, runner))
+        self.assertEqual(queue.inspect(self.dsn, self.actor, self.workspace, first['jobId'])['state'], 'SUCCEEDED')
+        self.assertEqual(queue.inspect(self.dsn, self.actor, self.workspace, second['jobId'])['state'], 'SUCCEEDED')
+        self.assertEqual(queue.inspect(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b), third['jobId'])['state'], 'SUCCEEDED')
 
     def test_mounted_read_queue_preserves_canonical_session_and_idempotence(self):
         m=method()
@@ -816,16 +868,26 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
         # Extra QA actors/workspaces are explicit; clean only these authored job rows.
         subjects=[(self.actor,self.workspace)]
         try:
+            # QueueTests owns this entire fresh disposable database. Start the
+            # global ceiling assertion from a known empty job/turn state so
+            # jobs authored by earlier tests in this class cannot consume its
+            # global admission budget.
+            with connect(self.dsn) as db:
+                db.execute('DELETE FROM btl.research_jobs')
+                db.execute('DELETE FROM btl.research_queue_actor_turns')
             for _ in range(8):
                 actor,headers=self.fixture.account()
                 workspace=self.fixture.client.post('/api/v1/workspaces',headers=headers,json={'name':'Queue pressure QA'}).json()['id']
                 subjects.append((uuid.UUID(actor),uuid.UUID(workspace)))
-            for actor,workspace in subjects[:8]:
-                for _ in range(2):
-                    queue.submit(self.dsn,actor,workspace,uuid.uuid4(),'workspace',('session:bounded',{}))
-            with self.assertRaises(ContractError) as full:
-                queue.submit(self.dsn,*subjects[-1],uuid.uuid4(),'workspace',('session:bounded',{}))
-            self.assertEqual(full.exception.code,'QUEUE_CAPACITY')
+            # Keep the lifespan workers from draining the queue while this
+            # synchronous boundary test fills the durable pending capacity.
+            with patch.object(queue, 'work_one', return_value=False):
+                for actor,workspace in subjects[:8]:
+                    for _ in range(2):
+                        queue.submit(self.dsn,actor,workspace,uuid.uuid4(),'workspace',('session:bounded',{}))
+                with self.assertRaises(ContractError) as full:
+                    queue.submit(self.dsn,*subjects[-1],uuid.uuid4(),'workspace',('session:bounded',{}))
+                self.assertEqual(full.exception.code,'QUEUE_CAPACITY')
             with connect(self.dsn) as db:
                 db.execute("UPDATE btl.research_jobs SET state='CANCELLED',finished_at=clock_timestamp() WHERE actor_id=ANY(%s)",([a for a,w in subjects],))
             for _ in range(40):

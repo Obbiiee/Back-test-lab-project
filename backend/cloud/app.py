@@ -43,7 +43,7 @@ class GuardedDatabaseStrategy(DatabaseStrategy):
             raise HTTPException(status_code=400, detail="LOGIN_BAD_CREDENTIALS")
 
 
-def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sandbox_reset_timezone=None, sandbox_event_secret=None,
+def create_app(dsn, secret, delivery, *, rate_limit=30, api_rate_limit=600, session_seconds=1800, sandbox_reset_timezone=None, sandbox_event_secret=None,
                google_client_id=None, google_client_secret=None, google_redirect_uri=None, sandbox_billing=None):
     if not dsn or type(secret) is not str or len(secret) < 64 or delivery is None:
         raise ValueError("Database, high-entropy auth secret and delivery required")
@@ -70,7 +70,7 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800, sa
     users = FastAPIUsers[User, uuid.UUID](manager, [backend])
     from .queue import lifespan
     app = FastAPI(title="Backtest Lab identity API", version="1", docs_url=None, redoc_url=None, debug=False, lifespan=lifespan)
-    app.add_middleware(IdentityBoundary, dsn=dsn, limit=rate_limit)
+    app.add_middleware(IdentityBoundary, dsn=dsn, limit=rate_limit, api_limit=api_rate_limit)
     app.include_router(users.get_register_router(UserRead, UserCreate), prefix="/api/v1/auth")
     app.include_router(users.get_auth_router(backend, requires_verification=True), prefix="/api/v1/auth")
     app.include_router(users.get_verify_router(UserRead), prefix="/api/v1/auth")

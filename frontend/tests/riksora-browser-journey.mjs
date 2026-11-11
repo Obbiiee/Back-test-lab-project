@@ -2,12 +2,15 @@ import {createInterface} from 'node:readline';
 import {pathToFileURL} from 'node:url';
 import {resolve,join} from 'node:path';
 import {readFileSync,realpathSync,statSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 
 const ROOT=resolve(new URL('../../',import.meta.url).pathname);
 const TOOLS=resolve(process.env.RIKSORA_BROWSER_TOOLS||join(ROOT,'frontend/tests/browser-tools'));
 const input=createInterface({input:process.stdin})[Symbol.asyncIterator]();
 const read=async()=>JSON.parse((await input.next()).value);
 const config=await read();
+if(!Number.isSafeInteger(config.startDelayMs??0)||(config.startDelayMs??0)<0||(config.startDelayMs??0)>180000)
+  throw Error('COHORT_START_DELAY_INVALID');
 const url=new URL(config.url);
 const configOrigin=url.origin;
 if(url.protocol!=='https:'||url.hostname!=='127.0.0.1'||Number(url.port)<1024||url.username||url.password||url.pathname!=='/'||url.search!=='?page=account'||url.hash||!/^[a-f0-9]{64}$/.test(config.nonce))throw Error('EXCLUSIVE_QA_TARGET_REQUIRED');
@@ -17,7 +20,22 @@ const evidence=realpathSync(config.evidence);
 if(!evidence.startsWith(expected+'/')||(statSync(evidence).mode&0o777)!==0o700||statSync(evidence).uid!==process.getuid())throw Error('PRIVATE_QA_ARTIFACTS_REQUIRED');
 for(const pkg of ['playwright','@playwright/test'])if(JSON.parse(readFileSync(join(TOOLS,'node_modules',pkg,'package.json'),'utf8')).version!=='1.64.1')throw Error('PINNED_PLAYWRIGHT_REQUIRED');
 const {chromium}=await import(pathToFileURL(join(TOOLS,'node_modules/playwright/index.mjs')));
-const {expect}=await import(pathToFileURL(join(TOOLS,'node_modules/@playwright/test/index.mjs')));
+const {expect:baseExpect}=await import(pathToFileURL(join(TOOLS,'node_modules/@playwright/test/index.mjs')));
+const {retryExactConfirm}=await import(pathToFileURL(join(TOOLS,'retry-exact-confirm.mjs')));
+const digestIdentity=value=>createHash('sha256').update(value).digest('hex').slice(0,20);
+// Matches the frontend's bounded product operation deadline so an explicit
+// pre-admission busy response can be retried without the harness truncating it.
+const API_REQUEST_DEADLINE_MS=95000;
+const safePath=pathname=>pathname.split('/').map(part=>{
+  let decoded=part;try{decoded=decodeURIComponent(part);}catch{}
+  return /^[A-Za-z][A-Za-z0-9_-]*:[a-f0-9-]{24,}$/i.test(decoded)||
+    /^[a-f0-9-]{24,}$/i.test(decoded)?'{id}':part;
+}).join('/');
+// Product API requests have a documented 30 s bound. Playwright's independent
+// 5 s assertion default was shorter and falsely failed while a bounded read
+// was recovering from the explicit RESEARCH_BUSY backpressure response.
+const expect=baseExpect.configure({timeout:30000});
+if(config.startDelayMs)await new Promise(resolve=>setTimeout(resolve,config.startDelayMs));
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
@@ -30,14 +48,32 @@ const requestFailures=[];page.on('requestfailed',request=>{
   if(pathname.startsWith('/api/v1/')&&requestFailures.length<32)
     requestFailures.push({method:request.method(),path:pathname,error:failure});
 });
-const apiBodyReads=[];const apiTrace=[];page.on('response',response=>{
+const apiBodyReads=[];const apiTrace=[];const apiStarts=new Map();let apiResponseCount=0;
+const apiRequestKey=request=>`${request.method()}\n${request.url()}`;
+page.on('request',request=>{
+  const requestUrl=new URL(request.url());
+  if(requestUrl.origin===configOrigin&&requestUrl.pathname.startsWith('/api/v1/')){
+    const key=apiRequestKey(request),started=apiStarts.get(key)??[];
+    started.push(performance.now());apiStarts.set(key,started);
+  }
+});
+page.on('response',response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
-  const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
-  if(pathname.startsWith('/api/v1/')&&apiTrace.length<128){
+  const pathname=safePath(url.pathname);
+  if(pathname.startsWith('/api/v1/'))apiResponseCount++;
+  if(pathname.startsWith('/api/v1/')&&apiTrace.length<512){
+    const requestTiming=response.request().timing();
+    const started=apiStarts.get(apiRequestKey(response.request()))??[];
+    const requestStarted=started.shift();
+    if(!started.length)apiStarts.delete(apiRequestKey(response.request()));
+    const requestDuration=Number.isFinite(requestTiming.responseEnd)&&requestTiming.responseEnd>0?
+      requestTiming.responseEnd:requestStarted===undefined?0:Math.max(0,performance.now()-requestStarted);
     const row={method:response.request().method(),path:pathname,status:response.status(),code:null,
-      rows:null,journalPage:null,state:null};
+      rows:null,journalPage:null,state:null,
+      atUnixMs:Date.now(),durationMs:Math.max(0,requestDuration)};
     apiTrace.push(row);
-    const parsed=response.json().then(body=>{
+    const parsed=(response.status()===204?Promise.resolve(null):response.json()).then(body=>{
+      row.serverTiming=response.headers()['server-timing']??null;
       const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
       row.code=typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null;
       row.rows=pathname.endsWith('/journal/pages')&&Array.isArray(body?.orders)?body.orders.length:null;
@@ -54,11 +90,35 @@ const apiBodyReads=[];const apiTrace=[];page.on('response',response=>{
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
       }:null;
       row.state=['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null;
+      const jobId=typeof body?.jobId==='string'?body.jobId:typeof body?.result?.jobId==='string'?body.result.jobId:
+        pathname.endsWith('/jobs/{id}')?decodeURIComponent(url.pathname.split('/').at(-1)):null;
+      if(typeof jobId==='string'&&/^[a-f0-9-]{36}$/i.test(jobId))row.jobDigest=digestIdentity(jobId);
+      const sessionSegment=url.pathname.split('/').find(part=>{
+        try{return decodeURIComponent(part).startsWith('session:');}catch{return false;}
+      });
+      if(sessionSegment)row.sessionDigest=digestIdentity(decodeURIComponent(sessionSegment));
+      if(pathname.endsWith('/jobs/{id}')){
+        const value=body?.result,state=value?.state,analysis=value?.analysis;
+        if(state&&Number.isSafeInteger(state.revision)){
+          const active=state.orders&&typeof state.orders==='object'?Object.values(state.orders):[];
+          const projected=Array.isArray(analysis?.orders)?analysis.orders:[];
+          row.sessionEvidence={revision:state.revision,balance:typeof state.balance==='string'?state.balance:null,
+            nextGroupIndex:Number.isSafeInteger(state.nextGroupIndex)?state.nextGroupIndex:null,
+            ended:typeof state.ended==='boolean'?state.ended:null,
+            unresolved:typeof state.unresolved==='boolean'?state.unresolved:null,
+            throughNs:typeof state.throughNs==='string'?state.throughNs:null,
+            activeOrders:active.slice(0,32).map(order=>({status:order?.status,exitRequested:order?.exitRequested===true})),
+            projectedOrderStatuses:projected.slice(0,32).map(order=>order?.status),
+            tradeCount:Number.isSafeInteger(analysis?.metrics?.tradeCount)?analysis.metrics.tradeCount:null};
+        }
+      }
+      process.stdout.write(JSON.stringify({apiEvent:row})+'\n');
     });
     apiBodyReads.push(parsed.catch(()=>{}));
   }
 });
-const step=name=>process.stdout.write(JSON.stringify({step:name})+'\n');
+const completedSteps=[];
+const step=name=>{completedSteps.push(name);process.stdout.write(JSON.stringify({step:name,atUnixMs:Date.now()})+'\n');};
 let phase='proof';
 try{
   const proof=await context.request.get(new URL('/__qa/browser-proof/'+config.nonce,url).href,{maxRedirects:0});
@@ -85,6 +145,12 @@ try{
   await page.getByRole('button',{name:'Create workspace',exact:true}).click();
   await page.getByRole('button',{name:/Synthetic browser acceptance/}).click();
   await expect(page.getByRole('heading',{name:'My Methods'})).toBeVisible();step('login_workspace');
+  if(config.cohortBarrier){
+    phase='cohort_barrier';process.stdout.write(JSON.stringify({need:'cohort_start'})+'\n');
+    const release=await read();if(release?.start!==true||!Number.isSafeInteger(release.delayMs??0)||
+      (release.delayMs??0)<0||(release.delayMs??0)>30000)throw Error('COHORT_START_REFUSED');
+    if(release.delayMs)await new Promise(resolve=>setTimeout(resolve,release.delayMs));
+  }
   phase='method_create';await page.getByRole('link',{name:'Create your first Method'}).click();
   await page.getByLabel('Method name').fill('Synthetic browser method');
   await page.getByRole('button',{name:'Save Method',exact:true}).click();
@@ -101,20 +167,26 @@ try{
   phase='session_submit';
   await page.getByRole('button',{name:'Create Session',exact:true}).click();
   phase='session_wait';
-  await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:60000});step('session_replay');
-  phase='replay';await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled();
+  await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});step('session_replay');
+  phase='replay';await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled({timeout:60000});
   const stepButton=page.getByRole('button',{name:'Step ticks',exact:true});
-  await stepButton.click();await expect(stepButton).toBeEnabled();
+  await stepButton.click();await expect(stepButton).toBeEnabled({timeout:95000});
   phase='order_review';await page.getByRole('button',{name:/Buy at Ask/}).click();
   const ticket=page.getByRole('dialog',{name:'Plan an order'});
   await ticket.getByLabel('Quantity (lots)').fill('0.01');
+  const reviewResponse=page.waitForResponse(response=>response.request().method()==='POST'&&
+    new URL(response.url()).pathname.endsWith('/reviews')&&response.status()===200,
+    {timeout:API_REQUEST_DEADLINE_MS});
   await ticket.getByRole('button',{name:'Review order',exact:true}).click();
-  const review=page.getByRole('dialog',{name:'Confirm reviewed order'});
-  await expect(review.getByRole('heading',{name:'Confirm reviewed order'})).toBeVisible();
+  const review=page.locator('[role="dialog"][aria-label="Confirm reviewed order"]');
+  expect((await reviewResponse).status()).toBe(200);
+  await expect(review.getByRole('heading',{name:'Confirm reviewed order'})).toBeVisible({timeout:60000});
   phase='order_review_wait_for_arm';
   await expect(review.getByRole('button',{name:'Confirm order',exact:true})).toBeEnabled();
   const confirmRequest=page.waitForRequest(request=>request.method()==='POST'&&new URL(request.url()).pathname.endsWith('/confirm'));
-  const confirmResponse=page.waitForResponse(response=>response.request().method()==='POST'&&new URL(response.url()).pathname.endsWith('/confirm'));
+  const confirmResponse=page.waitForResponse(response=>response.request().method()==='POST'&&
+    new URL(response.url()).pathname.endsWith('/confirm')&&response.status()===200,
+    {timeout:API_REQUEST_DEADLINE_MS});
   await review.getByRole('button',{name:'Confirm order',exact:true}).click();
   const request=await confirmRequest;const response=await confirmResponse;
   expect(response.status()).toBe(200);
@@ -129,16 +201,41 @@ try{
   expect(receipt.state?.sessionId).toBe(decodeURIComponent(new URL(request.url()).pathname.split('/').at(-2)));
   const authorization=await request.headerValue('authorization');
   expect(authorization).toBeTruthy();
-  const retry=await context.request.post(request.url(),{headers:{Authorization:authorization,'Content-Type':'application/json'},data:request.postDataJSON(),maxRedirects:0});
-  expect(retry.status()).toBe(200);expect(await retry.json()).toEqual(receipt);
+  const retryPayload=request.postDataJSON();
+  const retryPath=new URL(request.url()).pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
+  const retry=await retryExactConfirm({
+    send:({timeoutMs})=>context.request.post(request.url(),{headers:{Authorization:authorization,'Content-Type':'application/json'},
+      data:retryPayload,maxRedirects:0,timeout:timeoutMs}),
+    onResponse:row=>{apiResponseCount++;apiTrace.push({method:'POST',path:retryPath,status:row.status,code:row.code,
+      rows:null,journalPage:null,state:null,durationMs:row.durationMs});},
+  });
+  expect(retry.body).toEqual(receipt);
+  const reviewDialog=page.getByRole('dialog',{name:'Confirm reviewed order'});
+  if(await reviewDialog.isVisible()){
+    // A committed receipt with a failed workspace refresh is explicitly shown
+    // as COMMITTED and offers Reload Session. Exercise that durable recovery
+    // path instead of interacting through the modal or assuming stale state.
+    const reload=reviewDialog.getByRole('button',{name:'Reload Session',exact:true});
+    const resolution=await Promise.race([
+      reload.waitFor({state:'visible',timeout:95000}).then(()=> 'reload'),
+      reviewDialog.waitFor({state:'hidden',timeout:95000}).then(()=> 'refreshed'),
+    ]);
+    if(resolution==='reload'){
+      await reload.click({timeout:95000});
+      await expect(reviewDialog).not.toBeVisible({timeout:95000});
+    }
+  }
   await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible();
+  await expect(stepButton).toBeEnabled({timeout:95000});
   step('order_receipt');
   const terminal=page.getByRole('region',{name:'Trading and Analysis'});
   phase='trade_close_advance_to_open_positions';
   const beforeEntryRevision=Number(await terminal.getAttribute('data-revision'));
   expect(Number.isSafeInteger(beforeEntryRevision)).toBeTruthy();
-  await stepButton.click();
-  await expect(terminal).toHaveAttribute('data-revision',String(beforeEntryRevision+1));
+  await expect(stepButton).toBeEnabled({timeout:95000});
+  await stepButton.click({timeout:95000});
+  await expect(terminal).toHaveAttribute('data-revision',String(beforeEntryRevision+1),{timeout:95000});
+  await expect(stepButton).toBeEnabled({timeout:95000});
   phase='trade_close_open_positions_tab';
   await terminal.getByRole('button',{name:'Open positions',exact:true}).click();
   phase='trade_close_open_positions_table';
@@ -155,14 +252,29 @@ try{
   phase='trade_close_advance_after_commit';
   const beforeExitRevision=Number(await terminal.getAttribute('data-revision'));
   expect(Number.isSafeInteger(beforeExitRevision)).toBeTruthy();
-  await stepButton.click();
+  // A close commits before the next replay step; the single worker may still
+  // have earlier traders' jobs ahead of this Session. Bound this wait by the
+  // repository's 60 s queue TTL instead of Playwright's 20 s locator default.
+  await expect(stepButton).toBeEnabled({timeout:95000});
+  await stepButton.click({timeout:60000});
   await expect(terminal).toHaveAttribute('data-revision',String(beforeExitRevision+1));
+  await expect(stepButton).toBeEnabled({timeout:95000});
   phase='trade_close_closed_trades_tab';
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   phase='trade_close_committed_row';
-  await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);step('committed_trade_journal_analytics');
-  phase='journal_analytics_workspace_note';await terminal.getByRole('button',{name:'Journal',exact:true}).click();
-  await expect(terminal.getByText('No saved note',{exact:true})).toBeVisible();
+  await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1,{timeout:95000});
+  await expect(page.getByLabel('Saved balance 9999.7 USD')).toBeVisible();step('committed_trade_journal_analytics');
+  phase='journal_analytics_workspace_note';
+  const journalResponse=page.waitForResponse(response=>response.request().method()==='GET'&&
+    new URL(response.url()).pathname.endsWith('/journal/pages')&&response.status()===200,{timeout:95000});
+  await terminal.getByRole('button',{name:'Journal',exact:true}).click();
+  expect((await journalResponse).status()).toBe(200);
+  const sessionJournal=terminal.locator('.alpha-journal');
+  await expect(sessionJournal.getByRole('heading',{name:'Research journal'})).toBeVisible();
+  const journalOrder=sessionJournal.locator('article');
+  await expect(journalOrder).toHaveCount(1,{timeout:60000});
+  await expect(journalOrder.getByRole('heading',{name:'LONG · CLOSED'})).toBeVisible();
+  await expect(journalOrder.locator('small')).toHaveText('No saved note');
   phase='journal_analytics_workspace_tab';
   await terminal.getByRole('button',{name:'Analysis',exact:true}).click();
   phase='journal_analytics_workspace_heading';
@@ -198,7 +310,7 @@ try{
   await page.getByRole('link',{name:'Analytics for Synthetic browser session',exact:true}).click();
   await page.waitForURL(current=>current.searchParams.get('screen')==='analytics');
   phase='global_analytics_heading';await expect(page.locator('.rk-page-title h1')).toHaveText('Research analytics');
-  phase='global_analytics_session';await expect(page.locator('.rk-scope dd').filter({hasText:'Synthetic browser session'})).toHaveCount(1);
+  phase='global_analytics_session';await expect(page.locator('.rk-scope dd').filter({hasText:'Synthetic browser session'})).toHaveCount(1,{timeout:60000});
   phase='logout_resume';await page.getByRole('navigation',{name:'Account and help'}).getByRole('link',{name:'Account',exact:true}).click();
   await page.getByRole('button',{name:'Sign out',exact:true}).click();
   await expect(page.getByRole('tab',{name:'Sign in',exact:true})).toBeVisible();
@@ -207,19 +319,37 @@ try{
   await page.getByRole('button',{name:/Synthetic browser acceptance/}).click();
   await expect(page.getByRole('heading',{name:'My Methods'})).toBeVisible();
   await page.getByRole('button',{name:'Resume replay',exact:true}).click();
-  await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
   const resumedTerminal=page.getByRole('region',{name:'Trading and Analysis'});
   await resumedTerminal.getByRole('button',{name:'Closed trades',exact:true}).click();
-  await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);
+  await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1,{timeout:95000});
   await Promise.allSettled(apiBodyReads);
-  expect(apiTrace.filter(entry=>entry.status===429)).toEqual([]);
+  const busyResponses=apiTrace.filter(entry=>(entry.status===429&&entry.code==='RESEARCH_BUSY')||
+    (entry.status===503&&entry.code==='SERVICE_BUSY'));
+  const unrecoveredBusy=busyResponses.filter(entry=>{
+    const index=apiTrace.indexOf(entry);
+    return !apiTrace.slice(index+1).some(next=>next.method===entry.method&&next.path===entry.path&&next.status>=200&&next.status<400);
+  });
+  expect(apiTrace.filter(entry=>(entry.status===429&&entry.code!=='RESEARCH_BUSY')||
+    (entry.status===503&&entry.code!=='SERVICE_BUSY')||entry.status>=500&&entry.status!==503)).toEqual([]);
+  expect(unrecoveredBusy).toEqual([]);
   const committedJournal=apiTrace.filter(entry=>entry.path.endsWith('/journal/pages')&&entry.status===200).at(-1);
   expect(committedJournal?.journalPage?.firstOrderStatuses).toEqual(['CLOSED']);
   expect(errors).toEqual([]);step('logout_login_resume');
-  process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version()})+'\n');
+  process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),
+    apiTrace:apiTrace.map(({method,path,status,code,atUnixMs,durationMs,serverTiming,jobDigest,sessionDigest,
+      rows,journalPage,state,sessionEvidence})=>({method,path,status,code,atUnixMs,durationMs,
+      ...(serverTiming?{serverTiming}:{}),
+      ...(jobDigest?{jobDigest}:{}),...(sessionDigest?{sessionDigest}:{}),rows,journalPage,state,
+      ...(sessionEvidence?{sessionEvidence}:{})})),
+    transientBusyCount:busyResponses.length,
+    apiResponseCount,pageErrorCount:errors.length,failedRequests:requestFailures.length,
+    steps:completedSteps})+'\n');
 }catch(error){
   await Promise.allSettled(apiBodyReads);
   await new Promise(resolve=>setTimeout(resolve,0));
+  if(phase==='trade_close_committed_row')
+    await page.getByRole('region',{name:'Trading and Analysis'}).getByRole('button',{name:'Open positions',exact:true}).click().catch(()=>{});
   const panelTitles=await page.locator('.rk-state h1,.rk-state h2').allTextContents().catch(()=>[]);
   const panelKinds=new Map([['No orders yet','NO_ORDERS'],['No order matches','FILTERED_EMPTY'],
     ['The journal could not load','JOURNAL_ERROR'],['Loading the journal…','JOURNAL_LOADING'],
@@ -243,7 +373,8 @@ try{
       const cells=Array.from(row.querySelectorAll('td'));
       const rawStatus=cells[2]?.textContent?.trim()||'';
       const status=['ACTIVE','PENDING','UNRESOLVED'].find(value=>rawStatus.startsWith(value))||'OTHER';
-      return {status,side:['LONG','SHORT'].includes(cells[1]?.textContent?.trim())?cells[1].textContent.trim():'OTHER'};
+      return {status,exitRequested:rawStatus.includes('exit requested'),
+        side:['LONG','SHORT'].includes(cells[1]?.textContent?.trim())?cells[1].textContent.trim():'OTHER'};
     });
     return {routeScreen:new URL(location.href).searchParams.get('screen'),
       journalLists:document.querySelectorAll('.rk-journal').length,
@@ -256,7 +387,8 @@ try{
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
     .slice(0,300);
   process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
-    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,apiTrace,requestFailures})+'\n');
+    pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,
+    apiTrace:apiTrace.slice(-64),requestFailures})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

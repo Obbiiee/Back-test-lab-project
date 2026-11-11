@@ -1,5 +1,6 @@
 """Safety refusals before any browser mutation or database startup."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -16,6 +17,31 @@ spec.loader.exec_module(gate)
 
 
 class BrowserGateSafetyTests(unittest.TestCase):
+    def test_demo_tick_fixture_has_pinned_synthetic_identity_and_hash(self):
+        sys.path.insert(0, str(gate.REPOSITORY/'backend'))
+        from contracts.canonical import canonical_bytes
+        from execution.research_fixture import research_provider
+
+        source = research_provider()
+        self.assertEqual(source.dataset_id, 'synthetic:local-alpha-v1')
+        self.assertEqual(source.dataset_version,
+                         'e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32')
+        digest = hashlib.sha256()
+        count = 0
+        token = None
+        while True:
+            page = source.read_page(source.dataset_id, source.dataset_version, token, 64)
+            for event in page['events']:
+                digest.update(canonical_bytes(event))
+                digest.update(b'\n')
+                count += 1
+            if page['endOfDataset']:
+                break
+            token = page['nextToken']
+        self.assertEqual(count, 2048)
+        self.assertEqual(digest.hexdigest(),
+                         '5d2eefc52ceb9b613be7de7a11749dd479be267927268035fe991282699e1fad')
+
     def test_root_refused_before_paths_or_subprocesses(self):
         with patch.object(gate.os, 'geteuid', return_value=0), patch.object(gate.shutil, 'which') as lookup:
             with self.assertRaisesRegex(ValueError, 'ORDINARY_USER_REQUIRED'):

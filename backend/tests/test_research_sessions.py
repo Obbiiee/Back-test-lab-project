@@ -140,6 +140,8 @@ class ResearchSessionTests(unittest.TestCase):
                 cursor=page['nextCursor']
         self.assertEqual(len(collected),129)
         self.assertEqual(set(collected),set(created))
+        compatibility=self.app.catalog()
+        self.assertEqual(len(compatibility['sessions']),128)
 
     def test_product_review_history_has_no_256_item_lifetime_cap(self):
         record=method();self.app.create_method(record)
@@ -319,8 +321,14 @@ class ResearchSessionTests(unittest.TestCase):
     def test_stale_review_and_actual_fill_reload_without_reset(self):
         view,body=self.create();old=self.app.review(review_request(view))
         self.advance(view)
-        with self.assertRaisesRegex(ContractError,'REFUSED_STALE_REVISION'):
-            self.app.confirm(body['id'],dict(reviewId=old['review']['command']['commandId'],reviewHash=old['reviewHash']))
+        with self.assertLogs('execution.postgres',level='WARNING') as stale_log:
+            with self.assertRaisesRegex(ContractError,'REFUSED_STALE_REVISION'):
+                self.app.confirm(body['id'],dict(reviewId=old['review']['command']['commandId'],reviewHash=old['reviewHash']))
+        self.assertIn('requestType=OPEN',stale_log.output[0])
+        self.assertIn('expectedRevision=0',stale_log.output[0])
+        self.assertIn('actualRevision=1',stale_log.output[0])
+        self.assertIn('status=REFUSED_STALE_REVISION',stale_log.output[0])
+        self.assertNotIn(body['id'],stale_log.output[0])
         view=self.app.inspect(body['id']);new=self.app.review(review_request(view))
         self.app.confirm(body['id'],dict(reviewId=new['review']['command']['commandId'],reviewHash=new['reviewHash']))
         view=self.app.inspect(body['id']);self.advance(view)
@@ -333,6 +341,19 @@ class ResearchSessionTests(unittest.TestCase):
         for forbidden in ('controller','advanceTargets','endOfDataset','manifest','chunks','evidenceCatalog'):
             self.assertNotIn(forbidden,repr(saved))
         self.assertGreater(int(saved['state']['throughNs']),WARMUP_NS)
+
+    def test_stale_review_emits_revision_only_diagnostic(self):
+        view,body=self.create()
+        self.advance(view)
+        with self.assertLogs('execution.research',level='WARNING') as stale_log:
+            with self.assertRaisesRegex(ContractError,'REFUSED_STALE_REVISION'):
+                self.app.review(review_request(view))
+        message=stale_log.output[0]
+        self.assertIn('requestType=REVIEW',message)
+        self.assertIn('expectedRevision=0',message)
+        self.assertIn('actualRevision=1',message)
+        self.assertIn('status=REFUSED_STALE_REVISION',message)
+        self.assertNotIn(body['id'],message)
 
     def test_corrupt_and_older_records_preserved_fail_closed(self):
         view,body=self.create();saved=self.app.catalog()
