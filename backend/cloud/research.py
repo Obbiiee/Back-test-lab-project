@@ -270,11 +270,11 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             validate_source_selection(args[0],catalog,monthly_catalog)
         observed=_observed_route(operation,args,catalog,monthly_catalog);session_id=None
         session_metadata=None
-        if operation=='replay_to':
+        if operation in ('replay_to','jump_next_event'):
             session_id=args[0] if args else None
         elif operation not in ('catalog','create_method','create_session'):
             if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
-            elif operation in ('confirm','apply','replay','workspace','chart_history','bootstrap','inspect','summary','journal','journal_page','terminal_order_page','save_note','command_result') and args:session_id=args[0]
+            elif operation in ('confirm','apply','replay','jump_next_event','workspace','chart_history','bootstrap','inspect','summary','journal','journal_page','terminal_order_page','save_note','command_result') and args:session_id=args[0]
             if operation=='apply' and len(args)>1 and type(args[1]) is dict:session_id=args[1].get('sessionId')
         if type(session_id) is str:
             row=db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s',(str(workspace_id),session_id)).fetchone()
@@ -308,6 +308,8 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             monthly_provider=None;monthly_source_key=monthly_period=None
         if operation=='replay_to':
             require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
+        if operation=='jump_next_event' and observed:
+            require(catalog is not None,'jumpNextEvent','REFUSED_OBSERVED_OPERATION')
         monthly = None if observed else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication
@@ -604,6 +606,17 @@ def install(app):
             try:job_id=uuid.UUID(job_id)
             except ValueError:require(False,'jobId')
         return await execute(user,workspace_id,'replay_to',session_id,raw,write=True,job_id=job_id)
+
+    @app.post(prefix + '/sessions/{session_id}/jump-next-event')
+    async def jump_next_event(workspace_id: uuid.UUID, session_id: str, request: Request,
+                              user: User = Depends(current)):
+        raw=await json_body(request)
+        queue.jump_next_event_request(raw,session_id)
+        job_id=request.headers.get('x-btl-job')
+        if job_id is not None:
+            try:job_id=uuid.UUID(job_id)
+            except ValueError:require(False,'jobId')
+        return await execute(user,workspace_id,'jump_next_event',session_id,raw,write=True,job_id=job_id)
 
     @app.post(prefix + '/sessions/{session_id}/{operation}')
     async def session_operation(workspace_id: uuid.UUID, session_id: str, operation: str,

@@ -218,7 +218,7 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
         head[:2] == (prior_state['nextEventIndex'], prior_state['eventHash']) and
         type(head[2]) is int and head[2] >= 0 and
         type(head[3]) is int and head[3] >= 0 and
-        type(head[4]) is int and head[4] in (0, 1),
+        type(head[4]) is int and head[4] in (0, 1, 2),
         'journalIndexHead',
         'CORRUPT_RECORD',
     )
@@ -296,7 +296,7 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
         'WHERE workspace_id=%s AND session_id=%s FOR UPDATE',
         (workspace_id, session_id),
     ).fetchone()
-    if head[4] == 1:
+    if head[4] in (1, 2):
         require(metric_row is not None,
                 'sessionAnalyticsProjection', 'CORRUPT_RECORD')
     if metric_row is not None:
@@ -360,6 +360,8 @@ def append(db, workspace_id, session_id, prior_state, next_state, events):
             'WHERE workspace_id=%s AND session_id=%s',
             (raw, digest, workspace_id, session_id),
         )
+        db.execute('UPDATE btl.tick_journal_projection_heads SET analytics_format_version=2 '
+                   'WHERE workspace_id=%s AND session_id=%s', (workspace_id,session_id))
     db.execute(
         'UPDATE btl.tick_journal_projection_heads '
         'SET through_sequence=%s,event_hash=%s,order_count=order_count+%s,'

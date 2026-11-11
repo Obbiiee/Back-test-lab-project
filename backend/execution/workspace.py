@@ -108,6 +108,11 @@ class FixtureTimelineCache:
             self._publish(scope, session, timeline, groups)
             return ack, timeline.checkpoint()
 
+    def preview(self, checkpoint, target):
+        """Read one bounded controller-private page without changing the accepted cache tip."""
+        timeline = TickTimeline.resume(self.__provider, checkpoint)
+        return timeline.advance_through(target, timeline.cursor)
+
     def window(self, scope, session, checkpoint, *, last_only=False):
         with self.__lock:
             _, entry = self._entry(scope, session, checkpoint)

@@ -27,6 +27,8 @@ from .journal import (validate_note, request as journal_request, MAX_JOURNAL_ORD
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
 from .availability import catalog_availability, eligible_start_month
 from .journal_order_index import verify_projection as verify_journal_order_projection
+from .jump_next_event import (FINANCIAL_EVENT_KINDS, advance_command as jump_advance_command,
+                              result as jump_result, validate_request as validate_jump_request)
 
 log = logging.getLogger(__name__)
 
@@ -835,3 +837,53 @@ class ResearchApplication:
         with connect(self.dsn) as db:
             self._session(db,session_id)
         return self.controller.apply(self.scope,command)
+
+    def jump_next_event(self, session_id, raw):
+        """Commit one bounded canonical ADVANCE chunk toward the next event."""
+        validate_jump_request(raw, session_id)
+        with connect(self.dsn) as db:
+            _meta, _method, state, _checkpoint = self._session(db, session_id)
+        live = any(order['status'] in ('PENDING', 'ACTIVE') for order in state['orders'].values())
+        if not live or state['ended'] or state['unresolved']:
+            view = self.inspect(session_id, raw['timeframe'])
+            return jump_result(raw, status='NO_ACTIVE_ORDERS', through_ns=state['throughNs'],
+                advances=0, processed_groups=0, events=[], view=view)
+        end_exclusive = int(self.__provider.describe(state['datasetId'], state['datasetVersion'])['range']['endNs'])
+        target = str(end_exclusive - 1)
+        require(state['revision'] in (raw['expectedRevision'], raw['expectedRevision'] + 1),
+                'revision', 'REFUSED_STALE_REVISION')
+        if state['revision'] == raw['expectedRevision']:
+            preview = self.controller.preview_next_event(self.scope, state, _checkpoint, target)
+            # Timestamp alone cannot prove the source is exhausted: the cursor
+            # may still point at an unrevealed atomic group with that timestamp.
+            if not preview['previewGroups'] and int(state['throughNs']) >= int(target):
+                view = self.inspect(session_id, raw['timeframe'])
+                return jump_result(raw, status='NO_EVENT_UNTIL_SESSION_END',
+                    through_ns=state['throughNs'], advances=0, processed_groups=0,
+                    events=[], view=view)
+            advance_target = preview['targetNs']
+        else:
+            # Recovery after the command committed but its queue result was
+            # lost: the accepted throughNs is the exact idempotent command target.
+            advance_target = state['throughNs']
+        command = jump_advance_command({**raw, 'targetNs': advance_target}, raw['expectedRevision'],
+                                       'BTL-TICK-EXECUTION-COMMAND-1')
+        # Exact retries reuse this command id. The store returns its original
+        # durable receipt before checking a stale revision; no second ADVANCE
+        # or financial mutation is created.
+        saved = self.controller.apply(self.scope, command)
+        state_after = saved['state']
+        current = self.controller.inspect(self.scope, session_id, state_after['nextEventIndex'], 1)['state']
+        require(current['revision'] == state_after['revision'],
+                'revision', 'REFUSED_STALE_REVISION')
+        events = saved['events']
+        event_found = any(event['kind'] in FINANCIAL_EVENT_KINDS for event in events)
+        progressed = int(state_after['nextGroupIndex']) > int(state['nextGroupIndex']) or int(state_after['throughNs']) > int(state['throughNs'])
+        at_end = int(state_after['throughNs']) >= int(target)
+        status = ('EVENT_FOUND' if event_found else 'NO_EVENT_UNTIL_SESSION_END' if at_end
+                  else 'SEARCHING' if progressed else 'NO_EVENT_UNTIL_SESSION_END')
+        view = self.inspect(session_id, raw['timeframe'])
+        require(view['state']['revision'] == state_after['revision'], 'revision', 'REFUSED_STALE_REVISION')
+        return jump_result(raw, status=status, through_ns=state_after['throughNs'], advances=1,
+            processed_groups=max(0, int(state_after['nextGroupIndex']) - int(state['nextGroupIndex'])),
+            events=events, view=view)

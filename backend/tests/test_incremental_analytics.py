@@ -9,6 +9,30 @@ from tests.test_tick_execution import exercise
 
 
 class IncrementalAnalyticsTests(unittest.TestCase):
+    def test_non_terminating_r_multiple_is_accumulated_as_an_exact_ratio(self):
+        projection=record('session:analytics',0,'a'*64)
+        projection=add_trade(projection,{'id':'order:one','net':'1',
+            'rMultiple':{'numerator':'1','denominator':'3'},'durationNs':'1'})
+        projection=add_trade(projection,{'id':'order:two','net':'1',
+            'rMultiple':{'numerator':'1','denominator':'6'},'durationNs':'1'})
+        self.assertEqual(projection['formatVersion'],2)
+        self.assertEqual(projection['totals']['totalR'],'1/2')
+        self.assertEqual(metrics(projection)['averageR'],
+                         {'numerator':'1','denominator':'4'})
+
+    def test_legacy_v1_decimal_total_r_verifies_and_upgrades_without_rounding(self):
+        value=record('session:analytics',0,'a'*64)
+        value.update(formatVersion=1,artifact='BTL-TICK-SESSION-ANALYTICS-1')
+        value['totals']['totalR']='0'
+        value['contentHash']=content_hash({key:item for key,item in value.items()
+                                           if key!='contentHash'})
+        verified=verify(canonical_bytes(value),content_hash(value),
+            session_id='session:analytics',through_sequence=0,event_head='a'*64)
+        upgraded=add_trade(verified,{'id':'order:legacy','net':'1',
+            'rMultiple':{'numerator':'1','denominator':'3'},'durationNs':'1'})
+        self.assertEqual(upgraded['formatVersion'],2)
+        self.assertEqual(upgraded['totals']['totalR'],'1/3')
+
     def test_incremental_exact_metrics_match_canonical_fold(self):
         rows = [
             {'id': 'order:one', 'net': '5', 'rMultiple': {'numerator': '3', 'denominator': '2'},

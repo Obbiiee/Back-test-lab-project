@@ -2,6 +2,12 @@
 
 ## Owner checkpoint — V1 integration, browser stability and authority recovery (2026-11-10)
 
+### Jump to Next Event — local synthetic implementation evidence (2026-11-11)
+
+The frontend control and durable API/worker path now search bounded committed tick chunks through the canonical reducer and pinned provider, stopping on the earliest committed financial boundary while preserving order state at Session end. Golden parity includes pending fills, protection exits, equal-time ties, and the final unrevealed group at the current timestamp. Durable PostgreSQL tests cover retry, receipt recovery after worker death, and monthly-Parquet source execution. Two independent browser cohorts completed 10/10 full Jump → receipt → Journal/Analytics → logout/login/resume journeys on isolated PostgreSQL with the authored 2,048-tick fixture. Detailed measurements, test results, and private evidence paths are recorded in the newest `AI_CONTEXT/04_CURRENT_PHASE.md` checkpoint.
+
+The 10-user cohorts are not a latency/capacity PASS: observed API p95/p99 are 4.47/15.54 s and 4.62/16.48 s, above the previously recorded provisional interactive targets of 2/5 s. Admission and in-handler Review/Journal work both contribute, but SQL/lock/commit decomposition is unavailable. No normal-replay-versus-Jump speedup, long-history Parquet performance, or >10-user capacity claim is made; those measurements remain pending. No external market data is included.
+
 This register remains the implementation-gap tracker only. Agent permissions are defined in root `AGENTS.md`; technical architecture and frozen contracts remain in the Product System Architecture Blueprint; current authorization and status remain in `AI_CONTEXT/04_CURRENT_PHASE.md`. No second architecture or permission authority is introduced here.
 
 Remote branch reconciliation: related remote branch `codex/exness-monthly-prep-remote-20261109` advanced to `be3cfc6` from common ancestor `273f8b0`. Its GitHub Actions run `42678982007` recorded ten sequential real-browser journeys PASS and `42678981688` recorded the pinned Parquet suite PASS. This historical evidence belongs to that remote source tree and is not inherited as validation for the merged candidate below; both the hidden-Journal-tab fix and local concurrent-acceptance implementation must be tested together.

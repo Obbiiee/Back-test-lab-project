@@ -40,6 +40,10 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
+const consoleErrors=[];page.on('console',message=>{
+  if(message.type()!=='error'||consoleErrors.length>=16)return;
+  consoleErrors.push(message.text().split('\n',1)[0].slice(0,300));
+});
 const requestFailures=[];page.on('requestfailed',request=>{
   const url=new URL(request.url());if(url.origin!==configOrigin)return;
   const pathname=url.pathname.split('/').map(part=>part.startsWith('session:')||/^[a-f0-9-]{24,}$/i.test(part)?'{id}':part).join('/');
@@ -90,6 +94,8 @@ page.on('response',response=>{
         paginationValid:body?.complete===true||typeof body?.nextCursor==='string'&&body.nextCursor.length>0,
       }:null;
       row.state=['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELLED','RECONCILE_REQUIRED'].includes(body?.state)?body.state:null;
+      const jumpStatus=body?.result?.status??body?.status;
+      row.jumpStatus=['EVENT_FOUND','SEARCHING','NO_EVENT_UNTIL_SESSION_END','NO_ACTIVE_ORDERS'].includes(jumpStatus)?jumpStatus:null;
       const jobId=typeof body?.jobId==='string'?body.jobId:typeof body?.result?.jobId==='string'?body.result.jobId:
         pathname.endsWith('/jobs/{id}')?decodeURIComponent(url.pathname.split('/').at(-1)):null;
       if(typeof jobId==='string'&&/^[a-f0-9-]{36}$/i.test(jobId))row.jobDigest=digestIdentity(jobId);
@@ -173,7 +179,13 @@ try{
   await stepButton.click();await expect(stepButton).toBeEnabled({timeout:95000});
   phase='order_review';await page.getByRole('button',{name:/Buy at Ask/}).click();
   const ticket=page.getByRole('dialog',{name:'Plan an order'});
-  await ticket.getByLabel('Quantity (lots)').fill('0.01');
+  await ticket.getByRole('button',{name:'Add stop & target',exact:true}).click();
+  const entry=Number(await ticket.getByLabel('Entry').inputValue());
+  expect(Number.isFinite(entry)).toBeTruthy();
+  // Keep the stop/target close to the current synthetic quote so the real tick
+  // engine reaches a committed exit boundary in this bounded browser journey.
+  await ticket.getByLabel('Stop Loss').fill((entry-1.00).toFixed(2));
+  await ticket.locator('input[aria-label="Take Profit"]').fill((entry+2.00).toFixed(2));
   const reviewResponse=page.waitForResponse(response=>response.request().method()==='POST'&&
     new URL(response.url()).pathname.endsWith('/reviews')&&response.status()===200,
     {timeout:API_REQUEST_DEADLINE_MS});
@@ -206,8 +218,12 @@ try{
   const retry=await retryExactConfirm({
     send:({timeoutMs})=>context.request.post(request.url(),{headers:{Authorization:authorization,'Content-Type':'application/json'},
       data:retryPayload,maxRedirects:0,timeout:timeoutMs}),
-    onResponse:row=>{apiResponseCount++;apiTrace.push({method:'POST',path:retryPath,status:row.status,code:row.code,
-      rows:null,journalPage:null,state:null,durationMs:row.durationMs});},
+    onResponse:row=>{
+      const event={method:'POST',path:retryPath,status:row.status,code:row.code,
+        rows:null,journalPage:null,state:null,durationMs:row.durationMs};
+      apiResponseCount++;apiTrace.push(event);
+      process.stdout.write(JSON.stringify({apiEvent:event})+'\n');
+    },
   });
   expect(retry.body).toEqual(receipt);
   const reviewDialog=page.getByRole('dialog',{name:'Confirm reviewed order'});
@@ -229,41 +245,24 @@ try{
   await expect(stepButton).toBeEnabled({timeout:95000});
   step('order_receipt');
   const terminal=page.getByRole('region',{name:'Trading and Analysis'});
-  phase='trade_close_advance_to_open_positions';
+  phase='jump_to_entry_event';
   const beforeEntryRevision=Number(await terminal.getAttribute('data-revision'));
   expect(Number.isSafeInteger(beforeEntryRevision)).toBeTruthy();
-  await expect(stepButton).toBeEnabled({timeout:95000});
-  await stepButton.click({timeout:95000});
-  await expect(terminal).toHaveAttribute('data-revision',String(beforeEntryRevision+1),{timeout:95000});
-  await expect(stepButton).toBeEnabled({timeout:95000});
-  phase='trade_close_open_positions_tab';
-  await terminal.getByRole('button',{name:'Open positions',exact:true}).click();
-  phase='trade_close_open_positions_table';
-  await expect(terminal.getByRole('table',{name:'Open positions'})).toBeVisible();
-  phase='trade_close_find_open_position';
-  const row=terminal.locator('tr[data-order-id]').first();
-  await expect(row).toBeVisible();
-  phase='trade_close_open_confirmation';
-  await row.getByRole('button',{name:'Close position',exact:true}).click();
-  phase='trade_close_commit_confirmation';
-  const closeDialog=page.getByRole('dialog',{name:'Confirm position action'});
-  await closeDialog.getByRole('button',{name:'Confirm action',exact:true}).click();
-  await expect(closeDialog).toBeHidden();
-  phase='trade_close_advance_after_commit';
+  const jumpButton=page.getByRole('button',{name:'Jump to Next Event',exact:true});
+  await expect(jumpButton).toBeEnabled({timeout:95000});
+  await jumpButton.click({timeout:95000});
+  await expect.poll(async()=>Number(await terminal.getAttribute('data-revision')),{timeout:95000}).toBeGreaterThan(beforeEntryRevision);
+  await expect(jumpButton).toBeEnabled({timeout:95000});
+  phase='jump_to_exit_event';
   const beforeExitRevision=Number(await terminal.getAttribute('data-revision'));
   expect(Number.isSafeInteger(beforeExitRevision)).toBeTruthy();
-  // A close commits before the next replay step; the single worker may still
-  // have earlier traders' jobs ahead of this Session. Bound this wait by the
-  // repository's 60 s queue TTL instead of Playwright's 20 s locator default.
-  await expect(stepButton).toBeEnabled({timeout:95000});
-  await stepButton.click({timeout:60000});
-  await expect(terminal).toHaveAttribute('data-revision',String(beforeExitRevision+1));
-  await expect(stepButton).toBeEnabled({timeout:95000});
+  await jumpButton.click({timeout:95000});
+  await expect.poll(async()=>Number(await terminal.getAttribute('data-revision')),{timeout:95000}).toBeGreaterThan(beforeExitRevision);
   phase='trade_close_closed_trades_tab';
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   phase='trade_close_committed_row';
   await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1,{timeout:95000});
-  await expect(page.getByLabel('Saved balance 9999.7 USD')).toBeVisible();step('committed_trade_journal_analytics');
+  await expect(page.locator('.alpha-balance-pill')).not.toHaveAttribute('aria-label','Saved balance 10000 USD');step('jump_entry_exit_journal_analytics');
   phase='journal_analytics_workspace_note';
   const journalResponse=page.waitForResponse(response=>response.request().method()==='GET'&&
     new URL(response.url()).pathname.endsWith('/journal/pages')&&response.status()===200,{timeout:95000});
@@ -333,12 +332,13 @@ try{
   expect(apiTrace.filter(entry=>(entry.status===429&&entry.code!=='RESEARCH_BUSY')||
     (entry.status===503&&entry.code!=='SERVICE_BUSY')||entry.status>=500&&entry.status!==503)).toEqual([]);
   expect(unrecoveredBusy).toEqual([]);
+  expect(apiTrace.filter(entry=>entry.jumpStatus==='EVENT_FOUND').length).toBeGreaterThanOrEqual(2);
   const committedJournal=apiTrace.filter(entry=>entry.path.endsWith('/journal/pages')&&entry.status===200).at(-1);
   expect(committedJournal?.journalPage?.firstOrderStatuses).toEqual(['CLOSED']);
   expect(errors).toEqual([]);step('logout_login_resume');
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),
-    transientBusyCount:busyResponses.length,
-    apiResponseCount,pageErrorCount:errors.length,failedRequests:requestFailures.length,
+    transientBusyCount:busyResponses.length,apiResponseCount,pageErrorCount:errors.length,
+    failedRequests:requestFailures.length,
     steps:completedSteps})+'\n');
 }catch(error){
   await Promise.allSettled(apiBodyReads);
@@ -381,9 +381,9 @@ try{
     .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,'{id}')
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g,'{email}')
     .slice(0,300);
-  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,
+  process.stdout.write(JSON.stringify({failurePhase:phase,failureType:error?.name||'Error',screenState,consoleErrors,
     pageErrorCount:errors.length,browserDiagnostics,browserFailureMessage:failureMessage,
-    apiTrace:apiTrace.slice(-64),requestFailures})+'\n');
+    requestFailures})+'\n');
   await page.screenshot({path:join(evidence,'failure.png'),fullPage:true}).catch(()=>{});
   const body=await page.locator('body').innerText().catch(()=> '');
   await import('node:fs/promises').then(fs=>fs.writeFile(join(evidence,'failure.txt'),String(error)+'\n'+body));

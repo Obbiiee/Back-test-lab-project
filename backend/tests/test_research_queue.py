@@ -29,6 +29,16 @@ from infrastructure.postgres_metrics import collect_job_metrics
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
 
 
+class WorkerErrorFieldTests(unittest.TestCase):
+    def test_worker_preserves_bounded_contract_error_field(self):
+        from cloud.worker import _result
+        from contracts.canonical import canonical_bytes
+        with self.assertRaises(ContractError) as caught:
+            _result(canonical_bytes({'schemaVersion':1,'error':'INVALID_INPUT',
+                                     'errorField':'expectedRevision'}))
+        self.assertEqual(caught.exception.field,'expectedRevision')
+
+
 @unittest.skipUnless(DSN, 'Real PostgreSQL required; skip is not acceptance')
 class QueueTests(unittest.TestCase):
     @classmethod
@@ -711,6 +721,26 @@ class QueueTests(unittest.TestCase):
 
                         confirmed_view = active.get(path + '/sessions/' + session_id,
                                                     headers=self.fixture.headers).json()
+                        jump_request = {'schemaVersion': 1, 'artifact': 'BTL-JUMP-NEXT-EVENT-1',
+                            'requestId': uuid.uuid4().hex, 'sessionId': session_id,
+                            'expectedRevision': confirmed_view['state']['revision'], 'timeframe': '1m'}
+                        jump_job = str(uuid.uuid4())
+                        queued_jump = active.post(path + '/sessions/' + session_id + '/jump-next-event',
+                            headers={**self.fixture.headers, 'X-BTL-Job': jump_job}, json=jump_request)
+                        self.assertEqual(queued_jump.status_code, 202, queued_jump.text)
+                        jump_status = completed_job(active, path, jump_job)
+                        self.assertEqual(jump_status['state'], 'SUCCEEDED', jump_status)
+                        self.assertEqual(jump_status['result']['artifact'], 'BTL-JUMP-NEXT-EVENT-RESULT-1')
+                        self.assertEqual(jump_status['result']['status'], 'EVENT_FOUND')
+                        self.assertTrue(any(event['kind'] == 'ENTRY_FILL'
+                                            for event in jump_status['result']['events']))
+                        repeated_jump = active.post(path + '/sessions/' + session_id + '/jump-next-event',
+                            headers={**self.fixture.headers, 'X-BTL-Job': jump_job}, json=jump_request)
+                        self.assertEqual(repeated_jump.status_code, 200, repeated_jump.text)
+                        self.assertEqual(repeated_jump.json(), jump_status['result'])
+
+                        confirmed_view = active.get(path + '/sessions/' + session_id,
+                                                    headers=self.fixture.headers).json()
                         advance = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
                                    'sessionId': session_id,
                                    'commandId': 'command:' + uuid.uuid4().hex,
@@ -775,6 +805,44 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
             duplicate=self.submit(operation='replay',args=(session,command))
             self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,duplicate['jobId'],cancel=True)['state'],'RECONCILE_REQUIRED')
             self.assertEqual(app.inspect(session),before,'Cancelled operational retry must not claim the previous fill was absent')
+        finally:
+            app.close()
+
+    def test_jump_process_death_after_inner_commit_recovers_same_financial_receipt(self):
+        app,session,_command=self.replay_fixture()
+        try:
+            before=app.inspect(session)
+            request={'schemaVersion':1,'artifact':'BTL-JUMP-NEXT-EVENT-1',
+                'requestId':uuid.uuid4().hex,'sessionId':session,
+                'expectedRevision':before['state']['revision'],'timeframe':'1m'}
+            job=self.submit(operation='jump_next_event',args=(session,request))
+            script="""from cloud.queue import work_one
+from cloud.research import run
+import os
+def crash_after(*args,**kwargs):
+    run(*args,**kwargs)
+    os._exit(17)
+work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
+"""
+            process=subprocess.run([sys.executable,'-B','-c',script],timeout=20,capture_output=True,
+                env={**os.environ,'BTL_TEST_DATABASE_URL':self.dsn})
+            self.assertEqual(process.returncode,17,process.stderr.decode(errors='replace'))
+            committed=app.inspect(session)
+            self.assertEqual(committed['state']['revision'],before['state']['revision']+1)
+            self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in committed['events']))
+            with connect(self.dsn) as db:
+                db.execute("UPDATE btl.research_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=%s",
+                           (job['jobId'],))
+            self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])['state'],'QUEUED')
+            self.assertTrue(queue.work_one(self.dsn,run))
+            result=queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])
+            self.assertEqual(result['state'],'SUCCEEDED')
+            self.assertEqual(result['result']['status'],'EVENT_FOUND')
+            self.assertEqual(app.inspect(session),committed)
+            with connect(self.dsn) as db:
+                count=db.execute('SELECT count(*) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id LIKE %s',
+                    (str(self.workspace),session,'jump:'+request['requestId']+':r%')).fetchone()[0]
+            self.assertEqual(count,1)
         finally:
             app.close()
 

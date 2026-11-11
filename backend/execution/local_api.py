@@ -208,6 +208,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
     async def command(session_id: str,request: Request):
         return await execute(application(request).apply,session_id,await body(request))
 
+    @app.post("/api/v1/tick-alpha/sessions/{session_id}/jump-next-event")
+    async def jump_next_event(session_id: str,request: Request):
+        return await execute(application(request).jump_next_event,session_id,await body(request))
+
     return app
 
 

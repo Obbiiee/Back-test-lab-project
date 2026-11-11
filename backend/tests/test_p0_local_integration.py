@@ -132,6 +132,62 @@ class P0LocalIntegrationTests(unittest.TestCase):
         self.assertEqual(checked["receipt"]["commandId"], command_id)
         self.assertEqual(self.count_commands(command_id), 1)
 
+    def test_jump_to_next_event_stops_at_entry_then_exit_and_retry_is_receipt_safe(self):
+        reviewed = self.review()
+        order_id = reviewed['review']['command']['commandId']
+        confirmed = self.client.post(f"{ROOT}/sessions/{self.session_id}/confirm",
+            json={'reviewId':order_id,'reviewHash':reviewed['reviewHash']})
+        self.assertEqual(confirmed.status_code,200,confirmed.text)
+        start = confirmed.json()['state']
+
+        def jump(expected):
+            raw=dict(schemaVersion=1,artifact='BTL-JUMP-NEXT-EVENT-1',requestId=uuid.uuid4().hex,
+                     sessionId=self.session_id,expectedRevision=expected,timeframe='1m')
+            response=self.client.post(f"{ROOT}/sessions/{self.session_id}/jump-next-event",json=raw)
+            self.assertEqual(response.status_code,200,response.text)
+            return raw,response.json()
+
+        request,entry=jump(start['revision'])
+        self.assertEqual(entry['status'],'EVENT_FOUND')
+        self.assertEqual([event['kind'] for event in entry['events'] if event['kind']=='ENTRY_FILL'],['ENTRY_FILL'])
+        self.assertEqual(entry['view']['state']['orders'][order_id]['status'],'ACTIVE')
+        self.assertEqual(entry['view']['state']['throughNs'],entry['throughNs'])
+        # The same request reuses its exact ADVANCE receipt after a response loss.
+        retry=self.client.post(f"{ROOT}/sessions/{self.session_id}/jump-next-event",json=request)
+        self.assertEqual(retry.status_code,200,retry.text)
+        self.assertEqual(retry.json()['events'],entry['events'])
+        self.assertEqual(retry.json()['view']['state']['revision'],entry['view']['state']['revision'])
+
+        _request,exit_event=jump(entry['view']['state']['revision'])
+        self.assertEqual(exit_event['status'],'EVENT_FOUND')
+        fills=[event for event in exit_event['events'] if event['kind']=='EXIT_FILL']
+        self.assertEqual(len(fills),1)
+        self.assertEqual(fills[0]['detail']['reason'],'SL')
+        self.assertTrue(any(order['id']==order_id and order['status']=='CLOSED'
+                            for order in exit_event['view']['analysis']['orders']))
+        journal=self.client.get(f"{ROOT}/sessions/{self.session_id}/journal").json()
+        self.assertTrue(any(order['id']==order_id and order['status']=='CLOSED' for order in journal['orders']))
+        summary=self.client.get(f"{ROOT}/sessions/{self.session_id}/summary").json()
+        self.assertEqual(summary['completedTrades'],1)
+        self.assertEqual(summary['balance'],exit_event['view']['state']['balance'])
+
+    def test_jump_processes_the_last_tick_when_its_timestamp_is_already_the_frontier(self):
+        reviewed=self.review()
+        order_id=reviewed['review']['command']['commandId']
+        confirmed=self.client.post(f"{ROOT}/sessions/{self.session_id}/confirm",
+            json={'reviewId':order_id,'reviewHash':reviewed['reviewHash']})
+        self.assertEqual(confirmed.status_code,200,confirmed.text)
+        state=confirmed.json()['state']
+        raw=dict(schemaVersion=1,artifact='BTL-JUMP-NEXT-EVENT-1',requestId=uuid.uuid4().hex,
+            sessionId=self.session_id,expectedRevision=state['revision'],timeframe='1m')
+        response=self.client.post(f"{ROOT}/sessions/{self.session_id}/jump-next-event",json=raw)
+        self.assertEqual(response.status_code,200,response.text)
+        result=response.json()
+        self.assertEqual(result['status'],'EVENT_FOUND')
+        self.assertEqual(result['advances'],1)
+        self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in result['events']))
+        self.assertEqual(result['view']['state']['revision'],state['revision']+1)
+
     def test_revision_advance_proves_not_committed_and_stale_confirm_refuses(self):
         reviewed = self.review()
         command_id = reviewed["review"]["command"]["commandId"]

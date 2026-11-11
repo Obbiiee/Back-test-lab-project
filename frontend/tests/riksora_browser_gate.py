@@ -24,7 +24,7 @@ from unittest.mock import patch
 REPOSITORY = Path(__file__).resolve().parents[2]
 VERSION = '1.64.1'
 STEPS = ('login_screen', 'login_workspace', 'method', 'session_replay',
-         'order_receipt', 'committed_trade_journal_analytics', 'logout_login_resume')
+         'order_receipt', 'jump_entry_exit_journal_analytics', 'logout_login_resume')
 
 
 def preflight(repository, tools):
@@ -60,6 +60,7 @@ def sanitize_api_event(item):
     method, path, status, duration = (event.get('method'), event.get('path'),
                                       event.get('status'), event.get('durationMs'))
     code = event.get('code')
+    jump_status = event.get('jumpStatus')
     if (method not in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE') or
             not isinstance(path, str) or not path.startswith('/api/v1/') or
             len(path) > 240 or '?' in path or '\n' in path or '\r' in path or
@@ -72,8 +73,11 @@ def sanitize_api_event(item):
         return None
     # Store only route/status/timing fields; response bodies and identity data
     # never cross the browser-parent QA protocol.
+    if jump_status is not None and jump_status not in (
+            'EVENT_FOUND', 'SEARCHING', 'NO_EVENT_UNTIL_SESSION_END', 'NO_ACTIVE_ORDERS'):
+        return None
     return {'method': method, 'path': path, 'status': status,
-            'code': code, 'durationMs': duration}
+            'code': code, 'jumpStatus': jump_status, 'durationMs': duration}
 
 
 def _queue_job_timeline(dsn):
@@ -233,13 +237,21 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                 code = message.split(marker, 1)[1].split()[0]
                 if code.isascii() and code.isupper() and all(c.isalnum() or c == '_' for c in code):
                     report['workerFailureCode'] = code
+                field_marker='error_field='
+                field=message.split(field_marker,1)[1].split()[0] if field_marker in message else ''
+                if field.isascii() and field.isidentifier() and len(field)<=64:
+                    report['workerFailureField']=field
+                source_marker='error_source='
+                source=message.split(source_marker,1)[1].split()[0] if source_marker in message else ''
+                if source.isascii() and len(source)<=128 and all(c.isalnum() or c in '_.:-' for c in source):
+                    report['workerFailureSource']=source
                 operation_marker = 'operation='
                 operation=''
                 if operation_marker in message:
                     operation = message.split(operation_marker, 1)[1].split()[0]
                     # Keep only the bounded operation label; never retain job,
                     # actor, workspace, or other values from the log record.
-                    if operation in ('workspace', 'bootstrap', 'replay', 'replay_to', 'create_session',
+                    if operation in ('workspace', 'bootstrap', 'replay', 'replay_to', 'jump_next_event', 'create_session',
                                      'apply', 'journal', 'method_analytics', 'session_page'):
                         report['workerFailureOperation'] = operation
                 job_marker='job_id='
@@ -248,7 +260,11 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                     item={'jobDigest':hashlib.sha256(job_id.encode()).hexdigest()[:20],
                           'errorCode':code if code.isascii() and code.isupper() and all(c.isalnum() or c=='_' for c in code) else None,
                           'atUnixMs':int(time.time()*1000)}
-                    if operation in ('workspace','bootstrap','replay','replay_to','create_session','apply','journal','method_analytics','session_page'):
+                    if field.isascii() and field.isidentifier() and len(field)<=64:
+                        item['errorField']=field
+                    if source.isascii() and len(source)<=128 and all(c.isalnum() or c in '_.:-' for c in source):
+                        item['errorSource']=source
+                    if operation in ('workspace','bootstrap','replay','replay_to','jump_next_event','create_session','apply','journal','method_analytics','session_page'):
                         item['operation']=operation
                     try:
                         with psycopg.connect(dsn,connect_timeout=2) as diagnostic_db:
@@ -451,6 +467,11 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                                     type(item.get('pageErrorCount')) is int and 0 <= item['pageErrorCount'] <= 32):
                                 report['browserDiagnostics'] = diagnostics
                                 report['pageErrorCount'] = item['pageErrorCount']
+                            console_errors = item.get('consoleErrors', [])
+                            if isinstance(console_errors, list) and len(console_errors) <= 16 and all(
+                                    isinstance(value, str) and len(value) <= 1200 and value.isascii()
+                                    for value in console_errors):
+                                report['browserConsoleErrors'] = console_errors
                             trace = item.get('apiTrace', [])
                             if isinstance(trace, list) and len(trace) <= 128:
                                 report['apiTrace'] = [entry for entry in trace if
@@ -468,7 +489,9 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                                     (entry.get('code') is None or
                                      isinstance(entry.get('code'), str) and
                                      entry['code'].isascii() and entry['code'].isupper() and
-                                     all(c.isalnum() or c == '_' for c in entry['code']))]
+                                     all(c.isalnum() or c == '_' for c in entry['code'])) and
+                                    (entry.get('jumpStatus') is None or entry.get('jumpStatus') in
+                                     ('EVENT_FOUND','SEARCHING','NO_EVENT_UNTIL_SESSION_END','NO_ACTIVE_ORDERS'))]
                             failures = item.get('requestFailures', [])
                             if isinstance(failures, list) and len(failures) <= 32:
                                 report['requestFailures'] = [entry for entry in failures if
@@ -773,7 +796,10 @@ def run_browser_cohort(environment, tools, browser_cache, evidence, report, *, u
                         user['status']='FAIL'
                         failure='BROWSER_JOURNEY_ASSERTION'
                         break
-                    api=item.get('apiTrace',[])
+                    # API events are streamed as individual frames so each
+                    # account remains below the bounded protocol line size.
+                    # The completion frame intentionally carries no full trace.
+                    api=user['apiTrace']
                     transient_busy=lambda row:(row.get('status')==429 and row.get('code')=='RESEARCH_BUSY') or (
                         row.get('status')==503 and row.get('code')=='SERVICE_BUSY')
                     unrecovered_busy=[row for index,row in enumerate(api)

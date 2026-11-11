@@ -23,7 +23,7 @@ class BrowserGateSafetyTests(unittest.TestCase):
             'email': 'private@example.com', 'responseBody': {'token': 'secret'}}}
         self.assertEqual(gate.sanitize_api_event(event), {
             'method': 'GET', 'path': '/api/v1/auth/providers', 'status': 200,
-            'code': None, 'durationMs': 12.5})
+            'code': None, 'jumpStatus': None, 'durationMs': 12.5})
         self.assertIsNone(gate.sanitize_api_event({'apiEvent': {
             'method': 'GET', 'path': '/api/v1/auth/login?email=private@example.com',
             'status': 200, 'durationMs': 1}}))

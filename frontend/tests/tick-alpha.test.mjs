@@ -28,6 +28,12 @@ assert.equal(sourceContext(),'synthetic');
 await api('/catalog');
 assert.equal(accountCalls.at(-1)[0],'/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog');
 assert.equal(accountCalls.at(-1)[1].headers['X-BTL-Source'],undefined);
+const jumpBody={schemaVersion:1,artifact:'BTL-JUMP-NEXT-EVENT-1',requestId:'c'.repeat(32),
+  sessionId:'session:jump',expectedRevision:7,timeframe:'1m'};
+await api('/sessions/session%3Ajump/jump-next-event',jumpBody);
+const jumpCall=accountCalls.at(-1);
+assert.ok(jumpCall[0].endsWith('/sessions/session%3Ajump/jump-next-event'));
+assert.ok(jumpCall[1].headers['X-BTL-Job'],'Next-event mutation is admitted through the durable job protocol');
 const transientReadCalls=[];
 let transientMutationCalls=0;
 const transientReadAccount=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
@@ -463,6 +469,11 @@ const wizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',impo
 assert.ok(wizard.includes('name="startPeriod"')&&wizard.includes('Start month (UTC)'));
 assert.ok(ui.includes("api('/sessions',{id:creationId.current"),'Session creation still sends the existing POST /sessions payload');
 assert.ok(ui.includes("dialog==='ticket'"));
+assert.ok(ui.includes("+'/jump-next-event'"));
+assert.ok(ui.includes("artifact:'BTL-JUMP-NEXT-EVENT-1'"));
+const workspaceUi=readFileSync(new URL('../src/tickAlpha/AlphaWorkspace.jsx',import.meta.url),'utf8');
+assert.ok(workspaceUi.includes('Jump to Next Event')&&workspaceUi.includes('Cancel search'));
+assert.ok(workspaceUi.includes('role="status" aria-live="polite"'));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
 console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');
 const historyView={metadata:{startPeriod:'2015-09'},state:{datasetId:'test:history',datasetVersion:'test:v1',throughNs:'1441067400000000000'}};

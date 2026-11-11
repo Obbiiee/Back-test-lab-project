@@ -1,5 +1,27 @@
 # OWNER CHECKPOINT — V1 integration, browser stability and authority recovery (2026-11-10)
 
+### Jump to Next Event implementation checkpoint (2026-11-11)
+
+Implemented bounded Jump to Next Event through the canonical tick reducer, durable PostgreSQL queue, pinned synthetic/observed source routing, Session revision/idempotency, worker recovery, cancellation-at-committed-chunk, and replay controls. The UI pauses visual replay, applies verified committed chunks, stops at entry/exit/unresolved boundaries, and resumes from persisted Session state. It reports `NO_EVENT_UNTIL_SESSION_END` only after the bounded source preview confirms there are no remaining groups; pending orders remain unchanged. No financial reducer, fill rule, tick evidence, or no-look-ahead contract was changed.
+
+A real Chromium → frontend → API → two-worker queue → disposable PostgreSQL synthetic journey now exercises Jump to entry and Jump to close, receipt, CLOSED Journal/Analytics, logout/login, and Session resume. Two independent ten-trader runs on `synthetic:local-alpha-v1` (2,048 ticks; source manifest `e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32`) each completed 10/10 journeys and closed 10/10 trades, with no failed jobs or auth rate limits. Private evidence: `frontend/tests/artifacts/riksora-private-browser-kfjn59rt/report.json` and `frontend/tests/artifacts/riksora-private-browser-en9s0dan/report.json`; both isolated PostgreSQL clusters cleaned up.
+
+| Measurement | Run 1 | Confirmation |
+| --- | ---: | ---: |
+| Journey completion / closed trades | 10/10 / 10 | 10/10 / 10 |
+| Wall hold | 361.50 s | 361.61 s |
+| API p50 / p95 / p99 | 77.7 / 4,472 / 15,541 ms | 78.6 / 4,619 / 16,480 ms |
+| Queue wait p50 / p95 | 3.81 / 21.95 s | 2.54 / 9.05 s |
+| Worker wall p50 / p95 | 42 / 7,387 ms | 52 / 4,569 ms |
+| API status 503 / transient backpressure | 0 / 0 | 1 / 1, recovered |
+| Queue failed jobs | 0 | 0 |
+| Peak cgroup memory / min MemAvailable | 2.84 GiB / 13.15 GB | 2.84 GiB / 13.13 GB |
+| DB growth / max connections | 1.91 MB / 15 | 1.88 MB / 15 |
+
+Latency evidence continues to show that admission wait and operation time both contribute. In the confirmation run, Review requests had ~3.2–14.8 s admission plus ~11.7–14.4 s operation; Confirm tails were dominated by admission (~15.8 s) while the operation was ~0.4 s; Journal operation reached ~10.3 s in the sampled tail. Independent PostgreSQL probe RTT p95 was ~599 ms and is not per-request SQL attribution. The provisional interactive API target p95 ≤2 s / p99 ≤5 s remains unmet. No additional API optimization is claimed from these runs; do not advance to 20+ traders until the tail is reduced and the existing gates pass.
+
+Targeted backend parity/scanner/golden regressions: 45/45 PASS; isolated PostgreSQL Jump receipt/retry, last-timestamp boundary, monthly-Parquet worker path, and worker-death recovery: 4/4 PASS; complete queue suite: 24/24 PASS; frontend TickAlpha and Analytics regressions, ESLint, and Vite production build: PASS; browser-gate safety: 9/9 PASS; Python compile and `git diff --check`: PASS. Normal-replay-vs-Jump resource/performance A/B, longer Parquet workload, full repository suite, and >10 cohorts are NOT RUN. This checkpoint demonstrates synthetic software behavior only, not historical market accuracy, commercial data rights, host/VPS capacity, or production readiness.
+
 ### Owner directive — publish, optimize latency, and extend local synthetic capacity (2026-11-11)
 
 Owner authorizes reconciling local commit `018f9d93d86c7c2317995c4538b42a6e84e277da` with the current GitHub history, publishing the reviewed result to `codex/exness-monthly-diagnostics-20261109` by a safe fast-forward/Git Data API route, running relevant regressions, and progressing real-browser synthetic application cohorts 10 → 20 → 50 → 100 on this local host. Keep auth limits 30 sensitive auth/IP/minute, 10/account/minute, and 600 global API/IP/minute; use the candidate's configured two workers. Every cohort requires the product UI, real API/worker, isolated disposable PostgreSQL16, isolated accounts/Sessions, and the existing watchdog. Before each stage enforce repository resource/queue/deadline/integrity gates and stop on the first violation. Only deterministic repository synthetic ticks are allowed. No external/real market data, VPS/SSH, broker, paid service, user/production database, protected data, Annual PASS, force-push, main change, merge-to-main, deployment, or public dataset. A candidate interactive/API SLO may be recorded before optimization assessment but is not a frozen product contract. This checkpoint is the explicit owner authorization narrowing and superseding prior local no-push/10-user limits only for this task.

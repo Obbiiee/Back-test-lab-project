@@ -31,8 +31,8 @@ MAX_JOB_ATTEMPTS = 3
 LEASE_SECONDS = 30
 HEARTBEAT_SECONDS = 5
 QUEUE_TTL_SECONDS = 60
-OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to'))
-MUTATING_OPERATIONS = frozenset(('create_session', 'replay', 'replay_to'))
+OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to', 'jump_next_event'))
+MUTATING_OPERATIONS = frozenset(('create_session', 'replay', 'replay_to', 'jump_next_event'))
 
 _CLAIM_NEXT_JOB = """
 SELECT j.* FROM btl.research_jobs j
@@ -81,10 +81,10 @@ def _reap_expired_leases(db):
         )
         UPDATE btl.research_jobs j SET
             state = CASE
-                WHEN j.cancel_requested_at IS NOT NULL AND j.operation NOT IN ('replay','replay_to','create_session') THEN 'CANCELLED'
+                WHEN j.cancel_requested_at IS NOT NULL AND j.operation NOT IN ('replay','replay_to','jump_next_event','create_session') THEN 'CANCELLED'
                 WHEN j.cancel_requested_at IS NOT NULL THEN 'RECONCILE_REQUIRED'
                 WHEN j.attempts < %s THEN 'QUEUED'
-                WHEN j.operation IN ('replay','replay_to','create_session') THEN 'RECONCILE_REQUIRED'
+                WHEN j.operation IN ('replay','replay_to','jump_next_event','create_session') THEN 'RECONCILE_REQUIRED'
                 ELSE 'FAILED'
             END,
             expires_at = CASE WHEN j.cancel_requested_at IS NULL AND j.attempts < %s
@@ -101,7 +101,7 @@ def _reap_expired_leases(db):
 def _expire_queued(db):
     return db.execute("""
         UPDATE btl.research_jobs SET
-            state=CASE WHEN operation IN ('replay','replay_to','create_session') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,
+            state=CASE WHEN operation IN ('replay','replay_to','jump_next_event','create_session') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,
             finished_at=clock_timestamp()
         WHERE state='QUEUED' AND expires_at < clock_timestamp()
     """).rowcount
@@ -151,6 +151,11 @@ def replay_to_request(raw, session_id):
     uint(raw['targetNs'])
     require(type(raw['timeframe']) is str and raw['timeframe'] in ('1m','3m','5m','15m','30m','1h','2h','4h','D'), 'timeframe')
     return raw
+
+
+def jump_next_event_request(raw, session_id):
+    from execution.jump_next_event import validate_request
+    return validate_request(raw, session_id)
 
 
 def _worker_measurements(result):
@@ -205,21 +210,25 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
         require(type(args[1]) is dict, 'request')
     if operation == 'replay_to':
         replay_to_request(args[1], args[0])
+    elif operation == 'jump_next_event':
+        jump_next_event_request(args[1], args[0])
     payload = {'schemaVersion': 1, 'operation': operation, 'args': list(args)}
     raw = canonical_bytes(payload)
     require(len(raw) <= 16384, 'request')
     digest = content_hash(payload)
     with connect(dsn) as db:
         unit = scoped(db, actor_id, workspace_id)
-        if operation in ('replay', 'replay_to', 'create_session'):
+        if operation in ('replay', 'replay_to', 'jump_next_event', 'create_session'):
             owner(unit.role)
-        if operation in ('replay', 'replay_to'):
+        if operation in ('replay', 'replay_to', 'jump_next_event'):
             session_artifact = _persisted_session_artifact(db, str(workspace_id), args[0])
             if operation == 'replay':
                 replay_command(args[1], args[0], session_artifact)
-            else:
+            elif operation == 'replay_to':
                 require(session_artifact == 'BTL-OBSERVED-RESEARCH-SESSION-1',
                         'replayTo', 'REFUSED_OBSERVED_OPERATION')
+            else:
+                jump_next_event_request(args[1], args[0])
         # Serialize inexpensive count/admission across all API processes.
         db.execute('SELECT pg_advisory_xact_lock(2020,300)')
         previous = db.execute('SELECT * FROM btl.research_jobs WHERE id=%s', (job_id,)).fetchone()
@@ -284,10 +293,10 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
             if row['state'] != 'QUEUED':
                 return view(row)
             if cancel:
-                state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else 'CANCELLED'
+                state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS or row['operation']=='create_session' else 'CANCELLED'
                 row = db.execute("UPDATE btl.research_jobs SET state=%s,cancel_requested_at=clock_timestamp(),finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *", (state, job_id)).fetchone() or row
             elif not db.execute('SELECT clock_timestamp()<%s AS valid',(row['expires_at'],)).fetchone()['valid']:
-                state = 'RECONCILE_REQUIRED' if row['operation'] in ('replay','replay_to','create_session') else 'EXPIRED'
+                state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS or row['operation']=='create_session' else 'EXPIRED'
                 row = db.execute("UPDATE btl.research_jobs SET state=%s,finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *",(state, job_id)).fetchone()
         elif row['state'] == 'RUNNING' and cancel:
             row = db.execute("UPDATE btl.research_jobs SET cancel_requested_at=COALESCE(cancel_requested_at,clock_timestamp()) WHERE id=%s AND state='RUNNING' RETURNING *",
@@ -376,6 +385,8 @@ def work_one(dsn, runner):
                 # The native worker applies its 30s execution deadline after
                 # any bounded pinned-source re-admission. Keep that separate
                 # startup allowance from the queue transaction's wall time.
+            elif row['operation'] == 'jump_next_event':
+                result = runner(dsn, row['actor_id'], row['workspace_id'], 'jump_next_event', tuple(args), write=True)
             elif row['operation'] == 'create_session':
                 result = runner(dsn, row['actor_id'], row['workspace_id'], 'create_session', tuple(args), write=True)
             else:
@@ -387,8 +398,9 @@ def work_one(dsn, runner):
             state = 'SUCCEEDED'
         except ContractError as error:
             logging.getLogger(__name__).warning(
-                'research_job_failed job_id=%s operation=%s error_code=%s',
-                row['id'], row['operation'], error.code)
+                'research_job_failed job_id=%s operation=%s error_code=%s error_field=%s error_source=%s',
+                row['id'], row['operation'], error.code, error.field,
+                getattr(error,'source','worker'))
             worker_metrics_raw, worker_metrics_hash = _worker_measurements(error)
             raw = None
             state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
