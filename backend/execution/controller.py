@@ -80,8 +80,24 @@ class ExecutionController:
         """Return a bounded private candidate page; never mutate the accepted cursor."""
         require(self.__fixture_cache is not None and callable(getattr(self.__fixture_cache, 'preview', None)),
                 'nextEventSource', 'REFUSED_JUMP_NEXT_EVENT_UNSUPPORTED')
-        ack = self.__fixture_cache.preview(checkpoint, target_ns)
-        supported, candidate = scan_next_group(state, ack['groups'])
+        scan = {'supported': True, 'candidate': False, 'groups': 0}
+
+        def stop_at_candidate(group):
+            scan['groups'] += 1
+            supported, candidate = scan_next_group(state, [group])
+            if not supported:
+                scan['supported'] = False
+                return True
+            if candidate is not None:
+                scan['candidate'] = True
+                return group['timeNs']
+            if scan['groups'] == 64:
+                return group['timeNs']
+            return None
+
+        ack = self.__fixture_cache.preview(scope, state['sessionId'], checkpoint, target_ns,
+                                           stop_when=stop_at_candidate)
+        supported, candidate = scan['supported'], (len(ack['groups']) - 1 if scan['candidate'] else None)
         safe_batch = (supported and candidate is None and not ack['diagnostics']['records'] and
                       coverage_complete(ack['coverage'], int(state['throughNs']), int(ack['throughNs'])))
         if candidate is not None and supported:

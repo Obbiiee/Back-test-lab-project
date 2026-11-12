@@ -3,6 +3,7 @@ from copy import deepcopy
 from decimal import Decimal, localcontext
 from fractions import Fraction
 import unittest
+from unittest.mock import patch
 
 from application.models import TrustedScope
 from contracts.canonical import content_hash, canonical_bytes
@@ -223,11 +224,27 @@ class TickExecutionTests(unittest.TestCase):
                                 'BTL-TICK-EXECUTION-COMMAND-1')
             return preview,controller.apply(scope,raw)
 
-        first_preview,first=next_jump(1)
+        _, checkpoint = store.sessions[(scope.workspace_id, session)]
+        _, timeline_entry = cache._entry(scope, session, checkpoint)
+        with patch.object(timeline_entry.timeline, 'advance_through',
+                          wraps=timeline_entry.timeline.advance_through) as traversals:
+            first_preview,first=next_jump(1)
+            self.assertEqual(traversals.call_count,1,
+                             'The committed ADVANCE should reuse the verified Jump preview traversal')
         self.assertEqual(first_preview['targetNs'],'1')
+        self.assertEqual(first_preview['previewGroups'],1,
+                         'Jump preview should stop at the first causal financial candidate')
         self.assertEqual([event['kind'] for event in first['events']],['ENTRY_FILL'])
-        second_preview,second=next_jump(2)
+        _, checkpoint = store.sessions[(scope.workspace_id, session)]
+        _, timeline_entry = cache._entry(scope, session, checkpoint)
+        with patch.object(timeline_entry.timeline, 'advance_through',
+                          wraps=timeline_entry.timeline.advance_through) as traversals:
+            second_preview,second=next_jump(2)
+            self.assertEqual(traversals.call_count,1,
+                             'The committed exit ADVANCE should reuse its verified Jump traversal')
         self.assertEqual(second_preview['targetNs'],'2')
+        self.assertEqual(second_preview['previewGroups'],1,
+                         'Jump preview should stop at the first causal exit candidate')
         self.assertEqual([event['kind'] for event in second['events']],['EXIT_FILL'])
 
         normal=Harness(provider_for(case),profile_for(case),session=session,

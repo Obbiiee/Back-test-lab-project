@@ -45,6 +45,13 @@ class _Entry:
     groups: tuple
 
 
+@dataclass
+class _Preview:
+    entry: _Entry
+    acknowledgement: dict
+    checkpoint: dict
+
+
 class FixtureTimelineCache:
     """Bounded private entries; exact durable checkpoint is always the lookup key.
 
@@ -58,6 +65,7 @@ class FixtureTimelineCache:
         self.__provider = provider
         self.__entries = _FIXTURE_ENTRIES
         self.__lock = _FIXTURE_LOCK
+        self.__previews = OrderedDict()
         self.__provider_identity = (provider.dataset_id, provider.dataset_version,
             content_hash(provider.describe(provider.dataset_id, provider.dataset_version)))
 
@@ -90,7 +98,7 @@ class FixtureTimelineCache:
         while len(self.__entries) > FIXTURE_CACHE_ENTRIES:
             self.__entries.popitem(last=False)
 
-    def _entry(self, scope, session, checkpoint):
+    def _entry(self, scope, session, checkpoint, *, take=False):
         key, raw = self._key(scope, session, checkpoint)
         lock_started = perf_counter_ns()
         with self.__lock:
@@ -99,6 +107,8 @@ class FixtureTimelineCache:
             if entry is not None:
                 self.__entries.move_to_end(key)
                 require(entry.checkpoint == raw, 'cachePins', 'CORRUPT_RECORD')
+                if take:
+                    del self.__entries[key]
                 return key, entry
             gate = _FIXTURE_RESTORE_GATES.get(key)
             if gate is None:
@@ -134,6 +144,8 @@ class FixtureTimelineCache:
                     else:
                         timeline.close()
                     self.__entries.move_to_end(key)
+                    if take:
+                        del self.__entries[key]
             require(entry.checkpoint == raw, 'cachePins', 'CORRUPT_RECORD')
             return key, entry
         finally:
@@ -151,11 +163,23 @@ class FixtureTimelineCache:
             self._publish(scope, session, timeline, groups)
 
     def reveal(self, scope, session, checkpoint, target, *, seek=False):
-        key, entry = self._entry(scope, session, checkpoint)
+        key, raw = self._key(scope, session, checkpoint)
+        token = (key, str(target))
         with self.__lock:
-            # The immutable group tuple may still be used by readers that got it
-            # immediately before removal. Timeline mutation stays outside this lock.
-            del self.__entries[key]
+            preview = self.__previews.pop(token, None)
+        if preview is not None and not seek:
+            require(preview.entry.checkpoint == raw and
+                    preview.acknowledgement['targetNs'] == str(target) and
+                    preview.checkpoint == preview.entry.timeline.checkpoint(),
+                    'previewPins', 'CORRUPT_RECORD')
+            groups = preview.entry.groups + tuple(canonical_bytes(
+                {'schemaVersion':1,'artifact':'BTL-PRIVATE-PAST-GROUP-1','group':group})
+                for group in preview.acknowledgement['groups'])
+            with self.__lock:
+                self._publish(scope, session, preview.entry.timeline, groups)
+            return preview.acknowledgement, preview.checkpoint
+
+        key, entry = self._entry(scope, session, checkpoint, take=True)
         timeline = entry.timeline
         if seek:
             ack = timeline.seek(target)
@@ -167,10 +191,22 @@ class FixtureTimelineCache:
             self._publish(scope, session, timeline, groups)
         return ack, timeline.checkpoint()
 
-    def preview(self, checkpoint, target):
+    def preview(self, scope, session, checkpoint, target, *, stop_when=None):
         """Read one bounded controller-private page without changing the accepted cache tip."""
-        timeline = TickTimeline.resume(self.__provider, checkpoint)
-        return timeline.advance_through(target, timeline.cursor)
+        key, entry = self._entry(scope, session, checkpoint, take=True)
+        ack = entry.timeline.advance_through(target, entry.timeline.cursor, stop_when=stop_when)
+        next_checkpoint = entry.timeline.checkpoint()
+        if ack['targetNs'] == entry.timeline.cursor['throughNs']:
+            token = (key, ack['targetNs'])
+            with self.__lock:
+                prior = self.__previews.pop(token, None)
+                if prior is not None:
+                    self.__previews[token] = prior
+                self.__previews[token] = _Preview(entry, ack, next_checkpoint)
+                self.__previews.move_to_end(token)
+                while len(self.__previews) > FIXTURE_CACHE_ENTRIES:
+                    self.__previews.popitem(last=False)
+        return ack
 
     def window(self, scope, session, checkpoint, *, last_only=False):
         indexed_reader = getattr(self.__provider, 'read_revealed_window', None)

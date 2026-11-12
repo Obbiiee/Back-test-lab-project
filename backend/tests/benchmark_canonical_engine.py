@@ -195,11 +195,15 @@ def _engine_only_full_replay(provider, *, profile=False, progress=False):
     io_before = _io_counters()
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     replay_cpu, replay_wall = process_time(), perf_counter()
+    ticks = groups = batches = 0
+    block_start_ticks = ticks
+    block_start_groups = groups
+    block_start_wall, block_start_cpu = replay_wall, replay_cpu
+    block_start_io = _io_counters()
     profiler = cProfile.Profile() if profile else None
     if profiler:
         profiler.enable()
     end_ns = str(int(manifest["range"]["endNs"]) - 1)
-    ticks = groups = batches = 0
     while True:
         ack = timeline.advance_through(end_ns, timeline.cursor)
         state, committed = advance(state, ack["groups"], ack["coverage"],
@@ -209,13 +213,24 @@ def _engine_only_full_replay(provider, *, profile=False, progress=False):
         ticks += count
         groups += len(ack["groups"])
         batches += 1
-        if progress and batches % 32 == 0:
-            elapsed = perf_counter() - replay_wall
+        if progress and ticks - block_start_ticks >= 4096:
+            block_wall = perf_counter() - block_start_wall
+            block_cpu = process_time() - block_start_cpu
+            block_io = _io_counters()
             print(json.dumps(dict(label="SYNTHETIC / TEST ONLY", progress=True,
-                ticksProcessed=ticks, groupsProcessed=groups, batches=batches,
-                elapsedSeconds=round(elapsed, 3), ticksPerSecond=round(ticks / elapsed, 2),
-                processRssKiB=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+                ticksProcessed=ticks, blockTicks=ticks - block_start_ticks,
+                groupsProcessed=groups, blockGroups=groups - block_start_groups,
+                batches=batches, blockWallSeconds=round(block_wall, 3),
+                blockCpuSeconds=round(block_cpu, 3),
+                blockTicksPerSecond=round((ticks - block_start_ticks) / block_wall, 2),
+                processRssKiB=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+                blockProcessIoRcharBytes=block_io.get("rchar", 0) - block_start_io.get("rchar", 0),
+                blockProcessIoReadBytes=block_io.get("read_bytes", 0) - block_start_io.get("read_bytes", 0)),
                 sort_keys=True), file=sys.stderr, flush=True)
+            block_start_ticks = ticks
+            block_start_groups = groups
+            block_start_wall, block_start_cpu = perf_counter(), process_time()
+            block_start_io = _io_counters()
         if ack["exhaustedThroughBoundary"]:
             break
         if batches > 2048:
@@ -254,19 +269,31 @@ def run(events_count=4096, repeats=3, mode="ab", profile=False, progress=False):
         raise ValueError(f"{mode} benchmark supports 512..{maximum} events")
     if type(repeats) is not int or not 1 <= repeats <= 3:
         raise ValueError("repeats must be 1..3")
+    generation_cpu, generation_wall = process_time(), perf_counter()
     source_manifest, events = build_dataset(events_count)
+    generation = dict(cpuSeconds=process_time() - generation_cpu,
+        wallSeconds=perf_counter() - generation_wall)
     with tempfile.TemporaryDirectory(prefix="riksora-engine-bench-") as temporary:
         root = Path(temporary) / "monthly"
+        write_cpu, write_wall = process_time(), perf_counter()
         parquet_manifest = write_monthly_parquet(root, iter(events), source_manifest,
             expected_version=events[0]["datasetVersion"], row_group_size=512)
+        parquet_write = dict(cpuSeconds=process_time() - write_cpu,
+            wallSeconds=perf_counter() - write_wall)
+        provider_cpu, provider_wall = process_time(), perf_counter()
         provider = MonthlyParquetProvider(root,
             expected_dataset_id=source_manifest["datasetId"],
             expected_dataset_version=events[0]["datasetVersion"],
             expected_manifest_hash=parquet_manifest["manifestHash"])
+        provider_open = dict(cpuSeconds=process_time() - provider_cpu,
+            wallSeconds=perf_counter() - provider_wall)
+        fixture_preparation = dict(generation=generation, parquetWrite=parquet_write,
+            providerOpenAndVerify=provider_open)
         file_bytes = sum(item["bytes"] for item in parquet_manifest["files"])
         if mode == "engine-replay":
             result = _engine_only_full_replay(provider, profile=profile, progress=progress)
             result.update(generatorVersion=GENERATOR_VERSION, seed=SEED,
+                fixturePreparation=fixture_preparation,
                 datasetId=source_manifest["datasetId"], datasetVersion=events[0]["datasetVersion"],
                 sourceManifestHash=content_hash(source_manifest),
                 parquetManifestHash=parquet_manifest["manifestHash"],
@@ -309,6 +336,7 @@ def run(events_count=4096, repeats=3, mode="ab", profile=False, progress=False):
         result = dict(label="SYNTHETIC / TEST ONLY",
             benchmark="canonical ExecutionController + TickTimeline + financial reducer; in-memory commit adapter",
             generatorVersion=GENERATOR_VERSION, seed=SEED, datasetId=source_manifest["datasetId"],
+            fixturePreparation=fixture_preparation,
             datasetVersion=events[0]["datasetVersion"], sourceManifestHash=source_manifest["sourceManifestHash"]
                 if "sourceManifestHash" in source_manifest else content_hash(source_manifest),
             parquetManifestHash=parquet_manifest["manifestHash"],
