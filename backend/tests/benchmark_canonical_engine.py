@@ -148,20 +148,31 @@ def _new_run(provider, mode, target_ns=None):
         throughNs=state["throughNs"], groupIndex=int(state["nextGroupIndex"]))
 
 
-def _measure(provider, mode, target_ns=None):
+def _measure(provider, mode, target_ns=None, *, profile=False):
     io_before = _io_counters()
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     cpu_before, wall_before = process_time(), perf_counter()
+    profiler = cProfile.Profile() if profile else None
+    if profiler:
+        profiler.enable()
     result = _new_run(provider, mode, target_ns)
+    if profiler:
+        profiler.disable()
     wall, cpu = perf_counter() - wall_before, process_time() - cpu_before
     rss_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     io_after = _io_counters()
+    profile_output = None
+    if profiler:
+        output = io.StringIO()
+        pstats.Stats(profiler, stream=output).sort_stats("cumtime").print_stats(30)
+        profile_output = output.getvalue()
     return result, dict(mode=mode, wallSeconds=wall, cpuSeconds=cpu,
         tickGroupsCommitted=result["groupIndex"],
         stages=result["stages"],
         peakRssKiB=max(rss_before, rss_after),
         processIoRcharBytes=(io_after.get("rchar", 0) - io_before.get("rchar", 0)),
-        processIoReadBytes=(io_after.get("read_bytes", 0) - io_before.get("read_bytes", 0)))
+        processIoReadBytes=(io_after.get("read_bytes", 0) - io_before.get("read_bytes", 0)),
+        cProfileTop=profile_output)
 
 
 def _engine_only_full_replay(provider, *, profile=False, progress=False):
@@ -264,7 +275,7 @@ def run(events_count=4096, repeats=3, mode="ab", profile=False, progress=False):
                 eventCount=events_count, parquetBytes=file_bytes)
             print(json.dumps(result, sort_keys=True, indent=2))
             return result
-        jump_probe, jump_probe_metrics = _measure(provider, "jump")
+        jump_probe, jump_probe_metrics = _measure(provider, "jump", profile=profile)
         target_ns = jump_probe["throughNs"]
         replay_rows, jump_rows = [], []
         jump_rows.append(jump_probe_metrics)
@@ -272,12 +283,12 @@ def run(events_count=4096, repeats=3, mode="ab", profile=False, progress=False):
         if parity["closedTrades"] != 1 or parity["fillCount"] != 2:
             raise AssertionError("synthetic workload did not produce one committed closed trade")
         for iteration in range(repeats):
-            normal, normal_metrics = _measure(provider, "normal", target_ns)
+            normal, normal_metrics = _measure(provider, "normal", target_ns, profile=profile)
             if normal["parity"] != parity:
                 raise AssertionError("normal replay and Jump financial parity diverged")
             replay_rows.append(normal_metrics)
             if iteration + 1 < repeats:
-                jumped, jump_metrics = _measure(provider, "jump")
+                jumped, jump_metrics = _measure(provider, "jump", profile=profile)
                 if jumped["parity"] != parity:
                     raise AssertionError("repeated Jump outcome was not deterministic")
                 jump_rows.append(jump_metrics)

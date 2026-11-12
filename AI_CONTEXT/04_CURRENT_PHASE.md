@@ -1,5 +1,17 @@
 # OWNER CHECKPOINT — V1 integration, browser stability and authority recovery (2026-11-10)
 
+### Owner authorization and evidence — local engine profiling (2026-11-12)
+
+The owner authorized bounded synthetic canonical-engine profiling, open-source technical research, isolated reversible experiments, focused regressions, and safe publication to PR #53. This supersedes only the repository-only benchmark restriction for this checkpoint; existing memory/disk/resource gates and all frozen financial and causal contracts remain in force. No production, VPS, external market data, Annual PASS, or user database was used.
+
+This continuation profiled `backend/tests/benchmark_canonical_engine.py` on the existing deterministic synthetic Monthly Parquet fixture. At 8,192 ticks, a one-run cProfile diagnostic before the provider page-copy change measured 70.285 CPU / 70.290 wall seconds; after it measured 62.842 CPU / 62.845 wall seconds, or about 10.6% lower CPU/wall in this single profiled run. Throughput was 116.5→130.4 ticks/s; peak RSS stayed about 137 MiB. Profiler overhead is substantial and this is diagnostic, not a repeated benchmark or product throughput claim. The source fixture and config were identical.
+
+The provider change keeps the single hash-verified row group private and avoids cloning every event in a touched row group for each page; it copies only the selected events at the public page boundary. The 63-test targeted Monthly Parquet, TickTimeline, tick execution, golden, and Jump scanner suite passed after the change. `py_compile` and `git diff --check` passed. An attempted 65,536-tick rerun stopped at 32,768 ticks with exit 124 under its bounded timeout; it produced no complete result and is NOT a new full-size measurement.
+
+A profiled 1,024-tick A/B run retained exact financial parity. Under cProfile, Jump spent about 4.8 s in two `preview_next_event` calls and about 6.5 s cumulatively validating provider/timeline state; committed replay then reprocessed the causal range. This supports duplicate preview/commit traversal as a measured cost center, not a financial correctness defect. No shortcut or financial-engine change was made. A final-tree unprofiled three-run confirmation measured replay median 1.360 s wall / 1.359 CPU s and Jump median 2.809 s / 2.809 CPU s, with identical financial hashes; replay was 2.07× faster. This excludes PostgreSQL, worker, and browser.
+
+The 2026-11-12 local branch/remote baseline trees were identical before this continuation; existing history was not reset or rewritten. External references were reviewed conceptually only; no third-party code/dependency was copied. Final A/B confirmation is complete; the full-size rerun was incomplete at 32,768 ticks, and final-commit CI is pending publication.
+
 ### Canonical engine benchmark and Parquet page-read checkpoint (2026-11-12)
 
 On local branch `codex/exness-monthly-diagnostics-20261109`, the pre-change HEAD was `7bd051443ec1f39c2e6596ad49655a62b8ede4ee`; fetched GitHub branch head was `882420e596465a22e01c18cc13674308deb730ba`. The initial tracking ref was stale; after fetch, local and remote baseline trees were identical (`1d09456f926c1607c70e51db35744d4addd52553`) despite divergent histories (23 local-only and 7 remote-only commits). No reset/rebase was performed. This checkpoint adds a bounded benchmark harness, synthetic fixture coverage declarations, and a Parquet read regression/optimization; no financial reducer or execution rule changed.

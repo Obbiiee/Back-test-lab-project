@@ -131,6 +131,19 @@ def _row_to_event(row):
     return CanonicalTick.from_wire(event).wire
 
 
+def _copy_verified_event(event):
+    """Copy a hash-verified canonical event without generic graph traversal.
+
+    CanonicalTick validation guarantees that only provenance and quality are
+    nested mappings; their leaves are immutable scalars. Copying all three
+    dictionaries preserves caller isolation while avoiding deepcopy overhead.
+    """
+    result = event.copy()
+    result["provenance"] = event["provenance"].copy()
+    result["quality"] = event["quality"].copy()
+    return result
+
+
 def _atomic_publish(temp_path: Path, target: Path):
     """Publish one new immutable file without replacing an existing object."""
     require(not target.exists(), "immutable", "IMMUTABLE_ALREADY_PUBLISHED")
@@ -574,7 +587,7 @@ class MonthlyParquetProvider:
         cached = self._verified_row_group_cache
         if cached is not None and cached[0] == cache_key:
             _key, events, timestamps, global_indices = cached
-            return deepcopy(events), timestamps.copy(), global_indices.copy()
+            return events, timestamps, global_indices
         parquet = self._open_parquet(path)
         try:
             events, timestamps, global_indices = self._read_row_group_file(
@@ -586,7 +599,7 @@ class MonthlyParquetProvider:
         # verified cache or later pages.
         self._verified_row_group_cache = (
             cache_key, events, timestamps, global_indices)
-        return deepcopy(events), timestamps.copy(), global_indices.copy()
+        return events, timestamps, global_indices
 
     def _read_row_group_file(self, parquet, file_entry, group_entry):
         require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()),
@@ -729,6 +742,10 @@ class MonthlyParquetProvider:
                     afterRawOrdinal=last["rawOrdinal"])
             try:
                 canonical_bytes(result)
+                # Row-group data remains private to the provider cache. Clone
+                # only the selected page at the public boundary rather than
+                # cloning every row in each touched row group on every page.
+                result["events"] = [_copy_verified_event(event) for event in selected]
                 return result
             except ValueError:
                 require(len(selected) > 1, "page", "RECORD_LIMIT")
