@@ -1,5 +1,9 @@
 # RIKSORA V1 — frozen-architecture integration register
 
+## Owner Commercial V1 acceptance target — 2026-11-13
+
+The explicit capacity, performance, correctness, market-rights, billing, backup and GO/HOLD acceptance gates are in [RIKSORA Commercial V1 — Capacity Target & Definition of Done](RIKSORA-COMMERCIAL-V1-TARGETS.md). Target: **20 simultaneous active traders**, four planned worker slots on a 6-vCPU/16-GiB VPS, **five active traders per worker as a planning ratio only**, and two reproducible 60-minute financial-active cohorts. This is **NOT TESTED/NOT ACCEPTED** as a VPS or commercial capacity claim; older functional ten-browser PASS and local engine-only results do not meet this gate. Continue using this integration register for implementation evidence and AI_CONTEXT for operational authorization.
+
 ## Canonical engine benchmark checkpoint (2026-11-12)
 
 ### Follow-up profiling and final-tree A/B (2026-11-12)
