@@ -6,6 +6,10 @@
 
 This existing roadmap is the sole long-term plan. It was normalized in Phase 7.6 rather than creating a competing AI_CONTEXT roadmap. [Current phase/authorization](../AI_CONTEXT/04_CURRENT_PHASE.md) controls work; [completed history](../AI_CONTEXT/03_PHASE_HISTORY.md) controls historical facts; [workflow/Definition of Done](../AI_CONTEXT/06_WORKFLOW_RULES.md) controls execution. Do not maintain a second current-phase tracker here.
 
+## Commercial V1 measurable release target — 2026-11-13
+
+The owner-defined **20 simultaneous active traders / target four-worker / five-trader-per-worker planning ratio**, financial correctness, SLOs and paid-release GO/HOLD gates are specified in [RIKSORA Commercial V1 — Capacity Target & Definition of Done](acceptance/RIKSORA-COMMERCIAL-V1-TARGETS.md). This document is a finite acceptance criterion attached to the existing Paid-Beta scope, **not a second roadmap or acceptance evidence**; the capacity and sales gates remain NOT VERIFIED until measured on the real target VPS and approved. Existing operational permissions and frozen contracts still govern work.
+
 ## Paid-Beta delivery amendment — 2026-10-17
 
 The human approved continuing toward limited paid Beta, delegating UI/UX to Claude and backend/data/integration to Codex. This is a delivery subset mapped to existing phases, not completion or renumbering of phases1–75. It brings the necessary identity, instrument and monetization capabilities forward without requiring the broad professional/research/team catalog first. Operational authorization remains in current-phase. Existing Alpha frozen financial, causal, provenance, uncertainty and release-quality contracts remain in force; changes to their semantics still follow change control.
