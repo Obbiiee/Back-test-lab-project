@@ -10,9 +10,10 @@ from ticks.contracts import CanonicalTick, TickManifest, chunk_content, event_id
 
 
 GENERATOR_VERSION = "riksora-synthetic-parquet-perf-v1"
-MAX_EVENTS = 65_536  # 128 source segments x 512 source records (manifest limit).
+MAX_EVENTS = 262_144  # 128 source segments x 2,048 records; V1 manifest node budget.
 SOURCE_SEGMENT_SIZE = 512
 CHUNK_SIZE = 64
+DEFAULT_EVENTS = 65_536
 SEED = 20261111
 DATASET_ID = "synthetic:perf-monthly-65k-v1"
 
@@ -21,21 +22,30 @@ def _price(value):
     return f"{value // 100_000}.{value % 100_000:05d}".rstrip("0").rstrip(".")
 
 
-def build_dataset(event_count=MAX_EVENTS, seed=SEED):
+def build_dataset(event_count=DEFAULT_EVENTS, seed=SEED, *, source_segment_size=None, chunk_size=None):
     """Return (canonical source manifest, canonical events) for Parquet tests.
 
     Timestamps are deterministic and cross the January/February 2020 partition
     boundary. Most rows advance one second; periodic 60s/300s pauses provide
     sparse intervals. Spread changes deterministically. No market claim is made.
     """
-    if (type(event_count) is not int or event_count < SOURCE_SEGMENT_SIZE or
-            event_count > MAX_EVENTS or event_count % SOURCE_SEGMENT_SIZE or
-            (event_count // SOURCE_SEGMENT_SIZE) % 2):
-        raise ValueError("event_count must be an even multiple of 512 up to 65,536")
+    if type(event_count) is not int or event_count < SOURCE_SEGMENT_SIZE or event_count > MAX_EVENTS:
+        raise ValueError(f"event_count must be between 512 and {MAX_EVENTS}")
+    if source_segment_size is None:
+        source_segment_size = SOURCE_SEGMENT_SIZE if event_count <= DEFAULT_EVENTS else 2048
+    if chunk_size is None:
+        chunk_size = CHUNK_SIZE if event_count <= DEFAULT_EVENTS else 256
+    if (type(source_segment_size) is not int or source_segment_size < SOURCE_SEGMENT_SIZE or
+            source_segment_size > 2048 or event_count % source_segment_size or
+            event_count // source_segment_size > 128 or (event_count // source_segment_size) % 2):
+        raise ValueError("source_segment_size must yield an even manifest source count <=128")
+    if (type(chunk_size) is not int or not 1 <= chunk_size <= 1024 or
+            event_count % chunk_size or event_count // chunk_size > 4096):
+        raise ValueError("chunk_size must satisfy the canonical manifest chunk bounds")
     if type(seed) is not int or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
 
-    segment_count = event_count // SOURCE_SEGMENT_SIZE
+    segment_count = event_count // source_segment_size
     jan_ns = int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp() * 1_000_000_000)
     feb_ns = int(datetime(2020, 2, 1, tzinfo=timezone.utc).timestamp() * 1_000_000_000)
     rows = []
@@ -54,13 +64,13 @@ def build_dataset(event_count=MAX_EVENTS, seed=SEED):
         phase = ((index * 1103515245 + seed) & 0x7FFFFFFF) % 4001 - 2000
         base = 110_000 + phase
         spread = 3 + index % 5 + (15 if index % 97 == 0 else 0)
-        rows.append(dict(ordinal=str(index % SOURCE_SEGMENT_SIZE), timeNs=str(timestamp),
+        rows.append(dict(ordinal=str(index % source_segment_size), timeNs=str(timestamp),
                          bid=_price(base), ask=_price(base + spread), sequence=None))
 
     sources = []
     member_hashes = []
     for segment in range(segment_count):
-        raw_rows = rows[segment * SOURCE_SEGMENT_SIZE:(segment + 1) * SOURCE_SEGMENT_SIZE]
+        raw_rows = rows[segment * source_segment_size:(segment + 1) * source_segment_size]
         member_hash = content_hash(dict(schemaVersion=1, artifact="BTL-SYNTHETIC-RAW-1",
                                         rows=raw_rows, diagnostics=[]))
         member_hashes.append(member_hash)
@@ -77,7 +87,7 @@ def build_dataset(event_count=MAX_EVENTS, seed=SEED):
             label="SYNTHETIC / TEST ONLY", memberHash=member_hash,
             assertion="AUTHORED_FIXTURE_COMPLETE_FRESH_QUOTES"))
         source_id = f"synthetic:perf:{segment:03d}"
-        for index in range(segment * SOURCE_SEGMENT_SIZE, (segment + 1) * SOURCE_SEGMENT_SIZE):
+        for index in range(segment * source_segment_size, (segment + 1) * source_segment_size):
             row = rows[index]
             event = dict(schemaVersion=1, artifact="BTL-CANONICAL-TICK-1",
                 datasetId=DATASET_ID, datasetVersion="0" * 64,
@@ -92,8 +102,8 @@ def build_dataset(event_count=MAX_EVENTS, seed=SEED):
             events.append(CanonicalTick.from_wire(event).wire)
 
     chunk_index = []
-    for offset in range(0, event_count, CHUNK_SIZE):
-        batch = events[offset:offset + CHUNK_SIZE]
+    for offset in range(0, event_count, chunk_size):
+        batch = events[offset:offset + chunk_size]
         chunk = dict(schemaVersion=1, artifact="BTL-TICK-CHUNK-1", datasetId=DATASET_ID,
                      chunkIndex=str(len(chunk_index)), events=batch)
         chunk_index.append(dict(chunkIndex=str(len(chunk_index)),

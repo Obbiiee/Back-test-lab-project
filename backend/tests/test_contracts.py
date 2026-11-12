@@ -99,6 +99,27 @@ class CanonicalTests(unittest.TestCase):
             self.assertEqual(canonical_bytes(candidate), reference)
             self.assertEqual(content_hash(candidate), hashlib.sha256(reference).hexdigest())
 
+    def test_msgspec_encoder_matches_legacy_oracle_for_decimal_time_and_empty_values(self):
+        cases = [
+            {"schemaVersion": 1, "positiveZero": Decimal("0.000"),
+             "negativeZero": Decimal("-0.000000"), "scaled": Decimal("1.230000"),
+             "tiny": Decimal("1e-27"), "empty": [], "nullable": None,
+             "flags": [True, False]},
+            {"schemaVersion": 1,
+             "utc": datetime(2026, 11, 12, 9, 8, 7, 123456, tzinfo=timezone.utc),
+             "offset": datetime(2026, 11, 12, 12, 8, 7, 123456,
+                                tzinfo=timezone(timedelta(hours=3))),
+             "nested": {"z": Decimal("-12.3400"), "a": [Decimal("2.50")] }},
+        ]
+        for candidate in cases:
+            with self.subTest(candidate=candidate):
+                normalized = _normalize(candidate)
+                oracle = json.dumps(normalized, sort_keys=True, ensure_ascii=False,
+                    separators=(",", ":"), allow_nan=False).encode("utf-8")
+                self.assertEqual(canonical_bytes(candidate), oracle)
+                self.assertEqual(hashlib.sha256(canonical_bytes(candidate)).hexdigest(),
+                                 hashlib.sha256(oracle).hexdigest())
+
     def test_independent_golden_vectors(self):
         vectors = json.loads((Path(__file__).parent / "fixtures" / "contract_hash_vectors.json").read_text(encoding="utf-8"))
         for v in vectors:

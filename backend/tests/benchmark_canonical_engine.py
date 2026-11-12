@@ -39,7 +39,7 @@ from tests.test_tick_execution import MemoryStore
 
 
 MAX_CONTROLLER_EVENTS = 4096
-MAX_ENGINE_DATASET_EVENTS = 65_536
+MAX_ENGINE_DATASET_EVENTS = 262_144
 PROFILE = fixture_profile()
 PROFILE["tickSize"] = "0.00001"
 PROFILE["priceScale"] = "100000"
@@ -179,6 +179,7 @@ def _engine_only_full_replay(provider, *, profile=False, progress=False):
     """Stream all Parquet events through canonical Timeline and reducer."""
     start_cpu, start_wall = process_time(), perf_counter()
     manifest = provider.describe(provider.dataset_id, provider.dataset_version)
+    expected_ticks = sum(chunk["eventCount"] for chunk in manifest["chunks"])
     start_ns = manifest["range"]["startNs"]
     timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version, start_ns)
     state = seed_state("synthetic:engine-only-session", provider.dataset_id,
@@ -233,7 +234,7 @@ def _engine_only_full_replay(provider, *, profile=False, progress=False):
             block_start_io = _io_counters()
         if ack["exhaustedThroughBoundary"]:
             break
-        if batches > 2048:
+        if batches > max(2048, (expected_ticks + 63) // 64 + 32):
             raise RuntimeError("canonical replay exceeded the bounded batch guard")
     if profiler:
         profiler.disable()
