@@ -22,11 +22,12 @@ from workspace.store import WorkspaceUnit
 from workspace.policy import owner
 from execution.contracts import command_wire
 from ticks.contracts import tag, uint
+from .worker_config import WORKER_COUNT
 
 GLOBAL_LIMIT = 16
 USER_LIMIT = 2
 RETAINED_LIMIT = 32
-WORKERS = 2
+WORKERS = WORKER_COUNT
 MAX_JOB_ATTEMPTS = 3
 LEASE_SECONDS = 30
 HEARTBEAT_SECONDS = 5

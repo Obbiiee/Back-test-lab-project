@@ -20,6 +20,7 @@ except ImportError:  # Windows controller tests expose unsupported RSS as null.
 
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError, require
+from .worker_config import WORKER_COUNT
 
 MAX_RESULT = 8388608
 DEADLINE = 30
@@ -31,7 +32,8 @@ SERVE_ENTRY = 'import sys; sys.path[:0]=sys.argv[1:]; from cloud.worker import s
 # frequent recycling would rehash the entire multi-GB archive every 32 jobs.
 MAX_JOBS = 4096
 WARM_REQUEST = b'{"control":"WARM_OPERATOR_SOURCES","schemaVersion":1}\n'
-_exchanges = ThreadPoolExecutor(max_workers=2, thread_name_prefix='btl-native-exchange')
+_exchanges = ThreadPoolExecutor(max_workers=WORKER_COUNT,
+                                thread_name_prefix='btl-native-exchange')
 
 
 class _MeasuredResult(dict):
@@ -74,7 +76,7 @@ def _measurement(start_wall_ns, start_cpu_ns, start_io):
 
 
 class _Slot:
-    """One native child; at most two controller slots, never a consumer handle."""
+    """One bounded native child slot; never a consumer handle."""
     def __init__(self):
         self.lock = Lock()
         self.process = None
@@ -94,7 +96,7 @@ class _Slot:
             process.stdout.close()
 
 
-_slots = (_Slot(), _Slot())
+_slots = tuple(_Slot() for _ in range(WORKER_COUNT))
 
 
 def close():

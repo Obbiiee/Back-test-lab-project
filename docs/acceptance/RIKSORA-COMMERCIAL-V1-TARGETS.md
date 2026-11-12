@@ -19,7 +19,7 @@ Do **not** advertise real-time brokerage, live execution, automated profitabilit
 
 ## 2. Capacity target: one VPS, clear meaning of 'trader'
 
-Deployment profile under test: 6 vCPU / 16 GiB RAM single VPS, with API, PostgreSQL and workers co-resident as proposed (verify actual topology). Codex/development processes may share the host; never assume six exclusive worker CPUs. The default repository queue and native worker pool currently have two slots; four is a **target configuration**, not present acceptance evidence.
+Deployment profile under test: 6 vCPU / 16 GiB RAM single VPS, with API, PostgreSQL and workers co-resident as proposed (verify actual topology). Codex/development processes may share the host; never assume six exclusive worker CPUs. `BTL_RESEARCH_WORKERS` now configures the bounded queue/native pool from 1 through 4, with default 2. The four-slot setting is configurable but remains a **target configuration**, not capacity acceptance evidence.
 
 **V1 GO capacity target: 20 simultaneously active, independently authenticated traders, with a planned ratio of five active traders per each of four workers.**
 
@@ -128,9 +128,35 @@ E. Freeze release candidate, verify all final-SHA CI and gates, and obtain separ
 
 ### Current baseline, not acceptance
 
-- Repository currently has two queue workers and two native slots; four worker configuration is unimplemented/unproven.
+- Repository worker pool accepts `BTL_RESEARCH_WORKERS=1..4` (default 2); configuration wiring has unit coverage. Actual multi-worker capacity and four-slot resource safety remain unproven.
 - Local synthetic real-browser ten-trader cohort has passed functional journeys, but older interactive p95/p99 exceeded candidate targets. A local 20-user cohort was blocked by host resource gate.
 - 524,288-tick synthetic financial-active engine replay passed in local KVM with one closed trade, not an end-to-end long durable worker on target VPS.
 - No 20-user / four-worker real-VPS capacity PASS, complete rights-qualified launch catalog, live billing evidence or verified Commercial V1 unit economics exists in this checkpoint.
 
-**DoD status on 2026-11-13: NOT DONE / HOLD.**
+### Local worker-capacity checkpoint (2026-11-12, continued)
+
+This checkpoint is local Linux KVM synthetic software evidence only. It does not satisfy product browser, VPS, historical-data, or Commercial V1 capacity acceptance.
+
+- Worker pool wiring: `BTL_RESEARCH_WORKERS=1..4`, default `2`; bounded queue worker count, native child slots, and exchange executor use the same parsed count. Invalid values fail closed. Configuration tests: 4/4 PASS. Real 2–4 worker load and resource safety: NOT TESTED.
+- One-worker authenticated API → PostgreSQL 16.15 durable queue/native child → canonical Monthly Parquet → financial reducer → durable receipt → CLOSED Journal → Analytics: PASS for 2,048 synthetic ticks. One identity/session, 34 queue jobs (create, quote setup, 32 bounded advances), one trade, ENTRY_FILL + EXIT_FILL, balance `10000.7`. Repeat confirm returned the same result.
+- Fixture: `riksora-synthetic-financial-monthly-v1`, seed `20261112`, label `SYNTHETIC / TEST ONLY`; dataset version `d12c77000573eb1acce8e56b0297b6f3909cce2d066f44e246c450a61ca57d86`; source-member SHA-256 `1c8bb56a4a211129ce59ddffb5fb1e94bcf4b343f9cf276c6d9d3ad5ba8cf37f`; Parquet manifest SHA-256 `3629f511796ed1a7cb22c094afd053d984237063c45f8a269f449c2fa5ed57f`.
+- Three initial 2,048-tick repeats plus a post-merge-commit verification now exist; they are not an optimization before/after. Runs 1–3 are detailed in the integration register. The fourth unbound run measured journey 11.958 s, worker CPU/wall 3.207/3.959 s, queue wait p50/p95/p99 11.103/15.504/15.570 ms over 34 jobs, child peak RSS 184,410,112 B, DB growth 876,544 B. All four used the same synthetic identity/hash and produced one CLOSED trade with identical retry-confirm behavior. One affinity-limited run pinned the API/test process and native child, not PostgreSQL; CPU 5 was not exclusive. These tiny-fixture repetitions do not establish heavy-job throughput or optimization ROI. `/proc` reported zero process `read_bytes`; physical disk I/O is not established. Endpoint-latency decomposition and browser-visible time: NOT TESTED.
+- A one-worker durable attempt at 65,536 ticks failed after 167.659 s with `REFUSED_RECOVERY_LIMIT` (`fixtureSteps`); a 16,320-tick probe also failed with that code after 109.060 s. The legacy fixture controller contract is `MAX_STEPS=256`, and `TickTimeline` stores each accepted advance target in its checkpoint. Splitting API work into durable queue jobs does not reset this same Session checkpoint. No limit was changed. Durable full-history completion at 65,536/131,072/262,144 ticks: BLOCKED by the frozen Session checkpoint budget; the 65,536 and 16,320 outcomes are FAIL for those attempted test runs, not data corruption or a successful full replay.
+- Test harness now snapshots queue/worker metrics as each job completes because operational `research_jobs` retention is capped at 32. The retention policy was not changed. Focused regression: worker-pool config, queue contract, worker deadline, and synthetic financial fixture **37/37 PASS**. Real 2,048-tick journey **1/1 PASS**. The two larger attempts above **FAIL** at the step guard.
+- Browser/UI journey, chart page/timeframe/warm-up, mixed multi-order workload, multi-trader 1/2/3/5 cohorts, actual 1–4 worker scaling, 262,144 full durable history, and actual target VPS: NOT TESTED or BLOCKED as stated. Qualified two-year chart prehistory remains BLOCKED on qualified source rights/coverage.
+
+### Performance ROI decisions — local engine evidence only
+
+These are engineering disposition decisions, **not durable-worker capacity claims**. Existing before/after figures are single measurements from earlier synthetic engine-only runs; the requested three-run same-workload confirmation is still required before attributing Commercial V1 capacity gains.
+
+| Candidate | Decision | Measured CPU saved per synthetic 65,536-tick engine pass | Worker-capacity implication |
+|---|---|---:|---|
+| Verified one-row-group Parquet cache / avoid repeated decode and hash validation | RETEST | About 256.35 CPU-s versus the earlier uncached run (473.24 → 216.89 CPU-s including setup+replay; single run per side) | Theoretical 2.18× CPU-bound engine throughput only; durable queue/worker benefit is unmeasured. Keep the implementation pending repeated ROI/parity confirmation. |
+| Canonical accumulator, msgspec-after-normalization, and timeline hot-path optimization (combined; effects cannot be separated honestly) | RETEST | About 120.10 CPU-s versus the cached pre-optimization run (216.89 → 96.79 CPU-s including setup+replay; single run per side) | Theoretical 2.24× CPU-bound engine throughput only; not a worker-capacity multiplier. Exact canonical byte/hash golden tests pass. |
+| Provider page-copy reduction (8,192-tick profiled diagnostic) | RETEST | 7.443 CPU-s in one profiled run (70.285 → 62.842 CPU-s; about 10.6%) | Below the 15–20% end-to-end promotion bar and profiler-instrumented; durable-worker capacity saved is unknown, so no capacity credit. |
+| Jump preview/replay reuse as a compute optimization | REJECT for CPU-capacity claims; retain the user-facing Jump feature | On the measured 1,024-tick A/B, Jump used about 1.45 more CPU-s (2.809 vs 1.359) and was 2.07× slower by wall time | At that sample it would reduce compute-limited throughput to about 0.48× normal replay; no CPU saving is shown. A new algorithm requires causal parity and a new benchmark. |
+| Rust/PyO3 hot-loop replacement | REJECT for production adoption; no prototype justified yet | 0 CPU-s measured/saved | No capacity impact established. Reconsider only after a profile isolates a suitable hot loop and an isolated candidate demonstrates roughly 2× end-to-end gain or a major memory reduction with full parity/recovery. |
+
+No candidate currently qualifies for Commercial V1 capacity credit: the promising Python/Arrow savings lack three-run repetition and a durable-worker comparison, while the durable 65,536-tick path is blocked by the existing 256-step Session checkpoint limit. No Rust/native dependency is added.
+
+**DoD status on 2026-11-13: NOT DONE / HOLD.** The next engineering blocker is a reviewed, backward-compatible durable timeline checkpoint compaction/continuation design that can represent long Sessions without relaxing financial, causal, or recovery guarantees. That changes frozen checkpoint/recovery behavior and needs Owner authorization before implementation.

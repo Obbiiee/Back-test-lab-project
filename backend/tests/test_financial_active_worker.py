@@ -12,6 +12,7 @@ from psycopg import sql
 
 from cloud import queue, worker
 from contracts.canonical import content_hash
+from execution.contracts import MAX_STEPS
 from infrastructure.database import connect, migrate
 from market_data.monthly_parquet import write_monthly_parquet
 from tests import test_cloud_research as cloud_fixture
@@ -53,8 +54,33 @@ class FinancialActiveWorkerAcceptance(unittest.TestCase):
     def tearDown(self):
         self.fixture.client.close()
 
+    def _capture_job_metrics(self, job_id):
+        """Capture bounded operational metrics before queue retention prunes a row."""
+        with connect(self.dsn) as db:
+            row = db.execute(
+                "SELECT operation,state,queue_metrics,worker_metrics "
+                "FROM btl.research_jobs WHERE id=%s", (uuid.UUID(job_id),)
+            ).fetchone()
+        self.assertIsNotNone(row, f"completed job {job_id} was not retained")
+        self.assertEqual(row[1], "SUCCEEDED", f"job {job_id}: {row[1]}")
+        self.assertIsNotNone(row[2], f"job {job_id} has no queue metrics")
+        self.assertIsNotNone(row[3], f"job {job_id} has no worker metrics")
+        return dict(operation=row[0], state=row[1],
+            queue=json.loads(bytes(row[2])), worker=json.loads(bytes(row[3])))
+
     def test_authenticated_monthly_parquet_to_closed_trade_receipt_journal_analytics(self):
-        count = 512
+        count = int(os.environ.get("BTL_FINANCIAL_WORKER_EVENTS", "512"))
+        self.assertIn(count, (512, 2_048, 65_536, 131_072, 262_144))
+        # Avoid replaying hundreds/thousands of real durable jobs when the
+        # frozen Session checkpoint cannot represent the required advance
+        # sequence. A prior bounded attempt reproduced this guard at 16,320.
+        minimum_targets = 1 + ((count - 1 + 63) // 64)
+        if minimum_targets >= MAX_STEPS:
+            self.skipTest(
+                f"BLOCKED: {count} unique-timestamp ticks require at least "
+                f"{minimum_targets} advance targets; frozen Session budget is {MAX_STEPS}"
+            )
+        worker_count = queue.WORKERS
         source_manifest, member_hash, _ = build_manifest(count)
         source_version = content_hash(source_manifest)
         with tempfile.TemporaryDirectory(prefix="riksora-financial-worker-source-") as temporary:
@@ -90,6 +116,7 @@ class FinancialActiveWorkerAcceptance(unittest.TestCase):
                 create_status = self.fixture.client.get(base + "/jobs/" + create_job,
                     headers=self.fixture.headers).json()
                 self.assertEqual(create_status["state"], "SUCCEEDED", create_status)
+                captured_job_metrics = [self._capture_job_metrics(create_job)]
                 view = self.fixture.client.get(base + "/sessions/" + session_id,
                     headers=self.fixture.headers).json()
                 self.assertEqual((view["state"]["datasetId"], view["state"]["datasetVersion"]),
@@ -108,6 +135,7 @@ class FinancialActiveWorkerAcceptance(unittest.TestCase):
                 self.assertTrue(queue.work_one(self.dsn, worker.run))
                 self.assertEqual(self.fixture.client.get(base + "/jobs/" + setup_job,
                     headers=self.fixture.headers).json()["state"], "SUCCEEDED")
+                captured_job_metrics.append(self._capture_job_metrics(setup_job))
                 view = self.fixture.client.get(base + "/sessions/" + session_id,
                     headers=self.fixture.headers).json()
                 self.assertIsNotNone(view["quote"])
@@ -144,7 +172,11 @@ class FinancialActiveWorkerAcceptance(unittest.TestCase):
 
                 target_ns = int(source_manifest["range"]["endNs"]) - 1
                 replay_job_ids = []
-                for _ in range(16):
+                # Each accepted ADVANCE is one bounded canonical 64-group
+                # command. A long synthetic history is a sequence of durable
+                # commands, never one oversized worker job or request payload.
+                max_replay_jobs = ((count - 1 + 63) // 64) + 2
+                for _ in range(max_replay_jobs):
                     view = self.fixture.client.get(base + "/sessions/" + session_id,
                         headers=self.fixture.headers).json()
                     if int(view["state"]["throughNs"]) >= target_ns:
@@ -160,9 +192,11 @@ class FinancialActiveWorkerAcceptance(unittest.TestCase):
                     self.assertTrue(queue.work_one(self.dsn, worker.run))
                     result = self.fixture.client.get(base + "/jobs/" + job_id,
                         headers=self.fixture.headers).json()
-                    self.assertEqual(result["state"], "SUCCEEDED", result)
+                    self.assertEqual(result["state"], "SUCCEEDED",
+                        dict(replayJobIndex=len(replay_job_ids), requestedEvents=count, result=result))
                     self.assertTrue(result["result"]["durable"])
                     replay_job_ids.append(uuid.UUID(job_id))
+                    captured_job_metrics.append(self._capture_job_metrics(job_id))
                 else:
                     self.fail("bounded ADVANCE jobs did not reach the end of synthetic Session")
 
@@ -189,21 +223,24 @@ class FinancialActiveWorkerAcceptance(unittest.TestCase):
                         "WHERE workspace_id=%s AND session_id=%s ORDER BY sequence",
                         (str(self.fixture.workspace), session_id)).fetchall()
                     job_ids = [uuid.UUID(create_job), uuid.UUID(setup_job), *replay_job_ids]
-                    job_rows = db.execute("SELECT operation,state,queue_metrics,worker_metrics "
-                        "FROM btl.research_jobs WHERE id=ANY(%s::uuid[])", (job_ids,)).fetchall()
+                    # Operational job rows are intentionally bounded by RETAINED_LIMIT.
+                    # They may be pruned during a long replay, so durable job completion
+                    # and metrics are asserted/captured immediately after each job above.
+                    job_rows = db.execute("SELECT state FROM btl.research_jobs "
+                        "WHERE state IN ('FAILED','EXPIRED','RECONCILE_REQUIRED')").fetchall()
                     database_bytes_after = db.execute(
                         "SELECT pg_database_size(current_database())").fetchone()[0]
                 events = [unpack(raw, digest) for raw, digest in event_rows]
                 fills = [event for event in events if event["classification"] == "SIMULATED_FILL"]
                 self.assertEqual([event["kind"] for event in fills], ["ENTRY_FILL", "EXIT_FILL"])
-                self.assertEqual(len(job_rows), len(job_ids))
-                self.assertTrue(all(row[1] == "SUCCEEDED" for row in job_rows))
-                worker_metrics = [json.loads(bytes(row[3])) for row in job_rows if row[3] is not None]
-                self.assertEqual(len(worker_metrics), len(job_ids))
-                queue_metrics = [json.loads(bytes(row[2])) for row in job_rows if row[2] is not None]
+                self.assertFalse(job_rows, f"unexpected failed operational jobs: {job_rows}")
+                self.assertEqual(len(captured_job_metrics), len(job_ids))
+                worker_metrics = [item["worker"] for item in captured_job_metrics]
+                queue_metrics = [item["queue"] for item in captured_job_metrics]
                 evidence = dict(label="SYNTHETIC / TEST ONLY", eventCount=count,
                     sourceMemberSha256=member_hash, datasetVersion=source_version,
                     parquetManifestHash=parquet_manifest["manifestHash"],
+                    configuredWorkerCount=worker_count,
                     replayJobs=len(replay_job_ids), setupQuoteJobs=1,
                     wallSeconds=time.perf_counter()-started,
                     workerCpuSeconds=sum(item["cpuNs"] for item in worker_metrics)/1e9,
