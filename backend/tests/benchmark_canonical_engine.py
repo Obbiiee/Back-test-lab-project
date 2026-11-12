@@ -24,6 +24,7 @@ from time import perf_counter, process_time
 
 from application.models import TrustedScope
 from contracts.canonical import canonical_bytes, content_hash
+from ticks.contracts import TickManifest
 from contracts.models import MethodPolicy
 from execution.analysis import project
 from execution.controller import ExecutionController
@@ -35,11 +36,15 @@ from execution.workspace import FixtureTimelineCache
 from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
 from ticks.timeline import TickTimeline
 from tests.synthetic_monthly_perf import build_dataset, GENERATOR_VERSION, SEED
+from tests.synthetic_financial_monthly import (build_manifest as build_financial_manifest,
+    fixture_identity as financial_fixture_identity, iter_events as iter_financial_events,
+    GENERATOR_VERSION as FINANCIAL_GENERATOR_VERSION)
 from tests.test_tick_execution import MemoryStore
 
 
 MAX_CONTROLLER_EVENTS = 4096
 MAX_ENGINE_DATASET_EVENTS = 262_144
+MAX_FINANCIAL_DATASET_EVENTS = 1_048_576
 PROFILE = fixture_profile()
 PROFILE["tickSize"] = "0.00001"
 PROFILE["priceScale"] = "100000"
@@ -264,7 +269,193 @@ def _engine_only_full_replay(provider, *, profile=False, progress=False):
         warning="Engine-only in-memory state; no queue, durable receipts, PostgreSQL, browser, or exclusive CPU reservation.")
 
 
+def _engine_only_financial_replay(provider, *, profile=False, progress=False):
+    """Canonical bounded replay with one pending limit, entry, and TP close."""
+    manifest = provider.describe(provider.dataset_id, provider.dataset_version)
+    start_cpu, start_wall = process_time(), perf_counter()
+    start_ns = manifest["range"]["startNs"]
+    session_id = "synthetic:financial-active-session"
+    financial_profile = dict(PROFILE, tickSize="0.01", priceScale="100", contractSize="100")
+    state = seed_state(session_id, provider.dataset_id, provider.dataset_version,
+        start_ns, financial_profile, POLICY)
+    order_command = command_wire(dict(schemaVersion=1,
+        artifact="BTL-TICK-EXECUTION-COMMAND-1", sessionId=session_id,
+        commandId="synthetic:financial-active:pending-limit", expectedRevision=0,
+        kind="OPEN", payload=dict(side="LONG", orderType="LIMIT", workflow="PLANNED",
+            entry="1998.90", quantity="0.01", sl="1998.00", tp="1999.50",
+            riskPercent="1", observations=[])))
+    state, events = submit(state, order_command)
+    setup = dict(wallSeconds=perf_counter() - start_wall,
+                 cpuSeconds=process_time() - start_cpu)
+    io_before = _io_counters()
+    rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    validation_wall, validation_cpu = perf_counter(), process_time()
+    timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version, start_ns)
+    timeline_validation = dict(wallSeconds=perf_counter()-validation_wall,
+                               cpuSeconds=process_time()-validation_cpu)
+    replay_wall, replay_cpu = perf_counter(), process_time()
+    ticks = groups = batches = 0
+    block_ticks, block_wall, block_cpu = 0, replay_wall, replay_cpu
+    end_ns = str(int(manifest["range"]["endNs"]) - 1)
+    profiler = cProfile.Profile() if profile else None
+    if profiler:
+        profiler.enable()
+    while True:
+        ack = timeline.advance_through(end_ns, timeline.cursor)
+        state, committed = advance(state, ack["groups"], ack["coverage"],
+            ack["diagnostics"], ack["throughNs"])
+        events.extend(committed)
+        batch_ticks = sum(len(group["events"]) for group in ack["groups"])
+        ticks += batch_ticks
+        groups += len(ack["groups"])
+        batches += 1
+        if progress and ticks - block_ticks >= 8192:
+            now_wall, now_cpu = perf_counter(), process_time()
+            print(json.dumps(dict(label="SYNTHETIC / TEST ONLY", mode="financial-active",
+                ticksProcessed=ticks, blockTicks=ticks-block_ticks,
+                blockWallSeconds=round(now_wall-block_wall, 3),
+                blockCpuSeconds=round(now_cpu-block_cpu, 3),
+                blockTicksPerSecond=round((ticks-block_ticks)/(now_wall-block_wall), 2),
+                peakRssKiB=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+                sort_keys=True), file=sys.stderr, flush=True)
+            block_ticks, block_wall, block_cpu = ticks, now_wall, now_cpu
+        if ack["exhaustedThroughBoundary"]:
+            break
+        if batches > max(2048, (ticks + 63) // 64 + 32):
+            raise RuntimeError("financial replay exceeded bounded batch guard")
+    if profiler:
+        profiler.disable()
+    replay_wall_seconds = perf_counter() - replay_wall
+    replay_cpu_seconds = process_time() - replay_cpu
+    financial_events = [event for event in events if event["classification"] == "SIMULATED_FILL"]
+    analytics = project(state, events, None)
+    closed = analytics["metrics"].get("tradeCount", 0)
+    closed_order = next((row for row in analytics["orders"]
+                         if row.get("id") == order_command["commandId"]), None)
+    if (len(financial_events) != 2 or closed != 1 or closed_order is None or
+            closed_order.get("status") != "CLOSED" or state["realizedGross"] == "0"):
+        raise AssertionError(f"financial fixture did not close one trade: fills={len(financial_events)} metrics={analytics['metrics']}")
+    analytics_hash = content_hash(dict(schemaVersion=1,
+        artifact="BTL-SYNTHETIC-ANALYTICS-PARITY-1", account=analytics["account"],
+        orders=analytics["orders"], metrics=analytics["metrics"]))
+    state_hash = content_hash({key: value for key, value in state.items() if key != "revision"})
+    receipt_hash = content_hash(dict(schemaVersion=1,
+        artifact="BTL-SYNTHETIC-FINANCIAL-OUTCOME-1", events=financial_events))
+    io_after = _io_counters()
+    profile_output = None
+    if profiler:
+        output = io.StringIO()
+        pstats.Stats(profiler, stream=output).sort_stats("cumtime").print_stats(20)
+        profile_output = output.getvalue()
+    return dict(label="SYNTHETIC / TEST ONLY", mode="financial-active engine-only canonical replay",
+        execution="MonthlyParquetProvider → TickTimeline → existing submit/advance reducer",
+        setup=setup, timelineValidation=timeline_validation,
+        replay=dict(wallSeconds=replay_wall_seconds, cpuSeconds=replay_cpu_seconds,
+            ticksProcessed=ticks, groupsProcessed=groups, batches=batches,
+            ticksPerSecond=ticks/replay_wall_seconds,
+            peakRssKiB=max(rss_before, resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+            processIoRcharBytes=io_after.get("rchar", 0)-io_before.get("rchar", 0),
+            processIoReadBytes=io_after.get("read_bytes", 0)-io_before.get("read_bytes", 0)),
+        outcome=dict(orderId=order_command["commandId"], orderStatus=closed_order["status"],
+            fillKinds=[event["kind"] for event in financial_events], closedTrades=closed,
+            balance=state["balance"], realizedGross=state["realizedGross"],
+            financialStateHash=state_hash, financialReceiptEvidenceHash=receipt_hash,
+            analyticsHash=analytics_hash, eventHead=state["eventHash"]),
+        cProfileTop=profile_output,
+        warning="Engine-only in-memory commit path; fill events are not durable PostgreSQL receipts.")
+
+
+def recommended_financial_chunk_size(events_count):
+    """Keep manifest/chunk normalization bounded as financial fixtures scale."""
+    return 512 if events_count > 262_144 else 256
+
+
+def prepare_financial(root, events_count=4096, *, seed=20261112, chunk_size=None):
+    if type(events_count) is not int or not 512 <= events_count <= MAX_FINANCIAL_DATASET_EVENTS:
+        raise ValueError(f"financial benchmark supports 512..{MAX_FINANCIAL_DATASET_EVENTS} events")
+    if chunk_size is None:
+        chunk_size = recommended_financial_chunk_size(events_count)
+    generation_cpu, generation_wall = process_time(), perf_counter()
+    source_manifest, member_hash, _quality_hash = build_financial_manifest(
+        events_count, seed, chunk_size=chunk_size)
+    dataset_version = TickManifest.from_wire(source_manifest).version
+    generation = dict(cpuSeconds=process_time()-generation_cpu,
+                      wallSeconds=perf_counter()-generation_wall)
+    root = Path(root)
+    require_not_exists = not root.exists()
+    if not require_not_exists:
+        raise FileExistsError(f"refusing to overwrite existing benchmark path: {root}")
+    root.parent.mkdir(parents=True, exist_ok=True)
+    write_cpu, write_wall = process_time(), perf_counter()
+    parquet_manifest = write_monthly_parquet(root,
+        iter_financial_events(events_count, source_manifest, seed), source_manifest,
+        expected_version=dataset_version, row_group_size=8192)
+    parquet_write = dict(cpuSeconds=process_time()-write_cpu,
+                         wallSeconds=perf_counter()-write_wall)
+    file_manifest = [dict(month=item["month"], bytes=item["bytes"], sha256=item["sha256"],
+        rowGroups=len(item["rowGroups"])) for item in parquet_manifest["files"]]
+    parquet_configuration = dict(compression=parquet_manifest["compression"],
+        rowGroupSize=parquet_manifest["rowGroupSize"], partitionCount=len(file_manifest),
+        rowGroupCount=sum(item["rowGroups"] for item in file_manifest),
+        layout="YYYY-MM/ticks.parquet")
+    result = dict(label="SYNTHETIC / TEST ONLY", generatorVersion=FINANCIAL_GENERATOR_VERSION,
+        seed=seed, chunkSize=chunk_size,
+        fixture=financial_fixture_identity(events_count, source_manifest),
+        sourceManifestHash=content_hash(source_manifest), sourceMemberSha256=member_hash,
+        parquetManifestHash=parquet_manifest["manifestHash"], files=file_manifest,
+        parquetBytes=sum(row["bytes"] for row in file_manifest),
+        parquetConfiguration=parquet_configuration,
+        fixturePreparation=dict(generation=generation, parquetWrite=parquet_write),
+        warning="Fixture preparation only. Not an engine throughput measurement.")
+    return result
+
+
+def replay_financial(root, *, progress=False, profile=False):
+    root = Path(root)
+    manifest_load_cpu, manifest_load_wall = process_time(), perf_counter()
+    manifest = json.loads((root / "manifest.json").read_bytes())
+    manifest_load = dict(cpuSeconds=process_time()-manifest_load_cpu,
+                         wallSeconds=perf_counter()-manifest_load_wall)
+    provider_open_cpu, provider_open_wall = process_time(), perf_counter()
+    provider = MonthlyParquetProvider(root,
+        expected_dataset_id=manifest["datasetId"],
+        expected_dataset_version=manifest["datasetVersion"],
+        expected_manifest_hash=manifest["manifestHash"])
+    provider_open = dict(cpuSeconds=process_time()-provider_open_cpu,
+                         wallSeconds=perf_counter()-provider_open_wall)
+    source_manifest = manifest["sourceManifest"]
+    event_count = manifest["eventCount"]
+    result = dict(label="SYNTHETIC / TEST ONLY", generatorVersion=FINANCIAL_GENERATOR_VERSION,
+        fixture=financial_fixture_identity(event_count, source_manifest),
+        sourceManifestHash=content_hash(source_manifest),
+        parquetManifestHash=manifest["manifestHash"], parquetBytes=sum(x["bytes"] for x in manifest["files"]),
+        parquetConfiguration=dict(compression=manifest["compression"],
+            rowGroupSize=manifest["rowGroupSize"], partitionCount=len(manifest["files"]),
+            rowGroupCount=sum(len(x["rowGroups"]) for x in manifest["files"]),
+            layout="YYYY-MM/ticks.parquet"),
+        manifestLoad=manifest_load, providerOpen=provider_open,
+        files=[dict(month=x["month"], bytes=x["bytes"], sha256=x["sha256"],
+            rowGroups=len(x["rowGroups"])) for x in manifest["files"]],
+        replay=_engine_only_financial_replay(provider, progress=progress, profile=profile),
+        warning="Engine-only; no durable queue/PostgreSQL receipt, exclusive CPU, market-history validation, or VPS capacity claim.")
+    print(json.dumps(result, sort_keys=True, indent=2))
+    return result
+
+
+def run_financial(events_count=4096, *, seed=20261112, chunk_size=None,
+                  progress=False, profile=False):
+    with tempfile.TemporaryDirectory(prefix="riksora-financial-bench-") as temporary:
+        root = Path(temporary) / "monthly"
+        result = prepare_financial(root, events_count, seed=seed, chunk_size=chunk_size)
+        replay = replay_financial(root, progress=progress, profile=profile)
+        result.update(replay=replay["replay"], replayManifestHash=replay["parquetManifestHash"])
+        print(json.dumps(result, sort_keys=True, indent=2))
+        return result
+
+
 def run(events_count=4096, repeats=3, mode="ab", profile=False, progress=False):
+    if mode == "financial-active":
+        return run_financial(events_count, progress=progress, profile=profile)
     maximum = MAX_CONTROLLER_EVENTS if mode == "ab" else MAX_ENGINE_DATASET_EVENTS
     if type(events_count) is not int or not 512 <= events_count <= maximum:
         raise ValueError(f"{mode} benchmark supports 512..{maximum} events")
@@ -354,14 +545,34 @@ def run(events_count=4096, repeats=3, mode="ab", profile=False, progress=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--events", type=int, default=4096)
+    parser.add_argument("--chunk-size", type=int, default=None,
+        help="canonical synthetic tick chunk size; defaults to 256 through 262,144 events, then 512 (bounded by the frozen node budget)")
     parser.add_argument("--repeats", type=int, default=3)
-    parser.add_argument("--mode", choices=("ab", "engine-replay"), default="ab")
+    parser.add_argument("--mode", choices=("ab", "engine-replay", "financial-active",
+        "financial-prepare", "financial-replay"), default="ab")
     parser.add_argument("--profile", action="store_true",
         help="collect cProfile hot functions; the profiled run is not a throughput measurement")
     parser.add_argument("--progress", action="store_true",
         help="write bounded engine replay progress records to stderr")
+    parser.add_argument("--root", type=Path,
+        help="owned scratch path, required by financial-prepare and financial-replay")
     args = parser.parse_args()
-    run(args.events, args.repeats, args.mode, args.profile, args.progress)
+    if args.mode == "financial-prepare":
+        if args.root is None:
+            parser.error("--root is required for financial-prepare")
+        print(json.dumps(prepare_financial(args.root, args.events,
+            chunk_size=args.chunk_size), sort_keys=True, indent=2))
+        return
+    if args.mode == "financial-replay":
+        if args.root is None:
+            parser.error("--root is required for financial-replay")
+        replay_financial(args.root, progress=args.progress, profile=args.profile)
+        return
+    if args.mode == "financial-active":
+        run_financial(args.events, chunk_size=args.chunk_size,
+            progress=args.progress, profile=args.profile)
+    else:
+        run(args.events, args.repeats, args.mode, args.profile, args.progress)
 
 
 if __name__ == "__main__":
