@@ -105,6 +105,55 @@ class MonthlyParquetTests(unittest.TestCase):
                             for call in batch_calls))
         self.assertGreaterEqual(len(batch_calls), 2)
 
+    def test_page_resume_reuses_verified_token_row_group_across_pages(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=2)
+        provider = MonthlyParquetProvider(self.root,
+            expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        first = provider.read_page(provider.dataset_id, provider.dataset_version,
+            max_events=1)
+        with patch.object(provider, "_read_row_group_file",
+                wraps=provider._read_row_group_file) as read:
+            second = provider.read_page(provider.dataset_id, provider.dataset_version,
+                first["nextToken"], max_events=1)
+        self.assertEqual(read.call_count, 0)
+        self.assertEqual(second["events"], [self.wire_events[1]])
+
+    def test_page_resume_seeks_to_late_token_group_without_scanning_prefix(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=1)
+        provider = MonthlyParquetProvider(self.root,
+            expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        first = provider.read_page(provider.dataset_id, provider.dataset_version,
+            max_events=3)
+        self.assertEqual(first["events"], self.wire_events[:3])
+        with patch.object(provider, "_read_row_group_file",
+                wraps=provider._read_row_group_file) as read:
+            next_page = provider.read_page(provider.dataset_id, provider.dataset_version,
+                first["nextToken"], max_events=1)
+        # The token row group is already verified in the bounded cache; only
+        # the following row group is read. Prefix row groups are not rescanned.
+        self.assertEqual(read.call_count, 1)
+        self.assertEqual(next_page["events"], [self.wire_events[3]])
+
+    def test_page_mutation_does_not_change_cached_verified_rows(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=2)
+        provider = MonthlyParquetProvider(self.root,
+            expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        first = provider.read_page(provider.dataset_id, provider.dataset_version,
+            max_events=1)
+        first["events"][0]["bid"] = "0"
+        second = provider.read_page(provider.dataset_id, provider.dataset_version,
+            first["nextToken"], max_events=1)
+        self.assertEqual(second["events"], [self.wire_events[1]])
+
     def test_monthly_provider_replays_original_pages_and_timeline(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
                                          expected_version=self.source.dataset_version, row_group_size=2)

@@ -109,7 +109,18 @@ def build_dataset(event_count=MAX_EVENTS, seed=SEED):
             endNs=str(int(events[-1]["timeNs"]) + 1), endExclusive=True),
         ordering=dict(timestamps="VERIFIED_NONDECREASING", ties="UNTRUSTED",
                       sequenceScope=None, sequenceEvidenceHash=None),
-        coverage=[], gaps=[], rights={"class": "SYNTHETIC", "evidenceHash": None},
+        # Completeness here means the authored synthetic fixture is fully
+        # enumerated, including intentional quiet intervals. It is not market
+        # coverage evidence and must never be presented as historical data.
+        coverage=[
+            dict(startNs=events[0]["timeNs"], endNs=str(feb_ns), status="DECLARED_COMPLETE",
+                 evidenceHash=content_hash(dict(schemaVersion=1, artifact="BTL-SYNTHETIC-COVERAGE-1",
+                     generator=GENERATOR_VERSION, seed=seed, month="2020-01", label="SYNTHETIC / TEST ONLY"))),
+            dict(startNs=str(feb_ns), endNs=str(int(events[-1]["timeNs"]) + 1),
+                 status="DECLARED_COMPLETE",
+                 evidenceHash=content_hash(dict(schemaVersion=1, artifact="BTL-SYNTHETIC-COVERAGE-1",
+                     generator=GENERATOR_VERSION, seed=seed, month="2020-02", label="SYNTHETIC / TEST ONLY"))),
+        ], gaps=[], rights={"class": "SYNTHETIC", "evidenceHash": None},
         diagnostics=[], chunks=chunk_index))
     version = source_manifest.version
     for event in events:
