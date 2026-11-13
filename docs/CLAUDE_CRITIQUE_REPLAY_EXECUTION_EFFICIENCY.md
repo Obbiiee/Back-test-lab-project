@@ -1187,3 +1187,82 @@ may not reveal data beyond the event time.
 - Release-window design: choose W so that request rate stays acceptable at the
   maximum allowed playback speed; cap speed in strict mode if needed.
 - Rights check for tick-level display (14.3) before any public "scalping" positioning.
+
+## 15. Frontend optimization plan with budgets (2026-11-13)
+
+> **Status: ADVISORY.** No implementation authorized; frozen financial, no-look-ahead
+> and market-data contracts are not touched by F0–F7 unless stated. Baselines below
+> were **measured** with `npm ci && vite build` on `main` `4fc9939` (gzip via `gzip -c`)
+> and by reading source; improvements are targets, not results.
+
+### 15.0 Corrections to earlier statements (B3 / B-polling)
+
+- **B3 was overstated.** Heavy screens are already lazy-loaded
+  (`FigmaWorkspace.jsx:29` → `CandleChart`; `PrototypeEntry`, `TickAlphaEntry`,
+  `AlphaAccount`, `TickReviewEntry` each `lazy()` their workspace). What stays in the
+  entry chunk is `main.jsx` importing the five *entry* wrappers plus the legacy
+  `FigmaWorkspace` shell, React and shared code. The right next step is to inspect
+  what the 350 KB `index` chunk actually contains (bundle visualizer), not to add
+  lazy routes blindly.
+- **"500 ms polling" is a play loop.** `tickAlpha/AlphaWorkspace.jsx:70-82` runs
+  `await onReplay('ADVANCE', …)` then waits 500 ms before the next call, i.e. one
+  server round-trip per ≥500 ms for every playing user. (Any job-status polling inside
+  `onReplay`/`client.js` was not re-verified.) The cost is still a per-step server
+  call; the Option D / batched-cursor design (§13) is what removes it.
+
+### 15.1 Measured baseline (`vite build`)
+
+| Asset | Size | gzip | Note |
+|---|---|---|---|
+| `riksora-mark-*.png` | 1,200.5 KB | 945.5 KB | PNG, nearly incompressible |
+| `index-*.js` (entry) | 350.2 KB | 108.9 KB | React + shell + entries |
+| `RiskRewardGeometry-*.js` | 178.6 KB | 57.3 KB | chunk worth inspecting |
+| `index-*.css` | 114.2 KB | 21.6 KB | legacy styles included |
+| `TickAlpha-*.js` | 84.5 KB | 25.1 KB | |
+| `CandleChart-*.js` | 59.8 KB | 19.0 KB | |
+| `dist/` total | **273 MB** | — | dominated by `public/market` JSON |
+
+### 15.2 Plan (ordered by impact/risk)
+
+| ID | Work | Metric / budget (target) | Risk |
+|---|---|---|---|
+| F0 | Add bundle analysis (e.g. `rollup-plugin-visualizer`) and a size-budget check in CI; record baseline | budgets: entry JS ≤ 90 KB gz, any route chunk ≤ 60 KB gz, CSS ≤ 15 KB gz, total code `dist` ≤ 5 MB | none |
+| F1 | Remove `public/market` from `dist`/git; deploy as separate immutable assets (custom domain + cache); keep M1 only, derive other timeframes in the browser | `dist` 273 MB → code only; first request unaffected by data size | low (display only) |
+| F2 | Replace `riksora-mark.png` (SVG, or WebP/AVIF at displayed size, explicit width/height) | ≤ 30 KB | none |
+| F3 | Shrink the entry chunk: inspect `index`; make the legacy `FigmaWorkspace` shell load on demand; trim unused CSS per route | entry JS ≤ 90 KB gz; CSS ≤ 15 KB gz | low |
+| F4 | Incremental indicators: rolling state for SMA/EMA/RSI/ATR/MACD/Stochastic/Bollinger, `series.update()` for the last bar; full `setData` only on seek/timeframe change/error. Keep current calculators as reference tests | per-step main-thread cost independent of history length | medium — requires equality tests (full recompute == incremental) |
+| F5 | Data/engine work off the main thread: Web Worker for candle decode, aggregation and (V2) practice engine; typed arrays | long tasks ≤ 50 ms at 10× | low–medium |
+| F6 | Render budget: redraw ≤ 60 fps desktop / ≤ 30 fps mobile, never per tick; cap visible bars (~2,000–5,000) with lazy history; cap simultaneous indicators/drawings in a mobile preset; lower max speed on mobile | fps ≥ 30 on a 3–4 GB Android at 10× | low |
+| F7 | Network: SSE (or batched cursor marks) instead of per-step ADVANCE loop; coalesce requests; abort on unmount; HTTP caching for static chunks | requests/min per playing user ≪ 120 | tied to §13 (owner grant for protocol change) |
+| F8 | Component hygiene: split `CandleChart.jsx` (595 lines) into data/series/overlay/interaction; memoize props that do not change per tick; avoid re-creating series/handlers per render | fewer re-renders per step (React Profiler) | low |
+
+### 15.3 Measurement protocol (so claims become evidence)
+
+- **Build metrics:** `vite build` sizes (raw and gzip) per chunk in CI; fail on budget
+  regression.
+- **Lab:** Lighthouse (mobile preset, throttled) for LCP/TBT/CLS on the home route and a
+  workspace route; record before/after.
+- **Runtime:** Chrome DevTools Performance + Memory on (a) 4 GB laptop profile, (b)
+  3–4 GB Android, replaying 1×/10×/100×: heap MB, long tasks, fps, requests/min.
+- **React Profiler:** commits per replay step and render time of `CandleChart` before
+  and after F8.
+- **Correctness:** all existing `test:*` scripts and `test:regression` must pass; F4
+  adds a property test (random series, random step order) asserting bit-identical
+  indicator values between full and incremental computation.
+- Record results in the blueprint/authority documents, not only the handoff.
+
+### 15.4 Contract notes
+
+- F0–F3, F5, F6, F8: no financial or market-data contract touched.
+- F1: the candles stay display-only; tick evidence/execution authority unchanged.
+- F4: indicator values are display/analytics; equality tests protect them.
+- F7: changes the replay transport; depends on §13 and needs an explicit owner grant.
+- No-look-ahead: F1/F6 must not let a strict-tier session fetch candles beyond the
+  released window (§13.5); static all-month candle files are acceptable only in the
+  UNVERIFIED practice tier.
+
+### 15.5 Suggested first frontend checkpoint
+
+F0 + F2 (+ F1 design only): add measurement and budgets, fix the 1.2 MB logo, and
+document the data-delivery change — all reversible and low risk — then re-measure
+before choosing F3–F8.
