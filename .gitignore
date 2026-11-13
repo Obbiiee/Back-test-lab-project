@@ -42,3 +42,7 @@ Desktop.ini
 /deploy/vps/secrets/
 
 /integrations/odoo/secrets/
+
+# Generated XAUUSD decade archive (npm run history:decade). manifest.json stays tracked as the provenance record.
+/frontend/public/market/decade/*.json
+!/frontend/public/market/decade/manifest.json
