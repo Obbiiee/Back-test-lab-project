@@ -918,3 +918,198 @@ Open owner decisions: (a) rights status per provider; (b) approve Option D exper
 - (ii) blockers: rights matrix; real-month compact-chunk measurement.
 - (iii) owner-authorized: receipt-based verification; Option D; columnar/fixed-point
   read path; moving constant per-row fields to the manifest.
+
+## 13. Claude reference architecture — "Verify once, settle by events, serve small" (2026-11-13)
+
+> **Status: ADVISORY PROPOSAL. Not architecture authority.** It does not replace
+> `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md`, authorize implementation, or change any
+> frozen contract. It consolidates §1–12 into one target design for Codex to review,
+> challenge and, if the owner agrees, translate into authorized checkpoints.
+> All capacity/size/speed figures are **hypotheses until measured** (§13.9, Gate list).
+
+### 13.1 Goals and design rules
+
+Goals, in priority order: **accurate** (financial results byte-identical to the frozen
+engine) → **safe** (no-look-ahead, provenance, data rights) → **fast** → **efficient**
+→ **effective** (shippable V1 on one 6 vCPU / 16 GB VPS).
+
+Rules:
+1. **Verify once, use many times.** Integrity work is done per file/row group at
+   admission and pinned by a receipt; it is never repeated per replay step.
+2. **The server works on events, not on steps.** Cost scales with orders and touched
+   chunks, not with replay ticks or playback speed.
+3. **Ticks are evidence; candles are display.** Execution never uses OHLC
+   (AGENTS.md); candles are derived and may be re-derived any time.
+4. **Never move bytes the user does not need;** never recompute what is already proven.
+5. **Everything new sits behind a flag with the current path as rollback** until
+   parity and load evidence exist.
+6. **Two trust tiers:** results are `VERIFIED` only if the server computed them from
+   server-held data under a pinned policy; anything client-computed is `UNVERIFIED`.
+
+### 13.2 Layered data model (what is stored where)
+
+| Layer | Content | Authority | Location | Notes |
+|---|---|---|---|---|
+| L0 Raw archive | original provider files, SHA-256 pinned | evidence | VPS disk + off-host backup (object storage) | immutable; ≈15.2 GB retained HistData today |
+| L1 Canonical | Monthly Parquet (frozen layout) | canonical execution input | VPS disk | unchanged; verified once → **verification receipt** |
+| L2 Index | per-chunk metadata: time range, row count, min/max Bid/Ask, chunk hash, byte/row-group offset | derived, disposable | VPS disk (SQLite/Parquet) + PostgreSQL registry | enables Option D skipping; megabytes only |
+| L3 Delivery | derived display candles (from tick/M1), optional compact tick chunks (later) | display / UNVERIFIED tier | object storage + CDN, content-addressed | re-derivable from L1; never an authority |
+| L4 Session state | command log (orders, cancels, SL/TP edits, cursor marks), checkpoints on order events | product state | PostgreSQL | rows scale with orders, not steps |
+
+Manifest ties layers together: L3/L2 chunk → L1 file hash + row-group range →
+L0 source hashes, plus exporter/verifier versions. No acceptance or source hash is
+rewritten.
+
+### 13.3 Runtime topology (single VPS, V1)
+
+```
+Browser (React + lightweight-charts)
+   │  HTTPS (custom domain, Cloudflare cache)
+   ▼
+Caddy ──► static assets / candle chunks (immutable cache)  ──► Cloudflare R2 (optional)
+   │
+   ├──► API (N uvicorn processes, N ≈ cores/2)  ── in-memory rate limiter, async+sync pools
+   │        │   SSE for job/cursor notifications (no 500 ms polling)
+   │        ▼
+   │     PostgreSQL (tuned; command log, receipts, registry, queue with LISTEN/NOTIFY)
+   │
+   └──► Workers (separate systemd service, 3–4 processes, CPU/RAM capped)
+            • Settlement worker (Option D: index scan → exact tick read → reducer)
+            • Verification/notary worker (full replay only for published/VERIFIED sessions)
+            • Ingestion worker (vectorized parse, off-peak, nice'd)
+L1/L2 on local disk (NVMe); L0 + backups off-host (R2/B2); nightly pg_dump + WAL archive
+```
+
+Resource caps (systemd `MemoryMax`/`CPUQuota`) per service — budget in B14; target
+reserve ≥ 2.5 GB RAM; alert at 80% RAM / 75% disk.
+
+### 13.4 Core flows
+
+**A. Normal replay with no order (the common case)**
+- Client advances its cursor locally and renders candles it has been *released*.
+- Server load ≈ 0 per step. Cursor marks are batched (every few seconds or on
+  pause/seek) as a signed, append-only release log — no DB transaction per step.
+
+**B. Placing/changing an order (Option D settlement)**
+1. Client sends command (idempotent, sequence-numbered) → API validates → one INSERT
+   into the command log.
+2. Settlement worker computes the next market time at which the order/position can
+   change: query L2 for the first chunk after the revealed time whose min/max range
+   touches the trigger (entry, SL, TP, liquidation, trailing logic, time exits).
+3. It reads only that chunk's ticks exactly (columnar, integer fixed-point), applies the
+   frozen reducer (`Fraction`/`Decimal`) with atomic timestamp groups and the existing
+   ambiguity/gap rules, and stores the outcome **scheduled at its market time**.
+4. The outcome is **released to the client only when the revealed cursor reaches that
+   time** (together with the normal cursor update). Until then the client learns
+   nothing beyond "no event yet".
+
+**C. Session completion / publication (notary, only when VERIFIED is requested)**
+- Full deterministic re-execution of the command log over L1 under the pinned policy,
+  using the verification receipt for the files involved. Server-computed result =
+  authoritative for statistics, Experiment Passport, leaderboards. Mismatch with any
+  client-claimed value → flagged. Run in the worker pool with per-user quotas.
+
+**D. Data admission**
+- L0 → parse (vectorized) → canonical L1 (frozen rules) → verify once → write receipt
+  (file SHA-256, manifest hash, verifier version, policy version) → build L2 index →
+  optional L3 derivatives → publish manifest. Any byte change invalidates the receipt.
+
+### 13.5 No-look-ahead correction to earlier statements (important)
+
+Serving whole static candle files from a CDN lets a client read **future candles**.
+Therefore:
+- **Practice tier:** static candle chunks are acceptable; results are `UNVERIFIED`
+  (owner decision A in §5).
+- **Verified/strict tier:** display candles must also be released progressively
+  (window W, e.g. ≤ 1 s of market time or a small group count; stateless signed cursor,
+  batched release log). Total bytes per user stay similar to the static case
+  (≈0.2 MB per M1-month), but they arrive in slices — so the "≈0.2 MB" figure in §12.3
+  is a *volume*, not proof of causality for static hosting.
+- Tick data never leaves the server in V1 in either tier.
+- Timestamp groups remain atomic in every release and in every settlement read.
+
+### 13.6 Precision design (how speed does not cost accuracy)
+
+- Prices as **int64 fixed-point at source scale** per chunk (bid/ask are exact decimal
+  strings today, so conversion is lossless); spread as integer delta if useful.
+- Comparisons and min/max skipping use integers; **money arithmetic stays exact**
+  (`Fraction`/`Decimal`; BigInt rationals in any future browser twin) and runs only on
+  touched ticks.
+- Nanosecond timestamps: int64 (Python/Arrow), BigInt in JS; never `Number`.
+- Canonical JSON/hashes unchanged for the frozen contract; per-row evidence becomes
+  per-row-group hash / Merkle tree **only if the owner authorizes** a storage-contract
+  change (§B13).
+- **Parity gate:** new read/settlement paths must produce byte-identical canonical
+  hashes and financial results versus the current path on all golden vectors
+  (`tick_execution_v1.json`, contract vectors) plus one real EURUSD and one real
+  XAUUSD month. Any mismatch → reject.
+
+### 13.7 V1 scope vs V2
+
+**V1 (fits one VPS, lowest rights risk):**
+- XAUUSD only, 1–2 years (≈5–10 GB in the current serving format by the repo's own
+  84.25 B/tick; arithmetic, not a qualified projection).
+- Server-held ticks; Option D settlement; receipts; columnar read path; display
+  candles (static for practice, released-window for strict).
+- Hardening from Part B: CI full-suite zero-skip, in-memory rate limiter, pools, SSE,
+  multi-process API, systemd caps, reproducible deploy/backup/restore, lazy routes,
+  candle data out of git/`dist`.
+- Off-host backup of L0 and manifests (R2/B2) — not used for client tick delivery.
+
+**V2 (after rights + measurements):**
+- UNVERIFIED practice engine in the browser (TS + BigInt twin, Python stays the
+  independent oracle) with compact tick chunks via custom-domain CDN.
+- More symbols/years; compact transport derivative of L1 (measure real B/tick first).
+- Full notary for competitions/leaderboards; optional storage-contract slimming
+  (§B13) with Merkle chunk hashes.
+
+### 13.8 Expected targets (HYPOTHESES — to be confirmed by §13.9)
+
+| Metric | Today (evidence) | V1 target |
+|---|---|---|
+| Concurrent replay sessions on 6 vCPU/16 GB | tens (10-session probe near limits) | hundreds (server cost ∝ orders) |
+| Server CPU per replay step | queue + process + DB tx | ≈0 (cursor marks batched) |
+| Parquet read throughput | ≈2,100 ticks/s conversion; 399 CPU-s / 262,144-tick case | order-of-magnitude higher via receipts + columnar (unmeasured) |
+| Client download per user-month (XAU, strict) | whole Parquet 400–700 MB if ever served | ≈0.2 MB candles in released slices |
+| Storage for XAU 1–2 y (serving) | 84.25 B/tick → ≈5–10 GB | same or smaller after measurement |
+| Deploy artifact | 273 MB `dist` | code only (<5 MB gz) |
+
+### 13.9 Migration plan with gates
+
+Each step: reversible, feature-flagged, behind the owner's explicit grant where it
+touches frozen contracts. Order follows §9/§11.4/§12.6.
+
+| Step | Work | Gate to proceed | Contract |
+|---|---|---|---|
+| M0 | Profile the read path and the 399 CPU-s case (read / JSON / hash / validate / reducer split); full-suite zero-skip CI | numbers recorded in the blueprint | neutral |
+| M1 | In-memory rate limiter, pools, SSE, `LISTEN/NOTIFY`, multi-process API, systemd caps, lazy routes, candle data out of git/`dist` | tests green; load test before/after | security review for limiter |
+| M2 | Rights matrix per provider; L2 index builder; delivery manifest; custom-domain static delivery (no `r2.dev`) | rights written; index parity on one month | neutral / owner |
+| M3 | Verification receipts + columnar fixed-point read path | byte-identical hashes/results on goldens + real months | **owner grant** |
+| M4 | Option D settlement worker + released-window cursor | parity vs full replay incl. gaps, equal-time groups, partial closes, trailing/time exits; no-look-ahead proof | **owner grant** |
+| M5 | Retire per-step ADVANCE/SEEK job path and legacy engines | load test + rollback proven | **owner grant** |
+| M6 (V2) | Browser practice engine (TS+BigInt), tick chunks, notary for competitions | Gates A/B/D from §11.2 Q8 | **owner grant** + rights |
+
+Reject / rollback triggers: any parity mismatch; Option D verified Session cost not
+below ≈30 CPU-s; client heap > 500 MB on the 4 GB profile; no written redistribution
+permission for any client tick delivery (then V2 browser delivery is dropped, V1 design
+remains valid).
+
+### 13.10 Risks and unknowns
+
+- Option D must match frozen semantics for gaps, spread changes, ambiguous ordering,
+  trailing stops and time-based rules; trailing/time exits may force finer scans.
+- Receipt-based verification changes *where* verification runs, which is a frozen
+  rule — needs explicit authority text.
+- Index min/max skipping is only an optimization: if an edge case is unsafe, fall back
+  to exact tick scan for that chunk.
+- Rights status of every provider is UNKNOWN to Claude; no hosting/CDN choice grants
+  rights.
+- None of the numbers in §13.8 were measured by Claude; no PR #53 tests, benchmarks or
+  device tests were run.
+
+### 13.11 What Codex is asked to do
+
+Respond in this file under a new heading: AGREE / DISAGREE / NEEDS DATA per layer,
+flow and gate in §13.2–13.9; flag any conflict with frozen 42.17/42.19 contracts;
+propose the smallest first authorized checkpoint (suggest M0 profiling). This is a
+collaboration note, not a request to implement or to overwrite PR #53.
