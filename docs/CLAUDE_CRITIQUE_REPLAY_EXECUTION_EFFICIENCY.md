@@ -2,8 +2,10 @@
 
 Part A (sections 1–6): replay execution path and capacity.
 Part B (section 8): whole-repository audit — data, frontend, backend/API, database,
-security, testing/CI, deployment, low-end devices, documentation/process — each with
-evidence, impact and proposed solution. Section 9 gives the combined priority order.
+security, testing/CI, deployment, low-end devices, documentation/process (B1–B12) and
+resource efficiency: tick storage, RAM, CPU, PostgreSQL, disk/backup, bandwidth and a
+measurement plan (B13–B19) — each with evidence, impact and proposed solution.
+Section 9 gives the combined priority order.
 
 > **Status: ADVISORY REVIEW ONLY. Not architecture authority.**
 > This document records an external review requested by the owner. It does not
@@ -350,19 +352,181 @@ touches frozen authority (owner grant required) or is contract-neutral.
 - Contract: touches the AI-context authority structure — owner grant; no product
   contract change.
 
+### B13. Tick storage footprint — the largest efficiency problem (CRITICAL)
+
+- Evidence (Codex measurements recorded in `docs/AI_HANDOFF.md`, 2026-10-23/24):
+  - One accepted EURUSD month, 1,496,361 ticks: validation store **479,637,504 B
+    (≈320 B/tick)** + serving replica **124,080,128 B (≈83 B/tick)**.
+  - Parquet PoC: 14,888,706 B per 100,000 ticks (**≈149 B/tick**) because each row
+    keeps exact Bid/Ask strings, source/event IDs, textual ordinal, full canonical
+    bytes, a per-row SHA-256 and the original raw record bytes.
+  - Linear forecast for the audited 2,451,954,017 rows: ≈786 GB validation,
+    ≈989 GB validation+serving (also ≈545 GB with the normalized layout) versus
+    ≈150–163 GB free. Eight-symbol 11-month beta alone: ≈104–121 GB new copies,
+    ≈242 GB with a local backup → NO-GO.
+  - Meanwhile the **entire retained raw HistData root is ≈15.2 GB** (15,209,961,033 B),
+    i.e. the source itself is ≈6 B/tick. Derived stores are ≈50–65× larger than the
+    evidence they are derived from.
+- Root cause: integrity and provenance are stored **per row, redundantly, in every
+  copy** (canonical bytes + raw bytes + digest + string IDs), and validation and
+  serving are separate full copies.
+- Solution (keeps exact precision, provenance and verifiability):
+  1. **Raw source archive = the evidence.** Keep the original GZIP files immutable,
+     pinned by SHA-256 (already done). They are the only copy that must be preserved
+     byte-for-byte.
+  2. **Deterministic derivation instead of stored canonical bytes.** Canonical ticks
+     are a pure function of (raw file hash, parser version, admission policy
+     version). Store that recipe plus the result hash; anyone can re-derive and
+     re-verify. Per-row canonical bytes and per-row raw bytes need not be stored.
+  3. **Integrity per chunk, not per row.** Hash each chunk (e.g. one hour or one
+     timestamp-group range) and build a Merkle tree per month/dataset; the root hash
+     is pinned in the registry/Passport. Tampering with any tick changes the root.
+     Proofs for a single tick are a few hashes (log₂ n), not 32 B per row.
+  4. **One compact serving format.** Columnar chunk: `int64` ns timestamp as
+     delta/zigzag varint, Bid and Ask as fixed-point integers at the **source
+     precision** (store the scale per chunk, so no rounding and no float error),
+     Ask stored as spread from Bid, optional source ordinal as delta; compressed
+     with zstd (or brotli for web delivery). Equal-time groups remain atomic because
+     chunks split only at group boundaries.
+  5. **No separate validation copy at rest.** Validation runs at admission time and
+     outputs a report + hashes; it does not need its own permanent full copy. If a
+     queryable index is required, keep a small per-chunk index (time range, row
+     count, hash, byte offset), not per-row rows.
+- Expected size: synthetic EURUSD-like stream (70,000 ticks, ms timestamps,
+  integer pip deltas) measured **≈2.2–2.9 B/tick** with delta + deflate/xz; real data
+  has more entropy, so plan for **≈3–8 B/tick**. Full 2.45 B-row corpus ≈ **7–20 GB**
+  instead of ≈786–989 GB; eight-symbol beta year ≈ 1–3 GB. This must be confirmed by
+  a real-data PoC (one EURUSD + one XAUUSD month) with exact canonical-hash parity
+  against the current store.
+- Contract: changes storage/evidence representation (Market Data Standard, 42.17/42.19
+  storage contract) — **owner grant required**. Execution semantics, Bid/Ask
+  exactness, ordering trust flags and no-look-ahead are unchanged.
+
+### B14. Server RAM budget for 6 vCPU / 16 GB (HIGH)
+
+- Evidence: internal probe 10 sessions → sampled host RAM 85–95%
+  (`04_CURRENT_PHASE.md`); Parquet/DuckDB full scan VmHWM 415 MB, Arrow-only
+  154 MB, SQLite reader ≈47 MB per process (handoff measurements); per-job native
+  child processes (`cloud/worker.py`); per-process timeline cache
+  (`execution/workspace.py`, 4 entries).
+- Impact: memory grows with sessions × processes × caches; a heavy scan job can
+  push the host into swap and stall the API.
+- Solution — explicit budget, enforced by systemd `MemoryMax=` per service:
+
+  | Component | Budget | Notes |
+  |---|---|---|
+  | OS + Caddy + page cache floor | 2 GB | page cache benefits chunk serving |
+  | PostgreSQL | 4 GB | `shared_buffers=2GB`, `effective_cache_size=6GB` |
+  | API processes (4–6) | 3 GB | ≈300–500 MB each, no market data in-process |
+  | Queue / verification workers (3) | 4.5 GB | `MemoryMax=1.5G` each; DuckDB `memory_limit` + streaming reads |
+  | Reserve | 2.5 GB | no swap thrash; alert at 80% |
+
+  - Stream chunks instead of loading months; cap per-request result size (already
+    8 MB — keep it).
+  - Bound caches by bytes, not entry count; one shared chunk cache (OS page cache or
+    a single process) instead of per-session copies.
+  - With the Part A notary model, per-session server RAM ≈ 0 during replay.
+- Contract: neutral.
+
+### B15. CPU budget (MEDIUM)
+
+- Evidence: per-step replay work on the server (Part A); conversion 47.7 s CPU per
+  100k EURUSD ticks in the Parquet PoC (≈2,100 ticks/s single thread) — ingestion of
+  2.45 B rows at that rate ≈ 13 CPU-days; single uvicorn process (B7).
+- Solution:
+  - Ingestion: vectorized parsing (PyArrow CSV reader / Polars) instead of per-row
+    Python; process months in parallel with `nice` and CPU affinity off the API cores;
+    target ≥ 500k–1M ticks/s per core (to be measured).
+  - Reserve cores: e.g. 2 vCPU for API + PostgreSQL, 4 vCPU for workers via
+    systemd `CPUQuota=`/`AllowedCPUs=`; ingestion only off-peak.
+  - Verification re-execution (Part A) is linear in ticks of the session window;
+    measure ticks/s of the reducer and set per-user job quotas.
+- Contract: neutral.
+
+### B16. PostgreSQL tuning and write amplification (MEDIUM)
+
+- Evidence: no PostgreSQL configuration is tracked in the repository; hot-path writes
+  per API request (B5) and per replay step (Part A); queue table polled every 0.25 s
+  per worker (`cloud/queue.py` lifespan loop) with `FOR UPDATE SKIP LOCKED`.
+- Solution:
+  - Track a reviewed `postgresql.conf` fragment in `deploy/` (B9):
+    `shared_buffers=2GB`, `effective_cache_size=6GB`, `work_mem=16MB`,
+    `maintenance_work_mem=512MB`, `max_connections=50` (pools in front),
+    `wal_compression=on`, `checkpoint_timeout=15min`, `max_wal_size=4GB`,
+    SSD: `random_page_cost=1.1`.
+  - Aggressive autovacuum on hot tables (`research_jobs`, `auth_rate_limits`,
+    `tick_*`): lower `autovacuum_vacuum_scale_factor` per table.
+  - Replace 0.25 s queue polling with `LISTEN/NOTIFY` (wake on insert) plus a slow
+    fallback poll.
+  - Remove per-request rate-limit writes (B5) and per-step checkpoint writes
+    (Part A / B6) — these dominate WAL volume.
+  - Enable `pg_stat_statements` to find the top queries before tuning further.
+- Contract: neutral.
+
+### B17. Disk I/O, backup and retention (HIGH)
+
+- Evidence: backup of new stores would need ≈242 GB (B13); handoff notes
+  `riksora-beta-backup` exists but contents/off-host copy unverified; local
+  file-copy drill is explicitly not disaster recovery.
+- Solution:
+  - After B13, the whole market corpus is small enough (≈7–20 GB) to back up
+    off-host cheaply (object storage, e.g. Backblaze B2 / Cloudflare R2 / Wasabi);
+    raw GZIP archives backed up once (immutable, verify by hash).
+  - PostgreSQL: nightly `pg_dump -Fc` (or `pgBackRest` with WAL archiving for
+    point-in-time recovery), encrypted, off-host, 7 daily / 4 weekly / 6 monthly
+    retention; monthly automated restore test into a scratch database.
+  - Separate volumes/directories for OS, PostgreSQL, market data, backups; alert at
+    75% disk.
+  - Retention: delete scratch/experiment copies after their report is pinned
+    (owner-approved policy); never auto-delete evidence.
+- Contract: deletion policies require owner grant.
+
+### B18. Network bandwidth (MEDIUM)
+
+- Estimate (to be measured): compact ticks ≈ 0.2–0.6 MB per symbol-day; a
+  user replaying ~100 symbol-days per month ≈ 20–60 MB; 1,000 active users ≈
+  20–60 GB/month of chunk traffic, plus app assets. Current JSON candles are
+  ≈1.5 MB/month per timeframe file and re-downloaded without content addressing.
+- Solution: content-addressed immutable URLs + CDN (Cloudflare free tier is enough
+  at this scale) so most traffic never reaches the VPS; brotli for text assets;
+  HTTP caching headers on static chunks; per-user download quotas for abuse.
+- Contract: neutral (respect data-rights gates before any public distribution —
+  HistData hosted/public rights are still UNKNOWN per handoff).
+
+### B19. Measurement plan (so the numbers above become evidence)
+
+Estimates in this review must be replaced by measurements before decisions:
+
+1. **Storage PoC (B13):** one EURUSD and one XAUUSD month → compact chunk format;
+   report B/tick, encode/decode ticks/s, canonical-hash parity with the current
+   store, Merkle root reproducibility.
+2. **Server load test:** k6 or Locust against a staging VPS with the real
+   API: 10 / 50 / 200 / 1,000 simulated users; record p95 latency, CPU per core,
+   RSS per process, PostgreSQL TPS/WAL MB/s, error rate. Run before and after
+   B5/B6/B7 and Part A option C.
+3. **Client profile (B10):** Chrome DevTools performance + memory on a 3–4 GB
+   Android phone and a 4 GB laptop: heap MB, long tasks, fps at 1×/10×/100× replay.
+4. **Bandwidth:** bytes per session from the load test and real beta logs.
+5. Record all results in the proper authority document (system blueprint), not
+   only in the handoff.
+
 ## 9. Combined priority order
 
 | # | Item | Impact | Effort | Contract |
 |---|---|---|---|---|
 | 1 | B8 CI with PostgreSQL, required check | quality gate for everything else | low | neutral |
-| 2 | B5 rate limiter + connection pools (B6) | removes a real availability bug | low–medium | security review |
-| 3 | B1 market data out of git/dist, binary + derive TFs | −270 MB deploy, faster load | medium | neutral (display) |
-| 4 | Part A step 1: engine parity TS/WASM + golden vectors | unlocks Part A | medium–high | owner grant |
-| 5 | Part A low-risk optimizations (option C list) | 2–5× replay capacity | medium | neutral |
-| 6 | B9 reproducible deploy/backup/restore | removes NO-GO blocker | medium | neutral |
-| 7 | B3 lazy routes + logo | faster first load | low | neutral |
-| 8 | B4 incremental indicators | low-end devices | medium | neutral with tests |
-| 9 | B12 documentation slimming | agent cost/clarity | low | owner grant |
-| 10 | B2 single engine / retire legacy | maintenance | medium | owner grant |
-| 11 | Part A full notary architecture (options A/B) | thousands of users | high | owner grant |
-| 12 | B7, B10, B11 | scale/reach polish | varies | neutral |
+| 2 | B13 compact tick storage PoC (chunk hashes, fixed-point, zstd) | ≈786–989 GB → ≈7–20 GB forecast; unblocks data NO-GO | medium | owner grant |
+| 3 | B5 rate limiter + connection pools (B6) | removes a real availability bug | low–medium | security review |
+| 4 | B19 measurement plan (load test, storage PoC, client profile) | turns estimates into evidence | low–medium | neutral |
+| 5 | B1 market data out of git/dist, binary + derive TFs | −270 MB deploy, faster load | medium | neutral (display) |
+| 6 | B9 + B17 reproducible deploy, off-host backup, restore tests | removes NO-GO blocker | medium | neutral / retention needs grant |
+| 7 | B14 + B16 RAM budget, systemd limits, PostgreSQL config | stability under load | low | neutral |
+| 8 | Part A step 1: engine parity TS/WASM + golden vectors | unlocks Part A | medium–high | owner grant |
+| 9 | Part A low-risk optimizations (option C list) | 2–5× replay capacity | medium | neutral |
+| 10 | B3 lazy routes + logo | faster first load | low | neutral |
+| 11 | B4 incremental indicators | low-end devices | medium | neutral with tests |
+| 12 | B12 documentation slimming | agent cost/clarity | low | owner grant |
+| 13 | B2 single engine / retire legacy | maintenance | medium | owner grant |
+| 14 | B15 vectorized ingestion, CPU reservation | faster imports | medium | neutral |
+| 15 | Part A full notary architecture (options A/B) | thousands of users | high | owner grant |
+| 16 | B7, B10, B11, B18 | scale/reach polish | varies | neutral |
