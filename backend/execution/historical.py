@@ -20,6 +20,19 @@ from ticks.contracts_v2 import canonical_v2_bytes, hash_v2
 from ticks.storage_v2 import ArtifactStore, DiskTickProvider
 from ticks.timeline_v2 import IndexedTickTimeline
 from .fixture_demo import fixture_profile
+
+
+def new_session_log_codec(folder):
+    """Physical timeline-log codec for a Session log folder (logical bytes and hashes are unchanged).
+
+    An explicit ``BTL_QA_TIMELINE_LOG_CODEC`` always wins. Otherwise NEW private logs use ``zlib-1``
+    (measured about 8x smaller than ``raw`` on real ticks) while an existing archive is opened with
+    ``None`` so it keeps the layout it was written with; archives are never migrated or mixed.
+    """
+    explicit = os.environ.get('BTL_QA_TIMELINE_LOG_CODEC')
+    if explicit:
+        return explicit
+    return None if (Path(folder) / 'timeline.sqlite').exists() else 'zlib-1'
 from .workspace import WINDOW_GROUPS
 from .contracts import exact, text
 
@@ -221,7 +234,7 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             try:
                 timeline = IndexedTickTimeline(provider, self.source.dataset_id, self.source.version, str(start),
                                                log_folder=self._folder(scope, session), allow_threads=True,
-                                               log_codec=os.environ.get('BTL_QA_TIMELINE_LOG_CODEC'),
+                                               log_codec=new_session_log_codec(self._folder(scope, session)),
                                                max_groups_per_advance=self.max_groups_per_advance,
                                                storage_mode=self.timeline_storage_mode,
                                                source_pin=self._source_pin if self.timeline_storage_mode in ('shared-source-v1','shared-source-v2') else None)
