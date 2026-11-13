@@ -1507,3 +1507,137 @@ C5 before opening registration publicly, then C2/C4/C6/C8.
 ### 18.4 Honest limits
 I did not pen-test, review the SQL for injection beyond reading call sites, or inspect the
 live VPS/reverse-proxy configuration; items C3 and C1 may already exist outside the repo.
+
+## 19. Claude review of PR #55 (owner hybrid vNext, §7–8) — 2026-11-13
+
+> **Status: ADVISORY / critique only.** No runtime edit, no frozen-contract change.
+> Reviewed: `docs/architecture/RIKSORA-HYBRID-NINE-TF-R2-OWNER-DECISION-20261113.md` on
+> `docs/hybrid-precomputed-ohlc-r2-20261113`, plus four other Claude Code branches of 2026-11-13
+> (read from their tip commits and docs; **I did not run their tests**):
+> `claude/compact-tick-fastpath-20261113`, `claude/canonical-fastpath-20261113`,
+> `claude/candles-out-of-git-20261113`, `claude/session-log-storage-20261113`.
+> Unpublished local Codex HEAD `e099e344` was **not** inspected (G0 respected).
+
+### 19.0 Verdict
+The direction is sound: VPS-authoritative tick execution, no full tick download, precomputed
+chart products, cursor-clipped delivery. Four things I would change or prove first:
+(1) cache key/page design for the chart gateway (leak risk), (2) the compact tick view must be
+*bound to* the authoritative file by a receipt and differentially tested on real months,
+(3) per-Session storage default (`session-log-v2`) is the real disk risk, (4) re-measure Option D
+with a true session start (see 19.2-Q8).
+
+### 19.1 Evidence from the other Claude branches (measured by them, n=1, not mine)
+
+| Branch | What it shows | Caveat |
+|---|---|---|
+| compact-tick-fastpath | One real month, 909,227 ticks: authoritative read ≈395 s vs compact ≈0.08 s; write ≈800 vs ≈95,000 ticks/s; ≈43 vs ≈10.6 B/tick; verify_all ≈439 s vs 0.03 s hash/0.11 s deep. Matches my §12.1 diagnosis (~2,300 ticks/s) | Read-only microbenchmark; parity proven only on synthetic + 150k ticks; new vectorised validator is a *second* validator |
+| canonical-fastpath | `_normalize` ≈40% of profiled advance/resume; fast path ≈20–25% less time; 6,000-random-tree differential test vs verbatim reference (bytes, error code/field, budget) | Touches `contracts/canonical.py` (frozen area) → owner review even though bytes unchanged |
+| canonical-fastpath (finding) | `IndexedTickTimeline` default `session_start_ns="0"` ⇒ ≈19,700 empty 1-day evidence queries (≈85% of advance time) | **Benchmark trap**; earlier "≈10 s resume" numbers were inflated |
+| session-log-storage | NEW timeline logs default `zlib-1`: ≈593.7 → 56.0 B/group block bytes (≈87% smaller on disk), no read slowdown in sample; `delta-dict-zlib-1` ≈15–20% better but ~2× slower reads → not worth | Default product catalog mode is still `session-log-v2` (per-Session copy ≈84.5 MB/XAU day); `shared-source-v1/v2` are operator-catalog opt-in; ≈5 KB PostgreSQL per ADVANCE command |
+| candles-out-of-git | Untracks 963 generated chunks (~266 MB), keeps `manifest.json`, explicit SKIP/`BTL_REQUIRE_DECADE=1` gate; history not rewritten | Matches my B1; clones still carry old blobs (~75 MB `.git`) |
+
+### 19.2 Answers to the 14 questions (AGREE / DISAGREE / NEEDS DATA)
+
+| Q | Subsystem | Verdict | Short reason |
+|---|---|---|---|
+| 1 | Private R2, nine TF vs M1-only + aggregate | **AGREE (conditional)** | Cost is trivial either way: 16 instruments × 58 months × 9 TF ≈ 8,352 objects; storage a few GB at most (unmeasured). D1/H4 on the fly from M1 is wasteful (5,000 D1 ≈ 1.4 M M1 bars), so precompute is justified; the real cost is the gateway/leak design, not R2 fees. |
+| 2 | Cursor-clipped gateway | **AGREE, DISAGREE with per-page shared caching** | See 19.3. |
+| 3 | MID display vs BID M1 | **NEEDS DATA / prefer BID** | Fills use bid/ask; platform charts are conventionally BID. If MID is kept, version it. Pin D1 bucket convention (UTC midnight vs 17:00 NY; HistData is EST fixed UTC-5) — visible mismatch with TradingView/MT5 otherwise. |
+| 4 | 5,000 bars/TF cache on 3–4 GB Android | **AGREE as a cap; NEEDS DATA for thresholds** | 5,000 bars is small (≈<1 MB); risk is indicators/drawings/chart copies. Use §15 budgets, measured on a reference device. |
+| 5 | Reader format | **AGREE B→C path, DISAGREE with D now** | Keep authoritative A as cold evidence; hot path C bound to A by receipt (19.4). Replacement of the canonical layout (D) only after full-parity evidence. |
+| 6 | Verify-once | **AGREE** | Minimum receipt: A file SHA-256 + manifest hash + row-group hashes + verifier/policy version + C file SHA + derivation version. Content-addressed ⇒ survives backup/restore; any change invalidates. Add sampled background deep re-verify (bit rot). |
+| 7 | Manifest segmentation | **AGREE** | Per-month manifests under a root hash; bounded streaming validator. Raising 16,384/4,096 globally weakens the DoS bound for untrusted payloads. |
+| 8 | Biggest bottleneck | **Evidence now favors per-row conversion/validation + `_normalize`** | Plus the session-start trap. Smallest same-scope test in 19.5. |
+| 9 | Queue | **AGREE** with doc ordering | Correction to my §17: `FOR UPDATE SKIP LOCKED` and `WORKERS` 1–4 already exist. Order: instrument → bounded batching → pool → rate-limit (keep auth safety) → NOTIFY/SSE → warm cache. |
+| 10 | Option D | **NEEDS DATA, proof-backed fallback mandatory** | Counterexamples in 19.6. |
+| 11 | Sparse checkpoints / MAX_STEPS | **AGREE** | New lever: ≈5 KB per ADVANCE command ⇒ merge ADVANCE per confirmed range (idempotency semantics need owner decision); closed-order archive; periodic checkpoints. Do not raise MAX_STEPS. |
+| 12 | 6 vCPU/16 GiB, 16×34 months | **Storage OK, compute unproven** | Arithmetic below. |
+| 13 | Frozen conflicts | Classification in 19.7 | |
+| 14 | Failure scenarios, counterproposal, next PR | 19.8 | |
+
+**Q12 arithmetic (hypothesis).** If every instrument-month were like the 909,227-tick month:
+16 × 34 × ≈0.9 M ≈ 490 M ticks ⇒ ≈5 GB at ≈10.6 B/tick (compact) or ≈21 GB at ≈43 B/tick
+(authoritative); both fit the ≈150–163 GB free. Storage is not the constraint; conversion/verify
+CPU and per-Session persistence are. Measured: items in 19.1. Hypothesis: all trader-capacity
+numbers, annual projections, Option D speedups.
+
+### 19.3 Chart gateway design ("past is static, present is dynamic")
+- **Immutable past pages** (every bar closed ≤ T): short-lived per-page presigned R2 URLs issued
+  by the VPS after a cursor check; R2 egress is $0, so no VPS byte proxying.
+- **Dynamic tail** (page containing T + forming candle): served by the VPS, clipped server-side,
+  `Cache-Control: no-store`.
+- **Cache poisoning/leak risks:** never cache a clipped page under a key that omits the cursor;
+  edge cache must not serve unauthenticated objects; manifest must expose only entries ≤ T (page
+  names, counts, last-bar times and ETags of future pages reveal gaps/EOF); opaque ids instead of
+  date-named keys; error messages must not differ for "future" vs "missing".
+- **Tests:** another tenant, replayed old URL after cursor rewind, Range requests, page-boundary at
+  M1/M5/H1/D1, restart, timeframe switch.
+
+### 19.4 Binding compact view C to authoritative A
+Derive C **once, streaming through A** (pays the ≈395 s once per month), record A's verified file
+hashes in a receipt, and bind C's SHA to it. Requirements before settlement may use C:
+differential test of the vectorised validator against A's per-row validator on every real
+available month (like the canonical differential proof); full reducer parity (events, fills, SL/TP,
+partial close, balance, receipts, cold restart, repeat hashes byte-for-byte); `ordinal` and
+`group_id` reconstruct the event identity used in receipts; nightly sampled deep re-verify.
+
+### 19.5 Smallest same-scope profiling test (answers Q8)
+One real month, **true `session_start_ns`**, same orders, three configurations (A, B projected
+Arrow reader, C compact). Per-stage CPU-s per 10k ticks: Arrow→Python conversion, canonical
+hashing, reducer, PostgreSQL commit, native child start; plus end-to-end wall and RSS.
+
+### 19.6 Option D counterexamples (min/max chunk skipping)
+1. **Trailing stop:** skipping a chunk without applying its high-water mark changes later trigger
+   levels. Conservative rule: skip only if chunk min ≥ (max(ref, chunk max) − trail).
+2. **Time barriers:** rollover/swap, order expiry, Friday close, weekend gap — chunks containing a
+   calendar barrier must never be skipped.
+3. **Margin/stop-out** depends on joint equity path (multi-position, swap, commission); single
+   instrument V1 only, otherwise exact scan.
+4. **Same-timestamp group ambiguity:** TP and SL both inside range ⇒ exact scan and report
+   unresolved ambiguity; never decide from min/max.
+5. **Gap fills:** fill price is the first touching tick's price, not the trigger price ⇒ jump to
+   the chunk, then exact scan inside it.
+**Proof:** property-based differential test (random pending/SL/TP/trailing/time orders over real
+months): first-event index, state, receipts must be byte-identical to exact scan; any mismatch =
+FAIL. **Re-run the earlier ≈2.809 vs ≈1.359 CPU-s comparison with a true session start** — it may
+have been contaminated by the `session_start_ns="0"` trap (unverified).
+
+### 19.7 Owner-grant classification
+- **No grant (new files, reversible):** compact tick derivative (non-authoritative), candle
+  untracking, profiling harness, chart gateway fixture without real data.
+- **Owner review recommended even if bytes unchanged:** `canonical._normalize` fast path (frozen
+  canonicalization), `zlib-1` default for NEW timeline logs (physical encoding of evidence).
+- **Owner grant required:** verify-once replacing per-row proofs, activating C for settlement,
+  Option D activation, sparse checkpoints/delta receipts, ADVANCE merging, MAX_STEPS change,
+  retention/archive of immutable evidence, switching catalog default to `shared-source-v2`,
+  any real data admission/rights/R2 credentials.
+
+### 19.8 Failure scenarios, counterproposal, next PR
+**Failure scenarios**
+1. *Future leak via cache/metadata* (19.3): a shared cache keyed without cursor serves tenant B a
+   page clipped at tenant A's later T.
+2. *Silent divergence:* vectorised C validator/scale conversion differs from A; trades settle on
+   wrong ticks while labeled "verified" because A no longer runs.
+3. *Disk exhaustion:* default `session-log-v2` copies timeline per Session (≈84.5 MB per XAU day
+   before compression) plus ≈5 KB per ADVANCE row; many Sessions fill the ≈150 GB SSD, PostgreSQL
+   WAL stops, all users down. Mitigate: per-user quotas, disk alarms (70%/85%), shared-source mode
+   after measurement, restore drill.
+
+**Counterproposal (refinement, not a different architecture):** "Past is static, present is
+dynamic" chart delivery (19.3) + "hot C bound to cold A by receipt" (19.4) + shared-source Session
+storage with merged ADVANCE and closed-order archive.
+
+**Single most valuable next reversible PR:** the A/B/C **differential parity + profiling harness**
+(19.5) on one real month with true session start.
+*PASS:* byte-identical reducer outputs across A/B/C and C end-to-end ≥10× faster than A.
+*REJECT C:* any byte difference, or end-to-end gain <2× (then stay on B).
+
+### 19.9 Unknown rights/host risks
+Provider licensing for commercial redistribution (HistData, Exness, Dukascopy) per instrument and
+period; BID vs MID display basis rights; VPS disk I/O under concurrent Parquet reads; R2 credentials
+and Class A/B costs at real page sizes; pre-2023 OHLC-only provider seam (price offset marker).
+
+### 19.10 Corrections to my earlier sections
+- §17.1: `SKIP LOCKED` is already implemented (my "to check" is resolved).
+- §12.1: confirmed by measurement (≈395 s per 909k ticks).
+- §11.3/§14: Option D CPU comparison may be contaminated by the session-start trap.
