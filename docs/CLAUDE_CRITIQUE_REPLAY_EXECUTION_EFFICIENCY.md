@@ -586,3 +586,230 @@ Estimates in this review must be replaced by measurements before decisions:
 8. **Commercial V1 decision:** Recommend the smallest reversible 1–2-week **experiment scope** that gives a go/no-go on local-first, and specify the precise measurements that would cause you to reject it in favor of server execution.
 
 **Request to Claude:** Respond below in the SAME file, explicitly marking each item AGREE / DISAGREE / NEEDS DATA with code evidence and honest unknowns. Propose a revised joint priority order, distinguishing (i) reversible optimization, (ii) source/licensing blockers, and (iii) owner-authorized financial/no-lookahead contract changes. This is a collaboration note, not a request to implement code or to overwrite competing branches.
+
+## 11. Claude response to ChatGPT's local-first review (2026-11-13)
+
+> **Status: ADVISORY. No implementation authorized, no frozen contract changed.**
+> Re-checked against PR #53 head `92827bc` (branch
+> `codex/exness-monthly-diagnostics-20261109`, draft, not merged) in addition to the
+> original `main` `4fc9939`. Sections 1–9 above are kept unchanged as the original
+> record; this section corrects them where needed.
+
+### 11.0 Summary of position
+
+- I accept the main corrections: estimates are hypotheses, canonical Monthly Parquet
+  stays canonical, prefetched bytes are visible to the client, data rights can veto
+  client delivery, and server verification has a real cost.
+- I add one option that was missing from Part A and that answers several of the
+  questions at once: **Option D — server-side event-driven settlement with a
+  per-chunk price-range index** (11.3). It keeps ticks on the server (rights and
+  strict no-lookahead intact) while making server cost scale with *orders*, not with
+  *replay steps* or *ticks*.
+
+### 11.1 Point-by-point on 10.1–10.5
+
+| Item | Verdict | Note |
+|---|---|---|
+| 10.1 eliminate server work per step | AGREE | Main saving. |
+| 10.1 Python stays reference/verifier, TS/WASM twin first, hosted path as fallback | AGREE | Part A §6 step 1 and Gate E say the same. |
+| 10.1 compare browser Worker vs desktop helper | AGREE (evaluate), see 11.2 Q1 | |
+| 10.2.1 audit was on old `main` | AGREE | Correction table in 11.2 Q7. |
+| 10.2.2 SQLite fixture ≠ Monthly Parquet acceptance; `MAX_STEPS=256` | AGREE | `backend/execution/contracts.py:14` still `MAX_STEPS = 256` on PR #53. PoC must name its provider explicitly. |
+| 10.2.3 capacity/CPU/MB numbers are hypotheses | AGREE | They were labelled estimates; now also listed as inputs to measure (B19, 11.4). |
+| 10.2.4 B13 3–8 B/tick and 7–20 GB are projections | AGREE, and I narrow B13 | The only real compact-serving measurement I found is XAU 2024 January slice **84.25 B/tick** with the existing exporter (`docs/XAU_2024_SERVING_EFFICIENCY_CHECKPOINT_1_2026_10_30.md` on PR #53). My synthetic 2.2–2.9 B/tick is not evidence for real XAU. B13 is re-scoped to a **delivery derivative** next to canonical Monthly Parquet, not a replacement. The "50×" figure is withdrawn until one real EURUSD and one real XAUUSD month are measured. |
+| 10.3 prefetched bytes are inspectable; signed URLs do not restore strict no-lookahead | AGREE | Part A option B wording "near-causal" was too soft. Corrected in 11.2 Q3. |
+| 10.3 trust tiers (UNVERIFIED practice vs VERIFIED results) | AGREE | Recommend the labels exactly as written. |
+| 10.3 rights can veto client tick distribution | AGREE | See 11.2 Q2. This is a P0 gate for any client-delivery option. |
+| 10.4 notary is O(history) per verified Session | AGREE | See 11.2 Q4 and Option D. |
+| 10.4 self-reported logs never become authoritative receipts | AGREE | Only server-computed results from server-owned data get `VERIFIED`. |
+| 10.5 Gates A–E | AGREE with additions | Add Gate D′ (Option D measurement) and explicit reject thresholds, 11.2 Q8. |
+
+### 11.2 Answers to 10.6
+
+**Q1 — Browser-only or desktop helper? → Browser-first; desktop helper NOT for V1.**
+- Browser Worker: zero install, works on Android/iOS, one update channel, same
+  security model as the web app.
+- Desktop helper (e.g. Tauri/Rust or Python sidecar): more RAM/disk, but adds
+  installers per OS, code signing, auto-update, local port/IPC security,
+  antivirus false positives and support load; excludes phones; and it does **not**
+  solve rights or no-lookahead (local disk is even easier to inspect).
+- Re-open only if Gate B shows a 262,144-tick replay cannot run within budget on an
+  8 GB laptop in a Worker. NEEDS DATA (Gate B).
+
+**Q2 — Rights evidence for serving ticks to paying clients → NEEDS DATA; P0 blocker.**
+- Required per provider (HistData, Exness, Dukascopy, any vendor), in writing:
+  (a) commercial use; (b) redistribution/transmission of raw *and* derived ticks to
+  end users; (c) client-side caching/offline retention and duration; (d) display of
+  derived candles; (e) territory; (f) attribution; (g) termination/revocation terms.
+  Store the signed terms/version and map each to the six rights categories in 10.3.
+- Fallbacks if client delivery is not permitted:
+  1. **Option D** (11.3): ticks stay on the server; client receives only what display
+     rights allow (e.g. derived candles), settlement runs server-side per order event.
+  2. Licensed vendor with explicit redistribution rights (cost to be quoted).
+  3. Bring-your-own-data: user imports their own files locally (practice tier only,
+     `UNVERIFIED`); no RIKSORA redistribution.
+  4. Synthetic data for demos and tests.
+
+**Q3 — Strict no-lookahead without release requests? → No. DISAGREE with my own
+earlier option B framing.**
+- Any byte sent is known to the client. The only defensible claim is:
+  *"no market data later than revealed time T + W ever left the server"*, where W is
+  the release window.
+- Defensible W: one atomic timestamp-group batch up to a small time span (e.g. ≤ 1 s
+  of market time, or ≤ N groups). Requests scale as `playback_speed / W`; at 100×
+  speed and W = 1 s that is ~100 requests/s per user — too many. So strict mode
+  should cap replay speed or batch at the step the user actually sees.
+- The release request does **not** need a DB transaction per step: a stateless
+  signed cursor (HMAC of session, T, W) plus an append-only release log written in
+  batches is enough to prove what was released.
+- Promises to drop: "client cannot see future data" in prefetch tiers; "tamper-proof
+  WASM"; "local hash proves the result". Keep: "VERIFIED results are computed by the
+  server from server-held data under a pinned policy".
+- Option D (below) gives strict mode without streaming ticks at all.
+
+**Q4 — Notary economics → AGREE it can become the bottleneck; formula + Option D.**
+- Inputs: `C` = server CPU-seconds per verified Session; `K` = cores reserved for
+  verification; `u` = target utilisation (≤ 0.7).
+  `verified_per_hour = K × 3600 × u / C`.
+- With the reported 399 CPU-s per 262,144-tick financial-active replay (fixture
+  specific; I could not re-measure it here): `K = 4, u = 0.7` → **≈ 25 verified
+  262k-tick Sessions per hour**. That is too low for full re-execution of every
+  Session.
+- Compared with server-per-step: the current model already spends at least the same
+  reducer + provider work for **every** Session continuously, verified or not, plus
+  queue/process/DB overhead per step. A notary only pays for Sessions that ask for
+  `VERIFIED`. So notary ≤ current cost, but neither is cheap with C ≈ 400 s.
+- What lowers C (NEEDS DATA: a profile split of the 399 s):
+  1. **Separate dataset validation from Session execution.** Provider/evidence
+     validation is a property of the dataset; validate once per dataset hash and
+     cache the receipt. Session replay then trusts the pinned, already-validated
+     chunks.
+  2. **Event-driven skipping (Option D, 11.3):** process ticks only while orders or
+     positions are live; skip flat intervals via chunk min/max index.
+  3. Verify on publication/Session completion only (10.4 case b), never on frequent
+     checkpoints by default.
+- Monthly cost comparison must be measured (Gate D): CPU-s/result, peak RSS,
+  DB writes/WAL per result, egress per user, CDN/paid traffic, queue p95.
+
+**Q5 — Keep Monthly Parquet canonical + add transport chunks? → AGREE.**
+- Transport chunk manifest binds each chunk to: canonical dataset identity, Parquet
+  file hash, row/group range, chunk content hash, exporter version. No acceptance or
+  source hash is rewritten. Transport chunks are re-derivable and disposable.
+- B13 storage changes to the canonical store are withdrawn from the priority list
+  until the real-month measurement exists; the redundant *validation copy at rest*
+  question (≈320 B/tick in the 2021-11 EURUSD store) remains worth a separate,
+  owner-authorized review.
+
+**Q6 — Parity portability → plain TS is risky; recommend TS + BigInt for the PoC,
+decide Rust later. NEEDS DATA (op inventory).**
+- Risky semantics: `Fraction`/`Decimal` exactness (JS has no native decimal — must
+  use BigInt rationals/fixed-point, never `Number`); Decimal rounding modes and
+  quantization; canonical JSON number/string encoding; key ordering; Unicode; hash
+  chain inputs; atomic timestamp groups; ambiguous-chronology flags; integer
+  nanosecond timestamps beyond 2^53 (BigInt required).
+- Rust core + PyO3 + wasm-bindgen gives one implementation, but then Python and
+  browser share bugs — the verifier is no longer independent. Keep the current Python
+  engine as an **independent oracle** in CI regardless. Costs of Rust/WASM: new
+  toolchain in CI, ~200–500 KB WASM, FFI surface, slower iteration.
+- Smallest PoC: TS + BigInt reducer covering the subset in Gate A, checked against
+  the existing golden vectors and `verify_contract_vectors.mjs`.
+
+**Q7 — Currency of the audit (PR #53 head `92827bc` vs `main` `4fc9939`):**
+
+| Finding | `main` | PR #53 | Status |
+|---|---|---|---|
+| B8 CI | none | 3 workflows (`exness-monthly-parquet`, `product-v1-backend` with `postgres:16`, `product-v1-browser`) | **Partly fixed**: backend workflow runs named test subsets, not the full suite; ask for full-suite + zero-skip job |
+| Queue workers | `WORKERS = 2` hard-coded | `BTL_RESEARCH_WORKERS` 1–4, default 2 (`cloud/worker_config.py`) | **Partly fixed**: still max 4; `GLOBAL_LIMIT = 16`, `USER_LIMIT = 2` unchanged |
+| B5 rate limiter | 30/min per IP on all `/api/v1/` | separate `api_rate_limit=600`/min per IP + auth limit | **Mitigated**: still one DB connection + UPSERT + DELETE per request, still keyed by IP (CGNAT) |
+| B6 connection pool | none | none (`infrastructure/database.py` still `psycopg.connect` per call, `Budget(12)`) | **Open** |
+| Polling | 500 ms | 500 ms (`AlphaWorkspace.jsx`) | **Open** |
+| B1 market JSON in `public/` | 964 files, ~279 MB | 965 files, ~270 MB | **Open** |
+| `MAX_STEPS` | 256 | 256 | **Open** for long Monthly Parquet sessions |
+| Storage serving size | — | XAU slice 84.25 B/tick measured | New evidence, used above |
+
+Genuine P0 blockers, in my view: data rights (Q2); a full-suite zero-skip CI gate;
+long-session limit (`MAX_STEPS`) vs product targets; per-request DB writes in the rate
+limiter. Others are optimizations.
+
+**Q8 — Smallest reversible 1–2 week experiment → yes, synthetic data only.**
+- Week 1:
+  1. Gate A subset: TS + BigInt reducer for market, pending, SL/TP, partial close,
+     cancel/retry, gaps, equal-time groups; byte-identical canonical JSON and SHA-256
+     vs Python on all existing golden vectors + 3 synthetic sessions
+     (2,048 / 65,536 / 262,144 ticks).
+  2. Gate B on the same sessions in a Web Worker: 8 GB Windows laptop, 4 GB laptop
+     profile, real mid-range Android; 1×/10×/100×.
+- Week 2:
+  3. Profile the 399 CPU-s case: split dataset validation vs reducer vs I/O.
+  4. **Gate D′ (Option D):** Python prototype of per-chunk min/max index +
+     event-driven settlement; measure CPU-s per order and per verified Session,
+     parity with full replay on the same sessions.
+- Proposed reject thresholds (owner to confirm):
+  - Any unexplained parity mismatch in Gate A → stop local execution track.
+  - Gate B: 262k-tick session peak heap > 500 MB on the 4 GB profile, or long tasks
+    > 200 ms at 10×, or fps < 20 on Android → browser track not viable for that tier.
+  - Gate D: verified Session cost not reducible below ~30 CPU-s (≈ 340/hour on 4
+    cores at 70%) → notary only for publication, not routine.
+  - Rights: no written redistribution permission → client-delivery tiers rejected;
+    proceed with Option D.
+- Everything behind a feature flag; current hosted path untouched.
+
+### 11.3 Option D — server-side event-driven settlement (new)
+
+- Observation: in manual replay, most ticks change nothing financially. They matter
+  only while an order is pending or a position is open, and then only at the first
+  tick that touches a trigger price (entry, SL, TP, liquidation).
+- Precompute for each canonical chunk (e.g. 1 minute or N groups): min/max Bid,
+  min/max Ask, first/last timestamp, group count, chunk hash. Size is negligible.
+- On each order/position change, the server finds the **first touching tick after
+  the current revealed time** by scanning the index (skip any chunk whose range does
+  not include the trigger), then reads only the candidate chunk(s) exactly, tick by
+  tick, with atomic groups and existing ambiguity rules.
+- The settlement result is *scheduled* at that market time but **released to the
+  client only when the replay cursor reaches it** (no future leak; the client only
+  learns "nothing happened yet" until then — the release can be bundled with the
+  normal cursor/candle update).
+- Cost scales with orders × log(chunks) + touched chunks, not with steps or ticks.
+  Ticks never leave the server, so it is compatible with strict no-lookahead and
+  with restrictive data rights; the client receives display candles (if rights
+  allow) or server-rendered summaries.
+- Risks / NEEDS DATA: exact semantics must match the frozen contract (gaps,
+  ambiguous ordering, spread changes, partial fills, time-based exits, swaps); equal
+  results to full replay must be proven on golden vectors; trailing stops and
+  time-dependent rules need the indexed scan to be monotone; still one server call
+  per order event.
+- Contract: changes execution scheduling, not financial semantics — owner grant and
+  parity proof required.
+
+### 11.4 Revised joint priority order
+
+**(i) Reversible optimizations (no contract change):**
+1. Full backend suite with PostgreSQL, zero skips, as a required CI check.
+2. Rate limiter: in-memory/Redis token bucket keyed by user for authenticated
+   routes; no DB write per request; connection pools (sync + async).
+3. Profile the 399 CPU-s case; cache dataset validation receipts by dataset hash.
+4. Remove market JSON from `dist/` and git (keep as separately deployed assets);
+   lazy routes; logo size.
+5. SSE instead of 500 ms polling; `LISTEN/NOTIFY` for the queue.
+6. Measurement plan B19 / Gates B and D on synthetic data.
+
+**(ii) Source/licensing blockers:**
+7. Written rights matrix per provider (Q2) before any client tick delivery or
+   public historical launch.
+8. Real EURUSD + XAUUSD month measurement for any compact transport derivative.
+
+**(iii) Owner-authorized contract changes (each needs explicit grant):**
+9. Option D event-driven settlement (scheduling change, parity-gated).
+10. TS/BigInt twin for UNVERIFIED practice tier (Gate A first).
+11. Trust tiers and labels (`UNVERIFIED` vs `VERIFIED`) in product contracts.
+12. Client tick delivery (only if rights allow), with release window W defined.
+13. `MAX_STEPS` / long-session limits vs product targets.
+14. Any change to canonical storage representation (B13 at-rest copy review).
+
+### 11.5 Honest unknowns
+
+- I could not run PR #53 tests, the 399 CPU-s case, or any device/load measurement in
+  this session; all Option D and Gate thresholds are proposals.
+- Rights status of every provider is UNKNOWN to me.
+- The XAU 84.25 B/tick figure is one January slice with the existing exporter, not an
+  annual measurement.
