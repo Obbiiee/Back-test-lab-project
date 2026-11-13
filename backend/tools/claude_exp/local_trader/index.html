@@ -45,8 +45,8 @@ h3{margin:4px 0 6px;font-size:13px;color:var(--mu);font-weight:600}
    <div class="row"><select id="typ"><option>MARKET</option><option>LIMIT</option><option>STOP</option></select>
     <span class="k">Lot</span><input id="lots" value="0.01"></div>
    <div class="row"><span class="k">Entry (pending)</span><input id="entry" placeholder="harga"></div>
-   <div class="row"><span class="k">SL $</span><input id="sl" value="2"><span class="k">TP $</span><input id="tp" value="3"></div>
-   <div class="k" style="margin-bottom:6px">SL/TP dalam jarak harga dari entry. Order pending wajib punya SL dan TP.</div>
+   <div class="row"><span class="k">SL</span><input id="sl" value="2"><span class="k">TP</span><input id="tp" value="3"></div>
+   <div class="k" style="margin-bottom:6px">SL/TP = jarak harga dari entry (XAUUSD dalam dolar, FX contoh 0.0010 = 10 pip). Order pending wajib punya SL dan TP.</div>
    <div class="row"><button class="buy" id="buy" style="flex:1">BUY</button><button class="sell" id="sell" style="flex:1">SELL</button></div>
   </section>
   <section class="card" style="margin-top:10px"><h3>Order</h3><table id="orders"></table></section>
@@ -61,7 +61,9 @@ async function call(path,body){const r=await fetch(path,body===undefined?{}:{met
  const j=await r.json();if(!r.ok){$('err').textContent=j.error||'error';throw new Error(j.error)};$('err').textContent='';return j}
 async function refresh(state){S=state||await call('/api/state');const c=await call('/api/candles?tf='+TF+'&n=200');CANDLES=c.candles;render()}
 function f(n){return n==null?'-':n}
+let INFO_SET=false;
 function render(){
+ if(!INFO_SET&&S.info){INFO_SET=true;$('sl').value=S.info.defSl;$('tp').value=S.info.defTp;document.title='RIKSORA Local Trader — '+S.info.symbol;window.DEC=S.info.dec}
  $('t').textContent=S.timeIso;$('bid').textContent=f(S.bid);$('ask').textContent=f(S.ask);$('spr').textContent=f(S.spread);
  $('bal').textContent=S.balance;$('real').textContent=S.realized;
  let fl=S.orders.reduce((a,o)=>a+(o.floating?+o.floating:0),0);$('flt').textContent=fl.toFixed(2);$('flt').className='v '+(fl>=0?'pos':'neg');
@@ -81,7 +83,7 @@ function draw(){
  const lines=[];S.orders.filter(o=>o.status==='ACTIVE'||o.status==='PENDING').forEach(o=>{[['entry',o.fill||o.entry,tx],['sl',o.sl,dn],['tp',o.tp,up]].forEach(([k,v,c])=>{if(v)lines.push([+v,c,k+' '+o.id.replace('order:','#')])})});
  let hi=Math.max(...cs.map(c=>c[2])),lo=Math.min(...cs.map(c=>c[3]));lines.forEach(l=>{hi=Math.max(hi,l[0]);lo=Math.min(lo,l[0])});const pad=(hi-lo)*.05||.5;hi+=pad;lo-=pad;
  const Y=p=>10+(hi-p)/(hi-lo)*(h-30),cw=(w-70)/n;
- g.strokeStyle=ln;g.fillStyle=mu;g.font='11px system-ui';for(let i=0;i<=5;i++){const p=lo+(hi-lo)*i/5,y=Y(p);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.fillText(p.toFixed(2),w-56,y+4)}
+ g.strokeStyle=ln;g.fillStyle=mu;g.font='11px system-ui';for(let i=0;i<=5;i++){const p=lo+(hi-lo)*i/5,y=Y(p);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.fillText(p.toFixed(window.DEC||3),w-56,y+4)}
  cs.forEach((c,i)=>{const x=i*cw+cw/2,col=c[4]>=c[1]?up:dn;g.strokeStyle=col;g.fillStyle=col;g.beginPath();g.moveTo(x,Y(c[2]));g.lineTo(x,Y(c[3]));g.stroke();
   const y1=Y(c[1]),y2=Y(c[4]);g.fillRect(x-cw*.35,Math.min(y1,y2),cw*.7,Math.max(1,Math.abs(y1-y2)))});
  lines.forEach(([p,c,t])=>{const y=Y(p);g.strokeStyle=c;g.setLineDash([5,4]);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.setLineDash([]);g.fillStyle=c;g.fillText(t,6,y-3)});
@@ -89,7 +91,7 @@ function draw(){
 async function adv(sec,until){try{await refresh(await call('/api/advance',{seconds:sec,untilEvent:!!until}))}catch(e){stop()}}
 async function order(side){const typ=$('typ').value,lots=$('lots').value;let entry=+($('entry').value||0);const sl=+$('sl').value,tp=+$('tp').value,d=side==='BUY'?1:-1;
  const ref=typ==='MARKET'?(side==='BUY'?+S.ask:+S.bid):entry;if(!ref){$('err').textContent='isi harga entry untuk pending';return}
- const body={side,type:typ,lots,entry:typ==='MARKET'?undefined:entry,sl:sl?(ref-d*sl).toFixed(3):null,tp:tp?(ref+d*tp).toFixed(3):null};
+ const body={side,type:typ,lots,entry:typ==='MARKET'?undefined:entry,sl:sl?(ref-d*sl).toFixed(window.DEC||3):null,tp:tp?(ref+d*tp).toFixed(window.DEC||3):null};
  try{await refresh(await call('/api/order',body))}catch(e){}}
 async function act(kind,id){try{await refresh(await call('/api/'+kind,{orderId:id}))}catch(e){}}
 function stop(){if(timer){clearInterval(timer);timer=null;$('play').textContent='▶ Putar'}}

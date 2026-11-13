@@ -25,6 +25,29 @@ LOCK = threading.Lock()
 S = {}
 
 
+def build_histdata(zip_path, pair, offset, ticks, cache):
+    import re
+    month = re.search(r"_T(\d{6})", Path(zip_path).name).group(1)
+    mh = histdata_member_hash(zip_path)
+    key = hashlib.sha256(f"{mh}|{pair}|{offset}|{ticks}".encode()).hexdigest()[:16]
+    root = Path(cache) / key
+    meta_path = root / "meta.json"
+    if meta_path.exists():
+        return root, json.loads(meta_path.read_text())
+    rows = read_histdata_rows(zip_path, ticks, offset)
+    print(f"[data] {pair} {len(rows)} HistData-UTC ticks -> compact (one time)", flush=True)
+    ds = f"local:histdata-utc:{pair}:{month}:{mh[:24]}"
+    dv = hashlib.sha256(f"{ds}|{offset}|{ticks}".encode()).hexdigest()
+    root.mkdir(parents=True, exist_ok=True)
+    m = write_compact(root / "compact", ({"timeNs": str(ts * 1_000_000), "bid": bid, "ask": ask, "rawOrdinal": str(i)}
+                                         for i, (ts, ask, bid) in enumerate(rows)), parent=dict(datasetId=ds, datasetVersion=dv), scale=5)
+    adm = dict(datasetId=ds, datasetVersion=dv, providerId="histdata", feedId="local-unverified:" + pair, instrumentId="histdata:" + pair,
+               sourceId="histdata:utc:" + mh[:24], memberHash=mh, manifestHash=m["manifestHash"], scale=100000, kind="histdata-utc")
+    meta = dict(adm=adm, start_ms=rows[0][0], end_ms=rows[-1][0], ticks=len(rows), seed=genesis_checkpoint(ds, dv, rows[0][0] * 10**6), pair=pair)
+    meta_path.write_text(json.dumps(meta))
+    return root, meta
+
+
 def build_dataset(zip_path, offset, ticks, cache):
     key = hashlib.sha256(f"{Path(zip_path).name}|{offset}|{ticks}".encode()).hexdigest()[:16]
     root = Path(cache) / key
@@ -53,16 +76,21 @@ def build_dataset(zip_path, offset, ticks, cache):
     return root, meta
 
 
-def open_session(zip_path, offset, ticks, cache):
-    root, meta = build_dataset(zip_path, offset, ticks, cache)
+def open_session(zip_path, offset, ticks, cache, pair="XAUUSD"):
+    root, meta = build_dataset(zip_path, offset, ticks, cache) if pair == "XAUUSD" else build_histdata(zip_path, pair, offset, ticks, cache)
+    meta.setdefault("pair", "XAUUSD")
     os.environ["XAU_TICK_ZIP"] = str(zip_path)
     # the stub store must carry the SAME dataset identity as the compact manifest parent; rebuild it deterministically
     adm = meta["adm"]
     src = AdmittedSource(root / "compact", adm, expected_manifest_hash=adm["manifestHash"], deep_verify=True)
-    profile_raw = json.loads(json.dumps(PROFILE))
-    profile_raw["primary"] = dict(datasetId=adm["datasetId"], datasetVersion=adm["datasetVersion"], providerId=adm["providerId"],
-                                  feedId=adm["feedId"], feedInstrumentId=adm["instrumentId"], providerSymbol="XAUUSD",
-                                  evidenceClass="PROVIDER_OBSERVATION")
+    primary = dict(datasetId=adm["datasetId"], datasetVersion=adm["datasetVersion"], providerId=adm["providerId"],
+                   feedId=adm["feedId"], feedInstrumentId=adm["instrumentId"], providerSymbol="XAUUSD", evidenceClass="PROVIDER_OBSERVATION")
+    if pair == "XAUUSD":
+        profile_raw = json.loads(json.dumps(PROFILE)); profile_raw["primary"] = primary
+    else:
+        import fx_profile
+        fx_profile.install()
+        profile_raw = fx_profile.fx_profile_wire(PROFILE, pair, primary)
     profile = ObservedExecutionProfile.from_wire(profile_raw)
     return src, profile, meta["seed"], meta
 
@@ -72,6 +100,8 @@ def session_json():
     st = cs.state
     k = int(st["nextGroupIndex"])
     bid = ask = None
+    sc, dec = src.scale, len(str(src.scale)) - 1
+    contract = Fraction(st["profile"]["contractSize"])
     if k:
         bid, ask = int(src.gbid[k - 1]), int(src.gask[k - 1])
     orders = []
@@ -79,19 +109,20 @@ def session_json():
         row = dict(id=oid, side=o["side"], type=o["orderType"], status=o["status"], lots=o["quantity"], entry=o["entry"], sl=o["sl"], tp=o["tp"],
                    fill=o["entryPrice"], pnl=o["grossPosted"], remaining=o["remaining"])
         if o["status"] == "ACTIVE" and bid is not None:
-            px = Fraction(bid, 1000) if o["side"] == "LONG" else Fraction(ask, 1000)
+            px = Fraction(bid, sc) if o["side"] == "LONG" else Fraction(ask, sc)
             e = Fraction(o["entryPrice"])
             d = 1 if o["side"] == "LONG" else -1
-            row["floating"] = f"{float((px - e) * d * 100 * Fraction(o['remaining'])):.2f}"
+            row["floating"] = f"{float((px - e) * d * contract * Fraction(o['remaining'])):.2f}"
         orders.append(row)
     thr = int(st["throughNs"])
     return dict(time=thr // 1_000_000, timeIso=time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(thr / 1e9)),
-                balance=st["balance"], realized=st["realizedGross"], bid=None if bid is None else f"{bid/1000:.3f}",
-                ask=None if ask is None else f"{ask/1000:.3f}", spread=None if bid is None else f"{(ask-bid)/1000:.3f}",
+                balance=st["balance"], realized=st["realizedGross"], bid=None if bid is None else f"{bid/sc:.{dec}f}",
+                ask=None if ask is None else f"{ask/sc:.{dec}f}", spread=None if bid is None else f"{(ask-bid)/sc:.{dec}f}",
+                info=dict(symbol=S["meta"]["pair"], dec=dec, defSl="2" if dec == 3 else "0.0010", defTp="3" if dec == 3 else "0.0015", lot="0.01"),
                 unresolved=st["unresolved"], ended=st["ended"], orders=orders,
                 quoteFresh=bool(st["quoteBasis"] is not None and thr - int(st["quoteBasis"]["timeNs"]) <= int(st["profile"]["maxObservedSilenceNs"])),
                 progress=dict(group=k, groups=src.ngroups, startMs=S["meta"]["start_ms"], endMs=S["meta"]["end_ms"]),
-                atEnd=k >= src.ngroups, events=S["events"][-40:], trades=S["trades"][-40:], model="observed quotes only; no slippage/commission; XAUUSD contract 100")
+                atEnd=k >= src.ngroups, events=S["events"][-40:], trades=S["trades"][-40:], model="observed quotes only; no slippage/commission")
 
 
 def candles(tf, n):
@@ -108,7 +139,7 @@ def candles(tf, n):
     out = []
     for a, b in zip(first, np.r_[first[1:], len(t)]):
         seg = bid[a:b]
-        out.append([int(bucket[a]) * tf, float(seg[0]) / 1000, float(seg.max()) / 1000, float(seg.min()) / 1000, float(seg[-1]) / 1000])
+        out.append([int(bucket[a]) * tf, float(seg[0]) / src.scale, float(seg.max()) / src.scale, float(seg.min()) / src.scale, float(seg[-1]) / src.scale])
     return out[-n:]
 
 
@@ -172,10 +203,10 @@ def api(path, q, body):
         if typ == "MARKET":
             entry = b["ask" if side == "LONG" else "bid"]; workflow = "QUICK"
         else:
-            entry = f"{Decimal(str(body['entry'])):.3f}"; workflow = "PLANNED"
+            entry = f"{Decimal(str(body['entry'])):.{len(str(cs.src.scale)) - 1}f}"; workflow = "PLANNED"
         def lvl(k):
             v = body.get(k)
-            return None if v in (None, "", 0) else f"{Decimal(str(v)):.3f}"
+            return None if v in (None, "", 0) else f"{Decimal(str(v)):.{len(str(cs.src.scale)) - 1}f}"
         sl, tp = lvl("sl"), lvl("tp")
         if workflow == "PLANNED" and (sl is None or tp is None):
             raise ContractError("PLANNED_NEEDS_SL_TP", "pending orders need both SL and TP in this engine")
@@ -225,10 +256,10 @@ class H(BaseHTTPRequestHandler):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--zip", required=True); ap.add_argument("--ticks", type=int, default=400000); ap.add_argument("--offset", type=int, default=0)
-    ap.add_argument("--port", type=int, default=8765); ap.add_argument("--cache", default=str(Path(tempfile.gettempdir()) / "riksora_local_trader"))
+    ap.add_argument("--pair", default="XAUUSD", help="XAUUSD (Dukascopy zip) or EURUSD/GBPUSD/AUDUSD/NZDUSD (HistData-UTC zip)"); ap.add_argument("--port", type=int, default=8765); ap.add_argument("--cache", default=str(Path(tempfile.gettempdir()) / "riksora_local_trader"))
     ap.add_argument("--fresh", action="store_true", help="ignore a saved session")
     a = ap.parse_args()
-    src, profile, seed, meta = open_session(a.zip, a.offset, a.ticks, a.cache)
+    src, profile, seed, meta = open_session(a.zip, a.offset, a.ticks, a.cache, a.pair)
     S.update(src=src, meta=meta, events=[], trades=[], meta_orders={})
     S["snap_path"] = Path(a.cache) / f"session_{meta['adm']['manifestHash'][:12]}.json"
     cs = ClaudeSession(src, profile, policy(), seed, archive=True)     # order archiving: constant-cost commands in long sessions

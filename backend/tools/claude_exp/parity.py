@@ -42,15 +42,19 @@ def _orders_view(orders, drop_terminal):
 def semantic(events):
     return [e for e in strip_source_specific([x for x in events if x["kind"] != "REPLAY_ADVANCED"])]
 
-def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed=0, rows_override=None, offset=0, archive=False):
+def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed=0, rows_override=None, offset=0, archive=False, hd=None):
     out = dict(n=n, mode=mode)
-    rows = rows_override if rows_override is not None else inject(read_real_rows(n + offset)[offset:], mode)
+    rows = rows_override if rows_override is not None else (read_histdata_rows(hd["zip"], n, offset) if hd else inject(read_real_rows(n + offset)[offset:], mode))
     work = Path(tempfile.mkdtemp(prefix="par-", dir=tmp))
-    provider, res, t_ing = ingest_engine(rows, work)
+    if hd:    # HistData-UTC FX month: hd = dict(zip=..., pair=..., month=...)
+        mh = histdata_member_hash(hd["zip"]); t0 = time.perf_counter()
+        provider = ingest_histdata(rows, work, hd["pair"], mh, hd["month"]); t_ing = time.perf_counter() - t0; res = dict(acceptedRows=len(rows))
+    else:
+        provider, res, t_ing = ingest_engine(rows, work)
     out["ingest_engine_s"] = round(t_ing, 1); out["accepted"] = res["acceptedRows"]
     # baseline
     groups = []
-    b = run_baseline(provider, rows, step_s, tp, sl, collect=groups, mix=mix, archive=archive)
+    b = run_baseline(provider, rows, step_s, tp, sl, collect=groups, mix=mix, archive=archive, symbol=(hd["pair"] if hd else "XAUUSD"))
     out["baseline"] = dict(cpu=round(b["cpu"], 2), wall=round(b["wall"], 2), balance=b["state"]["balance"],
                            fills=sum(e["kind"] in ("ENTRY_FILL", "EXIT_FILL") for e in b["events"]),
                            unresolved=b["state"]["unresolved"])
@@ -58,11 +62,11 @@ def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed
     t0 = time.perf_counter()
     first = groups[0]["events"][0]
     cdir = work / "compact"
-    m = write_compact(cdir, compact_events([(r[0], r[1], r[2]) for r in rows]), parent=dict(datasetId=first["datasetId"], datasetVersion=first["datasetVersion"]), scale=3)
+    m = write_compact(cdir, compact_events([(r[0], r[1], r[2]) for r in rows]), parent=dict(datasetId=first["datasetId"], datasetVersion=first["datasetVersion"]), scale=(5 if hd else 3))
     out["compact_write_s"] = round(time.perf_counter() - t0, 2); out["compact_bytes"] = sum(f["bytes"] for f in m["files"])
     adm = dict(datasetId=first["datasetId"], datasetVersion=first["datasetVersion"], providerId=first["providerId"], feedId=first["feedId"],
                instrumentId=first["instrumentId"], sourceId=first["provenance"]["sourceId"], memberHash=first["provenance"]["memberHash"],
-               manifestHash=m["manifestHash"])
+               manifestHash=m["manifestHash"], scale=(100000 if hd else 1000), kind=("histdata-utc" if hd else "dukascopy-csv"))
     t0 = time.perf_counter()
     src = AdmittedSource(cdir, adm, expected_manifest_hash=m["manifestHash"])
     out["admit_load_s"] = round(time.perf_counter() - t0, 2)
@@ -73,7 +77,7 @@ def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed
         if src.canonical_group(g) != grp: mismatch += 1
     out["admission_reconstruction_mismatches"] = mismatch; out["admission_verify_s"] = round(time.perf_counter() - t0, 2)
     # claude run (identical strategy)
-    profile = make_profile(provider)
+    profile = make_profile(provider, hd["pair"] if hd else "XAUUSD")
     work2 = tempfile.mkdtemp(prefix="seed-")
     tl = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version, str(rows[0][0] * 1_000_000), log_folder=work2)
     seed_cp = tl.checkpoint(); tl.close()

@@ -107,6 +107,21 @@ Scalper, 30,000 real ticks, 20 s steps: Codex+archive **142.1 CPU-s**, Claude+ar
 Mixed trader 8,000 ticks: 32.8 vs 2.0 CPU-s (16x), identical. Integrity suite (restart, tamper cases) passes in archive mode; archive-mode fuzz 12/12 parity.
 Local app command latency with archiving stays flat: 6 / 18 / 15 ms at the 1st / 60th / 120th order (was 13 / 101 / 141 ms without it); same final balance.
 
+### FX (HistData-UTC) on the same engine
+Four USD-quote pairs run through the SAME reducer: EURUSD, GBPUSD, AUDUSD, NZDUSD (`tools/claude_exp/fx_profile.py`). Real ticks from the local HistData-UTC zips; Codex baseline = canonical store built with the repo's DatasetBuilder using the repo-validated HistData event layout; archive mode on both sides; same scripted trader.
+
+| Pair / month | ticks | Codex CPU-s | Claude CPU-s | Fills | Result |
+|---|---|---|---|---|---|
+| EURUSD 2024-01 | 20,000 | 42.8 | 0.38 | 17 | identical events, balance 10001.17, 0 reconstruction mismatches |
+| GBPUSD 2025-06 | 15,000 | 42.2 | 0.30 | 19 | identical, balance 10000.67 |
+| AUDUSD 2026-03 | 15,000 | 35.0 | 0.20 | 21 | identical, balance 9998.76 |
+| NZDUSD 2026-08 (ms-less era) | 15,000 | 30.8 | 4.81 | 1 | identical (only one fill; the session hit a gap, the Claude path spent its time in exact per-group processing after it) |
+
+What this is NOT: the reducer hard-codes the XAUUSD instrument inside `observed_profile.validate_profile`. FX support here wraps that single validator at runtime (all other rules still run in the original function); it does not edit the frozen contract and is not approved for product use.
+Pairs whose quote currency is not USD (USDJPY, USDCAD, USDCHF, crosses) are NOT supported: the profile has `conversion=None` and the reducer has no cross-currency P/L. Crossed-quote ticks (HistData USDCAD 2026-07 only) are handled by the exact path in theory but untested in FX. Ordinals are relative to the tick slice. HistData rights remain UNKNOWN.
+
+Local app long play test (EURUSD, 400 auto-play steps of 150 s plus candle refresh): 800 calls, 0 errors, median 7.7 ms, p95 27.6 ms, max 220 ms.
+
 ## 5. Jump to next event
 Exact integer thresholds (scaled by 1000) against per-256-group min/max blocks, per order type: pending MARKET (next group), LIMIT/STOP (ask or bid vs entry), ACTIVE SL/TP, exit request.
 Gap guard and crossed/equal-time groups are always exact. If a price is not an exact scaled integer the search returns "scan exactly".

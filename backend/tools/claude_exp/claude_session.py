@@ -40,6 +40,8 @@ class AdmittedSource:
         self.reader = CompactTickReader(root, expected_manifest_hash=expected_manifest_hash)
         self.reader.verify_all(deep=deep_verify)
         self.adm = admission
+        self.scale = int(admission.get("scale", 1000))
+        self.kind = admission.get("kind", "dukascopy-csv")
         a = self.reader.read_range(0, 2**62)
         self.ts, self.bid, self.ask = a["ts_ns"], a["bid"], a["ask"]
         self.ordinal, self.crossed = a["ordinal"], a["is_crossed"].astype(bool)
@@ -72,16 +74,21 @@ class AdmittedSource:
     def canonical_row(self, i):
         a = self.adm
         ts_ms = int(self.ts[i]) // 1_000_000
-        original = dt.datetime.fromtimestamp(ts_ms / 1000, dt.timezone.utc).strftime("%d.%m.%Y %H:%M:%S.") + f"{ts_ms % 1000:03d}"
+        if self.kind == "histdata-utc":
+            original = str(ts_ms)                      # HistData-UTC keeps the epoch-ms text of the source row
+            quote = "CROSSED" if self.crossed[i] else "VALID"
+        else:
+            original = dt.datetime.fromtimestamp(ts_ms / 1000, dt.timezone.utc).strftime("%d.%m.%Y %H:%M:%S.") + f"{ts_ms % 1000:03d}"
+            quote = "VALID"
         ordn = str(int(self.ordinal[i]))
         return {
-            "artifact": "BTL-CANONICAL-TICK-1", "ask": _scaled_text(self.ask[i]), "bid": _scaled_text(self.bid[i]),
+            "artifact": "BTL-CANONICAL-TICK-1", "ask": _scaled_text(self.ask[i], self.scale), "bid": _scaled_text(self.bid[i], self.scale),
             "datasetId": a["datasetId"],
             "eventId": event_id(a["providerId"], a["feedId"], a["memberHash"], ordn),
             "feedId": a["feedId"], "instrumentId": a["instrumentId"],
             "provenance": {"memberHash": a["memberHash"], "originalTimestamp": original, "sourceId": a["sourceId"]},
             "providerId": a["providerId"],
-            "quality": {"duplicateOf": None, "evidenceHash": None, "freshness": "UNKNOWN", "gapBefore": "UNKNOWN_SILENCE", "quote": "VALID"},
+            "quality": {"duplicateOf": None, "evidenceHash": None, "freshness": "UNKNOWN", "gapBefore": "UNKNOWN_SILENCE", "quote": quote},
             "rawOrdinal": ordn, "resolutionNs": "1000000", "schemaVersion": 1, "timeNs": str(int(self.ts[i])),
             "trustedSequence": None, "datasetVersion": a["datasetVersion"],
         }
@@ -119,7 +126,7 @@ class AdmittedSource:
             side = o["side"]
             d = 1 if side == "LONG" else -1
             def scaled(txt):
-                f = Fraction(txt) * 1000
+                f = Fraction(txt) * self.scale
                 return f.numerator if f.denominator == 1 else None
             if o["status"] == "PENDING":
                 if o["orderType"] == "MARKET":

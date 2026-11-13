@@ -3,9 +3,9 @@ import sys, time, json, tempfile, shutil
 from pathlib import Path
 from common import *
 
-def run_baseline(provider, rows, step_s=300, tp=1500, sl=1000, log_codec="zlib-1", collect=None, mix=False, archive=False):
+def run_baseline(provider, rows, step_s=300, tp=1500, sl=1000, log_codec="zlib-1", collect=None, mix=False, archive=False, symbol="XAUUSD"):
     work = Path(tempfile.mkdtemp(prefix="bl-"))
-    profile = make_profile(provider)
+    profile = make_profile(provider, symbol)
     start = rows[0][0] * 1_000_000; end = rows[-1][0] * 1_000_000
     tl = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version, str(start), log_folder=work / "log",
                              log_codec=log_codec, max_groups_per_advance=256)
