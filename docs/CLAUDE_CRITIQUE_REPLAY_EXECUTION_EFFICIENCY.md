@@ -1469,3 +1469,41 @@ before the load test below.
 ### 17.6 Open owner decisions
 (a) Option D experiment; (b) receipt-based verification study; (c) warm per-Session
 process policy (memory cap/idle timeout); (d) worker count/limits policy; (e) V1 scope.
+
+## 18. Additional audit — security, operations, abuse control (2026-11-13)
+
+> **Status: ADVISORY.** Read-only review of `backend/cloud/app.py`, `identity/*`,
+> `cloud/serve.py`, `api/main.py`, `requirements*.txt`, `frontend/src/tickAlpha/accountClient.js`.
+> No test or scan was run.
+
+### 18.1 Already good (no action; do not regress)
+- Auth secret must be ≥ 64 chars; session lifetime bounded (60 s–24 h); DB-backed
+  revocable tokens; `logout-all`; verification required for login.
+- Validation errors are rewritten so passwords/tokens are not echoed; docs/redoc disabled.
+- Proxy headers are trusted **only** from explicit `BTL_TRUSTED_PROXY_IPS`; `X-Forwarded-For`
+  is never trusted blindly.
+- Bearer token is kept in a JS variable (not `localStorage`) → smaller XSS blast radius.
+- SMTP send runs in `asyncio.to_thread` with a 10 s timeout (does not block the loop).
+
+### 18.2 New findings
+
+| # | Finding | Severity | Suggested fix |
+|---|---|---|---|
+| C1 | No health/readiness endpoint, structured logging or metrics in the cloud app (`/api/health` exists only in legacy `api/main.py`) | HIGH (operations) | `/healthz` (process) + `/readyz` (DB + queue lag); JSON logs with request id; counters: queue depth/wait, job duration, DB budget use, 429s |
+| C2 | Legacy `api/main.py` allows CORS origin `"null"` with `*` methods/headers | MEDIUM if ever exposed | Ensure it is never deployed; delete or gate behind a dev flag |
+| C3 | No security headers set by the app (CSP, HSTS, X-Frame-Options, Referrer-Policy) | MEDIUM | Set at the reverse proxy; CSP restricts script/connect origins (R2 custom domain) |
+| C4 | Fixed 30-min bearer session held only in memory: page reload or long replay may force re-login (not verified in UI) | LOW–MEDIUM (UX) | Sliding renewal near expiry; optional refresh flow; keep token out of storage |
+| C5 | Account creation + data serving with no per-account download quota/audit | MEDIUM (data rights, scraping) | Per-account/day served-data quota and audit row (bytes, dataset hash); ties to §14.3 data-rights matrix; CAPTCHA or email-domain throttling at registration if abuse appears |
+| C6 | Login/registration depend on SMTP; an outage blocks new users | LOW–MEDIUM | Transactional email provider, retry with backoff, resend limit |
+| C7 | `requirements.txt` uses `>=` for fastapi/uvicorn/tzdata/certifi although a lock exists | LOW | Deploy and CI install only from `requirements.lock` |
+| C8 | ~12 broad `except Exception/except:` outside tests (count by grep) | LOW–MEDIUM | Review that none swallows errors in integrity/evidence paths; log and re-raise |
+| C9 | No dependency/supply-chain scanning | LOW | `pip-audit` and `npm audit` in the CI proposed in B8 |
+| C10 | No restore drill documented (backup exists conceptually in B17) | HIGH if data is paid-for | Quarterly restore test to a scratch DB with hash verification; record RTO/RPO |
+
+### 18.3 Priority
+C1 and C10 first (cheap, protect everything else), then C3/C7/C9 (config only), then
+C5 before opening registration publicly, then C2/C4/C6/C8.
+
+### 18.4 Honest limits
+I did not pen-test, review the SQL for injection beyond reading call sites, or inspect the
+live VPS/reverse-proxy configuration; items C3 and C1 may already exist outside the repo.
