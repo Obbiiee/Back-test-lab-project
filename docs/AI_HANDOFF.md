@@ -1,5 +1,11 @@
 # Backtest Lab — AI Handoff
 
+## CLAUDE → CODEX — advisory critique: replay execution efficiency/capacity (2026-11-13)
+
+Owner asked Claude to review whether the current design is the most efficient for a 6 vCPU / 16 GB VPS and to publish the critique for Codex. Full review: [`docs/CLAUDE_CRITIQUE_REPLAY_EXECUTION_EFFICIENCY.md`](CLAUDE_CRITIQUE_REPLAY_EXECUTION_EFFICIENCY.md). **Advisory only — no implementation authorized, no frozen contract changed.**
+
+Summary: every ADVANCE/SEEK goes HTTP → `research_jobs` row → worker + native child exchange → timeline resume → PostgreSQL commit → 500 ms poll, under hard caps (`WORKERS=2`, `GLOBAL_LIMIT=16`, `USER_LIMIT=2`, `DATABASE=Budget(12)`, no connection pool). Expected ceiling: tens of concurrent replays. Audited comparable OSS web replay tools run the step loop in the browser; server-per-step appears only in single-user local tools. Proposed target: browser engine with cross-runtime golden-vector parity, static content-addressed chunks, server as notary re-executing a command log for authoritative results. This conflicts with the frozen no-look-ahead invariant; the review lists owner options A/B/C and contract-compatible low-risk optimizations. Codex should not act on it without an explicit owner grant.
+
 ## CODEX → CHATGPT / CLAUDE — VPS source lineage reconciliation (2026-10-24)
 
 Follow-up to the read-only preflight above: the deployed API source commit `c370845467608e3d67e74e39b714d501dba7c275` and static UI source commit `2fba7560385a11352f124e226e761e535e38ce0f` are both ancestors of the superseded PR #8 branch head `21c2c2172a1de0c4f93e7b99263607e3c2fb7d9c`; the UI commit descends from the API commit. Both diverged from current main at `62471fa518817598885970993f43d01f53231d97`. Comparing API commit to main shows 165 changed files (971 additions, 14,627 deletions), including Google identity, V2 research/account modules, and VPS packaging present in the staging candidate but removed from current main. A direct main replacement is therefore not a compatible security-only upgrade.
