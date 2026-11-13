@@ -1113,3 +1113,77 @@ Respond in this file under a new heading: AGREE / DISAGREE / NEEDS DATA per laye
 flow and gate in §13.2–13.9; flag any conflict with frozen 42.17/42.19 contracts;
 propose the smallest first authorized checkpoint (suggest M0 profiling). This is a
 collaboration note, not a request to implement or to overwrite PR #53.
+
+## 14. Addendum to §13 — manual/scalping workflows and "jump to next event" (2026-11-13)
+
+> **Status: ADVISORY.** Refines §11.3 and §13; no implementation authorized, no
+> frozen contract changed. Raised by the owner: a scalper who uses no SL/TP gives
+> Option D nothing to skip to.
+
+### 14.1 Correction to the Option D wording
+
+§11.3 and §13.4-B describe Option D as "the server works when there is an order".
+That is incomplete. The precise statement is: **the server works only on events**, and
+an event is any of:
+
+1. a manual command (market open/close, partial close, cancel, SL/TP edit);
+2. an automatic trigger (entry of a pending order, SL, TP, trailing/time exit);
+3. a margin stop-out (the price at which equity reaches the stop-out level is a
+   computable trigger for a given set of open positions; it changes whenever
+   positions change);
+4. a verification/notary request.
+
+Server cost is proportional to the number of events, not to ticks or playback steps.
+
+### 14.2 Manual scalping without SL/TP
+
+- Opening/closing by click: the server resolves the fill at the revealed cursor time
+  with one timestamp lookup (index → row group → exact tick), applies the frozen
+  spread/slippage/commission rules, and appends one command-log row. Hundreds of
+  clicks per session stay cheap because each is one bounded lookup.
+- No automatic skip target exists for such a user, so "jump to next SL/TP" is
+  not applicable; the playback controls that matter are play/pause, speed,
+  step-by-N-ticks/seconds, and jump-to-next-candle-close.
+- Floating PnL shown in the UI may be computed client-side from the displayed price and
+  labelled `UNVERIFIED`; the authoritative PnL is the server's at close.
+
+### 14.3 Fine-grained display requires released tick data (rights impact)
+
+Scalpers need tick or sub-minute price display. Under the no-look-ahead rule the
+client receives only a bounded released window around the cursor (window W,
+signed cursor, batched release log — §11.2 Q3, §13.5).
+
+- Volume is small: XAU averages roughly 1–2 ticks/s from ≈4.7 M ticks/month
+  (rough arithmetic from the repo's slice count, to be measured); a 5-minute replay is
+  hundreds of ticks, i.e. tens of KB.
+- But it means **tick values reach the client**, even if briefly. This re-opens the
+  rights question for display of tick-derived data. Options if raw tick display is not
+  permitted: 1-second candles derived from ticks (display-only), or restrict scalping
+  tools to providers whose terms allow tick display. This is a V1 gate for any
+  "scalping mode" claim (rights matrix, §11.2 Q2).
+
+### 14.4 "Jump to next event" as a user feature
+
+Same engine as Option D settlement. Candidate jump targets, all computed server-side
+and released only when the cursor reaches them:
+
+- next fill/close of an existing order or position (SL/TP/pending entry/stop-out);
+- next time price touches a user-defined level or alert;
+- next scheduled time (session open, news release — relates to Phase 14.5 News
+  Backtesting Engine, not authorized);
+- plain playback controls remain available for users with no triggers.
+
+Rules: stop at the **first** event in market order; equal-time groups stay atomic;
+ambiguous ordering remains `AMBIGUOUS`, never resolved in the user's favour; the jump
+may not reveal data beyond the event time.
+
+### 14.5 Required tests and measurements (add to Gates in §11.2 Q8 / §13.9)
+
+- Scalping scenario in the Option D parity suite: several hundred manual
+  opens/closes per session, no SL/TP, tick-level replay, mixed with partial closes
+  and a stop-out; result must be byte-identical to full replay.
+- Load test with the same scenario: p95 per click, CPU-s per event, DB rows per event,
+  released-window request rate at 1×/10×/100× playback.
+- Release-window design: choose W so that request rate stays acceptable at the
+  maximum allowed playback speed; cap speed in strict mode if needed.
+- Rights check for tick-level display (14.3) before any public "scalping" positioning.
