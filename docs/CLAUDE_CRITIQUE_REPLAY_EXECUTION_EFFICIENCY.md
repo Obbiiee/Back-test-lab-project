@@ -1266,3 +1266,118 @@ may not reveal data beyond the event time.
 F0 + F2 (+ F1 design only): add measurement and budgets, fix the 1.2 MB logo, and
 document the data-delivery change — all reversible and low risk — then re-measure
 before choosing F3–F8.
+
+## 16. Trade / Session storage efficiency (2026-11-13)
+
+> **Status: ADVISORY.** No implementation authorized. Several items touch frozen
+> evidence/storage contracts (immutable tables, 42.17/42.19) and need an explicit
+> owner grant. Evidence is read from PR #53 head `92827bc`
+> (`backend/infrastructure/migrations/005_tick_execution.sql`,
+> `docs/XAU_2024_INTEGRATED_SESSION_CHECKPOINT_7_2026_10_30.md`,
+> `docs/CP6A3_POSTGRES_DELTA_INTEGRATION_2026-10-31.md`). I did not run any storage
+> benchmark myself.
+
+### 16.1 What is stored per trade/Session today
+
+- Tables `btl.tick_sessions`, `tick_commands`, `tick_events`, `tick_checkpoints`
+  (migration 005), each row a `bytea` payload (≤ 1 MiB) plus a 64-char hex
+  `content_hash` stored as **text**; `UPDATE/DELETE/TRUNCATE` are denied by
+  immutable triggers on commands, events and checkpoints.
+- **One command receipt and one checkpoint per committed command**, each carrying
+  full state (not a delta). The opt-in `qa_state_delta_v3` writes an extra delta per
+  command but the full receipts/checkpoints remain, so the repo itself states it is
+  "not a storage-savings result" (`CP6A3_*`: delta bytes are additive).
+- Terminal order archives exist (migrations 024/025) and a 128-order limit bounds
+  the financial fixture.
+
+### 16.2 Measured numbers in the repo (not mine)
+
+| Fixture | Baseline | Candidate (dedup/compact) |
+|---|---|---|
+| Financial 512 commands, PostgreSQL portion | 18,423,808 B (≈36 KB/command) | 4,755,456 B (≈9.3 KB/command) |
+| Marginal growth 256→512 commands | 46,208 B/command | 11,088 B/command |
+| XAU 16→36 commands | 12,697.6 B/command | 9,216 B/command |
+| Byte comparison, financial 512: receipts / checkpoints | 18,233,018 B / 17,903,984 B | — |
+
+The same document warns these are combined slopes (commands/events/checkpoints
+co-vary), include MVCC/autovacuum/page slack, and must not be extrapolated; and that
+retaining protected source makes a tiny Session use *more* host space (7.30 → 8.54 MB).
+
+### 16.3 Why it is expensive (diagnosis)
+
+1. **Full-state snapshot per command** → cost ≈ commands × state size, and state grows
+   with open/archived orders.
+2. **Redundant copies:** receipt state + checkpoint state + event rows + optional delta
+   all hold overlapping information.
+3. **Hex hash text** (64 B) instead of raw 32 B bytes on every row and index.
+4. **Uncompressed payloads** in PostgreSQL (TOAST compresses large values, but small
+   rows stay raw).
+5. **Immutable tables** cannot be pruned; without an archive policy they only grow.
+6. **A scalper (hundreds of manual open/close commands per Session)** multiplies all of
+   the above: a 512-command Session ≈ 18–19 MB baseline vs ≈ 5 MB candidate in the
+   repo's own fixture.
+
+### 16.4 Proposed solutions (ordered by safety)
+
+**S1. Reversible, no contract change**
+- Add a retention/archival design **before** growth: partition `tick_*` tables by
+  time/workspace; document the hot/cold boundary.
+- `autovacuum` tuned for these tables; `wal_compression=on`; measure bloat with
+  `pgstattuple`/`pg_total_relation_size` on a real Session.
+- Raw 32-byte `bytea` for new hash columns where a migration is already planned (index
+  size halves).
+- Client side: keep unsynced account/drawings state in **IndexedDB** instead of
+  `localStorage` (≈5 MB cap, synchronous), with a size cap and compaction.
+
+**S2. Needs owner grant (storage/evidence representation)**
+- **Command log + sparse checkpoints:** persist commands (small, canonical) and
+  per-command *deltas*; take a full checkpoint every K commands and at structural events
+  (fills, closes, cancels), not on every command. Recovery = nearest checkpoint + replay
+  of ≤ K deltas. Keep exact hashes: each receipt hash chains over (previous hash,
+  command, delta), so tamper evidence is unchanged.
+- **Content-addressed dedup** of shared objects across Sessions (the repo's candidate
+  already shows PostgreSQL dedup as the principal saving).
+- **Compressed payloads** (zstd/zlib) for receipts/checkpoints ≥ a threshold, with the
+  uncompressed canonical hash preserved.
+- **Terminal archive:** move closed orders/positions out of the active state object
+  into an append-only archive keyed by id, so active state stays O(open orders).
+
+**S3. Product-level (works with §13 Option D)**
+- For the notary/Option D model the authoritative record per Session is the **command
+  log** plus references to pinned data (dataset hash, receipts); full-state receipts per
+  step are not needed because state is recomputed on demand. Hypothesis: ≈ 100–300 B per
+  command compressed (unmeasured) versus ≈ 9–46 KB today.
+- **Cold tiering:** Sessions inactive for N days → export a compressed, hash-pinned
+  bundle (command log + final checkpoint + reports) to object storage; keep a small
+  index row in PostgreSQL. Restoring re-verifies the hash. Requires an owner-approved
+  retention policy because current tables are immutable.
+- **Practice tier:** trades kept locally (UNVERIFIED), synced as a compact command log
+  only when the user saves/publishes.
+
+### 16.5 Expected effect (hypotheses to be measured)
+
+| Case | Today (repo fixture) | After S1+S2 | After S3 |
+|---|---|---|---|
+| 512-command Session, PostgreSQL | ≈18–19 MB | ≈5 MB (repo candidate) or less with sparse checkpoints | tens–hundreds of KB (unmeasured) |
+| 1,000 users × 5 such Sessions/month | ≈ 90 GB/month | ≈ 25 GB/month | ≈ < 1 GB/month |
+
+Arithmetic from the repo numbers; not a forecast. The 128-order limit and a
+scalping workload (hundreds of commands) must be tested explicitly.
+
+### 16.6 Required tests and gates
+
+- Recovery equivalence: for random command sequences, state rebuilt from
+  (sparse checkpoint + deltas) is byte-identical to the current full-state path, including
+  SIGKILL/restart cases already used in the repo's QA (before/after SQL commit).
+- Hash-chain equivalence for receipts/events; independent verifier (no writer codec)
+  still passes.
+- Storage benchmark on real Sessions: bytes/command (data + indexes + WAL), restore time
+  from cold tier, vacuum/bloat after 100k commands, with a scalping profile and a
+  swing profile.
+- Retention policy review before any DELETE/archival path touches immutable tables.
+
+### 16.7 Open owner decisions
+
+(a) Allow sparse checkpoints + delta receipts as the persistent representation; (b)
+retention/cold-tier policy for immutable evidence; (c) raw-bytea hashes in new tables;
+(d) whether UNVERIFIED practice trades may live only on the client until saved.
