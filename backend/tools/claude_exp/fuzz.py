@@ -1,5 +1,5 @@
 """Randomised parity: many real-tick windows x random ties/gaps x step sizes x trader styles. Claude jump path must equal the reference."""
-import sys, random, json, shutil, collections
+import sys, os, random, json, shutil, collections
 sys.path.insert(0, ".")
 from parity import *
 
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     for seed in range(seeds):
         rows, info = build(seed, n)
         step = random.Random(seed + 99).choice([60, 300, 900]); mix = seed % 2 == 1
-        r = run(n, step_s=step, mix=mix, rows_override=rows)
+        r = run(n, step_s=step, mix=mix, rows_override=rows, archive=os.environ.get("ARCH") == "1")
         cs = r["_cs"]; ok = all(r["parity"].values()) and r["admission_reconstruction_mismatches"] == 0
         allok &= ok
         for e in cs.log: pass

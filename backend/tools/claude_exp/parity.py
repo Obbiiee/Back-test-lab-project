@@ -35,10 +35,14 @@ def compact_events(rows):
     for i, (ts, ask, bid) in enumerate(rows):
         yield dict(timeNs=str(ts * 1_000_000), bid=bid, ask=ask, rawOrdinal=str(i))
 
+def _orders_view(orders, drop_terminal):
+    keep = lambda v: not (drop_terminal and v["status"] in ("CANCELLED", "CLOSED", "EXPIRED", "UNRESOLVED"))
+    return {k: {x: v[x] for x in ("status", "entryPrice", "grossPosted", "remaining")} for k, v in orders.items() if keep(v)}
+
 def semantic(events):
     return [e for e in strip_source_specific([x for x in events if x["kind"] != "REPLAY_ADVANCED"])]
 
-def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed=0, rows_override=None, offset=0):
+def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed=0, rows_override=None, offset=0, archive=False):
     out = dict(n=n, mode=mode)
     rows = rows_override if rows_override is not None else inject(read_real_rows(n + offset)[offset:], mode)
     work = Path(tempfile.mkdtemp(prefix="par-", dir=tmp))
@@ -46,7 +50,7 @@ def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed
     out["ingest_engine_s"] = round(t_ing, 1); out["accepted"] = res["acceptedRows"]
     # baseline
     groups = []
-    b = run_baseline(provider, rows, step_s, tp, sl, collect=groups, mix=mix)
+    b = run_baseline(provider, rows, step_s, tp, sl, collect=groups, mix=mix, archive=archive)
     out["baseline"] = dict(cpu=round(b["cpu"], 2), wall=round(b["wall"], 2), balance=b["state"]["balance"],
                            fills=sum(e["kind"] in ("ENTRY_FILL", "EXIT_FILL") for e in b["events"]),
                            unresolved=b["state"]["unresolved"])
@@ -74,7 +78,7 @@ def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed
     tl = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version, str(rows[0][0] * 1_000_000), log_folder=work2)
     seed_cp = tl.checkpoint(); tl.close()
     start, end = rows[0][0] * 1_000_000, rows[-1][0] * 1_000_000
-    cs = ClaudeSession(src, profile, policy(), seed_cp)
+    cs = ClaudeSession(src, profile, policy(), seed_cp, archive=archive)
     cpu0, t0 = time.process_time(), time.perf_counter()
     events_all = drive(cs.advance_through, lambda k, pl, cid: cs.command(k, pl, cid), lambda: cs.state, start, end, step_s, tp, sl, mix)
     cpu, wall = time.process_time() - cpu0, time.perf_counter() - t0
@@ -84,8 +88,7 @@ def run(n, mode="clean", step_s=300, tp=1500, sl=1000, tmp=None, mix=False, seed
     sb, sc_ = semantic(b["events"]), semantic(events_all)
     out["parity"] = dict(eventsEqual=sb == sc_, eventsBaseline=len(sb), eventsClaude=len(sc_),
                          balanceEqual=b["state"]["balance"] == cs.state["balance"],
-                         ordersEqual={k: {x: v[x] for x in ("status", "entryPrice", "grossPosted", "remaining")} for k, v in b["state"]["orders"].items()}
-                                     == {k: {x: v[x] for x in ("status", "entryPrice", "grossPosted", "remaining")} for k, v in cs.state["orders"].items()},
+                         ordersEqual=_orders_view(b["state"]["orders"], False) == _orders_view(cs.state["orders"], False),
                          lastObservedEqual=b["state"]["lastObservedNs"] == cs.state["lastObservedNs"],
                          nextGroupEqual=b["state"]["nextGroupIndex"] == cs.state["nextGroupIndex"],
                          quoteBasisEqual=b["state"]["quoteBasis"] == cs.state["quoteBasis"],

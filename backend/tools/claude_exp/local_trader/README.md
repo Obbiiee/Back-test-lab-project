@@ -14,6 +14,4 @@ Behaviour worth knowing: market orders fill on the NEXT revealed quote; a manual
 observed quote that crosses the level (so the fill can be worse than the level); a data gap over 60 s while an order is live
 makes the session UNRESOLVED (the reference reducer's rule). The browser only receives ticks/candles up to the session cursor.
 
-Measured responsiveness (150k real ticks, scripted open/close cycles): opening an order took ~13 ms with 1 order in the session,
-~100 ms with 60 and ~140 ms with 120, i.e. roughly +1.1 ms per retained order (the reference reducer re-validates every retained order
-on each command). Comfortable for manual trading; a session with many hundreds of orders will feel slower. Order archiving is the fix and is not integrated.
+Order archiving is enabled: command latency stays flat (6 / 18 / 15 ms at the 1st / 60th / 120th order on 150k real ticks; without archiving it grew from 13 to 140 ms). Closed trades are listed in the "Riwayat trade" panel.

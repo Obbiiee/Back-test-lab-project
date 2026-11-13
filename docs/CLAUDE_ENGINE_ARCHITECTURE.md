@@ -101,6 +101,12 @@ The gain is smaller than for swing (21-30x) because both engines pay the same ke
 every retained order on every command (O(orders) per command, quadratic over a session; 263k `open_payload` calls at 50k ticks). Jump cannot remove it;
 the repo's order-archive state mode is the intended mitigation and was not integrated here. After the tick reader is fast, THIS is the next bottleneck.
 
+### Order archiving integrated (repo's QA archive state, both engines)
+Both sides run the reference archive mode (`qa_order_archive_v1`, retention V4: 4,096 cumulative orders; the non-archive reducer caps a session at 128 cumulative orders, which is why earlier scalper runs stopped at 146 fills).
+Scalper, 30,000 real ticks, 20 s steps: Codex+archive **142.1 CPU-s**, Claude+archive **12.4 CPU-s** (11.5x), 892 fills, identical events, balance and orders (766 orders archived).
+Mixed trader 8,000 ticks: 32.8 vs 2.0 CPU-s (16x), identical. Integrity suite (restart, tamper cases) passes in archive mode; archive-mode fuzz 12/12 parity.
+Local app command latency with archiving stays flat: 6 / 18 / 15 ms at the 1st / 60th / 120th order (was 13 / 101 / 141 ms without it); same final balance.
+
 ## 5. Jump to next event
 Exact integer thresholds (scaled by 1000) against per-256-group min/max blocks, per order type: pending MARKET (next group), LIMIT/STOP (ask or bid vs entry), ACTIVE SL/TP, exit request.
 Gap guard and crossed/equal-time groups are always exact. If a price is not an exact scaled integer the search returns "scan exactly".

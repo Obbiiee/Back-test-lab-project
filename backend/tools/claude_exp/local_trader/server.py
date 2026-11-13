@@ -91,7 +91,7 @@ def session_json():
                 unresolved=st["unresolved"], ended=st["ended"], orders=orders,
                 quoteFresh=bool(st["quoteBasis"] is not None and thr - int(st["quoteBasis"]["timeNs"]) <= int(st["profile"]["maxObservedSilenceNs"])),
                 progress=dict(group=k, groups=src.ngroups, startMs=S["meta"]["start_ms"], endMs=S["meta"]["end_ms"]),
-                atEnd=k >= src.ngroups, events=S["events"][-40:], model="observed quotes only; no slippage/commission; XAUUSD contract 100")
+                atEnd=k >= src.ngroups, events=S["events"][-40:], trades=S["trades"][-40:], model="observed quotes only; no slippage/commission; XAUUSD contract 100")
 
 
 def candles(tf, n):
@@ -117,13 +117,19 @@ def log_events(evs):
         if e["kind"] == "REPLAY_ADVANCED":
             continue
         d = e.get("detail") or {}
-        S["events"].append(dict(kind=e["kind"], orderId=e.get("orderId"), price=d.get("price") if isinstance(d, dict) else None,
-                                reason=d.get("reason") if isinstance(d, dict) else None,
-                                pnl=d.get("grossPosted") if isinstance(d, dict) else None, timeMs=int(S["cs"].state["throughNs"]) // 1_000_000))
+        d = d if isinstance(d, dict) else {}
+        oid, now = e.get("orderId"), int(S["cs"].state["throughNs"]) // 1_000_000
+        S["events"].append(dict(kind=e["kind"], orderId=oid, price=d.get("price"), reason=d.get("reason"), pnl=d.get("grossPosted"), timeMs=now))
+        if e["kind"] == "ENTRY_FILL":
+            S["meta_orders"].setdefault(oid, {})["entry"] = d.get("price")
+        elif e["kind"] == "EXIT_FILL":
+            m = S["meta_orders"].get(oid, {})
+            S["trades"].append(dict(id=oid, side=m.get("side"), lots=d.get("quantity"), entry=m.get("entry"), exit=d.get("price"),
+                                    pnl=d.get("grossPosted"), reason=d.get("reason"), timeMs=now))
 
 
 def save():
-    S["snap_path"].write_text(json.dumps(dict(snapshot=S["cs"].snapshot(), events=S["events"])))
+    S["snap_path"].write_text(json.dumps(dict(snapshot=S["cs"].snapshot(), events=S["events"], trades=S["trades"], meta_orders=S["meta_orders"])))
 
 
 def do_advance(seconds, until_event=False, max_seconds=6 * 3600):
@@ -176,6 +182,7 @@ def api(path, q, body):
         pay = dict(side=side, orderType=typ, workflow=workflow, entry=entry, quantity=str(body.get("lots", "0.01")), sl=sl, tp=tp,
                    riskPercent="1", observations=[])
         S["serial"] = S.get("serial", 0) + 1
+        S["meta_orders"][f"order:{S['serial']}"] = dict(side="BUY" if side == "LONG" else "SELL")
         cs.command("OPEN", pay, f"order:{S['serial']}"); save(); return session_json()
     if path in ("/api/close", "/api/cancel"):
         kind = "CLOSE" if path.endswith("close") else "CANCEL"
@@ -222,12 +229,12 @@ def main():
     ap.add_argument("--fresh", action="store_true", help="ignore a saved session")
     a = ap.parse_args()
     src, profile, seed, meta = open_session(a.zip, a.offset, a.ticks, a.cache)
-    S.update(src=src, meta=meta, events=[])
+    S.update(src=src, meta=meta, events=[], trades=[], meta_orders={})
     S["snap_path"] = Path(a.cache) / f"session_{meta['adm']['manifestHash'][:12]}.json"
-    cs = ClaudeSession(src, profile, policy(), seed)
+    cs = ClaudeSession(src, profile, policy(), seed, archive=True)     # order archiving: constant-cost commands in long sessions
     if S["snap_path"].exists() and not a.fresh:
         saved = json.loads(S["snap_path"].read_text())
-        cs = ClaudeSession.recover(src, profile, policy(), seed, saved["snapshot"]); S["events"] = saved["events"]
+        cs = ClaudeSession.recover(src, profile, policy(), seed, saved["snapshot"]); S["events"] = saved["events"]; S["trades"] = saved.get("trades", []); S["meta_orders"] = saved.get("meta_orders", {})
         print("[session] resumed from verified snapshot (hash chain + state checked)")
     S["cs"] = cs
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)

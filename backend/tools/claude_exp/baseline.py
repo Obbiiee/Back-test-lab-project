@@ -3,25 +3,35 @@ import sys, time, json, tempfile, shutil
 from pathlib import Path
 from common import *
 
-def run_baseline(provider, rows, step_s=300, tp=1500, sl=1000, log_codec="zlib-1", collect=None, mix=False):
+def run_baseline(provider, rows, step_s=300, tp=1500, sl=1000, log_codec="zlib-1", collect=None, mix=False, archive=False):
     work = Path(tempfile.mkdtemp(prefix="bl-"))
     profile = make_profile(provider)
     start = rows[0][0] * 1_000_000; end = rows[-1][0] * 1_000_000
     tl = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version, str(start), log_folder=work / "log",
                              log_codec=log_codec, max_groups_per_advance=256)
-    box = dict(state=seed_state("session:qa", profile, policy(), tl.checkpoint()), serial=0)
+    import execution.observed_kernel as K0
+    ret = K0.QA_ORDER_RETENTION_V4 if archive else None
+    box = dict(state=seed_state("session:qa", profile, policy(), tl.checkpoint(), **(dict(order_retention_policy=ret, qa_order_archive_v1=True) if archive else {})), serial=0, ids=set())
+    def run_apply(raw, **kw):
+        if archive:
+            lookup = lambda oid: dict(status="CLOSED") if oid in box["ids"] and oid not in box["state"]["orders"] else None
+            st, ev, _rows = apply(box["state"], raw, order_retention_policy=ret, qa_order_archive_v1=True, archived_order_lookup=lookup, **kw)
+            return st, ev
+        return apply(box["state"], raw, **kw)
     def advance(target):
         evs = []
         while True:
             frame = tl.advance_through(str(target), tl.cursor); cp = tl.checkpoint()
             if collect is not None: collect.extend(frame["groups"])
             box["serial"] += 1
-            box["state"], ev = apply(box["state"], raw_command(box["state"], box["serial"], "ADVANCE", dict(targetNs=str(target))), reveal=frame, checkpoint=cp)
+            box["state"], ev = run_apply(raw_command(box["state"], box["serial"], "ADVANCE", dict(targetNs=str(target))), reveal=frame, checkpoint=cp)
             evs.extend(ev)
             if frame["exhaustedThroughBoundary"]: return evs
     def command(kind, payload, cid):
         box["serial"] += 1
-        box["state"], ev = apply(box["state"], raw_command(box["state"], box["serial"], kind, payload, command=cid)); return ev
+        box["state"], ev = run_apply(raw_command(box["state"], box["serial"], kind, payload, command=cid))
+        if kind == "OPEN": box["ids"].add(cid)
+        return ev
     cpu0, t0 = time.process_time(), time.perf_counter()
     events_all = drive(advance, command, lambda: box["state"], start, end, step_s, tp, sl, mix)
     cpu, wall = time.process_time() - cpu0, time.perf_counter() - t0

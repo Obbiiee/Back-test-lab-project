@@ -6,14 +6,15 @@ from claude_session import AdmittedSource, ClaudeSession
 from market_data.compact_tick import CompactTickReader
 
 n = int(sys.argv[1]) if len(sys.argv) > 1 else 20000
-r = run(n, "clean", mix=True)
+ARCH = os.environ.get("ARCH") == "1"
+r = run(n, "clean", mix=True, archive=ARCH)
 src, profile, seed, rows, cdir, m, groups = r["_src"], r["_profile"], r["_seed"], r["_rows"], r["_cdir"], r["_manifest"], r["_groups"]
 adm = src.adm; mh = m["manifestHash"]
 start, end = rows[0][0] * 10**6, rows[-1][0] * 10**6
 res = {}
 
 def fresh(source=src):
-    return ClaudeSession(source, profile, policy(), seed)
+    return ClaudeSession(source, profile, policy(), seed, archive=ARCH)
 
 def full(cs, upto=None, step_s=300):
     return drive(cs.advance_through, lambda k, p, c: cs.command(k, p, c), lambda: cs.state, start, upto or end, step_s, 1500, 1000, True)

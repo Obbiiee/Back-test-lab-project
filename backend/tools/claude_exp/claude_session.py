@@ -18,6 +18,7 @@ import datetime as dt
 import numpy as np
 
 import execution.observed_kernel as K
+from execution.observed_order_archive_v1 import ARTIFACT as QA_ARCHIVE_ARTIFACT
 from execution.observed_kernel import apply, validate_state
 from execution.observed_profile import ObservedExecutionProfile, MODEL_V2
 from contracts.canonical import decimal_text, content_hash
@@ -148,9 +149,15 @@ class AdmittedSource:
 
 
 class ClaudeSession:
-    def __init__(self, source, profile, policy, seed_checkpoint, session_id="session:qa", start_ns=None):
+    def __init__(self, source, profile, policy, seed_checkpoint, session_id="session:qa", start_ns=None, archive=False):
         self.src = source
-        self.state = K.seed_state(session_id, profile, policy, seed_checkpoint)
+        self.archive = archive
+        self.retention = K.QA_ORDER_RETENTION_V4 if archive else None
+        self.opened_ids = set()
+        if archive:
+            self.state = K.seed_state(session_id, profile, policy, seed_checkpoint, order_retention_policy=self.retention, qa_order_archive_v1=True)
+        else:
+            self.state = K.seed_state(session_id, profile, policy, seed_checkpoint)
         self.guard = int(self.state["profile"]["maxObservedSilenceNs"])
         self.start_ns = int(self.state["startNs"])
         prev = np.r_[self.start_ns, source.gts[:-1]]
@@ -172,9 +179,25 @@ class ClaudeSession:
         self.serial += 1
         raw = dict(schemaVersion=1, artifact="BTL-OBSERVED-EXECUTION-COMMAND-1", sessionId=self.state["sessionId"],
                    commandId=command_id or f"command:{self.serial}", expectedRevision=self.state["revision"], kind=kind, payload=payload)
-        self.state, events = apply(self.state, raw)
+        if self.archive:
+            lookup = lambda oid: dict(status="CLOSED") if oid in self.opened_ids and oid not in self.state["orders"] else None
+            self.state, events, _rows = apply(self.state, raw, order_retention_policy=self.retention, qa_order_archive_v1=True, archived_order_lookup=lookup)
+        else:
+            self.state, events = apply(self.state, raw)
+        if kind == "OPEN":
+            self.opened_ids.add(raw["commandId"])
         self._commit(dict(t="C", kind=kind, id=raw["commandId"], payload=payload))
         return events
+
+    def _archive_terminal(self, s):
+        """Same step `apply` performs after every command: move terminal orders into the hash-chained archive summary."""
+        terminal = [(oid, o) for oid, o in sorted(s["orders"].items()) if o["status"] in ("CANCELLED", "CLOSED", "EXPIRED", "UNRESOLVED")]
+        summary = s["orderArchive"]
+        for oid, order in terminal:
+            row = K.archive_append(summary, session_id=s["sessionId"], revision=s["revision"] + 1, order_id=oid, order=order, artifact=QA_ARCHIVE_ARTIFACT)
+            summary = K.archive_advance(summary, [row])
+            del s["orders"][oid]
+        s["orderArchive"] = summary
 
     def _light_check(self, s):
         """Checks every field a skipped span can change. Orders, balance and flags are untouched on this path."""
@@ -307,9 +330,11 @@ class ClaudeSession:
         dirty = bool(events) or self.stats["exact_groups"] != exact_before
         # NOTE: the reference emits a REPLAY_ADVANCED progress event when an advance has no other event. It is not a
         # financial event; here progress lives in the advance log instead (proposal, needs owner approval for product use).
+        if self.archive and dirty:
+            self._archive_terminal(s)
         s["revision"] += 1
         if dirty or self.full_validate_every_advance:
-            validate_state(s)          # financial state may have changed: full reference validation
+            validate_state(s, order_retention_policy=self.retention)          # financial state may have changed: full reference validation
         else:
             self._light_check(s)       # only cursor fields moved; orders/balance are byte-identical to the validated state
         self._commit(dict(t="A", target=str(target), next=s["nextGroupIndex"]), dirty=dirty)
@@ -317,19 +342,20 @@ class ClaudeSession:
 
     # ---- recovery: rebuild the tip from the durable advance log, compare with the saved state
     def snapshot(self):
-        return dict(state=deepcopy(self.state), log=list(self.log), tip=self.tip, serial=self.serial)
+        return dict(state=deepcopy(self.state), log=list(self.log), tip=self.tip, serial=self.serial, archive=self.archive)
 
     @classmethod
     def recover(cls, source, profile, policy, seed_checkpoint, snap):
         """Cheap recovery: verify the hash chain over the durable log, that the saved state is exactly the state the last
         record committed to, and that the cursor is inside the pinned source."""
-        self = cls(source, profile, policy, seed_checkpoint)
+        self = cls(source, profile, policy, seed_checkpoint, archive=snap.get("archive", False))
         tip = self.tip
         for rec in snap["log"]:
             tip = hashlib.sha256((tip + "|" + json.dumps(rec, sort_keys=True, separators=(",", ":"))).encode()).hexdigest()
         if tip != snap["tip"] or snap["state"]["sourcePrefixHash"] != tip:
             raise ValueError("RECOVERY_CHAIN_MISMATCH")
         self.state, self.log, self.tip, self.serial = deepcopy(snap["state"]), list(snap["log"]), tip, snap["serial"]
+        self.opened_ids = {r["id"] for r in snap["log"] if r["t"] == "C" and r["kind"] == "OPEN"}
         if snap["log"]:
             last = snap["log"][-1]
             if self._fin_hash() != last["fin"]:
@@ -346,20 +372,20 @@ class ClaudeSession:
                 raise ValueError("RECOVERY_QUOTE_BASIS_MISMATCH")
         if int(self.state["nextGroupIndex"]) > source.ngroups:
             raise ValueError("RECOVERY_CURSOR_BEYOND_SOURCE")
-        validate_state(self.state)
+        validate_state(self.state, order_retention_policy=self.retention)
         return self
 
     @classmethod
     def verify_by_replay(cls, source, profile, policy, seed_checkpoint, snap):
         """Independent recovery proof: deterministically re-execute every logged advance/command from the seed and require
         byte-identical state and chain. Affordable because the jump engine replays millions of ticks per second."""
-        self = cls(source, profile, policy, seed_checkpoint)
+        self = cls(source, profile, policy, seed_checkpoint, archive=snap.get("archive", False))
         for rec in snap["log"]:
             if rec["t"] == "A":
                 self.advance_through(rec["target"])
             else:
                 self.command(rec["kind"], rec["payload"], rec["id"])
-        validate_state(self.state)
+        validate_state(self.state, order_retention_policy=self.retention)
         if self.log != snap["log"] or self.tip != snap["tip"] or self.state != snap["state"]:
             raise ValueError("REPLAY_VERIFICATION_MISMATCH")
         return self

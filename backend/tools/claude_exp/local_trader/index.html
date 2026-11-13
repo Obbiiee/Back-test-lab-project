@@ -50,6 +50,7 @@ h3{margin:4px 0 6px;font-size:13px;color:var(--mu);font-weight:600}
    <div class="row"><button class="buy" id="buy" style="flex:1">BUY</button><button class="sell" id="sell" style="flex:1">SELL</button></div>
   </section>
   <section class="card" style="margin-top:10px"><h3>Order</h3><table id="orders"></table></section>
+  <section class="card" style="margin-top:10px"><h3>Riwayat trade</h3><table id="trades"></table></section>
   <section class="card" style="margin-top:10px"><h3>Kejadian</h3><div id="log"></div></section>
  </aside>
 </main>
@@ -69,6 +70,7 @@ function render(){
  $('orders').innerHTML='<tr><th>ID</th><th>Sisi</th><th>Status</th><th>Entry</th><th>SL/TP</th><th>P/L</th><th></th></tr>'+S.orders.slice().reverse().slice(0,12).map(o=>{
   const pl=o.status==='ACTIVE'?o.floating:o.pnl;const act=o.status==='ACTIVE'?`<button onclick="act('close','${o.id}')">Tutup</button>`:o.status==='PENDING'?`<button onclick="act('cancel','${o.id}')">Batal</button>`:'';
   return `<tr><td>${o.id.replace('order:','#')}</td><td>${o.side==='LONG'?'BUY':'SELL'} ${o.lots}</td><td>${o.status}</td><td>${o.fill||o.entry}</td><td>${o.sl||'-'} / ${o.tp||'-'}</td><td class="${+pl>=0?'pos':'neg'}">${pl}</td><td>${act}</td></tr>`}).join('');
+ $('trades').innerHTML='<tr><th>ID</th><th>Sisi</th><th>Entry</th><th>Exit</th><th>P/L</th><th>Alasan</th></tr>'+S.trades.slice().reverse().slice(0,15).map(t=>`<tr><td>${t.id.replace('order:','#')}</td><td>${t.side||''} ${t.lots||''}</td><td>${t.entry||''}</td><td>${t.exit||''}</td><td class="${+t.pnl>=0?'pos':'neg'}">${t.pnl}</td><td>${t.reason||''}</td></tr>`).join('');
  $('log').innerHTML=S.events.slice().reverse().map(e=>`${new Date(e.timeMs).toISOString().slice(11,19)} ${e.kind} ${e.orderId||''} ${e.price||''} ${e.reason||''} ${e.pnl||''}`).join('<br>');
  draw()}
 function draw(){
