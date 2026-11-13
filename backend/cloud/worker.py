@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import sysconfig
+import traceback
 from threading import Lock
 from time import monotonic
 from time import monotonic_ns, process_time_ns
@@ -19,6 +20,7 @@ except ImportError:  # Windows controller tests expose unsupported RSS as null.
 
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError, require
+from .worker_config import WORKER_COUNT
 
 MAX_RESULT = 8388608
 DEADLINE = 30
@@ -30,7 +32,8 @@ SERVE_ENTRY = 'import sys; sys.path[:0]=sys.argv[1:]; from cloud.worker import s
 # frequent recycling would rehash the entire multi-GB archive every 32 jobs.
 MAX_JOBS = 4096
 WARM_REQUEST = b'{"control":"WARM_OPERATOR_SOURCES","schemaVersion":1}\n'
-_exchanges = ThreadPoolExecutor(max_workers=2, thread_name_prefix='btl-native-exchange')
+_exchanges = ThreadPoolExecutor(max_workers=WORKER_COUNT,
+                                thread_name_prefix='btl-native-exchange')
 
 
 class _MeasuredResult(dict):
@@ -73,7 +76,7 @@ def _measurement(start_wall_ns, start_cpu_ns, start_io):
 
 
 class _Slot:
-    """One native child; at most two controller slots, never a consumer handle."""
+    """One bounded native child slot; never a consumer handle."""
     def __init__(self):
         self.lock = Lock()
         self.process = None
@@ -93,7 +96,7 @@ class _Slot:
             process.stdout.close()
 
 
-_slots = (_Slot(), _Slot())
+_slots = tuple(_Slot() for _ in range(WORKER_COUNT))
 
 
 def close():
@@ -259,7 +262,17 @@ def _result(raw):
         error.worker_metrics = metrics
         raise error
     if value.get('error'):
-        error = ContractError(value['error'], 'worker')
+        error_field=value.get('errorField','worker')
+        require(type(error_field) is str and 1<=len(error_field)<=80 and error_field.isascii() and
+                all(char.isalnum() or char in '_.:-' for char in error_field),
+                'workerErrorField','CORRUPT_RECORD')
+        error = ContractError(value['error'], error_field)
+        source=value.get('errorSource')
+        if source is not None:
+            require(type(source) is str and len(source)<=128 and source.isascii() and
+                    all(char.isalnum() or char in '_.:-' for char in source),
+                    'workerErrorSource','CORRUPT_RECORD')
+            error.source=source
         error.worker_metrics = metrics
         raise error
     require(type(value.get('result')) is dict, 'workerResult', 'CORRUPT_RECORD')
@@ -296,10 +309,10 @@ def pooled_invoke(dsn, payload, *, deadline=DEADLINE):
     # The configured catalog and its admitted handles live in one controller
     # process. Keep observed-family work on the warmed slot instead of causing
     # a second full archive admission in a parallel cold slot.
-    observed_family = (type(payload) is dict and payload.get('operation') in ('apply', 'replay_to')
+    observed_family = (type(payload) is dict and payload.get('operation') in ('apply', 'replay_to', 'jump_next_event')
                        and type(payload.get('args')) is list and len(payload['args']) == 2
                        and type(payload['args'][1]) is dict
-                      and payload['args'][1].get('artifact') in ('BTL-OBSERVED-EXECUTION-COMMAND-1', 'BTL-OBSERVED-REPLAY-TO-1'))
+                      and payload['args'][1].get('artifact') in ('BTL-OBSERVED-EXECUTION-COMMAND-1', 'BTL-OBSERVED-REPLAY-TO-1', 'BTL-JUMP-NEXT-EVENT-1'))
     candidates = (_slots[0],) if observed_family and os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG') else _slots
     slot = next((candidate for candidate in candidates if candidate.lock.acquire(False)), None)
     if slot is None:
@@ -364,7 +377,7 @@ def invoke(dsn, payload, *, deadline=DEADLINE):
 
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
-    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'command_result'), 'workerOperation')
+    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'jump_next_event', 'command_result'), 'workerOperation')
     return pooled_invoke(dsn, dict(schemaVersion=1, actor=str(actor_id), workspace=str(workspace_id),
                             operation=operation, args=list(args), write=write))
 
@@ -376,7 +389,7 @@ def _execute(raw):
         require(len(raw) <= 32768, 'workerInput')
         request = json.loads(raw)
         require(request.get('schemaVersion') == 1 and
-                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'command_result'), 'workerInput')
+                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'jump_next_event', 'command_result'), 'workerInput')
         from .research import run as authorized_run
         result = authorized_run(os.environ['BTL_WORKER_DATABASE'], uuid.UUID(request['actor']),
                                 uuid.UUID(request['workspace']), request['operation'],
@@ -385,7 +398,11 @@ def _execute(raw):
                                       workerMetrics=_measurement(started_wall, started_cpu, started_io)))
         require(len(output) <= MAX_RESULT, 'result', 'REFUSED_RESPONSE_LIMIT')
     except ContractError as error:
-        output = canonical_bytes(dict(schemaVersion=1, error=error.code,
+        frames=traceback.extract_tb(error.__traceback__)
+        caller=frames[-3] if len(frames)>=3 else frames[-1] if frames else None
+        source=(caller.filename.rsplit('/',1)[-1]+':'+caller.name) if caller else None
+        output = canonical_bytes(dict(schemaVersion=1, error=error.code,errorField=error.field,
+                                      errorSource=source,
                                       workerMetrics=_measurement(started_wall, started_cpu, started_io)))
     except Exception:
         output = canonical_bytes(dict(schemaVersion=1, infrastructureFailure=True,

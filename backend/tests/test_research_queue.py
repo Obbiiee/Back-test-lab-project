@@ -11,7 +11,7 @@ from unittest.mock import patch
 import psycopg
 from psycopg import sql
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
+from threading import Barrier, Event, Lock
 
 from cloud import queue
 from cloud.research import run
@@ -27,6 +27,16 @@ from contracts.canonical import content_hash
 from infrastructure.postgres_metrics import collect_job_metrics
 
 DSN = os.getenv('BTL_TEST_DATABASE_URL')
+
+
+class WorkerErrorFieldTests(unittest.TestCase):
+    def test_worker_preserves_bounded_contract_error_field(self):
+        from cloud.worker import _result
+        from contracts.canonical import canonical_bytes
+        with self.assertRaises(ContractError) as caught:
+            _result(canonical_bytes({'schemaVersion':1,'error':'INVALID_INPUT',
+                                     'errorField':'expectedRevision'}))
+        self.assertEqual(caught.exception.field,'expectedRevision')
 
 
 @unittest.skipUnless(DSN, 'Real PostgreSQL required; skip is not acceptance')
@@ -51,7 +61,9 @@ class QueueTests(unittest.TestCase):
     def setUp(self):
         # Reuse real verified identity setup, not forged user/workspace fixtures.
         self.fixture = cloud_fixture.CloudResearchTests('test_member_read_only_then_revocation_and_logout')
-        self.fixture.setUp()
+        # Queue tests own claims directly. Starting the API lifespan worker in
+        # their identity fixture would race those fault-injection assertions.
+        self.fixture.setUp(start_workers=False)
         self.actor = uuid.UUID(self.fixture.actor)
         self.workspace = uuid.UUID(self.fixture.workspace)
         self.ids = []
@@ -189,6 +201,12 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(result['result'], {'schemaVersion': 1, 'value': 'bounded result'})
         self.assertNotIn('queueMetrics', result)
 
+    def test_healthy_job_status_poll_skips_global_lease_reconciliation(self):
+        job = self.submit()
+        with patch('cloud.queue._reap_expired_leases', side_effect=AssertionError('global reaper on poll')):
+            result = queue.inspect(self.dsn, self.actor, self.workspace, job['jobId'])
+        self.assertEqual(result['state'], 'QUEUED')
+
     def test_actual_process_exit_releases_claim_and_worker_slots(self):
         job=self.submit()
         script="from cloud.queue import work_one; import os; work_one(os.environ['BTL_TEST_DATABASE_URL'], lambda *args: os._exit(17))"
@@ -207,6 +225,50 @@ class QueueTests(unittest.TestCase):
                 db.execute('SELECT pg_advisory_xact_lock(2020,%s)',(310+i,))
             self.assertFalse(queue.work_one(self.dsn,lambda *args:self.fail('Third worker must not enter')))
         self.assertTrue(queue.work_one(self.dsn,lambda *args:{'value':'slots released'}))
+
+    def test_two_workers_run_distinct_actors_concurrently_and_keep_actor_fifo(self):
+        first = self.submit(args=('session:parallel-a1', {'timeframe': '1m'}))
+        second = self.submit(args=('session:parallel-a2', {'timeframe': '1m'}))
+        actor_b, headers_b = self.fixture.account()
+        workspace_b = self.fixture.client.post('/api/v1/workspaces', headers=headers_b,
+                                               json={'name': 'Parallel worker QA'}).json()['id']
+        third_id = uuid.uuid4()
+        self.ids.append(third_id)
+        third = queue.submit(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b), third_id,
+                             'workspace', ('session:parallel-b1', {'timeframe': '1m'}))
+        gate = Barrier(2)
+        lock = Lock()
+        running = 0
+        peak = 0
+        started = 0
+        claimed = []
+
+        def runner(_dsn, actor_id, _workspace_id, operation, args, **_kwargs):
+            nonlocal running, peak, started
+            with lock:
+                started += 1
+                wait_for_peer = started <= 2
+                running += 1
+                peak = max(peak, running)
+                claimed.append((str(actor_id), args[0]))
+            try:
+                if wait_for_peer:
+                    gate.wait(timeout=5)
+                return {'operation': operation, 'session': args[0]}
+            finally:
+                with lock:
+                    running -= 1
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(queue.work_one, self.dsn, runner) for _ in range(2)]
+            self.assertEqual([future.result(timeout=8) for future in futures], [True, True])
+        self.assertEqual(peak, 2)
+        self.assertEqual({session for _actor, session in claimed},
+                         {'session:parallel-a1', 'session:parallel-b1'})
+        self.assertTrue(queue.work_one(self.dsn, runner))
+        self.assertEqual(queue.inspect(self.dsn, self.actor, self.workspace, first['jobId'])['state'], 'SUCCEEDED')
+        self.assertEqual(queue.inspect(self.dsn, self.actor, self.workspace, second['jobId'])['state'], 'SUCCEEDED')
+        self.assertEqual(queue.inspect(self.dsn, uuid.UUID(actor_b), uuid.UUID(workspace_b), third['jobId'])['state'], 'SUCCEEDED')
 
     def test_mounted_read_queue_preserves_canonical_session_and_idempotence(self):
         m=method()
@@ -564,6 +626,126 @@ class QueueTests(unittest.TestCase):
                 finally:
                     worker.close()
 
+    def test_financial_active_monthly_parquet_replay_commits_receipt_journal_and_analytics(self):
+        """Real authenticated API + durable queue + worker + PG + canonical reducer."""
+        from cloud import worker
+        from market_data.monthly_parquet import write_monthly_parquet
+        from tests.synthetic_financial_monthly import build_manifest, iter_events
+        worker.close()
+        source_manifest, _member_hash, _quality_hash = build_manifest(512)
+        source_version = content_hash(source_manifest)
+        with tempfile.TemporaryDirectory(prefix='riksora-financial-worker-') as temporary:
+            root = os.path.join(temporary, 'monthly')
+            parquet = write_monthly_parquet(root, iter_events(512, source_manifest), source_manifest,
+                expected_version=source_version, row_group_size=128)
+            pins = {
+                'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+                'BTL_QA_SYNTHETIC_MONTHLY_ROOT': root,
+                'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': source_manifest['datasetId'],
+                'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': source_version,
+                'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': parquet['manifestHash'],
+                'BTL_TICK_SESSION_STORAGE_FORMAT': 'compact-v1',
+            }
+            with patch.dict(os.environ, pins):
+                path = self.fixture.root
+                record = method()
+                self.assertEqual(self.fixture.client.post(path + '/methods',
+                    headers=self.fixture.headers, json=record).status_code, 200)
+                session_id = 'session:' + uuid.uuid4().hex
+                create_job = str(uuid.uuid4())
+                created = self.fixture.client.post(path + '/sessions',
+                    headers={**self.fixture.headers, 'X-BTL-Job': create_job}, json={
+                        'id': session_id, 'name': 'Synthetic financial-active worker benchmark',
+                        'methodId': record['id'], 'initialBalance': '10000', 'startPeriod': '2020-01'})
+                self.assertEqual(created.status_code, 202, created.text)
+                self.assertTrue(queue.work_one(self.dsn, worker.run))
+                self.assertEqual(self.fixture.client.get(path + '/jobs/' + create_job,
+                    headers=self.fixture.headers).json()['state'], 'SUCCEEDED')
+                view = self.fixture.client.get(path + '/sessions/' + session_id,
+                    headers=self.fixture.headers).json()
+                self.assertEqual((view['state']['datasetId'], view['state']['datasetVersion']),
+                    (source_manifest['datasetId'], source_version))
+                # A reviewed order requires a committed quote. Reveal the first
+                # tick through the normal authenticated durable-worker path.
+                setup_job = str(uuid.uuid4())
+                setup_command = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                    'sessionId': session_id, 'commandId': 'command:' + uuid.uuid4().hex,
+                    'expectedRevision': view['state']['revision'], 'kind': 'ADVANCE',
+                    'payload': {'targetNs': source_manifest['range']['startNs']}}
+                setup_queued = self.fixture.client.post(path + '/sessions/' + session_id + '/commands',
+                    headers={**self.fixture.headers, 'X-BTL-Job': setup_job}, json=setup_command)
+                self.assertEqual(setup_queued.status_code, 202, setup_queued.text)
+                self.assertTrue(queue.work_one(self.dsn, worker.run))
+                setup_result = self.fixture.client.get(path + '/jobs/' + setup_job,
+                    headers=self.fixture.headers).json()
+                self.assertEqual(setup_result['state'], 'SUCCEEDED', setup_result)
+                self.assertTrue(setup_result['result']['durable'])
+                view = self.fixture.client.get(path + '/sessions/' + session_id,
+                    headers=self.fixture.headers).json()
+                self.assertIsNotNone(view['quote'])
+                review = dict(sessionId=session_id, requestId='order:' + uuid.uuid4().hex,
+                    expectedRevision=view['state']['revision'], planId='plan:' + uuid.uuid4().hex,
+                    planRevision=0,
+                    draft=dict(side='LONG', orderType='LIMIT', workflow='PLANNED',
+                        entry='1998.90', quantity='0.01', sl='1998.00', tp='1999.50',
+                        riskPercent='1', observations=[]))
+                reviewed = self.fixture.client.post(path + '/reviews',
+                    headers=self.fixture.headers, json=review)
+                self.assertEqual(reviewed.status_code, 200, reviewed.text)
+                confirm_body = {'reviewId': review['requestId'], 'reviewHash': reviewed.json()['reviewHash']}
+                confirmed = self.fixture.client.post(path + '/sessions/' + session_id + '/confirm',
+                    headers=self.fixture.headers, json=confirm_body)
+                self.assertEqual(confirmed.status_code, 200, confirmed.text)
+                receipt = self.fixture.client.get(path + '/sessions/' + session_id +
+                    '/commands/' + review['requestId'], headers=self.fixture.headers).json()
+                self.assertEqual(receipt['status'], 'COMMITTED')
+                self.assertTrue(receipt['receipt']['durable'])
+                target_ns = str(int(source_manifest['range']['endNs']) - 1)
+                advance_jobs = []
+                for index in range(16):
+                    view = self.fixture.client.get(path + '/sessions/' + session_id,
+                        headers=self.fixture.headers).json()
+                    if int(view['state']['throughNs']) >= int(target_ns):
+                        break
+                    command_id, job_id = 'command:' + uuid.uuid4().hex, str(uuid.uuid4())
+                    command = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                        'sessionId': session_id, 'commandId': command_id,
+                        'expectedRevision': view['state']['revision'], 'kind': 'ADVANCE',
+                        'payload': {'targetNs': target_ns}}
+                    queued = self.fixture.client.post(path + '/sessions/' + session_id + '/commands',
+                        headers={**self.fixture.headers, 'X-BTL-Job': job_id}, json=command)
+                    self.assertEqual(queued.status_code, 202, queued.text)
+                    self.assertTrue(queue.work_one(self.dsn, worker.run))
+                    job = self.fixture.client.get(path + '/jobs/' + job_id,
+                        headers=self.fixture.headers).json()
+                    self.assertEqual(job['state'], 'SUCCEEDED', job)
+                    self.assertTrue(job['result']['durable'])
+                    advance_jobs.append(job_id)
+                final_view = self.fixture.client.get(path + '/sessions/' + session_id,
+                    headers=self.fixture.headers).json()
+                self.assertGreaterEqual(int(final_view['state']['throughNs']), int(target_ns))
+                journal = self.fixture.client.get(path + '/sessions/' + session_id + '/journal',
+                    headers=self.fixture.headers)
+                self.assertEqual(journal.status_code, 200, journal.text)
+                self.assertEqual(len(journal.json()['orders']), 1)
+                self.assertEqual(journal.json()['orders'][0]['status'], 'CLOSED')
+                summary = self.fixture.client.get(path + '/sessions/' + session_id + '/summary',
+                    headers=self.fixture.headers)
+                self.assertEqual(summary.status_code, 200, summary.text)
+                self.assertEqual(summary.json()['datasetVersion'], source_version)
+                self.assertEqual(summary.json()['completedTrades'], 1)
+                self.assertEqual(summary.json()['netCashChange'], '0.7')
+                from execution.postgres import unpack
+                with connect(self.dsn) as db:
+                    event_rows = db.execute("SELECT payload,content_hash FROM btl.tick_events "
+                        "WHERE session_id=%s ORDER BY sequence", (session_id,)).fetchall()
+                    events = [unpack(raw, digest) for raw, digest in event_rows]
+                    fills = [event for event in events if event["classification"] == "SIMULATED_FILL"]
+                    jobs = db.execute("SELECT state,count(*) FROM btl.research_jobs WHERE id=ANY(%s::uuid[]) GROUP BY state",
+                        ([uuid.UUID(create_job), uuid.UUID(setup_job), *(uuid.UUID(job) for job in advance_jobs)],)).fetchall()
+                self.assertEqual([event["kind"] for event in fills], ['ENTRY_FILL', 'EXIT_FILL'])
+                self.assertEqual(sum(row[1] for row in jobs if row[0] == 'SUCCEEDED'), len(advance_jobs) + 2)
+
     def test_api_lifespan_worker_executes_pinned_monthly_parquet_pipeline(self):
         """Exercise the complete shared-source path through the service worker pump."""
         from cloud import worker
@@ -659,6 +841,26 @@ class QueueTests(unittest.TestCase):
 
                         confirmed_view = active.get(path + '/sessions/' + session_id,
                                                     headers=self.fixture.headers).json()
+                        jump_request = {'schemaVersion': 1, 'artifact': 'BTL-JUMP-NEXT-EVENT-1',
+                            'requestId': uuid.uuid4().hex, 'sessionId': session_id,
+                            'expectedRevision': confirmed_view['state']['revision'], 'timeframe': '1m'}
+                        jump_job = str(uuid.uuid4())
+                        queued_jump = active.post(path + '/sessions/' + session_id + '/jump-next-event',
+                            headers={**self.fixture.headers, 'X-BTL-Job': jump_job}, json=jump_request)
+                        self.assertEqual(queued_jump.status_code, 202, queued_jump.text)
+                        jump_status = completed_job(active, path, jump_job)
+                        self.assertEqual(jump_status['state'], 'SUCCEEDED', jump_status)
+                        self.assertEqual(jump_status['result']['artifact'], 'BTL-JUMP-NEXT-EVENT-RESULT-1')
+                        self.assertEqual(jump_status['result']['status'], 'EVENT_FOUND')
+                        self.assertTrue(any(event['kind'] == 'ENTRY_FILL'
+                                            for event in jump_status['result']['events']))
+                        repeated_jump = active.post(path + '/sessions/' + session_id + '/jump-next-event',
+                            headers={**self.fixture.headers, 'X-BTL-Job': jump_job}, json=jump_request)
+                        self.assertEqual(repeated_jump.status_code, 200, repeated_jump.text)
+                        self.assertEqual(repeated_jump.json(), jump_status['result'])
+
+                        confirmed_view = active.get(path + '/sessions/' + session_id,
+                                                    headers=self.fixture.headers).json()
                         advance = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
                                    'sessionId': session_id,
                                    'commandId': 'command:' + uuid.uuid4().hex,
@@ -723,6 +925,44 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
             duplicate=self.submit(operation='replay',args=(session,command))
             self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,duplicate['jobId'],cancel=True)['state'],'RECONCILE_REQUIRED')
             self.assertEqual(app.inspect(session),before,'Cancelled operational retry must not claim the previous fill was absent')
+        finally:
+            app.close()
+
+    def test_jump_process_death_after_inner_commit_recovers_same_financial_receipt(self):
+        app,session,_command=self.replay_fixture()
+        try:
+            before=app.inspect(session)
+            request={'schemaVersion':1,'artifact':'BTL-JUMP-NEXT-EVENT-1',
+                'requestId':uuid.uuid4().hex,'sessionId':session,
+                'expectedRevision':before['state']['revision'],'timeframe':'1m'}
+            job=self.submit(operation='jump_next_event',args=(session,request))
+            script="""from cloud.queue import work_one
+from cloud.research import run
+import os
+def crash_after(*args,**kwargs):
+    run(*args,**kwargs)
+    os._exit(17)
+work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
+"""
+            process=subprocess.run([sys.executable,'-B','-c',script],timeout=20,capture_output=True,
+                env={**os.environ,'BTL_TEST_DATABASE_URL':self.dsn})
+            self.assertEqual(process.returncode,17,process.stderr.decode(errors='replace'))
+            committed=app.inspect(session)
+            self.assertEqual(committed['state']['revision'],before['state']['revision']+1)
+            self.assertTrue(any(event['kind']=='ENTRY_FILL' for event in committed['events']))
+            with connect(self.dsn) as db:
+                db.execute("UPDATE btl.research_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE id=%s",
+                           (job['jobId'],))
+            self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])['state'],'QUEUED')
+            self.assertTrue(queue.work_one(self.dsn,run))
+            result=queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'])
+            self.assertEqual(result['state'],'SUCCEEDED')
+            self.assertEqual(result['result']['status'],'EVENT_FOUND')
+            self.assertEqual(app.inspect(session),committed)
+            with connect(self.dsn) as db:
+                count=db.execute('SELECT count(*) FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id LIKE %s',
+                    (str(self.workspace),session,'jump:'+request['requestId']+':r%')).fetchone()[0]
+            self.assertEqual(count,1)
         finally:
             app.close()
 
@@ -816,16 +1056,26 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
         # Extra QA actors/workspaces are explicit; clean only these authored job rows.
         subjects=[(self.actor,self.workspace)]
         try:
+            # QueueTests owns this entire fresh disposable database. Start the
+            # global ceiling assertion from a known empty job/turn state so
+            # jobs authored by earlier tests in this class cannot consume its
+            # global admission budget.
+            with connect(self.dsn) as db:
+                db.execute('DELETE FROM btl.research_jobs')
+                db.execute('DELETE FROM btl.research_queue_actor_turns')
             for _ in range(8):
                 actor,headers=self.fixture.account()
                 workspace=self.fixture.client.post('/api/v1/workspaces',headers=headers,json={'name':'Queue pressure QA'}).json()['id']
                 subjects.append((uuid.UUID(actor),uuid.UUID(workspace)))
-            for actor,workspace in subjects[:8]:
-                for _ in range(2):
-                    queue.submit(self.dsn,actor,workspace,uuid.uuid4(),'workspace',('session:bounded',{}))
-            with self.assertRaises(ContractError) as full:
-                queue.submit(self.dsn,*subjects[-1],uuid.uuid4(),'workspace',('session:bounded',{}))
-            self.assertEqual(full.exception.code,'QUEUE_CAPACITY')
+            # Keep the lifespan workers from draining the queue while this
+            # synchronous boundary test fills the durable pending capacity.
+            with patch.object(queue, 'work_one', return_value=False):
+                for actor,workspace in subjects[:8]:
+                    for _ in range(2):
+                        queue.submit(self.dsn,actor,workspace,uuid.uuid4(),'workspace',('session:bounded',{}))
+                with self.assertRaises(ContractError) as full:
+                    queue.submit(self.dsn,*subjects[-1],uuid.uuid4(),'workspace',('session:bounded',{}))
+                self.assertEqual(full.exception.code,'QUEUE_CAPACITY')
             with connect(self.dsn) as db:
                 db.execute("UPDATE btl.research_jobs SET state='CANCELLED',finished_at=clock_timestamp() WHERE actor_id=ANY(%s)",([a for a,w in subjects],))
             for _ in range(40):

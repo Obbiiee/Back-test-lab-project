@@ -1,7 +1,8 @@
 """Pure bounded wire validation for the replay queue's frozen families."""
 import unittest
 
-from cloud.queue import _persisted_session_artifact, replay_command, replay_to_request
+from cloud.queue import (_persisted_session_artifact, jump_next_event_request,
+                         replay_command, replay_to_request)
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 
@@ -54,6 +55,14 @@ class ReplayQueueContractTests(unittest.TestCase):
         invalid=dict(raw,targetNs='01700000000000000000')
         with self.assertRaises(ContractError):replay_to_request(invalid,raw['sessionId'])
         with self.assertRaises(ContractError):replay_to_request(raw,'session:other')
+
+    def test_jump_request_is_session_scoped_versioned_and_idempotency_keyed(self):
+        raw=dict(schemaVersion=1,artifact='BTL-JUMP-NEXT-EVENT-1',requestId='c'*32,
+                 sessionId='session:2024-01',expectedRevision=3,timeframe='1m')
+        self.assertEqual(jump_next_event_request(raw,raw['sessionId']),raw)
+        for invalid in (dict(raw,sessionId='session:other'),dict(raw,requestId='bad'),
+                        dict(raw,timeframe='10m'),dict(raw,extra=True)):
+            with self.assertRaises(ContractError):jump_next_event_request(invalid,raw['sessionId'])
 
     def test_command_family_is_resolved_only_from_hash_verified_workspace_session(self):
         import hashlib

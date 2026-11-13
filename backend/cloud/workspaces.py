@@ -37,6 +37,24 @@ class MemberCreate(BaseModel):
     userId: uuid.UUID
 
 
+def domain_error_response(error):
+    # The shared DB budget rejects before opening a connection. This is a
+    # retryable admission refusal, not an ambiguous database outage.
+    if error.code == "RESOURCE_CAPACITY":
+        return Response(canonical_bytes({"schemaVersion": 1, "detail": "SERVICE_BUSY"}),
+                        status_code=503, media_type="application/json",
+                        headers={"Retry-After": "1"})
+    statuses = {"RESOURCE_UNAVAILABLE": 404, "UNAUTHORIZED": 401, "OWNER_REQUIRED": 403,
+                "WRITE_FORBIDDEN": 403, "SCOPE_MISMATCH": 403, "STALE_REVISION": 409,
+                "IDEMPOTENCY_CONFLICT": 409, "REFUSED_STALE_REVISION": 409,
+                "REFUSED_IDEMPOTENCY_CONFLICT": 409, "REFUSED_ARCHIVED": 409,
+                "REFUSED_IDENTITY_REUSE": 409, "INVALID_INPUT": 422}
+    status = statuses.get(error.code, 503)
+    body = {"detail": error.code if status != 503 else "SERVICE_UNAVAILABLE"}
+    return Response(canonical_bytes({"schemaVersion": 1, **body}), status_code=status,
+                    media_type="application/json")
+
+
 class Clock:
     def now_utc(self):
         return datetime.now(timezone.utc)
@@ -55,14 +73,7 @@ def install(app):
         return await anyio.to_thread.run_sync(partial(method, *args, **kwargs))
     @app.exception_handler(ContractError)
     async def domain_error(request, error):
-        statuses = {"RESOURCE_UNAVAILABLE": 404, "UNAUTHORIZED": 401, "OWNER_REQUIRED": 403, "WRITE_FORBIDDEN": 403,
-                    "SCOPE_MISMATCH": 403, "STALE_REVISION": 409, "IDEMPOTENCY_CONFLICT": 409,
-                    "REFUSED_STALE_REVISION": 409, "REFUSED_IDEMPOTENCY_CONFLICT": 409,
-                    "REFUSED_ARCHIVED": 409, "REFUSED_IDENTITY_REUSE": 409,
-                    "INVALID_INPUT": 422}
-        status = statuses.get(error.code, 503)
-        body = {"detail": error.code if status != 503 else "SERVICE_UNAVAILABLE"}
-        return Response(canonical_bytes({"schemaVersion": 1, **body}), status_code=status, media_type="application/json")
+        return domain_error_response(error)
     @app.post(prefix, status_code=201)
     async def create(body: Named, user: User = Depends(current)):
         return await call(store.create, user.id, body.name)

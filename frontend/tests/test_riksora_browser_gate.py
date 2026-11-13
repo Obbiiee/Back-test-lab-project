@@ -1,5 +1,6 @@
 """Safety refusals before any browser mutation or database startup."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -16,6 +17,84 @@ spec.loader.exec_module(gate)
 
 
 class BrowserGateSafetyTests(unittest.TestCase):
+    def test_shared_ip_cohort_auth_pacing_stays_inside_limit_and_watchdog_window(self):
+        self.assertEqual(gate.cohort_auth_start_spacing_ms(5), 0)
+        for size in (10, 20, 50, 100):
+            spacing = gate.cohort_auth_start_spacing_ms(size)
+            self.assertLessEqual((size - 1) * spacing, gate.MAX_AUTH_START_DELAY_MS)
+            self.assertGreaterEqual(spacing, 2_100)
+            self.assertLessEqual(60_000 / spacing, 30)
+
+    def test_concurrent_capacity_traders_use_independent_browser_processes(self):
+        self.assertTrue(gate.use_shared_browser_server(1))
+        for size in (2, 5, 10, 20, 50, 100):
+            self.assertFalse(gate.use_shared_browser_server(size))
+
+    def test_api_telemetry_frame_is_accepted_and_strips_untrusted_fields(self):
+        event = {'apiEvent': {'method': 'GET', 'path': '/api/v1/auth/providers',
+            'status': 200, 'code': None, 'durationMs': 12.5,
+            'email': 'private@example.com', 'responseBody': {'token': 'secret'}}}
+        self.assertEqual(gate.sanitize_api_event(event), {
+            'method': 'GET', 'path': '/api/v1/auth/providers', 'status': 200,
+            'code': None, 'jumpStatus': None, 'durationMs': 12.5, 'serverTiming': None})
+        timed = {'apiEvent': {'method': 'POST', 'path': '/api/v1/workspaces/{id}/research/reviews',
+            'status': 200, 'code': None, 'durationMs': 25.0,
+            'serverTiming': 'research-admission;dur=0.1, research-operation;dur=20.0, db-sql;dur=5.0, fixture-timeline-resume;dur=4.2, db-sql-count;desc=8'}}
+        self.assertEqual(gate.sanitize_api_event(timed)['serverTiming'], timed['apiEvent']['serverTiming'])
+        timed['apiEvent']['serverTiming'] = 'research-operation;dur=20.0, SQL: SELECT secret'
+        self.assertIsNone(gate.sanitize_api_event(timed))
+        self.assertIsNone(gate.sanitize_api_event({'apiEvent': {
+            'method': 'GET', 'path': '/api/v1/auth/login?email=private@example.com',
+            'status': 200, 'durationMs': 1}}))
+
+    def test_api_telemetry_redacts_url_encoded_typed_ids(self):
+        result = gate.sanitize_api_event({'apiEvent': {
+            'method': 'POST',
+            'path': '/api/v1/workspaces/workspace%3A01234567-89ab-cdef-0123-456789abcdef/research/sessions/session%3Afedcba98-7654-3210-fedc-ba9876543210/confirm',
+            'status': 200, 'durationMs': 12.5}})
+        self.assertEqual(result['path'],
+            '/api/v1/workspaces/{id}/research/sessions/{id}/confirm')
+
+    def test_route_latency_summary_groups_ids_and_server_timing(self):
+        rows = [
+            {'method':'GET','path':'/api/v1/workspaces/{id}/research/sessions/session%3A01234567-89ab-cdef-0123-456789abcdef/journal/pages',
+             'durationMs':20.0,'serverTiming':'research-operation;dur=10.0, db-sql;dur=4.0'},
+            {'method':'GET','path':'/api/v1/workspaces/{id}/research/sessions/session%3Afedcba98-7654-3210-fedc-ba9876543210/journal/pages',
+             'durationMs':40.0,'serverTiming':'research-operation;dur=20.0, db-sql;dur=8.0'},
+        ]
+        routes, timings = gate.summarize_api_latencies(rows)
+        route = 'GET /api/v1/workspaces/{id}/research/sessions/{id}/journal/pages'
+        self.assertEqual(routes[route],
+            {'samples':2,'p50Ms':20.0,'p95Ms':40.0,'p99Ms':40.0,'maxMs':40.0})
+        self.assertEqual(timings[route+' :: research-operation'],
+            {'samples':2,'p50Ms':10.0,'p95Ms':20.0,'p99Ms':20.0,'maxMs':20.0})
+        self.assertEqual(timings[route+' :: db-sql']['p95Ms'],8.0)
+
+    def test_demo_tick_fixture_has_pinned_synthetic_identity_and_hash(self):
+        sys.path.insert(0, str(gate.REPOSITORY/'backend'))
+        from contracts.canonical import canonical_bytes
+        from execution.research_fixture import research_provider
+
+        source = research_provider()
+        self.assertEqual(source.dataset_id, 'synthetic:local-alpha-v1')
+        self.assertEqual(source.dataset_version,
+                         'e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32')
+        digest = hashlib.sha256()
+        count = 0
+        token = None
+        while True:
+            page = source.read_page(source.dataset_id, source.dataset_version, token, 64)
+            for event in page['events']:
+                digest.update(canonical_bytes(event))
+                digest.update(b'\n')
+                count += 1
+            if page['endOfDataset']:
+                break
+            token = page['nextToken']
+        self.assertEqual(count, 2048)
+        self.assertEqual(digest.hexdigest(),
+                         '5d2eefc52ceb9b613be7de7a11749dd479be267927268035fe991282699e1fad')
+
     def test_root_refused_before_paths_or_subprocesses(self):
         with patch.object(gate.os, 'geteuid', return_value=0), patch.object(gate.shutil, 'which') as lookup:
             with self.assertRaisesRegex(ValueError, 'ORDINARY_USER_REQUIRED'):

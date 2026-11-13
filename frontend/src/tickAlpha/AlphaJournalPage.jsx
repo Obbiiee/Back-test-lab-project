@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
 import {money,utc,lastSession} from './productData.js';
+import {ratioLabel} from './annotations.js';
 import {linkTo,navigate,setLeaveGuard} from './productRoute.js';
 import {readDraft,writeDraft,clearDraft,isDirty,tagList,tagText} from './noteDrafts.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
@@ -182,7 +183,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
               <div><dt>Lots</dt><dd className="rk-num">{dash(order.quantity)}</dd></div>
               <div><dt>SL / TP</dt><dd className="rk-num">{dash(order.sl)} / {dash(order.tp)}</dd></div>
               <div><dt>Net cash change</dt><dd className="rk-num">{money(order.netCashChange)}</dd></div>
-              <div><dt>R multiple</dt><dd className="rk-num" title={order.rMultiple===null?order.rReason:undefined}>{order.rMultiple===null?'—':order.rMultiple}</dd></div>
+              <div><dt>R multiple</dt><dd className="rk-num" title={order.rMultiple===null?order.rReason:undefined}>{order.rMultiple===null?'—':ratioLabel(order.rMultiple)}</dd></div>
             </dl>
             <NoteEditor key={order.id} order={order} note={note} sessionId={session.id} path={path} onSaved={savedNote} onDirty={onDirty} onReload={()=>setAttempt(n=>n+1)}/>
           </li>;})}</ol>

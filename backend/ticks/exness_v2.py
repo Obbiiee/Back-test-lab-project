@@ -19,6 +19,7 @@ ADAPTER = "EXNESS-LOCAL-CSV-2"
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.([0-9]{3})Z")
 FIELDS = ["Exness", "Symbol", "Timestamp", "Bid", "Ask"]
+TICK_HISTORY_FIELDS = ["Symbol", "Timestamp", "Bid", "Ask"]
 
 
 def source_pin(path):
@@ -30,11 +31,18 @@ def source_pin(path):
     return dict(filename=path.name, bytes=path.stat().st_size, sha256=sha.hexdigest())
 
 
-def parse_record(raw):
+def parse_record(raw, expected_fields=None):
     require(len(raw) <= 8192, "record", "ARTIFACT_LIMIT")
-    fields = next(csv.reader([raw.decode("utf-8-sig").rstrip("\r\n")], strict=True))
-    require(len(fields) == 5, "csv", "MALFORMED_RECORD")
-    return dict(zip(FIELDS, fields))
+    values = next(csv.reader([raw.decode("utf-8-sig").rstrip("\r\n")], strict=True))
+    row_fields = FIELDS if len(values) == len(FIELDS) else TICK_HISTORY_FIELDS
+    require(len(values) == len(row_fields) and
+            (expected_fields is None or row_fields == expected_fields), "csv", "MALFORMED_RECORD")
+    row = dict(zip(row_fields, values))
+    # Official Tick History exports identify the provider by the selected
+    # adapter, while legacy local Exness-shaped exports carry an Exness column.
+    if "Exness" not in row:
+        row["Exness"] = "exness"
+    return row
 
 
 class ExnessIngestion:
@@ -51,8 +59,9 @@ class ExnessIngestion:
         self.source = Path(source)
         self.pin = source_pin(source)
         with self.source.open("rb") as stream:
-            require(next(csv.reader([stream.readline(8193).decode("utf-8-sig")], strict=True)) == FIELDS, "header", "SCHEMA_MISMATCH")
-            first = parse_record(stream.readline(8193))
+            self.csv_fields = next(csv.reader([stream.readline(8193).decode("utf-8-sig")], strict=True))
+            require(self.csv_fields in (FIELDS, TICK_HISTORY_FIELDS), "header", "SCHEMA_MISMATCH")
+            first = parse_record(stream.readline(8193), self.csv_fields)
         require(first["Exness"] == "exness" and first["Symbol"], "feed", "IDENTITY_CONFLICT")
         self.symbol = first["Symbol"]
         self.source_id = "exness:csv:" + self.pin["sha256"][:24]
@@ -144,7 +153,7 @@ class ExnessIngestion:
                     cancel.check()
                     require(len(raw) <= 8192, "record", "ARTIFACT_LIMIT")
                     try:
-                        row = parse_record(raw)
+                        row = parse_record(raw, self.csv_fields)
                         if self.first_rows is not None and ordinal >= self.first_rows and row['Timestamp'] != self.stats['lastTimestamp']:
                             break
                         self.stats["parsedRows"] += 1

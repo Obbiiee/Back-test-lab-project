@@ -3,7 +3,8 @@ from contracts.models import MethodPolicy
 from contracts.primitives import require, revision
 from ticks.timeline import TickTimeline
 from .contracts import MAX_STEPS, command_wire, seed_state, profile_wire
-from .engine import submit, advance, emit
+from .engine import submit, advance, emit, coverage_complete
+from .next_event import scan_next_group
 
 
 class ExecutionController:
@@ -74,6 +75,43 @@ class ExecutionController:
             return next_state, next_checkpoint, events, replay
 
         return self.__store.run(scope, command, operation)
+
+    def preview_next_event(self, scope, state, checkpoint, target_ns):
+        """Return a bounded private candidate page; never mutate the accepted cursor."""
+        require(self.__fixture_cache is not None and callable(getattr(self.__fixture_cache, 'preview', None)),
+                'nextEventSource', 'REFUSED_JUMP_NEXT_EVENT_UNSUPPORTED')
+        scan = {'supported': True, 'candidate': False, 'groups': 0}
+
+        def stop_at_candidate(group):
+            scan['groups'] += 1
+            supported, candidate = scan_next_group(state, [group])
+            if not supported:
+                scan['supported'] = False
+                return True
+            if candidate is not None:
+                scan['candidate'] = True
+                return group['timeNs']
+            if scan['groups'] == 64:
+                return group['timeNs']
+            return None
+
+        ack = self.__fixture_cache.preview(scope, state['sessionId'], checkpoint, target_ns,
+                                           stop_when=stop_at_candidate)
+        supported, candidate = scan['supported'], (len(ack['groups']) - 1 if scan['candidate'] else None)
+        safe_batch = (supported and candidate is None and not ack['diagnostics']['records'] and
+                      coverage_complete(ack['coverage'], int(state['throughNs']), int(ack['throughNs'])))
+        if candidate is not None and supported:
+            target = ack['groups'][candidate]['timeNs']
+        elif safe_batch and ack['groups']:
+            target = ack['throughNs']
+        elif ack['groups']:
+            # Unsupported source proof or an integrity boundary: commit only
+            # the first atomic timestamp group, then inspect the next chunk.
+            target = ack['groups'][0]['timeNs']
+        else:
+            target = ack['throughNs']
+        return dict(targetNs=str(target), previewGroups=len(ack['groups']),
+                    exhaustedThroughBoundary=ack['exhaustedThroughBoundary'])
 
     def inspect(self, scope, session_id, after_sequence=0, maximum=64):
         revision(after_sequence)

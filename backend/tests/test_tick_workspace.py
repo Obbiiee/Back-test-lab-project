@@ -2,7 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 import os
-from threading import Event
+from threading import Barrier, Event, local
 import unittest
 import uuid
 from unittest.mock import patch
@@ -12,7 +12,9 @@ from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 from execution.research import ResearchApplication
 from execution.research_fixture import WARMUP_NS, STEP_NS
+from execution.research_fixture import research_provider, START_NS
 from execution.workspace import display_candles, FixtureTimelineCache
+from ticks.timeline import TickTimeline
 from infrastructure.database import migrate
 from tests.test_research_sessions import method, review_request
 from ticks.provider import SyntheticTickProvider
@@ -37,6 +39,47 @@ class DisplayTests(unittest.TestCase):
         partial=display_candles(groups,'181000000000','1m',9)
         self.assertTrue(partial['candles'][0]['partialWindow'])
         with self.assertRaises(ContractError):FixtureTimelineCache(SyntheticTickProvider([]))
+
+    def test_immutable_fixture_timeline_cache_is_shared_across_short_lived_adapters(self):
+        provider=research_provider()
+        scope=TrustedScope('workspace:shared-fixture-cache:'+uuid.uuid4().hex,'fixture:operator')
+        session='session:shared-fixture-cache:'+uuid.uuid4().hex
+        timeline=TickTimeline(provider,provider.dataset_id,provider.dataset_version,str(START_NS))
+        timeline.seek(str(WARMUP_NS))
+        checkpoint=timeline.checkpoint()
+        first=FixtureTimelineCache(provider)
+        first.seed(scope,session,timeline)
+        expected=first.window(scope,session,checkpoint,last_only=True)
+        second=FixtureTimelineCache(provider)
+        with patch('execution.workspace.TickTimeline.resume',side_effect=AssertionError('unexpected cold resume')):
+            actual=second.window(scope,session,checkpoint,last_only=True)
+        self.assertEqual(actual,expected)
+
+    def test_cold_restores_for_independent_sessions_do_not_hold_global_cache_lock(self):
+        base=research_provider()
+        rendezvous=Barrier(2, timeout=5)
+        per_thread=local()
+        class ConcurrentProvider:
+            dataset_id=base.dataset_id
+            dataset_version=base.dataset_version
+            def describe(self, dataset_id, dataset_version):
+                return base.describe(dataset_id, dataset_version)
+            def read_page(self, dataset_id, dataset_version, after_token=None, max_events=1024):
+                if not getattr(per_thread,'joined',False):
+                    per_thread.joined=True
+                    rendezvous.wait()
+                return base.read_page(dataset_id,dataset_version,after_token,max_events)
+        provider=ConcurrentProvider()
+        cache=FixtureTimelineCache(provider,allow_injected_synthetic=True)
+        timeline=TickTimeline(base,base.dataset_id,base.dataset_version,str(START_NS))
+        timeline.seek(str(WARMUP_NS))
+        checkpoint=timeline.checkpoint()
+        scopes=[TrustedScope('workspace:restore-parallel:'+uuid.uuid4().hex,'fixture:operator') for _ in range(2)]
+        sessions=['session:restore-parallel:'+uuid.uuid4().hex for _ in range(2)]
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures=[pool.submit(cache.window,scopes[i],sessions[i],checkpoint,last_only=True) for i in range(2)]
+            rows=[future.result(timeout=10) for future in futures]
+        self.assertEqual(rows[0],rows[1])
 
 
 @unittest.skipUnless(DSN,'Actual isolated PostgreSQL required; skips are not PASS')
@@ -80,7 +123,7 @@ class TickWorkspaceTests(unittest.TestCase):
         from execution.postgres import pack as native_pack
         before=self.view();command=self.command(before)
         def fail(value):
-            if value.get('artifact')=='BTL-TICK-EXECUTION-RESULT-1':raise RuntimeError('QA before SQL publication')
+            if value.get('artifact')=='BTL-TICK-EXECUTION-COMPACT-DELTA-1':raise RuntimeError('QA before SQL publication')
             return native_pack(value)
         with patch('execution.postgres.pack',side_effect=fail),self.assertRaises(RuntimeError):
             self.app.apply(self.session,command)

@@ -28,7 +28,11 @@ def private_postgres(*, keep=False, root_dir=None):
     if os.geteuid() == 0:
         raise ValueError('RUN_AS_ORDINARY_USER_WITHOUT_SUDO')
     repository = Path(__file__).resolve().parents[3]
-    binaries = Path('/usr/lib/postgresql/16/bin')
+    # The disposable harness normally uses the host's PostgreSQL 16 install.
+    # Allow an explicitly selected, user-owned extraction for local/CI runs;
+    # this never accepts a DSN and still initializes only its own temp cluster.
+    binaries = Path(os.environ.get('BTL_QA_PG_BIN', '/usr/lib/postgresql/16/bin')).resolve()
+    share_dir = os.environ.get('BTL_QA_PG_SHAREDIR')
     for name in ('initdb', 'pg_ctl', 'pg_dump', 'pg_restore'):
         if not (binaries/name).is_file():
             raise ValueError('POSTGRESQL16_TOOLS_REQUIRED')
@@ -48,6 +52,20 @@ def private_postgres(*, keep=False, root_dir=None):
     environment = {k: v for k, v in os.environ.items()
                    if not k.startswith(('PG', 'BTL_'))}
     environment.update(PYTHONDONTWRITEBYTECODE='1', PYTHONPATH=str(repository/'backend'))
+    if share_dir:
+        share = Path(share_dir).resolve()
+        package_root = binaries.parents[3]
+        if not share.is_dir() or not share.is_relative_to(package_root):
+            raise ValueError('POSTGRESQL16_SHAREDIR_INVALID')
+        environment['PGSHAREDIR'] = str(share)
+    package_root = binaries.parents[3]
+    library_dirs = [binaries.parent.parent/'lib', package_root/'lib/x86_64-linux-gnu']
+    # Debian/Ubuntu package-local libraries are needed when PostgreSQL was
+    # extracted without root; preserve an existing loader path if present.
+    library_path = [str(path) for path in library_dirs if path.is_dir()]
+    if library_path:
+        prior = environment.get('LD_LIBRARY_PATH')
+        environment['LD_LIBRARY_PATH'] = ':'.join(library_path) + (':' + prior if prior else '')
     environment['BTL_QA_CLUSTER_ROOT'] = str(root)
     data = root/'data'
     started = False

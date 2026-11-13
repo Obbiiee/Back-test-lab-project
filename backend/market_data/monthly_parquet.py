@@ -6,6 +6,7 @@ typed timestamp/ordinal columns used only for bounded seeking and pruning.
 """
 from __future__ import annotations
 
+from bisect import bisect_right
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
@@ -128,6 +129,19 @@ def _row_to_event(row):
         "trustedSequence": row["trusted_sequence"], "provenance": provenance, "quality": quality,
     }
     return CanonicalTick.from_wire(event).wire
+
+
+def _copy_verified_event(event):
+    """Copy a hash-verified canonical event without generic graph traversal.
+
+    CanonicalTick validation guarantees that only provenance and quality are
+    nested mappings; their leaves are immutable scalars. Copying all three
+    dictionaries preserves caller isolation while avoiding deepcopy overhead.
+    """
+    result = event.copy()
+    result["provenance"] = event["provenance"].copy()
+    result["quality"] = event["quality"].copy()
+    return result
 
 
 def _atomic_publish(temp_path: Path, target: Path):
@@ -448,6 +462,7 @@ class MonthlyParquetProvider:
         self._dataset_id = manifest["datasetId"]
         self._dataset_version = manifest["datasetVersion"]
         self.manifest_hash = supplied_hash
+        self._verified_row_group_cache = None
         require(type(manifest.get("sourceIdentity")) is list and
                 1 <= len(manifest["sourceIdentity"]) <= 128,
                 "sourceIdentity", "SCHEMA_MISMATCH")
@@ -466,6 +481,9 @@ class MonthlyParquetProvider:
                 "files", "INCOMPLETE_INGESTION")
         previous_month = None
         total = 0
+        self._token_group_lows = []
+        self._token_groups = []
+        previous_token_high = None
         for entry in self._files:
             require(type(entry) is dict and set(entry) == {
                 "month", "path", "sha256", "bytes", "eventCount", "firstTimeNs", "lastTimeNs",
@@ -507,6 +525,14 @@ class MonthlyParquetProvider:
                     "fileBounds", "CORRUPT_INDEX_POINTER")
             for group in entry["rowGroups"]:
                 digest(group["canonicalEventHash"], "canonicalEventHash")
+                token_low = (group["firstSourceIndex"], uint(group["firstOrdinal"]))
+                token_high = (group["lastSourceIndex"], uint(group["lastOrdinal"]))
+                require(token_low <= token_high and
+                        (previous_token_high is None or previous_token_high < token_low),
+                        "rowGroupTokenIndex", "CORRUPT_INDEX_POINTER")
+                self._token_group_lows.append(token_low)
+                self._token_groups.append((entry, group, token_high))
+                previous_token_high = token_high
             total += entry["eventCount"]
             previous_month = entry["month"]
         require(total == manifest["eventCount"], "eventCount", "COUNT_CONFLICT")
@@ -557,11 +583,23 @@ class MonthlyParquetProvider:
         return int(events[0]["timeNs"])
 
     def _read_row_group(self, path, file_entry, group_entry):
+        cache_key = (self.manifest_hash, path, group_entry["index"])
+        cached = self._verified_row_group_cache
+        if cached is not None and cached[0] == cache_key:
+            _key, events, timestamps, global_indices = cached
+            return events, timestamps, global_indices
         parquet = self._open_parquet(path)
         try:
-            return self._read_row_group_file(parquet, file_entry, group_entry)
+            events, timestamps, global_indices = self._read_row_group_file(
+                parquet, file_entry, group_entry)
         finally:
             parquet.close()
+        # Keep one bounded row group of already hash-verified canonical data.
+        # Callers receive copies, so mutating a returned page cannot alter the
+        # verified cache or later pages.
+        self._verified_row_group_cache = (
+            cache_key, events, timestamps, global_indices)
+        return events, timestamps, global_indices
 
     def _read_row_group_file(self, parquet, file_entry, group_entry):
         require(parquet.schema_arrow.remove_metadata().equals(SCHEMA.remove_metadata()),
@@ -650,6 +688,7 @@ class MonthlyParquetProvider:
         require(type(max_events) is int and 1 <= max_events <= 64, "max_events", "ARTIFACT_LIMIT")
         require(not self._source_manifest["diagnostics"], "diagnostics", "INCOMPLETE_DIAGNOSTICS")
         start = 0
+        token_group = None
         if after_token is not None:
             tag(after_token, "BTL-TICK-PAGE-TOKEN-1", "datasetVersion sourceIndex afterRawOrdinal")
             require(after_token["datasetVersion"] == dataset_version, "token", "VERSION_MISMATCH")
@@ -657,22 +696,19 @@ class MonthlyParquetProvider:
             require(source_index < len(self._source_manifest["sources"]), "token", "INVALID_PAGE_TOKEN")
             require(after_token["afterRawOrdinal"] is not None, "token", "INVALID_PAGE_TOKEN")
             ordinal = uint(after_token["afterRawOrdinal"])
+            token_key = (source_index, ordinal)
+            group_index = bisect_right(self._token_group_lows, token_key) - 1
+            require(group_index >= 0, "token", "INVALID_PAGE_TOKEN")
+            entry, group, high = self._token_groups[group_index]
+            require(token_key <= high, "token", "INVALID_PAGE_TOKEN")
+            events, _times, indices = self._read_row_group(entry["path"], entry, group)
+            token_group = (entry["path"], group["index"], events, _times, indices)
             found = False
-            for entry in self._files:
-                for group in entry["rowGroups"]:
-                    low = (group["firstSourceIndex"], int(group["firstOrdinal"]))
-                    high = (group["lastSourceIndex"], int(group["lastOrdinal"]))
-                    if low <= (source_index, ordinal) <= high:
-                        events, _times, indices = self._read_row_group(entry["path"], entry, group)
-                        for event, global_index in zip(events, indices):
-                            if (self._source_indices[event["provenance"]["sourceId"]],
-                                    int(event["rawOrdinal"])) == (source_index, ordinal):
-                                start = int(global_index) + 1
-                                found = True
-                                break
-                    if found:
-                        break
-                if found:
+            for event, global_index in zip(events, indices):
+                if (self._source_indices[event["provenance"]["sourceId"]],
+                        int(event["rawOrdinal"])) == token_key:
+                    start = int(global_index) + 1
+                    found = True
                     break
             require(found, "token", "INVALID_PAGE_TOKEN")
         selected = []
@@ -683,7 +719,10 @@ class MonthlyParquetProvider:
                     continue
                 if group["firstGlobalIndex"] >= stop:
                     break
-                events, _times, indices = self._read_row_group(entry["path"], entry, group)
+                if token_group is not None and token_group[:2] == (entry["path"], group["index"]):
+                    events, _times, indices = token_group[2:]
+                else:
+                    events, _times, indices = self._read_row_group(entry["path"], entry, group)
                 selected.extend(event for event, index in zip(events, indices)
                                 if start <= int(index) < stop)
             if len(selected) >= max_events:
@@ -703,6 +742,10 @@ class MonthlyParquetProvider:
                     afterRawOrdinal=last["rawOrdinal"])
             try:
                 canonical_bytes(result)
+                # Row-group data remains private to the provider cache. Clone
+                # only the selected page at the public boundary rather than
+                # cloning every row in each touched row group on every page.
+                result["events"] = [_copy_verified_event(event) for event in selected]
                 return result
             except ValueError:
                 require(len(selected) > 1, "page", "RECORD_LIMIT")
@@ -764,6 +807,60 @@ class MonthlyParquetProvider:
             require(len(pending) <= MAX_TIMESTAMP_GROUP_EVENTS, "timestampGroup", "GROUP_LIMIT")
         if pending:
             yield {"timeNs": pending_time, "events": pending}
+
+    def read_revealed_window(self, through_ns, maximum_groups):
+        """Read a bounded, verified display window ending at committed time.
+
+        The manifest row-group index is used only to prune immutable Parquet
+        reads. Every returned row group is hash-checked, and the returned ticks
+        are clipped to ``through_ns`` before grouping. This is a controller-side
+        display projection; it cannot advance execution or expose future rows.
+        """
+        require(type(through_ns) is int and 0 <= through_ns <= 2**63 - 1,
+                "throughNs", "RANGE_CONFLICT")
+        require(type(maximum_groups) is int and 1 <= maximum_groups <= 1024,
+                "maximumGroups", "ARTIFACT_LIMIT")
+        from ticks.timeline import make_group
+
+        reverse_groups = []
+        for file_entry in reversed(self._files):
+            if int(file_entry["firstTimeNs"]) > through_ns:
+                continue
+            for group_entry in reversed(file_entry["rowGroups"]):
+                if int(group_entry["firstTimeNs"]) > through_ns:
+                    continue
+                events, _timestamps, _indices = self._read_row_group(
+                    file_entry["path"], file_entry, group_entry)
+                visible = [event for event in events if int(event["timeNs"]) <= through_ns]
+                if not visible:
+                    continue
+                forward_groups = []
+                current_time = None
+                current_events = []
+                for event in visible:
+                    stamp = event["timeNs"]
+                    if current_time is not None and stamp != current_time:
+                        forward_groups.append(make_group(current_events, self.dataset_version))
+                        current_events = []
+                    current_time = stamp
+                    current_events.append(event)
+                if current_events:
+                    forward_groups.append(make_group(current_events, self.dataset_version))
+                part = list(reversed(forward_groups))
+                if reverse_groups and part and part[0]["timeNs"] == reverse_groups[-1]["timeNs"]:
+                    older = part.pop(0)
+                    newer = reverse_groups.pop()
+                    merged = make_group(older["events"] + newer["events"], self.dataset_version)
+                    reverse_groups.append(merged)
+                reverse_groups.extend(part)
+                if (len(reverse_groups) > maximum_groups and
+                        reverse_groups[maximum_groups - 1]["timeNs"] !=
+                        reverse_groups[maximum_groups]["timeNs"]):
+                    break
+        selected = list(reversed(reverse_groups[:maximum_groups]))
+        require(all(int(group["timeNs"]) <= through_ns for group in selected),
+                "futureWindow", "UNREVEALED_INDEX")
+        return selected
 
     def verify_all(self):
         """Full, explicit integrity pass; never performed implicitly by a seek."""

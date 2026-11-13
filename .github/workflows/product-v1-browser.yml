@@ -22,7 +22,7 @@ permissions:
 jobs:
   browser-journey:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,6 +41,9 @@ jobs:
           sudo apt-get install --yes postgresql-16 postgresql-client-16
       - name: Install pinned backend dependencies
         run: python -m pip install --requirement backend/requirements.lock
+      - name: Guard authority documents against binary corruption
+        working-directory: backend
+        run: timeout 120s python -B -m unittest tests.test_authority_documents -v
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -64,14 +67,17 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/riksora-playwright
         run: |
           python -B -m unittest discover -s frontend/tests -p test_riksora_browser_gate.py -v
-          python -B frontend/tests/riksora_browser_gate.py \
-            --tools frontend/tests/browser-tools \
-            --browser-cache "$PLAYWRIGHT_BROWSERS_PATH"
+          for attempt in $(seq 1 10); do
+            echo "Browser acceptance iteration ${attempt}/10"
+            timeout 300s python -B frontend/tests/riksora_browser_gate.py \
+              --tools frontend/tests/browser-tools \
+              --browser-cache "$PLAYWRIGHT_BROWSERS_PATH"
+          done
       - name: Publish sanitized browser acceptance report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: riksora-browser-acceptance-report
-          path: frontend/tests/artifacts/*/report.json
+          path: frontend/tests/artifacts/riksora-private-browser-*/report.json
           if-no-files-found: ignore
           retention-days: 7

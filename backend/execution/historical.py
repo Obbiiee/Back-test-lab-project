@@ -11,6 +11,7 @@ import json
 import os
 import re
 from threading import RLock
+from tempfile import TemporaryDirectory
 from time import monotonic
 
 from contracts.canonical import canonical_bytes, content_hash
@@ -284,6 +285,20 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
                 return result, next_checkpoint
             except BaseException:
                 timeline.close(); provider.close(); raise
+
+    def preview(self, checkpoint, target):
+        """Validate one bounded private candidate page without advancing the accepted tip."""
+        mode=self._checkpoint_mode(checkpoint);provider=self.source.provider()
+        try:
+            with TemporaryDirectory(prefix='btl-next-event-preview-') as folder:
+                timeline=IndexedTickTimeline.resume(provider,checkpoint,log_folder=Path(folder)/'timeline',
+                    allow_threads=True,max_groups_per_advance=self.max_groups_per_advance,
+                    storage_mode=mode,
+                    source_pin=self._source_pin if mode in ('shared-source-v1','shared-source-v2') else None)
+                try:return timeline.advance_through(target,timeline.cursor)
+                finally:timeline.close()
+        finally:
+            provider.close()
 
     def window(self, scope, session, checkpoint, *, last_only=False):
         with self._lock:

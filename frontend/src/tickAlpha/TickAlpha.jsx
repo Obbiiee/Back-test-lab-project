@@ -228,6 +228,35 @@ export default function TickAlpha(){
       <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
         trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
+        canJump={!view.state.ended&&!view.state.unresolved&&(view.analysis?.orders??[]).some(order=>['PENDING','ACTIVE'].includes(order.status))}
+        onJump={({view:initial,cancelled,onProgress})=>run(async()=>{
+          let current=initial,processed=0;
+          const requestId=crypto.randomUUID().replaceAll('-','');
+          for(let step=0;step<4096;step++){
+            if(cancelled())return {status:'SEARCHING',view:current};
+            const request={schemaVersion:1,artifact:'BTL-JUMP-NEXT-EVENT-1',requestId,
+              sessionId:current.metadata.id,expectedRevision:current.state.revision,timeframe};
+            const result=await api(sessionPath(current.metadata.id)+'/jump-next-event',request);
+            if(result?.artifact!=='BTL-JUMP-NEXT-EVENT-RESULT-1'||result.requestId!==requestId||
+               result.sessionId!==current.metadata.id||!['EVENT_FOUND','SEARCHING','NO_EVENT_UNTIL_SESSION_END','NO_ACTIVE_ORDERS'].includes(result.status)||
+               result.view?.metadata?.id!==current.metadata.id||!Number.isSafeInteger(result.view?.state?.revision)||
+               result.view?.state?.revision<current.state.revision||result.view?.state?.throughNs!==result.throughNs)
+              throw Error('Next event result could not be verified. Reload the saved Session before continuing.');
+            current=result.view;processed+=result.processedGroups;setView(current);
+            onProgress({throughNs:result.throughNs,processedGroups:processed});
+            if(result.status==='SEARCHING')continue;
+            if(result.status==='EVENT_FOUND'){
+              emitLocal('replay_advanced');
+              if(result.events.some(event=>event.kind==='EXIT_FILL'))emitLocal('order_outcome_committed');
+              if(result.events.some(event=>event.kind==='UNRESOLVED'))emitLocal('order_outcome_unresolved');
+              setNotice(`Replay paused at the next committed trading event (${new Date(Number(BigInt(result.throughNs)/1000000n)).toISOString().replace('T',' ')} UTC).`);
+            }else if(result.status==='NO_EVENT_UNTIL_SESSION_END')setNotice('No trading event was found before this Session ended. Pending and open order states are preserved.');
+            else setNotice('There are no pending or active orders to search.');
+            return result;
+          }
+          setNotice('Search reached its bounded browser work limit. Session progress is saved; press Jump to Next Event to continue.');
+          return {status:'SEARCHING',view:current};
+        })}
         onReplay={(kind,targetNs)=>run(async()=>{
           let saved;
           if(kind==='SEEK'&&isAccountPage()&&view.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'){
