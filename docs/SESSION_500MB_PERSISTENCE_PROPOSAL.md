@@ -13,13 +13,14 @@ Kekhawatiran awal ("perlu skema bukti blok yang lebih ringkas") sebagian besar s
 | `shared-source-v1` | hanya rantai advance/kursor | 434 KB per hari, kira-kira 178 MB per tahun (proyeksi linear CP6A-9) |
 | `shared-source-v2` | checkpoint `nextPosition`, tanpa log posisi/advance per grup | belum diukur di dokumen yang saya baca |
 
-`AdmittedObservedSource` di `backend/execution/historical.py` sudah berdefault `shared-source-v2`. Freeze register
-(2026-11-08) menyebut celahnya: `ObservedCatalog.resolve` tidak meneruskan mode, jadi jalur produk bisa tetap jatuh ke
-`session-log-v2`. Itu harus diverifikasi di kode cabang produk, bukan diasumsikan.
+**Diverifikasi di kode (dibaca, belum dijalankan):** default `shared-source-v2` di `historical.py:172` hanya untuk
+`IndexedTimelineCache` bawaan. Jalur produk lewat `observed_catalog.py:30` membaca `timelineStorageMode` dari katalog
+operator dengan default `session-log-v2`; `shared-source-v1` ditolak di luar QA (`observed_admission.py`, `REFUSED_QA_ONLY_MODE`),
+dan `shared-source-v2` hanya aktif bila operator menuliskannya di katalog. Tidak ada kode non-tes yang menuliskannya.
+Jadi default produk sekarang `session-log-v2`.
 
-Konsekuensi untuk pekerjaan saya sebelumnya: codec `zlib-1` default baru hanya menolong jalur `session-log-v2`. Kalau
-produk memang memakai `shared-source-v2`, manfaatnya kecil. Itu tetap aman (tidak mengubah byte logis), tetapi jangan
-dihitung sebagai jalan ke 500 MB.
+Konsekuensi: codec `zlib-1` default baru (cabang ini) berlaku di jalur produk default, jadi relevan. Tetapi 500 MB
+hanya realistis bila katalog operator diaktifkan ke `shared-source-v2`; itu keputusan operator/pemilik, bukan kode.
 
 ## 2. Dari mana sisa 4,45 GB per tahun (proyeksi CP6A-9) berasal
 
