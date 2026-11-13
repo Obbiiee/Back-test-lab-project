@@ -93,11 +93,13 @@ and no authorization was given for that): 7.5 CPU-s for a swing trader (189 fill
 Not measured: PostgreSQL, durable worker, multi-session cache sharing, browser/R2 candles. `fill_event_canonical_bytes_avg` is 1,316 B
 (ENTRY/EXIT fill); a trade is roughly three events, so about 3.5-4 KB canonical before PostgreSQL row/index overhead (unmeasured proxy).
 
-### Where Claude's path is NOT faster (important)
-Scalper profile, 200,000 ticks, 20 s steps, TP 0.15/SL 0.10: 6,754 advances, 146 fills: **277 CPU-s (721 ticks/CPU-s)**, about the same as the
-Codex baseline rate. The scan is not the cost: profile shows ~90% in the kernel's `validate_state`, which re-validates every retained order on every
-command (`open_payload` called 263k times at 50k ticks). That is O(orders) per command, quadratic over a session. Jump cannot fix it; the repo's order-archive state
-mode is the intended mitigation and was not integrated here. After the tick reader is fast, THIS is the next bottleneck.
+### Scalper profile (head-to-head, same input, identical result)
+30,000 real ticks, 20 s steps, TP 0.15 / SL 0.10, mixed order types: Codex baseline **363.5 CPU-s (387 s wall)**, Claude path **82.0 CPU-s (83 s wall)**,
+4.4x faster; 146 fills each, identical balance, events and orders (parity true, 0 reconstruction mismatches).
+Earlier text in this experiment said the scalper case was "no faster than Codex"; that was wrong: I compared Claude's rate with the swing-profile baseline rate, not with the baseline measured on the scalper input.
+The gain is smaller than for swing (21-30x) because both engines pay the same kernel cost: profile shows ~90% of the Claude path in `validate_state`, which re-validates
+every retained order on every command (O(orders) per command, quadratic over a session; 263k `open_payload` calls at 50k ticks). Jump cannot remove it;
+the repo's order-archive state mode is the intended mitigation and was not integrated here. After the tick reader is fast, THIS is the next bottleneck.
 
 ## 5. Jump to next event
 Exact integer thresholds (scaled by 1000) against per-256-group min/max blocks, per order type: pending MARKET (next group), LIMIT/STOP (ask or bid vs entry), ACTIVE SL/TP, exit request.
@@ -114,7 +116,7 @@ Measured: the scan is vectorised numpy (12 M ticks/s reading; 99.9% of groups sk
 Rust could help the reducer's exact-money validation, but would have to re-prove parity with the frozen reducer; high risk, low priority. Keep Python + PyArrow/numpy; revisit only if scalper latency (section 4) matters after the order-archive fix.
 
 ## 7. Scale and cost (assumptions explicit)
-- CPU: 100k ticks ≈ 5-7 CPU-s, 1M ≈ 7.5 CPU-s for a swing trader on this desktop; scalper ≈ 277 CPU-s per 200k ticks until validation is fixed. Do not extrapolate traders per server from this.
+- CPU: 100k ticks ≈ 5-7 CPU-s, 1M ≈ 7.5 CPU-s for a swing trader on this desktop; scalper 82 CPU-s per 30k ticks (Codex 363) until validation is fixed. Do not extrapolate traders per server from this.
 - RAM per active session: 468 MB measured for 1M ticks with whole-array load (not tuned); loading per-month blocks would cut it. Shared compact files can be cached once across sessions of one dataset (read-only arrays); nothing here tests that.
 - One worker can serve many sessions serially: recovery by chain check costs milliseconds; state is rebuilt from the log. Not load-tested.
 - Storage per million ticks: compact 15.4 MB; Codex canonical store ~307 MB.
@@ -124,7 +126,7 @@ A. Keep: canonical contract, hash-chained events, reducer semantics, cold-recove
 B. Too costly: re-canonicalising each immutable tick several times per read (`storage_v2._load`, `_validate`, frame hash), per-group prefix hash, O(orders) `validate_state` per command.
 C. Eliminate: per-tick validation of already-verified immutable data; `REPLAY_ADVANCED` as a persisted event (progress is not financial).
 D. Rewrite (as layers, not the reducer): source access, cursor/prefix commitment, next-event scan.
-E. End-to-end faster? Yes for swing-style sessions (21-30x, 100k ticks, parity identical). No for scalper-style until `validate_state` is fixed.
+E. End-to-end faster? Yes: swing-style 21-30x (100k ticks), scalper-style 4.4x (30k ticks), parity identical in both. The scalper gain is capped by the shared `validate_state` cost.
 F. Migration risks: a second cursor/commitment format; owner approval for the proposals below; replay-equivalence must be proven per source type; two engines must never both be authoritative.
 
 ## 9. If building from scratch today (16 instruments, years of history, budget server)
