@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RIKSORA Local Trader</title>
+<style>
+:root{--bg:#0f1218;--panel:#171b24;--line:#262c3a;--tx:#d8dde8;--mu:#8a93a6;--up:#26a69a;--dn:#ef5350;--ac:#4c8dff}
+@media (prefers-color-scheme:light){:root{--bg:#f4f5f8;--panel:#fff;--line:#d9dde6;--tx:#1b2030;--mu:#667086}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,Segoe UI,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header b{font-size:15px}.k{color:var(--mu);font-size:12px}.v{font-variant-numeric:tabular-nums}
+main{display:grid;grid-template-columns:1fr 330px;gap:12px;padding:12px;max-width:1500px;margin:auto}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+canvas{width:100%;height:440px;display:block;background:var(--panel);border-radius:8px}
+.row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;align-items:center}
+button,select,input{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 10px}
+button{cursor:pointer}button:hover{border-color:var(--ac)}button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+button.buy{background:var(--up);border-color:var(--up);color:#fff;font-weight:600}button.sell{background:var(--dn);border-color:var(--dn);color:#fff;font-weight:600}
+input{width:90px}table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
+.pos{color:var(--up)}.neg{color:var(--dn)}.badge{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}.bad{background:var(--dn);color:#fff}
+#err{color:var(--dn);min-height:18px;margin:4px 0}#log{max-height:150px;overflow:auto;font-size:12px;color:var(--mu)}
+h3{margin:4px 0 6px;font-size:13px;color:var(--mu);font-weight:600}
+</style></head><body>
+<header>
+ <b>RIKSORA Local Trader</b>
+ <span><span class="k">Waktu UTC</span> <span class="v" id="t">-</span></span>
+ <span><span class="k">Bid</span> <span class="v" id="bid">-</span> <span class="k">Ask</span> <span class="v" id="ask">-</span> <span class="k">Spread</span> <span class="v" id="spr">-</span></span>
+ <span><span class="k">Saldo</span> <span class="v" id="bal">-</span> <span class="k">Realisasi</span> <span class="v" id="real">-</span> <span class="k">Floating</span> <span class="v" id="flt">0.00</span></span>
+ <span id="badges"></span>
+</header>
+<main>
+ <section class="card">
+  <div class="row"><span class="k">Timeframe</span>
+   <button data-tf="60" class="tf on">M1</button><button data-tf="300" class="tf">M5</button><button data-tf="900" class="tf">M15</button><button data-tf="3600" class="tf">H1</button>
+   <span class="k" style="margin-left:auto">Chart hanya berisi tick yang sudah dilewati kursor sesi</span></div>
+  <canvas id="c" width="1100" height="440"></canvas>
+  <div class="row"><span class="k">Maju</span>
+   <button data-adv="1">+1d</button><button data-adv="10">+10d</button><button data-adv="60">+1m</button><button data-adv="300">+5m</button><button data-adv="900">+15m</button><button data-adv="3600">+1j</button>
+   <button id="next" title="Lompat sampai ada fill atau sesi berhenti (maks 6 jam simulasi)">Event berikutnya ⏭</button>
+   <span style="margin-left:auto" class="row"><button id="play">▶ Putar</button>
+    <select id="speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="60">60×</option><option value="300">300×</option></select></span></div>
+  <div id="err"></div>
+ </section>
+ <aside>
+  <section class="card"><h3>Order baru</h3>
+   <div class="row"><select id="typ"><option>MARKET</option><option>LIMIT</option><option>STOP</option></select>
+    <span class="k">Lot</span><input id="lots" value="0.01"></div>
+   <div class="row"><span class="k">Entry (pending)</span><input id="entry" placeholder="harga"></div>
+   <div class="row"><span class="k">SL $</span><input id="sl" value="2"><span class="k">TP $</span><input id="tp" value="3"></div>
+   <div class="k" style="margin-bottom:6px">SL/TP dalam jarak harga dari entry. Order pending wajib punya SL dan TP.</div>
+   <div class="row"><button class="buy" id="buy" style="flex:1">BUY</button><button class="sell" id="sell" style="flex:1">SELL</button></div>
+  </section>
+  <section class="card" style="margin-top:10px"><h3>Order</h3><table id="orders"></table></section>
+  <section class="card" style="margin-top:10px"><h3>Kejadian</h3><div id="log"></div></section>
+ </aside>
+</main>
+<script>
+let TF=60,S=null,CANDLES=[],timer=null;
+const $=id=>document.getElementById(id);
+async function call(path,body){const r=await fetch(path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const j=await r.json();if(!r.ok){$('err').textContent=j.error||'error';throw new Error(j.error)};$('err').textContent='';return j}
+async function refresh(state){S=state||await call('/api/state');const c=await call('/api/candles?tf='+TF+'&n=200');CANDLES=c.candles;render()}
+function f(n){return n==null?'-':n}
+function render(){
+ $('t').textContent=S.timeIso;$('bid').textContent=f(S.bid);$('ask').textContent=f(S.ask);$('spr').textContent=f(S.spread);
+ $('bal').textContent=S.balance;$('real').textContent=S.realized;
+ let fl=S.orders.reduce((a,o)=>a+(o.floating?+o.floating:0),0);$('flt').textContent=fl.toFixed(2);$('flt').className='v '+(fl>=0?'pos':'neg');
+ $('real').className='v '+(+S.realized>=0?'pos':'neg');
+ $('badges').innerHTML=(S.unresolved?'<span class="badge bad">UNRESOLVED — sesi berhenti</span> ':'')+(!S.quoteFresh&&S.bid?'<span class="badge bad">quote tidak segar</span> ':'')+(S.atEnd?'<span class="badge">akhir data</span>':'')+` <span class="badge">${S.progress.group}/${S.progress.groups} grup</span>`;
+ $('orders').innerHTML='<tr><th>ID</th><th>Sisi</th><th>Status</th><th>Entry</th><th>SL/TP</th><th>P/L</th><th></th></tr>'+S.orders.slice().reverse().slice(0,12).map(o=>{
+  const pl=o.status==='ACTIVE'?o.floating:o.pnl;const act=o.status==='ACTIVE'?`<button onclick="act('close','${o.id}')">Tutup</button>`:o.status==='PENDING'?`<button onclick="act('cancel','${o.id}')">Batal</button>`:'';
+  return `<tr><td>${o.id.replace('order:','#')}</td><td>${o.side==='LONG'?'BUY':'SELL'} ${o.lots}</td><td>${o.status}</td><td>${o.fill||o.entry}</td><td>${o.sl||'-'} / ${o.tp||'-'}</td><td class="${+pl>=0?'pos':'neg'}">${pl}</td><td>${act}</td></tr>`}).join('');
+ $('log').innerHTML=S.events.slice().reverse().map(e=>`${new Date(e.timeMs).toISOString().slice(11,19)} ${e.kind} ${e.orderId||''} ${e.price||''} ${e.reason||''} ${e.pnl||''}`).join('<br>');
+ draw()}
+function draw(){
+ const cv=$('c'),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext('2d');g.scale(dpr,dpr);
+ const st=getComputedStyle(document.body),up=st.getPropertyValue('--up'),dn=st.getPropertyValue('--dn'),mu=st.getPropertyValue('--mu'),ln=st.getPropertyValue('--line'),tx=st.getPropertyValue('--tx');
+ g.clearRect(0,0,w,h);if(!CANDLES.length){g.fillStyle=mu;g.fillText('Belum ada tick. Tekan Maju.',20,30);return}
+ const n=Math.min(CANDLES.length,Math.floor((w-70)/8)),cs=CANDLES.slice(-n);
+ const lines=[];S.orders.filter(o=>o.status==='ACTIVE'||o.status==='PENDING').forEach(o=>{[['entry',o.fill||o.entry,tx],['sl',o.sl,dn],['tp',o.tp,up]].forEach(([k,v,c])=>{if(v)lines.push([+v,c,k+' '+o.id.replace('order:','#')])})});
+ let hi=Math.max(...cs.map(c=>c[2])),lo=Math.min(...cs.map(c=>c[3]));lines.forEach(l=>{hi=Math.max(hi,l[0]);lo=Math.min(lo,l[0])});const pad=(hi-lo)*.05||.5;hi+=pad;lo-=pad;
+ const Y=p=>10+(hi-p)/(hi-lo)*(h-30),cw=(w-70)/n;
+ g.strokeStyle=ln;g.fillStyle=mu;g.font='11px system-ui';for(let i=0;i<=5;i++){const p=lo+(hi-lo)*i/5,y=Y(p);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.fillText(p.toFixed(2),w-56,y+4)}
+ cs.forEach((c,i)=>{const x=i*cw+cw/2,col=c[4]>=c[1]?up:dn;g.strokeStyle=col;g.fillStyle=col;g.beginPath();g.moveTo(x,Y(c[2]));g.lineTo(x,Y(c[3]));g.stroke();
+  const y1=Y(c[1]),y2=Y(c[4]);g.fillRect(x-cw*.35,Math.min(y1,y2),cw*.7,Math.max(1,Math.abs(y1-y2)))});
+ lines.forEach(([p,c,t])=>{const y=Y(p);g.strokeStyle=c;g.setLineDash([5,4]);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.setLineDash([]);g.fillStyle=c;g.fillText(t,6,y-3)});
+ if(S.ask){g.strokeStyle=up;g.setLineDash([2,3]);let y=Y(+S.ask);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.strokeStyle=dn;y=Y(+S.bid);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.setLineDash([])}}
+async function adv(sec,until){try{await refresh(await call('/api/advance',{seconds:sec,untilEvent:!!until}))}catch(e){stop()}}
+async function order(side){const typ=$('typ').value,lots=$('lots').value;let entry=+($('entry').value||0);const sl=+$('sl').value,tp=+$('tp').value,d=side==='BUY'?1:-1;
+ const ref=typ==='MARKET'?(side==='BUY'?+S.ask:+S.bid):entry;if(!ref){$('err').textContent='isi harga entry untuk pending';return}
+ const body={side,type:typ,lots,entry:typ==='MARKET'?undefined:entry,sl:sl?(ref-d*sl).toFixed(3):null,tp:tp?(ref+d*tp).toFixed(3):null};
+ try{await refresh(await call('/api/order',body))}catch(e){}}
+async function act(kind,id){try{await refresh(await call('/api/'+kind,{orderId:id}))}catch(e){}}
+function stop(){if(timer){clearInterval(timer);timer=null;$('play').textContent='▶ Putar'}}
+document.querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>adv(+b.dataset.adv));
+document.querySelectorAll('.tf').forEach(b=>b.onclick=()=>{TF=+b.dataset.tf;document.querySelectorAll('.tf').forEach(x=>x.classList.toggle('on',x===b));refresh()});
+$('next').onclick=()=>adv(0,true);$('buy').onclick=()=>order('BUY');$('sell').onclick=()=>order('SELL');
+$('play').onclick=()=>{if(timer)return stop();$('play').textContent='⏸ Jeda';timer=setInterval(()=>adv(+$('speed').value*0.5),500)};
+window.addEventListener('resize',()=>S&&draw());refresh();
+</script></body></html>
