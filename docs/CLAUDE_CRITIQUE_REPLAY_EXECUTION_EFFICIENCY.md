@@ -1381,3 +1381,91 @@ scalping workload (hundreds of commands) must be tested explicitly.
 (a) Allow sparse checkpoints + delta receipts as the persistent representation; (b)
 retention/cold-tier policy for immutable evidence; (c) raw-bytea hashes in new tables;
 (d) whether UNVERIFIED practice trades may live only on the client until saved.
+
+## 17. Tick engine, queue, worker + Claude workflow and best architecture (2026-11-13)
+
+> **Status: ADVISORY.** No implementation authorized; nothing here was benchmarked.
+> Any change to frozen contracts (42.17/42.19, evidence tables, no-look-ahead) needs an
+> explicit owner grant. Builds on §4, §7, §11–§16.
+
+### 17.1 Diagnosis (from repo evidence read earlier)
+
+**Tick engine**
+- Read path re-verifies per row in Python (~2,100 ticks/s; 399 CPU-s for a 262,144-tick
+  case per repo docs); Parquet carries per-row string ids/hashes/JSON.
+- A native child process + timeline resume is used per step.
+
+**Queue (`btl.research_jobs`)**
+- One replay step = HTTP → queue row → worker → PostgreSQL commit → response; the
+  frontend ADVANCE loop waits 500 ms between steps; `MAX_STEPS=256`.
+- To check (not verified by me): whether job claim uses `FOR UPDATE SKIP LOCKED`.
+
+**Worker / admission**
+- `WORKERS=2` (PR #53 makes `BTL_RESEARCH_WORKERS` 1–4), `GLOBAL_LIMIT=16`,
+  `USER_LIMIT=2`, `DATABASE=Budget(12)`, ApiAdmission 8.
+- `psycopg.connect` on every call (no pool); `identity/boundary._attempt` does
+  UPSERT+DELETE per request keyed by IP.
+
+### 17.2 Fixes by component
+
+| Component | Fix | Risk |
+|---|---|---|
+| Engine read | Verify-once receipt (file SHA-256 + manifest hash + verifier version + policy version); columnar int64 fixed-point read; Fraction/Decimal only on touched ticks | Needs byte-identical parity gate vs golden vectors + real EURUSD/XAUUSD months |
+| Engine jump | Option D: per-chunk min/max index, jump to first touching tick, release result only when cursor reaches it | Needs owner grant (contract) |
+| Engine process | Keep one warm native process per Session (sticky), not spawn per step; idle timeout + memory cap | Crash/restart equivalence tests |
+| Queue | Batch many ticks per job; release window W so one request returns many ticks; `LISTEN/NOTIFY` instead of polling; `SKIP LOCKED` if absent; separate light (read) and heavy (verify) queues | Ordering/idempotency tests |
+| Worker | Worker count ≈ cores−1 for CPU-bound work (6 vCPU → 4–5); heartbeat + visibility timeout; backpressure with explicit 429/Retry-After | Load test needed |
+| DB | Connection pool (psycopg_pool) sized to Budget; move rate limiting to in-memory token bucket (single VPS) | Lose limits on restart (acceptable) |
+| Frontend | ADVANCE loop adaptive: fetch next window while the current one plays; no fixed 500 ms | See §15 |
+
+### 17.3 Claude's runtime workflow (one trading Session)
+
+```
+Open Session
+  → server pins dataset (hash) + issues signed cursor
+  → client receives window W (ticks up to cursor + lookahead budget)
+Play / step / speed-up
+  → client animates inside W (no request per tick)
+  → near end of W: prefetch next W (one batched request)
+Trader command (open/close/modify)
+  → POST command + cursor → server validates, appends to command log
+  → state = checkpoint + deltas (§16)
+Auto events (pending entry, SL/TP, trailing, stop-out)
+  → Option D jump: server finds first touching tick, releases up to it
+No-SL/TP scalping
+  → no auto event; server just serves windows; cost scales with windows, not ticks
+Finish / idle
+  → final checkpoint + report, hash-pinned; cold tier after N days
+```
+
+Practice (UNVERIFIED) tier: same UI, data from static files client-side, trades local;
+only the VERIFIED tier uses the server flow above.
+
+### 17.4 Best architecture (Claude version, summary of §13 + above)
+
+- **L0 Data:** monthly columnar files, fixed-point int64, per-chunk min/max index,
+  verify-once receipts; R2 for backup/serving with custom domain + cache.
+- **L1 Engine:** pure function (state, command, ticks) → (state′, events); warm process
+  per Session; same code path for verification and serving (no second implementation).
+- **L2 Scheduler:** PostgreSQL queue with NOTIFY, batching, two lanes (light/heavy),
+  pool, admission/backpressure.
+- **L3 Evidence:** command log + deltas + sparse checkpoints + hash chain (§16).
+- **L4 Client:** window-based playback, adaptive prefetch, IndexedDB, lazy heavy screens
+  (§15).
+
+Capacity estimate remains a hypothesis until measured; I would not quote a trader count
+before the load test below.
+
+### 17.5 Rollout order (each step reversible, with gate)
+
+1. Profile the 399 CPU-s case and one real Session (CPU, RAM, DB time, queue wait).
+2. Connection pool + in-memory rate limit (small, no contract change).
+3. Batch/window request + adaptive ADVANCE loop (client + queue).
+4. Warm per-Session process.
+5. Columnar read path + verify-once receipts behind a flag, parity gate must pass.
+6. Option D experiment (owner grant), then sparse checkpoints (§16).
+7. Load test: swing profile vs scalping profile, 6 vCPU / 16 GB.
+
+### 17.6 Open owner decisions
+(a) Option D experiment; (b) receipt-based verification study; (c) warm per-Session
+process policy (memory cap/idle timeout); (d) worker count/limits policy; (e) V1 scope.
