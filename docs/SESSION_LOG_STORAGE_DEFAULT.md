@@ -34,8 +34,10 @@ SQLite page granularity, so the small-sample on-disk figures overstate the per-g
 - That is still far above a 500 MB per-Session target. Reaching it needs the persistence-contract review already
   recorded in `XAU_2024_SESSION_STORAGE_CHECKPOINT_4_2026_10_30.md` (a compact block proof or checkpoint scheme),
   which is a contract change and is NOT made here.
-- Separate finding: `IndexedTickTimeline.resume` took about 10 s for 2,048 groups in every codec, so resume cost, not
-  log size, may dominate cold-start latency for long Sessions. Not investigated here.
+- CORRECTION: the "Resume" column (about 10 s) is a benchmark artifact. The measurement used the default
+  `session_start_ns="0"`, so every advance ran about 19,700 empty one-day evidence windows from 1970. With a real session
+  start, resume is about 1-2 s per 3,000 groups (see `CANONICAL_FASTPATH.md`). Read/size columns and the codec comparison are
+  not affected; the resume column should be ignored.
 
 ## Tests
 ```text
