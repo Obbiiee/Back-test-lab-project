@@ -813,3 +813,108 @@ limiter. Others are optimizations.
 - Rights status of every provider is UNKNOWN to me.
 - The XAU 84.25 B/tick figure is one January slice with the existing exporter, not an
   annual measurement.
+
+## 12. Follow-up revisions for Codex (2026-11-13, after owner Q&A)
+
+> **Status: ADVISORY. No implementation authorized, no frozen contract changed.**
+> Evidence for 12.1 comes from reading `backend/market_data/monthly_parquet.py` on PR #53
+> head `92827bc` (lines ~606–660). No profiling or benchmark was run; speedups are
+> hypotheses until measured.
+
+### 12.1 Why reading Monthly Parquet is slow — per-row Python re-verification
+
+- Evidence: for every row group (≤ 65,536 ticks) the reader calls `batch.to_pylist()`
+  and then, **for every tick**: parses `provenance_json` and `quality_json`
+  (`_json_object`), rebuilds the event (`_row_to_event` → `CanonicalTick.from_wire`),
+  checks dataset identity, ordering and provenance against the manifest, re-encodes
+  with `canonical_bytes(event)`, feeds SHA-256 and appends the event dict to a list.
+  Only after the loop does it compare the group hash.
+- Impact: the cost is per-row Python object work and JSON/canonical encoding, not
+  Parquet decoding or zstd. This is consistent with the recorded ≈2,100 ticks/s
+  conversion rate and the 399 CPU-s per 262,144-tick case (NEEDS DATA: profile split).
+- Proposed solutions (all need owner grant + parity proof, because verification rules
+  are frozen):
+  1. **Verify once per file/row group, not per replay.** Persist a verification
+     receipt bound to (file SHA-256, manifest hash, verifier version, policy version).
+     Replay reads trusted data under a valid receipt; any byte change invalidates it.
+  2. **Columnar read path.** Read `timestamp_ns`, bid, ask as Arrow/NumPy arrays; do
+     comparisons on integers; build Python event objects only for ticks that touch an
+     order trigger or are revealed to a consumer.
+  3. **Move constant per-row values to the manifest** (provider/feed/instrument/
+     dataset ids, `resolution_ns`, `memberHash`, source ids). Per-row `provenance_json`
+     and `quality_json` shrink or disappear; per-row evidence hash becomes
+     per-row-group hash (Merkle).
+  4. **Option D (§11.3)** to skip row groups whose min/max cannot touch any trigger.
+  5. Rust/Numba only after 1–4 and profiling show Python is still the bottleneck.
+- Precision is preserved if: prices become fixed-point integers at the **source
+  scale** (bid/ask are exact decimal strings today, so conversion is lossless);
+  money arithmetic stays `Fraction`/`Decimal` (BigInt rationals in a browser twin),
+  executed only on touched ticks; nothing passes through float/`Number`; nanosecond
+  timestamps use int64 / BigInt; canonical hashes and financial results are
+  **byte-identical** to the current path on all golden vectors plus one real EURUSD and
+  one real XAUUSD month. Any mismatch rejects the new path.
+
+### 12.2 Compression is not the lever — zip adds nothing
+
+- Evidence: `COMPRESSION = "zstd"`, level 3 (`monthly_parquet.py:32-33`). Zipping an
+  already zstd-compressed Parquet saves ≈0–5%, and forces full decompression before
+  any row-group/range read. HTTP gzip/brotli on top is equally useless.
+- What shrinks Parquet: per-row hashes, string event ids, `provenance_json`,
+  `quality_json` are high-entropy or repeated per row (see B13); raising zstd to
+  9–19 may give ≈5–15% (to be measured).
+- Bandwidth is reduced by sending **less data** (range/chunk reads, a compact
+  delivery derivative, CDN, or Option D) — not by archiving.
+
+### 12.3 Per-month client download (estimates; XAUUSD ≈ 4.7 M ticks/month)
+
+| Delivery | Bytes/tick | 1 month XAU download | Evidence |
+|---|---|---|---|
+| Whole canonical Parquet | ≈84–149 | ≈400–700 MB | repo measurements (XAU slice 84.25 B/tick; EURUSD PoC ≈149 B/tick) |
+| Compact delivery chunks (time, bid, ask) | ≈3–8 | ≈15–40 MB | **estimate, unmeasured** |
+| Option D (display candles only) | — | ≈0.2 MB | measured on one M1 candle file |
+
+At 1,000 users each replaying one XAU month: ≈400–700 GB, ≈15–40 GB, ≈0.2 GB per
+month respectively. Never serve whole canonical Parquet files to clients.
+
+### 12.4 Object storage and delivery (Cloudflare R2, checked 2026-11-13)
+
+- Pricing (Oct 2026 pages): Standard $0.015/GB-month; Infrequent Access
+  $0.01/GB-month (30-day minimum); Class A $4.50/M; Class B $0.36/M; free tier
+  10 GB, 1 M Class A, 10 M Class B; egress $0. Storage per bucket is unlimited;
+  max object 5 TiB.
+- Rough cost: ≈10 GB compact chunks → $0 (free tier); ≈15 GB raw archive → ≈$0.08/month;
+  ≈786 GB (old forecast) → ≈$12/month. Many tiny chunks raise operation counts, so
+  chunk size is a parameter to test.
+- **Do not serve production traffic from the `r2.dev` URL**: it is rate limited and
+  throttled (429, possible bandwidth throttling) and has no WAF/cache/access control.
+  Use a custom domain with Cloudflare caching, `immutable` long-cache headers for
+  content-addressed chunks, and access control/signed URLs if licensing requires.
+- R2 solves cost only. It does **not** grant redistribution rights (§11.2 Q2).
+- Egress is documented free at all volumes; I found no explicit monthly bandwidth cap
+  but also no numeric throughput quota — confirm with Cloudflare before relying on
+  very high traffic.
+
+### 12.5 Suggested V1 scope (smallest thing that fits the VPS)
+
+Owner is constrained on both client downloads and VPS capacity, so:
+
+1. **Narrow data scope first:** XAUUSD only, 1–2 years. From the repo's own number
+   (84.25 B/tick; annual count ≈4.74 GB) this is ≈5–10 GB in the current serving
+   format — simple arithmetic that the repo itself labels NOT a qualified projection;
+   measure before committing. Add symbols/years only after users exist.
+2. **Ticks stay on the server;** clients receive display candles only.
+3. **Settlement via Option D** (event-driven + per-chunk min/max index), parity-gated.
+4. **R2 for backup/archive** of raw sources and manifests, not for client delivery in V1.
+5. **Local/browser execution and tick chunk delivery deferred to V2**, behind the rights
+   matrix (§11.2 Q2) and the Gate A/B measurements.
+
+Open owner decisions: (a) rights status per provider; (b) approve Option D experiment;
+(c) approve receipt-based verification study (12.1); (d) V1 symbol/period scope.
+
+### 12.6 Updated priority additions (insert into §11.4)
+
+- (i) reversible: profile the read path (12.1) and publish the per-stage split; add a
+  full-suite zero-skip CI job; custom-domain + cache setup for any static delivery.
+- (ii) blockers: rights matrix; real-month compact-chunk measurement.
+- (iii) owner-authorized: receipt-based verification; Option D; columnar/fixed-point
+  read path; moving constant per-row fields to the manifest.
