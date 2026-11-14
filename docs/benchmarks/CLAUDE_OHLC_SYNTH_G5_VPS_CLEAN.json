@@ -1,0 +1,37 @@
+{
+ "gate": "G5-clean",
+ "label": "SYNTHETIC",
+ "months": 3,
+ "wall": 0.816,
+ "cpu": 1.094,
+ "peakRssMB": 157.3,
+ "rssBaseMB": 67.8,
+ "writeMB": 3.2,
+ "totalBytes": 3282093,
+ "puts": {
+  "put": 30,
+  "get": 0,
+  "head": 30,
+  "list": 0,
+  "bytesPut": 3292359,
+  "bytesGet": 0
+ },
+ "perMonth": [
+  {
+   "month": "2026-05",
+   "seconds": 0.334,
+   "bytes": 1049001
+  },
+  {
+   "month": "2026-06",
+   "seconds": 0.234,
+   "bytes": 1091998
+  },
+  {
+   "month": "2026-07",
+   "seconds": 0.248,
+   "bytes": 1141094
+  }
+ ],
+ "oracleEquality": "NOT_RUN"
+}

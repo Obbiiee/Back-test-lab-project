@@ -1,0 +1,41 @@
+{
+ "gate": "G5",
+ "label": "SYNTHETIC",
+ "months": 3,
+ "wall": 0.743,
+ "cpu": 0.966,
+ "peakRssMB": 161.2,
+ "rssBaseMB": 67.8,
+ "writeMB": 3.2,
+ "totalBytes": 3282093,
+ "puts": {
+  "put": 30,
+  "get": 0,
+  "head": 30,
+  "list": 0,
+  "bytesPut": 3292359,
+  "bytesGet": 0
+ },
+ "perMonth": [
+  {
+   "month": "2026-05",
+   "seconds": 0.278,
+   "bytes": 1049001
+  },
+  {
+   "month": "2026-06",
+   "seconds": 0.225,
+   "bytes": 1091998
+  },
+  {
+   "month": "2026-07",
+   "seconds": 0.24,
+   "bytes": 1141094
+  }
+ ],
+ "oracleEquality": {
+  "2026-05": "IDENTICAL",
+  "2026-06": "IDENTICAL",
+  "2026-07": "IDENTICAL"
+ }
+}

@@ -1,0 +1,82 @@
+{
+ "gate": "G6",
+ "label": "SYNTHETIC",
+ "months": 12,
+ "wall": 3.076,
+ "cpu": 3.963,
+ "peakRssMB": 200.7,
+ "rssBaseMB": 68.0,
+ "writeMB": 11.81,
+ "totalBytes": 12089139,
+ "puts": {
+  "put": 120,
+  "get": 0,
+  "head": 120,
+  "list": 0,
+  "bytesPut": 12130201,
+  "bytesGet": 0
+ },
+ "perMonth": [
+  {
+   "month": "2026-01",
+   "seconds": 0.294,
+   "bytes": 1093013
+  },
+  {
+   "month": "2026-02",
+   "seconds": 0.257,
+   "bytes": 1001220
+  },
+  {
+   "month": "2026-03",
+   "seconds": 0.266,
+   "bytes": 1092786
+  },
+  {
+   "month": "2026-04",
+   "seconds": 0.282,
+   "bytes": 1092177
+  },
+  {
+   "month": "2026-05",
+   "seconds": 0.285,
+   "bytes": 1048550
+  },
+  {
+   "month": "2026-06",
+   "seconds": 0.256,
+   "bytes": 1092921
+  },
+  {
+   "month": "2026-07",
+   "seconds": 0.269,
+   "bytes": 1139242
+  },
+  {
+   "month": "2026-08",
+   "seconds": 0.234,
+   "bytes": 890357
+  },
+  {
+   "month": "2026-09",
+   "seconds": 0.219,
+   "bytes": 795205
+  },
+  {
+   "month": "2026-10",
+   "seconds": 0.209,
+   "bytes": 803635
+  },
+  {
+   "month": "2026-11",
+   "seconds": 0.23,
+   "bytes": 904808
+  },
+  {
+   "month": "2026-12",
+   "seconds": 0.275,
+   "bytes": 1135225
+  }
+ ],
+ "oracleEquality": "NOT_RUN"
+}

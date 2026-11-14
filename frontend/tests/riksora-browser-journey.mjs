@@ -44,7 +44,7 @@ if(browserEndpoint){
   if(endpoint.protocol!=='ws:'||endpoint.hostname!=='127.0.0.1'||endpoint.port===''||endpoint.username||endpoint.password)
     throw Error('LOCAL_BROWSER_HOST_REQUIRED');
   browser=await chromium.connect(browserEndpoint);
-}else browser=await chromium.launch({headless:true});
+}else browser=await chromium.launch({headless:true,chromiumSandbox:process.env.RIKSORA_QA_NO_SANDBOX!=='1'});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));

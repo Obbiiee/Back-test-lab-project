@@ -1,0 +1,387 @@
+{
+ "environment": {
+  "python": "3.13.18",
+  "numpy": "2.5.4",
+  "platform": "Linux-6.8.0-146-generic-x86_64-with-glibc2.39",
+  "logicalCpus": 6,
+  "ramGiB": 15.6,
+  "sourceManifestHash": "58ae8e4416e4736620e6b3d825899b3a0aeb9d3620d188a8cf9a925aa548a729",
+  "sourceTicks": 1444646,
+  "scale": 5,
+  "targetHostNote": "target VPS is 6 vCPU / 16 GiB; this is NOT that host",
+  "pyarrow": "26.0.0"
+ },
+ "A_materialisation": [
+  {
+   "gate": "G0",
+   "ticks": 2048,
+   "repeats": 5,
+   "wallMedian": 0.016,
+   "wallRange": [
+    0.014,
+    0.035
+   ],
+   "cpuMedian": 0.023,
+   "peakRssMB": 119.6,
+   "rssBaseMB": 69.7,
+   "ticksPerSecMedian": 131324,
+   "readMB": 0.0,
+   "writeMB": 0.04,
+   "objects": 10,
+   "puts": 10,
+   "outputBytes": {
+    "M1": 2647,
+    "M3": 2061,
+    "M5": 1894,
+    "M15": 1620,
+    "M30": 1558,
+    "H1": 1498,
+    "H2": 1498,
+    "H4": 1498,
+    "D1": 1498
+   },
+   "outputBytesTotal": 15772,
+   "barCounts": {
+    "M1": 44,
+    "M3": 15,
+    "M5": 9,
+    "M15": 3,
+    "M30": 2,
+    "H1": 1,
+    "H2": 1,
+    "H4": 1,
+    "D1": 1
+   }
+  },
+  {
+   "gate": "G1",
+   "ticks": 65536,
+   "repeats": 5,
+   "wallMedian": 0.027,
+   "wallRange": [
+    0.024,
+    0.027
+   ],
+   "cpuMedian": 0.034,
+   "peakRssMB": 123.8,
+   "rssBaseMB": 121.7,
+   "ticksPerSecMedian": 2447199,
+   "readMB": 0.0,
+   "writeMB": 0.08,
+   "objects": 10,
+   "puts": 10,
+   "outputBytes": {
+    "M1": 28530,
+    "M3": 11473,
+    "M5": 8001,
+    "M15": 4368,
+    "M30": 3112,
+    "H1": 2413,
+    "H2": 2021,
+    "H4": 1773,
+    "D1": 1498
+   },
+   "outputBytesTotal": 63189,
+   "barCounts": {
+    "M1": 1382,
+    "M3": 461,
+    "M5": 277,
+    "M15": 93,
+    "M30": 47,
+    "H1": 24,
+    "H2": 12,
+    "H4": 6,
+    "D1": 1
+   }
+  },
+  {
+   "gate": "G2",
+   "ticks": 262144,
+   "repeats": 5,
+   "wallMedian": 0.061,
+   "wallRange": [
+    0.06,
+    0.066
+   ],
+   "cpuMedian": 0.079,
+   "peakRssMB": 127.6,
+   "rssBaseMB": 123.9,
+   "ticksPerSecMedian": 4295791,
+   "readMB": 0.0,
+   "writeMB": 0.21,
+   "objects": 10,
+   "puts": 10,
+   "outputBytes": {
+    "M1": 108260,
+    "M3": 39805,
+    "M5": 26058,
+    "M15": 11560,
+    "M30": 6946,
+    "H1": 4474,
+    "H2": 3105,
+    "H4": 2371,
+    "D1": 1680
+   },
+   "outputBytesTotal": 204259,
+   "barCounts": {
+    "M1": 5499,
+    "M3": 1833,
+    "M5": 1100,
+    "M15": 367,
+    "M30": 184,
+    "H1": 92,
+    "H2": 46,
+    "H4": 23,
+    "D1": 4
+   }
+  },
+  {
+   "gate": "G3",
+   "ticks": 1000000,
+   "repeats": 5,
+   "wallMedian": 0.186,
+   "wallRange": [
+    0.181,
+    0.2
+   ],
+   "cpuMedian": 0.248,
+   "peakRssMB": 137.2,
+   "rssBaseMB": 126.1,
+   "ticksPerSecMedian": 5389292,
+   "readMB": 0.0,
+   "writeMB": 0.72,
+   "objects": 10,
+   "puts": 10,
+   "outputBytes": {
+    "M1": 406749,
+    "M3": 145923,
+    "M5": 94200,
+    "M15": 37993,
+    "M30": 20776,
+    "H1": 11678,
+    "H2": 6873,
+    "H4": 4405,
+    "D1": 2140
+   },
+   "outputBytesTotal": 730737,
+   "barCounts": {
+    "M1": 20936,
+    "M3": 6979,
+    "M5": 4188,
+    "M15": 1396,
+    "M30": 698,
+    "H1": 349,
+    "H2": 175,
+    "H4": 88,
+    "D1": 15
+   }
+  },
+  {
+   "gate": "G4",
+   "ticks": 1444646,
+   "repeats": 5,
+   "wallMedian": 0.286,
+   "wallRange": [
+    0.275,
+    0.294
+   ],
+   "cpuMedian": 0.374,
+   "peakRssMB": 157.6,
+   "rssBaseMB": 136.6,
+   "ticksPerSecMedian": 5055207,
+   "readMB": 0.0,
+   "writeMB": 1.02,
+   "objects": 10,
+   "puts": 10,
+   "outputBytes": {
+    "M1": 586458,
+    "M3": 211429,
+    "M5": 135149,
+    "M15": 54039,
+    "M30": 29083,
+    "H1": 15991,
+    "H2": 9030,
+    "H4": 5480,
+    "D1": 2342
+   },
+   "outputBytesTotal": 1049001,
+   "barCounts": {
+    "M1": 30240,
+    "M3": 10080,
+    "M5": 6048,
+    "M15": 2016,
+    "M30": 1008,
+    "H1": 504,
+    "H2": 252,
+    "H4": 126,
+    "D1": 21
+   }
+  }
+ ],
+ "B_equality": [
+  {
+   "gate": "G0",
+   "ticks": 2048,
+   "equality": "IDENTICAL",
+   "oracleSeconds": 0.18
+  },
+  {
+   "gate": "G1",
+   "ticks": 65536,
+   "equality": "IDENTICAL",
+   "oracleSeconds": 5.58
+  },
+  {
+   "gate": "G2",
+   "ticks": 262144,
+   "equality": "IDENTICAL",
+   "oracleSeconds": 23.68
+  },
+  {
+   "gate": "G3",
+   "ticks": 1000000,
+   "equality": "IDENTICAL",
+   "oracleSeconds": 90.13
+  },
+  {
+   "gate": "G4",
+   "ticks": 1444646,
+   "equality": "IDENTICAL",
+   "oracleSeconds": 134.72
+  }
+ ],
+ "C_serving": {
+  "late-in-month": {
+   "cold": {
+    "requests": 18,
+    "p50ms": 3.52,
+    "p95ms": 69.76,
+    "p99ms": 69.76,
+    "meanPayloadBytes": 27685,
+    "maxPayloadBytes": 53536,
+    "storeGets": 10,
+    "storeBytes": 1052421,
+    "storeLists": 1,
+    "cacheHits": 25,
+    "cacheMisses": 9
+   },
+   "warm": {
+    "requests": 360,
+    "p50ms": 2.72,
+    "p95ms": 4.78,
+    "p99ms": 5.96,
+    "meanPayloadBytes": 27685,
+    "maxPayloadBytes": 53536,
+    "storeGets": 0,
+    "storeBytes": 0,
+    "storeLists": 0,
+    "cacheHits": 705,
+    "cacheMisses": 9
+   },
+   "firstPageByTimeframe": {
+    "M1": {
+     "firstPageP50ms": 2.62,
+     "payload": 26644
+    },
+    "M3": {
+     "firstPageP50ms": 2.99,
+     "payload": 27157
+    },
+    "M5": {
+     "firstPageP50ms": 3.33,
+     "payload": 27157
+    },
+    "M15": {
+     "firstPageP50ms": 3.43,
+     "payload": 27158
+    },
+    "M30": {
+     "firstPageP50ms": 3.46,
+     "payload": 27671
+    },
+    "H1": {
+     "firstPageP50ms": 3.14,
+     "payload": 27194
+    },
+    "H2": {
+     "firstPageP50ms": 2.89,
+     "payload": 13838
+    },
+    "H4": {
+     "firstPageP50ms": 2.24,
+     "payload": 7286
+    },
+    "D1": {
+     "firstPageP50ms": 2.32,
+     "payload": 1615
+    }
+   }
+  },
+  "one-third-from-end": {
+   "cold": {
+    "requests": 18,
+    "p50ms": 5.95,
+    "p95ms": 12.94,
+    "p99ms": 12.94,
+    "meanPayloadBytes": 24678,
+    "maxPayloadBytes": 52535,
+    "storeGets": 10,
+    "storeBytes": 1052421,
+    "storeLists": 1,
+    "cacheHits": 25,
+    "cacheMisses": 9
+   },
+   "warm": {
+    "requests": 360,
+    "p50ms": 4.92,
+    "p95ms": 7.02,
+    "p99ms": 7.89,
+    "meanPayloadBytes": 24678,
+    "maxPayloadBytes": 52535,
+    "storeGets": 0,
+    "storeBytes": 0,
+    "storeLists": 0,
+    "cacheHits": 705,
+    "cacheMisses": 9
+   },
+   "firstPageByTimeframe": {
+    "M1": {
+     "firstPageP50ms": 3.86,
+     "payload": 26644
+    },
+    "M3": {
+     "firstPageP50ms": 4.48,
+     "payload": 27157
+    },
+    "M5": {
+     "firstPageP50ms": 4.63,
+     "payload": 27157
+    },
+    "M15": {
+     "firstPageP50ms": 5.28,
+     "payload": 27158
+    },
+    "M30": {
+     "firstPageP50ms": 5.34,
+     "payload": 27671
+    },
+    "H1": {
+     "firstPageP50ms": 4.67,
+     "payload": 17442
+    },
+    "H2": {
+     "firstPageP50ms": 5.8,
+     "payload": 8962
+    },
+    "H4": {
+     "firstPageP50ms": 4.77,
+     "payload": 4801
+    },
+    "D1": {
+     "firstPageP50ms": 4.5,
+     "payload": 1237
+    }
+   }
+  }
+ }
+}
