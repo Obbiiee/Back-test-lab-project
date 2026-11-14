@@ -174,3 +174,30 @@ Findings
 4. Cost per full journey (1 closed trade, 38 API calls, charts open): about 5.8 CPU-seconds server-side (173 s for 30 journeys at 10 traders: API + workers + chart service; PostgreSQL 0.19 s), PostgreSQL growth about 0.1-0.2 MB per journey. It is an upper bound per trade because session creation amortizes over more trades; 120 trades per Session was NOT measured.
 5. D1 needs 5,000 candles = about 19 years = about 235 monthly objects: with the object cache of 64 each D1 open touches many objects. On real R2 (tens of ms per GET) cache the OHLC objects on the VPS SSD (about 190 MB per instrument at this density, about 1.1 MB x 237 for real density).
 NOT measured: real R2 latency/cost, real browsers with the Claude chart (the frontend still uses the frozen 512-bar previous-month context), real-month-size replay sessions (worker RSS and CPU per large Session), 120-trade Sessions, 12+ instruments, cohort sizes between 10 and 20, any cohort at 50 beyond the first 15 s.
+
+## H. Why more workers do not simply add capacity on this 6-vCPU host (diagnosis) — SYNTHETIC
+Method: per-role CPU/RSS sampled every second from the cgroup (`cpuByRole`), HTTP driver, 20 traders, 3 journeys each, client patient (busy refusals retried up to about 5 min) with client-side recovery of pruned job results (`poll:404`, resubmit with the same job/command id; NOT current frontend behaviour; counts are in `retentionRecoveries`). Raw: `docs/benchmarks/vps-cohorts/diagnosis/`.
+
+### H1. Product only, worker pool 2 / 3 / 4 (pool verified), 6-CPU cgroup
+| Workers | Journeys ok | Journeys/min | Native worker CPU avg / p95 / max (cores) | API process CPU avg / p95 / max | PostgreSQL avg | Host CPU p50 / p95 / max % | Queue max / oldest wait s |
+|---:|---|---:|---|---|---:|---|---|
+| 2 | 60/60 | 18.9 | 0.91 / 1.67 / 1.89 | 0.55 / 0.99 / 1.22 | 0.06 | 42 / 57 / 67 | saturated (16 / ~10 s in earlier runs) |
+| 3 | 60/60 | 22.8 | 1.32 / 2.49 / 2.66 | 0.62 / 1.05 / 1.17 | 0.07 | 51 / 69 / 77 | 15 / 6 |
+| 4 | 60/60 | 27.5 | 1.64 / 3.05 / 4.04 | 0.70 / 1.02 / 1.24 | 0.07 | 61 / 78 / 95 | 12 / 3.7 |
+With chart (2 workers): 60/60, 19.1 journeys/min, chart service process avg 0.26 / p95 1.46 / max 1.82 cores, host CPU 45 / 64 / 83 %.
+Readings: (a) each native worker averages only about 0.4 core (about 40% duty) but bursts to about 1 core, so N workers burst to about N cores at the same moment; (b) PostgreSQL is negligible (0.06-0.07 core); (c) the API process (one Python process) reaches about 1 core at p95 in every configuration; (d) at 4 workers the 6-vCPU host reaches 78-95% CPU at the burst peaks, i.e. the owner's 80% stop line, with API about 1 + workers about 3.5 + chart burst up to 1.8 + OS.
+
+### H2. Several API processes (extra instances share the same PostgreSQL queue; worker slots are global advisory locks, so total running jobs stay <= pool size), 4 workers, 20 traders, 1.5 s arrival spacing
+| API processes | Result | Journeys/min | API process CPU p95 (each) | Native worker CPU p95 | Host CPU p95 / max % |
+|---:|---|---:|---|---:|---|
+| 1 | 57/60 (1 trader failed, 2 SERVICE_BUSY); an earlier 0.3 s-spacing run 60/60, 27.9 | 25.7 | 0.90 | 2.76 | 77 / 86 |
+| 2 | 60/60, no recoveries needed | 26.8 | 0.53 / 0.55 | 3.21 | 88 / 91 |
+| 3 | stopped by the 80% CPU gate after 35 s | - | 0.30 / 0.71 | 3.12 | 89 / 91 |
+Two API processes split the API load (about 0.5 core each instead of 0.9) and worked correctly (zero failures), but throughput did not rise: at 20 traders with 4 workers the run is bounded by trader pacing (1 s think time, about 34 s per journey => about 35 journeys/min ceiling) rather than by capacity, and the queue is no longer saturated (oldest wait 1.4 s). So the claim "the API process is the bottleneck" is NOT proven; the single-process 1-core ceiling is a latent limit that only matters at higher load. With 2-3 API processes every extra instance also cold-starts its own native slots and re-admits the pinned source on first use (hypothesis, not isolated), which adds a CPU burst at the start that trips the 80% gate.
+Single runs per cell; no confidence ranges.
+
+### H3. Answer: spec vs design
+- Hard design limit: the pool is 1-4 slots (`worker_config.MAX_WORKER_COUNT = 4`, global advisory-lock slots 310..313). More than 4 concurrent jobs needs a product change (contract), not hardware.
+- Spec limit on this host, with the 80% stop line: 6 vCPU cannot absorb 4 native workers bursting (about 1 core each) + API (about 1) + chart opens (up to about 1.8) + PostgreSQL + OS. Practical setting here: 2-3 workers; 4 only if the CPU gate is relaxed or the host has about 8+ vCPU (estimate: 4 + 1 + 1 + 0.3 + 0.3 + headroom = about 7-8 vCPU).
+- Software items that would raise the ceiling without more CPU (not implemented, not measured): warm all native slots at startup (only slot 0 is warmed), a multi-process chart service or cached ready pages (open burst about 2 CPU-s per trader), and a finished-job retention that cannot prune results before their owner polls (`cloud/queue.py:245`).
+- Target of 100 simultaneous traders was attempted and NOT reached inside the gates: 3 workers 30 traders 58/60 journeys (1 trader failed); 50/75/100 traders and 2-worker 50 traders were stopped by the 80% CPU gate in the first 35 s (no completed run). 15 simultaneous (same instant) full-experience traders passed 3/3; 18 failed.

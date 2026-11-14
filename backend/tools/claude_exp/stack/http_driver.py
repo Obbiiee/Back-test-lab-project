@@ -129,13 +129,19 @@ class Trader:
         self.conn = None
         self.rng = random.Random(n)
         self.chart = None
+        self._auth_phase = True
+        self.journey_port = None
+        self.conns = {}
         self.max_retries = dict(QUEUE_CAPACITY=45, RESEARCH_BUSY=8, SERVICE_BUSY=8)
         self.recovered = 0
 
     def _conn(self):
-        if self.conn is None:
-            self.conn = http.client.HTTPSConnection(self.host, self.port, timeout=100, context=ssl._create_unverified_context())
-        return self.conn
+        port = self.port if (self.journey_port is None or self._auth_phase) else self.journey_port
+        c = self.conns.get(port)
+        if c is None:
+            c = self.conns[port] = http.client.HTTPSConnection(self.host, port, timeout=100, context=ssl._create_unverified_context())
+        self.conn = c
+        return c
 
     def call(self, method, path, body=None, ctype=None, job=None, auth=True, timed=True):
         headers = {'X-Forwarded-For': self.ip, 'X-Forwarded-Proto': 'https'}
@@ -147,13 +153,14 @@ class Trader:
             headers['Content-Type'] = ctype or 'application/json'
         t0 = time.perf_counter()
         for attempt in (0, 1):
-            reused = self.conn is not None
+            reused = (self.port if (self.journey_port is None or self._auth_phase) else self.journey_port) in self.conns
             try:
                 c = self._conn()
                 c.request(method, path, body.encode() if isinstance(body, str) else body, headers)
                 r = c.getresponse(); data = r.read(); status = r.status; self.retry_after = r.getheader('Retry-After')
                 break
             except Exception as error:
+                self.conns = {k: v for k, v in self.conns.items() if v is not self.conn}
                 self.conn = None
                 # A kept-alive connection the server already closed while idle: reconnect once (browsers do the same).
                 if attempt == 0 and reused and isinstance(error, (http.client.RemoteDisconnected, ConnectionResetError, BrokenPipeError)):
@@ -322,7 +329,7 @@ def main():
     ap.add_argument('--url', required=True); ap.add_argument('--traders', type=int, required=True)
     ap.add_argument('--cycles', type=int, default=3); ap.add_argument('--think-ms', type=int, default=1000)
     ap.add_argument('--stagger-ms', type=int, default=0)
-    ap.add_argument('--patient', action='store_true'); ap.add_argument('--chart-url', default=None); ap.add_argument('--chart-history', type=int, default=5000)
+    ap.add_argument('--api-ports', default=''); ap.add_argument('--patient', action='store_true'); ap.add_argument('--chart-url', default=None); ap.add_argument('--chart-history', type=int, default=5000)
     a = ap.parse_args()
     u = urllib.parse.urlsplit(a.url)
     template = json.loads(TEMPLATE.read_text())
@@ -343,6 +350,12 @@ def main():
     emit({'progress': 'setup_done', 'seconds': round(time.perf_counter() - t_setup, 1), 'failures': setup_fail[:5]})
     if setup_fail:
         emit({'summary': {'status': 'SETUP_FAILED', 'failures': setup_fail[:10]}}); return
+    extra_ports = [int(x) for x in a.api_ports.split(',') if x]
+    for t in traders:
+        t._auth_phase = False
+        if extra_ports:                       # spread traders over the main instance and the extra instances
+            allp = [u.port] + extra_ports
+            t.journey_port = allp[t.n % len(allp)]
     barrier = threading.Barrier(a.traders + 1)
 
     if a.patient:

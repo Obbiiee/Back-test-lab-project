@@ -37,6 +37,7 @@ def _role_ticks(cgroup, api_pid, chart_pid, driver_pid):
         elif pid == driver_pid: role = 'load_driver'
         elif comm.startswith('postgres'): role = 'postgres'
         elif b'cloud.worker import serve' in cmd: role = 'native_worker'
+        elif b'qa_extra_api' in cmd: role = 'api_process_extra'
         else: role = 'other'
         r = roles.setdefault(role, dict(ticks=0, rss=0, procs=0)); r['ticks'] += ticks; r['rss'] += rss; r['procs'] += 1
     return roles
@@ -101,7 +102,7 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
         ready = json.loads(chart_proc.stdout.readline())
         chart_args = ['--chart-url', f"http://127.0.0.1:{ready['port']}"]
     proc = subprocess.Popen([sys.executable, '-I', str(DRIVER), '--url', url, '--traders', str(cohort_size), '--cycles', str(cycles),
-                             '--think-ms', str(think_ms), '--stagger-ms', str(stagger_ms)] + chart_args + (['--patient'] if os.environ.get('RIKSORA_QA_HTTP_PATIENT') == '1' else []),
+                             '--think-ms', str(think_ms), '--stagger-ms', str(stagger_ms)] + chart_args + (['--api-ports', os.environ['RIKSORA_QA_API_EXTRA_PORTS']] if os.environ.get('RIKSORA_QA_API_EXTRA_PORTS') else []) + (['--patient'] if os.environ.get('RIKSORA_QA_HTTP_PATIENT') == '1' else []),
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, start_new_session=True)
     summary = {}
     phase = {'measuring': False}

@@ -353,7 +353,8 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
         if not report['runtimeMethodProjectionSelect']:
             raise PermissionError('QA_METHOD_PROJECTION_GRANT_MISSING')
     delivery = RecordingDelivery()
-    app = create_app(runtime, secrets.token_urlsafe(48), delivery,
+    qa_secret = secrets.token_urlsafe(48)
+    app = create_app(runtime, qa_secret, delivery,
                      rate_limit=auth_ip_limit if capacity_test else 1200,
                      sandbox_reset_timezone='UTC')
     if capacity_test:
@@ -437,11 +438,32 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                 # Measurement-only opt-in: HTTP-level traders (no browsers) against the same real backend; see http_load_cohort.py.
                 sys.path.insert(0, str(Path(__file__).resolve().parent))
                 from http_load_cohort import run_http_cohort
+                extra = []
+                instances = int(os.environ.get('RIKSORA_QA_API_INSTANCES', '1'))
+                for _i in range(1, instances):       # additional API processes sharing the same PostgreSQL queue (measurement only)
+                    xsock = socket.socket(); xsock.bind(('127.0.0.1', 0)); xport = xsock.getsockname()[1]; xsock.close()
+                    xp = subprocess.Popen([sys.executable, str(Path(__file__).with_name('qa_extra_api.py'))], stdin=subprocess.PIPE, text=True)
+                    xp.stdin.write(json.dumps(dict(dsn=runtime, secret=qa_secret, rate_limit=auth_ip_limit, port=xport,
+                                                   cert=str(tls/'cert.pem'), key=str(tls/'key.pem')))+'\n'); xp.stdin.flush()
+                    extra.append((xp, xport))
+                import ssl, urllib.request
+                for xp, xport in extra:
+                    for _ in range(300):
+                        try:
+                            urllib.request.urlopen(f'https://127.0.0.1:{xport}/api/v1/auth/providers',
+                                                   context=ssl._create_unverified_context(), timeout=2); break
+                        except Exception:
+                            time.sleep(0.1)
+                    else:
+                        raise RuntimeError('QA_EXTRA_API_TIMEOUT')
+                os.environ['RIKSORA_QA_API_EXTRA_PORTS'] = ','.join(str(x) for _, x in extra)
                 run_http_cohort(url=f'https://127.0.0.1:{port}', delivery=delivery, cohort_size=cohort_size, report=report, dsn=dsn,
                                 system_resources=_system_resources, nearest_rank=_nearest_rank, proc_snapshot=_proc_snapshot,
                                 cycles=int(os.environ.get('RIKSORA_QA_HTTP_CYCLES', '3')),
                                 think_ms=int(os.environ.get('RIKSORA_QA_HTTP_THINK_MS', '1000')),
                                 stagger_ms=int(os.environ.get('RIKSORA_QA_HTTP_STAGGER_MS', '0')))
+                for xp, _ in extra:
+                    xp.kill()
                 return
             if capacity_test:
                 run_browser_cohort(environment, tools, browser_cache, evidence, report,
