@@ -1,7 +1,7 @@
 """Financial parity on REAL EURUSD ticks: reference reducer (repo baseline) vs Claude jump engine, and the Claude engine on compact v1 vs compact v2.
 
 Real data (rights UNKNOWN: private QA only, never commercial evidence). A slice of the first N ticks of a verified v1 month is used as the input.
-  python -m tools.claude_exp.fin_parity_v2 <v1 month dir> <N> <scenario> <out.json>        (run from backend/)
+  python -m tools.claude_exp.fin_parity_v2 <v1 month dir> <N> <scenario> <out.json> [offset]        (run from backend/)
 Legs: (1) baseline reducer vs ClaudeSession on a compact written by parity.run (v1);  (2) the same slice re-encoded to compact v2 and read by ClaudeSession
 through `open_compact`; compare final state, stats and the full event list of leg (2) against leg (1) and against the baseline.
 """
@@ -26,10 +26,11 @@ def price(v, scale=5):
 
 def main():
     v1dir, n, scen, out = Path(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
+    offset = int(sys.argv[5]) if len(sys.argv) > 5 else 0          # first tick of the slice (default 0)
     set_instrument(5, "0.00040")
     rd = CompactTickReader(v1dir)
     a = rd.read_range(0, 2**62)
-    ts, bid, ask = a["ts_ns"][:n], a["bid"][:n], a["ask"][:n]
+    ts, bid, ask = a["ts_ns"][offset:offset + n], a["bid"][offset:offset + n], a["ask"][offset:offset + n]
     assert bool(np.all(ts % 1_000_000 == 0)), "source must be millisecond precision"
     rows = [(int(t) // 1_000_000, price(int(k)), price(int(b))) for t, k, b in zip(ts, ask, bid)]
     tmp = Path(tempfile.mkdtemp(prefix="finpar-"))
@@ -38,7 +39,7 @@ def main():
         zf.writestr("EURUSD_slice.csv", "timestamp,bid,ask\n" + "\n".join(f"{t},{b},{k}" for t, k, b in rows))
     month = v1dir.name
     r = run(n, "clean", rows_override=rows, hd=dict(zip=str(z), pair="EURUSD", month=month), **SCEN[scen])
-    res = dict(scenario=scen, ticks=n, source=str(v1dir.name), rights="UNKNOWN (private QA only)", baseline=r["baseline"], claude_v1=r["claude"], parity_baseline_vs_claude_v1=r["parity"],
+    res = dict(scenario=scen, ticks=n, sliceOffset=offset, source=str(v1dir.name), rights="UNKNOWN (private QA only)", baseline=r["baseline"], claude_v1=r["claude"], parity_baseline_vs_claude_v1=r["parity"],
                ingest_s=r["ingest_engine_s"], admission_mismatches=r["admission_reconstruction_mismatches"])
     # ---- leg 2: same slice as compact v2 -> ClaudeSession through open_compact
     v1c = r["_cdir"]; v2c = tmp / "v2"
