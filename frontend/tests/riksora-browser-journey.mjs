@@ -181,21 +181,22 @@ try{
     const fsp=await import('node:fs/promises');
     const shot=async name=>page.screenshot({path:join(evidence,name+'.png')});
     const mainNav=label=>page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:label,exact:true});
-    const newMethod=async(name,{protocol=false,condition='Trend aligned',checklist=false}={})=>{
+    const guarded=fn=>async(...args)=>{try{return await fn(...args);}catch(error){await page.screenshot({path:join(evidence,'cov-failure-'+Date.now()+'.png')}).catch(()=>{});await fsp.writeFile(join(evidence,'cov-failure.txt'),String(error)+'\n'+await page.locator('body').innerText().catch(()=>'')).catch(()=>{});throw error;}};
+    const newMethod=guarded(async(name,{protocol=false,condition='Trend aligned',checklist=false}={})=>{
       phase='cov_method_'+name;
       const first=page.getByRole('link',{name:'Create your first Method'});
-      if(await first.count())await first.click();else await page.getByRole('link',{name:/New Method/}).first().click();
+      if(await first.count())await first.click();else{await mainNav('Methods').click();await page.getByRole('link',{name:/New Method/}).first().click();}
       await page.getByLabel('Method name').fill(name);
       if(protocol){
-        await page.getByRole('radio',{name:'Protocol'}).click().catch(async()=>page.getByRole('button',{name:'Protocol',exact:true}).click());
+        await page.getByRole('radio',{name:'Protocol',exact:true}).click();
         await page.getByLabel('Condition 1').fill(condition);
         const sw=page.getByRole('checkbox',{name:/Checklist enforcement/});
         if(checklist!==await sw.isChecked())await sw.click({force:true});
       }
       await page.getByRole('button',{name:'Save Method',exact:true}).click();
       await expect(page.getByRole('heading',{name})).toBeVisible();
-    };
-    const newSession=async(methodName,sessionName)=>{
+    });
+    const newSession=guarded(async(methodName,sessionName)=>{
       phase='cov_session_'+sessionName;
       await page.getByRole('button',{name:'New Session',exact:true}).first().click();
       await page.locator('.rk-wizard .rk-combo button.rk-combo-trigger').click();
@@ -206,7 +207,7 @@ try{
       await page.getByRole('button',{name:'Create Session',exact:true}).click();
       await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
       await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled({timeout:60000});
-    };
+    });
     const terminal=()=>page.getByRole('region',{name:'Trading and Analysis'});
     const revision=async()=>Number(await terminal().getAttribute('data-revision'));
     const stepOnce=async()=>{const before=await revision();const b=page.getByRole('button',{name:'Step ticks',exact:true});await b.click();await expect.poll(revision,{timeout:95000}).toBeGreaterThanOrEqual(before);await expect(b).toBeEnabled({timeout:95000});};
