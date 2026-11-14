@@ -12,7 +12,20 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(REPO), str(REPO / 'backend')]
 
 
+def _exit_with_parent():
+    # Never outlive the harness: if it is killed (gate trip, timeout) this extra API instance exits instead of lingering as an orphan.
+    import threading, time
+    parent = os.getppid()
+    def watch():
+        while True:
+            if os.getppid() != parent:
+                os._exit(0)
+            time.sleep(1)
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def main():
+    _exit_with_parent()
     cfg = json.loads(sys.stdin.readline())
     import uvicorn
     from cloud.app import create_app
