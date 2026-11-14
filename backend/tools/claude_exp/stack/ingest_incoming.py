@@ -56,7 +56,9 @@ def check(pair, month, mdir, sha_list, deep):
                 h = hashlib.sha256()
                 with open(f, "rb") as fh:
                     while b := fh.read(1 << 22): h.update(b)
-                want = sha_list.get(key)
+                rel = f.relative_to(mdir).as_posix()
+                # tolerate sha lists written relative to the root (PAIR/MONTH/file), to the pair (MONTH/file) or to the month folder (file)
+                want = sha_list.get(key) or sha_list.get(f"{month}/{rel}") or (sha_list.get(rel) if "/" in rel or len({k for k in sha_list if k.endswith('compact.json')}) <= 1 else None)
                 if want is None: rec["problems"].append(f"not in sha list: {key}")
                 elif want != h.hexdigest(): rec["problems"].append(f"sha256 mismatch: {key}")
         reader = CompactTickReader(mdir, expected_manifest_hash=manifest["manifestHash"])
