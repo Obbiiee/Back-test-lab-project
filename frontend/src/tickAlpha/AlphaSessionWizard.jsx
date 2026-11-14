@@ -34,6 +34,8 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
   const balanceOk=DECIMAL.test(balance)&&Number(balance)>0;
   const ready=[Boolean(method),Boolean(instrument),periodOk,balanceOk&&Boolean(finalName),true];
   const canOpen=index=>ready.slice(0,index).every(Boolean);
+  // Why Continue is off, per step: a disabled button always says what is missing.
+  const WHY=['Choose a Method to continue.','Choose an instrument to continue.','Choose an available start month to continue.',balanceOk?'Enter a Session name to continue.':'Enter a starting balance above zero to continue.',''];
   const changeInstrument=value=>{setInstrument(value);setOtherMonth(false);setPeriod(defaultPeriod(periodAvailability(catalog,value,historical)));};
   // A refused month sends the user back to the Period step with the server's reason.
   const [seenError,setSeenError]=useState(error);
@@ -50,7 +52,7 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
     <PageHead back={method?{label:method.name,to:{screen:'method',method:method.id}}:{label:'Sessions',to:{screen:'sessions'}}} eyebrow="New Session" title="Set up a replay"
       lead="Five short steps. Nothing is saved until you press Create Session."/>
     <ol className="rk-steps" aria-label="Steps">{STEPS.map((label,index)=><li key={label}>
-      <button type="button" className={index===step?'is-current':index<step&&ready[index]?'is-done':''} aria-current={index===step?'step':undefined} disabled={!canOpen(index)||busy} onClick={()=>setStep(index)}>
+      <button type="button" className={index===step?'is-current':index<step&&ready[index]?'is-done':''} aria-current={index===step?'step':undefined} disabled={!canOpen(index)||busy} title={!canOpen(index)?'Finish the earlier steps first.':undefined} onClick={()=>setStep(index)}>
         <span aria-hidden="true">{index<step&&ready[index]?'✓':index+1}</span>{label}</button></li>)}</ol>
     <form className="rk-card rk-form rk-wizard" onSubmit={submit} noValidate>
       {step===0&&<fieldset className="rk-wizard-step"><legend>Which Method should this Session replay?</legend>
@@ -103,7 +105,8 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
       {error&&!periodError&&<p className="rk-form-error" role="alert">{error.text} Nothing was created; your choices are kept.</p>}
       <div className="rk-wizard-actions">
         {step>0?<button type="button" className="rk-btn" disabled={busy} onClick={()=>setStep(step-1)}>Back</button>:<a className="rk-btn rk-btn-quiet" {...linkTo(method?{screen:'method',method:method.id}:{screen:'sessions'})}>Cancel</a>}
-        <button className="rk-btn rk-btn-primary" disabled={busy||!ready[step]}>{step<4?'Continue':busy?'Creating…':'Create Session'}</button>
+        {!busy&&!ready[step]&&<p id="rk-wizard-why" className="rk-note rk-disabled-why">{WHY[step]}</p>}
+        <button className="rk-btn rk-btn-primary" disabled={busy||!ready[step]} aria-describedby={!busy&&!ready[step]?'rk-wizard-why':undefined}>{step<4?'Continue':busy?'Creating…':'Create Session'}</button>
       </div>
     </form>
   </>;

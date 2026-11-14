@@ -61,7 +61,7 @@ export default function TickAlpha(){
     (async()=>{try{
       const selected=new URL(window.location.href).searchParams.get('session');
       const result=await loadResearchContext(selected,{active:()=>mounted});
-      if(result){setCatalog(result.catalog);setView(result.view);emitLocal('workspace_opened');}
+      if(result){setCatalog(result.catalog);setView(result.view);if(result.viewError)setNotice(result.viewError);emitLocal('workspace_opened');}
     }catch(error){if(mounted)setNotice(error.message);}finally{if(mounted)setConnecting(false);}})();
     return ()=>{mounted=false;};
   },[]);

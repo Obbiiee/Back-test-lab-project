@@ -140,7 +140,7 @@ export function MethodNew({catalog,onSaved}){
           </fieldset>
         </>}
         {error&&<p id="rk-method-error" className="rk-error" role="alert">{error}</p>}
-        <div className="rk-form-actions"><button className="rk-btn rk-btn-primary" disabled={busy||!name.trim()||(protocol&&!filled.length)}>{busy?'Saving…':'Save Method'}</button><a className="rk-btn rk-btn-quiet" {...linkTo({screen:'methods'})}>Cancel</a></div>
+        <div className="rk-form-actions">{!busy&&(!name.trim()||(protocol&&!filled.length))&&<p id="rk-method-why" className="rk-note rk-disabled-why">{!name.trim()?'Name the Method to save it.':'Add at least one condition to save a Protocol.'}</p>}<button className="rk-btn rk-btn-primary" disabled={busy||!name.trim()||(protocol&&!filled.length)} aria-describedby={!busy&&(!name.trim()||(protocol&&!filled.length))?'rk-method-why':undefined}>{busy?'Saving…':'Save Method'}</button><a className="rk-btn rk-btn-quiet" {...linkTo({screen:'methods'})}>Cancel</a></div>
       </form>
       <aside className="rk-card rk-card-navy rk-howto" aria-labelledby="rk-howto-h">
         <h2 id="rk-howto-h">How this Method trades</h2>
