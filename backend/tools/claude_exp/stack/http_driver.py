@@ -10,7 +10,7 @@ Protocol with the parent (frontend/tests/http_load_cohort.py): JSON lines on std
   child -> {"summary": {...}} as the last line.
 Loopback to the harness's own self-signed server only; certificate verification is disabled for that reason.
 """
-import argparse, http.client, json, queue, random, re, ssl, sys, threading, time, urllib.parse, uuid
+import argparse, os, http.client, json, queue, random, re, ssl, sys, threading, time, urllib.parse, uuid
 from pathlib import Path
 
 TEMPLATE = Path(__file__).with_name('api_journey_template.json')
@@ -169,6 +169,7 @@ class Trader:
                 return 0, None
         ms = (time.perf_counter() - t0) * 1000
         self.stats.record(route_key(method, path), status, ms, None, timed)
+        self.last_body = data
         try:
             parsed = json.loads(data) if data else None
         except ValueError:
@@ -251,6 +252,7 @@ class Trader:
     def cycle(self, fresh_session):
         """One full recorded trader journey (workspace .. journal). Returns (ok, reason)."""
         mapping = {}
+        journal_path, journal_value = None, None
         for step in self.template:
             for text in (step['body'] or '', step['path']):
                 for kind, ident in CLIENT_ID.findall(urllib.parse.unquote(text)):
@@ -295,6 +297,8 @@ class Trader:
             elif status != step['status']:
                 detail = value.get('detail') if isinstance(value, dict) else None
                 return False, f'step{index}:{route_key(step["method"], path)}:{status}:{str(detail)[:40]}'
+            if '/journal/pages' in path and step['method'] == 'GET' and status == 200 and isinstance(value, dict):
+                journal_path, journal_value = path, value
             rec, live = dict(flatten(step['result'])), dict(flatten(value))
             for p, rv in rec.items():
                 lv = live.get(p)
@@ -303,6 +307,22 @@ class Trader:
             for p in ('/totalOrders',):
                 if p in rec and live.get(p) != rec[p]:
                     return False, f'step{index}:journal_mismatch:{rec[p]}!={live.get(p)}'
+        if os.environ.get('RIKSORA_QA_EXPORT_CHECK') == '1' and journal_path:
+            # Functional check of the server-side CSV export against the committed journal of THIS trader (real queue/worker/PostgreSQL path).
+            status, _ = self.call('GET', journal_path.split('/journal/pages')[0] + '/export?format=csv')
+            if status != 200:
+                return False, f'export:{status}'
+            import csv as _csv, io as _io
+            rows = list(_csv.reader(_io.StringIO(self.last_body.decode('utf-8'))))
+            header, body = rows[0], rows[1:]
+            orders = journal_value.get('orders') or []
+            if len(body) != journal_value.get('totalOrders') or len(body) != len(orders):
+                return False, f'export:rows {len(body)} != journal {journal_value.get("totalOrders")}'
+            idx = {name: i for i, name in enumerate(header)}
+            for row, order in zip(body, sorted(orders, key=lambda o: o['id'])):
+                if row[idx['net']] != str(order['net']) or row[idx['entryPrice']] != str(order['entryPrice']) or row[idx['exitReason']] != str(order['exitReason']):
+                    return False, 'export:row differs from the committed journal'
+            self.stats.export_checked = getattr(self.stats, 'export_checked', 0) + len(body)
         return True, None
 
 
@@ -439,7 +459,7 @@ def main():
     emit({'summary': {
         'status': 'DONE', 'traders': a.traders, 'cyclesPerTrader': a.cycles, 'thinkMs': a.think_ms, 'staggerMs': a.stagger_ms,
         'wallSeconds': round(wall, 2), 'completedCycles': stats.completed, 'failedTraders': len(stats.failures),
-        'chartEnabled': bool(a.chart_url), 'chartErrors': stats.chart_errors, 'retentionRecoveries': stats.recoveries, 'chartCandlesLoadedPerTimeframe': (traders[0].chart.candles if a.chart_url else None), 'failures': stats.failures[:10], 'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'statusCounts': stats.status, 'transportErrors': stats.errors,
+        'exportRowsVerified': getattr(stats, 'export_checked', 0), 'chartEnabled': bool(a.chart_url), 'chartErrors': stats.chart_errors, 'retentionRecoveries': stats.recoveries, 'chartCandlesLoadedPerTimeframe': (traders[0].chart.candles if a.chart_url else None), 'failures': stats.failures[:10], 'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'statusCounts': stats.status, 'transportErrors': stats.errors,
         'journeysPerMinute': round(stats.completed / wall * 60, 2),
         'cycleSeconds': {'p50': pct([x / 1000 for x in stats.cycle_ms], 50), 'p95': pct([x / 1000 for x in stats.cycle_ms], 95),
                          'max': round(max(stats.cycle_ms) / 1000, 2) if stats.cycle_ms else None},

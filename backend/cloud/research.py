@@ -492,6 +492,18 @@ def install(app):
     async def summary(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'summary', session_id)
 
+    @app.get(prefix + '/sessions/{session_id}/export')
+    async def export_session(workspace_id: uuid.UUID, session_id: str, format: str = 'csv', user: User = Depends(current)):
+        """CSV of the Session's committed trade ledger (one row per order). PDF/JSON are not implemented and are refused explicitly, never faked."""
+        require(format == 'csv', 'format', 'INVALID_INPUT')
+        from . import export_results
+        text, revision, _count = await anyio.to_thread.run_sync(
+            partial(export_results.export_session_csv, app.state.dsn, user.id, workspace_id, session_id, run=run), limiter=limiter)
+        import re as _re
+        name = 'riksora-' + _re.sub(r'[^A-Za-z0-9._-]', '_', session_id)[:80] + f'-r{revision}.csv'
+        return Response(text.encode('utf-8'), media_type='text/csv; charset=utf-8',
+                        headers={'Content-Disposition': f'attachment; filename="{name}"', 'X-Content-Type-Options': 'nosniff'})
+
     chart_limiter = anyio.CapacityLimiter(8)
 
     @app.get(prefix + '/sessions/{session_id}/chart-bars')
