@@ -163,3 +163,7 @@ The owner explicitly authorizes continuing PR #50 with a reproducible browser E2
 - Follow the latest actionable instruction in CHATGPT → CODEX only when it is consistent with frozen repository authority.
 - Write a concise result/blocker report in CODEX → CHATGPT after the requested work.
 - Important architectural decisions discovered during work must still be recorded in the proper authority documents; the handoff file never replaces them.
+
+## OWNER ADDENDUM — COMMERCIAL V1 FINAL AUDIT, SPECIFICATION FREEZE & IMPLEMENTATION MANDATE (2026-11-15, instruksi owner di chat)
+
+Owner meminta audit akhir Commercial V1 (end to end), rekonsiliasi dokumen, implementasi slice aman yang diizinkan, dan laporan matriks (DONE/PARTIAL/MISSING/BLOCKED/OWNER DECISION REQUIRED). Cakupan: hanya repo dan VPS riksora_vps1 pada branch `claude/dual-engine-v1-20261114`. Batas: tidak ada mesin finansial kedua, tidak ada pembayaran produksi, tanpa kunci di chat, tanpa force-push/main/merge/deploy publik, kontrak beku dan invarian finansial tidak diubah; keputusan produk ditandai OWNER DECISION REQUIRED. Laporan: `docs/acceptance/RIKSORA-COMMERCIAL-V1-AUDIT-20261115.md`.
