@@ -700,11 +700,25 @@ def install(app):
         return await execute(user, workspace_id, 'terminal_order_page', session_id,
                              {'limit': limit, 'afterSequence': after_sequence})
 
+    async def _window_guard(user, workspace_id, session_id, kind, target_ns=None):
+        entitlements = getattr(app.state, 'entitlements', None)
+        if entitlements is None:
+            return None
+        from . import window_guard
+        try:
+            await anyio.to_thread.run_sync(partial(window_guard.check, entitlements, app.state.dsn, user.id, workspace_id, session_id, kind, target_ns), limiter=limiter)
+        except window_guard.WindowRefused as refused:
+            return Response(canonical_bytes({'schemaVersion': 1, 'detail': refused.code, **refused.detail}), status_code=409, media_type='application/json')
+        return None
+
     @app.post(prefix + '/sessions/{session_id}/replay-to')
     async def replay_to(workspace_id: uuid.UUID, session_id: str, request: Request,
                         user: User = Depends(current)):
         raw=await json_body(request)
         queue.replay_to_request(raw,session_id)
+        refused = await _window_guard(user, workspace_id, session_id, 'ADVANCE', raw['targetNs'])
+        if refused is not None:
+            return refused
         job_id=request.headers.get('x-btl-job')
         if job_id is not None:
             try:job_id=uuid.UUID(job_id)
@@ -716,6 +730,9 @@ def install(app):
                               user: User = Depends(current)):
         raw=await json_body(request)
         queue.jump_next_event_request(raw,session_id)
+        refused = await _window_guard(user, workspace_id, session_id, 'JUMP')
+        if refused is not None:
+            return refused
         job_id=request.headers.get('x-btl-job')
         if job_id is not None:
             try:job_id=uuid.UUID(job_id)
@@ -731,6 +748,15 @@ def install(app):
         require(operation in operations, 'operation', 'RESOURCE_UNAVAILABLE')
         name, write = operations[operation]
         raw = await json_body(request)
+        if name == 'confirm':
+            refused = await _window_guard(user, workspace_id, session_id, 'OPEN')
+            if refused is not None:
+                return refused
+        elif name == 'apply' and type(raw) is dict and raw.get('kind') in ('OPEN', 'ADVANCE', 'SEEK', 'CANCEL', 'CLOSE', 'END'):
+            refused = await _window_guard(user, workspace_id, session_id, 'ADVANCE' if raw['kind'] in ('ADVANCE', 'SEEK') else raw['kind'],
+                                          (raw.get('payload') or {}).get('targetNs') if raw['kind'] in ('ADVANCE', 'SEEK') else None)
+            if refused is not None:
+                return refused
         queued = name in queue.OPERATIONS or (name == 'apply' and raw.get('kind') in ('ADVANCE','SEEK'))
         job_id = request.headers.get('x-btl-job') if queued else None
         if job_id is not None:
