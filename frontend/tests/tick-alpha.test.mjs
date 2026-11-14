@@ -1,7 +1,7 @@
 import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,replayObservedTo,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
+import {exportSessionCsv,loadChartBars,api,command,replayObservedTo,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
@@ -511,3 +511,29 @@ assert.equal(historyPage(historyView,pastPage,'1m',0)[0].open,1.001);
 for(const change of [{datasetId:'foreign'},{datasetVersion:'foreign'},{executionAuthority:true},{coverage:'COMPLETE'},{endTime:1441065660},{nextOffset:256},{endOfDataset:true},{status:'BUILDING'},{candles:[{...pastPage.candles[0],time:1441065600}]},{candles:[{...pastPage.candles[0],time:1439164801}]}])assert.throws(()=>historyPage(historyView,{...pastPage,...change},'1m',0));
 assert.deepEqual(historyPage(historyView,{...pastPage,candles:[],status:'BUILDING'},'1m',0),[]);
 console.log('PASS past OHLC context identity, exact price display, Session boundary, timeframe alignment, bounded pagination and future metadata refusal.');
+
+// Committed-ledger CSV and chart-history pages travel through the authenticated account transport, as text/validated JSON.
+{
+  const seen=[];
+  const fetcher=async(path,options)=>{
+    seen.push([path,options]);
+    if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'QA-MEMORY-TOKEN',token_type:'bearer'})};
+    if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+    if(path.includes('/export?'))return {ok:true,status:200,text:async()=>'sessionId,datasetId\r\ns1,d1\r\n',json:async()=>{throw Error('not json');}};
+    if(path.includes('/chart-bars?'))return {ok:true,status:200,json:async()=>({schemaVersion:1,artifact:'BTL-CHART-HISTORY-PAGE-1',executionAuthority:false,candles:[],hasMore:false})};
+    throw Error('unexpected '+path);
+  };
+  const client=createAccountClient({fetcher,secure:()=>true});
+  await client.login('qa@example.com','Test fixture passphrase only');
+  setAccountTransport(client,'11111111-1111-4111-8111-111111111111');
+  const csv=await exportSessionCsv('s1');
+  assert.ok(csv.startsWith('sessionId,'));
+  assert.ok(seen.at(-1)[0].endsWith('/research/sessions/s1/export?format=csv'));
+  assert.equal(seen.at(-1)[1].headers.Authorization,'Bearer QA-MEMORY-TOKEN');
+  const page=await loadChartBars('s1','5m',{limit:100,before:1700000000});
+  assert.equal(page.artifact,'BTL-CHART-HISTORY-PAGE-1');
+  assert.ok(seen.at(-1)[0].includes('timeframe=5m')&&seen.at(-1)[0].includes('before=1700000000'));
+  await assert.rejects(()=>loadChartBars('s1','7m'),/invalid/);
+  clearAccountTransport();
+  await assert.rejects(()=>exportSessionCsv('s1'),/Sign in/);
+}

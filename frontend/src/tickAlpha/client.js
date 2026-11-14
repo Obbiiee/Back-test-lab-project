@@ -313,6 +313,29 @@ export async function loadJournalPage(sessionId,cursor=null){
   return page;
 }
 
+// Server-side CSV of the COMMITTED ledger (BTL export route); never built from browser state. Account transport only.
+export async function exportSessionCsv(sessionId){
+  const account=accountTransport();
+  if(!account)throw Error('Sign in to export the committed trade ledger.');
+  if(typeof sessionId!=='string'||!sessionId)throw Error('Export Session is unavailable.');
+  const text=await account.client.request(`${account.root}${sessionPath(sessionId)}/export?format=csv`,{as:'text'});
+  if(typeof text!=='string'||!text.startsWith('sessionId,'))throw Error('Unsupported export; nothing was saved.');
+  return text;
+}
+
+const CHART_TIMEFRAMES=['1m','3m','5m','15m','30m','1h','2h','4h','D'];
+// BTL-CHART-HISTORY-PAGE-1: completed bars at or before the committed cursor, older pages by `before` (derived display data only).
+export async function loadChartBars(sessionId,timeframe,{limit=512,before=null}={}){
+  const account=accountTransport();
+  if(!account)throw Error('Sign in to load chart history.');
+  if(typeof sessionId!=='string'||!sessionId||!CHART_TIMEFRAMES.includes(timeframe))throw Error('Chart request is invalid.');
+  const query=new URLSearchParams({timeframe,limit:String(limit)});if(before!==null)query.set('before',String(before));
+  const page=await account.client.request(`${account.root}${sessionPath(sessionId)}/chart-bars?${query}`);
+  if(page?.artifact!=='BTL-CHART-HISTORY-PAGE-1'||page.executionAuthority!==false||!Array.isArray(page.candles)||typeof page.hasMore!=='boolean')
+    throw Error('Unsupported chart page; no state was imported.');
+  return page;
+}
+
 export async function createMethodVersion(family,method){
   if(!accountTransport())throw Error('Method versioning requires an authenticated workspace.');
   if(!family||typeof family.familyId!=='string'||!Number.isSafeInteger(family.revision))

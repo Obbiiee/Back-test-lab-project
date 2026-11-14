@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
+import {api,sessionPath,loadJournalPage,exportSessionCsv,noticeText} from './client.js';
 
 export default function AlphaJournal({view,active=true}){
   const [journal,setJournal]=useState(null),[error,setError]=useState(''),[saving,setSaving]=useState(false),[drafts,setDrafts]=useState({});
@@ -58,9 +58,18 @@ export default function AlphaJournal({view,active=true}){
       setTimeout(()=>URL.revokeObjectURL(url),1000);
     }catch(failure){setError(noticeText(failure.message));}finally{setSaving(false);}
   }
+  async function exportCsv(){
+    setSaving(true);setError('');
+    try{
+      const url=URL.createObjectURL(new Blob([await exportSessionCsv(view.metadata.id)],{type:'text/csv;charset=utf-8'}));
+      const link=document.createElement('a');link.href=url;link.download='backtest-trades.csv';link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(failure){setError(noticeText(failure.message));}finally{setSaving(false);}
+  }
   return <div className="alpha-analysis alpha-journal"><h2>Research journal</h2><p>Private notes on canonical orders. Pending and unresolved intents are not completed trades. Notes never change fills or cash. Saved notes remain in the local product database.</p>
     {error&&<p role="alert">{error} Your draft is retained here. Reload the journal before resolving a conflicting edit.</p>}
     <button disabled={saving||!journal} onClick={exportJournal}>Export saved journal JSON</button>
+    <button disabled={saving||!journal} onClick={exportCsv}>Export committed trades CSV</button>
     <button disabled={saving} onClick={reloadJournal}>Reload journal</button>
     {journal&&<p>Snapshot revision {journal.provenance.revision}. Financial authority: committed events only.</p>}
     {Object.keys(drafts).length>0&&<p>Unsaved drafts are excluded from export. Save before leaving this view.</p>}
