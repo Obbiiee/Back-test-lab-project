@@ -29,7 +29,10 @@ MAX_AUTH_START_DELAY_MS = 240_000
 STEPS = ('login_screen', 'login_workspace', 'method', 'session_replay',
          'order_receipt', 'jump_entry_exit_journal_analytics', 'logout_login_resume')
 if os.environ.get('RIKSORA_QA_E2E_COVERAGE') == '1':   # opt-in coverage journey (replaces the base journey after login): landing, methods, nine timeframes, ...
-    STEPS = ('login_screen', 'login_workspace', 'cov_landing', 'cov_methods', 'cov_session_free_style', 'cov_nine_timeframes')
+    STEPS = ('login_screen', 'login_workspace', 'cov_landing', 'cov_methods', 'cov_session_free_style', 'cov_nine_timeframes',
+             'cov_indicators', 'cov_drawing', 'cov_free_style_quick', 'cov_free_style_planned_limit', 'cov_jump_resolution',
+             'cov_free_style_manual_close', 'cov_journal_statistics', 'cov_export', 'cov_protocol_pending_limit_stop', 'cov_protocol_cancel',
+             'cov_protocol_jump_locked_exit', 'cov_position_planner', 'cov_idor')
 elif os.environ.get('RIKSORA_QA_E2E_EXTRA') == '1':   # opt-in extended journey: ledger CSV/PDF content, Trash/Restore, mobile viewport
     STEPS += ('export_csv_ledger', 'export_pdf_report', 'trash_restore', 'mobile_viewport')
 
@@ -475,8 +478,9 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                                    delivery=delivery, cohort_size=cohort_size)
                 return
             email = 'browser-'+secrets.token_hex(8)+'@example.com'
+            email2 = 'browser2-'+secrets.token_hex(8)+'@example.com'
             config = dict(url=f'https://127.0.0.1:{port}/?page=account', nonce=nonce,
-                          email=email, password='Authored QA passphrase 2026 only',
+                          email=email, email2=email2, password='Authored QA passphrase 2026 only',
                           tools=str(tools), evidence=str(evidence))
             child_environment = {k: v for k, v in environment.items() if not k.startswith(('PG', 'BTL_'))}
             child_environment['PLAYWRIGHT_BROWSERS_PATH'] = str(browser_cache)
@@ -501,8 +505,8 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                         if len(line) > 16384:
                             raise ValueError('QA_PROTOCOL_LIMIT')
                         item = json.loads(line)
-                        if item.get('need') == 'verification' and item.get('email') == email:
-                            process.stdin.write(json.dumps(dict(token=delivery.token(email, 'verification')))+'\n')
+                        if item.get('need') == 'verification' and item.get('email') in (email, email2):
+                            process.stdin.write(json.dumps(dict(token=delivery.token(item['email'], 'verification')))+'\n')
                             process.stdin.flush()
                         elif item.get('need') == 'recovery' and item.get('email') == email:
                             process.stdin.write(json.dumps(dict(token=delivery.token(email, 'recovery')))+'\n')

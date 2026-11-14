@@ -181,15 +181,17 @@ try{
     const fsp=await import('node:fs/promises');
     const shot=async name=>page.screenshot({path:join(evidence,name+'.png')});
     const mainNav=label=>page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:label,exact:true});
+    const seen={ws:null,sid:null};
+    page.on('request',r=>{const m=/\/workspaces\/([0-9a-f-]{36})\/research\/sessions\/([^/?]+)/.exec(r.url());if(m){seen.ws=m[1];const d=decodeURIComponent(m[2]);if(d.startsWith('session:'))seen.sid=d;}});
     const guarded=fn=>async(...args)=>{try{return await fn(...args);}catch(error){await page.screenshot({path:join(evidence,'cov-failure-'+Date.now()+'.png')}).catch(()=>{});await fsp.writeFile(join(evidence,'cov-failure.txt'),String(error)+'\n'+await page.locator('body').innerText().catch(()=>'')).catch(()=>{});throw error;}};
     const newMethod=guarded(async(name,{protocol=false,condition='Trend aligned',checklist=false}={})=>{
       phase='cov_method_'+name;
       const first=page.getByRole('link',{name:'Create your first Method'});
-      if(await first.count())await first.click();else{await mainNav('Methods').click();await page.getByRole('link',{name:/New Method/}).first().click();}
+      if(await first.count())await first.click();else{await mainNav('My Methods').click();await page.getByRole('link',{name:/New Method/}).first().click();}
       await page.getByLabel('Method name').fill(name);
       if(protocol){
         await page.getByRole('radio',{name:'Protocol',exact:true}).click();
-        await page.getByLabel('Condition 1').fill(condition);
+        await page.getByRole('textbox',{name:'Condition 1',exact:true}).fill(condition);
         const sw=page.getByRole('checkbox',{name:/Checklist enforcement/});
         if(checklist!==await sw.isChecked())await sw.click({force:true});
       }
@@ -248,6 +250,229 @@ try{
     await select.selectOption('1m');await expect(select).toBeEnabled({timeout:95000});
     await shot('cov-timeframes');
     step('cov_nine_timeframes');
+    // ---- indicators and drawing on the real chart
+    phase='cov_indicators';
+    await page.getByRole('button',{name:'Indicators',exact:false}).first().click();
+    await page.getByLabel('Search indicators').fill('moving average');
+    const addButtons=page.locator('.ind-group button:not([disabled])').filter({hasText:/moving average/i});
+    await addButtons.first().click();
+    await expect(page.getByRole('group',{name:/instance 1$/})).toBeVisible({timeout:30000});
+    await shot('cov-indicator');
+    await page.keyboard.press('Escape');
+    step('cov_indicators');
+    phase='cov_drawing';
+    const tools=page.getByRole('navigation',{name:'Drawing tools'});
+    await tools.locator('summary').first().click();
+    await shot('cov-drawing-menu');
+    const trend=page.getByRole('button',{name:/^Trend Line/i}).first();
+    await trend.click();
+    const canvasBox=await page.locator('.alpha-chart-workspace canvas').first().boundingBox();
+    await page.mouse.click(canvasBox.x+canvasBox.width*0.25,canvasBox.y+canvasBox.height*0.6);
+    await page.mouse.click(canvasBox.x+canvasBox.width*0.55,canvasBox.y+canvasBox.height*0.35);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:'Drawing objects'}).click();
+    await expect(page.getByRole('complementary',{name:'Drawing objects'})).toBeVisible();
+    await expect(page.getByText('DRAWINGS (1)')).toBeVisible({timeout:20000});
+    await shot('cov-drawing');
+    step('cov_drawing');
+    // ---- orders: helper
+    const quote=async side=>Number(/([0-9.]+)$/.exec(await page.getByRole('button',{name:side==='LONG'?/Buy at Ask/:/Sell at Bid/}).getAttribute('aria-label'))[1]);
+    const placeOrder=async({side,planned=false,type='MARKET',entry=null,sl=null,tp=null,pass=false})=>{
+      const b=page.getByRole('button',{name:side==='LONG'?/Buy at Ask/:/Sell at Bid/});
+      await b.click();
+      const ticket=page.getByRole('dialog',{name:'Plan an order'});
+      if(planned){
+        await ticket.getByRole('radio',{name:'Plan · R:R'}).click().catch(()=>{});
+        if(type!=='MARKET')await ticket.getByRole('radio',{name:type==='LIMIT'?'Limit':'Stop',exact:true}).click();
+        if(entry!==null)await ticket.getByLabel('Entry').fill(String(entry));
+        if(sl!==null)await ticket.getByLabel('Stop Loss').fill(String(sl));
+        if(tp!==null)await ticket.locator('input[aria-label="Take Profit"]').fill(String(tp));
+      }
+      if(pass)for(const r of await ticket.getByRole('radio',{name:'Pass'}).all())await r.click().catch(()=>{});
+      const reviewed=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname.endsWith('/reviews'),{timeout:95000});
+      await ticket.getByRole('button',{name:'Review order',exact:true}).click();
+      const reviewStatus=(await reviewed).status();
+      const review=page.locator('[role="dialog"][aria-label="Confirm reviewed order"]');
+      await expect(review.getByRole('heading',{name:'Confirm reviewed order'})).toBeVisible({timeout:60000});
+      await expect(review.getByRole('button',{name:'Confirm order',exact:true})).toBeEnabled();
+      const confirmed=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname.endsWith('/confirm'),{timeout:95000});
+      await review.getByRole('button',{name:'Confirm order',exact:true}).click();
+      const response=await confirmed;
+      expect(reviewStatus).toBe(200);expect(response.status()).toBe(200);
+      const receipt=await response.json();expect(receipt.durable).toBe(true);
+      const dlg=page.getByRole('dialog',{name:'Confirm reviewed order'});
+      if(await dlg.isVisible()){
+        const reload=dlg.getByRole('button',{name:'Reload Session',exact:true});
+        const r=await Promise.race([reload.waitFor({state:'visible',timeout:95000}).then(()=>'reload'),dlg.waitFor({state:'hidden',timeout:95000}).then(()=>'ok')]);
+        if(r==='reload'){await reload.click();await expect(dlg).not.toBeVisible({timeout:95000});}
+      }
+      return receipt;
+    };
+    const rows=async tab=>{await terminal().getByRole('button',{name:tab,exact:true}).click();return terminal().getByRole('table',{name:tab}).locator('tr[data-order-id]');};
+    const balance=async()=>(await terminal().locator('.alpha-account strong').first().innerText()).replace('$','');
+    const jump=page.getByRole('button',{name:'Jump to Next Event',exact:true});
+    const jumpOnce=async()=>{const before=await revision();await expect(jump).toBeEnabled({timeout:95000});await jump.click();await expect.poll(revision,{timeout:95000}).toBeGreaterThan(before);await expect(jump).toBeEnabled({timeout:95000});};
+    // ---- Free Style Quick: market sell at Bid, filled by the next quote
+    phase='cov_fs_quick';
+    const quickReceipt=await placeOrder({side:'SHORT'});
+    expect(quickReceipt.artifact).toBe('BTL-TICK-EXECUTION-RESULT-1');
+    await stepOnce();
+    await expect(await rows('Open positions')).toHaveCount(1,{timeout:60000});
+    await shot('cov-fs-quick');
+    step('cov_free_style_quick');
+    // ---- Free Style Planned: pending LIMIT below the market, then Jump to Next Event until it fills and stops out
+    phase='cov_fs_planned_limit';
+    const ask0=await quote('LONG');
+    const limitEntry=(ask0-3).toFixed(2),limitSl=(ask0-3.5).toFixed(2),limitTp=(ask0-1).toFixed(2);
+    await placeOrder({side:'LONG',planned:true,type:'LIMIT',entry:limitEntry,sl:limitSl,tp:limitTp});
+    await expect(await rows('Pending orders')).toHaveCount(1,{timeout:60000});
+    await shot('cov-fs-pending-limit');
+    step('cov_free_style_planned_limit');
+    phase='cov_jump_resolution';
+    for(let i=0;i<60;i++){
+      if(await (await rows('Pending orders')).count()===0&&await (await rows('Closed trades')).count()>=1)break;
+      await jumpOnce();
+    }
+    await expect(await rows('Pending orders')).toHaveCount(0,{timeout:60000});
+    await expect(await rows('Closed trades')).toHaveCount(1,{timeout:60000});
+    const closedRow=(await rows('Closed trades')).first();
+    expect(await closedRow.innerText()).toMatch(/LONG/);
+    await shot('cov-fs-limit-resolved');
+    step('cov_jump_resolution');
+    // manual close of the quick short (Free Style only), executed by the next quote
+    phase='cov_fs_manual_close';
+    const openRows=await rows('Open positions');
+    await expect(openRows).toHaveCount(1,{timeout:60000});
+    await openRows.first().getByRole('button',{name:'Close position',exact:true}).click();
+    await page.getByRole('button',{name:'Confirm action',exact:true}).click();
+    await expect(page.getByRole('dialog',{name:'Confirm position action'})).toBeHidden({timeout:95000});
+    await stepOnce();
+    await expect(await rows('Closed trades')).toHaveCount(2,{timeout:95000});
+    step('cov_free_style_manual_close');
+    // ---- Journal, Statistics and Export must agree with each other and with the balance shown
+    phase='cov_statistics';
+    const balanceNow=Number(await balance());
+    await terminal().getByRole('button',{name:'Analysis',exact:true}).click();
+    const analysisText=await terminal().locator('.alpha-analysis').innerText();
+    expect(analysisText).toMatch(/Completed trades\s*2/);
+    await shot('cov-statistics');
+    await terminal().getByRole('button',{name:'Journal',exact:true}).click();
+    await expect(terminal().locator('.alpha-journal article')).toHaveCount(2,{timeout:60000});
+    step('cov_journal_statistics');
+    phase='cov_export';
+    const [dlCsv]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.getByRole('button',{name:'Export committed trades CSV'}).click()]);
+    await dlCsv.saveAs(join(evidence,'cov-trades.csv'));
+    const csvLines=(await fsp.readFile(join(evidence,'cov-trades.csv'),'utf8')).trim().split('\r\n').map(l=>l.split(','));
+    expect(csvLines.length).toBe(3);
+    const ci=name=>csvLines[0].indexOf(name);
+    const netSum=csvLines.slice(1).reduce((sum,row)=>sum+Number(row[ci('net')]),0);
+    expect(Math.abs(balanceNow-10000-netSum)).toBeLessThan(1e-6);
+    expect(csvLines.slice(1).every(row=>row[ci('status')]==='CLOSED')).toBe(true);
+    expect(csvLines.slice(1).map(row=>row[ci('side')]).sort()).toEqual(['LONG','SHORT']);
+    const [dlPdf]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.getByRole('button',{name:'Export PDF report'}).click()]);
+    await dlPdf.saveAs(join(evidence,'cov-report.pdf'));
+    expect((await fsp.readFile(join(evidence,'cov-report.pdf'))).subarray(0,5).toString()).toBe('%PDF-');
+    await fsp.writeFile(join(evidence,'cov-expect.json'),JSON.stringify({balance:String(balanceNow),netSum:String(netSum),trades:2}));
+    step('cov_export');
+    // ---- Protocol: pending LIMIT and STOP, cancel one, Jump to the locked exit, no manual close
+    phase='cov_protocol';
+    await page.getByRole('link',{name:/^Back to /}).click();
+    await newSession('Cov Protocol','Cov Protocol session');
+    const placeProtocol=async({side,type,entry,sl})=>{
+      const b=page.getByRole('button',{name:side==='LONG'?/Buy at Ask/:/Sell at Bid/});
+      await b.click();
+      const ticket=page.getByRole('dialog',{name:'Plan an order'});
+      await ticket.getByRole('radio',{name:type==='LIMIT'?'Limit':'Stop',exact:true}).click();
+      await ticket.getByLabel('Entry').fill(String(entry));await ticket.getByLabel('Stop Loss').fill(String(sl));
+      await expect(ticket.getByText(/locked RR/)).toBeVisible();
+      const reviewed=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname.endsWith('/reviews'),{timeout:95000});
+      await ticket.getByRole('button',{name:'Review order',exact:true}).click();
+      expect((await reviewed).status()).toBe(200);
+      const review=page.locator('[role="dialog"][aria-label="Confirm reviewed order"]');
+      await expect(review.getByRole('button',{name:'Confirm order',exact:true})).toBeEnabled({timeout:60000});
+      const confirmed=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname.endsWith('/confirm'),{timeout:95000});
+      await review.getByRole('button',{name:'Confirm order',exact:true}).click();
+      expect((await confirmed).status()).toBe(200);
+      const dlg=page.getByRole('dialog',{name:'Confirm reviewed order'});
+      if(await dlg.isVisible()){
+        const reload=dlg.getByRole('button',{name:'Reload Session',exact:true});
+        const r=await Promise.race([reload.waitFor({state:'visible',timeout:95000}).then(()=>'reload'),dlg.waitFor({state:'hidden',timeout:95000}).then(()=>'ok')]);
+        if(r==='reload'){await reload.click();await expect(dlg).not.toBeVisible({timeout:95000});}
+      }
+    };
+    const pAsk=await quote('LONG'),pBid=await quote('SHORT');
+    await placeProtocol({side:'LONG',type:'LIMIT',entry:(pAsk-0.5).toFixed(2),sl:(pAsk-1.0).toFixed(2)});
+    await placeProtocol({side:'SHORT',type:'STOP',entry:(pBid-2).toFixed(2),sl:(pBid-1).toFixed(2)});
+    await expect(await rows('Pending orders')).toHaveCount(2,{timeout:60000});
+    await shot('cov-protocol-pending');
+    step('cov_protocol_pending_limit_stop');
+    phase='cov_protocol_cancel';
+    await (await rows('Pending orders')).last().getByRole('button',{name:'Cancel pending',exact:true}).click();
+    await page.getByRole('button',{name:'Confirm action',exact:true}).click();
+    await expect(page.getByRole('dialog',{name:'Confirm position action'})).toBeHidden({timeout:95000});
+    await expect(await rows('Pending orders')).toHaveCount(1,{timeout:60000});
+    step('cov_protocol_cancel');
+    phase='cov_protocol_jump';
+    for(let i=0;i<60;i++){
+      if(await (await rows('Closed trades')).count()>=1)break;
+      if(await (await rows('Open positions')).count()>=1){
+        const closeButton=(await rows('Open positions')).first().getByRole('button',{name:'Close position',exact:true});
+        await expect(closeButton).toBeDisabled();                         // Protocol: no manual close
+      }
+      await jumpOnce();
+    }
+    await expect(await rows('Closed trades')).toHaveCount(1,{timeout:60000});
+    await shot('cov-protocol-resolved');
+    step('cov_protocol_jump_locked_exit');
+    // ---- Position planner tool (Long Position) from the drawing menu
+    phase='cov_position_planner';
+    await page.locator('details.alpha-drawing-group').filter({hasText:/Long Position/}).locator('summary').click();
+    await page.getByRole('button',{name:/Long Position/i}).first().click();
+    const box2=await page.locator('.alpha-chart-workspace canvas').first().boundingBox();
+    await page.mouse.click(box2.x+box2.width*0.45,box2.y+box2.height*0.5);
+    await page.waitForTimeout(800);
+    await page.getByRole('button',{name:'Drawing objects'}).click().catch(()=>{});
+    await shot('cov-position-planner');
+    await expect(page.getByText(/POSITION PLANS \(1\)/)).toBeVisible({timeout:20000});
+    step('cov_position_planner');
+    // ---- IDOR: a second real account with a valid token attacks the first account's workspace and Session by id
+    phase='cov_idor';
+    {
+      const base=url.origin;
+      const post=(path,token,data)=>context.request.post(base+path,{headers:token?{Authorization:'Bearer '+token}:{},data,maxRedirects:0,failOnStatusCode:false});
+      const get=(path,token)=>context.request.get(base+path,{headers:token?{Authorization:'Bearer '+token}:{},maxRedirects:0,failOnStatusCode:false});
+      let regs=await post('/api/v1/auth/register',null,{email:config.email2,password:config.password});
+      expect(regs.status()).toBe(201);
+      process.stdout.write(JSON.stringify({need:'verification',email:config.email2})+'\n');
+      const token2=(await read()).token;
+      expect((await post('/api/v1/auth/verify',null,{token:token2})).status()).toBe(200);
+      const login=await context.request.post(base+'/api/v1/auth/login',{form:{username:config.email2,password:config.password},failOnStatusCode:false});
+      expect(login.status()).toBe(200);
+      const tokenB=(await login.json()).access_token;
+      const wsB=(await (await post('/api/v1/workspaces',tokenB,{name:'Attacker workspace'})).json()).id;
+      const A=`/api/v1/workspaces/${seen.ws}/research`,sid=encodeURIComponent(seen.sid),B=`/api/v1/workspaces/${wsB}/research`;
+      const attacks=[
+        ['GET',`/api/v1/workspaces/${seen.ws}`],['GET',`/api/v1/workspaces/${seen.ws}/capabilities`],['GET',`${A}/sessions`],['GET',`${A}/sessions?trashed=true`],
+        ['GET',`${A}/sessions/${sid}`],['GET',`${A}/sessions/${sid}/journal/pages`],['GET',`${A}/sessions/${sid}/export?format=csv`],['GET',`${A}/sessions/${sid}/export?format=pdf`],
+        ['GET',`${A}/sessions/${sid}/chart-bars?timeframe=1m`],['GET',`${A}/sessions/${sid}/analytics/pages`],['GET',`${A}/methods`],['GET',`${A}/entitlements`],
+        ['POST',`${A}/sessions/${sid}/trash`],['POST',`${A}/sessions/${sid}/restore`],['POST',`${A}/sessions/${sid}/commands`],
+        ['GET',`${B}/sessions/${sid}`],['GET',`${B}/sessions/${sid}/export?format=csv`],['GET',`${B}/sessions/${sid}/journal/pages`],['POST',`${B}/sessions/${sid}/trash`],
+      ];
+      const outcome=[];
+      for(const [method,path] of attacks){
+        const response=method==='GET'?await get(path,tokenB):await post(path,tokenB,{});
+        const body=await response.text();
+        outcome.push({method,path:path.replace(/[0-9a-f-]{36}/g,'{id}').replace(/session%3A[^/?]+/,'{sid}'),status:response.status()});
+        expect([401,403,404,422]).toContain(response.status());
+        expect(body).not.toContain('Cov Protocol session');expect(body).not.toContain('Cov FS session');expect(body).not.toContain('order:');
+      }
+      const anonymous=await get(`${A}/sessions/${sid}/export?format=csv`,null);expect(anonymous.status()).toBe(401);
+      // the victim's data is unchanged after the attacks
+      await terminal().getByRole('button',{name:'Closed trades',exact:true}).click();
+      await expect(terminal().getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1);
+      await fsp.writeFile(join(evidence,'cov-idor.json'),JSON.stringify({attacks:outcome,anonymousExport:401},null,1));
+    }
+    step('cov_idor');
     process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),transientBusyCount:0,apiResponseCount,pageErrorCount:errors.length,failedRequests:requestFailures.length,steps:completedSteps})+'\n');
     await context.close();await browser.close();process.exit(0);
   }
