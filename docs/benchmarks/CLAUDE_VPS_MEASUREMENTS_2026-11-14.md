@@ -120,3 +120,15 @@ Throughput stops growing at about 18-19 journeys/min from 20 traders onward whil
 - Degraded but functional: 20 (1-3 traders per run hit `poll:404`, queue full, job waits 10 s).
 - Saturated: 50 (throughput flat, 7,858 busy refusals, waits 23-52 s).
 - Server is not CPU/RAM-limited here; it is limited by 2 worker slots and the frozen queue limits. More workers did not help on 4 CPUs.
+
+### F4. 3 and 4 workers with the full 6-CPU cgroup (follow-up to F2) — the CPU-starvation hypothesis is REFUTED
+cgroup CPUQuota 600% (harness maximum), memory 4 GiB. CPU throttling was 0 in all four runs and host CPU p95 stayed 43-64% (max 79%), yet more workers still did not help.
+| Workers | Traders | Journeys | Failed traders | Throughput journeys/min | Job p95 / max s | Max RUNNING rows | Host CPU p95/max % |
+|---:|---:|---|---:|---:|---|---:|---|
+| 2 (F1, 4 CPU) | 20 | 55/60, 59/60 | 3, 1 | 18.0 / 19.2 | 8-11 / 11-14 | 2 | 50-52 / 58 |
+| 3 | 20 | 60/60 | 0 | 13.6 | 33 / 65 | 16 | 47 / 62 |
+| 4 | 20 | 58/60 | 1 | 11.0 | 33 / 91 | 17 | 43 / 57 |
+| 2 (F1, 4 CPU) | 50 | 142/150 | 3 | 18.2 | 25 / 52 | 2 | 67 / 72 |
+| 3 | 50 | 140/150 | 4 | 20.0 | 42 / 94 | 24 | 64 / 76 |
+| 4 | 50 | 135/150 | 6 | 17.0 | 63 / 94 | 40 | 62 / 79 |
+Observed: with 3-4 workers job end-to-end times cluster around 33 s (the 30 s native deadline/lease plus polling) and RUNNING rows exceed the worker count (16-40 RUNNING with 3-4 workers), with `RECONCILE_REQUIRED` (a queued mutating job passing its 60 s TTL), `FAILED` and `poll:404`. Throughput at 20 traders is LOWER with 3-4 workers than with 2. Cause not identified (not CPU, not memory); needs a code-level investigation of the worker/lease path in `cloud/queue.py` and `cloud/worker.py` (not changed here: frozen limits). Practical result on this host and fixture: 2 workers is the best-measured setting; 3 gives at most a marginal throughput gain at 50 traders with more failures; 4 is worse.
