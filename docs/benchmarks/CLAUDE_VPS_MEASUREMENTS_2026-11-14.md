@@ -92,3 +92,31 @@ Cohort 50 was not attempted (prior gate failed). No gate or timeout was changed 
 ### E4. Capacity statement (this host, synthetic, product baseline, label: measured on real browsers, needs production-like acceptance)
 Proven: 10 concurrent active traders, 3/3 repeat PASS, no failures, memory peak 2.6 GiB, MemAvailable min 11.8 GiB.
 Not proven / failed: 20 (2 of 2 attempts failed against existing gates). So the proven ceiling here is 10, the upper limit is between 10 and 20 under the existing gates. Not inferred: real-market data, longer sessions, the Claude chart path, sustained (not 1-journey) activity, real R2.
+
+## F. Server-side capacity with an HTTP driver (no browsers) — SYNTHETIC, same host, product baseline
+Why: in section C/E the Chromium generators (about 7 GB RSS at cohort 10) dominate memory/CPU, so "10 pass / 20 fail" described the generator. Here each trader is an HTTP client replaying the API journey that one real browser trader performed (recorded by the opt-in `RIKSORA_QA_RECORD_API` hook; template `backend/tools/claude_exp/stack/api_journey_template.json`, 38 calls, one closed trade; `totalOrders` checked per cycle). Path: API -> PostgreSQL 17 durable queue (admission 16 global / 2 per user, TTL 60 s) -> native worker -> synthetic Monthly Parquet (2,048-tick fixture) -> receipt -> journal. Code: `backend/tools/claude_exp/stack/http_driver.py`, `frontend/tests/http_load_cohort.py`, opt-in `RIKSORA_QA_HTTP_DRIVER=1`.
+Settings: 3 full journeys per trader, 1 s think time, 0.3 s start stagger, auth IP limit 1200 and a distinct X-Forwarded-For per trader (trusted-proxy emulation; all synthetic traders otherwise share 127.0.0.1), busy refusals retried exactly as the frontend client does. cgroup 4 GiB / 400% CPU. Gates: MemAvailable >= 10 GiB, disk, no swap, host CPU > 80% for 5 s (never tripped).
+LIMITS: the fixture is tiny, so worker cost per job is far below a real-month session: these are UPPER bounds for product capacity. Claude OHLC/R2 path not involved.
+
+### F1. 2 workers (product default)
+| Traders | Journeys done | Failed traders | Busy refusals (QUEUE_CAPACITY) | Throughput journeys/min | Job end-to-end p95 (max) s | Queue max q / oldest wait s | Host CPU p95 / max % | cgroup mem GiB |
+|---:|---|---:|---:|---:|---|---|---|---:|
+| 1 | 3/3 | 0 | 0 | 1.9 | 2.8 (2.8) | 1 / 0.2 | 12 / 21 | 0.46 |
+| 2 | 6/6 | 0 | 0 | 3.7 | 3.0 (3.0) | 1 / 0.1 | 20 / 34 | 0.46 |
+| 5 | 15/15 | 0 | 0 | 9.2 | 5.2 (5.2) | 2 / 1.7 | 34 / 45 | 0.47 |
+| 10 (3 runs) | 30/30 each | 0 | 0 | 14.8 / 15.7 / 15.5 | 5.2 (5.4) | 6-7 / 3.4-3.8 | 41-42 / 48-50 | 0.46-0.48 |
+| 20 (2 valid runs) | 55/60, 59/60 | 3, 1 | 9, 17 (recovered) | 18.0 / 19.2 | 8-11 (11-14) | 16 / 9.9-10.6 | 50-52 / 58 | 0.46 |
+| 50 (1 run) | 142/150 | 3 | 7,858 (2 unrecovered) | 18.2 | 25 (52) | 16 / 23.3 | 67 / 72 | 0.50 |
+The first cohort-20 attempt (`c20_invalid_stale_connection_bug.json`) is INVALID: a driver bug (reused idle keep-alive connection), fixed by one reconnect, as a browser does.
+Failures at 20/50 are `poll:404` (an accepted job no longer found when polled) and `submit:429` after retries are exhausted. Likely cause (code reading, not proven): `cloud/queue.py:245` deletes finished jobs beyond the 15 newest, globally, at every submit, so an owner can poll after its finished job was pruned.
+Throughput stops growing at about 18-19 journeys/min from 20 traders onward while CPU p95 is 50-67% and memory 0.5 GiB: the limit is worker slots + queue admission (16), not RAM/CPU.
+
+### F2. Worker count
+- 4 workers (addendum maximum), cgroup 4 CPU: WORSE. Cohort 20: 58/60, 11.1 journeys/min, job max 93 s, `RECONCILE_REQUIRED`, CPU throttled 0.48 s; cohort 50: 126/150, 8 failed traders (`poll:404`, `FAILED`, `RECONCILE_REQUIRED`), CPU throttled 10.7 s, jobs RUNNING up to 38 with 4 workers (leases lost). Hypothesis: native workers + API + PostgreSQL + driver exceed the 4-CPU cgroup, delaying the API-process heartbeat thread (5 s, lease 30 s). Not isolated.
+- 1 worker, cohorts 1/5/10: PASS 3/3, 5/5... all journeys done; at 10 traders 13.0 journeys/min, queue 8, oldest wait 9.6 s. cgroup CPU (whole stack: API + worker + PostgreSQL + driver) 0.20 / 0.66 / 1.02 cores = 3.4 / 11.1 / 16.9 % of 6 vCPU. API process incl. live worker slot 0.10 / 0.36 / 0.56 cores; PostgreSQL 0.01-0.03 cores (CPU of exited per-job native processes is not included, so the process figures are lower bounds). 2 workers at 10 traders: whole stack 1.5 cores (25%).
+
+### F3. Capacity statement (HTTP driver, this host, synthetic tiny fixture) — UPPER BOUND, needs production-like acceptance
+- Clean (0 failures, 0 busy refusals, journey cycle p95 about 40 s): up to 10 active traders with 2 workers, 3/3 repeats.
+- Degraded but functional: 20 (1-3 traders per run hit `poll:404`, queue full, job waits 10 s).
+- Saturated: 50 (throughput flat, 7,858 busy refusals, waits 23-52 s).
+- Server is not CPU/RAM-limited here; it is limited by 2 worker slots and the frozen queue limits. More workers did not help on 4 CPUs.

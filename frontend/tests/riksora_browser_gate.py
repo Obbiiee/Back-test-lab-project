@@ -267,7 +267,7 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
     from execution.research_fixture import research_provider
     from market_data.monthly_parquet import write_monthly_parquet
     if capacity_test:
-        if worker_count not in (1, 2):
+        if worker_count not in (1, 2, 3, 4):   # owner addendum 2026-11-14: at most 4 workers
             raise ValueError('QA_WORKER_COUNT_REFUSED')
         research_queue.WORKERS = worker_count
         report['workerCount'] = worker_count
@@ -422,7 +422,7 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
             port = sock.getsockname()[1]
             server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=port,
                 ssl_certfile=str(tls/'cert.pem'), ssl_keyfile=str(tls/'key.pem'),
-                proxy_headers=False, access_log=False, log_level='info'))
+                proxy_headers=os.environ.get('RIKSORA_QA_HTTP_DRIVER') == '1', forwarded_allow_ips='127.0.0.1', access_log=False, log_level='info'))
             thread = threading.Thread(target=server.run, kwargs={'sockets': [sock]}, daemon=True)
             thread.start()
             for _ in range(200):
@@ -433,6 +433,16 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                 time.sleep(.05)
             if not server.started:
                 raise RuntimeError('QA_SERVER_TIMEOUT')
+            if capacity_test and os.environ.get('RIKSORA_QA_HTTP_DRIVER') == '1':
+                # Measurement-only opt-in: HTTP-level traders (no browsers) against the same real backend; see http_load_cohort.py.
+                sys.path.insert(0, str(Path(__file__).resolve().parent))
+                from http_load_cohort import run_http_cohort
+                run_http_cohort(url=f'https://127.0.0.1:{port}', delivery=delivery, cohort_size=cohort_size, report=report, dsn=dsn,
+                                system_resources=_system_resources, nearest_rank=_nearest_rank, proc_snapshot=_proc_snapshot,
+                                cycles=int(os.environ.get('RIKSORA_QA_HTTP_CYCLES', '3')),
+                                think_ms=int(os.environ.get('RIKSORA_QA_HTTP_THINK_MS', '1000')),
+                                stagger_ms=int(os.environ.get('RIKSORA_QA_HTTP_STAGGER_MS', '0')))
+                return
             if capacity_test:
                 run_browser_cohort(environment, tools, browser_cache, evidence, report,
                                    url=f'https://127.0.0.1:{port}/?page=account', nonce=nonce,
@@ -1117,7 +1127,7 @@ if __name__ == '__main__':
     parser.add_argument('--browser-cache', type=Path)
     parser.add_argument('--capacity-cohort', type=int, choices=(1,2,5,10,20,50),
                         help='concurrent real-browser synthetic product users; requires bounded systemd cgroup')
-    parser.add_argument('--worker-count', type=int, choices=(1,2), default=1,
+    parser.add_argument('--worker-count', type=int, choices=(1,2,3,4), default=1,
                         help='bounded cloud job workers for capacity acceptance only')
     parser.add_argument('--auth-ip-limit', type=int, choices=tuple(range(30,1201)), default=30,
                         help='isolated QA auth/IP budget; default preserves the production default of 30/min')

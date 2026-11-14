@@ -1,7 +1,7 @@
 import {createInterface} from 'node:readline';
 import {pathToFileURL} from 'node:url';
 import {resolve,join} from 'node:path';
-import {readFileSync,realpathSync,statSync} from 'node:fs';
+import {readFileSync,realpathSync,statSync,appendFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
 const ROOT=resolve(new URL('../../',import.meta.url).pathname);
@@ -62,8 +62,10 @@ const requestFailures=[];page.on('requestfailed',request=>{
 });
 const apiBodyReads=[];const apiTrace=[];const apiStarts=new Map();let apiResponseCount=0;
 const apiRequestKey=request=>`${request.method()}\n${request.url()}`;
+const recordFile=process.env.RIKSORA_QA_RECORD_API||null;const recordSeq=new WeakMap();let recordCounter=0;
 page.on('request',request=>{
   const requestUrl=new URL(request.url());
+  if(recordFile&&requestUrl.origin===configOrigin&&requestUrl.pathname.startsWith('/api/v1/'))recordSeq.set(request,recordCounter++);
   if(requestUrl.origin===configOrigin&&requestUrl.pathname.startsWith('/api/v1/')){
     const key=apiRequestKey(request),started=apiStarts.get(key)??[];
     started.push(performance.now());apiStarts.set(key,started);
@@ -73,6 +75,12 @@ page.on('response',response=>{
   const url=new URL(response.url());if(url.origin!==configOrigin) return;
   const pathname=safePath(url.pathname);
   if(pathname.startsWith('/api/v1/'))apiResponseCount++;
+  if(recordFile&&recordSeq.has(response.request())){
+    // QA-only opt-in: private record of one synthetic trader's API traffic, used to replay the same journey over HTTP.
+    const req=response.request(),seq=recordSeq.get(req);
+    response.text().catch(()=>'').then(text=>appendFileSync(recordFile,JSON.stringify({seq,method:req.method(),path:url.pathname+url.search,
+      job:req.headers()['x-btl-job']??null,contentType:req.headers()['content-type']??null,body:req.postData()??null,status:response.status(),response:text})+'\n'));
+  }
   if(pathname.startsWith('/api/v1/')&&apiTrace.length<512){
     const requestTiming=response.request().timing();
     const started=apiStarts.get(apiRequestKey(response.request()))??[];
