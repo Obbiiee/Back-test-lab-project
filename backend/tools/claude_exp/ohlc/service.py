@@ -30,8 +30,11 @@ class ServiceError(Exception):
 
 
 class Session:
-    def __init__(self, session_id, user, instrument, source_hash, basis, cursor_ns, entitled_from_ns=0, revision=0):
+    def __init__(self, session_id, user, instrument, source_hash, basis, cursor_ns, entitled_from_ns=0, revision=0, source_hashes=None):
         self.id, self.user, self.instrument, self.source_hash = session_id, user, instrument, source_hash
+        # Ordered catalog of the datasets this Session may read (a dataset per instrument-month is the storage unit). Priority = order: if two
+        # datasets publish the same month, the first listed wins, so the result is deterministic. Default: just `source_hash`.
+        self.source_hashes = tuple(source_hashes) if source_hashes else (source_hash,)
         self.basis, self.cursor_ns, self.entitled_from_ns, self.revision = basis, cursor_ns, entitled_from_ns, revision
 
 
@@ -45,16 +48,19 @@ class ChartService:
         self.hits = self.misses = 0
 
     # ---- catalog and decoded objects ------------------------------------------------------------------------------------
-    def months(self, instrument, source_hash, basis):
-        key = (instrument, source_hash[:16], basis)
+    def months(self, instrument, sources, basis):
+        """Month -> manifest across the Session's ordered dataset catalog (a single hash string is accepted for one dataset)."""
+        sources = (sources,) if isinstance(sources, str) else tuple(sources)
+        key = (instrument, tuple(h[:16] for h in sources), basis)
         with self.lock:
             if key not in self.catalog:
-                prefix = f"ohlc/{engine.TRANSFORM_VERSION}/{instrument}/{source_hash[:16]}/{basis}/"
                 found = {}
-                for k in self.store.list(prefix):
-                    if k.endswith("/manifest.json"):
-                        m = json.loads(self.store.get(k))
-                        found[m["month"]] = m
+                for h in sources:
+                    prefix = f"ohlc/{engine.TRANSFORM_VERSION}/{instrument}/{h[:16]}/{basis}/"
+                    for k in self.store.list(prefix):
+                        if k.endswith("/manifest.json"):
+                            m = json.loads(self.store.get(k))
+                            found.setdefault(m["month"], m)          # first listed dataset wins for a month
                 self.catalog[key] = found
             return self.catalog[key]
 
@@ -96,7 +102,7 @@ class ChartService:
             raise ServiceError(409, "STALE_REVISION")
         T, width = s.cursor_ns, TF_SECONDS[tf] * NS
         limit = limit or FIRST_PAGE
-        catalog = self.months(s.instrument, s.source_hash, s.basis)
+        catalog = self.months(s.instrument, s.source_hashes, s.basis)
         if not catalog:
             raise ServiceError(404, "NOT_FOUND")
         newest_allowed = T - width                                       # bar start such that start + tf <= T
@@ -140,7 +146,7 @@ class ChartService:
         b0 = T - (T % width)
         minute0 = T - (T % (60 * NS))
         agg = Aggregator(TF_SECONDS[tf])
-        catalog = self.months(s.instrument, s.source_hash, s.basis)
+        catalog = self.months(s.instrument, s.source_hashes, s.basis)
         if tf != "M1" and minute0 > b0:
             for month in sorted(catalog, reverse=True):
                 m = catalog[month]
@@ -152,6 +158,8 @@ class ChartService:
                 if hi > lo:
                     agg.feed({k: c[k][lo:hi] for k in COLUMNS})
         reader = self.readers[s.instrument]
+        if callable(reader):                                   # per-month datasets: pick the one holding the cursor's minute
+            reader = reader(minute0)
         minute_rows = None
         for block in reader.iter_blocks(minute0, T + 1, atomic=False):
             r = tick_rows(block, s.basis)

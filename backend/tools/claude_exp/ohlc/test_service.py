@@ -318,5 +318,50 @@ class ObjectStoreAdapter(unittest.TestCase):
         self.assertFalse(s.simulation)
 
 
+
+class MultiDatasetCatalog(unittest.TestCase):
+    """Product storage is one dataset per instrument-month (each with its own source hash): history must read across them exactly like one dataset."""
+
+    def test_history_and_forming_bar_across_per_month_datasets_equal_a_single_dataset(self):
+        cut = ts("2026-05-08T12:00:00")
+        ticks = [t for t in make_ticks() if t[0] < cut]
+        month = lambda ns: datetime.fromtimestamp(ns // NS, timezone.utc).strftime("%Y-%m")
+
+        def compact(rows, name, fill):
+            root = Path(tempfile.mkdtemp(prefix="svc-m-")) / "c"
+            m = write_compact(root, ({"timeNs": str(t), "bid": b, "ask": a, "rawOrdinal": str(i)} for i, (t, b, a) in enumerate(rows)),
+                              parent=dict(datasetId=f"local:test:{name}", datasetVersion=fill * 64), scale=SCALE)
+            return CompactTickReader(root, expected_manifest_hash=m["manifestHash"]), m["manifestHash"]
+        r_apr, h_apr = compact([t for t in ticks if month(t[0]) == "2026-04"], "apr", "a")
+        r_may, h_may = compact([t for t in ticks if month(t[0]) == "2026-05"], "may", "c")
+        r_all, h_all = compact(ticks, "all", "d")
+        store, ref_store = LocalObjectStore(tempfile.mkdtemp(prefix="svc-s-")), LocalObjectStore(tempfile.mkdtemp(prefix="svc-s-"))
+        engine.publish_month(store, r_apr, "TESTUSD", "2026-04", rights="SYNTHETIC")
+        engine.publish_month(store, r_may, "TESTUSD", "2026-05", rights="SYNTHETIC")
+        for m_ in ("2026-04", "2026-05"):
+            engine.publish_month(ref_store, r_all, "TESTUSD", m_, rights="SYNTHETIC")
+        for T in (ts("2026-05-06T10:07:31.250"), ts("2026-05-01T00:00:30"), ts("2026-04-30T23:59:59.500")):     # mid-May, just after and just before the boundary
+            multi = svc.ChartService(store, {"TESTUSD": lambda ns: r_may if month(ns) == "2026-05" else r_apr},
+                                     {"s": svc.Session("s", "u", "TESTUSD", h_may, "MID", T, source_hashes=(h_may, h_apr))}, {"tok": "u"})
+            ref = svc.ChartService(ref_store, {"TESTUSD": r_all}, {"s": svc.Session("s", "u", "TESTUSD", h_all, "MID", T)}, {"tok": "u"})
+            for tf in svc.TF_SECONDS:
+                got, want = self._all(multi, tf), self._all(ref, tf)
+                self.assertEqual(got, want, f"{tf} at {T}")
+                self.assertGreater(len(got[0]["t"]), 0)
+
+    @staticmethod
+    def _all(service, tf):
+        pages, before, active = [], None, None
+        while True:
+            out = service.bars("tok", "s", tf, 1000, before)
+            if before is None:
+                active = out.get("active")
+            pages.append(out["bars"])
+            if not out["hasMore"]:
+                break
+            before = out["nextBefore"]
+        cols = {k: [x for p in reversed(pages) for x in p[k]] for k in pages[0]}
+        return cols, active
+
 if __name__ == "__main__":
     unittest.main()
