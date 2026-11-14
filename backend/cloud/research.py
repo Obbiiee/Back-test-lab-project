@@ -599,7 +599,16 @@ def install(app):
         catalog = await anyio.to_thread.run_sync(_operator_catalog, app.state.dsn, limiter=limiter)
         monthly_catalog = await anyio.to_thread.run_sync(_monthly_catalog, app.state.dsn, limiter=limiter)
         validate_source_selection(raw, catalog, monthly_catalog)
-        return await execute(user, workspace_id, 'create_session', raw, write=True, job_id=job_id)
+        entitlements = getattr(app.state, 'entitlements', None)
+        claim = None
+        if entitlements is not None:               # opt-in server-side Free/Pro admission (BTL_ENTITLEMENT_ENFORCE=1)
+            claim = await anyio.to_thread.run_sync(partial(entitlements.claim, user.id, workspace_id, raw), limiter=limiter)
+        try:
+            return await execute(user, workspace_id, 'create_session', raw, write=True, job_id=job_id)
+        except BaseException:
+            if claim is not None and claim[1]:     # a creation refused before it started must not burn the day's window
+                await anyio.to_thread.run_sync(partial(entitlements.release, user.id, claim[0]))
+            raise
 
     @app.post(prefix + '/reviews')
     async def review(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):

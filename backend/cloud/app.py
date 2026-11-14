@@ -95,6 +95,8 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, api_rate_limit=600, sess
     app.state.current_user = current
     app.state.dsn = dsn
     from . import chart_history
+    from . import entitlements
+    app.state.entitlements = entitlements.from_environment(dsn)          # None unless BTL_ENTITLEMENT_ENFORCE=1 (needs BTL_ENTITLEMENT_RESET_TIMEZONE)
     app.state.chart_history = chart_history.from_environment(dsn)        # None unless BTL_CHART_REGISTRY is set; the route then answers like an unknown resource
     app.state.product_provider_status = {
         "emailPasswordConfigured": True,

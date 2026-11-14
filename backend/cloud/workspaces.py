@@ -48,7 +48,7 @@ def domain_error_response(error):
                 "WRITE_FORBIDDEN": 403, "SCOPE_MISMATCH": 403, "STALE_REVISION": 409,
                 "IDEMPOTENCY_CONFLICT": 409, "REFUSED_STALE_REVISION": 409,
                 "REFUSED_IDEMPOTENCY_CONFLICT": 409, "REFUSED_ARCHIVED": 409,
-                "REFUSED_IDENTITY_REUSE": 409, "INVALID_INPUT": 422}
+                "REFUSED_IDENTITY_REUSE": 409, "INVALID_INPUT": 422, "DAILY_WINDOW_LIMIT": 409}
     status = statuses.get(error.code, 503)
     body = {"detail": error.code if status != 503 else "SERVICE_UNAVAILABLE"}
     return Response(canonical_bytes({"schemaVersion": 1, **body}), status_code=status,
