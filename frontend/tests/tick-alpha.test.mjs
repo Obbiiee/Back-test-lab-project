@@ -191,6 +191,27 @@ setAccountTransport({subject:queuedAccount.subject,request:async(path,options={}
 await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===lostId);
 assert.equal(lostReplayCalls.filter(([path])=>path.endsWith('/commands')).length,1);
 assert.equal(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),false,'do not cancel an uncertain financial mutation');
+// A finished job row that was pruned before its owner polled it (HTTP 404) is recovered by asking again with the SAME job/command ID.
+const prunedCalls=[];let prunedId,pollsServed=0;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  prunedCalls.push([path,options]);
+  if(path.endsWith('/commands')){prunedId=options.jobId;return {schemaVersion:1,jobId:prunedId,state:'QUEUED',result:null};}
+  if(path.includes('/jobs/')&&pollsServed++===0)throw Object.assign(Error('This workspace or record is unavailable.'),{status:404});
+  return {schemaVersion:1,jobId:prunedId,state:'SUCCEEDED',result:{schemaVersion:1,revision:9}};
+}},'11111111-1111-4111-8111-111111111111');
+const recovered=await api('/sessions/session:queue/commands',replayBody);
+assert.equal(recovered.revision,9,'pruned finished job is recovered');
+const commandCalls=prunedCalls.filter(([path])=>path.endsWith('/commands'));
+assert.equal(commandCalls.length,2,'resubmitted exactly once after the 404');
+assert.equal(commandCalls[1][1].jobId,prunedId,'recovery reuses the SAME durable financial job ID');
+assert.equal(commandCalls[1][1].body,replayBody,'recovery resends the identical canonical command');
+let notFoundForever=0;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  if(path.endsWith('/commands'))return {schemaVersion:1,jobId:options.jobId,state:'QUEUED',result:null};
+  notFoundForever++;throw Object.assign(Error('This workspace or record is unavailable.'),{status:404});
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&!!error.jobId,'repeated 404 stays an UNKNOWN financial outcome, never a silent success');
+assert.ok(notFoundForever<=3,'bounded recovery attempts');
 const retried=[];
 setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
   retried.push([path,options]);

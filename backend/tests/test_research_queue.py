@@ -1052,6 +1052,24 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
             row=db.execute('SELECT state,result FROM btl.research_jobs WHERE id=%s',(job['jobId'],)).fetchone()
         self.assertEqual(row,('FAILED',None))
 
+    def test_finished_job_results_survive_the_poll_window_then_age_out(self):
+        """A finished job stays readable past the old 15-row rule and is removed only after RETENTION_SECONDS."""
+        done=[]
+        for _ in range(25):
+            job=self.submit()
+            queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'],cancel=True)
+            done.append(uuid.UUID(job['jobId']))
+        self.submit()                                    # an admission prunes; nothing is old enough to delete yet
+        with connect(self.dsn) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM btl.research_jobs WHERE id=ANY(%s)',(done,)).fetchone()[0],25)
+            db.execute("UPDATE btl.research_jobs SET finished_at=clock_timestamp()-make_interval(secs=>%s) WHERE id=ANY(%s)",(queue.RETENTION_SECONDS+60,done[:10]))
+        self.submit()                                    # the next admission removes only the aged rows
+        with connect(self.dsn) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM btl.research_jobs WHERE id=ANY(%s)',(done[:10],)).fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM btl.research_jobs WHERE id=ANY(%s)',(done[10:],)).fetchone()[0],15)
+        # A finished result is still readable by its owner through the status route's source of truth.
+        self.assertEqual(queue.inspect(self.dsn,self.actor,self.workspace,done[-1])['state'],'CANCELLED')
+
     def test_global_ceiling_and_bounded_completed_retention(self):
         # Extra QA actors/workspaces are explicit; clean only these authored job rows.
         subjects=[(self.actor,self.workspace)]
@@ -1082,7 +1100,10 @@ work_one(os.environ['BTL_TEST_DATABASE_URL'],crash_after)
                 job=self.submit()
                 queue.inspect(self.dsn,self.actor,self.workspace,job['jobId'],cancel=True)
             with connect(self.dsn) as db:
-                self.assertLessEqual(db.execute('SELECT count(*) FROM btl.research_jobs').fetchone()[0],queue.RETAINED_LIMIT)
+                kept=db.execute('SELECT count(*) FROM btl.research_jobs').fetchone()[0]
+                self.assertLessEqual(kept,queue.RETAINED_LIMIT)
+                # Age-based retention (2026-11-14): recent finished jobs are not deleted merely because newer ones arrived.
+                self.assertGreaterEqual(kept,40)
         finally:
             with connect(self.dsn) as db:
                 db.execute('DELETE FROM btl.research_jobs WHERE actor_id=ANY(%s)',([a for a,w in subjects],))

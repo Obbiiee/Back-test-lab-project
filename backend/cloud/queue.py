@@ -26,7 +26,11 @@ from .worker_config import WORKER_COUNT
 
 GLOBAL_LIMIT = 16
 USER_LIMIT = 2
-RETAINED_LIMIT = 32
+# Finished operational job rows stay readable long enough for their owner to poll them (client deadline 95 s plus margin), then age out; a hard
+# count cap still bounds the table. Owner decision 2026-11-14: the earlier count-only rule (the 15 newest finished jobs, globally) deleted a
+# result before its owner polled it under load (HTTP 404). Admission (GLOBAL_LIMIT/USER_LIMIT), TTL, lease and deadline are unchanged.
+RETENTION_SECONDS = 900
+RETAINED_LIMIT = 4096
 WORKERS = WORKER_COUNT
 MAX_JOB_ATTEMPTS = 3
 LEASE_SECONDS = 30
@@ -241,8 +245,9 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
         _expire_queued(db)
         counts = db.execute("SELECT count(*) AS global_count,count(*) FILTER (WHERE actor_id=%s) AS user_count FROM btl.research_jobs WHERE state='QUEUED'", (actor_id,)).fetchone()
         require(counts['global_count'] < GLOBAL_LIMIT and counts['user_count'] < USER_LIMIT, 'queue', 'QUEUE_CAPACITY')
-        # Bounded completed operational receipts; canonical financial history is untouched.
-        db.execute("DELETE FROM btl.research_jobs WHERE id IN (SELECT id FROM btl.research_jobs WHERE state NOT IN ('QUEUED','RUNNING') ORDER BY finished_at DESC,id OFFSET %s)", (RETAINED_LIMIT-GLOBAL_LIMIT-1,))
+        # Completed operational receipts: age-based retention plus a hard cap; canonical financial history is untouched.
+        db.execute("DELETE FROM btl.research_jobs WHERE state NOT IN ('QUEUED','RUNNING') AND finished_at < clock_timestamp() - make_interval(secs => %s)", (RETENTION_SECONDS,))
+        db.execute("DELETE FROM btl.research_jobs WHERE id IN (SELECT id FROM btl.research_jobs WHERE state NOT IN ('QUEUED','RUNNING') ORDER BY finished_at DESC,id OFFSET %s)", (RETAINED_LIMIT,))
         row = db.execute("INSERT INTO btl.research_jobs(id,actor_id,workspace_id,operation,input,input_hash,state) VALUES (%s,%s,%s,%s,%s,%s,'QUEUED') RETURNING *",
                          (job_id, actor_id, workspace_id, operation, raw, digest)).fetchone()
         return view(row)

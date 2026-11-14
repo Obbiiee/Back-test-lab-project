@@ -37,7 +37,7 @@ export async function api(path,body,{signal}={}){
     const jobId=mutating?await durableJobId(account,path,body):queuedRead?crypto.randomUUID():undefined;
     const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(PRODUCT_JOB_DEADLINE_MS)]):AbortSignal.timeout(PRODUCT_JOB_DEADLINE_MS);
     const uncertain=()=>Object.assign(Error('UNKNOWN: durable operation outcome is not yet known. Reconcile its job or authoritative Session/receipt before retrying.'),{code:'UNKNOWN',jobId});
-    let value,pollAttempt=0;
+    let value,pollAttempt=0,recoveries=0;
     try{value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal:bounded,jobId});}
     catch(error){
       const definitiveRefusal=[400,401,403,404,409,422,426,429].includes(error?.status);
@@ -73,6 +73,13 @@ export async function api(path,body,{signal}={}){
         });
         value=await account.client.request(account.root+'/jobs/'+jobId,{signal:bounded});
       }catch(error){
+        // The server keeps finished job rows for a bounded time. If this poll finds the row gone (404), the operation is still
+        // idempotent by its job/command ID, so ask again with the SAME IDs (never a new ID) at most twice before giving up.
+        if(error?.status===404&&recoveries<2&&!bounded.aborted){
+          recoveries++;pollAttempt=0;
+          try{value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal:bounded,jobId});continue;}
+          catch(retryError){if(mutating)throw uncertain();throw retryError;}
+        }
         // Mutations are never cancelled on a transport timeout: cancellation
         // races the commit and can only leave an UNKNOWN outcome.
         if(mutating)throw uncertain();
