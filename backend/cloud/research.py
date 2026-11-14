@@ -173,6 +173,15 @@ def _observed_session_uses_product_archive(db,workspace_id,session_id):
     return dispatch_observed_session(state).archive_codec
 
 
+def _check_member(dsn, actor_id, workspace_id, need_owner):
+    """Membership (and OWNER for writes) exactly as the research routes verify it; a non-member answers like an unknown workspace."""
+    with connect(dsn) as db:
+        db.row_factory = dict_row
+        unit = WorkspaceUnit(db, actor_id, workspace_id)
+        if need_owner:
+            owner(unit.role)
+
+
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
     # Keep verified-user/membership locks through the INNER service commit.
     # The external source selector is an operator catalog; HTTP supplies only
@@ -625,19 +634,29 @@ def install(app):
         validate_source_selection(raw, catalog, monthly_catalog)
         entitlements = getattr(app.state, 'entitlements', None)
         claim = None
-        if entitlements is not None:               # opt-in server-side Free/Pro admission (BTL_ENTITLEMENT_ENFORCE=1)
+        if entitlements is not None:               # server-side Free/Pro admission (see cloud/entitlements.py)
+            from . import audit
+            from .entitlements import QuotaRefused
+            await anyio.to_thread.run_sync(partial(_check_member, app.state.dsn, user.id, workspace_id, True), limiter=limiter)   # never reserve for a foreign workspace
             try:
-                claim = await anyio.to_thread.run_sync(partial(entitlements.claim, user.id, workspace_id, raw), limiter=limiter)
-            except ContractError:
-                from . import audit
+                claim = await anyio.to_thread.run_sync(partial(entitlements.reserve, user.id, workspace_id, raw, job_id), limiter=limiter)
+            except QuotaRefused as refused:
                 await anyio.to_thread.run_sync(partial(audit.record, app.state.dsn, user.id, workspace_id, 'SESSION_CREATE', None, 'REFUSED'))
-                raise
+                return Response(canonical_bytes({'schemaVersion': 1, 'detail': refused.code, 'quota': refused.quota, 'resetsAt': refused.reset_at.isoformat(),
+                                                 'resetTimezone': 'UTC'}), status_code=409, media_type='application/json')
         try:
             return await execute(user, workspace_id, 'create_session', raw, write=True, job_id=job_id)
         except BaseException:
-            if claim is not None and claim[1]:     # a creation refused before it started must not burn the day's window
-                await anyio.to_thread.run_sync(partial(entitlements.release, user.id, claim[0]))
+            if claim is not None:                  # refused/failed before it started: the tokens are available again
+                await anyio.to_thread.run_sync(partial(entitlements.release, user.id, claim))
             raise
+
+    @app.get(prefix + '/entitlements')
+    async def entitlement_status(workspace_id: uuid.UUID, user: User = Depends(current)):
+        entitlements = getattr(app.state, 'entitlements', None)
+        require(entitlements is not None, 'entitlements', 'RESOURCE_UNAVAILABLE')
+        await anyio.to_thread.run_sync(partial(_check_member, app.state.dsn, user.id, workspace_id, False), limiter=limiter)
+        return Response(canonical_bytes(await anyio.to_thread.run_sync(partial(entitlements.status, user.id), limiter=limiter)), media_type='application/json')
 
     @app.post(prefix + '/reviews')
     async def review(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):
