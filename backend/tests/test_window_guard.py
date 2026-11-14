@@ -82,7 +82,7 @@ class WindowGuardTests(unittest.TestCase):
         # before the boundary a step may not cross it, and the refusal says where it can go
         crossing = self.command("ADVANCE", {"targetNs": str(end + STEP_NS)})
         self.assertEqual(crossing.status_code, 409, crossing.text)
-        self.assertEqual((crossing.json()["detail"], crossing.json()["maxTargetNs"]), ("WINDOW_BOUNDARY", str(end)))
+        self.assertEqual((crossing.json()["detail"], crossing.json()["maxTargetNs"]), ("WINDOW_BOUNDARY", str(end - 1)))
         # reach the boundary with the position still open: nothing is closed, priced or reset
         before_balance = self.state()["balance"]
         state = self.advance_to(end)
@@ -128,6 +128,12 @@ class WindowGuardTests(unittest.TestCase):
         self.assertEqual(confirmed.status_code, 200, confirmed.text)
         orders = list(self.state()["orders"].values())
         self.assertEqual([o["status"] for o in orders], ["PENDING"])
+        early = self.jump()                                                           # before the boundary the route allows Jump; the worker bounds it
+        self.assertIn(early.status_code, (200, 202), early.text)
+        result = f.completed_job_result(early)
+        self.assertEqual(result["status"], "NO_EVENT_UNTIL_SESSION_END", "the pending order would fill 22 steps in; the window ends after 3")
+        self.assertLess(int(self.state()["throughNs"]), end)
+        self.assertEqual([o["status"] for o in self.state()["orders"].values()], ["PENDING"])
         self.advance_to(end)
         state = self.state()
         self.assertEqual([o["status"] for o in state["orders"].values()], ["PENDING"], "a pending order is not touched by the boundary")
@@ -181,13 +187,14 @@ class WindowGuardRuleTable(unittest.TestCase):
         R = self.run_check
         self.assertIsNone(R("OPEN", through=10))
         self.assertEqual(R("OPEN", through=self.END), "WINDOW_ENDED")
-        self.assertIsNone(R("ADVANCE", through=10, target=self.END))
+        self.assertIsNone(R("ADVANCE", through=10, target=self.END - 1))
+        self.assertEqual(R("ADVANCE", through=10, target=self.END), "WINDOW_BOUNDARY")
         self.assertEqual(R("ADVANCE", through=10, target=self.END + 1), "WINDOW_BOUNDARY")
         self.assertEqual(R("ADVANCE", through=self.END, target=self.END + 1), "WINDOW_ENDED_CONTINUATION_ONLY")
         self.assertEqual(R("JUMP", through=self.END, pending=1, active=1), "PENDING_AT_WINDOW_END")
         self.assertEqual(R("JUMP", through=self.END), "WINDOW_COMPLETED")
         self.assertIsNone(R("JUMP", through=self.END, active=2))
-        self.assertIsNone(R("JUMP", through=10, pending=1))                     # far from the boundary: ordinary Jump
+        self.assertIsNone(R("JUMP", through=10, pending=1))                     # before the boundary a Jump is allowed; the orchestration bounds it
         for kind in ("CANCEL", "CLOSE", "END"):
             self.assertIsNone(R(kind, through=self.END + 5000, pending=3))
         self.assertIsNone(R("OPEN", through=self.END + 5000, tier="PRO"))

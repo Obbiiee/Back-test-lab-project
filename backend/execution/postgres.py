@@ -651,6 +651,8 @@ def grant_execution_runtime(dsn, role):
         # Commercial product tables: Session list visibility (trash/restore), Free/Pro claim ledger and the append-only audit trail.
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.session_lifecycle,btl.entitlement_claims TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT INSERT ON btl.audit_events TO {}").format(sql.Identifier(role)))
+        # Tier lookup (PAID, unexpired) for the Free window; column-limited, read only.
+        db.execute(sql.SQL("GRANT SELECT(actor_id,phase,paid_at,expires_at) ON btl.sandbox_billing_orders TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(order_status,last_sequence,event_id,payload,content_hash) ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT UPDATE(payload,content_hash) ON btl.tick_session_metric_projections TO {}").format(sql.Identifier(role)))

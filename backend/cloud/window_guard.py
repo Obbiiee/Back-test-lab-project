@@ -8,13 +8,11 @@ than the already-open lifecycle needs:
   at/after the boundary: OPEN/confirm refused; ADVANCE/SEEK/replay-to refused; CANCEL, CLOSE and END stay allowed;
                          Jump to Next Event allowed only with at least one ACTIVE order and no PENDING order (a pending order would be a new entry
                          outside the window: cancel it first). With nothing live the window is complete and says so.
-Known limit (documented in the audit report): a PENDING order created inside the window that is still pending when one Jump chunk crosses the boundary
-could fill after it. Closing that needs the jump orchestration to receive the window end; until then the guard refuses Jump when a PENDING order exists
-and the boundary is nearer than the next-event search could prove (conservative: it refuses a Jump with PENDING orders once the cursor is within one UTC day of the end).
+A PENDING order created inside the window is protected where the ticks are consumed: the jump orchestration (`execution/research.py`, with the lookup in
+`execution/free_window.py`) bounds its search to the last tick of the window BEFORE any tick that could fill is processed; ADVANCE/SEEK/replay-to are bounded here
+(window = ticks with time < end, last allowed cursor end-1). The frozen reducer is not touched.
 """
 from contracts.primitives import ContractError
-
-NEAR_END_NS = 24 * 3600 * 10**9
 
 
 class WindowRefused(ContractError):
@@ -47,7 +45,7 @@ def check(entitlements, dsn, actor_id, workspace_id, session_id, kind, target_ns
         return
     end = int(window["endNs"])
     state = live_orders(dsn, workspace_id, actor_id, session_id)
-    through, after = state["throughNs"], state["throughNs"] >= end
+    through, after = state["throughNs"], state["throughNs"] >= end - 1       # window = ticks with time < end; end-1 is the last allowed cursor
     base = dict(windowEndNs=str(end), throughNs=str(through), activeOrders=state["active"], pendingOrders=state["pending"])
     if kind == "OPEN":
         if after:
@@ -56,8 +54,8 @@ def check(entitlements, dsn, actor_id, workspace_id, session_id, kind, target_ns
     if kind == "ADVANCE":
         if after:
             raise WindowRefused("WINDOW_ENDED_CONTINUATION_ONLY", {**base, "allowed": "JUMP_NEXT_EVENT_WITH_ACTIVE_ORDERS_CANCEL_CLOSE_END"})
-        if target_ns is not None and int(target_ns) > end:
-            raise WindowRefused("WINDOW_BOUNDARY", {**base, "maxTargetNs": str(end)})
+        if target_ns is not None and int(target_ns) > end - 1:
+            raise WindowRefused("WINDOW_BOUNDARY", {**base, "maxTargetNs": str(end - 1)})
         return
     if kind == "JUMP":
         if after:
@@ -66,7 +64,5 @@ def check(entitlements, dsn, actor_id, workspace_id, session_id, kind, target_ns
             if not state["active"]:
                 raise WindowRefused("WINDOW_COMPLETED", base)
             return
-        if state["pending"] and end - through <= NEAR_END_NS:
-            raise WindowRefused("PENDING_NEAR_WINDOW_END", base)
-        return
+        return                                          # a PENDING order is protected inside the jump orchestration (bounded before any fill), see execution/free_window.py
     raise ContractError("INVALID_INPUT", "kind")

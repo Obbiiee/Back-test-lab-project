@@ -10,10 +10,9 @@ export function entitlementRefusal(body){
     WINDOW_DAY_LIMIT:`Free plan: one newly opened historical month per day (UTC).${at?` Another month can be opened from ${at}.`:''} Continuing a month you already opened is free.`,
     ACTIVATION_IN_PROGRESS:'Another Session is still being created. Wait a moment and check your Sessions before trying again.',
     WINDOW_ENDED:'This Free window has ended: new orders cannot be opened. Open positions can still be resolved.',
-    WINDOW_BOUNDARY:'This step would cross the end of your Free window. Step to the boundary, or use Jump to Next Event while an order is open.',
+    WINDOW_BOUNDARY:'This step would cross the end of your Free window. Step to the last tick of the window, or use Jump to Next Event while an order is open.',
     WINDOW_ENDED_CONTINUATION_ONLY:'This Free window has ended. Only Jump to Next Event (with an open position), Close, Cancel and End are available.',
     PENDING_AT_WINDOW_END:'A pending order is still waiting at the end of your Free window. Cancel it before continuing.',
-    PENDING_NEAR_WINDOW_END:'A pending order could fill after your Free window ends. Cancel it or step to the boundary first.',
     WINDOW_COMPLETED:'This Free window is complete: no open or pending orders remain.',
     TRASH_EXPIRED:'The 30-day restore window for this Session has passed.',
   };

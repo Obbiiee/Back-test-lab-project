@@ -23,6 +23,10 @@ class Grants(unittest.TestCase):
         with psycopg.connect(**base) as db:
             db.execute("SELECT 1 FROM btl.session_lifecycle LIMIT 1")
             db.execute("SELECT 1 FROM btl.entitlement_claims LIMIT 1")
+            db.execute("SELECT actor_id,phase,paid_at,expires_at FROM btl.sandbox_billing_orders LIMIT 1")      # tier lookup for the Free window
+            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                db.execute("SELECT transaction_id FROM btl.sandbox_billing_orders LIMIT 1")                   # nothing beyond the four columns
+            db.rollback()
             db.execute("INSERT INTO btl.audit_events(actor_id,action,outcome) VALUES (%s,'TEST_GRANT','OK')", (uuid.uuid4(),))
             for statement in ("DELETE FROM btl.audit_events", "UPDATE btl.audit_events SET outcome='REFUSED'", "SELECT 1 FROM btl.audit_events LIMIT 1"):
                 with self.assertRaises(psycopg.errors.InsufficientPrivilege, msg=statement):

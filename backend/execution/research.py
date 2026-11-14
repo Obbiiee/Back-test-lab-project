@@ -843,6 +843,8 @@ class ResearchApplication:
         validate_jump_request(raw, session_id)
         with connect(self.dsn) as db:
             _meta, _method, state, _checkpoint = self._session(db, session_id)
+            from .free_window import free_window_end
+            window_end = free_window_end(db, self.scope.workspace_id, session_id)
         live = any(order['status'] in ('PENDING', 'ACTIVE') for order in state['orders'].values())
         if not live or state['ended'] or state['unresolved']:
             view = self.inspect(session_id, raw['timeframe'])
@@ -850,6 +852,10 @@ class ResearchApplication:
                 advances=0, processed_groups=0, events=[], view=view)
         end_exclusive = int(self.__provider.describe(state['datasetId'], state['datasetVersion'])['range']['endNs'])
         target = str(end_exclusive - 1)
+        if window_end is not None and any(order['status'] == 'PENDING' for order in state['orders'].values()):
+            # Free window: a PENDING order may not fill outside the activated month. The search is bounded BEFORE any tick that could fill is processed;
+            # the reducer is untouched (this only lowers the upper bound of an ordinary canonical ADVANCE). Active-only continuation is not bounded.
+            target = str(min(end_exclusive, window_end) - 1)
         require(state['revision'] in (raw['expectedRevision'], raw['expectedRevision'] + 1),
                 'revision', 'REFUSED_STALE_REVISION')
         if state['revision'] == raw['expectedRevision']:
