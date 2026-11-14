@@ -17,7 +17,8 @@ from common import set_instrument, drive, policy                      # noqa: E4
 from claude_session import ClaudeSession, AdmittedSource             # noqa: E402
 
 SCEN = {"swing": dict(step_s=3600, tp=5000, sl=3000, mix=False), "pending": dict(step_s=600, tp=1500, sl=1000, mix=True),
-        "eventheavy": dict(step_s=60, tp=150, sl=100, mix=True), "scalp": dict(step_s=20, tp=300, sl=200, mix=False)}
+        "eventheavy": dict(step_s=60, tp=150, sl=100, mix=True), "scalp": dict(step_s=20, tp=300, sl=200, mix=False),
+        "scalp_tight": dict(step_s=10, tp=30, sl=20, mix=False), "pending_tight": dict(step_s=30, tp=40, sl=30, mix=True)}   # tight targets: many fills on EURUSD
 
 
 def price(v, scale=5):

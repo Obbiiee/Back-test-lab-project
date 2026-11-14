@@ -378,6 +378,7 @@ def main():
         import random as _r
         rng, started, done_lat, fails, lock2 = _r.Random(7), [], [], [], threading.Lock()
         stats.t_start = time.perf_counter()
+        emit({'progress': 'ready'})            # the parent starts its CPU/memory/queue sampling on this line
         def one(t, t_arr):
             t0 = time.perf_counter(); ok, why = t.cycle(0); ms = (time.perf_counter() - t0) * 1000
             with lock2:

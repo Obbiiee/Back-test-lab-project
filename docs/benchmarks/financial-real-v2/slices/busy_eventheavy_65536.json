@@ -1,0 +1,76 @@
+{
+ "scenario": "eventheavy",
+ "ticks": 65536,
+ "sliceOffset": 16384,
+ "source": "2024-01",
+ "rights": "UNKNOWN (private QA only)",
+ "baseline": {
+  "cpu": 59.41,
+  "wall": 60.06,
+  "balance": "9996.73",
+  "fills": 25,
+  "unresolved": false
+ },
+ "claude_v1": {
+  "cpu": 0.4,
+  "wall": 0.4,
+  "balance": "9996.73",
+  "stats": {
+   "exact_groups": 25,
+   "skipped_groups": 65511,
+   "jumps": 564
+  },
+  "fills": 25,
+  "unresolved": false,
+  "advanceLogBytes": 83538
+ },
+ "parity_baseline_vs_claude_v1": {
+  "eventsEqual": true,
+  "eventsBaseline": 55,
+  "eventsClaude": 55,
+  "balanceEqual": true,
+  "ordersEqual": true,
+  "lastObservedEqual": true,
+  "nextGroupEqual": true,
+  "quoteBasisEqual": true,
+  "realizedEqual": true
+ },
+ "ingest_s": 23.2,
+ "admission_mismatches": 0,
+ "compact_bytes": {
+  "v1": 985706,
+  "v2": 166673
+ },
+ "claude_v1_rerun": {
+  "cpu": 0.42,
+  "wall": 0.42,
+  "balance": "9996.73",
+  "stats": {
+   "exact_groups": 25,
+   "skipped_groups": 65511,
+   "jumps": 564
+  },
+  "fills": 25,
+  "unresolved": false
+ },
+ "claude_v2": {
+  "cpu": 0.39,
+  "wall": 0.39,
+  "balance": "9996.73",
+  "stats": {
+   "exact_groups": 25,
+   "skipped_groups": 65511,
+   "jumps": 564
+  },
+  "fills": 25,
+  "unresolved": false
+ },
+ "claude_v1_rerun_equals_parity_run_claude": true,
+ "claude_v2_vs_claude_v1": {
+  "finalStateAndStatsEqual": true,
+  "eventsEqual": true,
+  "rawEventsEqual": true,
+  "events": 55
+ },
+ "status": "PASS"
+}
