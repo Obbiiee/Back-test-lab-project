@@ -25,6 +25,7 @@ from contracts.canonical import decimal_text, content_hash
 from ticks.contracts import event_id
 from ticks.timeline import make_group
 from market_data.compact_tick import CompactTickReader
+from tools.claude_exp.compact2 import open_compact      # opens a v1 (compact.json) or v2 (compact2.json) month; same six logical columns
 
 BLOCK = 256
 
@@ -37,7 +38,7 @@ class AdmittedSource:
     """Immutable, hash-pinned compact source + deterministic canonical reconstruction rule (verified at admission)."""
 
     def __init__(self, root, admission, *, expected_manifest_hash, deep_verify=False):
-        self.reader = CompactTickReader(root, expected_manifest_hash=expected_manifest_hash)
+        self.reader = open_compact(root, expected_manifest_hash=expected_manifest_hash)
         self.reader.verify_all(deep=deep_verify)
         self.adm = admission
         self.scale = int(admission.get("scale", 1000))

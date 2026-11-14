@@ -205,7 +205,22 @@ class Trader:
         value = first
         while value.get('state') in ('QUEUED', 'RUNNING'):
             time.sleep((min(3000, 1000 + attempt * 500) + self.rng.randint(0, 250)) / 1000); attempt += 1
-            s, value = self.call('GET', f'{root}/jobs/{jid}')
+            busy_retries = 0
+            while True:
+                s, value = self.call('GET', f'{root}/jobs/{jid}')
+                detail = value.get('detail') if isinstance(value, dict) else None
+                if s in (429, 503) and detail in ('RESEARCH_BUSY', 'QUEUE_CAPACITY', 'SERVICE_BUSY'):
+                    # Same as the frontend client, which retries every request refused with these pre-admission codes (read-only poll: always safe).
+                    with self.stats.l:
+                        self.stats.busy[detail + '(poll)'] = self.stats.busy.get(detail + '(poll)', 0) + 1
+                    if busy_retries < self.patience(detail):
+                        try:
+                            hint = min(3.0, max(0.0, float(self.retry_after)))
+                        except (TypeError, ValueError):
+                            hint = 0.0
+                        time.sleep(max(hint, min(0.8, 0.05 * 2 ** busy_retries)) + self.rng.random() * 0.025); busy_retries += 1
+                        continue
+                break
             if s != 200 or not isinstance(value, dict):
                 return None, f'poll:{s}', (time.perf_counter() - t0) * 1000
         ms = (time.perf_counter() - t0) * 1000
