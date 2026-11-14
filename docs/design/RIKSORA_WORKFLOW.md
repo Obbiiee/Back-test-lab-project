@@ -1,5 +1,8 @@
 # RIKSORA Backtest Lab — workflow (one source of truth)
 
+> **OWNER UPDATE — 2026-11-15 (supersedes 2026-10-23 Free quotas below):** Free = 1 chosen pair, 1 Method, max 12 consecutive calendar months of qualified tick trading history, 1 newly created Session per UTC calendar month, and 1 additional historical calendar-month backtest segment activated per UTC day. This is a monthly *historical research window*, not one historical day, not a wall-clock access timer. An activated month remains resumable; the next chronological month requires another real UTC day's unused token; tokens do not accumulate. Reset: 00:00 UTC.
+> Pro = unlimited Method and Session creation, no daily historical-month activation quota, all qualified tick history for the selected pair in one continuous Session, with bounded shared compute/queue safety. Historical descriptions below indicate old candidate UX, not newer product authority. Follow the [Commercial V1 Contract](../acceptance/RIKSORA-COMMERCIAL-V1-TARGETS.md) and [Entitlement Specification](../SUBSCRIPTION_ENTITLEMENT_SPEC.md).
+
 Repository copy of canvas artboard **00w · Workflow** in the private design canvas "RIKSORA Backtest Lab — Design" (owner's claude.ai account). Owner decisions of 2026-10-23 are recorded here. Statuses were corrected the same day after Codex's audit of the PDF exports.
 
 When this file and the canvas differ, change the canvas first, then this file. Screen numbers refer to canvas artboards. The screen map with code status is artboard **00 · Design map & status**.

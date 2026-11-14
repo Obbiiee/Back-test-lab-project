@@ -2,6 +2,9 @@
 
 Status: product/architecture authority for future subscription work. This document does not authorize implementation or finalize price.
 
+> **LATEST OWNER V1 ENTITLEMENT — 2026-11-15:** Free can activate one new tradable *historical calendar-month segment* per real UTC day (FX Replay-style), not one historical day and not a two-hour access timer. Daily allowances reset at 00:00 UTC (07:00 WIB) and do not accumulate. Once activated, the same month can be resumed later without another daily debit. The next eligible chronological month needs a new daily activation. Free also has one selected pair, one usable Trading Method, a 12-consecutive-calendar-month qualified tick-history cap, and one *new Session creation* per UTC calendar month; old saved Sessions persist.
+> **Pro:** unlimited product-count Methods and Sessions; unlimited newly activated historical calendar-month windows and contiguous qualified full-history replay within each Session's one selected pair, with safe bounded shared CPU/queue. This replaces conflicting historic five-saved-Session caps. See the current Commercial V1 target for contract priority.
+
 ## Core monetization principle
 
 **Do not sell correctness. Sell research capacity, depth and convenience.**
@@ -19,9 +22,9 @@ The intended Free experience is a complete, credible Backtest Lab workflow with 
 ### Daily allowance
 
 - A Free user may activate **one tradable historical window of up to one calendar month per daily entitlement period**.
-- The exact reset timezone/time and anti-abuse mechanics are implementation decisions to be defined before launch; they must be deterministic and visible to the user.
+- Reset daily at 00:00 UTC (07:00 WIB), enforced atomically by the server; activation spends quota only if successfully and durably recorded. Changing device clock, racing tabs or replaying the same activation cannot mint more windows.
 - **Activating the monthly segment immediately consumes that day's Free allowance**, even if the user later trades or replays only part of the activated month. The allowance is not prorated by days used.
-- Once a window is activated, trading/replay execution is allowed inside that window.
+- Once the historical monthly window is activated, trading/replay may be paused and resumed in that same month later without another token; there is no elapsed wall-clock access timer. A separate next chronological calendar month needs another day's activation.
 - The user may make multiple valid trades inside the activated window; the limit is the research window, not an arbitrary trade-count penalty.
 - The daily allowance must be enforced server-side once cloud entitlements exist.
 
@@ -59,10 +62,10 @@ The next new Free tradable-window allowance becomes available according to the n
 ## Free account/session capacity rules
 
 - The Free daily tradable allowance does **not** accumulate. If unused for a daily entitlement period, it expires rather than banking additional monthly segments.
-- A Free user may keep a maximum of **5 active/saved Sessions**.
-- At the five-Session limit, creating another active Session requires freeing a slot or upgrading to an applicable paid entitlement.
-- Deleting an active Session moves it to **Trash for 30 days** before permanent deletion. A trashed Session does not consume one of the five active/saved Free Session slots.
-- Restoring a Session from Trash makes it active/saved again and therefore consumes a slot. If the Free account is already at 5/5 active/saved Sessions, restore is blocked until the user frees a slot or obtains an applicable higher entitlement.
+- A Free user may create at most **one new Session per UTC calendar month**; unused Session-creation allowances do not accumulate. Old saved Sessions do not consume the next month's creation allowance.
+- Free is restricted to **one chosen qualified pair, one usable Method and 12 consecutive historical tick calendar months**; continuing an existing Session retains its balance, orders and financial evidence.
+- Archiving, deleting, restoring or moving Sessions to Trash never restores a used Session-creation token, Method slot, pair right or daily monthly-window activation. Previously created Sessions and legitimate evidence remain reviewable.
+- Existing safe Trash/retention rules may apply separately; they must not silently erase valid financial research.
 - Session reset/restart is not a product workflow for Free or Pro. A separate experiment starts as a new Session.
 - Session duplication is not part of the intended product workflow.
 - A Free user with an available daily allowance may apply it to continuing an eligible prior Session or to starting an eligible new Session.
@@ -122,7 +125,7 @@ Advanced research visualization and analysis may remain Pro-gated when they repr
 
 When **Continue Session** is selected:
 - if the daily Free allowance is available, the user may activate the next eligible tradable monthly segment for that session and return to the Backtest Workspace;
-- if the daily allowance has already been consumed, the Session Overview and prior results remain accessible, but a new tradable segment cannot be activated until the next allowance or an applicable upgrade;
+- if the daily allowance has already been consumed, prior results and Session Overview remain accessible and an already activated month can be resumed; only the activation of a NEW historical monthly segment must await the next allowance or Pro upgrade;
 - the existing open-position boundary rule still applies and must not manufacture outcomes.
 
 ## Free trading capabilities
@@ -140,6 +143,18 @@ Subject to normal product/data availability, Free should retain the core experie
 - journal/history needed to understand the completed session.
 
 Protocol Mode must not be treated as synonymous with a paid subscription.
+
+## Export results — Free and Pro (Commercial V1 owner update 2026-11-15)
+
+**Both Free and Pro may export their own already committed backtest results**, including actual trade/order/position outcomes from ordinary replay, fast replay and Jump to Next Event; exported math must use the same canonical tick execution ledger, receipts and Journal/Statistics for both tiers. This is NOT a reason to withhold accurate historical result records from Free.
+
+- **Free minimum:** owned Session full trade-history **CSV**, plus **PDF** basic Session performance report with canonically defined win rate, realized PnL, R statistics, profit factor, drawdown, balance curve and Method/source disclosure; no fake trade-row truncation.
+- **Pro:** the same accurate basic exports, plus **batch and multi-Session / Method-across-Sessions reports** for owned research and advanced outputs only when the underlying metrics are implemented. Unlimited Methods/Sessions does not mean unlimited parallel export CPU, I/O or disk resources.
+- **Additional V1 structured option:** machine-readable versioned **JSON** research/evidence export with scoped eligible metadata and receipt identity, subject to source rights and security; this is a target that must be explicitly tested, not claimed implemented from older frontend helpers.
+- The export must disclose Session/Method/pair, selected history range, UTC timestamps, fees/precision and source/profile assumptions, pending/open/unresolved states, partial exit handling, snapshot/committed revision and report generation timestamp. Financial content must match the immutable account ledger and not depend on which replay control was clicked.
+- **Privacy and rights:** strict authenticated account ownership for each export request/download; no guessed URLs, cross-tenant access, raw market tick dataset redistribution or future-data leakage. Rate-limit and bound streaming/large jobs, clean temporary files safely and protect CSV cells against formula injection.
+- Free/Pro downgrade or entitlement expiry must **not destroy historical research**; owned basic result export should remain available during read-only account access, subject to retention and applicable account security.
+- The normative formats, integrity tests and acceptance are defined in the [Commercial V1 Export Results contract](acceptance/RIKSORA-COMMERCIAL-V1-TARGETS.md#f1-export-backtest-results--commercial-v1-owner-2026-11-15).
 
 ## Free results — Basic Statistics
 

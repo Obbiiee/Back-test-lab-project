@@ -7,6 +7,7 @@
 | Why does Backtest Lab exist? What is the scientific thesis? | `BACKTEST_LAB_RESEARCH_THESIS.md` |
 | What should users see and how should the product feel/work? | `PRODUCT_DESIGN_BLUEPRINT.md` |
 | How should the software/system be structured? | `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` |
+| What is the current owner-selected 2026-11-13 hybrid V1 architecture and Claude review brief? | [Detailed hybrid vNext decision and adversarial-review request](architecture/RIKSORA-HYBRID-NINE-TF-R2-OWNER-DECISION-20261113.md); **linked from the sole system authority blueprint**, not a competing authority. |
 | What is the planned backend contract and guarded integration path? | [Same system blueprint — Phase 19 planning handoff](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#38-phase-19--backend-architecture-planning-handoff) |
 | What Application/API intake is implemented, and what remains deferred? | [Same system blueprint — intake evidence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#389-applicationapi-intake--implementation-evidence) and [Phase 19 completion audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#3810-phase-19-completion-audit) |
 | What durable database, identity and ownership adapters actually exist? | Same system blueprint: [persistence](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#391-implemented-persistence-and-acceptance-evidence), [identity](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#401-implemented-identity-and-validation), [ownership/final audit](PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md#411-implemented-ownership-and-final-journey-audit) |
