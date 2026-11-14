@@ -535,6 +535,12 @@ class ObservedResearchApplication:
         from market_data.context_warmup import FrameWarmup,MAX_BARS
         from .workspace import TIMEFRAMES
         keys(raw,'timeframe offset');timeframe=raw['timeframe'];offset=raw['offset']
+        from . import claude_ohlc_seam
+        if claude_ohlc_seam.enabled():
+            require(type(timeframe) is str and timeframe in TIMEFRAMES,'timeframe','REFUSED_TIMEFRAME')
+            with connect(self.dsn) as db:
+                db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');state=self._session(db,session_id)[2]
+            return claude_ohlc_seam.past_context(state,timeframe,offset)
         require(type(timeframe) is str and timeframe in TIMEFRAMES,'timeframe','REFUSED_TIMEFRAME')
         require(type(offset) is int and 0<=offset<=50000,'offset','INVALID_INPUT')
         archive,source_info=self.catalog.reference_context()
