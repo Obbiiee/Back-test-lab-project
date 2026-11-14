@@ -31,3 +31,8 @@ Rights for real data are UNKNOWN; the product refuses real sources without pinne
 ## Rules (from the owner brief)
 No force-push, no reset, no merge into main, no copying the other engine's experimental code before both are frozen, no weakening acceptance, no PnL tolerance to hide a financial mismatch.
 Report claims as: proven / hypothesis / prototype-only / needs production-like acceptance. Mention what was not measured.
+
+## Progress log (Linux VPS, 2026-11-14)
+- Toolchain in user-space, no sudo: uv + Python 3.13.18 (`~/tools/venv313`, from `requirements.lock`), PostgreSQL 17.12 via micromamba (`~/tools/pg17`, data `~/tools/pgdata`, port 54329), Node 22.23.5 (`~/tools/node`). `npm ci && npm run build` OK.
+- `local_stack.py setup` (migrations + grants) and `api` run on Linux unchanged. PROVEN (item 1, partial), synthetic accounts only: register 201, login before verify refused (400), verify via outbox 200, login 200, `/auth/me` 200 and 401 without token, owner reads own workspace 200 while another user gets 404 (same as unknown id) for workspace and sessions. Script: `backend/tools/claude_exp/stack/e2e_auth.py`.
+- NOT yet done in item 1: replay session on a synthetic source; gateway + browser path. Items 2-5 not started. Measurements need the owner addendum now recorded in AGENTS.md.
