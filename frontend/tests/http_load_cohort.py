@@ -7,6 +7,12 @@ free disk < 30 GiB, swap present; plus the addendum's 80% host CPU gate (5 conse
 import json, os, subprocess, sys, threading, time
 from pathlib import Path
 
+# Default gates (MemAvailable >= 10 GiB, host CPU <= 80% for 5 s). The owner's 2026-11-14 budget addendum (5 vCPU / 14 GiB for the site, cgroup-enforced)
+# is opt-in: RIKSORA_QA_BUDGET=5cpu14g relaxes them to an OS-protection floor (MemAvailable >= 1 GiB, host CPU <= 97% for 10 s).
+_BUDGET = os.environ.get('RIKSORA_QA_BUDGET') == '5cpu14g'
+MIN_AVAIL_GIB = 1.0 if _BUDGET else 10.0
+CPU_GATE_PCT = 97 if _BUDGET else 80
+CPU_GATE_SECONDS = 10 if _BUDGET else 5
 DRIVER = Path(__file__).resolve().parents[2] / 'backend/tools/claude_exp/stack/http_driver.py'
 
 
@@ -117,16 +123,16 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             if not phase['measuring']:
                 last = _cpu_times(); continue
             s = system_resources(); samples.append(s)
-            if (s['memAvailableBytes'] is None or s['memAvailableBytes'] < 10 * 1024 ** 3 or
+            if (s['memAvailableBytes'] is None or s['memAvailableBytes'] < MIN_AVAIL_GIB * 1024 ** 3 or
                     s['diskFreeBytes'] < 30 * 1024 ** 3 or s['swapTotalBytes'] != 0):
                 stop['reason'] = 'CAPACITY_RESOURCE_STOP'; _kill(); return
             now = _cpu_times(); dt, di = now[0] - last[0], now[1] - last[1]; last = now
             pct = 100 * (dt - di) / dt if dt else 0; cpu_pct.append(pct)
-            high = high + 1 if pct > 80 else 0
+            high = high + 1 if pct > CPU_GATE_PCT else 0
             if cg is not None:
                 roles_series.append((time.monotonic(), _role_ticks(cg, os.getpid(), chart_proc.pid if chart_proc else None, proc.pid)))
-            if high >= 5:
-                stop['reason'] = 'CAPACITY_CPU_GATE_80PCT'; _kill(); return
+            if high >= CPU_GATE_SECONDS:
+                stop['reason'] = 'CAPACITY_CPU_GATE_%dPCT' % CPU_GATE_PCT; _kill(); return
             try:
                 with psycopg.connect(dsn, connect_timeout=2) as db:
                     r = db.execute("""SELECT count(*) FILTER (WHERE state='QUEUED'), count(*) FILTER (WHERE state='RUNNING'),
@@ -204,7 +210,7 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             d = max(0, snaps['after'][who + 'CpuTicks'] - snaps['before'][who + 'CpuTicks'])
             cpu_by[who] = dict(cpuSeconds=round(d / ticks, 2), coresAverage=round(d / ticks / elapsed, 3))
         cpu_by['note'] = 'service = API + in-process queue workers (one OS process); generator = HTTP driver; CPU of exited processes is not included'
-    report['capacity'] = dict(cpuByRole=role_report, driverProcess=driver_acct, chartServiceProcess=chart_acct, processCpu=cpu_by, measuredSeconds=round(elapsed, 1),
+    report['capacity'] = dict(budget=('5cpu14g (owner addendum 2026-11-14)' if _BUDGET else 'default gates (80% CPU / 10 GiB MemAvailable)'), cpuByRole=role_report, driverProcess=driver_acct, chartServiceProcess=chart_acct, processCpu=cpu_by, measuredSeconds=round(elapsed, 1),
         measurementKind='HTTP_DRIVER_NO_BROWSER_SYNTHETIC', cohortSize=cohort_size, stopReason=stop['reason'], driver=summary,
         host=dict(memAvailableMinBytes=min((s['memAvailableBytes'] for s in samples), default=None),
                   cgroupMemoryPeakBytes=max((s['cgroup'].get('memoryPeakBytes') or 0 for s in samples), default=None),

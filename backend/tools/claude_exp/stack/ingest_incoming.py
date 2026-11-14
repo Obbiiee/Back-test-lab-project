@@ -14,13 +14,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from market_data.compact_tick import CompactTickReader          # noqa: E402
+from tools.claude_exp import compact2                           # noqa: E402  (open_compact opens v1 or v2 by manifest name)
 
 
 def datasets(root, pairs):
     for pdir in sorted(p for p in Path(root).iterdir() if p.is_dir()):
         if pairs and pdir.name not in pairs:
             continue
-        for mdir in sorted(p for p in pdir.iterdir() if p.is_dir() and (p / "compact.json").exists()):
+        for mdir in sorted(p for p in pdir.iterdir() if p.is_dir() and ((p / "compact.json").exists() or (p / "compact2.json").exists())):
             yield pdir.name, mdir.name, mdir
 
 
@@ -33,11 +34,13 @@ def load_sha_list(path):
     return out
 
 
-def check(pair, month, mdir, sha_list, deep):
+def check(pair, month, mdir, sha_list, deep, v1_root=None):
     rec = dict(pair=pair, month=month, status="OK", problems=[])
     t0 = time.perf_counter()
     try:
-        manifest = json.loads((mdir / "compact.json").read_text())
+        is_v2 = (mdir / "compact2.json").exists()
+        manifest = json.loads((mdir / ("compact2.json" if is_v2 else "compact.json")).read_text())
+        rec["format"] = "v2" if is_v2 else "v1"
         done = json.loads((mdir / "DONE.json").read_text()) if (mdir / "DONE.json").exists() else None
         rec.update(manifestHash=manifest["manifestHash"], eventCount=manifest["eventCount"], priceScale=manifest["priceScale"],
                    rights=(manifest.get("rights") or {}).get("class"), crossed=(manifest.get("quality") or {}).get("crossedQuotes"))
@@ -46,7 +49,7 @@ def check(pair, month, mdir, sha_list, deep):
         else:
             if done.get("status") != "OK": rec["problems"].append(f"DONE status {done.get('status')}")
             if done.get("manifestHash") != manifest["manifestHash"]: rec["problems"].append("manifestHash != DONE.json")
-            if done.get("rows") != manifest["eventCount"]: rec["problems"].append("eventCount != DONE.json rows")
+            if (done.get("rows") if "rows" in done else done.get("ticks")) != manifest["eventCount"]: rec["problems"].append("eventCount != DONE.json rows/ticks")
         if rec["rights"] != "UNKNOWN":
             rec["problems"].append(f"rights class {rec['rights']} (expected UNKNOWN)")
         if sha_list is not None:
@@ -61,9 +64,15 @@ def check(pair, month, mdir, sha_list, deep):
                 want = sha_list.get(key) or sha_list.get(f"{month}/{rel}") or (sha_list.get(rel) if "/" in rel or len({k for k in sha_list if k.endswith('compact.json')}) <= 1 else None)
                 if want is None: rec["problems"].append(f"not in sha list: {key}")
                 elif want != h.hexdigest(): rec["problems"].append(f"sha256 mismatch: {key}")
-        reader = CompactTickReader(mdir, expected_manifest_hash=manifest["manifestHash"])
+        reader = compact2.open_compact(mdir, expected_manifest_hash=manifest["manifestHash"])
         reader.verify_all(deep=deep)
         rec["verified"] = "deep" if deep else "files-hash"
+        if is_v2 and v1_root is not None:         # optional: prove the v2 month decodes to the byte-identical v1 arrays
+            v1dir = Path(v1_root) / pair / month
+            if (v1dir / "compact.json").exists():
+                rec["verifyEqualTicks"] = compact2.verify_equal(v1dir, mdir)
+            else:
+                rec["problems"].append("v1 source not found for verify_equal")
     except Exception as error:
         rec["problems"].append(f"{type(error).__name__}: {str(error)[:200]}")
     rec["status"] = "OK" if not rec["problems"] else "FAILED"
@@ -77,7 +86,7 @@ def main():
     ap.add_argument("mode", choices=("verify", "publish"))
     ap.add_argument("--root", required=True); ap.add_argument("--report", required=True); ap.add_argument("--pairs", default="")
     ap.add_argument("--sha256-list"); ap.add_argument("--store"); ap.add_argument("--shallow", action="store_true")
-    ap.add_argument("--min-free-gb", type=float, default=30.0)
+    ap.add_argument("--min-free-gb", type=float, default=30.0); ap.add_argument("--v1-root", help="v1 compact root: cross-check v2 months with verify_equal")
     a = ap.parse_args()
     pairs = set(filter(None, a.pairs.split(",")))
     sha_list = load_sha_list(a.sha256_list) if a.sha256_list else None
@@ -98,11 +107,11 @@ def main():
             if (pair, month) in done_keys: continue
             if shutil.disk_usage(a.root).free < a.min_free_gb * 2**30:
                 print("STOP: free disk below reserve", flush=True); break
-            rec = check(pair, month, mdir, sha_list, deep=(a.mode == "verify" and not a.shallow))
+            rec = check(pair, month, mdir, sha_list, deep=(a.mode == "verify" and not a.shallow), v1_root=a.v1_root)
             if a.mode == "publish" and rec["status"] == "OK":
                 t0 = time.perf_counter()
                 try:
-                    reader = CompactTickReader(mdir, expected_manifest_hash=rec["manifestHash"])
+                    reader = compact2.open_compact(mdir, expected_manifest_hash=rec["manifestHash"])
                     manifest_key, stats = engine.publish_month(store, reader, pair, month, rights="UNKNOWN")
                     rec.update(published=manifest_key, publishSeconds=round(time.perf_counter() - t0, 2))
                 except Exception as error:
