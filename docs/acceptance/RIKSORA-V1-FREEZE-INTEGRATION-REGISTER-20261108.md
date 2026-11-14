@@ -17,6 +17,8 @@ Owner decision: market data (ticks, compact derivative, nine OHLC timeframes inc
 | D9 | Backup/restore drill, observability, WAL measurement | NOT RUN (P0 before beta) | never exercised |
 | D10 | Claude jump engine for settlement | NOT ADOPTED | real-data slice produced 3 events / 1 fill (order UNRESOLVED, undiagnosed) |
 
+Benchmark-grounded execution plan (workstreams W1-W8, gates, capacity and cost model): [RIKSORA V1 execution plan, 2026-11-14](RIKSORA-V1-EXECUTION-PLAN-20261114.md).
+
 
 ## Owner Commercial V1 acceptance target — 2026-11-13
 

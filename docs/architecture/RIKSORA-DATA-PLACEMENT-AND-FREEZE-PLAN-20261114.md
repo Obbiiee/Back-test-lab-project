@@ -63,3 +63,6 @@ Claude jump engine for settlement (needs activity-level parity and the real-data
 
 ## 4. Documents edited because of this decision (history preserved, tagged SUPERSEDED 2026-11-14)
 `PRODUCT_SYSTEM_ARCHITECTURE_BLUEPRINT.md` (banner), `architecture/RIKSORA-HYBRID-NINE-TF-R2-OWNER-DECISION-20261113.md` (R2-for-OHLC statements), `acceptance/RIKSORA-COMMERCIAL-V1-TARGETS.md` (override note), `DOCUMENT_MAP.md`, `acceptance/RIKSORA-V1-FREEZE-INTEGRATION-REGISTER-20261108.md` (new P0 items) and `AI_CONTEXT/04_CURRENT_PHASE.md` (dated checkpoint).
+
+## 5. Execution plan
+Benchmark-grounded workstreams W1-W8, gates, capacity model and cost model: [RIKSORA V1 execution plan, 2026-11-14](../acceptance/RIKSORA-V1-EXECUTION-PLAN-20261114.md).
