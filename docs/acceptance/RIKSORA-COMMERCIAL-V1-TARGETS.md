@@ -7,6 +7,126 @@
 
 > **LATEST OWNER ARCHITECTURE OVERRIDE — 2026-11-13:** [Hybrid tick-on-VPS + nine precomputed OHLC timeframes on private Cloudflare R2](../architecture/RIKSORA-HYBRID-NINE-TF-R2-OWNER-DECISION-20261113.md) supersedes conflicting **architecture/transport/cache** proposals below, including local-first browser financial execution, runtime browser M1→D1 candle aggregation, and the historical exception for D1's **active 5,000-bar chart cache**. The latest policy is **5,000 active chart candles for every selected timeframe including D1**, but unrestricted qualified archive pagination for all timeframes; initial ≤512-bar and older 500–1,000-bar pages remain. The existing financial acceptance, data-rights, safety, and true-date-range-count gates remain intact. This linked architecture is **NOT YET IMPLEMENTED / ACCEPTED**, and the most recent locally reported BID M1 sidecar is a partial foundation, not a nine-timeframe R2 product pipeline. See linked decision for the MID/BID display compatibility requirement and protection of unpublished local commits.
 
+## OWNER PRODUCT CONTRACT — 2026-11-15: Commercial V1 end-to-end website, Free/Pro, and Claude engine integration
+
+> **Status: NEW OWNER PRODUCT TARGET / IMPLEMENTATION SPECIFICATION; NOT A CLAIM OF DONE, LIVE INTEGRATION, QUALIFIED MARKET DATA, OR PAYMENT READINESS.** This section records the owner's latest requested Commercial V1 *user-facing product contract*; its explicit product/entitlement decisions override older inconsistent quota and journey wording (for example the 2026-10-23 draft's five Free saved Sessions and older unspecified Free/Pro limits). Existing frozen money/provenance/source-rights/security contracts remain protective authorities. Architecture/transport follows the [2026-11-13 hybrid owner decision](../architecture/RIKSORA-HYBRID-NINE-TF-R2-OWNER-DECISION-20261113.md). Deployment/merge/paid launch still require separate operational authorization and evidence.
+>
+> **One-line V1 promise:** a new trader can visit RIKSORA, log in with Google, create Free Style or Protocol Method, create a Session, analyze historical price charts, run correct tick-based simulation (normal/fast/Jump), confirm trades, inspect persistent Journal/Statistics, logout and resume; upgrade through an actually verified Midtrans transaction; and run unrestricted *qualified* history according to Pro entitlements. Every user is private from every other user.
+>
+> **Priority:** reach a usable, demonstrably correct *product* first, not merely a fast local engine benchmark. Do not replace the hosted application with the single-user Claude experiment server or lose existing working UI, Method/Session, PostgreSQL, receipts, Journal, or analytics.
+
+### A. Product information architecture and complete user journeys
+
+Required public surfaces: **Landing**, Features/How it works, Pricing (Free vs Pro), Login/Registration, FAQ/Support, basic legal/data-quality disclosures. Public pages should be accessible on mobile, lightweight, fast, and consistent with the existing RIKSORA design identity.
+
+Required private surfaces: **Onboarding → Methods → Sessions/Dashboard → Backtest Workspace → Journal → Statistics**, plus Account/Billing/Support. Main workspace must be chart-first; pair search, method and Session identity, source/version/time, replay controls, drawing tools, indicators, Long/Short planning, order review, Open/Pending/Closed positions and results must be discoverable without overwhelming the chart. Reuse existing correct components before redesigning.
+
+**New user (happy path):**
+1. Visitor opens RIKSORA → chooses **Continue with Google**.
+2. Owned Google OAuth/OIDC credentials and registered HTTPS callback complete a real authorization-code/PKCE/state/nonce transaction. Backend validates issuer/audience/signature/expiry, uses stable provider subject, and establishes a revocable first-party authenticated session; do not silently merge accounts on matching email, persist Google tokens in frontend URLs, or treat mocks as a completed login.
+3. New account receives **Free** server-side entitlement. Existing authenticated user goes to Dashboard. Unconfigured Google OAuth must fail clearly, not expose fake successful login.
+4. First use creates a Trading Method of type **FREE_STYLE** or **PROTOCOL** (see below).
+5. User creates a named Session by choosing Method, one qualified pair, starting balance, source identity and eligible historical start/range. Session inherits Method type; no redundant Method type picker; timeframe is changeable later.
+6. Backtest Workspace opens; user analyzes chart, replays, places eligible orders, reviews/confirms, reads Journal/Statistics, and can leave and later continue without losing committed evidence.
+7. Upgrade path: Pricing → Pro checkout → verified Midtrans payment status/webhook → internal billing ledger → Pro entitlement → same account and preserved research data. Account shows actual subscription period and transaction status.
+
+**Terminology/integrity:** one Method can own multiple Sessions; each Session binds **exactly one pair, one Method, one immutable feed/source identity and one chronological financial account**. Pro 'all pairs' means every qualified catalog pair may be selected across unlimited separate Sessions; **not** simultaneous mixed-pair execution in one Session. A Pro Session can traverse **all qualified tick history for its one selected pair as a continuous user experience**, even if backend data/jobs are partitioned internally by month/day. Historical OHLC context is never financial execution authority.
+
+### B. Free versus Pro — explicit commercial entitlement matrix
+
+| Policy | FREE (Rp0) | PRO |
+| --- | --- | --- |
+| Google login and private account | Yes | Yes |
+| Trading Method types | Free Style and Protocol | Free Style and Protocol |
+| Methods quota | **1 usable Trading Method per account** | **No product-count quota** |
+| Pair trading eligibility | **1 chosen pair per account** during Free entitlement; enforce server-side against Method/Session/API | All **qualified** available pairs (intended 16-symbol catalog) |
+| Trading-history entitlement | At most **12 consecutive calendar months of qualified tick history** per Free Session, confined to its eligible/pinned window | **Entire qualified available tick range** for that Session's chosen pair, chronological and continuous |
+| Session creation | **1 new Session per UTC calendar month** per Free account; creation tokens do not accumulate | **No product-count quota**; unlimited Sessions |
+| Replay time allowance | **1 historical calendar-day replay window per UTC day**, reset at 00:00 UTC; unused allowance expires and **never rolls over** | **No daily replay allowance restriction** |
+| Free Style / Protocol, chart, Jump, fast replay, planning, basic Journal and Statistics | Available within valid entitlement and method constraints | Available |
+| Additional research/statistical modules | Basic reliable statistics; advanced research may be gated according to implemented capabilities | Extended actually implemented features; do not advertise missing Monte Carlo/AI as already live |
+| Compute resources | Fair bounded queue and abuse protection | Fair bounded queue and abuse protection; **unlimited Sessions does not mean unlimited simultaneous CPU jobs** |
+
+**Free allowance exact behavior target:** A UTC day is determined by server clock, not device time. One replay allowance grants a single chosen **historical trading-calendar day** on that real UTC date. The allowance is consumed by the first successful replay activity/activation, not by opening a dashboard or merely examining already-eligible historical chart context. Pause, reconnect, logout/login and resume must not spend another allowance for the *same active daily historical window*. Once exhausted, **block further replay advancement outside the eligible window**, surface next reset, preserve pending orders, position state and every prior receipt, and allow read-only access consistent with entitlement. Never force-close a position, silently move the cursor, or fabricate a trade at midnight. No stockpiling; changing browser clock, deleting/recreating Session, simultaneous tabs, changed IDs or raw API requests cannot multiply allowance. Treat these detailed accounting choices as implementation interpretation of the owner's explicit '1 hari, tidak bisa dikumpulkan' target and expose them clearly in UX.
+
+**Free one-Method/one-pair/one-year implementation:** Separate durable account-level eligibility/usage records from Session rows; deleting/archive/recreating resources cannot bypass quotas. If a customer later changes selected pair or 12-month historical window, that requires a defined server-side entitlement transition, not an implicit loophole. Old historically committed research must remain preserved. A Session continues past a calendar-month quota boundary without resetting balance or consuming an extra *Session-creation* token; chronology and the replay-day allowance still apply.
+
+**Downgrade/expiry:** Pro → Free may prevent new replay, out-of-policy Session creation or Method creation, but **must not delete, rewrite, reset or cross-link** Pro evidence, Session, receipts or Journal. Continue read-only review of previously owned evidence subject to the documented retention/security contract, show upgrade CTA, and resume existing eligible work after re-upgrade. A cancelled payment/chargeback/refund must be reconciled without losing historical financial integrity.
+
+**Pricing:** Prior workflow contains Rp139.000/month and Rp1.668.000/year as owner-draft prices. Store prices, billing periods, tax and discounts **on the server as configurable catalog entries**; they are **not final approved commercial prices** and must not be hardcoded into the frontend. Obtain explicit owner sign-off before any live charging. Only Free and Pro are product tiers in V1.
+
+### C. Google authentication, Midtrans billing and tenant security
+
+**Google:** real sign-in with owner-controlled Google OAuth credentials, exact registered redirect, secure HttpOnly/SameSite cookies as appropriate, CSRF defense, revocable login/session lifecycle, logout-all, account disabled handling, stable provider subject mapping, safe account linking and recovery. Reuse [security architecture](../SECURITY_ARCHITECTURE.md) and existing authenticated account model. Pass Google credential-less offline fixtures separately from browser/OAuth acceptance with a real configured provider; never mark the latter PASS without a successful real exchange.
+
+**Midtrans:** Pricing → create server-priced invoice/order → official Midtrans checkout/Snap workflow in sandbox → payment notification verification (signature/merchant credentials/status) → idempotent durable billing ledger → server-side entitlement activation → account payment history and Pro expiry. Handle pending/failed/expired/duplicate/replayed/out-of-order notifications, browser redirect without payment, retry, cancellation and applicable refund/chargeback reconciliation. Do not activate Pro based on client-supplied status/redirect or expose payment secrets in browser. Sandbox end-to-end tests and production merchant readiness are separate gates. Frontend should show truthful pending/paid/failed state and not assume that payment completion is instant.
+
+**Tenant isolation (P0):** authenticated user A must not read, modify, execute, export, subscribe to, or infer user B's Methods, Sessions, Orders, Trades, Journal, Statistics, exports, billing, object storage, worker jobs, progress streams, cached Session data or admin-only details by changing IDs, using API directly or through concurrent requests. Enforce ownership at backend/service/database/query/storage boundaries, not merely hiding buttons. Treat all user research private by default. Test cross-tenant IDOR, horizontal and vertical authorization, subscription events, cache poisoning, job queue ownership, object storage URLs, account linking and token revocation. Operations/admin requires separate, audited authorization. Retain least privilege, HTTPS, rate limiting, secrets separation, backups and restore drills.
+
+### D. Free Style versus Protocol — non-negotiable behavior
+
+A Trading Method owns exactly one **type**, FREE_STYLE or PROTOCOL; a Session inherits it. Both are available under **both Free and Pro subscriptions**; do not confuse the Free Style type with Free entitlement.
+
+**Free Style:**
+- **Quick Execution:** user selects Buy/Sell and permitted size → review/explicit confirm as required by canonical order contract → market order fills only at next eligible historical tick using correct side of Bid/Ask. Supported discretionary manual/partial close remains possible; no mandated checklist.
+- **Planned Execution:** Long/Short Position Tool or Plan ticket chooses Entry/SL/TP, side, risk/size and appropriate Market/Limit/Stop type where supported; freely adjustable RR within execution constraints → review and confirm → pending/fill/SL/TP/exit driven by authoritative tick stream. Chart drawing is not execution; it must produce a properly validated canonical Order Request.
+
+**Protocol:**
+- Create named, immutable evidence-bearing method with **locked risk per trade, locked RR and ≥1 user-defined checklist condition**. Checklist enforcement ON requires **all** recorded conditions PASS; OFF records truthful state and still preserves checklist definition/evidence rather than inventing PASS.
+- Workspace must **show the actual Planned Trade / Long-Short position planner** in Protocol Mode. Do **not** hide or remove the planner. Disable **Quick market Buy/Sell**, direct market entries and unsupported manual discretionary exits; only **Planned pending LIMIT/STOP** entry is eligible.
+- Moving Entry or SL recomputes TP by locked RR, and permitted lot size by locked risk / contract, price precision, currency conversion and execution assumptions. Do not permit TP/risk bypass by direct API calls.
+- User opens immutable order review → explicit confirm → backend revalidates method, checklist, pending price, risk and RR → immutable canonical evidence → engine fills/exits via permitted SL/TP or explicitly preplanned terminal rules. Fixed-RR Protocol does not allow arbitrary manual close after trigger.
+- Material Method rule changes after evidence exist require **a new Method**, not silent historical mutation. Old results remain attached to the old immutable Method.
+- Include frontend tests for presence of Protocol planner and backend tests for forged Quick entry, RR/risk violations, checklist ON/OFF, pending activation, manual-close denial and rule provenance.
+
+### E. Chart, timeframes, OHLC, tick execution and replay
+
+**Exactly nine V1 timeframes:** M1, M3, M5, M15, M30, H1, H2, H4, D1. Do not expose W1/MN1 or unsupported fallbacks. Consistent with the most recent 2026-11-13 owner architecture override, **every selected timeframe, including D1, has an active rolling chart-history cache ceiling of 5,000 qualified bars**. This is **not** a cap on the complete underlying archive; qualified earlier bars remain reachable via bounded backward pagination/jumps. Actual visible candles depend on chart width/zoom and actual data. A small ≤512-candle initial request is a transport optimization; pages of ~500–1,000 are examples, not fabricated historical limits. Preserve source-gaps/holiday calendars and true counts.
+
+**Authoritative market-data architecture:** verified/immutable ordered Bid/Ask ticks and fast financial worker on VPS; precomputed/indexed source-pinned nine-timeframe OHLC sidecars in **private Cloudflare R2** according to the linked 2026-11-13 decision, served to authorized browser through bounded/paged delivery. Do not silently replace the private R2 hybrid architecture with eager all-history download or client-side financial execution. Maintain BID/MID compatibility/source disclosure as specified in that decision. Actual R2 provider credentials/object availability require separate validation, not a hardcoded successful assumption.
+
+**Data targets (not inventory or rights proof):** intended 16 pairs AUDUSD, EURGBP, NZDUSD, USDCHF, AUDJPY, CADJPY, EURUSD, GBPUSD, NZDJPY, USDCAD, CHFJPY, EURJPY, EURNZD, GBPJPY, USDJPY, XAUUSD; 2023-01 through 2025-10 tick trading target (544 instrument-months); 2021-01 through 2022-12 qualified OHLC-only prehistory (384 instrument-months). Actual eligible periods must use qualified source/version/hash/coverage/rights. Prehistory OHLC is **analysis-only** and never financial fill authority. If data are not qualified, show accurate unavailable/partial coverage and don't label Beta commercial-ready.
+
+**Causal display:** Historical completed bars are safe only up to the simulated cursor; current forming candle is generated/updated from **already processed ticks**. Future full H/L/C must not leak during replay even when a future-derived sidecar exists server-side. Higher-timeframe bars are generated correctly rather than retimestamping M1. Preserve drawings' time/price anchors, indicators (with separate bounded warm-up), active chart state and financial state through timeframe changes; no chart operation may mutate financial hashes. Browser does not need full multi-year tick downloads.
+
+**Replay controls:** Play, Pause, Step, variable speed (UX targets 1x/2x/5x/10x/20x/Fast; exact scheduling can be benchmark-tuned), progress, safe cancel, and **Jump to Next Event**. Jump must stop at the *next legally eligible financial event* (e.g. pending entry trigger/SL/TP/terminal), preserve other pending orders and exact event ordering, and return a durable reviewed/committed result. Normal, fast and Jump must be financially identical on identical state/input/action sequence. No future-data exposure, no double fills, no silent drop, no uncommitted 'success'. If no next event is available, surface truthful result.
+
+**Claude performance engine integration:** compact tick access, event-index skips, fast deterministic continuation/recovery are promising candidates, not evidence the hosted product uses them. Retain authoritative Python financial contract, exact money/profile, source manifest, order execution, receipts, Journal and Statistics. Address quoteBasis/policy/profile/source commitments in cheap recovery, fail closed on tampering, avoid loading all historical tick arrays per active trader, bound caches per worker, support real PG/durable queue and source qualifications. Report head-to-head same-workload/scenario/hardware accuracy and CPU/RSS, not scanner-only throughput; preserve cold restart, gap, crossing, chronology and unsupported FX conversions.
+
+### F. Journal, analytics, persistence, user controls
+
+- Persist Method, Session, position/order states, immutable receipt, financial state hashes, chart/drawing/indicator preferences, notes/tags and user-owned research history across refresh/logout/login/worker crash.
+- Journal records pair, Method, Session, time, planned and actual Entry/Exit, SL/TP, size, cost/spread assumptions, risk, RR, gross/net PnL, R-multiple, fill/receipt identity and Protocol checklist/exit reason.
+- Basic Statistics: trade count, closed count, win rate, average win/loss, realized balance curve, drawdown with clearly specified definition, expectancy, profit factor where defined, streaks, R distribution and breakdown by Method/Session/pair/period. Unavailable/insufficient measures must be clearly labelled; do not invent values or label realized balance as floating equity.
+- Exports must contain correct provenance and be restricted to owner. Session cannot silently reset balance on month boundary or Pro renewal; archival/retention must not erase immutable evidence.
+- Dashboard: Methods, Sessions, Continue, entitlement/allowance state, results summary, upgrade; Account: Google/password identities as legitimately linked, active tier/expiry, invoice/status history, logout/all-devices; support/help and honest loading/reconnect/error states.
+- Mobile-width navigation must preserve essential actions, though desktop is primary high-density chart experience.
+
+### G. V1 Acceptance / Definition of Done (all evidence-based)
+
+**Product/identity/monetization**
+1. Actual configured Google sign-in completes and returns the correct private account; first-time onboarding and subsequent login both tested; password/login compatibility retained when applicable.
+2. Free registration, exactly 1 Method, 1 selected pair, 1 Session created per UTC month, max 12-month tick range and 1 non-accumulating daily historical replay-day allowance are enforced by backend + concurrent/API abuse tests.
+3. Midtrans **Sandbox** end-to-end payment and verified webhook activate Pro once and exactly once; pending/invalid webhook cannot grant entitlement; real merchant launch remains separate.
+4. Pro can create more than one Method/Session, choose every **qualified** catalog symbol, and continue a single pair Session across every available qualified historical month without a monthly UX wall. No invisible product quota, but legitimate resource safety remains.
+5. Expiry/downgrade/upgrade preserve old Session/evidence, allow legal review/resumption and enforce current tier accurately.
+
+**Workspace/execution/evidence**
+6. All 9 timeframes correctly display causal candles; 5,000 active bars per timeframe, historical paging, precomputed sidecars, correct forming candle, drawings, indicators and source provenance are browser-verified (desktop and mobile-width).
+7. Free Style Quick+Planned execute exactly per canonical Bid/Ask tick and yield deterministic immutable receipts; Protocol planner is **visible** and Protocol pending-only/locked risk/RR/checklist/manual-exit restrictions hold through the backend.
+8. Play/Pause/Step/multiple speeds/Jump correctly work with pending orders, SL/TP, gaps and resume; financial parity is proven across speed modes, chunking and worker restarts.
+9. Journal and Statistics reconcile to canonical receipts, with Method/Session/pair aggregation, persisted notes and proper unsupported/unavailable states.
+10. Logout/login/refresh/cancel/retry/worker crash/cold recovery never lose or duplicate committed financial results.
+
+**Security/data/operations**
+11. Two or more independent accounts cannot read/change other tenants' any resource/API/job/stream/export, including direct forged IDs and storage access; tenant isolation and account revocation tests PASS.
+12. Each advertised symbol/range has qualified/licensed coverage provenance. Synthetic tests are distinct from commercial data, unavailable months are honestly labelled; actual rights gate PASS before customer sales.
+13. Real server integration, migrations, bounded worker resources, queue fairness, resource admission, p95/p99/API/RSS/CPU/storage measurements and 20-trader target-VPS acceptance meet the pre-existing detailed gates in this same document. Do not infer 20 simultaneous CPU-heavy jobs from 20 active users.
+14. Repeatable regression CI and real-browser E2E PASS on final release candidate SHA; historical benchmark results are never substituted for current tests. Production credentials, deployment, pricing launch, paid admission, merges and protected data changes require explicit respective authorization.
+
+**Claude execution handoff:** First audit repository implementation and report a requirement-to-code **DONE / PARTIAL / MISSING / BLOCKED** matrix, with paths and tested evidence, prioritizing Google auth, Midtrans billing, tenant isolation, Free/Pro quotas, Protocol planner, continuous Pro tick history, nine-TF chart sidecars, fast Replay/Jump, Journal/Statistics and recovery. Reuse and integrate; don't duplicate product architecture. Then implement in safe bounded slices with regression and actual E2E proof. Do not claim feature completeness from documentation, mocked services, prototype screenshots or single-run engine benchmarks. Report unchanged protected files, exact branch/commit SHA, tests and still-blocked external credentials/data. **No production deployment, live payment, changes to protected production datasets, force push, or unapproved frozen financial contract changes by this document alone.**
+
+
 ## 1. Exact product promise
 
 RIKSORA Commercial V1 is a hosted, authenticated, multi-tenant tick-level *historical simulation/backtesting* product: Method → Session → chart/replay → reviewed/confirmed planned order or supported quick execution → deterministic tick execution → immutable receipt → Journal/Analytics → logout/login/resume. Simulated fills are not live/broker fills, and uncertain tick chronology, missing coverage, unsupported conversion, or source qualification must be surfaced explicitly.
