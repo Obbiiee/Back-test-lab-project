@@ -382,6 +382,7 @@ try{
     step('export_pdf_report');
     // Trash and Restore through the product UI; the Session must disappear, come back, and keep its committed ledger.
     phase='trash_restore';
+    await page.getByRole('link',{name:'Back to Synthetic browser method',exact:true}).click();
     await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
     await page.getByRole('link',{name:'Synthetic browser session'}).first().click();
     await page.getByRole('button',{name:'Move to Trash',exact:true}).click();

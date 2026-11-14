@@ -45,6 +45,17 @@ class Formatter(unittest.TestCase):
         self.assertEqual(got["entryTimeUtc"], want)
         self.assertEqual((got["sessionId"], got["ledgerRevision"]), ("session:x", "7"))
 
+    def test_ratio_objects_never_leak_as_python_text(self):
+        """Found by the real browser run: a committed ratio {numerator, denominator} was written as a Python dict repr."""
+        prov = dict(sessionId="s", datasetId="d", datasetVersion="v", ledgerRevision=1)
+        got = dict(zip(ex.COLUMNS, parse(ex.rows_to_csv([ex.order_row(dict(id="o", side="LONG", rMultiple={"numerator": "-19", "denominator": "20"}), prov)]))[1]))
+        self.assertEqual((got["rMultiple"], got["rMultipleExact"]), ("-0.95000000", "-19/20"))
+        got = dict(zip(ex.COLUMNS, parse(ex.rows_to_csv([ex.order_row(dict(id="o", side="LONG", rMultiple={"numerator": "1", "denominator": "3"}), prov)]))[1]))
+        self.assertEqual((got["rMultiple"], got["rMultipleExact"]), ("0.33333333", "1/3"))
+        got = dict(zip(ex.COLUMNS, parse(ex.rows_to_csv([ex.order_row(dict(id="o", side="LONG", rMultiple={"numerator": "2", "denominator": "3"}), prov)]))[1]))
+        self.assertEqual(got["rMultiple"], "0.66666667")                                  # half away from zero
+        self.assertNotIn("numerator", ex.rows_to_csv([ex.order_row(dict(id="o", rMultiple={"numerator": "5", "denominator": "7"}), prov)]))
+
     def test_nanosecond_time_is_exact(self):
         self.assertEqual(ex.iso_ns("1577836800000000001"), "2020-01-01T00:00:00.000000001Z")
         self.assertEqual(ex.iso_ns(None), "")

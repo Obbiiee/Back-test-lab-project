@@ -109,6 +109,42 @@ class WindowGuardTests(unittest.TestCase):
                        "VALUES (%s,%s,%s,'m','p',1000,2592000,'PAID',%s,%s,%s,1)", ("btl-sbx-" + uuid.uuid4().hex, f.actor, uuid.uuid4(), "t" + uuid.uuid4().hex, now - 10, now - 10 + 2592000))
         self.assertNotEqual(self.command("ADVANCE", {"targetNs": str(end + STEP_NS)}).status_code, 409)
 
+    def test_protocol_pending_order_at_the_boundary_must_be_cancelled_before_anything_continues(self):
+        f = self.f
+        proto = method("PROTOCOL")
+        self.assertEqual(f.client.post(f.root + "/methods", headers=f.headers, json=proto).status_code, 200)
+        with connect(DSN) as db:                                                      # one Free session per month: give this account Pro only to create the Protocol session
+            db.execute("UPDATE btl.entitlement_claims SET status='RELEASED' WHERE actor_id=%s", (f.actor,))
+        sid = "session:" + uuid.uuid4().hex
+        f.completed_job_result(f.client.post(f.root + "/sessions", headers=f.headers, json=dict(id=sid, name="Protocol window", methodId=proto["id"], initialBalance="10000", startPeriod="2020-01")))
+        self.sid = sid
+        start = int(self.state()["throughNs"])
+        end = start + 3 * STEP_NS
+        self.set_end(end)
+        request = review_request(self.app.inspect(sid), protocol=True)                # LIMIT planned order, entry 2005 (not marketable): stays PENDING
+        reviewed = f.client.post(f.root + "/reviews", headers=f.headers, json=request)
+        self.assertEqual(reviewed.status_code, 200, reviewed.text)
+        confirmed = f.client.post(f.root + "/sessions/" + sid + "/confirm", headers=f.headers, json={"reviewId": request["requestId"], "reviewHash": reviewed.json()["reviewHash"]})
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        orders = list(self.state()["orders"].values())
+        self.assertEqual([o["status"] for o in orders], ["PENDING"])
+        self.advance_to(end)
+        state = self.state()
+        self.assertEqual([o["status"] for o in state["orders"].values()], ["PENDING"], "a pending order is not touched by the boundary")
+        refused = self.jump()
+        self.assertEqual((refused.status_code, refused.json()["detail"]), (409, "PENDING_AT_WINDOW_END"))
+        self.assertEqual(self.command("ADVANCE", {"targetNs": str(end + STEP_NS)}).json()["detail"], "WINDOW_ENDED_CONTINUATION_ONLY")
+        again = review_request(self.app.inspect(sid), protocol=True)
+        reviewed2 = f.client.post(f.root + "/reviews", headers=f.headers, json=again)
+        self.assertEqual(reviewed2.status_code, 200, reviewed2.text)
+        late = f.client.post(f.root + "/sessions/" + sid + "/confirm", headers=f.headers, json={"reviewId": again["requestId"], "reviewHash": reviewed2.json()["reviewHash"]})
+        self.assertEqual((late.status_code, late.json()["detail"]), (409, "WINDOW_ENDED"))
+        order_id = next(iter(state["orders"]))
+        cancelled = self.command("CANCEL", {"orderId": order_id})
+        self.assertNotEqual(cancelled.status_code, 409, cancelled.text)                # protocol has no manual close, but a pending plan can still be cancelled
+        self.assertEqual([o for o in self.state()["orders"].values() if o["status"] in ("PENDING", "ACTIVE")], [], "the cancelled order left the live set")
+        self.assertEqual(self.jump().json()["detail"], "WINDOW_COMPLETED")
+
     def test_a_session_without_a_claim_or_a_pro_account_is_not_limited(self):
         with connect(DSN) as db:
             db.execute("DELETE FROM btl.entitlement_claims WHERE workspace_id=%s AND session_id=%s", (self.f.workspace, self.sid))
