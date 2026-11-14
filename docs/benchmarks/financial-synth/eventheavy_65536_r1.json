@@ -1,0 +1,49 @@
+{
+ "n": 65536,
+ "mode": "clean",
+ "ingest_engine_s": 27.5,
+ "accepted": 65536,
+ "baseline": {
+  "cpu": 110.48,
+  "wall": 111.12,
+  "balance": "9964.65",
+  "fills": 202,
+  "unresolved": false
+ },
+ "compact_write_s": 0.31,
+ "compact_bytes": 1142038,
+ "admit_load_s": 0.01,
+ "admission_reconstruction_mismatches": 0,
+ "admission_verify_s": 3.92,
+ "claude": {
+  "cpu": 18.73,
+  "wall": 18.73,
+  "balance": "9964.65",
+  "stats": {
+   "exact_groups": 177,
+   "skipped_groups": 65283,
+   "jumps": 657
+  },
+  "fills": 202,
+  "unresolved": false,
+  "advanceLogBytes": 119791
+ },
+ "parity": {
+  "eventsEqual": true,
+  "eventsBaseline": 717,
+  "eventsClaude": 717,
+  "balanceEqual": true,
+  "ordersEqual": true,
+  "lastObservedEqual": true,
+  "nextGroupEqual": true,
+  "quoteBasisEqual": true,
+  "realizedEqual": true
+ },
+ "peak_rss_mb": 325.791744,
+ "scenario": "eventheavy",
+ "repeat": 1,
+ "syntheticDataset": "seeded random walk, scale 3, ~0.5 s/tick on average inside Jan 2024, duplicate timestamps possible",
+ "processTotalCpuS": 161.24,
+ "processTotalWallS": 162.19,
+ "peakRssMbProcess": 316.9
+}

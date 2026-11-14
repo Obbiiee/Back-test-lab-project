@@ -19,6 +19,7 @@ UUID = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 CLIENT_ID = re.compile(r'\b(session|method|command|order):(' + UUID + ')')
 REQUEST_ID = re.compile(r'"requestId":"([0-9a-f]{32})"')
 lock = threading.Lock()
+CHART_TAIL = re.compile(rb'"count":(\d+),"hasMore":(true|false),"nextBefore":(\d+|null)')
 pending = {}
 out_lock = threading.Lock()
 
@@ -57,6 +58,67 @@ def route_key(method, path):
     return f'{method} {p}'
 
 
+class Chart:
+    """Chart traffic of one trader against the chart service: 9 timeframes x up to 5,000 candles of history at session open, then
+    forming-candle polls and timeframe switches while the trader works (QA/measurement only, loopback HTTP, prototype auth)."""
+    TFS = ("M1", "M3", "M5", "M15", "M30", "H1", "H2", "H4", "D1")
+
+    def __init__(self, n, host, port, stats, rng, hist):
+        self.n, self.host, self.port, self.stats, self.rng, self.hist = n, host, port, stats, rng, hist
+        self.conn = None; self.stop = threading.Event(); self.candles = {}
+
+    def _get(self, path, route, method='GET'):
+        for attempt in (0, 1):
+            t0 = time.perf_counter()
+            try:
+                if self.conn is None:
+                    self.conn = http.client.HTTPConnection(self.host, self.port, timeout=60)
+                self.conn.request(method, path, headers={'Authorization': f'Bearer tok-{self.n}'} if method == 'GET' else {})
+                r = self.conn.getresponse(); data = r.read(); status = r.status
+                break
+            except Exception as error:
+                self.conn = None
+                if attempt == 0:
+                    continue
+                self.stats.record(route, 0, (time.perf_counter() - t0) * 1000, type(error).__name__, True)
+                return 0, None
+        self.stats.record(route, status, (time.perf_counter() - t0) * 1000, None, True)
+        if method != 'GET' or not data:
+            return status, None
+        # Only the paging fields are read: the browser (not this generator) would decode the candles, so a full json.loads of
+        # 5,000-candle pages in Python would charge client CPU to the server host.
+        m = CHART_TAIL.search(data[-4000:] if len(data) > 4000 else data)
+        if not m:
+            return status, None
+        return status, dict(count=int(m.group(1)), hasMore=m.group(2) == b'true', nextBefore=None if m.group(3) == b'null' else int(m.group(3)))
+
+    def load_tf(self, tf):
+        total, before, pages = 0, None, 0
+        while total < self.hist:
+            q = f'session=s-{self.n}&tf={tf}&limit={512 if before is None else 1000}' + ('' if before is None else f'&before={before}')
+            status, d = self._get('/v1/chart/bars?' + q, 'CHART first page 512' if before is None else 'CHART older page 1000')
+            if status != 200 or not d:
+                return False
+            total += d['count']; pages += 1; before = d['nextBefore']
+            if not d['hasMore'] or before is None:
+                break
+        self.candles[tf] = total
+        return True
+
+    def run(self):
+        t0 = time.perf_counter(); ok = all(self.load_tf(tf) for tf in self.TFS)
+        self.stats.record_job('CHART initial load 9 timeframes', (time.perf_counter() - t0) * 1000, None if ok else 'chart_load_failed')
+        tf, last_switch = 'M5', time.monotonic()
+        while not self.stop.wait(2.0 + self.rng.random() * 0.5):
+            self._get(f'/v1/chart/bars?session=s-{self.n}&tf={tf}&limit=1', 'CHART forming-candle poll')
+            if time.monotonic() - last_switch > 15:
+                tf = self.rng.choice(self.TFS); last_switch = time.monotonic()
+                self.load_tf(tf)
+
+    def advance(self, seconds):
+        self._get(f'/__qa/advance?session=s-{self.n}&seconds={seconds}', 'CHART qa-advance (not user traffic)', method='POST')
+
+
 class Trader:
     def __init__(self, n, host, port, template, think_ms, stats):
         self.n, self.host, self.port, self.template, self.think = n, host, port, template, think_ms
@@ -66,6 +128,7 @@ class Trader:
         self.token = None
         self.conn = None
         self.rng = random.Random(n)
+        self.chart = None
 
     def _conn(self):
         if self.conn is None:
@@ -184,6 +247,8 @@ class Trader:
                 self.stats.record_job(route_key(step['method'], path), logical_ms, error)
                 if error:
                     return False, f'step{index}:{route_key(step["method"], path)}:{error}'
+                if self.chart and 'jump-next-event' in path:
+                    self.chart.advance(60)      # the replay owner moved the cursor: tell the chart service (QA-only endpoint)
             elif status != step['status']:
                 detail = value.get('detail') if isinstance(value, dict) else None
                 return False, f'step{index}:{route_key(step["method"], path)}:{status}:{str(detail)[:40]}'
@@ -205,11 +270,14 @@ class Stats:
         self.t_start = None
         self.cycle_ms, self.failures, self.completed = [], [], 0
         self.busy, self.busy_unrecovered = {}, 0
+        self.chart_errors = 0
 
     def record(self, route, status, ms, err, timed):
         if not timed or self.t_start is None:
             return
         with self.l:
+            if route.startswith('CHART') and status != 200:
+                self.chart_errors += 1
             self.lat.setdefault(route, []).append(ms)
             self.status[str(status)] = self.status.get(str(status), 0) + 1
             if err:
@@ -232,6 +300,7 @@ def main():
     ap.add_argument('--url', required=True); ap.add_argument('--traders', type=int, required=True)
     ap.add_argument('--cycles', type=int, default=3); ap.add_argument('--think-ms', type=int, default=1000)
     ap.add_argument('--stagger-ms', type=int, default=0)
+    ap.add_argument('--chart-url', default=None); ap.add_argument('--chart-history', type=int, default=5000)
     a = ap.parse_args()
     u = urllib.parse.urlsplit(a.url)
     template = json.loads(TEMPLATE.read_text())
@@ -254,9 +323,17 @@ def main():
         emit({'summary': {'status': 'SETUP_FAILED', 'failures': setup_fail[:10]}}); return
     barrier = threading.Barrier(a.traders + 1)
 
+    chart_threads = []
+    if a.chart_url:
+        cu = urllib.parse.urlsplit(a.chart_url)
+        for t in traders:
+            t.chart = Chart(t.n, cu.hostname, cu.port, stats, random.Random(1000 + t.n), a.chart_history)
+
     def work(t):
         barrier.wait()
         time.sleep(t.n * a.stagger_ms / 1000)
+        if t.chart:
+            ct = threading.Thread(target=t.chart.run, daemon=True); ct.start()
         for c in range(a.cycles):
             t0 = time.perf_counter()
             ok, why = t.cycle(c)
@@ -273,11 +350,14 @@ def main():
     stats.t_start = time.perf_counter()
     barrier.wait()
     [x.join() for x in th]
+    for t in traders:
+        if t.chart:
+            t.chart.stop.set()
     wall = time.perf_counter() - stats.t_start
     emit({'summary': {
         'status': 'DONE', 'traders': a.traders, 'cyclesPerTrader': a.cycles, 'thinkMs': a.think_ms, 'staggerMs': a.stagger_ms,
         'wallSeconds': round(wall, 2), 'completedCycles': stats.completed, 'failedTraders': len(stats.failures),
-        'failures': stats.failures[:10], 'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'statusCounts': stats.status, 'transportErrors': stats.errors,
+        'chartEnabled': bool(a.chart_url), 'chartErrors': stats.chart_errors, 'chartCandlesLoadedPerTimeframe': (traders[0].chart.candles if a.chart_url else None), 'failures': stats.failures[:10], 'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'statusCounts': stats.status, 'transportErrors': stats.errors,
         'journeysPerMinute': round(stats.completed / wall * 60, 2),
         'cycleSeconds': {'p50': pct([x / 1000 for x in stats.cycle_ms], 50), 'p95': pct([x / 1000 for x in stats.cycle_ms], 95),
                          'max': round(max(stats.cycle_ms) / 1000, 2) if stats.cycle_ms else None},

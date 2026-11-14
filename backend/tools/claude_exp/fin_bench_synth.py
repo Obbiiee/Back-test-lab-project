@@ -18,10 +18,10 @@ SCEN = {"swing": dict(step_s=3600, tp=5000, sl=3000, mix=False), "pending": dict
 
 
 def synth_rows(n, seed=11):
-    """[(ts_ms, ask, bid)] 3-decimal prices (XAUUSD-like scale 3), weekdays only, duplicate timestamps allowed, strictly ordered."""
+    """[(ts_ms, ask, bid)] 3-decimal prices (XAUUSD-like scale 3), no weekend gaps, duplicate timestamps allowed, strictly ordered."""
     rng = np.random.default_rng(seed)
-    start_ms = 1_735_689_600_000          # 2025-01-01 UTC (Wed); span ~ 20 weekdays
-    span = 20 * 86_400_000
+    start_ms = 1_704_067_200_000          # 2024-01-01 UTC: the repo ingestion pins month 2024-01; span n*0.5 s (max 28 days)
+    span = min(28 * 86_400_000, n * 500)      # ~0.5 s per tick on average so the 60 s quote-freshness rule does not block orders
     ts = np.sort(rng.integers(0, span, n)) + start_ms
     mid = 2000.0 + np.cumsum(rng.normal(0, 0.05, n))
     mid = np.clip(mid, 1500, 2500)
@@ -39,7 +39,7 @@ def main():
     work = r.pop("_work")
     for k in ("_cs", "_src", "_profile", "_seed", "_rows", "_cdir", "_manifest", "_groups"):
         r.pop(k, None)
-    r.update(scenario=scen, repeat=rep, syntheticDataset="seeded random walk, scale 3, weekdays, duplicate timestamps possible",
+    r.update(scenario=scen, repeat=rep, syntheticDataset="seeded random walk, scale 3, ~0.5 s/tick on average inside Jan 2024, duplicate timestamps possible",
              processTotalCpuS=round(total_cpu, 2), processTotalWallS=round(total_wall, 2),
              peakRssMbProcess=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1))
     Path(out).write_text(json.dumps(r, indent=1, default=str))
