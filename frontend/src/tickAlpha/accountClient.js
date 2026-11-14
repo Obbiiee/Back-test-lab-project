@@ -54,7 +54,7 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
       // Never surface rejected payloads/passwords/tokens or raw server errors.
       throw Object.assign(Error(({400:'The request was refused. Check your details and verification.',401:'Sign in again.',403:'This action is not permitted.',404:'This workspace or record is unavailable.',409:'The saved record changed. Reload before retrying.',422:'Check the supplied fields.',426:'Account access requires HTTPS.',429:'The service is busy. Wait and retry.'})[response.status]||'Account service unavailable.'),{status:response.status,...(code?{code}:{})});
     }
-    const value=response.status===204?null:as==='text'?await response.text():await response.json();
+    const value=response.status===204?null:as==='text'?await response.text():as==='blob'?await response.blob():await response.json();
     if(current!==generation)throw Error('Account changed; this response was discarded.');
     return value;
   }

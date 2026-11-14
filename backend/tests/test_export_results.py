@@ -136,7 +136,7 @@ class Route(unittest.TestCase):
         self.assertTrue(ok.headers["content-type"].startswith("text/csv"))
         self.assertIn("attachment", ok.headers["content-disposition"])
         self.assertEqual(parse(ok.text)[0], list(ex.COLUMNS), "an empty ledger exports the header only, never invented rows")
-        self.assertEqual(f.client.get(self.path + "?format=pdf", headers=f.headers).status_code in (400, 422), True, "formats that do not exist are refused, not faked")
+        self.assertEqual(f.client.get(self.path + "?format=xlsx", headers=f.headers).status_code in (400, 422), True, "formats that do not exist are refused, not faked")
         _, foreign_headers = f.account()
         self.assertEqual(f.client.get(self.path, headers=foreign_headers).status_code, 404)
         other = f.client.post("/api/v1/workspaces", headers=foreign_headers, json={"name": "Foreign export QA"}).json()["id"]

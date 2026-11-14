@@ -323,6 +323,15 @@ export async function exportSessionCsv(sessionId){
   return text;
 }
 
+export async function exportSessionPdf(sessionId){
+  const account=accountTransport();
+  if(!account)throw Error('Sign in to export the report.');
+  if(typeof sessionId!=='string'||!sessionId)throw Error('Export Session is unavailable.');
+  const blob=await account.client.request(`${account.root}${sessionPath(sessionId)}/export?format=pdf`,{as:'blob'});
+  if(!blob||blob.type!=='application/pdf'||blob.size<200||blob.size>5000000)throw Error('Unsupported report; nothing was saved.');
+  return blob;
+}
+
 const CHART_TIMEFRAMES=['1m','3m','5m','15m','30m','1h','2h','4h','D'];
 // BTL-CHART-HISTORY-PAGE-1: completed bars at or before the committed cursor, older pages by `before` (derived display data only).
 export async function loadChartBars(sessionId,timeframe,{limit=512,before=null}={}){

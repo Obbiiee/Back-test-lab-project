@@ -10,3 +10,4 @@ httpx-oauth==0.17.0
 pyarrow==26.0.0
 numpy==2.5.4
 msgspec==0.22.0
+reportlab==5.1.0

@@ -503,9 +503,18 @@ def install(app):
 
     @app.get(prefix + '/sessions/{session_id}/export')
     async def export_session(workspace_id: uuid.UUID, session_id: str, format: str = 'csv', user: User = Depends(current)):
-        """CSV of the Session's committed trade ledger (one row per order). PDF/JSON are not implemented and are refused explicitly, never faked."""
-        require(format == 'csv', 'format', 'INVALID_INPUT')
+        """CSV (ledger rows) or PDF (report) of the committed Session. Any other format is refused explicitly, never faked."""
+        require(format in ('csv', 'pdf'), 'format', 'INVALID_INPUT')
         from . import export_results
+        if format == 'pdf':
+            from . import export_pdf, audit
+            pdf_bytes, revision = await anyio.to_thread.run_sync(
+                partial(export_pdf.build_report, app.state.dsn, user.id, workspace_id, session_id, run=run), limiter=limiter)
+            await anyio.to_thread.run_sync(partial(audit.record, app.state.dsn, user.id, workspace_id, 'EXPORT_PDF', session_id))
+            import re as _re2
+            pdf_name = 'riksora-' + _re2.sub(r'[^A-Za-z0-9._-]', '_', session_id)[:80] + f'-r{revision}.pdf'
+            return Response(pdf_bytes, media_type='application/pdf',
+                            headers={'Content-Disposition': f'attachment; filename="{pdf_name}"', 'X-Content-Type-Options': 'nosniff'})
         text, revision, _count = await anyio.to_thread.run_sync(
             partial(export_results.export_session_csv, app.state.dsn, user.id, workspace_id, session_id, run=run), limiter=limiter)
         from . import audit

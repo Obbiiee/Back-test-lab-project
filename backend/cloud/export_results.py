@@ -64,8 +64,8 @@ def rows_to_csv(rows):
     return out.getvalue()
 
 
-def export_session_csv(dsn, actor_id, workspace_id, session_id, *, run):
-    """Walk the journal pages of one Session at one committed revision and return (csv_text, revision, order_count)."""
+def collect_committed(dsn, actor_id, workspace_id, session_id, *, run):
+    """Walk the journal pages of one Session at one committed revision: (rows, summary). Shared by the CSV and PDF exports so both read the same ledger."""
     for attempt in range(3):                                    # a revision that advances while paging restarts the walk (bounded)
         summary = run(dsn, actor_id, workspace_id, "summary", (session_id,))
         provenance = dict(sessionId=session_id, datasetId=summary.get("datasetId"), datasetVersion=summary.get("datasetVersion"),
@@ -81,9 +81,15 @@ def export_session_csv(dsn, actor_id, workspace_id, session_id, *, run):
                 rows.extend(order_row(order, provenance) for order in page["orders"])
                 require(len(rows) <= MAX_EXPORT_ORDERS, "export", "REFUSED_EXPORT_LIMIT")
                 if page["complete"]:
-                    return rows_to_csv(rows), provenance["ledgerRevision"], len(rows)
+                    return rows, summary
                 cursor = page["nextCursor"]
         except ContractError as error:
             if error.code not in ("STALE_REVISION", "INVALID_CURSOR") or attempt == 2:
                 raise
     raise ContractError("STALE_REVISION", "export")
+
+
+def export_session_csv(dsn, actor_id, workspace_id, session_id, *, run):
+    """Return (csv_text, revision, order_count) for the committed ledger of one Session."""
+    rows, summary = collect_committed(dsn, actor_id, workspace_id, session_id, run=run)
+    return rows_to_csv(rows), summary.get("revision"), len(rows)
