@@ -1,0 +1,54 @@
+{
+ "month": "2026-06",
+ "instrument": "USDJPY",
+ "ticks": 1329259,
+ "oracleSeconds": 112.1,
+ "timeframes": {
+  "M1": {
+   "bars": 31249,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M3": {
+   "bars": 10475,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M5": {
+   "bars": 6287,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M15": {
+   "bars": 2096,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M30": {
+   "bars": 1048,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H1": {
+   "bars": 524,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H2": {
+   "bars": 266,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H4": {
+   "bars": 135,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "D1": {
+   "bars": 26,
+   "identical": true,
+   "firstDivergentBar": null
+  }
+ },
+ "status": "IDENTICAL"
+}

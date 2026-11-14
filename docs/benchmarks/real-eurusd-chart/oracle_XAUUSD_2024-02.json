@@ -1,0 +1,54 @@
+{
+ "month": "2024-02",
+ "instrument": "XAUUSD",
+ "ticks": 2126396,
+ "oracleSeconds": 175.4,
+ "timeframes": {
+  "M1": {
+   "bars": 28808,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M3": {
+   "bars": 9607,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M5": {
+   "bars": 5764,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M15": {
+   "bars": 1922,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M30": {
+   "bars": 961,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H1": {
+   "bars": 481,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H2": {
+   "bars": 251,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H4": {
+   "bars": 130,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "D1": {
+   "bars": 25,
+   "identical": true,
+   "firstDivergentBar": null
+  }
+ },
+ "status": "IDENTICAL"
+}
