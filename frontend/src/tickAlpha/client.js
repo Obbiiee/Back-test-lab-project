@@ -347,8 +347,17 @@ export async function setMethodArchived(family,archived){
 export async function loadResearchContext(selected,{active=()=>true,timeframe='1m'}={}){
   const catalog=await loadProductCatalog();
   if(!active())return null;
-  const view=selected?await api(sessionPath(selected)+'/view',{timeframe}):null;
-  return active()?{catalog,view}:null;
+  let view=null,viewError=null;
+  if(selected){
+    try{view=await api(sessionPath(selected)+'/view',{timeframe});}
+    catch(error){
+      // The service answered but refused this Session (missing, or not this account's):
+      // keep the workspace and say so, never "service unavailable". Other failures stay.
+      if(!(error.status>=400&&error.status<500))throw error;
+      viewError=error.message||'REFUSED';
+    }
+  }
+  return active()?{catalog,view,viewError}:null;
 }
 
 export function noticeText(message){

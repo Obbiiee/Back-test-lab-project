@@ -429,3 +429,25 @@
   .tick-alpha .rk-table-cards .rk-row-actions{flex-basis:100%;display:flex;gap:8px;margin-top:6px}
   .tick-alpha .rk-table-cards .rk-row-actions .rk-btn{flex:1;min-height:44px}
 }
+.tick-alpha .rk-disabled-why{flex:1 1 100%;order:-1;margin:0;color:var(--rk-ink-soft,#52627a);font-size:13px}
+
+/* Sessions hub (canvas 08): hero + cards */
+.tick-alpha .rk-hub-hero{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;margin:0 0 18px;padding:24px 28px;border-radius:28px;background:linear-gradient(135deg,#1378f5,#0f5fd0);color:#fff;box-shadow:0 6px 0 #0b3f8a}
+.tick-alpha .rk-hub-hero h2{margin:0 0 6px;font-size:clamp(22px,3vw,32px);font-weight:900;letter-spacing:-.02em}
+.tick-alpha .rk-hub-hero p{margin:0 0 14px;max-width:46ch;color:#e6f0ff;line-height:1.5}
+.tick-alpha .rk-hub-actions{display:flex;gap:10px;flex-wrap:wrap}
+.tick-alpha .rk-btn-light{background:#fff;color:#061a3c;border:0;box-shadow:0 3px 0 #b9c9e0}
+.tick-alpha .rk-hub-stats{display:flex;gap:10px;margin:0}.tick-alpha .rk-hub-stats div{min-width:96px;padding:12px 16px;border-radius:18px;background:#061a3c}
+.tick-alpha .rk-hub-stats dt{font-size:12px;font-weight:700;color:#a9bddb}.tick-alpha .rk-hub-stats dd{margin:2px 0 0;font:500 22px 'IBM Plex Mono',monospace}
+.tick-alpha .rk-session-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.tick-alpha .rk-session-card{height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:24px;background:var(--rk-soft,#f3f8ff);color:var(--rk-ink,#061a3c);box-shadow:0 5px 0 #1378f5}
+.tick-alpha .rk-session-card.is-last{box-shadow:0 5px 0 #ffce55}
+.tick-alpha .rk-session-head{display:flex;gap:12px;align-items:center}.tick-alpha .rk-session-head h2{margin:0;font-size:16px;font-weight:850;overflow-wrap:anywhere}
+.tick-alpha .rk-session-head h2 a{color:inherit;text-decoration:none}.tick-alpha .rk-session-head h2 a:hover{text-decoration:underline}
+.tick-alpha .rk-session-head p{margin:2px 0 0;font-size:13px;color:#52627a}
+.tick-alpha .rk-session-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tick-alpha .rk-session-facts span{padding:8px 10px;border-radius:14px;background:#fff;display:flex;flex-direction:column;gap:2px}
+.tick-alpha .rk-session-facts small{font-size:11px;font-weight:700;color:#52627a}.tick-alpha .rk-session-facts b{font-size:13px}
+.tick-alpha .rk-session-tags{display:flex;gap:6px;flex-wrap:wrap;min-height:22px}.tick-alpha .rk-tag-last{background:#ffce55;color:#061a3c}
+.tick-alpha .rk-session-actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}.tick-alpha .rk-session-actions .rk-btn{flex:1 1 auto;justify-content:center}
+.tick-alpha .rk-more{display:flex;justify-content:center;padding:18px 0}
+@media (max-width:760px){.tick-alpha .rk-hub-hero{padding:18px;border-radius:22px}.tick-alpha .rk-hub-stats{width:100%}.tick-alpha .rk-hub-stats div{flex:1}}
