@@ -20,7 +20,8 @@ def main():
         if m not in readers: readers[m] = compact2.open_compact(month_dirs[m])
         return readers[m]
     T = int(datetime.fromisoformat(cursor_iso).replace(tzinfo=timezone.utc).timestamp()) * 10**9
-    sessions = {"s": svc.Session("s", "u", pair, prefixes[0], "MID", T, source_hashes=prefixes)}
+    import os; basis = os.environ.get("BASIS", "MID")
+    sessions = {"s": svc.Session("s", "u", pair, prefixes[0], basis, T, source_hashes=prefixes)}
     service = svc.ChartService(store, {pair: reader_for}, sessions, {"tok": "u"}, cache_objects=64)
     res = dict(pair=pair, cursor=cursor_iso, datasets=len(prefixes), timeframes={})
     for phase in ("cold", "warm"):

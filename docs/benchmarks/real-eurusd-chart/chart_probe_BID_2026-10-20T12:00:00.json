@@ -1,0 +1,189 @@
+{
+ "pair": "EURUSD",
+ "cursor": "2026-10-20T12:00:00",
+ "datasets": 35,
+ "timeframes": {
+  "M1": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 121.9,
+    "maxPageMs": 118.8,
+    "oldestBar": "2026-10-14",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 7.9,
+    "maxPageMs": 5.4,
+    "oldestBar": "2026-10-14",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "M3": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 15.0,
+    "maxPageMs": 12.6,
+    "oldestBar": "2026-10-05",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 8.9,
+    "maxPageMs": 6.0,
+    "oldestBar": "2026-10-05",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "M5": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 13.7,
+    "maxPageMs": 9.1,
+    "oldestBar": "2026-09-23",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 17.6,
+    "maxPageMs": 12.5,
+    "oldestBar": "2026-09-23",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "M15": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 11.6,
+    "maxPageMs": 5.5,
+    "oldestBar": "2026-07-31",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 14.6,
+    "maxPageMs": 7.0,
+    "oldestBar": "2026-07-31",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "M30": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 20.6,
+    "maxPageMs": 8.2,
+    "oldestBar": "2026-05-12",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 20.2,
+    "maxPageMs": 10.3,
+    "oldestBar": "2026-05-12",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "H1": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 23.9,
+    "maxPageMs": 7.4,
+    "oldestBar": "2025-11-28",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 22.1,
+    "maxPageMs": 7.7,
+    "oldestBar": "2025-11-28",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "H2": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 33.1,
+    "maxPageMs": 6.9,
+    "oldestBar": "2025-01-20",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 38.2,
+    "maxPageMs": 8.4,
+    "oldestBar": "2025-01-20",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "H4": {
+   "cold": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 57.7,
+    "maxPageMs": 12.4,
+    "oldestBar": "2023-05-17",
+    "reached5000": true,
+    "hasMoreHistory": true
+   },
+   "warm": {
+    "candles": 5512,
+    "pages": 6,
+    "totalMs": 55.6,
+    "maxPageMs": 11.3,
+    "oldestBar": "2023-05-17",
+    "reached5000": true,
+    "hasMoreHistory": true
+   }
+  },
+  "D1": {
+   "cold": {
+    "candles": 1865,
+    "pages": 3,
+    "totalMs": 86.4,
+    "maxPageMs": 36.3,
+    "oldestBar": "2020-11-01",
+    "reached5000": false,
+    "hasMoreHistory": false
+   },
+   "warm": {
+    "candles": 1865,
+    "pages": 3,
+    "totalMs": 69.6,
+    "maxPageMs": 33.7,
+    "oldestBar": "2020-11-01",
+    "reached5000": false,
+    "hasMoreHistory": false
+   }
+  }
+ },
+ "cacheHits": 83,
+ "cacheMisses": 325
+}

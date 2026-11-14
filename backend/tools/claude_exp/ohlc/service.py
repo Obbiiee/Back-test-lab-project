@@ -38,6 +38,11 @@ class Session:
         self.basis, self.cursor_ns, self.entitled_from_ns, self.revision = basis, cursor_ns, entitled_from_ns, revision
 
 
+class _NoTicks:
+    def iter_blocks(self, *a, **k):
+        return iter(())
+
+
 class ChartService:
     def __init__(self, store, readers, sessions, tokens, cache_objects=64):
         self.store, self.readers, self.sessions, self.tokens = store, readers, sessions, tokens
@@ -91,7 +96,10 @@ class ChartService:
         return s
 
     def bars(self, token, session_id, tf, limit=None, before=None, rev=None):
-        s = self._session(token, session_id)
+        return self.page_for(self._session(token, session_id), tf, limit, before, rev)
+
+    def page_for(self, s, tf, limit=None, before=None, rev=None):
+        """Core page builder for an already authenticated Session (the caller owns identity, cursor and revision)."""
         if tf not in TF_SECONDS:
             raise ServiceError(400, "INVALID_REQUEST")
         if limit is not None and not (type(limit) is int and 1 <= limit <= MAX_PAGE):
@@ -160,6 +168,8 @@ class ChartService:
         reader = self.readers[s.instrument]
         if callable(reader):                                   # per-month datasets: pick the one holding the cursor's minute
             reader = reader(minute0)
+        if reader is None:                                     # no tick dataset for this minute: the forming bar uses completed M1 bars only
+            reader = _NoTicks()
         minute_rows = None
         for block in reader.iter_blocks(minute0, T + 1, atomic=False):
             r = tick_rows(block, s.basis)

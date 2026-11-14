@@ -492,6 +492,18 @@ def install(app):
     async def summary(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'summary', session_id)
 
+    chart_limiter = anyio.CapacityLimiter(8)
+
+    @app.get(prefix + '/sessions/{session_id}/chart-bars')
+    async def chart_bars(workspace_id: uuid.UUID, session_id: str, timeframe: str, limit: int | None = None, before: int | None = None,
+                         user: User = Depends(current)):
+        """BTL-CHART-HISTORY-PAGE-1: cursor-bound precomputed OHLC (additive; BTL-PAST-CHART-CONTEXT-1 is unchanged). Read-only, no queue slot."""
+        chart = getattr(app.state, 'chart_history', None)
+        require(chart is not None, 'chart', 'RESOURCE_UNAVAILABLE')
+        value = await anyio.to_thread.run_sync(
+            partial(chart.page, user.id, workspace_id, session_id, timeframe=timeframe, limit=limit, before=before), limiter=chart_limiter)
+        return Response(canonical_bytes(value), media_type='application/json', headers={'X-Content-Type-Options': 'nosniff'})
+
     @app.get(prefix + '/sessions/{session_id}/metering/storage')
     async def storage_metrics(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'storage_metrics', session_id)

@@ -26,11 +26,14 @@ def price(v, scale=5):
 
 
 def main():
-    v1dir, n, scen, out = Path(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
-    offset = int(sys.argv[5]) if len(sys.argv) > 5 else 0          # first tick of the slice (default 0)
+    dirs = [Path(x) for x in sys.argv[1].split(",")]              # one month dir, or "A,B" consecutive months (a slice that crosses the boundary)
+    v1dir, n, scen, out = dirs[0], int(sys.argv[2]), sys.argv[3], sys.argv[4]
+    offset = int(sys.argv[5]) if len(sys.argv) > 5 else 0          # first tick of the slice (default 0); with two months it is relative to the boundary (negative = before it)
     set_instrument(5, "0.00040")
-    rd = CompactTickReader(v1dir)
-    a = rd.read_range(0, 2**62)
+    parts = [C2.open_compact(d).read_range(0, 2**62) for d in dirs]
+    a = {k: np.concatenate([p[k] for p in parts]) for k in ("ts_ns", "bid", "ask")}
+    if len(dirs) > 1:
+        offset = len(parts[0]["ts_ns"]) + offset
     ts, bid, ask = a["ts_ns"][offset:offset + n], a["bid"][offset:offset + n], a["ask"][offset:offset + n]
     assert bool(np.all(ts % 1_000_000 == 0)), "source must be millisecond precision"
     rows = [(int(t) // 1_000_000, price(int(k)), price(int(b))) for t, k, b in zip(ts, ask, bid)]
@@ -38,9 +41,9 @@ def main():
     z = tmp / "identity.zip"                                          # only its member hash is used (dataset identity); rows come from the real ticks
     with zipfile.ZipFile(z, "w") as zf:
         zf.writestr("EURUSD_slice.csv", "timestamp,bid,ask\n" + "\n".join(f"{t},{b},{k}" for t, k, b in rows))
-    month = v1dir.name
+    month = v1dir.name                                              # dataset label only (a "+" is not a valid id character)
     r = run(n, "clean", rows_override=rows, hd=dict(zip=str(z), pair="EURUSD", month=month), **SCEN[scen])
-    res = dict(scenario=scen, ticks=n, sliceOffset=offset, source=str(v1dir.name), rights="UNKNOWN (private QA only)", baseline=r["baseline"], claude_v1=r["claude"], parity_baseline_vs_claude_v1=r["parity"],
+    res = dict(scenario=scen, ticks=n, sliceOffset=offset, months=[d.name for d in dirs], source=str(v1dir.name), rights="UNKNOWN (private QA only)", baseline=r["baseline"], claude_v1=r["claude"], parity_baseline_vs_claude_v1=r["parity"],
                ingest_s=r["ingest_engine_s"], admission_mismatches=r["admission_reconstruction_mismatches"])
     # ---- leg 2: same slice as compact v2 -> ClaudeSession through open_compact
     v1c = r["_cdir"]; v2c = tmp / "v2"
