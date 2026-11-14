@@ -135,9 +135,9 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
 
 let research=null;
 const validUuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-export function setAccountTransport(client,workspaceId){
+export function setAccountTransport(client,workspaceId,features={}){
   if(!validUuid(workspaceId)||!validUuid(client.subject()))throw Error('Verified workspace required');
-  research={client,root:`/api/v1/workspaces/${workspaceId}/research`,storageScope:`account:${workspaceId}:${client.subject()}`};
+  research={client,root:`/api/v1/workspaces/${workspaceId}/research`,storageScope:`account:${workspaceId}:${client.subject()}`,features:{chartHistory:features.chartHistory===true}};
 }
 export function clearAccountTransport(){research=null;}
 export function accountTransport(){return research;}

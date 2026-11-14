@@ -118,7 +118,7 @@ export default function AlphaAccount(){
   function open(workspace){
     void action(async()=>{
       const status=await client.request(`/api/v1/workspaces/${workspace.id}/capabilities`);
-      clearAccountTransport();setAccountTransport(client,workspace.id);
+      clearAccountTransport();setAccountTransport(client,workspace.id,{chartHistory:status?.chartHistory?.available===true});
       setCapabilities(status);setSelected(workspace);
       const target=intended.current;intended.current=null;
       navigate(target&&target.screen!=='account'?target:{screen:'methods'},{replace:true});

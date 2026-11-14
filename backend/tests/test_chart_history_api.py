@@ -46,6 +46,20 @@ class ChartRouteTests(unittest.TestCase):
         self.fixture.client.close()
         self.env.stop()
 
+    def test_capabilities_announce_the_chart_history_so_the_client_never_probes_a_missing_route(self):
+        f = self.fixture
+        caps = f.client.get("/api/v1/workspaces/" + f.workspace + "/capabilities", headers=f.headers).json()
+        self.assertEqual(caps["chartHistory"], {"available": True, "maxCandles": 5000})
+        self.assertFalse(caps["entitlement"]["enforced"])
+        with patch.dict(os.environ, {"BTL_CHART_REGISTRY": ""}):
+            f2 = cloud_fixture.CloudResearchTests("test_summary_requires_identity_membership_and_hides_foreign_session")
+            f2.setUp(start_workers=False)
+            try:
+                caps2 = f2.client.get("/api/v1/workspaces/" + f2.workspace + "/capabilities", headers=f2.headers).json()
+                self.assertEqual(caps2["chartHistory"]["available"], False)
+            finally:
+                f2.client.close()
+
     def test_identity_ownership_and_the_cursor_comes_from_the_durable_session(self):
         f = self.fixture
         self.assertEqual(f.client.get(self.path + "?timeframe=1h").status_code, 401, "no bearer token")

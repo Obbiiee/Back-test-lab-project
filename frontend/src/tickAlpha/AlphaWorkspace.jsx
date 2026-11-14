@@ -55,6 +55,8 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     const controller=new AbortController();
     const key=`${view.metadata.id}:${timeframe}`;
     if(accountTransport()){
+      // The server says whether the precomputed chart history is configured; never probe a route that is not there.
+      if(!accountTransport().features?.chartHistory)return undefined;
       // Hosted product: authenticated, cursor-bound pages of completed bars from the server (up to 5,000 candles; the server says when history is exhausted).
       const loadHosted=async()=>{
         const loaded=[];let before=null;

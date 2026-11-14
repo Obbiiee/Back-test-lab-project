@@ -106,8 +106,10 @@ def install(app):
                 "googleConfigured": configured["googleConfigured"],
                 "billingConfigured": configured["billingConfigured"],
             },
+            "chartHistory": {"available": getattr(app.state, "chart_history", None) is not None, "maxCandles": 5000},
             "entitlement": {
                 "status": "SANDBOX_ONLY" if configured["billingConfigured"] else "NOT_CONFIGURED",
+                "enforced": getattr(app.state, "entitlements", None) is not None,
                 "productionEntitlement": False,
                 "fundsCollected": False,
             },
