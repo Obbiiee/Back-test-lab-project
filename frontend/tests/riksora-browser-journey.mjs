@@ -92,7 +92,8 @@ page.on('response',response=>{
       rows:null,journalPage:null,state:null,
       atUnixMs:Date.now(),durationMs:Math.max(0,requestDuration)};
     apiTrace.push(row);
-    const parsed=(response.status()===204?Promise.resolve(null):response.json()).then(body=>{
+    // Exports (text/csv, application/pdf) are not JSON; they still count as API responses and must be traced like any other.
+    const parsed=(response.status()===204||!/json/i.test(response.headers()['content-type']??'')?Promise.resolve(null):response.json()).then(body=>{
       row.serverTiming=response.headers()['server-timing']??null;
       const jobCode=body?.result?.detail??body?.result?.error??body?.detail;
       row.code=typeof jobCode==='string'&&/^[A-Z][A-Z0-9_]{2,80}$/.test(jobCode)?jobCode:null;
