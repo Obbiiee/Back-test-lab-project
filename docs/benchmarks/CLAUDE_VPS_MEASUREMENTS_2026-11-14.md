@@ -111,7 +111,7 @@ The first cohort-20 attempt (`c20_invalid_stale_connection_bug.json`) is INVALID
 Failures at 20/50 are `poll:404` (an accepted job no longer found when polled) and `submit:429` after retries are exhausted. Likely cause (code reading, not proven): `cloud/queue.py:245` deletes finished jobs beyond the 15 newest, globally, at every submit, so an owner can poll after its finished job was pruned.
 Throughput stops growing at about 18-19 journeys/min from 20 traders onward while CPU p95 is 50-67% and memory 0.5 GiB: the limit is worker slots + queue admission (16), not RAM/CPU.
 
-### F2. Worker count
+### F2. Worker count  (3/4-worker parts INVALID — see F5)
 - 4 workers (addendum maximum), cgroup 4 CPU: WORSE. Cohort 20: 58/60, 11.1 journeys/min, job max 93 s, `RECONCILE_REQUIRED`, CPU throttled 0.48 s; cohort 50: 126/150, 8 failed traders (`poll:404`, `FAILED`, `RECONCILE_REQUIRED`), CPU throttled 10.7 s, jobs RUNNING up to 38 with 4 workers (leases lost). Hypothesis: native workers + API + PostgreSQL + driver exceed the 4-CPU cgroup, delaying the API-process heartbeat thread (5 s, lease 30 s). Not isolated.
 - 1 worker, cohorts 1/5/10: PASS 3/3, 5/5... all journeys done; at 10 traders 13.0 journeys/min, queue 8, oldest wait 9.6 s. cgroup CPU (whole stack: API + worker + PostgreSQL + driver) 0.20 / 0.66 / 1.02 cores = 3.4 / 11.1 / 16.9 % of 6 vCPU. API process incl. live worker slot 0.10 / 0.36 / 0.56 cores; PostgreSQL 0.01-0.03 cores (CPU of exited per-job native processes is not included, so the process figures are lower bounds). 2 workers at 10 traders: whole stack 1.5 cores (25%).
 
@@ -121,7 +121,7 @@ Throughput stops growing at about 18-19 journeys/min from 20 traders onward whil
 - Saturated: 50 (throughput flat, 7,858 busy refusals, waits 23-52 s).
 - Server is not CPU/RAM-limited here; it is limited by 2 worker slots and the frozen queue limits. More workers did not help on 4 CPUs.
 
-### F4. 3 and 4 workers with the full 6-CPU cgroup (follow-up to F2) — the CPU-starvation hypothesis is REFUTED
+### F4. [INVALID — HARNESS ARTIFACT, superseded by F5] 3 and 4 workers with the full 6-CPU cgroup
 cgroup CPUQuota 600% (harness maximum), memory 4 GiB. CPU throttling was 0 in all four runs and host CPU p95 stayed 43-64% (max 79%), yet more workers still did not help.
 | Workers | Traders | Journeys | Failed traders | Throughput journeys/min | Job p95 / max s | Max RUNNING rows | Host CPU p95/max % |
 |---:|---:|---|---:|---:|---|---:|---|
@@ -132,3 +132,19 @@ cgroup CPUQuota 600% (harness maximum), memory 4 GiB. CPU throttling was 0 in al
 | 3 | 50 | 140/150 | 4 | 20.0 | 42 / 94 | 24 | 64 / 76 |
 | 4 | 50 | 135/150 | 6 | 17.0 | 63 / 94 | 40 | 62 / 79 |
 Observed: with 3-4 workers job end-to-end times cluster around 33 s (the 30 s native deadline/lease plus polling) and RUNNING rows exceed the worker count (16-40 RUNNING with 3-4 workers), with `RECONCILE_REQUIRED` (a queued mutating job passing its 60 s TTL), `FAILED` and `poll:404`. Throughput at 20 traders is LOWER with 3-4 workers than with 2. Cause not identified (not CPU, not memory); needs a code-level investigation of the worker/lease path in `cloud/queue.py` and `cloud/worker.py` (not changed here: frozen limits). Practical result on this host and fixture: 2 workers is the best-measured setting; 3 gives at most a marginal throughput gain at 50 traders with more failures; 4 is worse.
+
+
+## F5. CORRECTION: the 3/4-worker results in F2/F4 were a harness mis-configuration, not a product defect
+Cause (proved by trace, `trace_invalid_w3_slots_mismatch.jsonl`): the harness `--worker-count N` only patched `cloud.queue.WORKERS`, while the native slot pool `cloud.worker._slots` (and its exchange thread pool) is sized at import from `BTL_RESEARCH_WORKERS` (default 2). With N=3/4 there were N queue loops but only 2 native slots, so the 3rd/4th concurrent job raised `RuntimeError: Native worker slots unavailable` (66 of 480 claims) AFTER the claim, leaving the job RUNNING until the 30 s lease expired. That produced the ~33 s job times, the RUNNING rows above the worker count and the RECONCILE_REQUIRED/FAILED states. The earlier statements "more workers is worse", "2 is best" and "cause not CPU" are WITHDRAWN. The 2-worker and 1-worker results are unaffected (pool size matched). Safeguard added: `http_load_cohort.py` now refuses to run (HARNESS_WORKER_POOL_MISMATCH) unless queue workers, native slots and exchange threads are equal; workers are set with the product variable `BTL_RESEARCH_WORKERS`.
+
+### F5a. Correct pools, 6-CPU cgroup (4 GiB), HTTP driver, 3 journeys/trader, 20 traders
+| Workers | Journeys done | Failed traders | Throughput journeys/min | Job p95 s (max) | Max RUNNING | Host CPU p95 / max % |
+|---:|---|---:|---:|---|---:|---|
+| 2 (F1, 4-CPU cgroup) | 55/60, 59/60 | 3, 1 | 18.0 / 19.2 | 8-11 (11-14) | 2 | 50-52 / 58 |
+| 3 | 51/60 | 4 | 23.2 | 5.2 (8.1) | 3 | 69 / 82 |
+| 4 | 47/60, 50/60 | 5, 4 | 24.2 / 24.6 | 3.1-3.3 (5.4) | 4 | 76 / 88 |
+50 traders: 3 workers 120/150 (15 failed, 2,378 QUEUE_CAPACITY + 16 SERVICE_BUSY refusals, 25.5 journeys/min, host CPU p95 80 / max 88); 4 workers: stopped by the 80% host CPU gate (`CAPACITY_CPU_GATE_80PCT`), not a completed run.
+More workers DO raise throughput (+22% at 3, +27% at 4 versus 2 at 20 traders) and shorten job waits, as expected. They also push host CPU to 76-88%, i.e. the addendum's 80% line, which is the practical limit of this host.
+
+### F5b. Remaining failure `poll:404` is explained by finished-job retention (verified, product limit)
+`cloud/queue.py:245` keeps only the 15 newest finished jobs globally (RETAINED_LIMIT 32 - GLOBAL_LIMIT 16 - 1). In the 4-worker run the count of finished job rows stayed at 15-17 (max 22) for 119 one-second samples (`trace_w4_prune_check.jsonl`). A trader that polls after 15 other jobs finished finds its result deleted (HTTP 404). The faster the pool completes jobs, the shorter the retention window (about 15 jobs / (jobs per second)), so failures appear as throughput rises (20 traders: 1-5 failed traders in every configuration). This is a design limit in a frozen contract, not changed here. Implication: the concurrent-trader ceiling with the current retention rule is set by completion rate x poll delay, not by CPU/RAM.

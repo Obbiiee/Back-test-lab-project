@@ -1,0 +1,1462 @@
+{"ev": "terminal_rows", "n": 0, "t": 5.04, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 5.04, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 6.068, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 6.068, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 7.1, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 7.1, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 8.131, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 8.131, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 9.163, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 9.163, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 10.202, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 10.202, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 11.237, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 11.237, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 12.284, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 12.285, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 13.325, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 13.325, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 0, "t": 14.353, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 14.354, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, false], "proc": [true, false, false, false], "jobs": [0, 0, 0, 0], "t": 14.447, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, false, false, false], "jobs": [0, 0, 0, 0], "t": 14.657, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, false, false], "jobs": [0, 0, 0, 0], "t": 14.741, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, false], "jobs": [0, 0, 0, 0], "t": 15.017, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 0, "t": 15.395, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["create_session", 1, 0.9, 1.0], ["create_session", 1, 0.7, 0.9], ["create_session", 1, 0.6, 0.9], ["create_session", 1, 0.4, 0.6]], "t": 15.395, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 1.798, "slotsBusyAtStart": 0, "ok": true, "t": 16.245, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.831, "ok": true, "t": 16.262, "thread": 137936989316800}
+{"ev": "terminal_rows", "n": 1, "t": 16.443, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["create_session", 1, 1.8, 1.9], ["create_session", 1, 1.7, 1.9], ["create_session", 1, 1.4, 1.6]], "t": 16.443, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, true, true], "proc": [true, true, true, true], "jobs": [1, 0, 0, 0], "t": 16.535, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 2.249, "slotsBusyAtStart": 1, "ok": true, "t": 16.906, "thread": 137936758630080}
+{"ev": "work_one", "dur": 2.273, "ok": true, "t": 16.911, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 2.265, "slotsBusyAtStart": 2, "ok": true, "t": 17.007, "thread": 137936725059264}
+{"ev": "work_one", "dur": 2.302, "ok": true, "t": 17.012, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [1, 1, 1, 0], "t": 17.183, "thread": 137936725059264}
+{"ev": "invoke", "op": "create_session", "dur": 2.232, "slotsBusyAtStart": 3, "ok": true, "t": 17.25, "thread": 137936733451968}
+{"ev": "work_one", "dur": 2.262, "ok": true, "t": 17.254, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [1, 1, 1, 1], "t": 17.282, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.949, "slotsBusyAtStart": 3, "ok": true, "t": 17.483, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.968, "ok": true, "t": 17.487, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 5, "t": 17.499, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["create_session", 1, 0.9, 2.2], ["create_session", 1, 0.3, 1.2], ["create_session", 1, 0.2, 1.2]], "t": 17.499, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [2, 1, 1, 1], "t": 17.529, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [2, 1, 1, 1], "t": 17.76, "thread": 137936989316800}
+{"ev": "invoke", "op": "create_session", "dur": 0.894, "slotsBusyAtStart": 2, "ok": true, "t": 18.078, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.921, "ok": true, "t": 18.085, "thread": 137936725059264}
+{"ev": "invoke", "op": "create_session", "dur": 0.864, "slotsBusyAtStart": 2, "ok": true, "t": 18.145, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.885, "ok": true, "t": 18.149, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [2, 2, 2, 1], "t": 18.353, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [2, 2, 2, 1], "t": 18.419, "thread": 137936725059264}
+{"ev": "invoke", "op": "create_session", "dur": 0.922, "slotsBusyAtStart": 2, "ok": true, "t": 18.45, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.946, "ok": true, "t": 18.453, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 8, "t": 18.527, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["create_session", 1, 0.8, 1.5], ["create_session", 1, 0.2, 1.1], ["create_session", 1, 0.1, 1.0]], "t": 18.527, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.9, "slotsBusyAtStart": 3, "ok": true, "t": 18.66, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.925, "ok": true, "t": 18.665, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [3, 2, 2, 2], "t": 18.722, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [3, 2, 2, 2], "t": 18.93, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 0.883, "slotsBusyAtStart": 2, "ok": true, "t": 19.236, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.9, "ok": true, "t": 19.239, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.937, "slotsBusyAtStart": 3, "ok": true, "t": 19.356, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.956, "ok": true, "t": 19.359, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [3, 3, 3, 2], "t": 19.508, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 11, "t": 19.566, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["create_session", 1, 0.8, 1.9], ["create_session", 1, 0.6, 1.6], ["create_session", 1, 0.0, 1.1]], "t": 19.566, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.884, "slotsBusyAtStart": 2, "ok": true, "t": 19.606, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.906, "ok": true, "t": 19.611, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, true], "proc": [true, true, true, true], "jobs": [4, 3, 3, 2], "t": 19.645, "thread": 137936989316800}
+{"ev": "invoke", "op": "create_session", "dur": 0.904, "slotsBusyAtStart": 3, "ok": true, "t": 19.835, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.92, "ok": true, "t": 19.837, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [4, 3, 3, 3], "t": 19.881, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [4, 3, 3, 3], "t": 20.106, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 0.9, "slotsBusyAtStart": 2, "ok": true, "t": 20.409, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.927, "ok": true, "t": 20.418, "thread": 137936725059264}
+{"ev": "invoke", "op": "create_session", "dur": 0.911, "slotsBusyAtStart": 2, "ok": true, "t": 20.556, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.944, "ok": true, "t": 20.558, "thread": 137936989316800}
+{"ev": "terminal_rows", "n": 15, "t": 20.593, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.7, 1.4], ["create_session", 1, 0.5, 1.3]], "t": 20.593, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [5, 4, 3, 3], "t": 20.686, "thread": 137936725059264}
+{"ev": "invoke", "op": "create_session", "dur": 0.86, "slotsBusyAtStart": 2, "ok": true, "t": 20.741, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.877, "ok": true, "t": 20.743, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [5, 4, 4, 3], "t": 20.824, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.887, "slotsBusyAtStart": 3, "ok": true, "t": 20.993, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.908, "ok": true, "t": 20.996, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [5, 4, 4, 4], "t": 21.012, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.039, "slotsBusyAtStart": 2, "ok": true, "t": 21.051, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.059, "ok": true, "t": 21.053, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [5, 4, 5, 4], "t": 21.261, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.049, "slotsBusyAtStart": 2, "ok": true, "t": 21.31, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 21.314, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [5, 4, 6, 4], "t": 21.324, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.033, "slotsBusyAtStart": 2, "ok": true, "t": 21.357, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.056, "ok": true, "t": 21.363, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 0.876, "slotsBusyAtStart": 2, "ok": true, "t": 21.562, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.896, "ok": true, "t": 21.566, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [6, 4, 7, 4], "t": 21.586, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 21.623, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.8, 2.0], ["create_session", 1, 0.0, 0.3]], "t": 21.623, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [6, 4, 7, 4], "t": 21.637, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.038, "slotsBusyAtStart": 2, "ok": true, "t": 21.676, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.062, "ok": true, "t": 21.678, "thread": 137936989316800}
+{"ev": "invoke", "op": "create_session", "dur": 0.898, "slotsBusyAtStart": 2, "ok": true, "t": 21.722, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.915, "ok": true, "t": 21.724, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 5, 8, 4], "t": 21.831, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.04, "slotsBusyAtStart": 1, "ok": true, "t": 21.871, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.057, "ok": true, "t": 21.874, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 6, 8, 4], "t": 21.943, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 1, "ok": true, "t": 21.986, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 21.989, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 7, 8, 4], "t": 21.995, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 1, "ok": true, "t": 22.04, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 22.043, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 8, 8, 4], "t": 22.14, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.04, "slotsBusyAtStart": 1, "ok": true, "t": 22.181, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.059, "ok": true, "t": 22.184, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 9, 8, 4], "t": 22.26, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 1, "ok": true, "t": 22.306, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.065, "ok": true, "t": 22.309, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 10, 8, 4], "t": 22.311, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.035, "slotsBusyAtStart": 1, "ok": true, "t": 22.346, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.054, "ok": true, "t": 22.349, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [6, 11, 8, 4], "t": 22.451, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 1, "ok": true, "t": 22.494, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.062, "ok": true, "t": 22.498, "thread": 137936989316800}
+{"ev": "invoke", "op": "create_session", "dur": 0.921, "slotsBusyAtStart": 1, "ok": true, "t": 22.507, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.939, "ok": true, "t": 22.51, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [7, 12, 8, 4], "t": 22.578, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 0, "ok": true, "t": 22.619, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [8, 12, 8, 4], "t": 22.621, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.063, "ok": true, "t": 22.624, "thread": 137936989316800}
+{"ev": "terminal_rows", "n": 16, "t": 22.663, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["workspace", 1, 0.0, 1.1]], "t": 22.664, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 0, "ok": true, "t": 22.664, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.065, "ok": true, "t": 22.667, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [9, 12, 8, 4], "t": 22.769, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [9, 12, 8, 4], "t": 22.785, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 0, "ok": true, "t": 22.811, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 22.819, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 1, "ok": true, "t": 22.833, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 22.838, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [10, 13, 8, 4], "t": 22.894, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 0, "ok": true, "t": 22.944, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 22.948, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [11, 13, 8, 4], "t": 23.085, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [11, 13, 8, 4], "t": 23.107, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 0, "ok": true, "t": 23.127, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.059, "ok": true, "t": 23.129, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.039, "slotsBusyAtStart": 1, "ok": true, "t": 23.146, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.061, "ok": true, "t": 23.15, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [12, 14, 8, 4], "t": 23.667, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 15, "t": 23.698, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["workspace", 1, 0.0, 0.2]], "t": 23.698, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 0, "ok": true, "t": 23.716, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 23.723, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 24.726, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 24.726, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [13, 14, 8, 4], "t": 25.28, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [13, 14, 8, 4], "t": 25.314, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.039, "slotsBusyAtStart": 0, "ok": true, "t": 25.319, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.056, "ok": true, "t": 25.321, "thread": 137936297260736}
+{"ev": "invoke", "op": "apply", "dur": 0.05, "slotsBusyAtStart": 1, "ok": true, "t": 25.363, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.071, "ok": true, "t": 25.367, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [14, 15, 8, 4], "t": 25.586, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [14, 15, 8, 4], "t": 25.607, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [14, 15, 8, 4], "t": 25.613, "thread": 137936297260736}
+{"ev": "invoke", "op": "apply", "dur": 0.056, "slotsBusyAtStart": 0, "ok": true, "t": 25.642, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 25.644, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 0.053, "slotsBusyAtStart": 1, "ok": true, "t": 25.66, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.077, "ok": true, "t": 25.664, "thread": 137936989316800}
+{"ev": "terminal_rows", "n": 16, "t": 25.754, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["replay", 1, 0.1, 0.2]], "t": 25.755, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [15, 16, 8, 4], "t": 25.909, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [15, 16, 8, 4], "t": 25.915, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [15, 16, 8, 4], "t": 25.937, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 0.051, "slotsBusyAtStart": 3, "ok": true, "t": 25.988, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.076, "ok": true, "t": 25.992, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [15, 16, 8, 5], "t": 26.265, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 0.937, "slotsBusyAtStart": 2, "ok": true, "t": 26.55, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.965, "ok": true, "t": 26.553, "thread": 137936297260736}
+{"ev": "terminal_rows", "n": 15, "t": 26.786, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.9, 0.9], ["replay", 1, 0.9, 1.1], ["replay", 1, 0.5, 0.8]], "t": 26.786, "thread": 137936741844672}
+{"ev": "invoke", "op": "apply", "dur": 0.888, "slotsBusyAtStart": 2, "ok": true, "t": 26.802, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.904, "ok": true, "t": 26.804, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [15, 17, 9, 5], "t": 26.822, "thread": 137936989316800}
+{"ev": "invoke", "op": "apply", "dur": 0.917, "slotsBusyAtStart": 1, "ok": true, "t": 26.826, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.946, "ok": true, "t": 26.837, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [false, true, false, true], "proc": [true, true, true, true], "jobs": [16, 17, 9, 5], "t": 27.073, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [16, 17, 9, 5], "t": 27.131, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 0.881, "slotsBusyAtStart": 3, "ok": true, "t": 27.146, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.903, "ok": true, "t": 27.148, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [16, 17, 9, 6], "t": 27.415, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 0.876, "slotsBusyAtStart": 2, "ok": true, "t": 27.698, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.894, "ok": true, "t": 27.701, "thread": 137936989316800}
+{"ev": "terminal_rows", "n": 16, "t": 27.823, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.7, 2.0], ["replay", 1, 0.7, 1.1], ["replay", 1, 0.4, 0.5]], "t": 27.824, "thread": 137936741844672}
+{"ev": "invoke", "op": "apply", "dur": 0.885, "slotsBusyAtStart": 2, "ok": true, "t": 27.958, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.907, "ok": true, "t": 27.964, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [17, 18, 9, 6], "t": 27.976, "thread": 137936989316800}
+{"ev": "invoke", "op": "apply", "dur": 0.879, "slotsBusyAtStart": 3, "ok": true, "t": 28.01, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.928, "ok": true, "t": 28.019, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [17, 18, 10, 6], "t": 28.234, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [17, 18, 10, 6], "t": 28.286, "thread": 137936297260736}
+{"ev": "invoke", "op": "apply", "dur": 1.027, "slotsBusyAtStart": 3, "ok": true, "t": 28.442, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.045, "ok": true, "t": 28.444, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [17, 18, 10, 7], "t": 28.712, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 17, "t": 28.854, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["replay", 1, 0.9, 1.6], ["replay", 1, 0.6, 2.0], ["replay", 1, 0.6, 2.0], ["replay", 1, 0.1, 1.5]], "t": 28.854, "thread": 137936741844672}
+{"ev": "invoke", "op": "apply", "dur": 1.001, "slotsBusyAtStart": 2, "ok": true, "t": 28.977, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.03, "ok": true, "t": 28.982, "thread": 137936989316800}
+{"ev": "invoke", "op": "apply", "dur": 0.859, "slotsBusyAtStart": 2, "ok": true, "t": 29.093, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.879, "ok": true, "t": 29.095, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 0.881, "slotsBusyAtStart": 3, "ok": true, "t": 29.167, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.899, "ok": true, "t": 29.169, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [18, 19, 11, 7], "t": 29.252, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 1, "ok": true, "t": 29.3, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.07, "ok": true, "t": 29.305, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [19, 19, 11, 7], "t": 29.363, "thread": 137936989316800}
+{"ev": "invoke", "op": "apply", "dur": 0.047, "slotsBusyAtStart": 1, "ok": true, "t": 29.409, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 29.412, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [20, 19, 11, 7], "t": 29.44, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.04, "slotsBusyAtStart": 1, "ok": true, "t": 29.48, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.063, "ok": true, "t": 29.484, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [21, 19, 11, 7], "t": 29.574, "thread": 137936989316800}
+{"ev": "invoke", "op": "apply", "dur": 0.894, "slotsBusyAtStart": 3, "ok": true, "t": 29.606, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.909, "ok": true, "t": 29.608, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 1, "ok": true, "t": 29.617, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.065, "ok": true, "t": 29.62, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [22, 19, 11, 8], "t": 29.678, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.039, "slotsBusyAtStart": 0, "ok": true, "t": 29.717, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.057, "ok": true, "t": 29.72, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [23, 19, 11, 8], "t": 29.753, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.033, "slotsBusyAtStart": 0, "ok": true, "t": 29.786, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.051, "ok": true, "t": 29.789, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [24, 19, 11, 8], "t": 29.878, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 19, "t": 29.884, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 29.884, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [24, 19, 11, 8], "t": 29.89, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 0, "ok": true, "t": 29.921, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 29.925, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 1, "ok": true, "t": 29.931, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 29.936, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [25, 20, 11, 8], "t": 29.993, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 0, "ok": true, "t": 30.035, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 30.037, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [26, 20, 11, 8], "t": 30.053, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 0, "ok": true, "t": 30.096, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 30.1, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [27, 20, 11, 8], "t": 30.192, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [27, 20, 11, 8], "t": 30.203, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.037, "slotsBusyAtStart": 0, "ok": true, "t": 30.23, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.056, "ok": true, "t": 30.233, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 1, "ok": true, "t": 30.245, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.058, "ok": true, "t": 30.248, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [28, 21, 11, 8], "t": 30.37, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.044, "slotsBusyAtStart": 0, "ok": true, "t": 30.414, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.063, "ok": true, "t": 30.417, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [29, 21, 11, 8], "t": 30.568, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.044, "slotsBusyAtStart": 0, "ok": true, "t": 30.612, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 30.615, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [30, 21, 11, 8], "t": 30.689, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 0, "ok": true, "t": 30.73, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.061, "ok": true, "t": 30.733, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 30.914, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 30.914, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [31, 21, 11, 8], "t": 31.001, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 31.048, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 31.051, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [32, 21, 11, 8], "t": 31.165, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 0, "ok": true, "t": 31.207, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.077, "ok": true, "t": 31.21, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [33, 21, 11, 8], "t": 31.31, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 0, "ok": true, "t": 31.351, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.068, "ok": true, "t": 31.358, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [34, 21, 11, 8], "t": 31.743, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.054, "slotsBusyAtStart": 0, "ok": true, "t": 31.797, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.079, "ok": true, "t": 31.804, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 16, "t": 31.951, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 31.951, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [35, 21, 11, 8], "t": 32.115, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 0, "ok": true, "t": 32.17, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 32.174, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [36, 21, 11, 8], "t": 32.34, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.044, "slotsBusyAtStart": 0, "ok": true, "t": 32.383, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 32.387, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [37, 21, 11, 8], "t": 32.439, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 0, "ok": true, "t": 32.486, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 32.491, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [38, 21, 11, 8], "t": 32.67, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [38, 21, 11, 8], "t": 32.712, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 0, "ok": true, "t": 32.725, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.084, "ok": true, "t": 32.73, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [39, 21, 11, 8], "t": 32.764, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.063, "slotsBusyAtStart": 1, "ok": true, "t": 32.775, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.095, "ok": true, "t": 32.782, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.06, "slotsBusyAtStart": 1, "ok": true, "t": 32.824, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.098, "ok": true, "t": 32.84, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [40, 22, 11, 8], "t": 32.933, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 0, "ok": true, "t": 32.983, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 32.985, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["workspace", 1, 0.0, 0.1]], "t": 32.985, "thread": 137936741844672}
+{"ev": "work_one", "dur": 0.071, "ok": true, "t": 32.987, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [41, 22, 11, 8], "t": 33.256, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [41, 22, 11, 8], "t": 33.261, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 0, "ok": true, "t": 33.304, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 33.312, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 1, "ok": true, "t": 33.313, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 33.32, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [42, 23, 11, 8], "t": 33.382, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 0, "ok": true, "t": 33.428, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.065, "ok": true, "t": 33.432, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [43, 23, 11, 8], "t": 33.7, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 0, "ok": true, "t": 33.748, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 33.752, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [44, 23, 11, 8], "t": 33.873, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [44, 23, 11, 8], "t": 33.881, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.054, "slotsBusyAtStart": 0, "ok": true, "t": 33.927, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.092, "ok": true, "t": 33.933, "thread": 137936989316800}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.107, "slotsBusyAtStart": 1, "ok": true, "t": 33.988, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.149, "ok": true, "t": 33.994, "thread": 137936297260736}
+{"ev": "terminal_rows", "n": 16, "t": 34.023, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 34.024, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [45, 24, 11, 8], "t": 34.023, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [45, 24, 11, 8], "t": 34.157, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [45, 24, 11, 8], "t": 34.205, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [45, 24, 11, 8], "t": 34.278, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 15, "t": 35.062, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.8, 0.9], ["jump_next_event", 1, 0.8, 0.8], ["jump_next_event", 1, 1.0, 1.1], ["jump_next_event", 1, 0.9, 1.1]], "t": 35.062, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.068, "slotsBusyAtStart": 0, "ok": true, "t": 35.091, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.091, "ok": true, "t": 35.095, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.014, "slotsBusyAtStart": 1, "ok": true, "t": 35.171, "thread": 137936297260736}
+{"ev": "work_one", "dur": 1.042, "ok": true, "t": 35.176, "thread": 137936297260736}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.972, "slotsBusyAtStart": 2, "ok": true, "t": 35.177, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.995, "ok": true, "t": 35.181, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.06, "slotsBusyAtStart": 3, "ok": true, "t": 35.338, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.094, "ok": true, "t": 35.343, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [46, 25, 12, 9], "t": 35.365, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.051, "slotsBusyAtStart": 0, "ok": true, "t": 35.416, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 35.42, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [47, 25, 12, 9], "t": 35.451, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [47, 25, 12, 9], "t": 35.455, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.049, "slotsBusyAtStart": 0, "ok": true, "t": 35.499, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 1, "ok": true, "t": 35.501, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 35.503, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 35.504, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [48, 26, 12, 9], "t": 35.61, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 35.658, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 35.66, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [49, 26, 12, 9], "t": 35.691, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [49, 26, 12, 9], "t": 35.772, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [49, 26, 12, 9], "t": 35.774, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.091, "slotsBusyAtStart": 0, "ok": true, "t": 35.782, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.116, "ok": true, "t": 35.79, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.093, "slotsBusyAtStart": 2, "ok": true, "t": 35.868, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.116, "ok": true, "t": 35.871, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [50, 26, 13, 9], "t": 35.93, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [50, 26, 13, 9], "t": 36.065, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 16, "t": 36.1, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.3, 1.6], ["jump_next_event", 1, 0.0, 0.8], ["jump_next_event", 1, 0.2, 1.0]], "t": 36.1, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [50, 26, 13, 9], "t": 36.139, "thread": 137936989316800}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.02, "slotsBusyAtStart": 1, "ok": true, "t": 36.792, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.041, "ok": true, "t": 36.795, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.983, "slotsBusyAtStart": 1, "ok": true, "t": 36.914, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.002, "ok": true, "t": 36.917, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [51, 27, 13, 9], "t": 37.064, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.014, "slotsBusyAtStart": 2, "ok": true, "t": 37.079, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.036, "ok": true, "t": 37.082, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 18, "t": 37.132, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 1.0, 2.2], ["jump_next_event", 1, 0.1, 1.4]], "t": 37.132, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.023, "slotsBusyAtStart": 3, "ok": true, "t": 37.162, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.043, "ok": true, "t": 37.165, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [51, 27, 14, 10], "t": 37.191, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [51, 27, 14, 10], "t": 37.352, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [51, 27, 14, 10], "t": 37.438, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.945, "slotsBusyAtStart": 2, "ok": true, "t": 38.009, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.963, "ok": true, "t": 38.011, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 15, "t": 38.17, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.8, 2.5], ["jump_next_event", 1, 0.7, 2.5], ["jump_next_event", 1, 1.0, 2.5]], "t": 38.17, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.985, "slotsBusyAtStart": 1, "ok": true, "t": 38.176, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.01, "ok": true, "t": 38.179, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [52, 28, 14, 10], "t": 38.279, "thread": 137936989316800}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.971, "slotsBusyAtStart": 2, "ok": true, "t": 38.323, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.994, "ok": true, "t": 38.327, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [52, 28, 15, 10], "t": 38.45, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.037, "slotsBusyAtStart": 3, "ok": true, "t": 38.475, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.062, "ok": true, "t": 38.479, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [52, 28, 15, 11], "t": 38.598, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [52, 28, 15, 11], "t": 38.745, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 15, "t": 39.21, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.5, 3.1], ["jump_next_event", 1, 0.6, 2.8], ["jump_next_event", 1, 0.9, 2.0], ["jump_next_event", 1, 0.7, 3.4]], "t": 39.21, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.144, "slotsBusyAtStart": 2, "ok": true, "t": 39.423, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.164, "ok": true, "t": 39.426, "thread": 137936989316800}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.073, "slotsBusyAtStart": 2, "ok": true, "t": 39.523, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.115, "ok": true, "t": 39.547, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.077, "slotsBusyAtStart": 2, "ok": true, "t": 39.675, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.101, "ok": true, "t": 39.679, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [53, 29, 16, 11], "t": 39.698, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.964, "slotsBusyAtStart": 3, "ok": true, "t": 39.708, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.982, "ok": true, "t": 39.713, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [53, 29, 16, 12], "t": 39.821, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [53, 29, 16, 12], "t": 39.948, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [53, 29, 16, 12], "t": 39.984, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 18, "t": 40.254, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.3, 3.6], ["jump_next_event", 1, 0.3, 2.5], ["jump_next_event", 1, 0.5, 3.5], ["jump_next_event", 1, 0.4, 4.0]], "t": 40.254, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.993, "slotsBusyAtStart": 1, "ok": true, "t": 40.691, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.015, "ok": true, "t": 40.695, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.047, "slotsBusyAtStart": 1, "ok": true, "t": 40.868, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.068, "ok": true, "t": 40.872, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [54, 30, 16, 12], "t": 40.962, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.036, "slotsBusyAtStart": 2, "ok": true, "t": 40.983, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.055, "ok": true, "t": 40.987, "thread": 137936989316800}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.092, "slotsBusyAtStart": 3, "ok": true, "t": 41.076, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.117, "ok": true, "t": 41.082, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [54, 30, 17, 13], "t": 41.145, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [54, 30, 17, 13], "t": 41.256, "thread": 137936297260736}
+{"ev": "terminal_rows", "n": 22, "t": 41.297, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.1, 4.9], ["jump_next_event", 1, 0.3, 3.2], ["jump_next_event", 1, 0.0, 2.5]], "t": 41.297, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [54, 30, 17, 13], "t": 41.359, "thread": 137936758630080}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.172, "slotsBusyAtStart": 2, "ok": true, "t": 42.134, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.193, "ok": true, "t": 42.139, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 15, "t": 42.332, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 1.2, 5.9], ["jump_next_event", 1, 1.1, 3.5], ["jump_next_event", 1, 1.0, 3.7]], "t": 42.332, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.228, "slotsBusyAtStart": 1, "ok": true, "t": 42.372, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.253, "ok": true, "t": 42.377, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [55, 31, 17, 13], "t": 42.409, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.222, "slotsBusyAtStart": 2, "ok": true, "t": 42.478, "thread": 137936297260736}
+{"ev": "work_one", "dur": 1.244, "ok": true, "t": 42.482, "thread": 137936297260736}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.246, "slotsBusyAtStart": 3, "ok": true, "t": 42.605, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.302, "ok": true, "t": 42.636, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [55, 31, 18, 14], "t": 42.688, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [55, 31, 18, 14], "t": 42.827, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [55, 31, 18, 14], "t": 42.907, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.099, "slotsBusyAtStart": 3, "ok": true, "t": 43.007, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.125, "ok": true, "t": 43.014, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [55, 31, 18, 15], "t": 43.286, "thread": 137936297260736}
+{"ev": "terminal_rows", "n": 16, "t": 43.371, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.5, 4.1], ["jump_next_event", 1, 0.1, 1.6], ["jump_next_event", 1, 1.0, 4.7], ["jump_next_event", 1, 0.7, 3.9]], "t": 43.374, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.184, "slotsBusyAtStart": 3, "ok": true, "t": 43.471, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.207, "ok": true, "t": 43.475, "thread": 137936297260736}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.117, "slotsBusyAtStart": 2, "ok": true, "t": 43.525, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.139, "ok": true, "t": 43.53, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [56, 31, 18, 16], "t": 43.763, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [56, 31, 18, 16], "t": 43.804, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.124, "slotsBusyAtStart": 1, "ok": true, "t": 43.812, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.182, "ok": true, "t": 43.817, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.108, "slotsBusyAtStart": 2, "ok": true, "t": 43.871, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.15, "ok": true, "t": 43.876, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.107, "slotsBusyAtStart": 2, "ok": true, "t": 43.934, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.203, "ok": true, "t": 43.938, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [57, 32, 19, 16], "t": 44.127, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [57, 32, 19, 16], "t": 44.142, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 18, "t": 44.466, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.7, 1.6], ["jump_next_event", 1, 0.3, 2.3], ["jump_next_event", 1, 0.3, 2.5]], "t": 44.466, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [57, 32, 19, 16], "t": 44.817, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.127, "slotsBusyAtStart": 3, "ok": true, "t": 44.931, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.121, "slotsBusyAtStart": 3, "ok": true, "t": 44.938, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.156, "ok": true, "t": 44.943, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.198, "ok": true, "t": 44.946, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.19, "slotsBusyAtStart": 2, "ok": true, "t": 45.332, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.232, "slotsBusyAtStart": 1, "ok": true, "t": 45.359, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.25, "ok": true, "t": 45.378, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.309, "ok": true, "t": 45.387, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 19, "t": 45.51, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 45.51, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [58, 33, 20, 17], "t": 45.931, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.098, "slotsBusyAtStart": 0, "ok": true, "t": 46.029, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.127, "ok": true, "t": 46.033, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 16, "t": 46.634, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 46.634, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [59, 33, 20, 17], "t": 46.656, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.112, "slotsBusyAtStart": 0, "ok": true, "t": 46.767, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.142, "ok": true, "t": 46.774, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [60, 33, 20, 17], "t": 47.311, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.097, "slotsBusyAtStart": 0, "ok": true, "t": 47.408, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.119, "ok": true, "t": 47.414, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 47.661, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 47.661, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [61, 33, 20, 17], "t": 48.145, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [61, 33, 20, 17], "t": 48.146, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.094, "slotsBusyAtStart": 1, "ok": true, "t": 48.24, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.115, "ok": true, "t": 48.243, "thread": 137936297260736}
+{"ev": "invoke", "op": "workspace", "dur": 0.102, "slotsBusyAtStart": 0, "ok": true, "t": 48.247, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.123, "ok": true, "t": 48.25, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [62, 34, 20, 17], "t": 48.429, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.097, "slotsBusyAtStart": 0, "ok": true, "t": 48.526, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.147, "ok": true, "t": 48.556, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [63, 34, 20, 17], "t": 48.576, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.089, "slotsBusyAtStart": 0, "ok": true, "t": 48.665, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.141, "ok": true, "t": 48.67, "thread": 137936758630080}
+{"ev": "terminal_rows", "n": 17, "t": 48.755, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 48.755, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [64, 34, 20, 17], "t": 48.842, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.074, "slotsBusyAtStart": 0, "ok": true, "t": 48.916, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.095, "ok": true, "t": 48.919, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [65, 34, 20, 17], "t": 49.381, "thread": 137936297260736}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [65, 34, 20, 17], "t": 49.381, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.091, "slotsBusyAtStart": 0, "ok": true, "t": 49.472, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.093, "slotsBusyAtStart": 0, "ok": true, "t": 49.473, "thread": 137936297260736}
+{"ev": "work_one", "dur": 0.116, "ok": true, "t": 49.476, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.116, "ok": true, "t": 49.477, "thread": 137936297260736}
+{"ev": "terminal_rows", "n": 15, "t": 49.869, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 49.869, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [66, 35, 20, 17], "t": 50.088, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [66, 35, 20, 17], "t": 50.105, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.097, "slotsBusyAtStart": 0, "ok": true, "t": 50.185, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.124, "ok": true, "t": 50.189, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.102, "slotsBusyAtStart": 1, "ok": true, "t": 50.207, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.13, "ok": true, "t": 50.211, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [67, 36, 20, 17], "t": 50.458, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [67, 36, 20, 17], "t": 50.488, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.079, "slotsBusyAtStart": 0, "ok": true, "t": 50.537, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.1, "ok": true, "t": 50.541, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.09, "slotsBusyAtStart": 1, "ok": true, "t": 50.578, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.119, "ok": true, "t": 50.583, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 17, "t": 50.901, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 50.902, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 17, "t": 51.931, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 51.931, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 17, "t": 52.963, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 52.963, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [68, 37, 20, 17], "t": 53.215, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 15, "t": 53.994, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.8, 0.8]], "t": 53.994, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.913, "slotsBusyAtStart": 0, "ok": true, "t": 54.129, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.933, "ok": true, "t": 54.132, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 55.027, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 55.027, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [69, 37, 20, 17], "t": 55.386, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.039, "slotsBusyAtStart": 0, "ok": true, "t": 55.425, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 55.428, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [70, 37, 20, 17], "t": 55.699, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [70, 37, 20, 17], "t": 55.981, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 15, "t": 56.063, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.1, 0.2], ["create_session", 1, 0.4, 0.5]], "t": 56.064, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [70, 37, 20, 17], "t": 56.55, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.999, "slotsBusyAtStart": 0, "ok": true, "t": 56.698, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.021, "ok": true, "t": 56.702, "thread": 137936750237376}
+{"ev": "invoke", "op": "create_session", "dur": 0.982, "slotsBusyAtStart": 1, "ok": true, "t": 56.964, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.003, "ok": true, "t": 56.967, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [71, 38, 20, 17], "t": 56.972, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 16, "t": 57.092, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.5, 0.6], ["create_session", 1, 0.1, 0.1]], "t": 57.092, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.941, "slotsBusyAtStart": 2, "ok": true, "t": 57.491, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.965, "ok": true, "t": 57.494, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [71, 38, 21, 17], "t": 57.661, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [71, 38, 21, 17], "t": 57.775, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 2, "ok": true, "t": 57.821, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 57.824, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.923, "slotsBusyAtStart": 1, "ok": true, "t": 57.896, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.943, "ok": true, "t": 57.898, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [72, 38, 22, 17], "t": 58.058, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 17, "t": 58.132, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.5, 0.5], ["create_session", 1, 0.1, 0.3]], "t": 58.132, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.931, "slotsBusyAtStart": 1, "ok": true, "t": 58.592, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.949, "ok": true, "t": 58.594, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [72, 39, 22, 17], "t": 58.623, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.049, "slotsBusyAtStart": 1, "ok": true, "t": 58.672, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.07, "ok": true, "t": 58.675, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [72, 40, 22, 17], "t": 58.872, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [72, 40, 22, 17], "t": 58.947, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 2, "ok": true, "t": 58.997, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 59.0, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 0.961, "slotsBusyAtStart": 1, "ok": true, "t": 59.018, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.982, "ok": true, "t": 59.023, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 15, "t": 59.174, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.3, 0.3]], "t": 59.175, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [73, 40, 23, 17], "t": 59.23, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [73, 40, 23, 17], "t": 59.277, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 2, "ok": true, "t": 59.319, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 59.321, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [73, 40, 24, 17], "t": 59.565, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [73, 40, 24, 17], "t": 59.602, "thread": 137936750237376}
+{"ev": "invoke", "op": "create_session", "dur": 0.979, "slotsBusyAtStart": 1, "ok": true, "t": 59.851, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.009, "ok": true, "t": 59.855, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, true, true], "proc": [true, true, true, true], "jobs": [73, 41, 24, 17], "t": 60.139, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 0.968, "slotsBusyAtStart": 1, "ok": true, "t": 60.198, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.989, "ok": true, "t": 60.2, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 60.213, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["create_session", 1, 0.6, 0.7], ["create_session", 1, 0.6, 0.6], ["create_session", 1, 0.1, 0.1]], "t": 60.213, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, true, true], "proc": [true, true, true, true], "jobs": [74, 41, 24, 17], "t": 60.471, "thread": 137936767022784}
+{"ev": "invoke", "op": "create_session", "dur": 0.964, "slotsBusyAtStart": 2, "ok": true, "t": 60.529, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.988, "ok": true, "t": 60.533, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 0.953, "slotsBusyAtStart": 3, "ok": true, "t": 60.556, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.984, "ok": true, "t": 60.562, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [74, 41, 25, 18], "t": 60.803, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [74, 41, 25, 18], "t": 60.847, "thread": 137936750237376}
+{"ev": "invoke", "op": "create_session", "dur": 1.044, "slotsBusyAtStart": 3, "ok": true, "t": 61.183, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.081, "ok": true, "t": 61.189, "thread": 137936758630080}
+{"ev": "terminal_rows", "n": 16, "t": 61.26, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["create_session", 1, 0.4, 1.5], ["create_session", 1, 0.8, 1.3], ["create_session", 1, 0.4, 0.5]], "t": 61.26, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, true, true], "proc": [true, true, true, true], "jobs": [74, 42, 25, 18], "t": 61.463, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 0.996, "slotsBusyAtStart": 3, "ok": true, "t": 61.467, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.017, "ok": true, "t": 61.469, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, true, true], "proc": [true, true, true, true], "jobs": [75, 42, 25, 18], "t": 61.738, "thread": 137936767022784}
+{"ev": "invoke", "op": "create_session", "dur": 0.972, "slotsBusyAtStart": 2, "ok": true, "t": 61.775, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.996, "ok": true, "t": 61.78, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.993, "slotsBusyAtStart": 3, "ok": true, "t": 61.839, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.031, "ok": true, "t": 61.844, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [75, 42, 26, 19], "t": 62.048, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [75, 42, 26, 19], "t": 62.114, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.068, "slotsBusyAtStart": 3, "ok": true, "t": 62.182, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.091, "ok": true, "t": 62.188, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 15, "t": 62.294, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.2, 2.8], ["create_session", 1, 0.8, 1.3], ["create_session", 1, 0.5, 0.7]], "t": 62.294, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.976, "slotsBusyAtStart": 3, "ok": true, "t": 62.439, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.997, "ok": true, "t": 62.443, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [75, 43, 26, 20], "t": 62.459, "thread": 137936758630080}
+{"ev": "invoke", "op": "create_session", "dur": 0.967, "slotsBusyAtStart": 3, "ok": true, "t": 62.705, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.989, "ok": true, "t": 62.709, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [76, 43, 26, 20], "t": 62.717, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.036, "slotsBusyAtStart": 2, "ok": true, "t": 62.753, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 62.756, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [77, 43, 26, 20], "t": 62.977, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [77, 43, 26, 20], "t": 63.024, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 0.978, "slotsBusyAtStart": 2, "ok": true, "t": 63.026, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.997, "ok": true, "t": 63.028, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.044, "slotsBusyAtStart": 3, "ok": true, "t": 63.068, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 63.071, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [77, 43, 27, 21], "t": 63.299, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 15, "t": 63.334, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["workspace", 1, 0.0, 2.4], ["replay", 1, 0.9, 1.5], ["replay", 1, 0.3, 1.1]], "t": 63.334, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [77, 43, 27, 21], "t": 63.34, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.058, "slotsBusyAtStart": 2, "ok": true, "t": 63.357, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.084, "ok": true, "t": 63.363, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 3, "ok": true, "t": 63.383, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.065, "ok": true, "t": 63.387, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 0.97, "slotsBusyAtStart": 2, "ok": true, "t": 63.429, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.986, "ok": true, "t": 63.431, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [77, 44, 28, 22], "t": 63.631, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [77, 44, 28, 22], "t": 63.658, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 1, "ok": true, "t": 63.676, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 63.679, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [77, 45, 28, 22], "t": 63.697, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 2, "ok": true, "t": 63.7, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.063, "ok": true, "t": 63.704, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 0.049, "slotsBusyAtStart": 2, "ok": true, "t": 63.746, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 63.748, "thread": 137936758630080}
+{"ev": "invoke", "op": "apply", "dur": 0.889, "slotsBusyAtStart": 2, "ok": true, "t": 63.866, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.908, "ok": true, "t": 63.869, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [78, 46, 29, 22], "t": 63.947, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [78, 46, 29, 22], "t": 63.97, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.04, "slotsBusyAtStart": 0, "ok": true, "t": 63.987, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.063, "ok": true, "t": 63.993, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 1, "ok": true, "t": 64.016, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [79, 47, 29, 22], "t": 64.022, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.07, "ok": true, "t": 64.025, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.044, "slotsBusyAtStart": 0, "ok": true, "t": 64.067, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.068, "ok": true, "t": 64.069, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [80, 47, 29, 22], "t": 64.14, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.038, "slotsBusyAtStart": 0, "ok": true, "t": 64.178, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.056, "ok": true, "t": 64.181, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [81, 47, 29, 22], "t": 64.262, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 0.049, "slotsBusyAtStart": 0, "ok": true, "t": 64.311, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.068, "ok": true, "t": 64.313, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 17, "t": 64.362, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 64.362, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [82, 47, 29, 22], "t": 64.555, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.051, "slotsBusyAtStart": 0, "ok": true, "t": 64.605, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 64.608, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [83, 47, 29, 22], "t": 65.115, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [83, 47, 29, 22], "t": 65.253, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.049, "slotsBusyAtStart": 1, "ok": true, "t": 65.302, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.084, "ok": true, "t": 65.314, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 15, "t": 65.403, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["replay", 1, 0.3, 0.4]], "t": 65.403, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [83, 48, 29, 22], "t": 65.416, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 1, "ok": true, "t": 65.471, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.079, "ok": true, "t": 65.475, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [83, 49, 29, 22], "t": 65.854, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.04, "slotsBusyAtStart": 1, "ok": true, "t": 65.894, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.061, "ok": true, "t": 65.898, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [83, 50, 29, 22], "t": 65.956, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.04, "slotsBusyAtStart": 1, "ok": true, "t": 65.997, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.059, "ok": true, "t": 66.0, "thread": 137936758630080}
+{"ev": "invoke", "op": "apply", "dur": 0.978, "slotsBusyAtStart": 0, "ok": true, "t": 66.093, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.001, "ok": true, "t": 66.097, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [84, 51, 29, 22], "t": 66.168, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [84, 51, 29, 22], "t": 66.283, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [84, 51, 29, 22], "t": 66.287, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 1, "ok": true, "t": 66.329, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.081, "ok": true, "t": 66.332, "thread": 137936758630080}
+{"ev": "terminal_rows", "n": 16, "t": 66.433, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["replay", 1, 0.3, 0.3], ["replay", 1, 0.1, 0.1]], "t": 66.433, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [84, 52, 29, 22], "t": 66.887, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [84, 52, 29, 22], "t": 66.909, "thread": 137936758630080}
+{"ev": "invoke", "op": "apply", "dur": 0.995, "slotsBusyAtStart": 0, "ok": true, "t": 67.163, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.026, "ok": true, "t": 67.175, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 1.01, "slotsBusyAtStart": 2, "ok": true, "t": 67.298, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.041, "ok": true, "t": 67.302, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [false, true, false, true], "proc": [true, true, true, true], "jobs": [85, 52, 30, 22], "t": 67.453, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 15, "t": 67.468, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.6, 0.8], ["replay", 1, 0.6, 0.6], ["replay", 1, 0.0, 0.1]], "t": 67.468, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [85, 52, 30, 22], "t": 67.576, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 1.022, "slotsBusyAtStart": 3, "ok": true, "t": 67.931, "thread": 137936758630080}
+{"ev": "invoke", "op": "apply", "dur": 1.053, "slotsBusyAtStart": 2, "ok": true, "t": 67.94, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.056, "ok": true, "t": 67.941, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.084, "ok": true, "t": 67.943, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [85, 53, 30, 23], "t": 68.216, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [85, 53, 30, 23], "t": 68.217, "thread": 137936733451968}
+{"ev": "invoke", "op": "apply", "dur": 0.065, "slotsBusyAtStart": 2, "ok": true, "t": 68.281, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.095, "ok": true, "t": 68.287, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 16, "t": 68.503, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.9, 1.4], ["replay", 1, 1.0, 1.2], ["replay", 1, 0.3, 0.6]], "t": 68.504, "thread": 137936741844672}
+{"ev": "invoke", "op": "apply", "dur": 1.055, "slotsBusyAtStart": 2, "ok": true, "t": 68.508, "thread": 137936414693056}
+{"ev": "work_one", "dur": 1.083, "ok": true, "t": 68.511, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [86, 54, 30, 23], "t": 68.559, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 1.084, "slotsBusyAtStart": 3, "ok": true, "t": 68.659, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.108, "ok": true, "t": 68.663, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [86, 54, 31, 23], "t": 68.789, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [86, 54, 31, 23], "t": 68.936, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 1.081, "slotsBusyAtStart": 3, "ok": true, "t": 69.298, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.109, "ok": true, "t": 69.303, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 69.531, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.6, 0.8], ["replay", 1, 0.7, 2.3], ["replay", 1, 1.0, 2.3]], "t": 69.532, "thread": 137936741844672}
+{"ev": "invoke", "op": "apply", "dur": 1.022, "slotsBusyAtStart": 2, "ok": true, "t": 69.582, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [87, 54, 31, 24], "t": 69.584, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.046, "ok": true, "t": 69.587, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 2, "ok": true, "t": 69.627, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.076, "ok": true, "t": 69.631, "thread": 137936733451968}
+{"ev": "invoke", "op": "apply", "dur": 0.971, "slotsBusyAtStart": 2, "ok": true, "t": 69.761, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.002, "ok": true, "t": 69.764, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [88, 55, 31, 24], "t": 69.863, "thread": 137936733451968}
+{"ev": "invoke", "op": "apply", "dur": 0.942, "slotsBusyAtStart": 3, "ok": true, "t": 69.878, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.968, "ok": true, "t": 69.881, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [88, 55, 32, 24], "t": 69.901, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 1, "ok": true, "t": 69.915, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.078, "ok": true, "t": 69.918, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.044, "slotsBusyAtStart": 1, "ok": true, "t": 69.945, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.068, "ok": true, "t": 69.95, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [89, 56, 32, 24], "t": 70.035, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 70.082, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.071, "ok": true, "t": 70.086, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [90, 56, 32, 24], "t": 70.155, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [90, 56, 32, 24], "t": 70.185, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 70.202, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 70.209, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [91, 56, 32, 24], "t": 70.224, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 1, "ok": true, "t": 70.231, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 70.233, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.054, "slotsBusyAtStart": 1, "ok": true, "t": 70.279, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.077, "ok": true, "t": 70.282, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [92, 57, 32, 24], "t": 70.357, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 0, "ok": true, "t": 70.403, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.068, "ok": true, "t": 70.406, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [93, 57, 32, 24], "t": 70.48, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [93, 57, 32, 24], "t": 70.498, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 0, "ok": true, "t": 70.522, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 70.53, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.053, "slotsBusyAtStart": 1, "ok": true, "t": 70.551, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 70.56, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [94, 58, 32, 24], "t": 70.567, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 17, "t": 70.574, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 70.574, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 0, "ok": true, "t": 70.615, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.084, "ok": true, "t": 70.62, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [95, 58, 32, 24], "t": 70.678, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 0, "ok": true, "t": 70.723, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.071, "ok": true, "t": 70.729, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [96, 58, 32, 24], "t": 70.801, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [96, 58, 32, 24], "t": 70.833, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 0, "ok": true, "t": 70.847, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 70.849, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.042, "slotsBusyAtStart": 1, "ok": true, "t": 70.875, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 70.878, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [97, 59, 32, 24], "t": 70.887, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 0, "ok": true, "t": 70.931, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.061, "ok": true, "t": 70.933, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [98, 59, 32, 24], "t": 71.117, "thread": 137936414693056}
+{"ev": "invoke", "op": "workspace", "dur": 0.035, "slotsBusyAtStart": 0, "ok": true, "t": 71.152, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.055, "ok": true, "t": 71.155, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [99, 59, 32, 24], "t": 71.2, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 0, "ok": true, "t": 71.241, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 71.244, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 17, "t": 71.608, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 71.608, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [100, 59, 32, 24], "t": 71.948, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [100, 59, 32, 24], "t": 71.961, "thread": 137936414693056}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 0, "ok": true, "t": 72.0, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 72.004, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [101, 59, 32, 24], "t": 72.04, "thread": 137936758630080}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.101, "slotsBusyAtStart": 1, "ok": true, "t": 72.062, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.119, "ok": true, "t": 72.066, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [101, 60, 32, 24], "t": 72.29, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [101, 60, 32, 24], "t": 72.622, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 15, "t": 72.668, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.6, 0.6], ["jump_next_event", 1, 0.4, 0.4], ["jump_next_event", 1, 0.0, 0.3]], "t": 72.669, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [101, 60, 32, 24], "t": 72.899, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.089, "slotsBusyAtStart": 1, "ok": true, "t": 73.129, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.115, "ok": true, "t": 73.14, "thread": 137936758630080}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.06, "slotsBusyAtStart": 1, "ok": true, "t": 73.35, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.098, "ok": true, "t": 73.355, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [102, 61, 32, 24], "t": 73.443, "thread": 137936414693056}
+{"ev": "invoke", "op": "workspace", "dur": 0.067, "slotsBusyAtStart": 2, "ok": true, "t": 73.51, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.127, "ok": true, "t": 73.524, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [103, 61, 32, 24], "t": 73.632, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.059, "slotsBusyAtStart": 2, "ok": true, "t": 73.691, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.091, "ok": true, "t": 73.706, "thread": 137936767022784}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.086, "slotsBusyAtStart": 2, "ok": true, "t": 73.708, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.136, "ok": true, "t": 73.713, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 17, "t": 73.713, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 1.1, 1.3], ["jump_next_event", 1, 0.8, 1.0], ["workspace", 1, 0.1, 0.2]], "t": 73.713, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [104, 61, 33, 24], "t": 73.814, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.103, "slotsBusyAtStart": 1, "ok": true, "t": 73.916, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.135, "ok": true, "t": 73.924, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.066, "slotsBusyAtStart": 3, "ok": true, "t": 73.965, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.103, "ok": true, "t": 73.973, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [105, 61, 33, 25], "t": 73.98, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [105, 61, 33, 25], "t": 73.986, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 1, "ok": true, "t": 74.031, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.056, "slotsBusyAtStart": 0, "ok": true, "t": 74.036, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.07, "ok": true, "t": 74.036, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.083, "ok": true, "t": 74.041, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [106, 62, 33, 25], "t": 74.197, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [106, 62, 33, 25], "t": 74.243, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.056, "slotsBusyAtStart": 0, "ok": true, "t": 74.253, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.082, "ok": true, "t": 74.257, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [107, 62, 33, 25], "t": 74.306, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [107, 62, 33, 25], "t": 74.326, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 1, "ok": true, "t": 74.361, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.078, "ok": true, "t": 74.366, "thread": 137936414693056}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.185, "slotsBusyAtStart": 1, "ok": true, "t": 74.428, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.207, "ok": true, "t": 74.433, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [108, 63, 33, 25], "t": 74.532, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.059, "slotsBusyAtStart": 1, "ok": true, "t": 74.591, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.087, "ok": true, "t": 74.596, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [109, 63, 33, 25], "t": 74.638, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [109, 63, 33, 25], "t": 74.702, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.066, "slotsBusyAtStart": 1, "ok": true, "t": 74.704, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.089, "ok": true, "t": 74.708, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 74.748, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.4, 0.5], ["workspace", 1, 0.0, 0.3]], "t": 74.748, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 2, "ok": true, "t": 74.752, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 74.756, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [110, 64, 33, 25], "t": 74.869, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 1, "ok": true, "t": 74.915, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 74.919, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [111, 64, 33, 25], "t": 74.976, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [111, 64, 33, 25], "t": 75.027, "thread": 137936414693056}
+{"ev": "invoke", "op": "workspace", "dur": 0.051, "slotsBusyAtStart": 1, "ok": true, "t": 75.028, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 75.032, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [112, 64, 33, 25], "t": 75.301, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.153, "slotsBusyAtStart": 2, "ok": true, "t": 75.48, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.193, "ok": true, "t": 75.489, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [112, 64, 34, 25], "t": 75.765, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [112, 64, 34, 25], "t": 75.773, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 75.796, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.8, 1.2], ["jump_next_event", 1, 0.5, 0.5], ["jump_next_event", 1, 0.0, 0.2], ["jump_next_event", 1, 0.0, 0.1]], "t": 75.796, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.139, "slotsBusyAtStart": 2, "ok": true, "t": 76.166, "thread": 137936414693056}
+{"ev": "work_one", "dur": 1.163, "ok": true, "t": 76.171, "thread": 137936414693056}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.101, "slotsBusyAtStart": 2, "ok": true, "t": 76.402, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.123, "ok": true, "t": 76.406, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [113, 65, 34, 25], "t": 76.444, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, true, true], "proc": [true, true, true, true], "jobs": [113, 65, 34, 25], "t": 76.684, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 15, "t": 76.832, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 1.1, 1.3], ["jump_next_event", 1, 1.1, 1.2], ["jump_next_event", 1, 0.4, 1.0], ["jump_next_event", 1, 0.1, 0.3]], "t": 76.832, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.118, "slotsBusyAtStart": 3, "ok": true, "t": 76.89, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.152, "ok": true, "t": 76.895, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.133, "slotsBusyAtStart": 2, "ok": true, "t": 76.897, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.156, "ok": true, "t": 76.9, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [113, 65, 35, 26], "t": 77.176, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [113, 65, 35, 26], "t": 77.177, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.101, "slotsBusyAtStart": 3, "ok": true, "t": 77.278, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.131, "ok": true, "t": 77.283, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [113, 65, 35, 27], "t": 77.551, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.147, "slotsBusyAtStart": 2, "ok": true, "t": 77.592, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.173, "ok": true, "t": 77.596, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.123, "slotsBusyAtStart": 3, "ok": true, "t": 77.806, "thread": 137936414693056}
+{"ev": "work_one", "dur": 1.147, "ok": true, "t": 77.811, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [114, 66, 35, 27], "t": 77.864, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 18, "t": 77.866, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.3, 1.9], ["jump_next_event", 1, 0.7, 1.8]], "t": 77.866, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, true, true], "proc": [true, true, true, true], "jobs": [114, 66, 35, 27], "t": 78.09, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.024, "slotsBusyAtStart": 2, "ok": true, "t": 78.2, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.057, "ok": true, "t": 78.206, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [114, 66, 36, 27], "t": 78.476, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.982, "slotsBusyAtStart": 3, "ok": true, "t": 78.533, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.025, "ok": true, "t": 78.56, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [114, 66, 36, 28], "t": 78.831, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.013, "slotsBusyAtStart": 2, "ok": true, "t": 78.877, "thread": 137936414693056}
+{"ev": "work_one", "dur": 1.043, "ok": true, "t": 78.89, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 21, "t": 78.91, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.8, 2.9], ["jump_next_event", 1, 0.4, 2.8], ["jump_next_event", 1, 0.1, 2.6]], "t": 78.91, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.02, "slotsBusyAtStart": 3, "ok": true, "t": 79.11, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.053, "ok": true, "t": 79.115, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [115, 67, 36, 28], "t": 79.162, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.123, "slotsBusyAtStart": 2, "ok": true, "t": 79.284, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.145, "ok": true, "t": 79.289, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [116, 67, 36, 28], "t": 79.402, "thread": 137936414693056}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.009, "slotsBusyAtStart": 3, "ok": true, "t": 79.486, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.03, "ok": true, "t": 79.488, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.093, "slotsBusyAtStart": 2, "ok": true, "t": 79.495, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.118, "ok": true, "t": 79.498, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [117, 67, 37, 28], "t": 79.564, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [117, 67, 37, 28], "t": 79.762, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [117, 67, 37, 28], "t": 79.781, "thread": 137936758630080}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.975, "slotsBusyAtStart": 3, "ok": true, "t": 79.806, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.998, "ok": true, "t": 79.812, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.164, "slotsBusyAtStart": 2, "ok": true, "t": 79.926, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.189, "ok": true, "t": 79.929, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.153, "slotsBusyAtStart": 3, "ok": true, "t": 79.934, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.185, "ok": true, "t": 79.938, "thread": 137936758630080}
+{"ev": "terminal_rows", "n": 18, "t": 79.941, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.2, 0.8], ["jump_next_event", 1, 0.4, 3.6]], "t": 79.941, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [117, 68, 38, 29], "t": 80.084, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.084, "slotsBusyAtStart": 1, "ok": true, "t": 80.168, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.106, "ok": true, "t": 80.171, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [117, 69, 38, 29], "t": 80.242, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [117, 69, 38, 29], "t": 80.248, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [117, 69, 38, 29], "t": 80.438, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.013, "slotsBusyAtStart": 1, "ok": true, "t": 80.577, "thread": 137936414693056}
+{"ev": "work_one", "dur": 1.036, "ok": true, "t": 80.583, "thread": 137936414693056}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.23, "slotsBusyAtStart": 3, "ok": true, "t": 80.668, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.255, "ok": true, "t": 80.677, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [118, 69, 38, 30], "t": 80.855, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 17, "t": 81.026, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.8, 1.6], ["jump_next_event", 1, 0.8, 1.6], ["jump_next_event", 1, 0.2, 0.6]], "t": 81.026, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.189, "slotsBusyAtStart": 2, "ok": true, "t": 81.044, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.214, "ok": true, "t": 81.051, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [119, 69, 38, 30], "t": 81.281, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.053, "slotsBusyAtStart": 1, "ok": true, "t": 81.295, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.118, "ok": true, "t": 81.301, "thread": 137936758630080}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.089, "slotsBusyAtStart": 2, "ok": true, "t": 81.337, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.153, "ok": true, "t": 81.347, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.1, "slotsBusyAtStart": 2, "ok": true, "t": 81.381, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.139, "ok": true, "t": 81.395, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [120, 70, 39, 30], "t": 81.568, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [120, 70, 39, 30], "t": 81.602, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.117, "slotsBusyAtStart": 0, "ok": true, "t": 81.685, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.155, "ok": true, "t": 81.707, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [121, 70, 39, 30], "t": 81.892, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [121, 70, 39, 30], "t": 81.977, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 82.06, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.5, 0.6], ["jump_next_event", 1, 0.2, 0.3], ["jump_next_event", 1, 0.1, 0.2]], "t": 82.06, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.142, "slotsBusyAtStart": 2, "ok": true, "t": 82.12, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.163, "ok": true, "t": 82.123, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [121, 70, 40, 30], "t": 82.26, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.09, "slotsBusyAtStart": 2, "ok": true, "t": 82.35, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.123, "ok": true, "t": 82.355, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [121, 70, 41, 30], "t": 82.39, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.041, "slotsBusyAtStart": 1, "ok": true, "t": 82.642, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.103, "ok": true, "t": 82.683, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [121, 71, 41, 30], "t": 82.713, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [121, 71, 41, 30], "t": 82.979, "thread": 137936414693056}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.099, "slotsBusyAtStart": 1, "ok": true, "t": 82.991, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.142, "ok": true, "t": 83.014, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.102, "slotsBusyAtStart": 3, "ok": true, "t": 83.081, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.143, "ok": true, "t": 83.086, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 17, "t": 83.115, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.7, 0.7], ["jump_next_event", 1, 0.4, 0.6]], "t": 83.115, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.098, "slotsBusyAtStart": 2, "ok": true, "t": 83.487, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.127, "ok": true, "t": 83.501, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.117, "slotsBusyAtStart": 2, "ok": true, "t": 83.83, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.225, "ok": true, "t": 83.835, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 19, "t": 84.154, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 84.154, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [122, 72, 42, 31], "t": 84.195, "thread": 137936414693056}
+{"ev": "invoke", "op": "workspace", "dur": 0.095, "slotsBusyAtStart": 0, "ok": true, "t": 84.291, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.117, "ok": true, "t": 84.294, "thread": 137936414693056}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [123, 72, 42, 31], "t": 84.347, "thread": 137936414693056}
+{"ev": "invoke", "op": "workspace", "dur": 0.09, "slotsBusyAtStart": 0, "ok": true, "t": 84.437, "thread": 137936414693056}
+{"ev": "work_one", "dur": 0.111, "ok": true, "t": 84.442, "thread": 137936414693056}
+{"ev": "terminal_rows", "n": 16, "t": 85.219, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 85.219, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [124, 72, 42, 31], "t": 85.542, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.09, "slotsBusyAtStart": 0, "ok": true, "t": 85.632, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.126, "ok": true, "t": 85.637, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [125, 72, 42, 31], "t": 85.911, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [125, 72, 42, 31], "t": 85.968, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.094, "slotsBusyAtStart": 0, "ok": true, "t": 86.005, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.12, "ok": true, "t": 86.009, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.083, "slotsBusyAtStart": 1, "ok": true, "t": 86.05, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.105, "ok": true, "t": 86.054, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 17, "t": 86.253, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 86.253, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [126, 73, 42, 31], "t": 86.93, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [126, 73, 42, 31], "t": 86.952, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.098, "slotsBusyAtStart": 0, "ok": true, "t": 87.027, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.129, "ok": true, "t": 87.037, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.107, "slotsBusyAtStart": 1, "ok": true, "t": 87.058, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.13, "ok": true, "t": 87.062, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [127, 74, 42, 31], "t": 87.089, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.097, "slotsBusyAtStart": 0, "ok": true, "t": 87.186, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.121, "ok": true, "t": 87.19, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [128, 74, 42, 31], "t": 87.248, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 87.281, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["workspace", 1, 0.0, 0.1]], "t": 87.281, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.1, "slotsBusyAtStart": 0, "ok": true, "t": 87.347, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.12, "ok": true, "t": 87.351, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [129, 74, 42, 31], "t": 87.458, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.103, "slotsBusyAtStart": 0, "ok": true, "t": 87.561, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.124, "ok": true, "t": 87.564, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 88.314, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 88.314, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 16, "t": 89.344, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 89.344, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [130, 74, 42, 31], "t": 89.709, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [130, 74, 42, 31], "t": 89.719, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.079, "slotsBusyAtStart": 1, "ok": true, "t": 89.798, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.101, "ok": true, "t": 89.802, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 16, "t": 90.372, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.7, 0.7]], "t": 90.372, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.975, "slotsBusyAtStart": 0, "ok": true, "t": 90.684, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.998, "ok": true, "t": 90.688, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [131, 75, 42, 31], "t": 91.139, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 15, "t": 91.421, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.3, 0.3]], "t": 91.422, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [131, 75, 42, 31], "t": 91.612, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [131, 75, 42, 31], "t": 91.957, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 2, "ok": true, "t": 92.002, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 92.012, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 1.007, "slotsBusyAtStart": 0, "ok": true, "t": 92.146, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.038, "ok": true, "t": 92.155, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [132, 75, 43, 31], "t": 92.288, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 15, "t": 92.45, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.8, 0.9], ["create_session", 1, 0.2, 0.3]], "t": 92.45, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 1.016, "slotsBusyAtStart": 1, "ok": true, "t": 92.628, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.044, "ok": true, "t": 92.637, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [132, 76, 43, 31], "t": 92.849, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 1, "ok": true, "t": 92.899, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.067, "ok": true, "t": 92.903, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [132, 77, 43, 31], "t": 93.23, "thread": 137936750237376}
+{"ev": "invoke", "op": "create_session", "dur": 1.011, "slotsBusyAtStart": 1, "ok": true, "t": 93.299, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.038, "ok": true, "t": 93.302, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [133, 77, 43, 31], "t": 93.461, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 16, "t": 93.496, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.3, 0.3], ["create_session", 1, 0.0, 0.2]], "t": 93.496, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [133, 77, 43, 31], "t": 93.838, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 2, "ok": true, "t": 93.885, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 93.887, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [133, 77, 44, 31], "t": 94.002, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 2, "ok": true, "t": 94.048, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.07, "ok": true, "t": 94.052, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.92, "slotsBusyAtStart": 1, "ok": true, "t": 94.15, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.944, "ok": true, "t": 94.152, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [133, 78, 45, 31], "t": 94.161, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 0.972, "slotsBusyAtStart": 1, "ok": true, "t": 94.434, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.001, "ok": true, "t": 94.437, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 17, "t": 94.534, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.4, 0.4]], "t": 94.534, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, false], "proc": [true, true, true, true], "jobs": [134, 78, 45, 31], "t": 94.869, "thread": 137936767022784}
+{"ev": "invoke", "op": "create_session", "dur": 1.04, "slotsBusyAtStart": 1, "ok": true, "t": 95.201, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.065, "ok": true, "t": 95.204, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [134, 79, 45, 31], "t": 95.213, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [134, 79, 45, 31], "t": 95.245, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.041, "slotsBusyAtStart": 1, "ok": true, "t": 95.253, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.06, "ok": true, "t": 95.258, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 2, "ok": true, "t": 95.29, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 95.293, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 18, "t": 95.574, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.7, 0.8]], "t": 95.574, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.948, "slotsBusyAtStart": 1, "ok": true, "t": 95.817, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.973, "ok": true, "t": 95.821, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [135, 80, 46, 31], "t": 96.006, "thread": 137936767022784}
+{"ev": "invoke", "op": "apply", "dur": 0.046, "slotsBusyAtStart": 0, "ok": true, "t": 96.052, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.064, "ok": true, "t": 96.055, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [136, 80, 46, 31], "t": 96.072, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.056, "slotsBusyAtStart": 0, "ok": true, "t": 96.128, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.08, "ok": true, "t": 96.132, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [137, 80, 46, 31], "t": 96.322, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 15, "t": 96.605, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["create_session", 1, 0.3, 0.3]], "t": 96.606, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [137, 80, 46, 31], "t": 96.62, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [137, 80, 46, 31], "t": 96.634, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [137, 80, 46, 31], "t": 96.942, "thread": 137936750237376}
+{"ev": "invoke", "op": "create_session", "dur": 0.941, "slotsBusyAtStart": 0, "ok": true, "t": 97.264, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.959, "ok": true, "t": 97.267, "thread": 137936767022784}
+{"ev": "invoke", "op": "apply", "dur": 0.885, "slotsBusyAtStart": 2, "ok": true, "t": 97.519, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.903, "ok": true, "t": 97.522, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, true, false, true], "proc": [true, true, true, true], "jobs": [138, 80, 47, 31], "t": 97.54, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 0.976, "slotsBusyAtStart": 1, "ok": true, "t": 97.596, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.997, "ok": true, "t": 97.602, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 17, "t": 97.646, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["create_session", 1, 0.7, 0.9], ["create_session", 1, 0.1, 0.8]], "t": 97.646, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [138, 81, 47, 31], "t": 97.797, "thread": 137936733451968}
+{"ev": "invoke", "op": "create_session", "dur": 0.884, "slotsBusyAtStart": 3, "ok": true, "t": 97.826, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.913, "ok": true, "t": 97.829, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [138, 81, 47, 32], "t": 97.874, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [138, 81, 47, 32], "t": 98.097, "thread": 137936767022784}
+{"ev": "invoke", "op": "create_session", "dur": 0.934, "slotsBusyAtStart": 2, "ok": true, "t": 98.475, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.96, "ok": true, "t": 98.479, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 15, "t": 98.678, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.8, 1.2], ["create_session", 1, 0.9, 1.0], ["replay", 1, 0.6, 1.3]], "t": 98.678, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.942, "slotsBusyAtStart": 2, "ok": true, "t": 98.739, "thread": 137936733451968}
+{"ev": "invoke", "op": "apply", "dur": 0.868, "slotsBusyAtStart": 2, "ok": true, "t": 98.742, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.967, "ok": true, "t": 98.747, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.893, "ok": true, "t": 98.751, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [139, 82, 48, 32], "t": 98.753, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 0.918, "slotsBusyAtStart": 3, "ok": true, "t": 99.015, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [139, 82, 48, 33], "t": 99.016, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.939, "ok": true, "t": 99.019, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [139, 82, 48, 33], "t": 99.021, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [139, 82, 48, 33], "t": 99.296, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 3, "ok": true, "t": 99.346, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.078, "ok": true, "t": 99.349, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [139, 82, 48, 34], "t": 99.618, "thread": 137936767022784}
+{"ev": "invoke", "op": "create_session", "dur": 0.964, "slotsBusyAtStart": 1, "ok": true, "t": 99.717, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.983, "ok": true, "t": 99.719, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 16, "t": 99.729, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["create_session", 1, 1.0, 1.5], ["replay", 1, 0.1, 1.3], ["create_session", 1, 0.7, 1.0], ["create_session", 1, 0.7, 0.7]], "t": 99.729, "thread": 137936741844672}
+{"ev": "invoke", "op": "create_session", "dur": 0.919, "slotsBusyAtStart": 1, "ok": true, "t": 99.936, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.95, "ok": true, "t": 99.949, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [140, 83, 48, 34], "t": 99.995, "thread": 137936381122240}
+{"ev": "invoke", "op": "create_session", "dur": 0.976, "slotsBusyAtStart": 2, "ok": true, "t": 99.997, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.995, "ok": true, "t": 100.0, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 0.051, "slotsBusyAtStart": 2, "ok": true, "t": 100.046, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 100.048, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [141, 83, 49, 34], "t": 100.22, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.045, "slotsBusyAtStart": 1, "ok": true, "t": 100.264, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 100.268, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [142, 83, 49, 34], "t": 100.278, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "create_session", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [142, 83, 49, 34], "t": 100.314, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [142, 83, 49, 34], "t": 100.543, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.051, "slotsBusyAtStart": 3, "ok": true, "t": 100.593, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 100.596, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 0.984, "slotsBusyAtStart": 3, "ok": true, "t": 100.602, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.005, "ok": true, "t": 100.605, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 15, "t": 100.756, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["replay", 1, 0.5, 0.5], ["create_session", 1, 0.4, 0.4]], "t": 100.756, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [142, 83, 50, 35], "t": 100.865, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [142, 83, 50, 35], "t": 100.878, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 2, "ok": true, "t": 100.912, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.07, "ok": true, "t": 100.917, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.053, "slotsBusyAtStart": 3, "ok": true, "t": 100.931, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.077, "ok": true, "t": 100.935, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [142, 83, 51, 36], "t": 101.194, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [142, 83, 51, 36], "t": 101.203, "thread": 137936767022784}
+{"ev": "invoke", "op": "apply", "dur": 0.967, "slotsBusyAtStart": 1, "ok": true, "t": 101.245, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.997, "ok": true, "t": 101.249, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.059, "slotsBusyAtStart": 2, "ok": true, "t": 101.253, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.086, "ok": true, "t": 101.256, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.053, "slotsBusyAtStart": 3, "ok": true, "t": 101.256, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.076, "ok": true, "t": 101.261, "thread": 137936767022784}
+{"ev": "invoke", "op": "create_session", "dur": 1.008, "slotsBusyAtStart": 2, "ok": true, "t": 101.323, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.027, "ok": true, "t": 101.326, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [143, 84, 52, 37], "t": 101.525, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [143, 84, 52, 37], "t": 101.532, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [143, 84, 52, 37], "t": 101.538, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 0, "ok": true, "t": 101.576, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.049, "slotsBusyAtStart": 1, "ok": true, "t": 101.581, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 101.585, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.081, "ok": true, "t": 101.585, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 2, "ok": true, "t": 101.593, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.081, "ok": true, "t": 101.599, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [144, 85, 53, 37], "t": 101.6, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 0, "ok": true, "t": 101.655, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.082, "ok": true, "t": 101.66, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 15, "t": 101.799, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 101.799, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [145, 85, 53, 37], "t": 101.88, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [145, 85, 53, 37], "t": 101.883, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.059, "slotsBusyAtStart": 0, "ok": true, "t": 101.939, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.063, "slotsBusyAtStart": 1, "ok": true, "t": 101.946, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.109, "ok": true, "t": 101.95, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.118, "ok": true, "t": 101.958, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [146, 86, 53, 37], "t": 102.16, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 0, "ok": true, "t": 102.212, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.079, "ok": true, "t": 102.217, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [147, 86, 53, 37], "t": 102.225, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [147, 86, 53, 37], "t": 102.234, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.056, "slotsBusyAtStart": 1, "ok": true, "t": 102.291, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.069, "slotsBusyAtStart": 0, "ok": true, "t": 102.295, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.094, "ok": true, "t": 102.298, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.099, "ok": true, "t": 102.3, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [148, 87, 53, 37], "t": 102.49, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 0.067, "slotsBusyAtStart": 0, "ok": true, "t": 102.558, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.103, "ok": true, "t": 102.572, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [149, 87, 53, 37], "t": 102.592, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.057, "slotsBusyAtStart": 0, "ok": true, "t": 102.648, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.101, "ok": true, "t": 102.656, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 17, "t": 102.834, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 102.835, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 17, "t": 103.87, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 103.87, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [150, 87, 53, 37], "t": 104.004, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 0, "ok": true, "t": 104.05, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.069, "ok": true, "t": 104.055, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [151, 87, 53, 37], "t": 104.131, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [151, 87, 53, 37], "t": 104.208, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.053, "slotsBusyAtStart": 1, "ok": true, "t": 104.261, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.098, "ok": true, "t": 104.266, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [151, 88, 53, 37], "t": 104.328, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.063, "slotsBusyAtStart": 1, "ok": true, "t": 104.391, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.094, "ok": true, "t": 104.4, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [151, 89, 53, 37], "t": 104.478, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.057, "slotsBusyAtStart": 1, "ok": true, "t": 104.535, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.09, "ok": true, "t": 104.548, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [151, 90, 53, 37], "t": 104.55, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.069, "slotsBusyAtStart": 1, "ok": true, "t": 104.619, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.099, "ok": true, "t": 104.626, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [151, 91, 53, 37], "t": 104.677, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [151, 91, 53, 37], "t": 104.83, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [151, 91, 53, 37], "t": 104.905, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 104.906, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.2, 0.3], ["replay", 1, 0.1, 0.2], ["replay", 1, 0.8, 0.9]], "t": 104.906, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.051, "slotsBusyAtStart": 3, "ok": true, "t": 104.956, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 104.962, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [151, 91, 53, 38], "t": 105.242, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 1.115, "slotsBusyAtStart": 0, "ok": true, "t": 105.246, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.145, "ok": true, "t": 105.251, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.06, "slotsBusyAtStart": 3, "ok": true, "t": 105.302, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.101, "ok": true, "t": 105.315, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "apply", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [152, 91, 53, 39], "t": 105.601, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 1.084, "slotsBusyAtStart": 1, "ok": true, "t": 105.761, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.108, "ok": true, "t": 105.765, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [152, 92, 53, 39], "t": 105.796, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 0.986, "slotsBusyAtStart": 2, "ok": true, "t": 105.816, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.014, "ok": true, "t": 105.819, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 105.957, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["replay", 1, 0.3, 0.4], ["replay", 1, 0.1, 0.3]], "t": 105.96, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [152, 92, 54, 39], "t": 106.044, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [152, 92, 54, 39], "t": 106.088, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 3, "ok": true, "t": 106.14, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 106.145, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "apply", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [152, 92, 54, 40], "t": 106.419, "thread": 137936767022784}
+{"ev": "invoke", "op": "apply", "dur": 1.079, "slotsBusyAtStart": 2, "ok": true, "t": 106.679, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.109, "ok": true, "t": 106.682, "thread": 137936725059264}
+{"ev": "invoke", "op": "apply", "dur": 1.045, "slotsBusyAtStart": 2, "ok": true, "t": 106.841, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.076, "ok": true, "t": 106.846, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "apply", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [153, 93, 54, 40], "t": 106.96, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 107.002, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["replay", 1, 0.6, 1.2], ["replay", 1, 0.9, 1.0], ["replay", 1, 0.0, 0.7]], "t": 107.002, "thread": 137936741844672}
+{"ev": "invoke", "op": "apply", "dur": 1.02, "slotsBusyAtStart": 2, "ok": true, "t": 107.064, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.048, "ok": true, "t": 107.068, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [153, 93, 55, 40], "t": 107.126, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [153, 93, 55, 40], "t": 107.352, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.056, "slotsBusyAtStart": 3, "ok": true, "t": 107.408, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.092, "ok": true, "t": 107.415, "thread": 137936381122240}
+{"ev": "invoke", "op": "apply", "dur": 1.036, "slotsBusyAtStart": 3, "ok": true, "t": 107.455, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.061, "ok": true, "t": 107.458, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [153, 93, 56, 41], "t": 107.691, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [153, 93, 56, 41], "t": 107.732, "thread": 137936750237376}
+{"ev": "invoke", "op": "apply", "dur": 1.05, "slotsBusyAtStart": 2, "ok": true, "t": 108.01, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.08, "ok": true, "t": 108.014, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 16, "t": 108.036, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.9, 2.4], ["jump_next_event", 1, 0.3, 2.0], ["jump_next_event", 1, 0.3, 2.0]], "t": 108.036, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.093, "slotsBusyAtStart": 2, "ok": true, "t": 108.219, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.118, "ok": true, "t": 108.223, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [154, 94, 56, 41], "t": 108.284, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.108, "slotsBusyAtStart": 2, "ok": true, "t": 108.392, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.131, "ok": true, "t": 108.4, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [155, 94, 56, 41], "t": 108.491, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.054, "slotsBusyAtStart": 2, "ok": true, "t": 108.545, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 108.548, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, true], "proc": [true, true, true, true], "jobs": [156, 94, 56, 41], "t": 108.669, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.058, "slotsBusyAtStart": 2, "ok": true, "t": 108.727, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.078, "ok": true, "t": 108.73, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.068, "slotsBusyAtStart": 2, "ok": true, "t": 108.759, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.096, "ok": true, "t": 108.762, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.079, "slotsBusyAtStart": 3, "ok": true, "t": 108.811, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.105, "ok": true, "t": 108.814, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [157, 94, 57, 42], "t": 108.817, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 108.864, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.066, "ok": true, "t": 108.868, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [158, 94, 57, 42], "t": 109.0, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [158, 94, 57, 42], "t": 109.028, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 18, "t": 109.064, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.0, 2.2], ["jump_next_event", 1, 0.1, 1.9]], "t": 109.065, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [158, 94, 57, 42], "t": 109.086, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.055, "slotsBusyAtStart": 2, "ok": true, "t": 109.141, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [158, 94, 58, 42], "t": 109.143, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.08, "ok": true, "t": 109.147, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.043, "slotsBusyAtStart": 2, "ok": true, "t": 109.185, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.069, "ok": true, "t": 109.188, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [158, 94, 59, 42], "t": 109.415, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [158, 94, 59, 42], "t": 109.738, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.046, "slotsBusyAtStart": 3, "ok": true, "t": 109.784, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 109.787, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [158, 94, 59, 43], "t": 110.061, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 3, "ok": true, "t": 110.113, "thread": 137936989316800}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.113, "slotsBusyAtStart": 0, "ok": true, "t": 110.114, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 15, "t": 110.117, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["workspace", 1, 0.0, 0.6], ["jump_next_event", 1, 1.1, 3.2], ["jump_next_event", 1, 1.1, 2.9], ["jump_next_event", 1, 0.7, 2.7]], "t": 110.117, "thread": 137936741844672}
+{"ev": "work_one", "dur": 1.137, "ok": true, "t": 110.118, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.096, "slotsBusyAtStart": 1, "ok": true, "t": 110.124, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.084, "ok": true, "t": 110.125, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.115, "ok": true, "t": 110.128, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [159, 95, 59, 44], "t": 110.391, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, true, false], "proc": [true, true, true, true], "jobs": [159, 95, 59, 44], "t": 110.4, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [159, 95, 59, 44], "t": 110.405, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.049, "slotsBusyAtStart": 1, "ok": true, "t": 110.44, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 110.447, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.081, "slotsBusyAtStart": 2, "ok": true, "t": 110.496, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.102, "ok": true, "t": 110.5, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.186, "slotsBusyAtStart": 2, "ok": true, "t": 110.586, "thread": 137936989316800}
+{"ev": "work_one", "dur": 0.213, "ok": true, "t": 110.59, "thread": 137936989316800}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [160, 96, 60, 44], "t": 110.726, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [160, 96, 60, 44], "t": 110.795, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [160, 96, 60, 44], "t": 110.879, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.053, "slotsBusyAtStart": 3, "ok": true, "t": 110.932, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.092, "ok": true, "t": 110.935, "thread": 137936767022784}
+{"ev": "terminal_rows", "n": 16, "t": 111.148, "thread": 137936741844672}
+{"ev": "running_rows", "n": 3, "rows": [["jump_next_event", 1, 0.7, 1.7], ["jump_next_event", 1, 0.4, 1.2], ["jump_next_event", 1, 0.4, 1.7]], "t": 111.148, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [160, 96, 61, 44], "t": 111.204, "thread": 137936767022784}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.097, "slotsBusyAtStart": 3, "ok": true, "t": 111.502, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.127, "ok": true, "t": 111.507, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.191, "slotsBusyAtStart": 1, "ok": true, "t": 111.917, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.225, "ok": true, "t": 111.927, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.195, "slotsBusyAtStart": 2, "ok": true, "t": 111.99, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.251, "ok": true, "t": 112.002, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [161, 97, 61, 45], "t": 112.1, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.052, "slotsBusyAtStart": 1, "ok": true, "t": 112.152, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.111, "ok": true, "t": 112.157, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 16, "t": 112.187, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["jump_next_event", 1, 1.0, 1.8]], "t": 112.187, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, true, false], "proc": [true, true, true, true], "jobs": [162, 97, 61, 45], "t": 112.201, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.043, "slotsBusyAtStart": 3, "ok": true, "t": 112.247, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.048, "slotsBusyAtStart": 1, "ok": true, "t": 112.249, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.066, "ok": true, "t": 112.253, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.073, "ok": true, "t": 112.253, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [163, 97, 62, 45], "t": 112.429, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 112.476, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.072, "ok": true, "t": 112.481, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [164, 97, 62, 45], "t": 112.523, "thread": 137936767022784}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.097, "slotsBusyAtStart": 0, "ok": true, "t": 112.621, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.122, "ok": true, "t": 112.626, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [165, 97, 62, 45], "t": 112.781, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 0, "ok": true, "t": 112.828, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.08, "ok": true, "t": 112.832, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [166, 97, 62, 45], "t": 112.894, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [166, 97, 62, 45], "t": 113.058, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.051, "slotsBusyAtStart": 1, "ok": true, "t": 113.109, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.075, "ok": true, "t": 113.112, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 16, "t": 113.277, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["jump_next_event", 1, 0.4, 0.5]], "t": 113.277, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [166, 98, 62, 45], "t": 113.358, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [166, 98, 62, 45], "t": 113.372, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [166, 98, 62, 45], "t": 113.392, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.047, "slotsBusyAtStart": 3, "ok": true, "t": 113.44, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.082, "ok": true, "t": 113.447, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [166, 98, 62, 46], "t": 113.744, "thread": 137936733451968}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.14, "slotsBusyAtStart": 0, "ok": true, "t": 114.034, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.16, "ok": true, "t": 114.038, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, true, true], "proc": [true, true, true, true], "jobs": [167, 98, 62, 46], "t": 114.307, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 114.318, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 1.0, 1.0], ["jump_next_event", 1, 0.9, 1.0], ["jump_next_event", 1, 0.6, 0.7], ["workspace", 1, 0.0, 0.6]], "t": 114.318, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.05, "slotsBusyAtStart": 3, "ok": true, "t": 114.357, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.074, "ok": true, "t": 114.364, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.138, "slotsBusyAtStart": 2, "ok": true, "t": 114.51, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.163, "ok": true, "t": 114.514, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.189, "slotsBusyAtStart": 1, "ok": true, "t": 114.547, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.225, "ok": true, "t": 114.551, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [168, 99, 63, 46], "t": 114.641, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [168, 99, 63, 46], "t": 114.796, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [168, 99, 63, 46], "t": 114.819, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.147, "slotsBusyAtStart": 3, "ok": true, "t": 114.891, "thread": 137936733451968}
+{"ev": "invoke", "op": "workspace", "dur": 0.098, "slotsBusyAtStart": 2, "ok": true, "t": 114.894, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.201, "ok": true, "t": 114.9, "thread": 137936733451968}
+{"ev": "work_one", "dur": 0.13, "ok": true, "t": 114.902, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.105, "slotsBusyAtStart": 3, "ok": true, "t": 114.924, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.125, "ok": true, "t": 114.927, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [168, 100, 64, 47], "t": 115.173, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [168, 100, 64, 47], "t": 115.18, "thread": 137936733451968}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [168, 100, 64, 47], "t": 115.198, "thread": 137936725059264}
+{"ev": "terminal_rows", "n": 15, "t": 115.358, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.7, 1.5], ["jump_next_event", 1, 0.2, 1.2], ["jump_next_event", 1, 0.2, 1.0], ["jump_next_event", 1, 0.1, 0.7]], "t": 115.358, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.09, "slotsBusyAtStart": 1, "ok": true, "t": 115.731, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.115, "ok": true, "t": 115.737, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, true, true, true], "proc": [true, true, true, true], "jobs": [169, 100, 64, 47], "t": 116.012, "thread": 137936767022784}
+{"ev": "invoke", "op": "workspace", "dur": 0.122, "slotsBusyAtStart": 3, "ok": true, "t": 116.134, "thread": 137936767022784}
+{"ev": "work_one", "dur": 0.147, "ok": true, "t": 116.138, "thread": 137936767022784}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.067, "slotsBusyAtStart": 1, "ok": true, "t": 116.24, "thread": 137936381122240}
+{"ev": "work_one", "dur": 1.092, "ok": true, "t": 116.243, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.055, "slotsBusyAtStart": 3, "ok": true, "t": 116.253, "thread": 137936725059264}
+{"ev": "work_one", "dur": 1.078, "ok": true, "t": 116.257, "thread": 137936725059264}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.098, "slotsBusyAtStart": 2, "ok": true, "t": 116.278, "thread": 137936733451968}
+{"ev": "work_one", "dur": 1.127, "ok": true, "t": 116.282, "thread": 137936733451968}
+{"ev": "terminal_rows", "n": 19, "t": 116.398, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 116.398, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [170, 101, 65, 48], "t": 116.408, "thread": 137936725059264}
+{"ev": "invoke", "op": "workspace", "dur": 0.122, "slotsBusyAtStart": 0, "ok": true, "t": 116.53, "thread": 137936725059264}
+{"ev": "work_one", "dur": 0.189, "ok": true, "t": 116.579, "thread": 137936725059264}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [171, 101, 65, 48], "t": 116.63, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [171, 101, 65, 48], "t": 116.636, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [171, 101, 65, 48], "t": 116.672, "thread": 137936716666560}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, true, false], "proc": [true, true, true, true], "jobs": [171, 101, 65, 48], "t": 116.943, "thread": 137936989316800}
+{"ev": "terminal_rows", "n": 15, "t": 117.429, "thread": 137936741844672}
+{"ev": "running_rows", "n": 4, "rows": [["jump_next_event", 1, 0.8, 2.0], ["jump_next_event", 1, 0.5, 1.3], ["jump_next_event", 1, 0.8, 2.5], ["jump_next_event", 1, 0.8, 2.1]], "t": 117.429, "thread": 137936741844672}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.081, "slotsBusyAtStart": 1, "ok": true, "t": 117.717, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.089, "slotsBusyAtStart": 0, "ok": true, "t": 117.719, "thread": 137936758630080}
+{"ev": "work_one", "dur": 1.216, "ok": true, "t": 117.739, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.221, "ok": true, "t": 117.741, "thread": 137936758630080}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.071, "slotsBusyAtStart": 2, "ok": true, "t": 117.743, "thread": 137936716666560}
+{"ev": "work_one", "dur": 1.212, "ok": true, "t": 117.751, "thread": 137936716666560}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, true], "proc": [true, true, true, true], "jobs": [172, 102, 66, 48], "t": 118.009, "thread": 137936716666560}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, true], "proc": [true, true, true, true], "jobs": [172, 102, 66, 48], "t": 118.009, "thread": 137936767022784}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, true], "proc": [true, true, true, true], "jobs": [172, 102, 66, 48], "t": 118.024, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.091, "slotsBusyAtStart": 3, "ok": true, "t": 118.034, "thread": 137936989316800}
+{"ev": "work_one", "dur": 1.164, "ok": true, "t": 118.037, "thread": 137936989316800}
+{"ev": "invoke", "op": "workspace", "dur": 0.094, "slotsBusyAtStart": 1, "ok": true, "t": 118.103, "thread": 137936716666560}
+{"ev": "work_one", "dur": 0.116, "ok": true, "t": 118.107, "thread": 137936716666560}
+{"ev": "terminal_rows", "n": 15, "t": 118.467, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.4, 0.9], ["jump_next_event", 1, 0.4, 0.4]], "t": 118.467, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, true, true, false], "proc": [true, true, true, true], "jobs": [173, 102, 66, 49], "t": 118.615, "thread": 137936716666560}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.17, "slotsBusyAtStart": 3, "ok": true, "t": 119.194, "thread": 137936750237376}
+{"ev": "work_one", "dur": 1.195, "ok": true, "t": 119.198, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [173, 102, 67, 49], "t": 119.202, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.251, "slotsBusyAtStart": 2, "ok": true, "t": 119.261, "thread": 137936767022784}
+{"ev": "work_one", "dur": 1.272, "ok": true, "t": 119.264, "thread": 137936767022784}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.182, "slotsBusyAtStart": 2, "ok": true, "t": 119.384, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.206, "ok": true, "t": 119.389, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [173, 103, 68, 49], "t": 119.465, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 16, "t": 119.505, "thread": 137936741844672}
+{"ev": "running_rows", "n": 2, "rows": [["jump_next_event", 1, 0.9, 1.1], ["jump_next_event", 1, 0.0, 0.1]], "t": 119.505, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, true, false, false], "proc": [true, true, true, true], "jobs": [173, 103, 68, 49], "t": 119.539, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.172, "slotsBusyAtStart": 1, "ok": true, "t": 119.638, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.1, "slotsBusyAtStart": 2, "ok": true, "t": 119.639, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.193, "ok": true, "t": 119.642, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.131, "ok": true, "t": 119.646, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [173, 104, 69, 49], "t": 119.66, "thread": 137936381122240}
+{"ev": "invoke", "op": "jump_next_event", "dur": 1.084, "slotsBusyAtStart": 2, "ok": true, "t": 119.699, "thread": 137936716666560}
+{"ev": "work_one", "dur": 1.148, "ok": true, "t": 119.703, "thread": 137936716666560}
+{"ev": "invoke", "op": "workspace", "dur": 0.095, "slotsBusyAtStart": 1, "ok": true, "t": 119.754, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.114, "ok": true, "t": 119.757, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [174, 105, 69, 49], "t": 119.91, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.089, "slotsBusyAtStart": 0, "ok": true, "t": 119.999, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.109, "ok": true, "t": 120.003, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [175, 105, 69, 49], "t": 120.447, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 15, "t": 120.538, "thread": 137936741844672}
+{"ev": "running_rows", "n": 1, "rows": [["workspace", 1, 0.1, 0.1]], "t": 120.538, "thread": 137936741844672}
+{"ev": "invoke", "op": "workspace", "dur": 0.103, "slotsBusyAtStart": 0, "ok": true, "t": 120.549, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.124, "ok": true, "t": 120.553, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "jump_next_event", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [176, 105, 69, 49], "t": 120.8, "thread": 137936750237376}
+{"ev": "invoke", "op": "jump_next_event", "dur": 0.169, "slotsBusyAtStart": 0, "ok": true, "t": 120.969, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.196, "ok": true, "t": 120.976, "thread": 137936750237376}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [177, 105, 69, 49], "t": 121.13, "thread": 137936716666560}
+{"ev": "invoke", "op": "workspace", "dur": 0.109, "slotsBusyAtStart": 0, "ok": true, "t": 121.239, "thread": 137936716666560}
+{"ev": "work_one", "dur": 0.21, "ok": true, "t": 121.265, "thread": 137936716666560}
+{"ev": "terminal_rows", "n": 17, "t": 121.565, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 121.565, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 17, "t": 122.6, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 122.601, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [178, 105, 69, 49], "t": 123.18, "thread": 137936750237376}
+{"ev": "invoke", "op": "workspace", "dur": 0.14, "slotsBusyAtStart": 0, "ok": true, "t": 123.32, "thread": 137936750237376}
+{"ev": "work_one", "dur": 0.191, "ok": true, "t": 123.341, "thread": 137936750237376}
+{"ev": "terminal_rows", "n": 16, "t": 123.636, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 123.636, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [179, 105, 69, 49], "t": 123.943, "thread": 137936758630080}
+{"ev": "invoke_start", "op": "workspace", "locked": [true, false, false, false], "proc": [true, true, true, true], "jobs": [179, 105, 69, 49], "t": 123.995, "thread": 137936716666560}
+{"ev": "invoke", "op": "workspace", "dur": 0.096, "slotsBusyAtStart": 0, "ok": true, "t": 124.039, "thread": 137936758630080}
+{"ev": "work_one", "dur": 0.171, "ok": true, "t": 124.043, "thread": 137936758630080}
+{"ev": "invoke", "op": "workspace", "dur": 0.082, "slotsBusyAtStart": 1, "ok": true, "t": 124.076, "thread": 137936716666560}
+{"ev": "work_one", "dur": 0.102, "ok": true, "t": 124.08, "thread": 137936716666560}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [180, 106, 69, 49], "t": 124.475, "thread": 137936716666560}
+{"ev": "invoke", "op": "workspace", "dur": 0.096, "slotsBusyAtStart": 0, "ok": true, "t": 124.571, "thread": 137936716666560}
+{"ev": "work_one", "dur": 0.119, "ok": true, "t": 124.574, "thread": 137936716666560}
+{"ev": "terminal_rows", "n": 16, "t": 124.669, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 124.669, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [181, 106, 69, 49], "t": 124.928, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.093, "slotsBusyAtStart": 0, "ok": true, "t": 125.021, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.118, "ok": true, "t": 125.027, "thread": 137936381122240}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [182, 106, 69, 49], "t": 125.564, "thread": 137936716666560}
+{"ev": "invoke", "op": "workspace", "dur": 0.088, "slotsBusyAtStart": 0, "ok": true, "t": 125.652, "thread": 137936716666560}
+{"ev": "work_one", "dur": 0.111, "ok": true, "t": 125.657, "thread": 137936716666560}
+{"ev": "terminal_rows", "n": 16, "t": 125.697, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 125.697, "thread": 137936741844672}
+{"ev": "invoke_start", "op": "workspace", "locked": [false, false, false, false], "proc": [true, true, true, true], "jobs": [183, 106, 69, 49], "t": 125.828, "thread": 137936381122240}
+{"ev": "invoke", "op": "workspace", "dur": 0.085, "slotsBusyAtStart": 0, "ok": true, "t": 125.912, "thread": 137936381122240}
+{"ev": "work_one", "dur": 0.104, "ok": true, "t": 125.916, "thread": 137936381122240}
+{"ev": "terminal_rows", "n": 16, "t": 126.74, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 126.741, "thread": 137936741844672}
+{"ev": "terminal_rows", "n": 16, "t": 127.77, "thread": 137936741844672}
+{"ev": "running_rows", "n": 0, "rows": [], "t": 127.77, "thread": 137936741844672}

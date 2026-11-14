@@ -19,6 +19,50 @@ def _cpu_times():
 def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources, nearest_rank, cycles, think_ms, stagger_ms, proc_snapshot=None):
     import psycopg
     began_res = system_resources()
+    # Guard against a mis-configured pool: the queue loops, the native slots and the exchange pool must all have the same size
+    # (a harness that only patched queue.WORKERS produced invalid 3/4-worker results).
+    from cloud import queue as _q0, worker as _w0
+    sizes = (_q0.WORKERS, len(_w0._slots), _w0._exchanges._max_workers)
+    if len(set(sizes)) != 1:
+        raise RuntimeError('HARNESS_WORKER_POOL_MISMATCH')
+    report['workerPool'] = dict(queueWorkers=sizes[0], nativeSlots=sizes[1], exchangeThreads=sizes[2])
+    trace_path = os.environ.get('RIKSORA_QA_QUEUE_TRACE')
+    if trace_path:
+        # Measurement-only instrumentation: wraps (does not edit) product functions in this QA process to record timings/exceptions.
+        import functools, traceback
+        from cloud import queue as _q, worker as _w
+        tlock = threading.Lock(); t00 = time.monotonic()
+        def _log(**kw):
+            kw['t'] = round(time.monotonic() - t00, 3); kw['thread'] = threading.get_ident()
+            with tlock, open(trace_path, 'a') as f:
+                f.write(json.dumps(kw) + '\n')
+        _orig_work, _orig_inv = _q.work_one, _w.pooled_invoke
+        @functools.wraps(_orig_work)
+        def traced_work(dsn, runner):
+            t = time.monotonic()
+            try:
+                r = _orig_work(dsn, runner)
+                if r:
+                    _log(ev='work_one', dur=round(time.monotonic() - t, 3), ok=True)
+                return r
+            except BaseException as e:
+                _log(ev='work_one_exc', dur=round(time.monotonic() - t, 3), exc=type(e).__name__, msg=str(e)[:120],
+                     tb=''.join(traceback.format_tb(e.__traceback__)[-3:])[-400:])
+                raise
+        @functools.wraps(_orig_inv)
+        def traced_inv(dsn, payload, **kw):
+            t = time.monotonic(); busy = sum(1 for sl in _w._slots if sl.lock.locked())
+            _log(ev='invoke_start', op=payload.get('operation'), locked=[sl.lock.locked() for sl in _w._slots],
+                 proc=[sl.process is not None for sl in _w._slots], jobs=[sl.jobs for sl in _w._slots])
+            try:
+                r = _orig_inv(dsn, payload, **kw)
+                _log(ev='invoke', op=payload.get('operation'), dur=round(time.monotonic() - t, 3), slotsBusyAtStart=busy, ok=True)
+                return r
+            except BaseException as e:
+                _log(ev='invoke_exc', op=payload.get('operation'), dur=round(time.monotonic() - t, 3), slotsBusyAtStart=busy, lockedNow=[sl.lock.locked() for sl in _w._slots], nslots=len(_w._slots),
+                     exc=type(e).__name__, msg=str(getattr(e, 'code', e))[:80])
+                raise
+        _q.work_one, _w.pooled_invoke = traced_work, traced_inv
     samples, queue, cpu_pct, stop = [], [], [], {'reason': None}
     done = threading.Event()
     proc = subprocess.Popen([sys.executable, '-I', str(DRIVER), '--url', url, '--traders', str(cohort_size), '--cycles', str(cycles),
@@ -50,6 +94,13 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
                         count(*) FILTER (WHERE state IN ('FAILED','EXPIRED','RECONCILE_REQUIRED')),
                         max(extract(epoch FROM (clock_timestamp()-created_at))) FILTER (WHERE state='QUEUED') FROM btl.research_jobs""").fetchone()
                 queue.append(dict(queued=r[0], running=r[1], failed=r[2], oldestQueuedSeconds=float(r[3] or 0)))
+                if trace_path:
+                    with psycopg.connect(dsn, connect_timeout=2) as db2:
+                        rr = db2.execute("SELECT operation,attempts,extract(epoch FROM (clock_timestamp()-heartbeat_at)),extract(epoch FROM (clock_timestamp()-created_at)) FROM btl.research_jobs WHERE state='RUNNING'").fetchall()
+                    with psycopg.connect(dsn, connect_timeout=2) as db3:
+                        term = db3.execute("SELECT count(*) FROM btl.research_jobs WHERE state NOT IN ('QUEUED','RUNNING')").fetchone()[0]
+                    _log(ev='terminal_rows', n=term)
+                    _log(ev='running_rows', n=len(rr), rows=[[x[0], x[1], round(float(x[2] or 0), 1), round(float(x[3] or 0), 1)] for x in rr][:45])
             except Exception:
                 pass
 
