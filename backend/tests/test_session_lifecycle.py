@@ -44,6 +44,9 @@ class SessionLifecycleTests(unittest.TestCase):
         trashed = f.client.post(f.root + "/sessions/" + sid + "/trash", headers=f.headers)
         self.assertEqual(trashed.status_code, 200, trashed.text)
         self.assertNotIn(sid, self.listed())
+        in_trash = f.client.get(f.root + "/sessions?trashed=true", headers=f.headers).json()["items"]
+        self.assertEqual([i["metadata"]["id"] for i in in_trash], [sid], "the Trash list shows exactly the trashed Session")
+        self.assertEqual(f.client.get(other_root + "/sessions?trashed=true", headers=other_headers).json()["items"], [], "another tenant's Trash is separate")
         self.assertEqual(f.client.post(f.root + "/sessions/" + sid + "/trash", headers=f.headers).status_code, 200, "idempotent")
         restored = f.client.post(f.root + "/sessions/" + sid + "/restore", headers=f.headers)
         self.assertEqual(restored.status_code, 200, restored.text)

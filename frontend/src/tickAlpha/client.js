@@ -345,6 +345,18 @@ export async function loadChartBars(sessionId,timeframe,{limit=512,before=null}=
   return page;
 }
 
+// Session Trash/Restore (server: owner only, 30-day restore window, evidence untouched).
+export async function setSessionTrashed(sessionId,trashed){
+  if(typeof sessionId!=='string'||!sessionId||typeof trashed!=='boolean')throw Error('Session action is invalid.');
+  const value=await api(`${sessionPath(sessionId)}/${trashed?'trash':'restore'}`,{});
+  if(value?.artifact!=='BTL-SESSION-LIFECYCLE-1'||value.sessionId!==sessionId||value.trashed!==trashed)throw Error('Unsupported Session response; nothing changed.');
+  return value;
+}
+export async function loadTrashedSessions(){
+  const page=await productPage('/sessions?trashed=true','BTL-SESSION-PAGE-1',null,item=>({...item.metadata,revision:item.revision}));
+  return page.items;
+}
+
 export async function createMethodVersion(family,method){
   if(!accountTransport())throw Error('Method versioning requires an authenticated workspace.');
   if(!family||typeof family.familyId!=='string'||!Number.isSafeInteger(family.revision))

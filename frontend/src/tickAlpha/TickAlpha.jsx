@@ -213,8 +213,8 @@ export default function TickAlpha(){
       :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='method-new'?<MethodNew key={route.family||'new'} catalog={catalog} route={route} onSaved={async methodId=>{setCatalog(await loadProductCatalog());setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice(route.family?'New immutable Method version saved.':'Method saved. Create a Session to start replay.');}}/>
       :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onLifecycle={async()=>setCatalog(await loadProductCatalog())} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
-      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))} onChanged={async()=>setCatalog(await loadProductCatalog())}/>
+      :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))} onTrashed={async()=>{setCatalog(await loadProductCatalog());navigate({screen:'sessions'});}}/>
       :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
       :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>
       :route.screen==='journal'?<AlphaJournalPage catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>

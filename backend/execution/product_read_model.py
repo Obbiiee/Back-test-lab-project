@@ -57,7 +57,7 @@ def method(db, workspace_id, method_id):
     return {"schemaVersion": 1, "artifact": "BTL-METHOD-1", "method": value}
 
 
-def sessions(db, workspace_id, *, limit=25, after=None, method_id=None):
+def sessions(db, workspace_id, *, limit=25, after=None, method_id=None, trashed=False):
     _page_args(limit, after)
     if method_id is not None:
         identifier(method_id, "methodId")
@@ -68,10 +68,10 @@ def sessions(db, workspace_id, *, limit=25, after=None, method_id=None):
         "JOIN btl.tick_sessions s ON s.workspace_id=r.workspace_id AND s.session_id=r.session_id "
         "JOIN btl.tick_methods m ON m.workspace_id=r.workspace_id AND m.method_id=r.method_id "
         "WHERE r.workspace_id=%s AND (%s::text IS NULL OR r.session_id>%s) "
-        "AND NOT EXISTS (SELECT 1 FROM btl.session_lifecycle l WHERE l.workspace_id=r.workspace_id AND l.session_id=r.session_id AND l.trashed_at IS NOT NULL) "
+        "AND (EXISTS (SELECT 1 FROM btl.session_lifecycle l WHERE l.workspace_id=r.workspace_id AND l.session_id=r.session_id AND l.trashed_at IS NOT NULL) = %s) "
         "AND (%s::text IS NULL OR r.method_id=%s) "
         "ORDER BY r.session_id LIMIT %s",
-        (workspace_id, after, after, method_id, method_id, limit + 1),
+        (workspace_id, after, after, bool(trashed), method_id, method_id, limit + 1),
     ).fetchall()
     page = []
     for row in rows[:limit]:

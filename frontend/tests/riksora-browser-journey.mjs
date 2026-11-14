@@ -355,6 +355,57 @@ try{
   const committedJournal=apiTrace.filter(entry=>entry.path.endsWith('/journal/pages')&&entry.status===200).at(-1);
   expect(committedJournal?.journalPage?.firstOrderStatuses).toEqual(['CLOSED']);
   expect(errors).toEqual([]);step('logout_login_resume');
+  if(process.env.RIKSORA_QA_E2E_EXTRA==='1'){
+    const fsp=await import('node:fs/promises');
+    // Exports: the downloaded files must carry the committed numbers, not just exist.
+    phase='export_csv';
+    await resumedTerminal.getByRole('button',{name:'Journal',exact:true}).click();
+    const csvButton=page.getByRole('button',{name:'Export committed trades CSV'});
+    await expect(csvButton).toBeEnabled({timeout:95000});
+    const [csvDownload]=await Promise.all([page.waitForEvent('download',{timeout:60000}),csvButton.click()]);
+    await csvDownload.saveAs(join(evidence,'trades.csv'));
+    const csvRows=(await fsp.readFile(join(evidence,'trades.csv'),'utf8')).trim().split('\r\n').map(line=>line.split(','));
+    expect(csvRows[0].slice(0,5)).toEqual(['sessionId','datasetId','datasetVersion','ledgerRevision','orderId']);
+    expect(csvRows.length).toBe(2);
+    const col=name=>csvRows[1][csvRows[0].indexOf(name)];
+    expect(col('status')).toBe('CLOSED');expect(Number(col('entryPrice'))).toBeGreaterThan(0);expect(Number(col('exitPrice'))).toBeGreaterThan(0);
+    const pill=await page.locator('.alpha-balance-pill').getAttribute('aria-label');
+    const shown=Number(/Saved balance ([-0-9.]+)/.exec(pill)?.[1]);
+    expect(Math.abs(shown-10000-Number(col('netCashChange')))).toBeLessThan(1e-6);   // exported net cash change equals the balance the UI shows
+    step('export_csv_ledger');
+    phase='export_pdf';
+    const [pdfDownload]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.getByRole('button',{name:'Export PDF report'}).click()]);
+    await pdfDownload.saveAs(join(evidence,'report.pdf'));
+    const pdfBytes=await fsp.readFile(join(evidence,'report.pdf'));
+    expect(pdfBytes.subarray(0,5).toString()).toBe('%PDF-');expect(pdfBytes.length).toBeGreaterThan(1500);
+    await fsp.writeFile(join(evidence,'report.expect.json'),JSON.stringify({netCashChange:col('netCashChange'),balance:String(shown)}));
+    step('export_pdf_report');
+    // Trash and Restore through the product UI; the Session must disappear, come back, and keep its committed ledger.
+    phase='trash_restore';
+    await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
+    await page.getByRole('link',{name:'Synthetic browser session'}).first().click();
+    await page.getByRole('button',{name:'Move to Trash',exact:true}).click();
+    await expect(page.getByText('No Sessions yet')).toBeVisible({timeout:60000});
+    await page.getByText('Trash',{exact:true}).click();
+    await page.getByRole('button',{name:/Restore Synthetic browser session/}).click();
+    await expect(page.getByRole('link',{name:'Synthetic browser session'}).first()).toBeVisible({timeout:60000});
+    step('trash_restore');
+    // Mobile viewport: no horizontal page scroll on the main screens and the replay workspace still opens.
+    phase='mobile_viewport';
+    await page.setViewportSize({width:390,height:844});
+    for(const screen of ['Sessions','Journal','Analytics']){
+      await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:screen,exact:true}).click();
+      await page.waitForTimeout(800);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+    }
+    await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
+    await page.getByRole('button',{name:/Continue replay|Open replay/}).first().click();
+    await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+    await fsp.copyFile(join(evidence,'trades.csv'),join(evidence,'trades.final.csv')).catch(()=>{});
+    await page.screenshot({path:join(evidence,'mobile-replay.png'),fullPage:false});
+    step('mobile_viewport');
+  }
   process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),
     transientBusyCount:busyResponses.length,apiResponseCount,pageErrorCount:errors.length,
     failedRequests:requestFailures.length,

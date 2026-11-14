@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {api,sessionPath,sourceContext} from './client.js';
+import {api,sessionPath,sourceContext,setSessionTrashed,loadTrashedSessions,noticeText} from './client.js';
 import {money,kindLabel,utc,lastSession} from './productData.js';
 import {linkTo} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
@@ -38,7 +38,26 @@ function SessionsHero({catalog,onOpen}){
   </section>;
 }
 
-export function SessionsPage({catalog,onOpen}){
+function TrashPanel({onChanged}){
+  const [state,setState]=useState({status:'idle',items:[]}),[message,setMessage]=useState('');
+  async function show(){
+    setState({status:'loading',items:[]});
+    try{setState({status:'ready',items:await loadTrashedSessions()});}catch(error){setState({status:'error',items:[]});setMessage(noticeText(error.message));}
+  }
+  async function restore(session){
+    setMessage('');
+    try{await setSessionTrashed(session.id,false);await show();await onChanged();}catch(error){setMessage(error.message==='TRASH_EXPIRED'?'The 30-day restore window has passed.':noticeText(error.message));}
+  }
+  return <details className="rk-card rk-disclosure" onToggle={event=>{if(event.currentTarget.open&&state.status==='idle')void show();}}>
+    <summary>Trash</summary>
+    {message&&<p role="alert" className="rk-note">{message}</p>}
+    {state.status==='loading'&&<p className="rk-note" role="status">Loading Trash…</p>}
+    {state.status==='ready'&&!state.items.length&&<p className="rk-note">Trash is empty. A trashed Session can be restored for 30 days; its orders and receipts are never deleted.</p>}
+    {state.items.length>0&&<ul aria-label="Trashed Sessions">{state.items.map(item=><li key={item.id}><span>{item.name} · {item.startPeriod}</span> <button type="button" className="rk-btn rk-btn-small" onClick={()=>restore(item)} aria-label={`Restore ${item.name}`}>Restore</button></li>)}</ul>}
+  </details>;
+}
+
+export function SessionsPage({catalog,onOpen,onChanged=async()=>{}}){
   const [shown,setShown]=useState(PAGE_SIZE);
   const [query,setQuery]=useState('');
   const [methodId,setMethodId]=useState(null);
@@ -54,7 +73,7 @@ export function SessionsPage({catalog,onOpen}){
   },[catalog,query,methodId,sort]);
   const newSession=<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new',method:methodId||undefined})}><Icon name="plus" size={18}/><span>New Session</span></a>;
   if(!catalog.sessions.length)return <><PageHead eyebrow="Research" title="Sessions" lead="A Session replays one Method on one instrument from a start month, with its own balance and journal." actions={newSession}/>
-    <StatePanel kind="empty" title="No Sessions yet" action={catalog.methods.length?newSession:<a className="rk-btn rk-btn-primary" {...linkTo({screen:'method-new'})}>Create your first Method</a>}><p>{catalog.methods.length?'Pick a Method and press Play. Your replay time, orders and journal are saved per Session.':'Write a Method first; every Session replays one Method.'}</p></StatePanel></>;
+    <StatePanel kind="empty" title="No Sessions yet" action={catalog.methods.length?newSession:<a className="rk-btn rk-btn-primary" {...linkTo({screen:'method-new'})}>Create your first Method</a>}><p>{catalog.methods.length?'Pick a Method and press Play. Your replay time, orders and journal are saved per Session.':'Write a Method first; every Session replays one Method.'}</p></StatePanel><TrashPanel onChanged={onChanged}/></>;
   return <><PageHead eyebrow="Research" title="Sessions" lead="Open one to continue where you left off." actions={newSession}/>
     <SessionsHero catalog={catalog} onOpen={onOpen}/>
     <div className="rk-toolbar">
@@ -63,13 +82,15 @@ export function SessionsPage({catalog,onOpen}){
       <label className="rk-select">Sort<select value={sort} onChange={event=>setSort(event.target.value)}><option value="newest">Newest first</option><option value="name">Name A–Z</option></select></label>
       <span className="rk-count" role="status">{rows.length} of {catalog.sessions.length}</span>
     </div>
+    <TrashPanel onChanged={onChanged}/>
     {rows.length?<><ul className="rk-session-grid" aria-label="Sessions">{rows.slice(0,shown).map(row=><SessionCard key={row.id} session={row} catalog={catalog} onOpen={onOpen} last={row.id===lastSession()}/>)}</ul>
       {rows.length>shown&&<div className="rk-more"><button type="button" className="rk-btn" onClick={()=>setShown(count=>count+PAGE_SIZE)}>Show {Math.min(PAGE_SIZE,rows.length-shown)} more of {rows.length-shown} remaining</button></div>}</>
       :<StatePanel kind="filtered" title="No Session matches" action={<button type="button" className="rk-btn" onClick={()=>{setQuery('');setMethodId(null);}}>Clear filters</button>}><p>Try another name or show all Methods.</p></StatePanel>}
   </>;
 }
 
-export function SessionOverview({catalog,route,onOpen}){
+export function SessionOverview({catalog,route,onOpen,onTrashed=async()=>{}}){
+  const [trashMessage,setTrashMessage]=useState('');
   const sessionId=route.analyticsSession;
   const session=catalog.sessions.find(s=>s.id===sessionId)||null;
   const [attempt,setAttempt]=useState(0);
@@ -109,8 +130,12 @@ export function SessionOverview({catalog,route,onOpen}){
         </dl>
       </section>
     </div>
+    <section className="rk-card" aria-labelledby="rk-so-trash"><h2 id="rk-so-trash">Trash</h2>
+      <p className="rk-note">Move this Session out of your list. You can restore it for 30 days; its orders, receipts and journal are never deleted.</p>
+      {trashMessage&&<p role="alert" className="rk-note">{trashMessage}</p>}
+      <button type="button" className="rk-btn" onClick={async()=>{setTrashMessage('');try{await setSessionTrashed(session.id,true);await onTrashed();}catch(error){setTrashMessage(noticeText(error.message));}}}>Move to Trash</button></section>
     <details className="rk-card rk-disclosure"><summary>What is not shown here yet</summary>
-      <p className="rk-note">Order counts, Trash and Restore need server routes that are not published yet. The trading terminal shows this Session’s positions, pending orders, journal and analysis.</p></details>
+      <p className="rk-note">Order counts per Session are not published on the list. The trading terminal shows this Session’s positions, pending orders, journal and analysis.</p></details>
   </>;
 }
 

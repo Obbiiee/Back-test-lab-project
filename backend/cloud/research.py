@@ -621,9 +621,9 @@ def install(app):
     @app.get(prefix + '/sessions')
     async def sessions(workspace_id: uuid.UUID, limit: int = Query(25, ge=1, le=50),
                        after: str | None = None, method_id: str | None = Query(None, alias='methodId'),
-                       user: User = Depends(current)):
+                       trashed: bool = False, user: User = Depends(current)):
         return await execute(user, workspace_id, 'session_page',
-                             {'limit': limit, 'after': after, 'method_id': method_id})
+                             {'limit': limit, 'after': after, 'method_id': method_id, 'trashed': trashed})
 
     @app.post(prefix + '/methods')
     async def method(workspace_id: uuid.UUID, request: Request, user: User = Depends(current)):
