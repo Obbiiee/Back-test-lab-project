@@ -267,9 +267,12 @@ try{
     const trend=page.getByRole('button',{name:/^Trend Line/i}).first();
     await trend.click();
     const canvasBox=await page.locator('.alpha-chart-workspace canvas').first().boundingBox();
-    await page.mouse.click(canvasBox.x+canvasBox.width*0.25,canvasBox.y+canvasBox.height*0.6);
-    await page.mouse.click(canvasBox.x+canvasBox.width*0.55,canvasBox.y+canvasBox.height*0.35);
-    await page.keyboard.press('Escape');
+    await page.mouse.move(canvasBox.x+canvasBox.width*0.30,canvasBox.y+canvasBox.height*0.55,{steps:5});
+    await page.mouse.click(canvasBox.x+canvasBox.width*0.30,canvasBox.y+canvasBox.height*0.55);
+    await page.waitForTimeout(600);
+    await page.mouse.move(canvasBox.x+canvasBox.width*0.50,canvasBox.y+canvasBox.height*0.40,{steps:8});
+    await page.mouse.click(canvasBox.x+canvasBox.width*0.50,canvasBox.y+canvasBox.height*0.40);
+    await page.waitForTimeout(800);
     await page.getByRole('button',{name:'Drawing objects'}).click();
     await expect(page.getByRole('complementary',{name:'Drawing objects'})).toBeVisible();
     await expect(page.getByText('DRAWINGS (1)')).toBeVisible({timeout:20000});
@@ -311,7 +314,16 @@ try{
     const rows=async tab=>{await terminal().getByRole('button',{name:tab,exact:true}).click();return terminal().getByRole('table',{name:tab}).locator('tr[data-order-id]');};
     const balance=async()=>(await terminal().locator('.alpha-account strong').first().innerText()).replace('$','');
     const jump=page.getByRole('button',{name:'Jump to Next Event',exact:true});
-    const jumpOnce=async()=>{const before=await revision();await expect(jump).toBeEnabled({timeout:95000});await jump.click();await expect.poll(revision,{timeout:95000}).toBeGreaterThan(before);await expect(jump).toBeEnabled({timeout:95000});};
+    // Jump to Next Event; false when nothing is live (the button is then disabled by design). Waits for the workspace to be idle first.
+    const jumpOnce=async()=>{
+      await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled({timeout:95000});
+      await page.waitForTimeout(400);
+      if(!(await jump.isEnabled()))return false;
+      const before=await revision();await jump.click();
+      await expect.poll(revision,{timeout:95000}).toBeGreaterThan(before);
+      await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled({timeout:95000});
+      return true;
+    };
     // ---- Free Style Quick: market sell at Bid, filled by the next quote
     phase='cov_fs_quick';
     const quickReceipt=await placeOrder({side:'SHORT'});
@@ -331,7 +343,7 @@ try{
     phase='cov_jump_resolution';
     for(let i=0;i<60;i++){
       if(await (await rows('Pending orders')).count()===0&&await (await rows('Closed trades')).count()>=1)break;
-      await jumpOnce();
+      if(!(await jumpOnce()))break;
     }
     await expect(await rows('Pending orders')).toHaveCount(0,{timeout:60000});
     await expect(await rows('Closed trades')).toHaveCount(1,{timeout:60000});
@@ -353,7 +365,7 @@ try{
     phase='cov_statistics';
     const balanceNow=Number(await balance());
     await terminal().getByRole('button',{name:'Analysis',exact:true}).click();
-    const analysisText=await terminal().locator('.alpha-analysis').innerText();
+    const analysisText=await terminal().locator('.alpha-analysis:not(.alpha-journal)').innerText();
     expect(analysisText).toMatch(/Completed trades\s*2/);
     await shot('cov-statistics');
     await terminal().getByRole('button',{name:'Journal',exact:true}).click();
@@ -414,12 +426,11 @@ try{
     step('cov_protocol_cancel');
     phase='cov_protocol_jump';
     for(let i=0;i<60;i++){
-      if(await (await rows('Closed trades')).count()>=1)break;
       if(await (await rows('Open positions')).count()>=1){
         const closeButton=(await rows('Open positions')).first().getByRole('button',{name:'Close position',exact:true});
         await expect(closeButton).toBeDisabled();                         // Protocol: no manual close
       }
-      await jumpOnce();
+      if(!(await jumpOnce()))break;
     }
     await expect(await rows('Closed trades')).toHaveCount(1,{timeout:60000});
     await shot('cov-protocol-resolved');
@@ -431,9 +442,9 @@ try{
     const box2=await page.locator('.alpha-chart-workspace canvas').first().boundingBox();
     await page.mouse.click(box2.x+box2.width*0.45,box2.y+box2.height*0.5);
     await page.waitForTimeout(800);
-    await page.getByRole('button',{name:'Drawing objects'}).click().catch(()=>{});
+    if(!(await page.getByRole('complementary',{name:'Drawing objects'}).isVisible()))await page.getByRole('button',{name:'Drawing objects'}).click();
     await shot('cov-position-planner');
-    await expect(page.getByText(/POSITION PLANS \(1\)/)).toBeVisible({timeout:20000});
+    await expect(page.getByText(/position plans \(1\)/i)).toBeVisible({timeout:20000});
     step('cov_position_planner');
     // ---- IDOR: a second real account with a valid token attacks the first account's workspace and Session by id
     phase='cov_idor';
