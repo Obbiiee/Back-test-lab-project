@@ -761,3 +761,5 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
   .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title *{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{margin-left:auto;order:1}
 }
+
+.tick-alpha .alpha-check-unmet select{border-color:#9e2b33;box-shadow:0 0 0 2px #ffd0d0}.tick-alpha .alpha-check-note{color:#9e2b33;font-size:12px;font-weight:700}
