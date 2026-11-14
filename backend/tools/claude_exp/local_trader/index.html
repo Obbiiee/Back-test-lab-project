@@ -2,102 +2,230 @@
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RIKSORA Local Trader</title>
 <style>
-:root{--bg:#0f1218;--panel:#171b24;--line:#262c3a;--tx:#d8dde8;--mu:#8a93a6;--up:#26a69a;--dn:#ef5350;--ac:#4c8dff}
+:root{--bg:#0f1218;--panel:#171b24;--line:#262c3a;--tx:#d8dde8;--mu:#8a93a6;--up:#26a69a;--dn:#ef5350;--ac:#4c8dff;--warn:#e6a23c}
 @media (prefers-color-scheme:light){:root{--bg:#f4f5f8;--panel:#fff;--line:#d9dde6;--tx:#1b2030;--mu:#667086}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,Segoe UI,sans-serif}
 header{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{font-size:15px}.k{color:var(--mu);font-size:12px}.v{font-variant-numeric:tabular-nums}
-main{display:grid;grid-template-columns:1fr 330px;gap:12px;padding:12px;max-width:1500px;margin:auto}
-@media(max-width:900px){main{grid-template-columns:1fr}}
+main{display:grid;grid-template-columns:1fr 360px;gap:12px;padding:12px;max-width:1560px;margin:auto}
+@media(max-width:960px){main{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
-canvas{width:100%;height:440px;display:block;background:var(--panel);border-radius:8px}
+canvas{width:100%;height:440px;display:block;background:var(--panel);border-radius:8px;cursor:crosshair}
 .row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;align-items:center}
-button,select,input{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 10px}
-button{cursor:pointer}button:hover{border-color:var(--ac)}button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+button,select,input,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--ac)}button:disabled{opacity:.45;cursor:not-allowed}
+button.on{background:var(--ac);border-color:var(--ac);color:#fff}
 button.buy{background:var(--up);border-color:var(--up);color:#fff;font-weight:600}button.sell{background:var(--dn);border-color:var(--dn);color:#fff;font-weight:600}
-input{width:90px}table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
-.pos{color:var(--up)}.neg{color:var(--dn)}.badge{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}.bad{background:var(--dn);color:#fff}
-#err{color:var(--dn);min-height:18px;margin:4px 0}#log{max-height:150px;overflow:auto;font-size:12px;color:var(--mu)}
+button.buy.off,button.sell.off{background:var(--bg);color:var(--tx);font-weight:400}
+input{width:96px}input.w{width:100%}textarea{width:100%;min-height:70px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}
+.pos{color:var(--up)}.neg{color:var(--dn)}.badge{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line);white-space:nowrap}.bad{background:var(--dn);color:#fff}
+.lock{background:var(--warn);color:#1b1b1b}.free{background:var(--ac);color:#fff}
+#err{color:var(--dn);min-height:18px;margin:4px 0;font-size:13px}#log,#ref{max-height:150px;overflow:auto;font-size:12px;color:var(--mu)}
 h3{margin:4px 0 6px;font-size:13px;color:var(--mu);font-weight:600}
+.tabs button{border-radius:7px 7px 0 0;flex:1}.note{font-size:12px;color:var(--mu);margin:4px 0}
+.pv{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px}.pv div{display:flex;justify-content:space-between;gap:8px}
+.pv .bad{background:none;color:var(--dn)}
+dialog{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:12px;max-width:560px;width:92%}
+dialog::backdrop{background:#0008}.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}.stat b{display:block;font-size:15px}
 </style></head><body>
 <header>
  <b>RIKSORA Local Trader</b>
+ <span id="sess" class="k"></span> <span id="mbadge"></span>
  <span><span class="k">Waktu UTC</span> <span class="v" id="t">-</span></span>
  <span><span class="k">Bid</span> <span class="v" id="bid">-</span> <span class="k">Ask</span> <span class="v" id="ask">-</span> <span class="k">Spread</span> <span class="v" id="spr">-</span></span>
  <span><span class="k">Saldo</span> <span class="v" id="bal">-</span> <span class="k">Realisasi</span> <span class="v" id="real">-</span> <span class="k">Floating</span> <span class="v" id="flt">0.00</span></span>
  <span id="badges"></span>
+ <button id="sessBtn" style="margin-left:auto">Sesi ▾</button>
 </header>
 <main>
  <section class="card">
-  <div class="row"><span class="k">Timeframe</span>
-   <button data-tf="60" class="tf on">M1</button><button data-tf="300" class="tf">M5</button><button data-tf="900" class="tf">M15</button><button data-tf="3600" class="tf">H1</button>
+  <div class="row"><span class="k">Timeframe</span><span id="tfs"></span>
    <span class="k" style="margin-left:auto">Chart hanya berisi tick yang sudah dilewati kursor sesi</span></div>
   <canvas id="c" width="1100" height="440"></canvas>
   <div class="row"><span class="k">Maju</span>
    <button data-adv="1">+1d</button><button data-adv="10">+10d</button><button data-adv="60">+1m</button><button data-adv="300">+5m</button><button data-adv="900">+15m</button><button data-adv="3600">+1j</button>
-   <button id="next" title="Lompat sampai ada fill atau sesi berhenti (maks 6 jam simulasi)">Event berikutnya ⏭</button>
+   <button id="next" title="Lompat tepat ke tick berikutnya yang bisa mengubah order (fill, SL/TP, gap data). Tick di antaranya dilewati tanpa dihitung ulang.">Event berikutnya ⏭ <span id="eta" class="k"></span></button>
+   <button id="toEnd" title="Maju sampai akhir data">Ke akhir</button>
    <span style="margin-left:auto" class="row"><button id="play">▶ Putar</button>
-    <select id="speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="60">60×</option><option value="300">300×</option></select></span></div>
-  <div id="err"></div>
+    <select id="speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="60">60×</option><option value="300">300×</option></select>
+    <label class="k"><input type="checkbox" id="autoStop" checked style="width:auto"> jeda saat ada event</label></span></div>
+  <div id="err"></div><div id="jumpmsg" class="note"></div>
  </section>
  <aside>
   <section class="card"><h3>Order baru</h3>
-   <div class="row"><select id="typ"><option>MARKET</option><option>LIMIT</option><option>STOP</option></select>
-    <span class="k">Lot</span><input id="lots" value="0.01"></div>
-   <div class="row"><span class="k">Entry (pending)</span><input id="entry" placeholder="harga"></div>
-   <div class="row"><span class="k">SL</span><input id="sl" value="2"><span class="k">TP</span><input id="tp" value="3"></div>
-   <div class="k" style="margin-bottom:6px">SL/TP = jarak harga dari entry (XAUUSD dalam dolar, FX contoh 0.0010 = 10 pip). Order pending wajib punya SL dan TP.</div>
-   <div class="row"><button class="buy" id="buy" style="flex:1">BUY</button><button class="sell" id="sell" style="flex:1">SELL</button></div>
+   <div class="row tabs"><button id="tabQuick" class="on">Quick</button><button id="tabPlan">Plan</button></div>
+   <div id="quickBox">
+    <div class="note">Quick = order market sekarang, tanpa SL dan TP. Isi lot lalu Tinjau.</div>
+    <div class="row"><span class="k">Lot</span><input id="qLots" value="0.01"><button id="addStops" title="Pindah ke Plan dengan entry di harga pasar">Tambah SL &amp; TP →</button></div>
+    <div class="row"><button class="buy" id="qBuy" style="flex:1">BUY</button><button class="sell" id="qSell" style="flex:1">SELL</button></div>
+   </div>
+   <div id="planBox" hidden>
+    <div class="row"><button class="buy" id="sideBuy" style="flex:1">Long</button><button class="sell off" id="sideSell" style="flex:1">Short</button></div>
+    <div class="row"><span class="k" style="width:64px">Entry</span><input id="entry" placeholder="harga pasar"><span id="otype" class="badge">MARKET</span></div>
+    <div class="row"><span class="k" style="width:64px">SL</span><input id="sl"><span class="k">atau</span><input id="slTicks" style="width:70px" placeholder="tick"></div>
+    <div class="row"><span class="k" style="width:64px">R:R</span><span id="rrBtns"></span></div>
+    <div class="row" id="tpRow"><span class="k" style="width:64px">TP</span><input id="tp" placeholder="otomatis"></div>
+    <div class="row"><span class="k" style="width:64px">Risiko</span><span id="riskBtns"></span><input id="risk" style="width:60px" value="1"><span class="k">%</span></div>
+    <div class="row" id="lotRow"><span class="k" style="width:64px">Lot</span><input id="lotsMan" style="width:80px" placeholder="otomatis"><span class="k">kosong = dihitung dari risiko</span></div>
+    <div id="checklist"></div>
+    <div class="row"><span class="k">Klik chart mengisi</span>
+     <label><input type="radio" name="pick" value="" checked style="width:auto"> tidak</label><label><input type="radio" name="pick" value="entry" style="width:auto"> Entry</label>
+     <label><input type="radio" name="pick" value="sl" style="width:auto"> SL</label><label><input type="radio" name="pick" value="tp" style="width:auto"> TP</label></div>
+    <div class="pv" id="pv">-</div>
+    <div class="row"><button id="doReview" style="flex:1" class="on">Tinjau order</button></div>
+   </div>
+   <div id="lockNote" class="note" hidden></div>
   </section>
   <section class="card" style="margin-top:10px"><h3>Order</h3><table id="orders"></table></section>
   <section class="card" style="margin-top:10px"><h3>Riwayat trade</h3><table id="trades"></table></section>
+  <section class="card" style="margin-top:10px"><h3>Statistik sesi</h3><div class="stat" id="stat"></div></section>
   <section class="card" style="margin-top:10px"><h3>Kejadian</h3><div id="log"></div></section>
+  <section class="card" style="margin-top:10px"><h3>Penolakan (bukti, bukan trade)</h3><div id="ref"></div></section>
  </aside>
 </main>
+
+<dialog id="rev"><h3>Tinjau order</h3><div id="revBody"></div><div class="row"><button id="revOk" class="on" style="flex:1">Konfirmasi</button><button id="revNo" style="flex:1">Batal</button></div><div id="revErr" class="note neg"></div></dialog>
+
+<dialog id="sessDlg"><h3>Sesi</h3><div id="sessList"></div><hr style="border-color:var(--line)">
+ <h3>Sesi baru</h3>
+ <div class="row"><input class="w" id="nsName" placeholder="Nama sesi"></div>
+ <div class="row"><span class="k">Saldo awal</span><input id="nsBal" value="10000"></div>
+ <div class="row"><label><input type="radio" name="nsKind" value="FREE_STYLE" checked style="width:auto"> Free Style (Quick + Plan)</label>
+  <label><input type="radio" name="nsKind" value="PROTOCOL" style="width:auto"> Protocol (Plan pending saja)</label></div>
+ <div id="nsProto" hidden>
+  <div class="note">Protocol mengunci risiko, R:R, dan checklist. Aturan material berubah = buat method baru. Tidak ada Quick, tidak ada Market, tidak ada tutup manual setelah trigger.</div>
+  <div class="row"><span class="k">Risiko %</span><input id="nsRisk" value="1"><span class="k">R:R 1 :</span><input id="nsRr" value="2"></div>
+  <div class="row"><span class="k">Checklist wajib PASS (ON)</span><input type="checkbox" id="nsOn" checked style="width:auto"></div>
+  <textarea id="nsCond" placeholder="Satu kondisi per baris (minimal satu)">Tren searah timeframe besar
+Level S/R jelas</textarea>
+ </div>
+ <div class="row"><button id="nsGo" class="on" style="flex:1">Mulai sesi</button><button id="nsClose" style="flex:1">Tutup</button></div><div id="nsErr" class="note neg"></div></dialog>
+
 <script>
-let TF=60,S=null,CANDLES=[],timer=null;
+const TFS=[['M1',60],['M3',180],['M5',300],['M15',900],['M30',1800],['H1',3600],['H2',7200],['H4',14400],['D1',86400]];
+const RRS=['1','1.25','1.5','2','3','manual'];
+let TF=60,S=null,CANDLES=[],timer=null,mode='quick',side='BUY',rrSel='2',riskSel='1',PRE=null,lastEv='',pvTimer=null,SCALE=null,opener=null,REV=null;
 const $=id=>document.getElementById(id);
-async function call(path,body){const r=await fetch(path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- const j=await r.json();if(!r.ok){$('err').textContent=j.error||'error';throw new Error(j.error)};$('err').textContent='';return j}
+const MSG={protocolType:'Protocol hanya boleh order Plan pending Limit/Stop (bukan Quick/Market).',rr:'R:R terkunci Protocol.',protocolRiskRR:'Risiko dan R:R terkunci Protocol.',
+ protocolQuantity:'Lot Protocol dihitung server dari risiko terkunci.',checklist:'Protocol ON: semua kondisi checklist harus PASS.',
+ REFUSED_PRICE_PRECISION:'Harga tidak pas di grid tick. Untuk Protocol, TP dari R:R terkunci harus pas di tick: ubah jarak SL.',
+ REFUSED_LOT_BOUNDS:'Lot di luar batas min/max (SL terlalu lebar atau risiko terlalu kecil).',REFUSED_LOT_PRECISION:'Lot tidak sesuai step.',
+ REFUSED_GEOMETRY:'SL/TP berada di sisi yang salah dari entry.',UNRESOLVED_RISK_QUOTE:'Quote tidak segar: maju sampai ada tick.',
+ SESSION_NOT_TRADABLE:'Sesi berhenti (unresolved/selesai).',REFUSED_STALE_REVISION:'Harga sudah bergerak, tinjau ulang.',INVALID_INPUT:'Input belum lengkap.'};
+function msg(j){const f=j.field||'';return (MSG[f]||MSG[j.code]||j.error||'error')}
+async function call(path,body,quiet){const r=await fetch(path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const j=await r.json();if(!r.ok){if(!quiet)$('err').textContent=msg(j);const e=new Error(j.error);e.j=j;throw e};if(!quiet)$('err').textContent='';return j}
 async function refresh(state){S=state||await call('/api/state');const c=await call('/api/candles?tf='+TF+'&n=200');CANDLES=c.candles;render()}
-function f(n){return n==null?'-':n}
-let INFO_SET=false;
+const f=n=>n==null?'-':n;
+const mm=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h}j ${m}m`:m?`${m}m ${s%60}d`:`${s}d`};
+const proto=()=>S&&S.method.kind==='PROTOCOL';
+function tfButtons(){$('tfs').innerHTML=TFS.map(([n,s])=>`<button class="tf ${s===TF?'on':''}" data-tf="${s}">${n}</button>`).join('');
+ document.querySelectorAll('.tf').forEach(b=>b.onclick=()=>{TF=+b.dataset.tf;tfButtons();refresh()})}
+function buildPlanStatic(){
+ $('rrBtns').innerHTML=RRS.map(r=>`<button data-rr="${r}" class="rr ${r===rrSel?'on':''}">${r==='manual'?'Manual':'1:'+r}</button>`).join('');
+ $('riskBtns').innerHTML=['0.5','1','2','3'].map(r=>`<button data-risk="${r}" class="rk ${r===riskSel?'on':''}">${r}%</button>`).join('');
+ document.querySelectorAll('.rr').forEach(b=>b.onclick=()=>{if(proto())return;rrSel=b.dataset.rr;buildPlanStatic();previewSoon()});
+ document.querySelectorAll('.rk').forEach(b=>b.onclick=()=>{if(proto())return;riskSel=b.dataset.risk;$('risk').value=riskSel;buildPlanStatic();previewSoon()})}
+function applyMethod(){
+ const m=S.method,p=m.kind==='PROTOCOL';
+ $('mbadge').innerHTML=p?`<span class="badge lock">PROTOCOL · R:R 1:${m.rr} · risiko ${m.riskPercent}% · checklist ${m.checklistOn?'ON':'OFF'}</span>`:'<span class="badge free">FREE STYLE</span>';
+ $('sess').textContent=S.info.sessionName+' · '+S.info.symbol;document.title='RIKSORA Local Trader — '+S.info.symbol;window.DEC=S.info.dec;
+ $('tabQuick').disabled=p;if(p&&mode==='quick')setMode('plan');
+ $('lockNote').hidden=!p;$('lockNote').textContent=p?'Method Protocol: plan your trade, trade your plan. Quick, Market, tutup manual, dan ubah SL/TP setelah entry tidak tersedia. Risiko, R:R dan lot dikunci; hanya Limit/Stop pending. Membatalkan order pending tetap boleh.':'';
+ if(p){rrSel=m.rr;riskSel=m.riskPercent;$('risk').value=m.riskPercent;$('tp').disabled=true;$('risk').disabled=true;$('lotsMan').disabled=true;$('lotsMan').value=''}
+ else{$('tp').disabled=false;$('risk').disabled=false;$('lotsMan').disabled=false;if(!RRS.includes(rrSel))rrSel='2'}
+ $('lotRow').hidden=p;$('tpRow').hidden=!p&&rrSel!=='manual'&&false;
+ buildPlanStatic();
+ const key=m.id+'|'+m.conditions.map(c=>c.id).join();if(window._ck!==key){window._ck=key;
+  $('checklist').innerHTML=m.conditions.length?`<div class="note">Checklist ${m.checklistOn?'(wajib PASS)':'(dicatat, tidak memblokir)'}</div>`+m.conditions.map(c=>`<div class="row"><span style="flex:1">${c.label}</span><select data-c="${c.id}"><option>NOT_ASSESSED</option><option>PASS</option><option>FAIL</option></select></div>`).join(''):'';
+  document.querySelectorAll('#checklist select').forEach(s=>s.onchange=previewSoon)}}
+function setMode(m){mode=m;$('tabQuick').classList.toggle('on',m==='quick');$('tabPlan').classList.toggle('on',m==='plan');$('quickBox').hidden=m!=='quick';$('planBox').hidden=m!=='plan';previewSoon()}
 function render(){
- if(!INFO_SET&&S.info){INFO_SET=true;$('sl').value=S.info.defSl;$('tp').value=S.info.defTp;document.title='RIKSORA Local Trader — '+S.info.symbol;window.DEC=S.info.dec}
+ applyMethod();
  $('t').textContent=S.timeIso;$('bid').textContent=f(S.bid);$('ask').textContent=f(S.ask);$('spr').textContent=f(S.spread);
  $('bal').textContent=S.balance;$('real').textContent=S.realized;
  let fl=S.orders.reduce((a,o)=>a+(o.floating?+o.floating:0),0);$('flt').textContent=fl.toFixed(2);$('flt').className='v '+(fl>=0?'pos':'neg');
  $('real').className='v '+(+S.realized>=0?'pos':'neg');
  $('badges').innerHTML=(S.unresolved?'<span class="badge bad">UNRESOLVED — sesi berhenti</span> ':'')+(!S.quoteFresh&&S.bid?'<span class="badge bad">quote tidak segar</span> ':'')+(S.atEnd?'<span class="badge">akhir data</span>':'')+` <span class="badge">${S.progress.group}/${S.progress.groups} grup</span>`;
+ $('eta').textContent=S.nextEvent?'(≈ +'+mm(S.nextEvent.inSeconds)+')':'';$('next').disabled=!S.nextEvent&&!S.orders.some(o=>o.status==='PENDING'||o.status==='ACTIVE');
  $('orders').innerHTML='<tr><th>ID</th><th>Sisi</th><th>Status</th><th>Entry</th><th>SL/TP</th><th>P/L</th><th></th></tr>'+S.orders.slice().reverse().slice(0,12).map(o=>{
-  const pl=o.status==='ACTIVE'?o.floating:o.pnl;const act=o.status==='ACTIVE'?`<button onclick="act('close','${o.id}')">Tutup</button>`:o.status==='PENDING'?`<button onclick="act('cancel','${o.id}')">Batal</button>`:'';
-  return `<tr><td>${o.id.replace('order:','#')}</td><td>${o.side==='LONG'?'BUY':'SELL'} ${o.lots}</td><td>${o.status}</td><td>${o.fill||o.entry}</td><td>${o.sl||'-'} / ${o.tp||'-'}</td><td class="${+pl>=0?'pos':'neg'}">${pl}</td><td>${act}</td></tr>`}).join('');
+  const pl=o.status==='ACTIVE'?o.floating:o.pnl;let act='';
+  if(o.status==='ACTIVE')act=proto()?'<span class="k" title="Protocol: keluar hanya lewat SL/TP terencana">🔒</span>':(o.exitRequested?'<span class="k">menunggu tick</span>':`<button onclick="act('close','${o.id}')">Tutup</button> <button onclick="act('close','${o.id}',true)">½</button>`);
+  else if(o.status==='PENDING')act=`<button onclick="act('cancel','${o.id}')">Batal</button>`;
+  return `<tr><td>${o.id.replace('order:','#')}</td><td>${o.side==='LONG'?'BUY':'SELL'} ${o.lots}</td><td>${o.status}${o.status==='PENDING'?' '+o.type:''}</td><td>${o.fill||o.entry}</td><td>${o.sl||'-'} / ${o.tp||'-'}</td><td class="${+pl>=0?'pos':'neg'}">${f(pl)}</td><td>${act}</td></tr>`}).join('');
  $('trades').innerHTML='<tr><th>ID</th><th>Sisi</th><th>Entry</th><th>Exit</th><th>P/L</th><th>Alasan</th></tr>'+S.trades.slice().reverse().slice(0,15).map(t=>`<tr><td>${t.id.replace('order:','#')}</td><td>${t.side||''} ${t.lots||''}</td><td>${t.entry||''}</td><td>${t.exit||''}</td><td class="${+t.pnl>=0?'pos':'neg'}">${t.pnl}</td><td>${t.reason||''}</td></tr>`).join('');
+ const st=S.stats;$('stat').innerHTML=`<div><b>${st.exits}</b><span class="k">exit</span></div><div><b>${st.winRate||'-'}</b><span class="k">menang</span></div><div><b class="${+st.net>=0?'pos':'neg'}">${st.net}</b><span class="k">net</span></div><div><b>${st.refusals}</b><span class="k">ditolak</span></div>`;
  $('log').innerHTML=S.events.slice().reverse().map(e=>`${new Date(e.timeMs).toISOString().slice(11,19)} ${e.kind} ${e.orderId||''} ${e.price||''} ${e.reason||''} ${e.pnl||''}`).join('<br>');
- draw()}
+ $('ref').innerHTML=S.refusals.length?S.refusals.slice().reverse().map(r=>`${new Date(r.timeMs).toISOString().slice(11,19)} ${r.action} → <b>${r.code}</b> ${r.reason}`).join('<br>'):'belum ada';
+ const key=S.events.length?JSON.stringify(S.events[S.events.length-1]):'';if(timer&&$('autoStop').checked&&key&&key!==lastEv&&lastEv!=='')stop();lastEv=key;
+ draw();previewSoon()}
 function draw(){
  const cv=$('c'),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext('2d');g.scale(dpr,dpr);
  const st=getComputedStyle(document.body),up=st.getPropertyValue('--up'),dn=st.getPropertyValue('--dn'),mu=st.getPropertyValue('--mu'),ln=st.getPropertyValue('--line'),tx=st.getPropertyValue('--tx');
- g.clearRect(0,0,w,h);if(!CANDLES.length){g.fillStyle=mu;g.fillText('Belum ada tick. Tekan Maju.',20,30);return}
+ g.clearRect(0,0,w,h);if(!CANDLES.length){g.fillStyle=mu;g.fillText('Belum ada tick. Tekan Maju.',20,30);SCALE=null;return}
  const n=Math.min(CANDLES.length,Math.floor((w-70)/8)),cs=CANDLES.slice(-n);
  const lines=[];S.orders.filter(o=>o.status==='ACTIVE'||o.status==='PENDING').forEach(o=>{[['entry',o.fill||o.entry,tx],['sl',o.sl,dn],['tp',o.tp,up]].forEach(([k,v,c])=>{if(v)lines.push([+v,c,k+' '+o.id.replace('order:','#')])})});
+ const pv=mode==='plan'&&PRE&&PRE.ok?PRE.preview:null;if(pv){[['entry',pv.entry,tx],['SL',pv.sl,dn],['TP',pv.tp,up]].forEach(([k,v,c])=>{if(v)lines.push([+v,c,'rencana '+k,true])})}
  let hi=Math.max(...cs.map(c=>c[2])),lo=Math.min(...cs.map(c=>c[3]));lines.forEach(l=>{hi=Math.max(hi,l[0]);lo=Math.min(lo,l[0])});const pad=(hi-lo)*.05||.5;hi+=pad;lo-=pad;
- const Y=p=>10+(hi-p)/(hi-lo)*(h-30),cw=(w-70)/n;
+ const Y=p=>10+(hi-p)/(hi-lo)*(h-30),cw=(w-70)/n;SCALE={hi,lo,h};
  g.strokeStyle=ln;g.fillStyle=mu;g.font='11px system-ui';for(let i=0;i<=5;i++){const p=lo+(hi-lo)*i/5,y=Y(p);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.fillText(p.toFixed(window.DEC||3),w-56,y+4)}
+ if(pv&&pv.sl&&pv.tp){const e=Y(+pv.entry);g.globalAlpha=.12;g.fillStyle=dn;g.fillRect(0,Math.min(e,Y(+pv.sl)),w-60,Math.abs(Y(+pv.sl)-e));g.fillStyle=up;g.fillRect(0,Math.min(e,Y(+pv.tp)),w-60,Math.abs(Y(+pv.tp)-e));g.globalAlpha=1}
  cs.forEach((c,i)=>{const x=i*cw+cw/2,col=c[4]>=c[1]?up:dn;g.strokeStyle=col;g.fillStyle=col;g.beginPath();g.moveTo(x,Y(c[2]));g.lineTo(x,Y(c[3]));g.stroke();
   const y1=Y(c[1]),y2=Y(c[4]);g.fillRect(x-cw*.35,Math.min(y1,y2),cw*.7,Math.max(1,Math.abs(y1-y2)))});
- lines.forEach(([p,c,t])=>{const y=Y(p);g.strokeStyle=c;g.setLineDash([5,4]);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.setLineDash([]);g.fillStyle=c;g.fillText(t,6,y-3)});
+ lines.forEach(([p,c,t,plan])=>{const y=Y(p);g.strokeStyle=c;g.setLineDash(plan?[2,3]:[5,4]);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.setLineDash([]);g.fillStyle=c;g.fillText(t,6,y-3)});
  if(S.ask){g.strokeStyle=up;g.setLineDash([2,3]);let y=Y(+S.ask);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.strokeStyle=dn;y=Y(+S.bid);g.beginPath();g.moveTo(0,y);g.lineTo(w-60,y);g.stroke();g.setLineDash([])}}
-async function adv(sec,until){try{await refresh(await call('/api/advance',{seconds:sec,untilEvent:!!until}))}catch(e){stop()}}
-async function order(side){const typ=$('typ').value,lots=$('lots').value;let entry=+($('entry').value||0);const sl=+$('sl').value,tp=+$('tp').value,d=side==='BUY'?1:-1;
- const ref=typ==='MARKET'?(side==='BUY'?+S.ask:+S.bid):entry;if(!ref){$('err').textContent='isi harga entry untuk pending';return}
- const body={side,type:typ,lots,entry:typ==='MARKET'?undefined:entry,sl:sl?(ref-d*sl).toFixed(window.DEC||3):null,tp:tp?(ref+d*tp).toFixed(window.DEC||3):null};
- try{await refresh(await call('/api/order',body))}catch(e){}}
-async function act(kind,id){try{await refresh(await call('/api/'+kind,{orderId:id}))}catch(e){}}
+$('c').onclick=ev=>{if(mode!=='plan'||!SCALE)return;const pick=document.querySelector('input[name=pick]:checked').value;if(!pick)return;
+ const r=$('c').getBoundingClientRect(),y=ev.clientY-r.top,{hi,lo,h}=SCALE;let p=hi-(y-10)/(h-30)*(hi-lo);const tk=+S.info.tick;p=Math.round(p/tk)*tk;$(pick).value=p.toFixed(S.info.dec);if(pick==='sl')$('slTicks').value='';
+ if(pick==='tp'){rrSel='manual';buildPlanStatic()}previewSoon()};
+function ref(){return +($('entry').value||(side==='BUY'?S.ask:S.bid))}
+$('slTicks').oninput=()=>{const t=+$('slTicks').value;if(!t||!S.ask)return;const tk=+S.info.tick,d=side==='BUY'?1:-1;$('sl').value=(ref()-d*t*tk).toFixed(S.info.dec);previewSoon()};
+['entry','sl','tp','risk','lotsMan','qLots'].forEach(i=>$(i).oninput=previewSoon);
+function obs(){return [...document.querySelectorAll('#checklist select')].map(s=>({conditionId:s.dataset.c,outcome:s.value}))}
+function draft(){
+ if(mode==='quick')return{side:$('qSide')?.value||side,workflow:'QUICK',lots:$('qLots').value};
+ const manualTp=rrSel==='manual'&&!proto();
+ return{side,workflow:'PLANNED',entry:$('entry').value||undefined,sl:$('sl').value||undefined,tpMode:manualTp?'PRICE':'RR',rr:manualTp?undefined:(proto()?undefined:rrSel),tp:manualTp?$('tp').value:undefined,
+  riskPercent:$('risk').value||'1',lots:proto()?undefined:($('lotsMan').value||undefined),observations:obs()}}
+function previewSoon(){clearTimeout(pvTimer);pvTimer=setTimeout(doPreview,200)}
+async function doPreview(){
+ if(!S||mode!=='plan'){PRE=null;return}
+ const d=draft();
+ if(!d.sl){PRE=null;$('pv').innerHTML='<span class="k">Isi SL (harga, tick, atau klik chart) untuk melihat lot, risiko, dan R:R.</span>';return}
+ try{PRE=await call('/api/preview',d,true);const p=PRE.preview;
+  $('otype').textContent=p.orderType;$('otype').className='badge '+(p.orderType==='MARKET'?'':'free');
+  if(!$('tp').disabled&&rrSel!=='manual')$('tp').value=p.tp||'';else if(proto())$('tp').value=p.tp||'';
+  $('pv').innerHTML=`<div><span>Order</span><b>${p.side} ${p.orderType}</b></div><div><span>Lot</span><b>${p.lots}</b></div><div><span>Risiko</span><b class="neg">${p.riskAmount} (${p.riskOfBalance}% saldo)</b></div><div><span>Target</span><b class="pos">${p.estProfit}</b></div><div><span>R:R</span><b>1 : ${p.rr}</b></div><div><span>Jarak SL / TP</span><b>${p.stopTicks} / ${p.rewardTicks} tick</b></div><div class="k">${p.pending?'Pending: aktif saat harga menyentuh entry.':'Market: terisi '+p.fills+'.'} Ini estimasi; review menampilkan angka final.</div>`;
+ }catch(e){PRE=null;$('pv').innerHTML=`<div class="bad">${msg(e.j||{})}</div>`}
+ draw()}
+async function startReview(d,from){opener=from;try{const r=await call('/api/review',d);REV=r;const p=r.preview,m=S.method;
+  const cl=d.observations&&d.observations.length?'<tr><td>Checklist</td><td>'+d.observations.map(o=>o.outcome).join(', ')+'</td></tr>':'';
+  $('revBody').innerHTML=`<table><tr><td>Method</td><td>${m.name} (${m.kind})</td></tr><tr><td>Sisi / jenis</td><td><b>${p.side} ${p.orderType}</b> (${p.workflow})</td></tr><tr><td>Entry</td><td>${p.entry}</td></tr><tr><td>SL / TP</td><td>${p.sl||'-'} / ${p.tp||'-'}</td></tr><tr><td>Lot</td><td>${p.lots}</td></tr><tr><td>Risiko</td><td>${p.riskAmount?p.riskAmount+' ('+p.riskOfBalance+'% saldo)':'tanpa SL: risiko tidak dihitung'}</td></tr><tr><td>Target / R:R</td><td>${p.estProfit||'-'} / ${p.rr?'1:'+p.rr:'-'}</td></tr>${cl}<tr><td>Eksekusi</td><td>${p.pending?'pending, menunggu harga menyentuh entry':'market, '+p.fills} (bukan fill instan, tanpa slippage/komisi)</td></tr></table>`;
+  $('revErr').textContent='';$('rev').showModal();$('revOk').focus()}catch(e){}}
+$('revOk').onclick=async()=>{try{await refresh(await call('/api/confirm',{reviewId:REV.reviewId},true));$('rev').close();$('err').textContent='';if(mode==='plan'){['entry','sl','slTicks','tp'].forEach(i=>$(i).value='');document.querySelectorAll('#checklist select').forEach(s=>s.value='NOT_ASSESSED')}}catch(e){$('revErr').textContent=msg(e.j||{});await refresh()}};
+$('revNo').onclick=()=>$('rev').close();$('rev').addEventListener('close',()=>{if(opener)opener.focus()});
+$('qBuy').onclick=()=>startReview({side:'BUY',workflow:'QUICK',lots:$('qLots').value},$('qBuy'));$('qSell').onclick=()=>startReview({side:'SELL',workflow:'QUICK',lots:$('qLots').value},$('qSell'));
+$('doReview').onclick=()=>startReview(draft(),$('doReview'));
+$('addStops').onclick=()=>{$('entry').value='';setMode('plan')};
+$('tabQuick').onclick=()=>!proto()&&setMode('quick');$('tabPlan').onclick=()=>setMode('plan');
+$('sideBuy').onclick=()=>{side='BUY';$('sideBuy').classList.remove('off');$('sideSell').classList.add('off');$('slTicks').oninput();previewSoon()};
+$('sideSell').onclick=()=>{side='SELL';$('sideSell').classList.remove('off');$('sideBuy').classList.add('off');$('slTicks').oninput();previewSoon()};
+async function adv(sec,until,toEnd){try{const s=await call('/api/advance',{seconds:sec,untilEvent:!!until,toEnd:!!toEnd});
+  const j=s.jump;$('jumpmsg').textContent=!j?'':j.jumped?`Lompat ${mm((j.toMs-j.fromMs)/1000)} simulasi ke event (${j.steps} langkah)`:(j.reason==='NO_LIVE_ORDER'?'Tidak ada order pending/aktif: tidak ada event untuk dituju.':'Tidak ada event sampai akhir data. Gunakan "Ke akhir" kalau mau melompat ke sana.');
+  await refresh(s)}catch(e){stop()}}
+async function act(kind,id,half){let body={orderId:id};if(half){const o=S.orders.find(x=>x.id===id),step=+S.info.lotStep;let q=Math.floor(+o.remaining/2/step+1e-9)*step;if(q<+S.info.minLot){$('err').textContent='Lot terlalu kecil untuk ditutup sebagian.';return}body.quantity=q.toFixed(4).replace(/\.?0+$/,'')}
+ try{await refresh(await call('/api/'+kind,body))}catch(e){await refresh()}}
 function stop(){if(timer){clearInterval(timer);timer=null;$('play').textContent='▶ Putar'}}
 document.querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>adv(+b.dataset.adv));
-document.querySelectorAll('.tf').forEach(b=>b.onclick=()=>{TF=+b.dataset.tf;document.querySelectorAll('.tf').forEach(x=>x.classList.toggle('on',x===b));refresh()});
-$('next').onclick=()=>adv(0,true);$('buy').onclick=()=>order('BUY');$('sell').onclick=()=>order('SELL');
-$('play').onclick=()=>{if(timer)return stop();$('play').textContent='⏸ Jeda';timer=setInterval(()=>adv(+$('speed').value*0.5),500)};
-window.addEventListener('resize',()=>S&&draw());refresh();
+$('next').onclick=()=>adv(0,true);$('toEnd').onclick=()=>{stop();adv(0,false,true)};
+$('play').onclick=()=>{if(timer)return stop();lastEv=S.events.length?JSON.stringify(S.events[S.events.length-1]):'';$('play').textContent='⏸ Jeda';timer=setInterval(()=>adv(+$('speed').value*0.5),500)};
+// sessions
+$('sessBtn').onclick=async()=>{stop();const l=(await call('/api/sessions')).sessions;$('sessList').innerHTML=l.length?'<table>'+l.map(s=>`<tr><td>${s.name}${s.current?' <span class="badge">aktif</span>':''}</td><td>${s.kind}</td><td>${s.balance}</td><td><button onclick="openSess('${s.id}')">Buka</button></td></tr>`).join('')+'</table>':'<span class="k">belum ada</span>';$('sessDlg').showModal()};
+async function openSess(id){try{await refresh(await call('/api/open_session',{id}));$('sessDlg').close()}catch(e){$('nsErr').textContent=e.message}}
+document.querySelectorAll('input[name=nsKind]').forEach(r=>r.onchange=()=>$('nsProto').hidden=document.querySelector('input[name=nsKind]:checked').value!=='PROTOCOL');
+$('nsClose').onclick=()=>$('sessDlg').close();
+$('nsGo').onclick=async()=>{const kind=document.querySelector('input[name=nsKind]:checked').value;
+ const method=kind==='PROTOCOL'?{kind,name:'Protocol 1:'+$('nsRr').value+' / '+$('nsRisk').value+'%',riskPercent:$('nsRisk').value,rr:$('nsRr').value,checklistOn:$('nsOn').checked,conditions:$('nsCond').value.split('\n')}:{kind,name:'Free Style'};
+ try{rrSel=kind==='PROTOCOL'?$('nsRr').value:'2';mode=kind==='PROTOCOL'?'plan':'quick';await refresh(await call('/api/new_session',{method,balance:$('nsBal').value,name:$('nsName').value||undefined},true));setMode(mode);$('sessDlg').close();$('nsErr').textContent=''}catch(e){$('nsErr').textContent=msg(e.j||{})+' '+((e.j||{}).field||'')}};
+window.addEventListener('resize',()=>S&&draw());tfButtons();buildPlanStatic();refresh().then(()=>setMode(proto()?'plan':'quick'));
 </script></body></html>

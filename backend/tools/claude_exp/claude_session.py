@@ -156,15 +156,15 @@ class AdmittedSource:
 
 
 class ClaudeSession:
-    def __init__(self, source, profile, policy, seed_checkpoint, session_id="session:qa", start_ns=None, archive=False):
+    def __init__(self, source, profile, policy, seed_checkpoint, session_id="session:qa", start_ns=None, archive=False, balance="10000"):
         self.src = source
         self.archive = archive
         self.retention = K.QA_ORDER_RETENTION_V4 if archive else None
         self.opened_ids = set()
         if archive:
-            self.state = K.seed_state(session_id, profile, policy, seed_checkpoint, order_retention_policy=self.retention, qa_order_archive_v1=True)
+            self.state = K.seed_state(session_id, profile, policy, seed_checkpoint, balance, order_retention_policy=self.retention, qa_order_archive_v1=True)
         else:
-            self.state = K.seed_state(session_id, profile, policy, seed_checkpoint)
+            self.state = K.seed_state(session_id, profile, policy, seed_checkpoint, balance)
         self.guard = int(self.state["profile"]["maxObservedSilenceNs"])
         self.start_ns = int(self.state["startNs"])
         prev = np.r_[self.start_ns, source.gts[:-1]]
@@ -303,6 +303,20 @@ class ClaudeSession:
         s["nextGroupIndex"] = str(int(s["nextGroupIndex"]) + (j - i))
         self.stats["skipped_groups"] += j - i; self.stats["jumps"] += 1
 
+    def next_event_ns(self):
+        """Time of the first revealed group at which a live order could change (exact integer proof) or a data gap is crossed.
+        None when no order is live or nothing more can happen inside the source. Never looks at an order's outcome, only at
+        where it could first be decided, so this is the "jump to next event" target."""
+        s, src = self.state, self.src
+        if not K._live(s) or s["unresolved"] or s["ended"]:
+            return None
+        i = int(s["nextGroupIndex"])
+        j = src.first_order_event(s, i, src.ngroups)
+        k = int(np.searchsorted(self.gap_idx, i))
+        if k < len(self.gap_idx):
+            j = min(j, int(self.gap_idx[k]))
+        return int(src.gts[j]) if j < src.ngroups else None
+
     def advance_through(self, target):
         s = self.state
         old, target = int(s["throughNs"]), int(target)
@@ -355,7 +369,7 @@ class ClaudeSession:
     def recover(cls, source, profile, policy, seed_checkpoint, snap):
         """Cheap recovery: verify the hash chain over the durable log, that the saved state is exactly the state the last
         record committed to, and that the cursor is inside the pinned source."""
-        self = cls(source, profile, policy, seed_checkpoint, archive=snap.get("archive", False))
+        self = cls(source, profile, policy, seed_checkpoint, archive=snap.get("archive", False), balance=snap["state"]["initialBalance"], session_id=snap["state"]["sessionId"])
         tip = self.tip
         for rec in snap["log"]:
             tip = hashlib.sha256((tip + "|" + json.dumps(rec, sort_keys=True, separators=(",", ":"))).encode()).hexdigest()
@@ -386,7 +400,7 @@ class ClaudeSession:
     def verify_by_replay(cls, source, profile, policy, seed_checkpoint, snap):
         """Independent recovery proof: deterministically re-execute every logged advance/command from the seed and require
         byte-identical state and chain. Affordable because the jump engine replays millions of ticks per second."""
-        self = cls(source, profile, policy, seed_checkpoint, archive=snap.get("archive", False))
+        self = cls(source, profile, policy, seed_checkpoint, archive=snap.get("archive", False), balance=snap["state"]["initialBalance"], session_id=snap["state"]["sessionId"])
         for rec in snap["log"]:
             if rec["t"] == "A":
                 self.advance_through(rec["target"])

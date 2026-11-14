@@ -31,6 +31,11 @@ def _validate(raw):
     xau = json.loads(json.dumps(raw))
     xau.update(symbol="XAUUSD", baseCurrency="XAU", tickSize="0.001", priceScale="1000", contractSize="100")
     xau["primary"]["providerSymbol"] = "XAUUSD"
+    # QA-only knob: the frozen XAUUSD profile fixes the silence guard at 60 s. FX quotes are only published when the price changes, so
+    # quiet minutes are normal; a local session may widen the guard (60 s..1 h). It stays a hard guard: longer silence = UNRESOLVED.
+    guard = raw.get("maxObservedSilenceNs")
+    require(type(guard) is str and guard.isdigit() and 60 * 10**9 <= int(guard) <= 3600 * 10**9, "maxObservedSilenceNs", "REFUSED_OBSERVED_MODEL_ASSUMPTION")
+    xau["maxObservedSilenceNs"] = "60000000000"
     _orig(xau)                         # every remaining rule of the original validator still applies
     result = canonical_bytes(raw)
     require(len(result) <= 16384, "profileBytes")
@@ -41,9 +46,11 @@ def install():
     OP.validate_profile = _validate
 
 
-def fx_profile_wire(base_wire, symbol, primary):
+def fx_profile_wire(base_wire, symbol, primary, silence_s=None):
     base, tick, scale, contract = FX[symbol]
     raw = json.loads(json.dumps(base_wire))
     raw.update(symbol=symbol, baseCurrency=base, quoteCurrency="USD", tickSize=tick, priceScale=scale, contractSize=contract)
     raw["primary"] = dict(primary, providerSymbol=symbol)
+    if silence_s is not None:
+        raw["maxObservedSilenceNs"] = str(int(silence_s) * 10**9)
     return raw

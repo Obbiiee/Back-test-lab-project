@@ -1,10 +1,12 @@
 """Local manual-trading app on the Claude engine (QA/prototype, single user, no PostgreSQL).
 
-    py -m tools.claude_exp.local_trader.server --zip <Dukascopy XAUUSD monthly zip> --ticks 400000 --offset 0
+    py -m tools.claude_exp.local_trader.server --zip <monthly zip> --pair EURUSD --ticks 400000 --offset 0
 
 Everything financial goes through the reference reducer (observed_kernel); this file only serves the UI. The browser never
 receives a tick or candle after the session cursor (no look-ahead): candles are built server-side from revealed ticks only.
-Prices are XAUUSD (profile fixture: contract size 100, tick 0.001). Execution model: observed quotes only, no slippage/commission.
+Trading methods follow docs/TRADING_METHOD_SESSION_SPEC.md: FREE_STYLE (Quick + Planned) and PROTOCOL (Planned pending only,
+locked risk and RR, checklist ON/OFF). Rules are enforced by the product's own contracts (see domain.py), not re-implemented.
+Execution model: observed quotes only, no slippage/commission.
 """
 import argparse, hashlib, json, os, sys, tempfile, threading, time
 from decimal import Decimal
@@ -15,14 +17,17 @@ from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
 from common import *                        # noqa: E402  (stubs psycopg, adds backend to sys.path)
 from claude_session import AdmittedSource, ClaudeSession    # noqa: E402
 from market_data.compact_tick import write_compact          # noqa: E402
 from contracts.primitives import ContractError              # noqa: E402
+from domain import build, make_method, method_view          # noqa: E402
 import numpy as np                                          # noqa: E402
 
 LOCK = threading.Lock()
 S = {}
+SESS_DIR = None
 
 
 def build_histdata(zip_path, pair, offset, ticks, cache):
@@ -76,11 +81,10 @@ def build_dataset(zip_path, offset, ticks, cache):
     return root, meta
 
 
-def open_session(zip_path, offset, ticks, cache, pair="XAUUSD"):
+def open_source(zip_path, offset, ticks, cache, pair="XAUUSD", silence_s=300):
     root, meta = build_dataset(zip_path, offset, ticks, cache) if pair == "XAUUSD" else build_histdata(zip_path, pair, offset, ticks, cache)
     meta.setdefault("pair", "XAUUSD")
     os.environ["XAU_TICK_ZIP"] = str(zip_path)
-    # the stub store must carry the SAME dataset identity as the compact manifest parent; rebuild it deterministically
     adm = meta["adm"]
     src = AdmittedSource(root / "compact", adm, expected_manifest_hash=adm["manifestHash"], deep_verify=True)
     primary = dict(datasetId=adm["datasetId"], datasetVersion=adm["datasetVersion"], providerId=adm["providerId"],
@@ -90,9 +94,20 @@ def open_session(zip_path, offset, ticks, cache, pair="XAUUSD"):
     else:
         import fx_profile
         fx_profile.install()
-        profile_raw = fx_profile.fx_profile_wire(PROFILE, pair, primary)
+        profile_raw = fx_profile.fx_profile_wire(PROFILE, pair, primary, silence_s)
     profile = ObservedExecutionProfile.from_wire(profile_raw)
     return src, profile, meta["seed"], meta
+
+
+def method_json():
+    return method_view(S["defn"], S["policy"])
+
+
+def stats():
+    tr = [float(t["pnl"]) for t in S["trades"] if t.get("pnl") is not None]
+    wins = [x for x in tr if x > 0]
+    return dict(exits=len(tr), wins=len(wins), losses=len([x for x in tr if x < 0]), net=f"{sum(tr):.2f}",
+                winRate=None if not tr else f"{len(wins) / len(tr) * 100:.0f}%", refusals=len(S["refusals"]))
 
 
 def session_json():
@@ -107,7 +122,8 @@ def session_json():
     orders = []
     for oid, o in st["orders"].items():
         row = dict(id=oid, side=o["side"], type=o["orderType"], status=o["status"], lots=o["quantity"], entry=o["entry"], sl=o["sl"], tp=o["tp"],
-                   fill=o["entryPrice"], pnl=o["grossPosted"], remaining=o["remaining"])
+                   fill=o["entryPrice"], pnl=o["grossPosted"], remaining=o["remaining"], workflow=o.get("workflow"),
+                   exitRequested=o.get("exitRequest") is not None)
         if o["status"] == "ACTIVE" and bid is not None:
             px = Fraction(bid, sc) if o["side"] == "LONG" else Fraction(ask, sc)
             e = Fraction(o["entryPrice"])
@@ -115,13 +131,19 @@ def session_json():
             row["floating"] = f"{float((px - e) * d * contract * Fraction(o['remaining'])):.2f}"
         orders.append(row)
     thr = int(st["throughNs"])
+    nxt = cs.next_event_ns()
+    pr = st["profile"]
     return dict(time=thr // 1_000_000, timeIso=time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(thr / 1e9)),
-                balance=st["balance"], realized=st["realizedGross"], bid=None if bid is None else f"{bid/sc:.{dec}f}",
+                balance=st["balance"], initialBalance=st["initialBalance"], realized=st["realizedGross"],
+                bid=None if bid is None else f"{bid/sc:.{dec}f}",
                 ask=None if ask is None else f"{ask/sc:.{dec}f}", spread=None if bid is None else f"{(ask-bid)/sc:.{dec}f}",
-                info=dict(symbol=S["meta"]["pair"], dec=dec, defSl="2" if dec == 3 else "0.0010", defTp="3" if dec == 3 else "0.0015", lot="0.01"),
+                info=dict(symbol=S["meta"]["pair"], dec=dec, tick=pr["tickSize"], contract=pr["contractSize"], lotStep=pr["lotStep"], minLot=pr["minLot"],
+                          maxLot=pr["maxLot"], defLot="0.01", silenceSeconds=int(pr["maxObservedSilenceNs"]) // 10**9, sessionName=S["name"], sessionId=S["sid"]),
+                method=method_json(), stats=stats(), refusals=S["refusals"][-12:],
                 unresolved=st["unresolved"], ended=st["ended"], orders=orders,
                 quoteFresh=bool(st["quoteBasis"] is not None and thr - int(st["quoteBasis"]["timeNs"]) <= int(st["profile"]["maxObservedSilenceNs"])),
                 progress=dict(group=k, groups=src.ngroups, startMs=S["meta"]["start_ms"], endMs=S["meta"]["end_ms"]),
+                nextEvent=None if nxt is None else dict(timeMs=nxt // 1_000_000, inSeconds=max(0, (nxt - thr) // 10**9)),
                 atEnd=k >= src.ngroups, events=S["events"][-40:], trades=S["trades"][-40:], model="observed quotes only; no slippage/commission")
 
 
@@ -159,27 +181,121 @@ def log_events(evs):
                                     pnl=d.get("grossPosted"), reason=d.get("reason"), timeMs=now))
 
 
+def session_file(sid):
+    return SESS_DIR / (sid.replace(":", "_") + ".json")
+
+
 def save():
-    S["snap_path"].write_text(json.dumps(dict(snapshot=S["cs"].snapshot(), events=S["events"], trades=S["trades"], meta_orders=S["meta_orders"])))
+    session_file(S["sid"]).write_text(json.dumps(dict(
+        sid=S["sid"], name=S["name"], dataset=S["meta"]["adm"]["manifestHash"], defn=S["defn"], balance=S["cs"].state["initialBalance"],
+        savedMs=int(time.time() * 1000), snapshot=S["cs"].snapshot(), events=S["events"], trades=S["trades"], meta_orders=S["meta_orders"],
+        refusals=S["refusals"], serial=S.get("serial", 0))))
 
 
-def do_advance(seconds, until_event=False, max_seconds=6 * 3600):
+def new_session(defn_in, balance, name):
+    """A session inherits its method. The method is immutable after this call (its hash is part of the session's identity)."""
+    kind = defn_in["kind"]
+    policy, defn = make_method(kind, defn_in.get("name") or ("Free Style" if kind == "FREE_STYLE" else "Protocol"),
+                               defn_in.get("riskPercent"), defn_in.get("rr"), defn_in.get("conditions") or [], defn_in.get("checklistOn", False))
+    bal = f"{Decimal(str(balance)):f}"
+    if not (Decimal("100") <= Decimal(bal) <= Decimal("100000000")):
+        raise ContractError("INVALID_INPUT", "balance")
+    sid = f"session:{int(time.time() * 1000)}"
+    cs = ClaudeSession(S["src"], S["profile"], policy, S["meta"]["seed"], session_id=sid, archive=True, balance=bal)
+    S.update(cs=cs, sid=sid, policy=policy, defn=defn, name=(name or defn["name"])[:60], events=[], trades=[], meta_orders={}, refusals=[],
+             reviews={}, serial=0)
+    save()
+
+
+def load_session(sid):
+    saved = json.loads(session_file(sid).read_text())
+    d = saved["defn"]
+    policy, defn = make_method(d["kind"], d["name"], d["riskPercent"], d["rr"], [c["label"] for c in d["conditions"]], d["checklistOn"])
+    if defn != d:
+        raise ValueError("METHOD_DEFINITION_CHANGED")
+    cs = ClaudeSession.recover(S["src"], S["profile"], policy, S["meta"]["seed"], saved["snapshot"])
+    S.update(cs=cs, sid=saved["sid"], policy=policy, defn=defn, name=saved["name"], events=saved["events"], trades=saved["trades"],
+             meta_orders=saved["meta_orders"], refusals=saved.get("refusals", []), reviews={}, serial=saved.get("serial", 0))
+
+
+def saved_sessions():
+    out = []
+    for f in sorted(SESS_DIR.glob("session_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            j = json.loads(f.read_text())
+        except Exception:
+            continue
+        if j.get("dataset") == S["meta"]["adm"]["manifestHash"]:
+            out.append(dict(id=j["sid"], name=j["name"], kind=j["defn"]["kind"], balance=j["balance"], savedMs=j["savedMs"], current=j["sid"] == S.get("sid")))
+    return out
+
+
+def refuse(action, e):
+    S["refusals"].append(dict(timeMs=int(S["cs"].state["throughNs"]) // 1_000_000, action=action, code=e.code, reason=e.field))
+    save()
+
+
+def do_advance(seconds):
     cs, src = S["cs"], S["src"]
-    end = int(src.gts[-1])
-    start = int(cs.state["throughNs"])
-    live = lambda: any(o["status"] in ("PENDING", "ACTIVE") for o in cs.state["orders"].values())
-    if until_event:
-        step, limit, target0 = 5 * 10**9, start + max_seconds * 10**9, start
-        while True:
-            t = min(int(cs.state["throughNs"]) + step, limit, end)
-            before = len(S["events"])
-            evs = cs.advance_through(t); log_events(evs)
-            if len(S["events"]) > before or cs.state["unresolved"] or t >= end or t >= limit or not live():
-                break
-            step = min(step * 2, 600 * 10**9)
-        return
-    t = min(start + int(seconds * 1e9), end)
+    t = min(int(cs.state["throughNs"]) + int(seconds * 1e9), int(src.gts[-1]))
     log_events(cs.advance_through(t))
+
+
+def jump_next_event():
+    """Exact jump: the source proves where a live order can first change; everything before it is skipped, then that group is
+    processed by the reference rules. Repeats only when the proof is unavailable (never guesses)."""
+    cs = S["cs"]
+    start, moves = int(cs.state["throughNs"]), 0
+    while True:
+        t = cs.next_event_ns()
+        if t is None:
+            live = any(o["status"] in ("PENDING", "ACTIVE") for o in cs.state["orders"].values())
+            return dict(jumped=moves > 0, reason=("NO_EVENT_BEFORE_END_OF_DATA" if live else "NO_LIVE_ORDER") if moves == 0 else "NO_MORE_EVENTS")
+        before = len(S["events"])
+        log_events(cs.advance_through(t)); moves += 1
+        if len(S["events"]) > before or cs.state["unresolved"] or moves > 200000:
+            return dict(jumped=True, reason="EVENT", fromMs=start // 10**6, toMs=int(cs.state["throughNs"]) // 10**6, steps=moves)
+
+
+def review(body, store):
+    cs = S["cs"]
+    try:
+        payload, prev = build(cs.state, body, len(str(S["src"].scale)) - 1)
+    except ContractError as e:
+        if store:
+            refuse("REVIEW_" + str(body.get("workflow")), e)
+        raise
+    if not store:
+        return dict(ok=True, preview=prev)
+    S["review_serial"] = S.get("review_serial", 0) + 1
+    rid = f"review:{S['review_serial']}"
+    S["reviews"][rid] = dict(payload=payload, revision=cs.state["revision"], preview=prev, status="OPEN", orderId=None)
+    return dict(ok=True, reviewId=rid, preview=prev, basisRevision=cs.state["revision"])
+
+
+def confirm(body):
+    cs = S["cs"]
+    r = S["reviews"].get(body.get("reviewId"))
+    if r is None:
+        raise ContractError("RESOURCE_UNAVAILABLE", "review")
+    if r["status"] == "CONFIRMED":                      # same reviewed snapshot confirmed twice -> the prior result, no second order
+        return dict(session_json(), duplicate=True, orderId=r["orderId"])
+    if cs.state["revision"] != r["revision"]:
+        r["status"] = "STALE"
+        e = ContractError("REFUSED_STALE_REVISION", "harga sudah bergerak, review ulang")
+        refuse("CONFIRM", e)
+        raise e
+    S["serial"] = S.get("serial", 0) + 1
+    oid = f"order:{S['serial']}"
+    S["meta_orders"][oid] = dict(side=r["preview"]["side"])
+    try:
+        log_events(cs.command("OPEN", r["payload"], oid))
+    except ContractError as e:                          # the kernel re-checks everything; a UI bypass still lands here
+        refuse("CONFIRM", e)
+        raise
+    r["status"], r["orderId"] = "CONFIRMED", oid
+    save()
+    return dict(session_json(), orderId=oid)
 
 
 def api(path, q, body):
@@ -190,38 +306,37 @@ def api(path, q, body):
         tf = int(q.get("tf", ["60"])[0]); n = min(int(q.get("n", ["300"])[0]), 5000)
         return dict(tf=tf, candles=candles(tf, n))
     if path == "/api/advance":
-        do_advance(float(body.get("seconds", 1)), bool(body.get("untilEvent")))
-        save(); return session_json()
-    if path == "/api/order":
-        st = cs.state
-        side = "LONG" if body["side"] == "BUY" else "SHORT"
-        if st["quoteBasis"] is None:
-            raise ContractError("NO_FRESH_QUOTE", "advance until a quote arrives")
-        b = st["quoteBasis"]
-        typ = body.get("type", "MARKET")
-        d = 1 if side == "LONG" else -1
-        if typ == "MARKET":
-            entry = b["ask" if side == "LONG" else "bid"]; workflow = "QUICK"
+        res = None
+        if body.get("toEnd"):
+            do_advance((int(S["src"].gts[-1]) - int(cs.state["throughNs"])) / 1e9)
+        elif body.get("untilEvent"):
+            res = jump_next_event()
         else:
-            entry = f"{Decimal(str(body['entry'])):.{len(str(cs.src.scale)) - 1}f}"; workflow = "PLANNED"
-        def lvl(k):
-            v = body.get(k)
-            return None if v in (None, "", 0) else f"{Decimal(str(v)):.{len(str(cs.src.scale)) - 1}f}"
-        sl, tp = lvl("sl"), lvl("tp")
-        if workflow == "PLANNED" and (sl is None or tp is None):
-            raise ContractError("PLANNED_NEEDS_SL_TP", "pending orders need both SL and TP in this engine")
-        pay = dict(side=side, orderType=typ, workflow=workflow, entry=entry, quantity=str(body.get("lots", "0.01")), sl=sl, tp=tp,
-                   riskPercent="1", observations=[])
-        S["serial"] = S.get("serial", 0) + 1
-        S["meta_orders"][f"order:{S['serial']}"] = dict(side="BUY" if side == "LONG" else "SELL")
-        cs.command("OPEN", pay, f"order:{S['serial']}"); save(); return session_json()
+            do_advance(float(body.get("seconds", 1)))
+        save(); return dict(session_json(), jump=res)
+    if path == "/api/preview":
+        return review(body, False)
+    if path == "/api/review":
+        return review(body, True)
+    if path == "/api/confirm":
+        return confirm(body)
     if path in ("/api/close", "/api/cancel"):
         kind = "CLOSE" if path.endswith("close") else "CANCEL"
-        pay = dict(orderId=body["orderId"], quantity=None) if kind == "CLOSE" else dict(orderId=body["orderId"])
+        pay = dict(orderId=body["orderId"], quantity=body.get("quantity")) if kind == "CLOSE" else dict(orderId=body["orderId"])
         S["serial"] = S.get("serial", 0) + 1
-        log_events(cs.command(kind, pay, f"{kind.lower()}:{body['orderId']}:{S['serial']}"))
-        # a manual close fills on the NEXT revealed quote (reference semantics): advance the smallest step
+        try:
+            log_events(cs.command(kind, pay, f"{kind.lower()}:{body['orderId']}:{S['serial']}"))
+        except ContractError as e:
+            refuse(kind, e)
+            raise
         save(); return session_json()
+    if path == "/api/sessions":
+        return dict(sessions=saved_sessions())
+    if path == "/api/new_session":
+        new_session(body["method"], body.get("balance", "10000"), body.get("name"))
+        return session_json()
+    if path == "/api/open_session":
+        load_session(body["id"]); return session_json()
     raise KeyError(path)
 
 
@@ -248,26 +363,30 @@ class H(BaseHTTPRequestHandler):
             try:
                 self._send(200, api(u.path, parse_qs(u.query), body))
             except ContractError as e:
-                self._send(400, dict(error=f"{e.code}: {e.field}"))
+                self._send(400, dict(error=f"{e.code}: {e.field}", code=e.code, field=e.field))
             except Exception as e:          # surface, never swallow
                 self._send(500, dict(error=f"{type(e).__name__}: {e}"))
 
 
 def main():
+    global SESS_DIR
     ap = argparse.ArgumentParser()
     ap.add_argument("--zip", required=True); ap.add_argument("--ticks", type=int, default=400000); ap.add_argument("--offset", type=int, default=0)
-    ap.add_argument("--pair", default="XAUUSD", help="XAUUSD (Dukascopy zip) or EURUSD/GBPUSD/AUDUSD/NZDUSD (HistData-UTC zip)"); ap.add_argument("--port", type=int, default=8765); ap.add_argument("--cache", default=str(Path(tempfile.gettempdir()) / "riksora_local_trader"))
-    ap.add_argument("--fresh", action="store_true", help="ignore a saved session")
+    ap.add_argument("--pair", default="XAUUSD", help="XAUUSD (Dukascopy zip) or EURUSD/GBPUSD/AUDUSD/NZDUSD (HistData-UTC zip)")
+    ap.add_argument("--port", type=int, default=8765); ap.add_argument("--cache", default=str(Path(tempfile.gettempdir()) / "riksora_local_trader"))
+    ap.add_argument("--silence-seconds", type=int, default=300, help="FX only (QA setting): quote silence longer than this makes live orders UNRESOLVED; XAUUSD keeps the frozen 60 s")
+    ap.add_argument("--balance", default="10000"); ap.add_argument("--fresh", action="store_true", help="start a new Free Style session instead of resuming the latest")
     a = ap.parse_args()
-    src, profile, seed, meta = open_session(a.zip, a.offset, a.ticks, a.cache, a.pair)
-    S.update(src=src, meta=meta, events=[], trades=[], meta_orders={})
-    S["snap_path"] = Path(a.cache) / f"session_{meta['adm']['manifestHash'][:12]}.json"
-    cs = ClaudeSession(src, profile, policy(), seed, archive=True)     # order archiving: constant-cost commands in long sessions
-    if S["snap_path"].exists() and not a.fresh:
-        saved = json.loads(S["snap_path"].read_text())
-        cs = ClaudeSession.recover(src, profile, policy(), seed, saved["snapshot"]); S["events"] = saved["events"]; S["trades"] = saved.get("trades", []); S["meta_orders"] = saved.get("meta_orders", {})
-        print("[session] resumed from verified snapshot (hash chain + state checked)")
-    S["cs"] = cs
+    src, profile, seed, meta = open_source(a.zip, a.offset, a.ticks, a.cache, a.pair, a.silence_seconds)
+    SESS_DIR = Path(a.cache) / "sessions"; SESS_DIR.mkdir(parents=True, exist_ok=True)
+    S.update(src=src, profile=profile, meta=meta, reviews={}, refusals=[], events=[], trades=[], meta_orders={})
+    S["meta"]["seed"] = seed
+    old = [] if a.fresh else saved_sessions()
+    if old:
+        load_session(old[0]["id"])
+        print(f"[session] resumed '{S['name']}' ({S['defn']['kind']}) from verified snapshot (hash chain + state checked)")
+    else:
+        new_session(dict(kind="FREE_STYLE", name="Free Style"), a.balance, "Sesi baru")
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
     print(f"[ready] http://127.0.0.1:{a.port}  ({src.ngroups} tick groups)", flush=True)
     srv.serve_forever()

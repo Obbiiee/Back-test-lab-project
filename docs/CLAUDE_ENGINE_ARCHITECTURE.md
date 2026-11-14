@@ -165,3 +165,24 @@ Jump scan with exact fallback. Reducer stays the audited Python implementation, 
 ## 11. Not proven
 PostgreSQL/worker path and bytes per trade; multi-session cache; browser candles/R2; sources with per-tick evidence; crossed-quote handling; margin/trailing logic; behaviour at yearly scale (largest run 1M ticks, Claude path only);
 the middle candidate (B) was not built, only bounded; one machine, no repeated runs for timing variance beyond the figures quoted.
+
+
+## 12. Local trader: Free Style / Protocol modes, jump to next event, USDCAD 2026-07 cross-check
+
+**Modes.** `tools/claude_exp/local_trader` now follows `docs/TRADING_METHOD_SESSION_SPEC.md` and `docs/design/RIKSORA_WORKFLOW.md`: a session inherits one immutable
+Method (Free Style: Quick + Plan; Protocol: Plan pending Limit/Stop only, locked risk and R:R, checklist ON/OFF, no manual close). The rules are not copied: the server
+dry-runs each draft through `execution.contracts.open_payload` / `risk_quantity`, and the kernel enforces them again on apply (`validate_action` for closes). 49 HTTP end-to-end
+checks pass (`local_trader/e2e_test.py`), including bypass attempts, stale and duplicate confirms, restart, and an independent full replay of every saved session.
+
+**Jump to next event.** `ClaudeSession.next_event_ns()` returns the first group where a live order could change (exact integer proof) or a gap over the silence guard is
+crossed; the app advances there in one step. On EURUSD 2026-05 a limit order from placement to TP took 2 jumps.
+
+**Finding: the 60 s silence guard on FX.** On EURUSD 2026-05 a 62 s quiet period (04:37 UTC) with a live order made the frozen XAUUSD-profile rule produce
+`UNRESOLVED_OBSERVED_SILENCE`, which ends the session. The jump found it correctly. The prototype FX profile therefore accepts a wider guard (default 300 s, `--silence-seconds`).
+This is a prototype setting, not a change to the frozen profile; using it in the product is a proposal that needs owner approval.
+
+**USDCAD 2026-07.** The HistData-UTC month has 353 crossed quotes (all on 2026-07-23, rows 847127..849109). Dukascopy USDCAD 2026-07 was downloaded with
+`dukascopy-node` (same command as the XAUUSD files) and compared tick by tick: both have 1,233,154 ticks in the same order; 1,231,048 have identical bid/ask; 2,106 differ, of which
+353 are exactly the crossed HistData rows (HistData's bid there equals Dukascopy's ask; Dukascopy has no crossed or zero-spread quote). The other 1,753 differences were not investigated further (rows 22,268 .. 1,233,113 of the month;
+the cause is unknown). Dukascopy is stored unchanged as `Dukascopy\USDCAD\DUKASCOPY_USDCAD_T202607.zip` and converted to
+`Hisdata parequet\USDCAD\2026-07-dukascopy` (derived, non-authoritative, rights UNKNOWN). The HistData-derived month is kept as it was.
