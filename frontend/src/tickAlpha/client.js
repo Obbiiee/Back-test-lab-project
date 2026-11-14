@@ -52,7 +52,8 @@ export async function api(path,body,{signal}={}){
     credentials:'omit',headers:{'X-BTL-Local':'1',...(source?{'X-BTL-Source':source}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},
     ...(body===undefined?{}:{body:JSON.stringify(body)}),signal:signal??AbortSignal.timeout(30000)});
   const value=await response.json();
-  if(!response.ok)throw new Error(value.detail||'Local service unavailable');
+  // `status` lets callers tell a definitive refusal from an unknown outcome (confirmOutcome.js).
+  if(!response.ok)throw Object.assign(new Error(value.detail||'Local service unavailable'),{status:response.status});
   if(value.schemaVersion!==1)throw new Error('Unsupported local response; no state was imported.');
   return value;
 }
@@ -86,8 +87,17 @@ export function command(view,kind,payload){
 export async function loadResearchContext(selected,{active=()=>true,timeframe='1m'}={}){
   const catalog=await api('/catalog');
   if(!active())return null;
-  const view=selected?await api(sessionPath(selected)+'/view',{timeframe}):null;
-  return active()?{catalog,view}:null;
+  let view=null,viewError=null;
+  if(selected){
+    try{view=await api(sessionPath(selected)+'/view',{timeframe});}
+    catch(error){
+      // The service answered but refused this Session (missing, or not this account's):
+      // keep the workspace and say so, never "service unavailable". Other failures stay.
+      if(!(error.status>=400&&error.status<500))throw error;
+      viewError=error.message||'REFUSED';
+    }
+  }
+  return active()?{catalog,view,viewError}:null;
 }
 
 export function noticeText(message){

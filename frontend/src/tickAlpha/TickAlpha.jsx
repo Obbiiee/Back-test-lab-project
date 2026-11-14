@@ -5,9 +5,12 @@ import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
+import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
 import AlphaBrand,{RiksoraMark} from './AlphaBrand.jsx';
-import AlphaSessions from './AlphaSessions.jsx';
+import AlphaSessionWizard from './AlphaSessionWizard.jsx';
+import AlphaJournalPage from './AlphaJournalPage.jsx';
+import {SessionsPage,SessionOverview,CatalogPage} from './AlphaSessionPages.jsx';
 import AlphaTicketEstimate from './AlphaTicketEstimate.jsx';
 import {targetForRR} from './orderEstimate.js';
 import AlphaTerminal from './AlphaTerminal.jsx';
@@ -19,6 +22,12 @@ import Icon from '../workspace/WorkspaceIcon.jsx';
 import {DirectionQuotes} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
 import Segmented from './AlphaSegmented.jsx';
+import AlphaShell,{StatePanel} from './AlphaShell.jsx';
+import {MyMethods,MethodNew,MethodOverview,Analytics,Placeholder} from './AlphaProduct.jsx';
+import {HelpPage,LocalAccountPage} from './AlphaHelp.jsx';
+import {rememberSession} from './productData.js';
+import {useRoute,navigate,linkTo,accountLink,setLeaveGuard} from './productRoute.js';
+import {classifyConfirmError,committedReceipt,reconcile,UNKNOWN_TEXT} from './confirmOutcome.js';
 import './tickAlpha.css';
 import {isAccountPage} from './accountClient.js';
 
@@ -29,14 +38,19 @@ export default function TickAlpha(){
   const [catalog,setCatalog]=useState(null),[view,setView]=useState(null),[busy,setBusy]=useState(false);
   const [objectsOpen,setObjectsOpen]=useState(false),[terminalRequest,setTerminalRequest]=useState(null);
   const [notice,setNotice]=useState(''),[dialog,setDialog]=useState(null),[review,setReview]=useState(null);
-  const [kind,setKind]=useState('FREE_STYLE'),[plan,setPlan]=useState(initialPlan),[planRevision,setPlanRevision]=useState(0);
+  const [plan,setPlan]=useState(initialPlan),[planRevision,setPlanRevision]=useState(0);
   const [picked,setPicked]=useState(null);
+  // Identity of a confirmation with no definitive answer (see confirmOutcome.js).
+  const [unverified,setUnverified]=useState(null);
   const flight=useRef(false),returnFocus=useRef(null);
   const [connecting,setConnecting]=useState(true);
   const creationId=useRef(null);
   const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
   const [orderAction,setOrderAction]=useState(null);
   const [selectedMethod,setSelectedMethod]=useState('');
+  const [createError,setCreateError]=useState(null);
+  const route=useRoute();
+  const showWorkspace=Boolean(view&&route.screen==='replay'&&route.session===view.metadata.id);
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
   // Opening a Session starts at the chart, not wherever the Sessions list was scrolled to.
   const openedSession=view?.metadata.id;
@@ -47,7 +61,7 @@ export default function TickAlpha(){
     (async()=>{try{
       const selected=new URL(window.location.href).searchParams.get('session');
       const result=await loadResearchContext(selected,{active:()=>mounted});
-      if(result){setCatalog(result.catalog);setView(result.view);emitLocal('workspace_opened');}
+      if(result){setCatalog(result.catalog);setView(result.view);if(result.viewError)setNotice(result.viewError);emitLocal('workspace_opened');}
     }catch(error){if(mounted)setNotice(error.message);}finally{if(mounted)setConnecting(false);}})();
     return ()=>{mounted=false;};
   },[]);
@@ -56,13 +70,20 @@ export default function TickAlpha(){
     flight.current=true;setBusy(true);setNotice('');
     try{return await action()??true;}catch(error){setNotice(error.message);return false;}finally{flight.current=false;setBusy(false);}
   };
-  const reopen=async session=>{
+  const reopen=async (session,{push=true}={})=>{
     setPauseToken(n=>n+1);
-    const saved=await loadWorkspace(session);setView(saved);setSelectedMethod(saved.method.id);selectSessionUrl(session);setReview(null);setDialog(null);setOrderAction(null);
+    const saved=await loadWorkspace(session);setView(saved);setSelectedMethod(saved.method.id);rememberSession(session);if(push)navigate({screen:'replay',session});else selectSessionUrl(session);setReview(null);setDialog(null);setOrderAction(null);
     setPlan(initialPlan(saved));setPlanRevision(0);
     setNotice('Session reopened from its committed state.');
     emitLocal('session_restored');
   };
+  useEffect(()=>{
+    if(!catalog||route.screen!=='replay'||!route.session||view?.metadata.id===route.session)return;
+    let live=true;
+    Promise.resolve().then(()=>{if(live)run(()=>reopen(route.session,{push:false}));});
+    return()=>{live=false;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[catalog,route.screen,route.session]);
   const edit=patch=>{setPlan(p=>({...p,...patch}));setPlanRevision(r=>r+1);setReview(null);};
   // Buy/Sell in the order bar only preselect the side; review and confirmation stay mandatory.
   const openTicket=(event,side)=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);if(side&&side!==plan.side)edit({side,...(plan.workflow==='PLANNED'&&plan.orderType==='MARKET'?{entry:quoteFor(side)}:{})});setDialog('ticket');};
@@ -81,30 +102,69 @@ export default function TickAlpha(){
       planId:planned?id('plan'):null,planRevision:planned?planRevision:null,draft});
     setReview(request);setDialog('review');
   });};
-  // Returns {ok, code} so the review sheet can show refusal/stale states (C-14).
+  // Confirm returns an outcome, not a boolean (confirmOutcome.js). The POST result and
+  // the Session refresh are separate: a failed refresh after a commit stays COMMITTED.
+  // An UNKNOWN outcome keeps this review's identity in `unverified`, locks new orders
+  // and is settled only by a read-only Session check, never by re-sending.
   const confirm=async()=>{
-    let code=null;
-    const result=await confirmReviewed(failure=>{code=failure;});
-    return {ok:result===true,code:result===undefined?'LOCAL_BUSY':code};
+    if(flight.current)return {outcome:'NOT_SENT',code:'LOCAL_BUSY'};
+    const sessionId=view.metadata.id,command=review.review.command;
+    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision};
+    flight.current=true;setBusy(true);setNotice('');
+    // While the confirmation is in flight, in-app navigation and Back are held and
+    // a page unload asks first; the sheet says to keep it open.
+    const unload=event=>{event.preventDefault();event.returnValue='';};
+    const leave=setLeaveGuard(()=>false);window.addEventListener('beforeunload',unload);
+    const release=()=>{leave();window.removeEventListener('beforeunload',unload);};
+    try{
+      let result;
+      try{result=await api(sessionPath(sessionId)+'/confirm',{reviewId:command.commandId,reviewHash:review.reviewHash});}
+      catch(error){
+        const outcome=classifyConfirmError(error);
+        if(outcome.outcome==='UNKNOWN'){setUnverified(identity);return {...outcome,identity};}
+        return outcome;
+      }
+      if(!committedReceipt(result,command.commandId)){setUnverified(identity);return {outcome:'UNKNOWN',code:'UNRECOGNISED_RESPONSE',identity};}
+      emitLocal('order_command_submitted');
+      return await refreshAfterCommit(sessionId);
+    }finally{release();flight.current=false;setBusy(false);}
   };
-  const confirmReviewed=onFailure=>run(async()=>{
-    try{await api(sessionPath(view.metadata.id)+'/confirm',{reviewId:review.review.command.commandId,reviewHash:review.reviewHash});}
-    catch(error){onFailure(error.message);throw error;}
-    setView(await loadWorkspace(view.metadata.id));setDialog(null);setReview(null);
-    emitLocal('order_command_submitted');
+  const refreshAfterCommit=async sessionId=>{
+    try{setView(await loadWorkspace(sessionId));}
+    catch{setNotice('Order saved. The Session view could not refresh; reload the Session to see it.');return {outcome:'COMMITTED',refreshed:false};}
+    setDialog(null);setReview(null);
     setNotice('Order accepted and saved. A fill requires the next eligible tick.');
-  });
-  const createMethod=event=>{
-    event.preventDefault();const fields=new FormData(event.currentTarget);
-    run(async()=>{
-      const value={schemaVersion:1,artifact:'BTL-LOCAL-METHOD-1',id:creationId.current,name:fields.get('name'),kind,
-        checklistOn:kind==='PROTOCOL'&&fields.get('checklist')==='ON',
-        conditions:kind==='PROTOCOL'?String(fields.get('conditions')).split('\n').filter(s=>s.trim()).map((s,i)=>({id:`condition:${i}`,label:s.trim()})):[],
-        riskPercent:kind==='PROTOCOL'?fields.get('risk'):null,rr:kind==='PROTOCOL'?fields.get('rr'):null};
-      await api('/methods',value);setCatalog(await api('/catalog'));setSelectedMethod(value.id);setDialog(null);
-      setNotice('Strategy rules saved. Create a Session to start replay.');
-    });
+    return {outcome:'COMMITTED',refreshed:true};
   };
+  // Read-only: GET the saved Session and look for this review's order.
+  // The sheet passes the identity from confirm()'s result for its immediate check,
+  // before this state has re-rendered.
+  const checkUnverified=async(pending=unverified)=>{
+    if(!pending||flight.current)return {outcome:'UNKNOWN',code:'LOCAL_BUSY'};
+    flight.current=true;setBusy(true);
+    try{
+      let saved;
+      try{saved=await api(sessionPath(pending.sessionId));}catch(error){setNotice('The Session could not be read, so the order status is still not verified. Check again in a moment.');return {outcome:'UNKNOWN',code:error.message};}
+      const found=reconcile(saved,pending);
+      if(found==='UNKNOWN'){setNotice('The saved Session does not show this order yet. Check again in a moment; nothing was sent again.');return {outcome:'UNKNOWN',code:'NOT_FOUND_YET'};}
+      setUnverified(null);
+      if(found==='REFUSED'){setNotice('The earlier confirmation was not saved: the Session moved on without it.');return {outcome:'REFUSED',code:'RECONCILED_NOT_SAVED',reconciled:true};}
+      emitLocal('order_command_submitted');
+      return {...await refreshAfterCommit(pending.sessionId),reconciled:true};
+    }finally{flight.current=false;setBusy(false);}
+  };
+  // A view loaded for another reason can also settle an unverified confirmation.
+  const [settledBy,setSettledBy]=useState(null);
+  if(unverified&&view&&view!==settledBy&&view.metadata.id===unverified.sessionId){
+    setSettledBy(view);
+    const found=reconcile(view,unverified);
+    if(found!=='UNKNOWN'){setUnverified(null);setNotice(found==='COMMITTED'?'The earlier order was saved.':'The earlier confirmation was not saved: the Session moved on without it.');}
+  }
+  // Instrument comes from the Session's pinned profile; without it, orders stay locked.
+  const instrument=sessionInstrument(view);
+  const symbolText=instrument?.symbol??'Instrument not stated';
+  const symbolGlyph=instrument?(instrument.symbol.startsWith('XAU')?'Au':instrument.symbol.slice(0,2)):'?';
+  const orderLocked=busy||Boolean(view?.state.unresolved)||Boolean(unverified)||Boolean(view&&!instrument);
   const requestAction=(order,kind,quantity=null)=>{
     returnFocus.current=document.activeElement;setNotice('');
     const payload={orderId:order.id,...(kind==='CLOSE'?{quantity}:{})};
@@ -112,42 +172,64 @@ export default function TickAlpha(){
   };
   const confirmAction=()=>run(async()=>{
     await api(sessionPath(view.metadata.id)+'/commands',orderAction.command);
-    setView(await loadWorkspace(view.metadata.id));setDialog(null);setOrderAction(null);
+    setDialog(null);setOrderAction(null);
+    // The command is committed once the POST succeeds; a failed refresh must not read as a failed action.
+    try{setView(await loadWorkspace(view.metadata.id));}
+    catch{setNotice(`${orderAction.kind==='CANCEL'?'Cancellation':'Exit request'} saved. The Session view could not refresh; reload the Session to see it.`);return;}
     setNotice(orderAction.kind==='CANCEL'?'Pending order cancellation committed.':'Exit requested. Actual closure needs the next eligible liquidation-side tick.');
   });
-  const createSession=event=>{
-    event.preventDefault();const fields=new FormData(event.currentTarget);
+  // Called by the New Session wizard with the same POST /sessions payload the old dialog sent.
+  const createSession=fields=>{
+    if(!creationId.current)creationId.current=id('session');
+    setCreateError(null);
     run(async()=>{
-      const saved=await api('/sessions',{id:creationId.current,name:fields.get('name'),methodId:fields.get('method'),
-        initialBalance:fields.get('balance'),startPeriod:fields.get('startPeriod')??catalog.startPeriod});
+     try{
+      const saved=await api('/sessions',{id:creationId.current,name:fields.name,methodId:fields.methodId,
+        initialBalance:fields.initialBalance,startPeriod:fields.startPeriod??catalog.startPeriod});
       const workspace=await loadWorkspace(saved.metadata.id);
-      setCatalog(await api('/catalog'));setView(workspace);selectSessionUrl(saved.metadata.id);setDialog(null);setPlan(initialPlan(workspace));setPlanRevision(0);
+      setCatalog(await api('/catalog'));setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
+     }catch(error){setCreateError({code:error.message,text:noticeText(error.message)});return false;}
     });
   };
   const openCreation=(type,event)=>{
     returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);
-    creationId.current=id(type);if(type==='method')setKind('FREE_STYLE');
-    setDialog(type==='method'?'method':'session');
+    if(type==='method'){navigate({screen:'method-new'});return;}
+    creationId.current=id('session');navigate({screen:'session-new',method:selectedMethod||view?.method.id});
   };
   const sessionMenu=<details className="alpha-session-menu"><summary>Session settings</summary>    <section className="alpha-context" aria-label="Method and Session">
-      <button disabled={busy||!catalog} onClick={event=>openCreation('method',event)}>New strategy</button>
+      <button disabled={busy||!catalog} onClick={event=>openCreation('method',event)}>New Method</button>
       <button disabled={busy||!catalog?.methods.length} onClick={event=>openCreation('session',event)}>Create Session</button>
       <label>Reopen Session<select aria-label="Reopen Session" disabled={busy||!catalog} value={view?.metadata.id||''} onChange={e=>{if(e.target.value)run(()=>reopen(e.target.value));}}>
         <option value="">Choose saved Session</option>{catalog?.sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       {view&&<><span>{view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}</span><button disabled={busy} onClick={()=>run(()=>reopen(view.metadata.id))}>Reload saved Session</button></>}
     </section>
 </details>;
-  return <main ref={mainRef} className={`tick-alpha${view?' has-workspace':''}`} onClickCapture={event=>{
+  return <main ref={mainRef} className={`tick-alpha${showWorkspace?' has-workspace':' has-product'}`} onClickCapture={event=>{
     if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
     if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
   }}>
-    <header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation">{view&&<a href={sessionsPath()}>All Sessions</a>}<a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav>{!view&&sessionMenu}</header>
-    {!catalog?<section className="alpha-empty"><h1>{isAccountPage()?'Connect your workspace':'Connect your local workspace'}</h1><p>{isAccountPage()?'An authorized account connection is required to create or reopen a Session.':'Start the local alpha service and database to create or reopen a Session.'}</p><p>{connecting?'Connecting to the saved workspace…':isAccountPage()?'The account service is unavailable. Retry, or sign out and sign in again.':'Your local service is unavailable. Start it, then retry the connection.'}</p><button disabled={busy||connecting} onClick={()=>run(async()=>{
-        setConnecting(true);try{const result=await loadResearchContext(new URL(window.location.href).searchParams.get('session'),{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
-      })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
-      <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>XAUUSD</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
-      <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" href={sessionsPath()} aria-label="Back to Sessions"><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label="XAUUSD data source" title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">Au</span>XAUUSD</button><span className="alpha-ws-phone-title"><strong>XAUUSD · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
+    {showWorkspace&&<header><div className="alpha-workspace-brand"><AlphaBrand href={pagePath('home')}/><span className="alpha-badge">{isAccountPage()?'Verified workspace':'Private local workspace'}</span></div><nav aria-label="Workspace navigation">{view&&<a href={sessionsPath()}>All Sessions</a>}<a href={pagePath('home')}>{isAccountPage()?'Account home':'Research home'}</a>{!isAccountPage()&&<a href="/?legacy=local">Legacy rollback</a>}</nav></header>}
+    {!showWorkspace?<AlphaShell route={route} label={isAccountPage()?'Verified workspace':'Private local workspace'}>
+      {!catalog?(connecting?<StatePanel level={1} kind="loading" title="Connecting to your workspace…"/>:<StatePanel level={1} kind={isAccountPage()?'unavailable':'offline'} title={isAccountPage()?'Workspace service unavailable':'Local service unavailable'} action={<button className="rk-btn rk-btn-primary" disabled={busy||connecting} onClick={()=>run(async()=>{
+        setConnecting(true);try{const result=await loadResearchContext(route.screen==='replay'?route.session:null,{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
+      })}>Retry connection</button>}><p>{isAccountPage()?'Retry, or sign out and sign in again. Nothing was changed.':'Start the local alpha service and database, then retry. Saved Sessions are kept.'}</p></StatePanel>)
+      :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='method-new'?<MethodNew catalog={catalog} onSaved={async methodId=>{setCatalog(await api('/catalog'));setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice('Method saved. Create a Session to start replay.');}}/>
+      :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
+      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
+      :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>
+      :route.screen==='journal'?<AlphaJournalPage catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='analytics'?<Analytics catalog={catalog} route={route}/>
+      :route.screen==='replay'&&route.session?(busy||!notice?<StatePanel level={1} kind="loading" title="Opening Session…"/>:<StatePanel level={1} kind="unavailable" title="This Session could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
+      :route.screen==='help'?<HelpPage catalog={catalog} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>
+      :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
+      :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
+    </AlphaShell>:<>
+      <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
+      <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
         trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         onReplay={(kind,targetNs)=>run(async()=>{
@@ -162,18 +244,19 @@ export default function TickAlpha(){
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
           catch(error){setNotice(error.message);}
-        }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button aria-label="Drawing objects" aria-expanded={objectsOpen} title="Drawing objects" onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Objects</span></button><button disabled={busy||view.state.unresolved} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/><span>Order</span></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/><span>News</span></button><button aria-label="Open journal panel" title="Journal" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog("journal");}}><Icon name="journal"/><span>Journal</span></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/><span>Source</span></button></aside>
+        }}/><aside className="alpha-action-rail" aria-label="Workspace tools"><button aria-label="Drawing objects" aria-expanded={objectsOpen} title="Drawing objects" onClick={()=>setObjectsOpen(value=>!value)}><Icon name="layers"/><span>Objects</span></button><button disabled={orderLocked} aria-label="Open order panel" title="Order" onClick={event=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);setDialog('ticket');}}><Icon name="order"/><span>Order</span></button><button aria-label="Open news panel" title="News" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('news');}}><Icon name="news"/><span>News</span></button><button aria-label="Open journal panel" title="Journal" onClick={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog("journal");}}><Icon name="journal"/><span>Journal</span></button><button onClick={openSource} aria-label="Open source details" title="Source details"><Icon name="layers"/><span>Source</span></button></aside>
       </div>
-      <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><label className="alpha-bar-lots" title={planned?'Planned orders size from risk in the ticket':'Draft quantity; the ticket still reviews it'}><span>Lots</span><input aria-label="Draft lots" inputMode="decimal" value={planned?'':plan.quantity??''} placeholder={planned?'risk':''} disabled={busy||planned||protocol} onChange={e=>edit({quantity:e.target.value})}/></label><button className="alpha-new-order" disabled={busy||view.state.unresolved} onClick={event=>openTicket(event)}>New order</button><span className="alpha-order-hint">{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span><span className="alpha-balance-pill" aria-label={`Saved balance ${view.state.balance} USD`}>${view.state.balance}</span></div>
+      {unverified&&unverified.sessionId===view.metadata.id&&dialog!=='review'&&<div className="alpha-unverified" role="status"><p><strong>Order status not verified.</strong> {UNKNOWN_TEXT} New orders stay locked until the saved Session shows the result.</p><button type="button" disabled={busy} onClick={()=>checkUnverified()}>Check again</button></div>}
+      <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={orderLocked||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={orderLocked||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><label className="alpha-bar-lots" title={planned?'Planned orders size from risk in the ticket':'Draft quantity; the ticket still reviews it'}><span>Lots</span><input aria-label="Draft lots" inputMode="decimal" value={planned?'':plan.quantity??''} placeholder={planned?'risk':''} disabled={busy||planned||protocol} onChange={e=>edit({quantity:e.target.value})}/></label><button className="alpha-new-order" disabled={orderLocked} onClick={event=>openTicket(event)}>New order</button><span className="alpha-order-hint">{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span><span className="alpha-balance-pill" aria-label={`Saved balance ${view.state.balance} USD`}>${view.state.balance}</span></div>
       <AlphaTerminal key={view.metadata.id} request={terminalRequest} view={view} busy={busy} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
     </>}
-    <nav className="alpha-bottom-nav" aria-label="App sections">
-      <a href={pagePath('home')}><Icon name="layers"/><span>Methods</span></a>
-      <a href={sessionsPath()} aria-current={!view?'page':undefined}><Icon name="calendar"/><span>Sessions</span></a>
+    {showWorkspace&&<nav className="alpha-bottom-nav" aria-label="App sections">
+      <a {...linkTo({screen:'methods'})}><Icon name="layers"/><span>Methods</span></a>
+      <a {...linkTo({screen:'sessions'})}><Icon name="calendar"/><span>Sessions</span></a>
       <button disabled={!view} aria-current={view?'page':undefined} onClick={()=>{globalThis.scrollTo?.({top:0,behavior:'smooth'});mainRef.current?.scrollTo?.({top:0,behavior:'smooth'});}}><Icon name="candles"/><span>Replay</span></button>
       <button disabled={!view} onClick={()=>setTerminalRequest({tab:'Analysis',id:Date.now()})}><Icon name="analytics"/><span>Analysis</span></button>
-      <a href="/?page=account"><Icon name="smile"/><span>Account</span></a>
-    </nav>
+      <a {...accountLink()}><Icon name="smile"/><span>Account</span></a>
+    </nav>}
     <footer><p className="alpha-status-line" role="status" aria-live="polite">{noticeText(notice)||(busy?'Processing your request… Replay and order controls will unlock when it finishes.':catalog?`${isAccountPage()?'Verified workspace research':'Private local research'} · source limitations available in Data source`:'Service required. No fallback market feed.')}</p></footer>
     {dialog==='feedback'&&<WorkspaceModal returnFocusRef={returnFocus} label="Optional research feedback" onClose={()=>setDialog(null)}><AlphaFeedback onClose={()=>setDialog(null)}/></WorkspaceModal>}
     {dialog==='source'&&<WorkspaceModal returnFocusRef={returnFocus} label="Data source" onClose={()=>setDialog(null)}><AlphaSourceDetails historical={sourceContext()==='historical'} account={isAccountPage()} catalog={catalog} view={view} onClose={()=>setDialog(null)}/></WorkspaceModal>}
@@ -184,17 +267,15 @@ export default function TickAlpha(){
         <DirectionQuotes side={plan.side} quote={view.quote} disabled={busy} onChange={side=>edit({side,...(planned&&plan.orderType==='MARKET'?{entry:quoteFor(side)}:{})})}/>
         <Segmented className="alpha-ticket-types" label="Order type" value={protocol&&plan.orderType==='MARKET'?'LIMIT':plan.orderType} disabled={busy||!planned} options={[...(protocol?[]:[['MARKET','Market']]),['LIMIT','Limit'],['STOP','Stop']]} onChange={value=>edit({orderType:value})}/>
         {planned?<><label>Entry<input aria-label="Entry" inputMode="decimal" value={plan.entry} disabled={busy} onChange={e=>edit({entry:e.target.value})}/></label><label>Stop Loss<input aria-label="Stop Loss" inputMode="decimal" value={plan.sl} disabled={busy} onChange={e=>edit({sl:e.target.value})}/></label>{protocol?<p>Target and quantity derive from locked RR {view.method.rr} and risk {view.method.riskPercent}%.</p>:<><label>Take Profit<input aria-label="Take Profit" inputMode="decimal" value={plan.tp} disabled={busy} onChange={e=>edit({tp:e.target.value})}/></label><div className="alpha-ticket-chips" role="group" aria-label="Set take profit by reward to risk">{['1','1.5','2','3'].map(rr=><button type="button" key={rr} disabled={busy} onClick={()=>{const tp=targetForRR({side:plan.side,entry:plan.entry,sl:plan.sl,rr,tickSize:view.state.profile.tickSize});if(tp)edit({tp});else setNotice('Enter a valid entry and stop first; the stop must be on the losing side.');}}>TP {rr}R</button>)}</div><fieldset className="alpha-ticket-risk"><legend>Risk per trade</legend><div className="alpha-ticket-chips" role="group" aria-label="Risk presets">{['0.5','1','2','3'].map(r=><button type="button" key={r} aria-pressed={plan.riskPercent===r} disabled={busy} onClick={()=>edit({riskPercent:r})}>{r}%</button>)}</div><label>Risk %<input aria-label="Risk %" inputMode="decimal" value={plan.riskPercent} disabled={busy} onChange={e=>edit({riskPercent:e.target.value})}/></label></fieldset><AlphaTicketEstimate plan={plan} view={view}/></>}</>:<><label>Quantity (lots)<input aria-label="Quantity (lots)" inputMode="decimal" value={plan.quantity} disabled={busy} onChange={e=>edit({quantity:e.target.value})}/></label>{!protocol&&<p className="alpha-ticket-hint">Quick sends a market order without a stop or target.<button type="button" disabled={busy} onClick={()=>edit({workflow:'PLANNED',orderType:'MARKET',entry:quoteFor(plan.side)})}>Add stop &amp; target</button></p>}</>}
-        {protocol&&<fieldset><legend>Checklist · enforcement {view.method.checklistOn?'ON':'OFF'}</legend>{view.method.conditions.map(c=><label key={c.id}>{c.label}<select aria-label={c.label} disabled={busy} value={plan.observations.find(o=>o.conditionId===c.id)?.outcome||'NOT_ASSESSED'} onChange={e=>edit({observations:[...plan.observations.filter(o=>o.conditionId!==c.id),{conditionId:c.id,outcome:e.target.value}]})}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select></label>)}</fieldset>}
+        {protocol&&<fieldset><legend>Checklist · enforcement {view.method.checklistOn?'ON':'OFF'}</legend>{!view.method.checklistOn&&<p className="alpha-ticket-hint">Recorded with the order, but not enforced: conditions never block it.</p>}{view.method.conditions.map(c=>{const outcome=plan.observations.find(o=>o.conditionId===c.id)?.outcome||'NOT_ASSESSED';const unmet=view.method.checklistOn&&notice==='PROTOCOL_BLOCKED'&&outcome!=='PASS';return <label key={c.id} className={unmet?'alpha-check-unmet':undefined}>{c.label}<select aria-label={c.label} aria-invalid={unmet||undefined} disabled={busy} value={outcome} onChange={e=>edit({observations:[...plan.observations.filter(o=>o.conditionId!==c.id),{conditionId:c.id,outcome:e.target.value}]})}><option value="NOT_ASSESSED">Not assessed</option><option value="PASS">Pass</option><option value="FAIL">Fail</option></select>{unmet&&<span className="alpha-check-note">Pass this condition first.</span>}</label>})}</fieldset>}
         {notice&&<p className="alpha-ticket-notice" role="alert">{notice==="INVALID_INPUT"?"Check the order values: quantity must be positive and match the Session lot step. For Planned orders, check the entry, stop and target values. (INVALID_INPUT)":noticeText(notice)}</p>}
-        <button disabled={busy||view.state.unresolved} onClick={openReview}>Review order</button><p>Quote-based simulation; no broker fill, margin, liquidity or slippage claim. The explicit QUOTE_BASELINE model uses zero commission; broker terms are not certified.</p>
+        <button disabled={orderLocked} onClick={openReview}>Review order</button><p>Quote-based simulation; no broker fill, margin, liquidity or slippage claim. The explicit QUOTE_BASELINE model uses zero commission; broker terms are not certified.</p>
       </section></WorkspaceModal>}
     {dialog==='action'&&orderAction&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm position action" onClose={()=>{if(!busy){setDialog(null);setOrderAction(null);}}}><section className="alpha-dialog"><h2>{orderAction.kind==='CANCEL'?'Cancel pending order':orderAction.quantity===null?'Request full close':'Request partial close'}</h2><p>{orderAction.order.side} · {orderAction.order.id}</p><p>{orderAction.kind==='CLOSE'?`Quantity: ${orderAction.quantity??orderAction.order.remaining} lots. A request does not settle the trade; the next eligible observed Bid/Ask determines its exit.`:'This cancels an unfilled intent; it does not close a position.'}</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button disabled={busy} onClick={()=>{setDialog(null);setOrderAction(null);}}>Keep current order</button><button disabled={busy} onClick={confirmAction}>Confirm action</button></section></WorkspaceModal>}
-    {dialog==='method'&&<WorkspaceModal returnFocusRef={returnFocus} label="Create strategy" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createMethod}><h2>Create strategy</h2><label>Name<input name="name" required maxLength={128}/></label><label>Type<select name="kind" value={kind} onChange={e=>setKind(e.target.value)}><option value="FREE_STYLE">Free Style</option><option value="PROTOCOL">Protocol</option></select></label>{kind==='PROTOCOL'&&<><label>Locked risk %<input name="risk" defaultValue="1" inputMode="decimal" required/></label><label>Locked RR<input name="rr" defaultValue="2" inputMode="decimal" required/></label><label>Conditions (one per line)<textarea name="conditions" required maxLength={4096}/></label><label>Checklist enforcement<select name="checklist"><option>ON</option><option>OFF</option></select></label></>}<p>Free Style lets you explore discretionary ideas. Protocol locks risk, reward and checklist rules for the Session.</p><p>Strategy rules are fixed for each Session. Create another strategy to test different rules.</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button className="alpha-primary-action" disabled={busy}>Save strategy</button></form></WorkspaceModal>}
-    {dialog==='session'&&<WorkspaceModal returnFocusRef={returnFocus} label="Create Session" onClose={()=>{if(!busy)setDialog(null);}}><form className="alpha-dialog" onSubmit={createSession}><h2>Create Session</h2><label>Name<input name="name" required maxLength={128}/></label><label>Strategy<select name="method" defaultValue={selectedMethod||view?.method.id||catalog.methods[0]?.id}>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name} · {m.kind==='PROTOCOL'?'Protocol':'Free Style'}</option>)}</select></label><label>Starting balance (USD)<input name="balance" defaultValue="10000" inputMode="decimal" required/></label>{sourceContext()==='historical'&&<label>Start month (UTC)<input name="startPeriod" type="month" defaultValue={catalog.startPeriod} min={catalog.startPeriod} max={`${catalog.startPeriod.slice(0,4)}-12`} required disabled={busy}/></label>}<p>XAUUSD · {sourceContext()==='historical'?'Exness historical quotes':'Synthetic fixture'}. The Session inherits your strategy rules. Replay starts at the first observed quote in the selected month; unavailable months are refused without substituting data.</p>{notice&&<p role="alert">{noticeText(notice)}</p>}<button type="button" disabled={busy} onClick={()=>setDialog(null)}>Cancel</button><button className="alpha-primary-action" disabled={busy}>Save Session</button></form></WorkspaceModal>}
     {picked&&view&&!dialog&&<AlphaPickTicket key={picked.at} price={picked.price} tickSize={view.state.profile?.tickSize} plan={plan} protocol={protocol}
       onCancel={()=>{setPicked(null);[...document.querySelectorAll('button')].find(button=>button.textContent==='Pick order price')?.focus();}} onApply={(field,patch)=>{const value=patch[field];edit(patch);setPicked(null);returnFocus.current=document.querySelector('.alpha-order-bar button')||null;setDialog('ticket');
         setNotice(`${({entry:'Entry',sl:'Stop loss',tp:'Take profit'})[field]} set to ${value} from the chart. Review before confirming.`);}}/>}
     {dialog==='review'&&review&&<WorkspaceModal returnFocusRef={returnFocus} label="Confirm reviewed order" onClose={()=>{if(!busy){setDialog(null);setReview(null);}}}><AlphaReviewSheet key={review.reviewHash} review={review} view={view} busy={busy}
-      onConfirm={confirm} onCancel={()=>{setReview(null);setDialog(null);setOrderAction(null);}} onReviewAgain={()=>{setReview(null);openReview();}}/></WorkspaceModal>}
+      onConfirm={confirm} onCheck={checkUnverified} onReload={()=>run(()=>reopen(view.metadata.id,{push:false}))} onCancel={()=>{setReview(null);setDialog(null);setOrderAction(null);}} onReviewAgain={()=>{setReview(null);openReview();}}/></WorkspaceModal>}
   </main>;
 }

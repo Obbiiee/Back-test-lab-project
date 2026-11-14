@@ -160,7 +160,27 @@
 /* RIKSORA brand sync (2026-10-17): Drive Master Blueprint tokens from riksoraBrand.css.
    Chart surfaces stay the human-approved neutral dark FX Replay-inspired set; only accent,
    selection, typography, risk/warning semantics, filled actions and light identity pages adopt the brand. */
-.tick-alpha{--lab-font-ui:var(--rk-font-ui);--lab-font-data:var(--rk-font-data);--lab-accent:var(--rk-blue-on-dark);--lab-selected:#12305e;--lab-error:var(--rk-coral);--lab-warning:var(--rk-yellow)}
+/* Terminal bridge (2026-11-06, extends the 2026-10-17 sync; chart canvas stays neutral dark): the dense terminal styles are written against --lab-* (designTokens.css,
+   shared with older surfaces). Inside RIKSORA they resolve to the brand semantics, so the
+   terminal chrome and product pages share colours, fonts and focus. The chart canvas
+   colours stay with CandleChart; sizes and spacing keep the terminal's density. */
+.tick-alpha{
+  --lab-font-ui:var(--rk-font-ui);
+  --lab-font-data:var(--rk-font-data);
+  --lab-surface-workspace:var(--rk-panel);
+  --lab-surface-secondary:#102d5e;
+  --lab-surface-elevated:var(--rk-panel-raised);
+  --lab-text-primary:var(--rk-text-soft-on-navy);
+  --lab-text-secondary:var(--rk-subtle-on-navy);
+  --lab-text-on-light:var(--rk-ink);
+  --lab-border:var(--rk-line-strong);
+  --lab-accent:var(--rk-blue-on-dark);
+  --lab-selected:var(--rk-selected);
+  --lab-success:var(--rk-success);
+  --lab-warning:var(--rk-yellow);
+  --lab-error:var(--rk-coral);
+  --lab-radius:var(--rk-radius-dense);
+}
 .tick-alpha :focus-visible{outline-color:var(--rk-blue)}
 .alpha-order-bar button,.tick-alpha .alpha-primary-action{background:var(--rk-blue-strong);border-color:var(--rk-blue-strong);color:#fff}
 .alpha-order-bar button:hover,.tick-alpha .alpha-primary-action:hover{background:var(--rk-blue-pressed);border-color:var(--rk-blue-pressed)}
@@ -679,6 +699,7 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 }
 /* C-14 (2026-11-06): confirm sheet (REVIEW_EXACT / COMMIT_PENDING / STALE / REFUSED) and Pick-from-chart mini ticket. */
 .alpha-review-sheet{display:flex;flex-direction:column;gap:12px;width:min(520px,calc(100vw - 32px))}
+.alpha-review-sheet:focus{outline:none}.alpha-review-sheet:focus-visible{outline:2px solid var(--lab-focus,#5aa2ff);outline-offset:2px}
 .alpha-review-sheet-head h2{margin:2px 0 0;font-size:20px}
 .alpha-review-step{font:600 12px var(--rk-font-data,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--lab-text-secondary)}
 .alpha-review-sheet-body{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto}
@@ -694,6 +715,14 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
 .alpha-review-refusal{padding:12px;border-radius:10px;border:2px solid var(--lab-error);background:#3a1a22}
 .tick-alpha .alpha-review-refusal[role=alert]{color:var(--lab-text-primary)}
 .alpha-review-refusal p{margin:4px 0 0}
+/* Unknown outcome (amber) and saved-but-not-refreshed (green): never styled as a refusal. */
+.alpha-review-unknown,.alpha-review-saved{padding:12px;border-radius:10px;border:2px solid var(--lab-warning);background:#3a2f16}
+.alpha-review-saved{border-color:var(--lab-success);background:#15322a}
+.tick-alpha .alpha-review-unknown[role=alert],.tick-alpha .alpha-review-saved{color:var(--lab-text-primary)}
+.alpha-review-unknown p,.alpha-review-saved p{margin:4px 0 0}
+.alpha-unverified{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:8px 12px;padding:10px 12px;border-radius:10px;border:2px solid var(--lab-warning);background:#3a2f16;color:var(--lab-text-primary)}
+.alpha-unverified p{margin:0}
+.alpha-unverified button{min-height:44px;flex:none}
 .alpha-review-pending{display:flex;align-items:center;gap:10px;margin:0;font-weight:600}
 .alpha-review-spinner{width:16px;height:16px;border-radius:50%;border:3px solid var(--lab-border);border-top-color:var(--rk-yellow,#ffce55);animation:alpha-spin .8s linear infinite}
 @keyframes alpha-spin{to{transform:rotate(360deg)}}
@@ -732,3 +761,5 @@ section.drawing-properties :is(input,select,textarea):focus-visible{outline:2px 
   .tick-alpha.has-workspace .alpha-chart-header>.alpha-ws-phone-title *{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tick-alpha.has-workspace .alpha-chart-header>.alpha-session-menu{margin-left:auto;order:1}
 }
+
+.tick-alpha .alpha-check-unmet select{border-color:#9e2b33;box-shadow:0 0 0 2px #ffd0d0}.tick-alpha .alpha-check-note{color:#9e2b33;font-size:12px;font-weight:700}

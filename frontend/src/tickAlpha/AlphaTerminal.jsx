@@ -17,10 +17,17 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback,request}){
   // Phone bottom navigation asks for a tab (e.g. Analysis); show it and bring the terminal into view.
   const [seenRequest,setSeenRequest]=useState(request);
   if(request!==seenRequest){setSeenRequest(request);if(request)setTab(request.tab);}
-  useEffect(()=>{if(request)root.current?.scrollIntoView({block:'start',behavior:'smooth'});},[request]);
   const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);
+  // A collapsed terminal hides its content, so a request for a tab restores it first.
+  const handled=useRef(null);
+  useEffect(()=>{
+    if(!request||handled.current===request)return;
+    handled.current=request;
+    if(panel.state==='COLLAPSED')panel.restore();
+    root.current?.scrollIntoView({block:'start',behavior:'smooth'});
+  });
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   const evidence=view.analysis;

@@ -1,13 +1,16 @@
 // Presentation of already-authorized catalog / revealed-view fields only.
 // No provider handles, unrestricted source metadata, EOF or future coverage.
-import {stamp} from './display.js';
+import {stamp,sessionInstrument} from './display.js';
+
+const catalogInstrument=catalog=>sessionInstrument({state:{profile:catalog?.profile}});
+const instrumentText=item=>item?`${item.symbol}${item.quote?` · ${item.quote}`:''}${item.feed?` · feed symbol ${item.feed}`:''}`:'Not stated by the server';
 
 export default function AlphaSourceDetails({historical,account=false,catalog,view,onClose}) {
   return <section className="alpha-dialog">
     <div className="alpha-terminal-heading"><h2>Data source</h2><button onClick={onClose} aria-label="Close data source">Close</button></div>
     <p>{historical?'Thanks to Exness for the historical quote source used in this local research workspace.':'This workspace uses an authored synthetic fixture for engineering checks.'}</p>
     <dl className="alpha-reviewed-values">
-      <div><dt>Instrument</dt><dd>XAUUSD · USD</dd></div>
+      <div><dt>Instrument</dt><dd>{instrumentText(view?sessionInstrument(view):catalogInstrument(catalog))}</dd></div>
       <div><dt>Source</dt><dd>{historical?'Exness · imported historical quotes':'Synthetic fixture'}</dd></div>
       <div><dt>Selected start month</dt><dd>{view?.metadata.startPeriod??catalog?.startPeriod??'Unavailable'}</dd></div>
       <div><dt>Revealed through (UTC)</dt><dd>{view?stamp(view.state.throughNs):'No Session selected'}</dd></div>
