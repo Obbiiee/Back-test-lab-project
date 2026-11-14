@@ -108,7 +108,7 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
         ready = json.loads(chart_proc.stdout.readline())
         chart_args = ['--chart-url', f"http://127.0.0.1:{ready['port']}"]
     proc = subprocess.Popen([sys.executable, '-I', str(DRIVER), '--url', url, '--traders', str(cohort_size), '--cycles', str(cycles),
-                             '--think-ms', str(think_ms), '--stagger-ms', str(stagger_ms)] + chart_args + (['--api-ports', os.environ['RIKSORA_QA_API_EXTRA_PORTS']] if os.environ.get('RIKSORA_QA_API_EXTRA_PORTS') else []) + (['--patient'] if os.environ.get('RIKSORA_QA_HTTP_PATIENT') == '1' else []),
+                             '--think-ms', str(think_ms), '--stagger-ms', str(stagger_ms)] + chart_args + (['--api-ports', os.environ['RIKSORA_QA_API_EXTRA_PORTS']] if os.environ.get('RIKSORA_QA_API_EXTRA_PORTS') else []) + (['--patient'] if os.environ.get('RIKSORA_QA_HTTP_PATIENT') == '1' else []) + (['--open-rate', os.environ['RIKSORA_QA_HTTP_OPEN_RATE'], '--open-seconds', os.environ.get('RIKSORA_QA_HTTP_OPEN_SECONDS', '120')] if os.environ.get('RIKSORA_QA_HTTP_OPEN_RATE') else []),
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, start_new_session=True)
     summary = {}
     phase = {'measuring': False}
@@ -223,5 +223,5 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
                    maxOldestQueuedSeconds=round(max((q['oldestQueuedSeconds'] for q in queue), default=0), 2)))
     if stop['reason']:
         raise RuntimeError(stop['reason'])
-    if summary.get('status') != 'DONE' or summary.get('failedTraders'):
+    if summary.get('status') != 'DONE' or (summary.get('failedTraders') and summary.get('model') != 'OPEN_POISSON'):
         raise RuntimeError('HTTP_COHORT_FAILED')

@@ -1,0 +1,54 @@
+{
+ "month": "2024-03",
+ "instrument": "EURUSD",
+ "ticks": 1475926,
+ "oracleSeconds": 141.6,
+ "timeframes": {
+  "M1": {
+   "bars": 30084,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M3": {
+   "bars": 10080,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M5": {
+   "bars": 6048,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M15": {
+   "bars": 2016,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "M30": {
+   "bars": 1008,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H1": {
+   "bars": 504,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H2": {
+   "bars": 256,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "H4": {
+   "bars": 131,
+   "identical": true,
+   "firstDivergentBar": null
+  },
+  "D1": {
+   "bars": 26,
+   "identical": true,
+   "firstDivergentBar": null
+  }
+ },
+ "status": "IDENTICAL"
+}

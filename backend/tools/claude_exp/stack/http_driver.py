@@ -344,6 +344,7 @@ def main():
     ap.add_argument('--url', required=True); ap.add_argument('--traders', type=int, required=True)
     ap.add_argument('--cycles', type=int, default=3); ap.add_argument('--think-ms', type=int, default=1000)
     ap.add_argument('--stagger-ms', type=int, default=0)
+    ap.add_argument('--open-rate', type=float, default=0.0); ap.add_argument('--open-seconds', type=int, default=120)
     ap.add_argument('--api-ports', default=''); ap.add_argument('--patient', action='store_true'); ap.add_argument('--chart-url', default=None); ap.add_argument('--chart-history', type=int, default=5000)
     a = ap.parse_args()
     u = urllib.parse.urlsplit(a.url)
@@ -371,6 +372,33 @@ def main():
         if extra_ports:                       # spread traders over the main instance and the extra instances
             allp = [u.port] + extra_ports
             t.journey_port = allp[t.n % len(allp)]
+    if a.open_rate > 0:
+        # OPEN workload model (Poisson arrivals): sessions arrive independently of completions at `open_rate` per second for `open_seconds`;
+        # each arrival is a fresh account running ONE full journey. Reports journey latency percentiles, refusals and failures versus the offered rate.
+        import random as _r
+        rng, started, done_lat, fails, lock2 = _r.Random(7), [], [], [], threading.Lock()
+        stats.t_start = time.perf_counter()
+        def one(t, t_arr):
+            t0 = time.perf_counter(); ok, why = t.cycle(0); ms = (time.perf_counter() - t0) * 1000
+            with lock2:
+                (done_lat if ok else fails).append(ms if ok else why)
+        pool = list(traders); threads2 = []; t_begin = time.perf_counter(); next_at = t_begin; arrivals = 0
+        while time.perf_counter() - t_begin < a.open_seconds and pool:
+            next_at += rng.expovariate(a.open_rate)
+            wait = next_at - time.perf_counter()
+            if wait > 0: time.sleep(wait)
+            t = pool.pop(); arrivals += 1
+            th = threading.Thread(target=one, args=(t, time.perf_counter())); th.start(); threads2.append(th)
+        offered_wall = time.perf_counter() - t_begin
+        for th in threads2: th.join(timeout=900)
+        wall = time.perf_counter() - t_begin
+        emit({'summary': {'status': 'DONE', 'model': 'OPEN_POISSON', 'offeredRatePerSecond': a.open_rate, 'arrivals': arrivals, 'poolExhausted': not pool and arrivals > 0 and offered_wall < a.open_seconds,
+              'completedJourneys': len(done_lat), 'failedJourneys': len(fails), 'failedTraders': len(fails), 'failures': fails[:10],
+              'offeredWallSeconds': round(offered_wall, 1), 'wallSeconds': round(wall, 1),
+              'journeySeconds': {'p50': pct([x / 1000 for x in done_lat], 50), 'p95': pct([x / 1000 for x in done_lat], 95), 'p99': pct([x / 1000 for x in done_lat], 99), 'max': round(max(done_lat) / 1000, 1) if done_lat else None},
+              'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'retentionRecoveries': stats.recoveries, 'jobErrors': stats.job_errors,
+              'httpLatencyMs': {k: {'n': len(v), 'p50': pct(v, 50), 'p95': pct(v, 95), 'p99': pct(v, 99)} for k, v in sorted(stats.lat.items())}}})
+        return
     barrier = threading.Barrier(a.traders + 1)
 
     if a.patient:

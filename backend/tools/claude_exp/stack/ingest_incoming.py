@@ -86,7 +86,7 @@ def main():
     ap.add_argument("mode", choices=("verify", "publish"))
     ap.add_argument("--root", required=True); ap.add_argument("--report", required=True); ap.add_argument("--pairs", default="")
     ap.add_argument("--sha256-list"); ap.add_argument("--store"); ap.add_argument("--shallow", action="store_true")
-    ap.add_argument("--min-free-gb", type=float, default=30.0); ap.add_argument("--v1-root", help="v1 compact root: cross-check v2 months with verify_equal")
+    ap.add_argument("--min-free-gb", type=float, default=30.0); ap.add_argument("--basis", default="MID", choices=("MID", "BID", "ASK")); ap.add_argument("--v1-root", help="v1 compact root: cross-check v2 months with verify_equal")
     a = ap.parse_args()
     pairs = set(filter(None, a.pairs.split(",")))
     sha_list = load_sha_list(a.sha256_list) if a.sha256_list else None
@@ -112,7 +112,7 @@ def main():
                 t0 = time.perf_counter()
                 try:
                     reader = compact2.open_compact(mdir, expected_manifest_hash=rec["manifestHash"])
-                    manifest_key, stats = engine.publish_month(store, reader, pair, month, rights="UNKNOWN")
+                    manifest_key, stats = engine.publish_month(store, reader, pair, month, basis=a.basis, rights="UNKNOWN")
                     rec.update(published=manifest_key, publishSeconds=round(time.perf_counter() - t0, 2))
                 except Exception as error:
                     rec["status"] = "FAILED"; rec["problems"].append(f"publish {type(error).__name__}: {str(error)[:200]}")
