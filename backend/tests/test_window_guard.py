@@ -127,7 +127,7 @@ class WindowGuardTests(unittest.TestCase):
 
 class WindowGuardRuleTable(unittest.TestCase):
     """Every rule branch with a stubbed ledger view (the real reducer path is exercised above)."""
-    END = 1000
+    END = 10**15
 
     def run_check(self, kind, *, through, active=0, pending=0, tier="FREE", target=None, window=True):
         from cloud import window_guard
@@ -144,19 +144,19 @@ class WindowGuardRuleTable(unittest.TestCase):
     def test_rules(self):
         R = self.run_check
         self.assertIsNone(R("OPEN", through=10))
-        self.assertEqual(R("OPEN", through=1000), "WINDOW_ENDED")
-        self.assertIsNone(R("ADVANCE", through=10, target=1000))
-        self.assertEqual(R("ADVANCE", through=10, target=1001), "WINDOW_BOUNDARY")
-        self.assertEqual(R("ADVANCE", through=1000, target=1001), "WINDOW_ENDED_CONTINUATION_ONLY")
-        self.assertEqual(R("JUMP", through=1000, pending=1, active=1), "PENDING_AT_WINDOW_END")
-        self.assertEqual(R("JUMP", through=1000), "WINDOW_COMPLETED")
-        self.assertIsNone(R("JUMP", through=1000, active=2))
+        self.assertEqual(R("OPEN", through=self.END), "WINDOW_ENDED")
+        self.assertIsNone(R("ADVANCE", through=10, target=self.END))
+        self.assertEqual(R("ADVANCE", through=10, target=self.END + 1), "WINDOW_BOUNDARY")
+        self.assertEqual(R("ADVANCE", through=self.END, target=self.END + 1), "WINDOW_ENDED_CONTINUATION_ONLY")
+        self.assertEqual(R("JUMP", through=self.END, pending=1, active=1), "PENDING_AT_WINDOW_END")
+        self.assertEqual(R("JUMP", through=self.END), "WINDOW_COMPLETED")
+        self.assertIsNone(R("JUMP", through=self.END, active=2))
         self.assertIsNone(R("JUMP", through=10, pending=1))                     # far from the boundary: ordinary Jump
         for kind in ("CANCEL", "CLOSE", "END"):
-            self.assertIsNone(R(kind, through=5000, pending=3))
-        self.assertIsNone(R("OPEN", through=5000, tier="PRO"))
-        self.assertIsNone(R("ADVANCE", through=5000, tier="PRO", target=9999))
-        self.assertIsNone(R("OPEN", through=5000, window=False))
+            self.assertIsNone(R(kind, through=self.END + 5000, pending=3))
+        self.assertIsNone(R("OPEN", through=self.END + 5000, tier="PRO"))
+        self.assertIsNone(R("ADVANCE", through=self.END + 5000, tier="PRO", target=self.END + 9999))
+        self.assertIsNone(R("OPEN", through=self.END + 5000, window=False))
 
 
 if __name__ == "__main__":
