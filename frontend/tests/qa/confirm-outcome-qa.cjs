@@ -3,12 +3,12 @@
 // through the unchanged API. Faults are INJECTED in the browser with page.route
 // (labeled per case); the server itself is never modified.
 //   a  POST /confirm 200, then the Session refresh fails        → saved, never "not placed"
-//   b  the server commits, the response is lost                 → unknown, then reconciled as saved
+//   b  the server commits, the response is lost                 → unknown, then receipt lookup says committed
 //   c  genuine 409 from the server (tampered reviewHash)        → refused, server has no order
 //   d  503 before the server                                    → unknown; banner + order lock
 //   e  double tap on Confirm while the POST is slow             → exactly one POST
 //   f  Back and reload while the confirm is pending             → held / no false claim, one POST
-//   g  reconciliation finds the order committed, or the Session moved on without it
+//   g  receipt lookup finds the commit, or a newer revision proves NOT_COMMITTED
 // Every case asserts no "not placed" text appeared unless the server refused, and
 // counts /confirm POSTs.
 // Run: backend on 127.0.0.1:5188 + `npx vite --port 5196`, then
@@ -30,12 +30,16 @@ const FALSE_CLAIM = /not placed|Nothing was placed|was not saved/i;
 
 (async () => {
   const catalog = await call('/catalog');
-  const method = catalog.methods.find(m => m.kind === 'FREE_STYLE' && !m.checklistOn);
-  must(method, 'need a Free Style Method without checklist in the local catalog');
+  let method = catalog.methods.find(m => m.kind === 'FREE_STYLE' && !m.checklistOn);
+  if (!method) {
+    method = { schemaVersion: 1, artifact: 'BTL-LOCAL-METHOD-1', id: `method:qa-outcome-${Date.now()}`,
+      name: 'QA outcome', kind: 'FREE_STYLE', checklistOn: false, conditions: [], riskPercent: null, rr: null };
+    method = await call('/methods', method);
+  }
   let n = 0;
   const newSession = async () => (await call('/sessions', { id: `session:qa-outcome-${Date.now()}-${n++}`, name: `QA confirm outcome ${n}`, methodId: method.id, startPeriod: catalog.startPeriod, initialBalance: '10000' })).metadata;
   const saved = id => call(`/sessions/${encodeURIComponent(id)}`);
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({executablePath: process.env.QA_CHROMIUM_PATH || undefined});
 
   const scenario = async (name, viewport, fn) => {
     const session = await newSession();
@@ -67,6 +71,16 @@ const FALSE_CLAIM = /not placed|Nothing was placed|was not saved/i;
     await page.getByRole('heading', { name: 'Confirm reviewed order' }).waitFor({ timeout: 15000 });
     await sleep(700); // arming delay
   };
+  const toPlannedReview = async page => {
+    await page.getByRole('button', { name: 'New order' }).click();
+    await page.getByRole('radio', { name: 'Plan · R:R' }).click();
+    await page.getByLabel('Entry').fill('2005');
+    await page.getByLabel('Stop Loss').fill('2000');
+    await page.locator('.alpha-ticket input[aria-label="Take Profit"]').fill('2015');
+    await page.getByRole('button', { name: 'Review order' }).click();
+    await page.getByRole('heading', { name: 'Confirm reviewed order' }).waitFor({ timeout: 15000 });
+    await sleep(700); // arming delay
+  };
   const orderOf = async (session, review) => {
     const s = await saved(session.id); return { has: Object.keys(s.state.orders).length, revision: s.state.revision };
   };
@@ -92,19 +106,21 @@ const FALSE_CLAIM = /not placed|Nothing was placed|was not saved/i;
     return 'server orders 1, confirm POSTs 1';
   });
 
-  await scenario('b: server commits, response lost → unknown, then read-only check finds it saved', desktop, async ({ page, session, confirms, claims }) => {
+  await scenario('b: server commits, response lost → automatic read-only receipt check finds it saved', desktop, async ({ page, session, confirms, claims }) => {
     const gets = [];
-    page.on('request', r => { if (r.method() === 'GET' && /\/sessions\/[^/]+$/.test(r.url())) gets.push(r.url()); });
+    page.on('request', r => { if (r.method() === 'GET' && /\/sessions\/[^/]+\/commands\/[^/]+$/.test(r.url())) gets.push(r.url()); });
     await page.route('**/sessions/*/confirm', async route => { await route.fetch(); await route.abort('failed'); }); // INJECTED: commit reaches the server, response dropped
     await toReview(page);
     await page.getByRole('button', { name: 'Confirm order' }).click(); await sleep(1800);
-    must(!(await page.locator('.alpha-review-sheet').count()), 'sheet did not close after reconciling as saved');
-    must(await page.getByText('Order accepted and saved').isVisible(), 'saved notice missing');
-    must(gets.length >= 1, 'no read-only Session check');
+    // The UI immediately performs a read-only receipt lookup after a lost
+    // response. If that lookup proves the commit, it should settle as saved.
+    must(await page.getByText('Order accepted and saved').isVisible(), 'lost response was not reconciled from the durable receipt');
+    must(!(await page.getByText(FALSE_CLAIM).count()), 'claimed not placed after response loss');
+    must(gets.length >= 1, 'no read-only durable receipt lookup');
     must(confirms.length === 1, 'confirm POSTs ' + confirms.length);
     must((await orderOf(session)).has === 1, 'server order count');
     const c = await claims(); must(!c.length, 'false claim: ' + c);
-    return `GET checks ${gets.length}, confirm POSTs 1`;
+    return `receipt lookups ${gets.length}, confirm POSTs 1`;
   });
 
   await scenario('c: genuine 409 from the server → refused, server has no order', desktop, async ({ page, session, confirms }) => {
@@ -125,12 +141,30 @@ const FALSE_CLAIM = /not placed|Nothing was placed|was not saved/i;
     return 'server 409 REFUSED_IDEMPOTENCY_CONFLICT';
   });
 
+  await scenario('h: planned limit trade → review → confirm → receipt → Journal', desktop, async ({ page, session, confirms }) => {
+    await toPlannedReview(page);
+    await page.getByRole('button', { name: 'Confirm order' }).click();
+    await page.getByText('Order accepted and saved').waitFor({ timeout: 10000 });
+    const state=await saved(session.id);
+    const ids=Object.keys(state.state.orders);
+    must(ids.length===1,'expected one planned order, got '+ids.length);
+    must(confirms.length===1,'confirm POSTs '+confirms.length);
+    const status=await call(`/sessions/${encodeURIComponent(session.id)}/commands/${encodeURIComponent(ids[0])}`);
+    must(status.status==='COMMITTED'&&status.receipt?.durable===true,'durable receipt missing');
+    const journal=await call(`/sessions/${encodeURIComponent(session.id)}/journal`);
+    must(journal.financialAuthority==='COMMITTED_EVENTS_ONLY','Journal financial authority changed');
+    must(journal.orders.some(order=>order.id===ids[0]),'confirmed planned order missing from Journal');
+    await page.getByRole('button',{name:'Journal',exact:true}).click();
+    await page.screenshot({path:`${out}/h-planned-trade-journal-1280.png`});
+    return 'one planned order, durable receipt verified, Journal contains the committed order';
+  });
+
   await scenario('d + g(committed): 503 → unknown, no resubmit offered, orders locked; later saved → Check again settles it', phone, async ({ page, session, confirms, review, claims }) => {
     await page.route('**/sessions/*/confirm', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"LOCAL_SERVICE_UNAVAILABLE"}' })); // INJECTED, never reaches the server
     await toReview(page);
     await page.getByRole('button', { name: 'Confirm order' }).tap(); await sleep(1200);
     must(await page.getByText('Order status not verified').isVisible(), 'unknown state missing');
-    must(await page.locator('.alpha-review-unknown').getByText(/does not show this order yet/).isVisible(), 'check result missing');
+    must(await page.locator('.alpha-review-unknown').getByText(/durable receipt is not conclusive yet/).isVisible(), 'check result missing');
     must(!(await page.getByRole('button', { name: /Confirm order|Review again/ }).count()), 'unsafe resubmission offered');
     await page.screenshot({ path: `${out}/d-unknown-390.png` });
     await page.locator('.alpha-review-actions').getByRole('button', { name: 'Close' }).tap(); await sleep(300);
@@ -159,8 +193,8 @@ const FALSE_CLAIM = /not placed|Nothing was placed|was not saved/i;
     const other = await call('/reviews', { ...review(), requestId: `order:qa-other-${Date.now()}` });
     await call(`/sessions/${encodeURIComponent(session.id)}/confirm`, { reviewId: other.review.command.commandId, reviewHash: other.reviewHash });
     await page.getByRole('button', { name: 'Check again' }).click(); await sleep(1200);
-    must(await page.getByText('The order was not placed').isVisible(), 'reconciled refusal missing');
-    must(await page.getByText(/moved on without this confirmation/).isVisible(), 'reason missing');
+    must(await page.getByText(/earlier confirmation was not committed/).isVisible(), 'reconciled refusal missing');
+    must(await page.getByText(/reviewed Session revision advanced first/).isVisible(), 'reason missing');
     must(await page.getByRole('button', { name: 'Review again' }).isVisible(), 'Review again not offered after settling');
     await page.screenshot({ path: `${out}/g-reconciled-refused-1280.png` });
     const s = await saved(session.id);

@@ -12,19 +12,21 @@
 
 const MONTH=/^\d{4}-(0[1-9]|1[0-2])$/;
 const REASONS={
+  PARTIAL:'Only the start months explicitly listed as available can be selected; month coverage is not implied',
   GAP:'No observations in this month',
   RIGHTS_BLOCKED:'Data rights do not cover this month',
   EXPIRED:'No longer offered for new Sessions',
   QA_BLOCKED:'Held back until data checks pass',
+  UNKNOWN:'Availability is not verified',
 };
-// Instrument-level statuses. PARTIAL is pinned fail-closed (REQ-01): until Codex
-// states that an AVAILABLE month of a PARTIAL instrument is complete and accepted by
-// POST /sessions, no month of it is offered. Any unknown status is also closed.
+// PARTIAL is an instrument-level summary, not a blanket month refusal. The server
+// may expose individual AVAILABLE start months while other months remain unavailable.
+// RIGHTS_BLOCKED, QA_BLOCKED and unknown instrument states remain closed.
 export const INSTRUMENT_REASONS={
-  PARTIAL:'Coverage for this instrument is partial; months open when the server confirms which are complete',
+  PARTIAL:'Coverage is partial; only start months individually marked available by the server can be selected',
   QA_BLOCKED:'Held back until data checks pass',
   RIGHTS_BLOCKED:'Data rights do not cover this instrument',
-  PLANNED:'Planned; not ingested yet',
+  UNKNOWN:'Availability and eligibility are not verified',
   NOT_LISTED:'The server does not list this instrument',
 };
 export const instrumentReason=status=>INSTRUMENT_REASONS[status]||'Instrument not available';
@@ -35,18 +37,25 @@ export const isMonth=value=>typeof value==='string'&&MONTH.test(value);
 //    {mode:'published', months:[{period,status,selectable,reason}]} when the DTO exists,
 //    {mode:'unpublished', earliest} otherwise.
 export function periodAvailability(catalog,instrumentId,historical){
-  if(!historical)return {mode:'fixed',earliest:catalog?.startPeriod??null};
   const dto=catalog?.availability;
-  if(dto&&dto.schemaVersion===1&&Array.isArray(dto.instruments)){
+  if(catalog&&Object.hasOwn(catalog,'availability')){
+    if(!dto||typeof dto!=='object'||dto.schemaVersion!==1||!Array.isArray(dto.instruments))return {mode:'published',months:[],instrumentStatus:'UNKNOWN'};
     const entry=dto.instruments.find(item=>item?.instrumentId===instrumentId);
     if(!entry)return {mode:'published',months:[],instrumentStatus:'NOT_LISTED'};
+    const parentEligible=entry.status==='AVAILABLE'||entry.status==='PARTIAL';
     const months=(Array.isArray(entry.periods)?entry.periods:[])
-      .filter(item=>isMonth(item?.period)&&typeof item.status==='string')
-      .map(item=>({period:item.period,status:item.status,selectable:entry.status==='AVAILABLE'&&item.status==='AVAILABLE',
-        reason:item.status==='AVAILABLE'?(entry.status==='AVAILABLE'?null:instrumentReason(entry.status)):(item.reason||REASONS[item.status]||'Not available')}))
+      .filter(item=>isMonth(item?.period))
+      .map(item=>{
+        const known=['AVAILABLE','PARTIAL','GAP','RIGHTS_BLOCKED','QA_BLOCKED','UNKNOWN','EXPIRED'].includes(item.status);
+        const status=known?item.status:'UNKNOWN';
+        const selectable=parentEligible&&status==='AVAILABLE';
+        return {period:item.period,status,selectable,
+          reason:selectable?null:(item.reason||REASONS[status]||instrumentReason(entry.status))};
+      })
       .sort((a,b)=>a.period.localeCompare(b.period));
     return {mode:'published',months,instrumentStatus:entry.status};
   }
+  if(!historical)return {mode:'fixed',earliest:catalog?.startPeriod??null};
   return {mode:'unpublished',earliest:isMonth(catalog?.startPeriod)?catalog.startPeriod:null};
 }
 

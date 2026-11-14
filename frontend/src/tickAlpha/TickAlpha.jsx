@@ -27,7 +27,7 @@ import {MyMethods,MethodNew,MethodOverview,Analytics,Placeholder} from './AlphaP
 import {HelpPage,LocalAccountPage} from './AlphaHelp.jsx';
 import {rememberSession} from './productData.js';
 import {useRoute,navigate,linkTo,accountLink,setLeaveGuard} from './productRoute.js';
-import {classifyConfirmError,committedReceipt,reconcile,UNKNOWN_TEXT} from './confirmOutcome.js';
+import {classifyConfirmError,committedReceipt,classifyCommandResult,UNKNOWN_TEXT} from './confirmOutcome.js';
 import './tickAlpha.css';
 import {isAccountPage} from './accountClient.js';
 
@@ -109,7 +109,7 @@ export default function TickAlpha(){
   const confirm=async()=>{
     if(flight.current)return {outcome:'NOT_SENT',code:'LOCAL_BUSY'};
     const sessionId=view.metadata.id,command=review.review.command;
-    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision};
+    const identity={sessionId,commandId:command.commandId,expectedRevision:command.expectedRevision,reviewHash:review.reviewHash};
     flight.current=true;setBusy(true);setNotice('');
     // While the confirmation is in flight, in-app navigation and Back are held and
     // a page unload asks first; the sheet says to keep it open.
@@ -136,30 +136,24 @@ export default function TickAlpha(){
     setNotice('Order accepted and saved. A fill requires the next eligible tick.');
     return {outcome:'COMMITTED',refreshed:true};
   };
-  // Read-only: GET the saved Session and look for this review's order.
+  // Read-only: GET the durable receipt/status for this exact reviewed command.
   // The sheet passes the identity from confirm()'s result for its immediate check,
   // before this state has re-rendered.
   const checkUnverified=async(pending=unverified)=>{
     if(!pending||flight.current)return {outcome:'UNKNOWN',code:'LOCAL_BUSY'};
     flight.current=true;setBusy(true);
     try{
-      let saved;
-      try{saved=await api(sessionPath(pending.sessionId));}catch(error){setNotice('The Session could not be read, so the order status is still not verified. Check again in a moment.');return {outcome:'UNKNOWN',code:error.message};}
-      const found=reconcile(saved,pending);
-      if(found==='UNKNOWN'){setNotice('The saved Session does not show this order yet. Check again in a moment; nothing was sent again.');return {outcome:'UNKNOWN',code:'NOT_FOUND_YET'};}
+      let status;
+      try{status=await api(`${sessionPath(pending.sessionId)}/commands/${encodeURIComponent(pending.commandId)}`);}
+      catch(error){setNotice('The durable command result could not be read, so the order status is still not verified. Check again in a moment.');return {outcome:'UNKNOWN',code:error.message};}
+      const found=classifyCommandResult(status,pending);
+      if(found.outcome==='UNKNOWN'){setNotice('The server has not established a durable result yet. Check again in a moment; nothing was sent again.');return found;}
       setUnverified(null);
-      if(found==='REFUSED'){setNotice('The earlier confirmation was not saved: the Session moved on without it.');return {outcome:'REFUSED',code:'RECONCILED_NOT_SAVED',reconciled:true};}
+      if(found.outcome==='REFUSED'){setNotice('The earlier confirmation was not committed: the reviewed Session revision advanced first.');return {...found,reconciled:true};}
       emitLocal('order_command_submitted');
       return {...await refreshAfterCommit(pending.sessionId),reconciled:true};
     }finally{flight.current=false;setBusy(false);}
   };
-  // A view loaded for another reason can also settle an unverified confirmation.
-  const [settledBy,setSettledBy]=useState(null);
-  if(unverified&&view&&view!==settledBy&&view.metadata.id===unverified.sessionId){
-    setSettledBy(view);
-    const found=reconcile(view,unverified);
-    if(found!=='UNKNOWN'){setUnverified(null);setNotice(found==='COMMITTED'?'The earlier order was saved.':'The earlier confirmation was not saved: the Session moved on without it.');}
-  }
   // Instrument comes from the Session's pinned profile; without it, orders stay locked.
   const instrument=sessionInstrument(view);
   const symbolText=instrument?.symbol??'Instrument not stated';
