@@ -1,4 +1,7 @@
-# RIKSORA — Owner architecture decision: VPS tick execution + nine precomputed OHLC timeframes in private Cloudflare R2
+# RIKSORA — Owner architecture decision: VPS tick execution + nine precomputed OHLC timeframes in private Cloudflare R2  [OHLC-in-R2 part SUPERSEDED 2026-11-14]
+
+> **SUPERSEDED IN PART — 2026-11-14 (owner):** nine-timeframe OHLC (and ticks) are stored on the **VPS local SSD**; **Cloudflare R2 is for user data only**. Statements below that place OHLC objects in R2, publish to R2, or test a private-R2 fixture are marked **[SUPERSEDED 2026-11-14]** and kept for history. Unchanged: tick authority, causal chart rules, 512 first page, 500–1,000 older pages, 5,000 active cache per timeframe incl. D1, no browser M1→D1 aggregation, no data-rights change. The R2 target for **user** data archives (Session/receipt/Journal exports, backups) remains. Replacement record: [data placement and freeze plan](RIKSORA-DATA-PLACEMENT-AND-FREEZE-PLAN-20261114.md).
+> The coverage numbers in section 2 (2021–2022 OHLC-only, 2023–2025 tick) are stale: the owner's data holds ticks 2024-01 through 2026-10 for 16 pairs, M1 BID OHLC only before 2024.
 
 Date: 2026-11-13
 Status: **OWNER-SELECTED TARGET ARCHITECTURE; NOT IMPLEMENTED / NOT COMMERCIALLY ACCEPTED**
@@ -10,7 +13,7 @@ This latest owner decision **supersedes** earlier proposals for:
 - mandatory client-side/local-first financial execution and shipping full yearly tick data to browsers;
 - deriving M3/M5/.../D1 from M1 **in the browser on each timeframe switch**;
 - leaving D1 outside the 5,000-candle **active chart cache** limit;
-- keeping the active OHLC archive on the VPS instead of Cloudflare R2.
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** - keeping the active OHLC archive on the VPS instead of Cloudflare R2.
 
 It does **not** change financial authority, tick contract, Session/recovery semantics, source rights, production, data acquisition, or paid-beta acceptance. Earlier Commercial V1 acceptance targets remain in effect except where this decision explicitly changes chart architecture/UI caching. Preserve the complete **unpublished Git commit history** and do not force-push, reset, or overwrite local Codex work.
 
@@ -19,7 +22,7 @@ It does **not** change financial authority, tick contract, Session/recovery sema
 | Role | Store and execution location | Actual behavior |
 | --- | --- | --- |
 | Canonical ordered Bid/Ask Tick Monthly Parquet, immutable manifest, Observed V2 metadata sidecar index | **Local SSD of RIKSORA VPS** | **Only** financial execution evidence; no second canonical tick copy; immutable source identity and coverage |
-| Precomputed, independently accessible OHLC for **M1, M3, M5, M15, M30, H1, H2, H4, D1** | **Private Cloudflare R2**, with per-instrument/month/timeframe/version manifests | Chart history and indicator input; generated **offline only once per validated source version** and incrementally republished when source changes |
+| Precomputed, independently accessible OHLC for **M1, M3, M5, M15, M30, H1, H2, H4, D1** | **Private Cloudflare R2**, with per-instrument/month/timeframe/version manifests | Chart history and indicator input; generated **offline only once per validated source version** and incrementally republished when source changes **[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** |
 | Trader browser | HTTP chart pages and UI | Request **the already-generated timeframe selected**, display candles, indicator analysis, drawings and order controls; **no M1→D1 aggregation on timeframe change**; no full-year tick download during normal backtest |
 | Python tick-precise canonical reducer + durable PostgreSQL queue/worker | VPS | Advance real replay cursor, pending orders, fills, SL/TP, fees, canonical receipts, active-candle update; server-authoritative V1 |
 | Session, Method, order events, receipts, Journal, Analytics | PostgreSQL VPS | Durable, tenant-isolated, idempotent records |
@@ -30,7 +33,7 @@ Do not substitute a faster OHLC-only fill simulator for tick authority. Do not a
 
 Implement an offline source- and version-pinned processing path:
 
-`Verified canonical tick (SSD VPS) → qualified M1 chart bars → offline nine-timeframe materialization → immutable manifest/hash → private Cloudflare R2 → authenticated bounded chart delivery`
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** `Verified canonical tick (SSD VPS) → qualified M1 chart bars → offline nine-timeframe materialization → immutable manifest/hash → private Cloudflare R2 → authenticated bounded chart delivery`
 
 Source periods are separate:
 - **2021-01 through 2022-12**: 24 months × 16 instruments = **384 instrument-months** of qualified **OHLC-only prehistory**, used for chart and indicator warm-up only. It is not execution tick evidence; it requires its own source/version/rights/price basis.
@@ -57,7 +60,7 @@ The owner means **5,000 historical OHLC candles for the active chart-window of e
 
 ## 4. Causal chart rendering with precomputed future OHLC
 
-Even though all future OHLC candles exist on private R2, a backtest at server-controlled cursor `T` may receive only **fully completed candle buckets whose close <= T**, plus an **in-progress candle constructed solely from tick groups already revealed on the VPS**. Never send the future final high/low/close of the active M5/H1/D1 bar. Do not generate unscoped signed R2 URLs whose cached contents could expose unapproved future full-bar data. Prefer an authenticated, entitlement-checked, Session-cursor-clipped API/edge gateway which returns bounded pages, with source-version pinning, ETags/cache discipline and no R2 credentials exposed. Historical catalog inspection outside a Session is a distinct, permissioned scope from in-Session replay visibility.
+Even though all future OHLC candles exist in the precomputed OHLC store **[location changed 2026-11-14: VPS local SSD instead of private R2; the causal rule below is unchanged]**, a backtest at server-controlled cursor `T` may receive only **fully completed candle buckets whose close <= T**, plus an **in-progress candle constructed solely from tick groups already revealed on the VPS**. Never send the future final high/low/close of the active M5/H1/D1 bar. Do not generate unscoped signed R2 URLs whose cached contents could expose unapproved future full-bar data. Prefer an authenticated, entitlement-checked, Session-cursor-clipped API/edge gateway which returns bounded pages, with source-version pinning, ETags/cache discipline and no R2 credentials exposed. Historical catalog inspection outside a Session is a distinct, permissioned scope from in-Session replay visibility.
 
 **No-lookahead tests:** cursor in the middle of M1, M5, H1, and D1; first/last partial candle at source edge, week/weekend gaps, 2022–2023 boundary, cursor restart and timeframe switch; indicators must see only eligible bars. Security is server-side authorization/cursor enforcement, not just browser hiding.
 
@@ -72,10 +75,10 @@ Even though all future OHLC candles exist on private R2, a backtest at server-co
 **Revised implementation order:**
 1. **Git safety**: preserve all 44 reportedly unpublished local commits; reconcile/push authentic ancestry safely, without force-push/squash/API snapshot. Do not cherry-pick this document onto a stale base without reviewing conflicts.
 2. **Promote existing BID M1 implementation** as a reusable offline generator; establish explicit MID/BID display compatibility using exact-source fixtures. Generate **all nine** monthly OHLC materializations **offline**, not in browser. Test timezone/session/gaps/month-boundary/hash and idempotent publish.
-3. **Cloudflare R2 private publishing**: use bucket credentials in trusted workers only; immutable path/version, manifest, integrity verification, bounded object access, retry/recovery and rights gates. No production upload of real market data without rights.
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** 3. **Cloudflare R2 private publishing**: use bucket credentials in trusted workers only; immutable path/version, manifest, integrity verification, bounded object access, retry/recovery and rights gates. No production upload of real market data without rights.
 4. **Authenticated chart history**: dataset entitlement, Session cursor and price-basis pins, exact selected-timeframe paging, 512 initial bars, 500–1,000 older bars, 5,000 active chart cache including D1. Rewire `AlphaWorkspace` and retire old tick-scanning historical page hot path after compatibility QA. Keep all nine-frame storage outside the Vite `frontend/public` bundle; never remove public files before a verified consumer migration/backup and source-rights audit.
 5. **Server-authoritative replay UX**: keep existing Python canonical reducer; send only durable cursor/receipt/financial events plus bounded active-candle updates built from revealed ticks. Optimize per-step queue/polling and timeline checkpoint recovery with explicit reviewed contract approval; retain fallback and golden financial hashes.
-6. **Commercial and economics gates**: synthetic full product browser E2E (source→R2 fixture→chart→replay→Journal→resume), protected access/tenant isolation and no-lookahead, VPS CPU/latency/RAM/database growth plus R2 stored bytes/Class A/B operations, then qualified licensed historical feed acceptance. No blanket 20-user or one-year capacity claim without actual load tests.
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** 6. **Commercial and economics gates**: synthetic full product browser E2E (source→R2 fixture→chart→replay→Journal→resume), protected access/tenant isolation and no-lookahead, VPS CPU/latency/RAM/database growth plus R2 stored bytes/Class A/B operations, then qualified licensed historical feed acceptance. No blanket 20-user or one-year capacity claim without actual load tests.
 
 **Deprioritized for now:** mandatory browser financial-engine TS/WASM port and downloading large tick histories to clients. Do **not** remove the local Codex tick-page transport primitive: preserve it for private QA, specialized later workflows or possible fallback, but **do not wire it as the normal backtest data plane** in this owner-selected hybrid.
 
@@ -83,7 +86,7 @@ Even though all future OHLC candles exist on private R2, a backtest at server-co
 
 - **Specification:** OWNER DECIDED; **implementation NOT DONE**.
 - **Dataset:** 384 qualified OHLC-only instrument-months plus 544 qualified tick instrument-months: **NOT VERIFIED / RIGHTS BLOCKED**.
-- **Private R2, all nine precomputed frames and browser paging:** **NOT IMPLEMENTED/ACCEPTED**.
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** - **Private R2, all nine precomputed frames and browser paging:** **NOT IMPLEMENTED/ACCEPTED**.
 - **Local BID M1 sidecar:** **reported implemented/tested locally**, not yet visible on the PR #53 remote final SHA.
 - **Financial correctness:** current frozen Python reducer and hash evidence retained; new chart system cannot become financial authority.
 - **Commercial release, billing, third-party market-data usage, deployment and storage migration:** **NOT AUTHORIZED** by this document.
@@ -101,7 +104,7 @@ This is an architecture decision and implementation specification only. It may b
 | Layer | Location | Responsibility | Does NOT do |
 | --- | --- | --- | --- |
 | Browser React/Vite, Lightweight Charts | Trader device | Chart, drawings, technical indicators, replay UX; render the *selected* precomputed TF | Execute authoritative fills, reconstruct a year's tick data, aggregate M1 into D1 on each switch |
-| R2 private | Cloudflare R2 | Immutable nine-timeframe chart objects per symbol/period/source-version, source manifest and hashes | Expose future bars to untrusted replay clients or store financial Session authority |
+| R2 private | Cloudflare R2 | Immutable nine-timeframe chart objects per symbol/period/source-version, source manifest and hashes | Expose future bars to untrusted replay clients or store financial Session authority **[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** |
 | Chart authorization/delivery | VPS API or secure edge gate (compare measured economics) | Entitlement + Session/revision/cursor checks, bounded chart pages, authorized cache | Issue unbounded whole-month URLs revealing future H/L/C |
 | Source and execution index | Local VPS SSD | Ordered Bid/Ask Tick Monthly Parquet or future independently verified physical equivalent, V2 seek plus optional time/min/max price index | Treat OHLC as a trading fill source |
 | Financial execution and worker | VPS Python + bounded durable queue | Exact reducer, pending/market/SL/TP, revision, verified event and receipt | Permanent dedicated CPU for an idle user |
@@ -114,7 +117,7 @@ This is an architecture decision and implementation specification only. It may b
 1. Qualify rights, source identity, input hash, feed precision, time ordering/ambiguity, UTC calendar, gaps, quality and replay eligibility. Pre-2023 OHLC-only prehistory remains read-only; tick-enabled 2023–2025 may support settlement only when source-qualified. Planned 384 OHLC-only instrument-months and 544 Tick instrument-months remain **unverified targets**.
 2. Reuse the locally reported streaming **BID M1** ZSTD writer and existing validation/manifest tooling; match the existing **MID = (Bid+Ask)/2** display contract or explicitly version and test a different price basis. Do not relabel BID bars as MID, nor hide provider-feed discontinuities.
 3. Offline, once per source/version, materialize **M1, M3, M5, M15, M30, H1, H2, H4, D1** as independently addressable, compressed and immutable objects. All bars have pinned aggregation version, source rights, price basis, timezone/calendar, first/last time, actual counts, gaps/partial-edge flags and hash. Handle UTC month and D1 bucket boundaries without synthetic gaps.
-4. Publish to **private R2 only when authorized**. Use path/version manifests and idempotent publication; chart users request the selected TF directly, not browser M1→D1 computation.
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** 4. Publish to **private R2 only when authorized**. Use path/version manifests and idempotent publication; chart users request the selected TF directly, not browser M1→D1 computation.
 5. Deliver at most **512 eligible completed bars** on first load; later pages **500–1,000**, rolling chart cache **at most 5,000 for the selected TF including D1**. Qualified archive remains available beyond that cache, including all qualified D1 through pagination. Indicator warm-up uses a separately bounded causal buffer.
 6. For Session at replay cursor T, only fully completed buckets with end <= T may leave the trusted boundary. Construct the forming candle solely from **revealed tick prefix**. In particular, raw R2 object URLs, object range headers, unrestricted indexes, cached CDN objects and error messages must not leak future full H/L/C, future gaps or EOF. Test server/edge responses and another tenant, not just UI clipping.
 7. Do not delete the ~965 legacy public market assets or claim a build-size speed gain before dependency audit, staged replacement and rollback. If the chart gateway proxies every R2 byte via VPS, it can still incur VPS egress; compare bounded secure edge delivery against a simple VPS proxy with measured access, bandwidth and R2 operation costs.
@@ -172,7 +175,7 @@ Logical target: Session and dataset pin + append-only idempotent command log + i
 
 Claude cited prior PostgreSQL fixture: ~18.4 MB for 512 commands versus ~4.76 MB compact candidate; verify same workload and scope before claiming ~74% universally. Examine repeating full-state receipts/checkpoints, optional additive deltas, indexes/WAL and per-command payload growth. Compare dedup, compression, binary hash storage, sparse checkpoint plus canonical deltas and structural checkpoints for fills/closes.
 
-**Do not delete or mutate currently immutable receipts/checkpoints.** Versioned snapshot/delta model and cold archival to R2 are **proposed** only and require explicit approval plus independent hash-chain, SIGKILL-before/after-commit, recovery, tenant separation, Journal/Analytics and retention tests. Recovery time and DB/WAL storage must be counted, not merely row payload bytes.
+**Do not delete or mutate currently immutable receipts/checkpoints.** Versioned snapshot/delta model and cold archival to R2 are **proposed** only and require explicit approval plus independent hash-chain, SIGKILL-before/after-commit, recovery, tenant separation, Journal/Analytics and retention tests. Recovery time and DB/WAL storage must be counted, not merely row payload bytes. **[Note 2026-11-14: R2 remains the proposed target for archives of USER data (Session/receipt/Journal exports, backups); only market data moved to the VPS SSD.]**
 
 ### 7.8 Capacity, economics and implementation gates
 
@@ -182,7 +185,7 @@ Target hardware is a **6 vCPU / 16 GiB** VPS with API, DB and worker co-location
 | --- | --- | --- |
 | G0 | Preserve local Codex HEAD e099e344 and its 44 unpublished commits; read PR #53/#54/#55 | No force-push, overwrite, reset, snapshot flattening, or unstated merge |
 | G1 | Frontend checkpoint integration and CPU/queue/DB baseline | Same-SHA metrics, tests and honest NOT RUN labels |
-| G2 | Nine-versioned-TF offline generator + safe private-R2 fixture + chart API | 512 seed, 500–1,000 pages, 5k per TF including D1, no-lookahead, source/tenant boundary, offline hash |
+| G2 | Nine-versioned-TF offline generator + safe private-R2 fixture + chart API | 512 seed, 500–1,000 pages, 5k per TF including D1, no-lookahead, source/tenant boundary, offline hash **[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** |
 | G3 | Compare A/B/C readers, verify-once proof and bounded cache | Full financial parity, independent evidence, version invalidation, real-host gate only with authorization |
 | G4 | Batching, possible pool/NOTIFY/SSE and warm bounded workers | Idempotency, restart, CPU and latency before/after, rollback |
 | G5 | Indexed Jump, long-session checkpoint design and sparse-state candidate | Explicit owner frozen-contract approval, exact parity and crash recovery |
@@ -194,7 +197,7 @@ Target hardware is a **6 vCPU / 16 GiB** VPS with API, DB and worker co-location
 
 **Review against the actual PR #53 code and Claude PR #54 audit; challenge this proposal, do not rubber-stamp it.** Return AGREE / DISAGREE / NEEDS DATA for each subsystem, with file-path evidence, economic assumptions, counterexamples and a better alternative where one exists. Do not treat unpublished e099e344 code as remotely inspected.
 
-1. Does a private-R2 nine-TF architecture *actually* lower full infrastructure cost versus M1-only plus edge/server aggregation, counting object operations, storage, cache leakage and multi-tenant authorization? What is break-even at 16 instruments and 58 months?
+**[SUPERSEDED 2026-11-14: nine-timeframe OHLC now on the VPS local SSD; R2 = user data only]** 1. Does a private-R2 nine-TF architecture *actually* lower full infrastructure cost versus M1-only plus edge/server aggregation, counting object operations, storage, cache leakage and multi-tenant authorization? What is break-even at 16 instruments and 58 months?
 2. Design an authenticated, replay-cursor-clipped chart gateway that cannot leak future complete OHLC via URLs, ranges, caching, metadata or unauthorized tenant access. Can it scale without proxying all bytes through VPS?
 3. How should MID display and BID M1 source be reconciled? Show exact M1/H1/D1 edge, gap, DST/calendar and source-provider discontinuity tests.
 4. Does the 5,000-bar cache **per selected TF including D1** remain efficient on 3–4 GB Android with multiple indicators, drawings and chart-library copies? What numerical memory/fps threshold is defensible?

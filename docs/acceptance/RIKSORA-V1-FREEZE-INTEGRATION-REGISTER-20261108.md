@@ -1,5 +1,23 @@
 # RIKSORA V1 — frozen-architecture integration register
 
+## Data placement and freeze plan — 2026-11-14 (owner decision; implementation register, not architectural authority)
+
+Owner decision: market data (ticks, compact derivative, nine OHLC timeframes incl. long history) on the **VPS local SSD**; **R2 for user data only**. Replaces the 2026-11-13 R2-for-OHLC placement. Detail: [data placement and freeze plan](../architecture/RIKSORA-DATA-PLACEMENT-AND-FREEZE-PLAN-20261114.md). Measured status (synthetic unless noted; `docs/benchmarks/CLAUDE_VPS_MEASUREMENTS_2026-11-14.md`):
+
+| # | Item | Status | Evidence / blocker |
+|---|---|---|---|
+| D1 | Compact tick v2 (`BTL-COMPACT-TICK-2`), derived, lossless | VERIFIED (derived only) | 9 edge tests; tick-by-tick equal to v1 on 5.35 M real EURUSD ticks (private QA); 5.5x smaller |
+| D2 | 34 months EURUSD v1 on the VPS | VERIFIED | 34/34 months, 102/102 SHA-256, 60,017,476 ticks, rights UNKNOWN |
+| D3 | Nine-timeframe OHLC generation on the VPS | IMPLEMENTED (tool), partly measured | identical to the independent oracle (G0-G5); byte-identical from v1 and v2; real-month publish and oracle sampling NOT RUN |
+| D4 | Chart service with 5,000 candles per timeframe | PROTOTYPE | 9 timeframes >= 5,000 candles in about 1-12 s at open depending on crowd; not connected to product identity; per-dataset catalog missing |
+| D5 | Cross-month instrument catalog and instrument definitions | MISSING (P0) | chart pins one source hash per Session |
+| D6 | OHLC-only prehistory (M1 BID before 2024) importer | MISSING | waiting for source format from the owner's laptop; basis BID, display only |
+| D7 | Queue retention (15 finished jobs, global) and frontend busy/pruned-job recovery | OPEN (frozen limit; owner approval) | `poll:404` verified; 100 traders complete only with a patient recovering client |
+| D8 | Full-month real replay through the product worker (RSS/CPU per worker) | NOT RUN (P0) | sets the RAM budget and the real capacity |
+| D9 | Backup/restore drill, observability, WAL measurement | NOT RUN (P0 before beta) | never exercised |
+| D10 | Claude jump engine for settlement | NOT ADOPTED | real-data slice produced 3 events / 1 fill (order UNRESOLVED, undiagnosed) |
+
+
 ## Owner Commercial V1 acceptance target — 2026-11-13
 
 The explicit capacity, performance, correctness, market-rights, billing, backup and GO/HOLD acceptance gates are in [RIKSORA Commercial V1 — Capacity Target & Definition of Done](RIKSORA-COMMERCIAL-V1-TARGETS.md). Target: **20 simultaneous active traders**, four planned worker slots on a 6-vCPU/16-GiB VPS, **five active traders per worker as a planning ratio only**, and two reproducible 60-minute financial-active cohorts. This is **NOT TESTED/NOT ACCEPTED** as a VPS or commercial capacity claim; older functional ten-browser PASS and local engine-only results do not meet this gate. Continue using this integration register for implementation evidence and AI_CONTEXT for operational authorization.
