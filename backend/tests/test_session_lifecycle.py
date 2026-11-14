@@ -54,6 +54,12 @@ class SessionLifecycleTests(unittest.TestCase):
         expired = f.client.post(f.root + "/sessions/" + sid + "/restore", headers=f.headers)
         self.assertEqual((expired.status_code, expired.json()["detail"]), (409, "TRASH_EXPIRED"))
         self.assertNotIn(sid, self.listed())
+        with connect(DSN) as db:
+            rows = db.execute("SELECT action,outcome FROM btl.audit_events WHERE target=%s ORDER BY event_id", (sid,)).fetchall()
+            self.assertIn(("SESSION_RESTORE", "REFUSED"), [tuple(r) for r in rows], "the expired restore is audited as refused")
+            self.assertTrue(any(r[0] == "SESSION_TRASH" and r[1] == "OK" for r in rows))
+            with self.assertRaises(Exception):
+                db.execute("DELETE FROM btl.audit_events")
 
 
 if __name__ == "__main__":

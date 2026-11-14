@@ -59,6 +59,11 @@ class EntitlementTests(unittest.TestCase):
                        "VALUES (%s,%s,%s,'m','p',1000,2592000,'PAID',%s,%s,%s,1)", ("btl-sbx-" + uuid.uuid4().hex, f.actor, uuid.uuid4(), "t" + uuid.uuid4().hex, now - 10, now - 10 + 2592000))
         _, pro = self.create(f.headers, f.root, mid, "three")
         self.assertIn(pro.status_code, (200, 201, 202), pro.text)
+        # a refund/chargeback (order REVERSED) removes Pro immediately: the day's Free window is then already used, so the next new window is refused
+        with connect(DSN) as db:
+            db.execute("UPDATE btl.sandbox_billing_orders SET phase='REVERSED', revision=revision+1 WHERE actor_id=%s", (f.actor,))
+        _, after_refund = self.create(f.headers, f.root, mid, "four")
+        self.assertEqual((after_refund.status_code, after_refund.json()["detail"]), (409, "DAILY_WINDOW_LIMIT"))
 
     def test_the_gate_is_off_without_the_opt_in_flag(self):
         f = self.fixture

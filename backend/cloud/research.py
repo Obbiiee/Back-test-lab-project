@@ -499,6 +499,8 @@ def install(app):
         from . import export_results
         text, revision, _count = await anyio.to_thread.run_sync(
             partial(export_results.export_session_csv, app.state.dsn, user.id, workspace_id, session_id, run=run), limiter=limiter)
+        from . import audit
+        await anyio.to_thread.run_sync(partial(audit.record, app.state.dsn, user.id, workspace_id, 'EXPORT_CSV', session_id))
         import re as _re
         name = 'riksora-' + _re.sub(r'[^A-Za-z0-9._-]', '_', session_id)[:80] + f'-r{revision}.csv'
         return Response(text.encode('utf-8'), media_type='text/csv; charset=utf-8',
@@ -520,9 +522,15 @@ def install(app):
         from . import session_lifecycle
         def scope(db, actor, workspace):
             owner(WorkspaceUnit(db, actor, workspace).role)         # membership verified, OWNER required, like every write route
-        return Response(canonical_bytes(await anyio.to_thread.run_sync(partial(
-            session_lifecycle.set_trashed, app.state.dsn, user.id, workspace_id, session_id, trashed, scope=scope), limiter=limiter)),
-            media_type='application/json')
+        from . import audit
+        try:
+            value = await anyio.to_thread.run_sync(partial(
+                session_lifecycle.set_trashed, app.state.dsn, user.id, workspace_id, session_id, trashed, scope=scope), limiter=limiter)
+        except ContractError:
+            await anyio.to_thread.run_sync(partial(audit.record, app.state.dsn, user.id, workspace_id, 'SESSION_TRASH' if trashed else 'SESSION_RESTORE', session_id, 'REFUSED'))
+            raise
+        await anyio.to_thread.run_sync(partial(audit.record, app.state.dsn, user.id, workspace_id, 'SESSION_TRASH' if trashed else 'SESSION_RESTORE', session_id))
+        return Response(canonical_bytes(value), media_type='application/json')
 
     @app.post(prefix + '/sessions/{session_id}/trash')
     async def trash_session(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
@@ -618,7 +626,12 @@ def install(app):
         entitlements = getattr(app.state, 'entitlements', None)
         claim = None
         if entitlements is not None:               # opt-in server-side Free/Pro admission (BTL_ENTITLEMENT_ENFORCE=1)
-            claim = await anyio.to_thread.run_sync(partial(entitlements.claim, user.id, workspace_id, raw), limiter=limiter)
+            try:
+                claim = await anyio.to_thread.run_sync(partial(entitlements.claim, user.id, workspace_id, raw), limiter=limiter)
+            except ContractError:
+                from . import audit
+                await anyio.to_thread.run_sync(partial(audit.record, app.state.dsn, user.id, workspace_id, 'SESSION_CREATE', None, 'REFUSED'))
+                raise
         try:
             return await execute(user, workspace_id, 'create_session', raw, write=True, job_id=job_id)
         except BaseException:
