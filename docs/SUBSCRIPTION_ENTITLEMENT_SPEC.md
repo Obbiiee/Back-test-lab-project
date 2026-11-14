@@ -144,6 +144,18 @@ Subject to normal product/data availability, Free should retain the core experie
 
 Protocol Mode must not be treated as synonymous with a paid subscription.
 
+## Export results — Free and Pro (Commercial V1 owner update 2026-11-15)
+
+**Both Free and Pro may export their own already committed backtest results**, including actual trade/order/position outcomes from ordinary replay, fast replay and Jump to Next Event; exported math must use the same canonical tick execution ledger, receipts and Journal/Statistics for both tiers. This is NOT a reason to withhold accurate historical result records from Free.
+
+- **Free minimum:** owned Session full trade-history **CSV**, plus **PDF** basic Session performance report with canonically defined win rate, realized PnL, R statistics, profit factor, drawdown, balance curve and Method/source disclosure; no fake trade-row truncation.
+- **Pro:** the same accurate basic exports, plus **batch and multi-Session / Method-across-Sessions reports** for owned research and advanced outputs only when the underlying metrics are implemented. Unlimited Methods/Sessions does not mean unlimited parallel export CPU, I/O or disk resources.
+- **Additional V1 structured option:** machine-readable versioned **JSON** research/evidence export with scoped eligible metadata and receipt identity, subject to source rights and security; this is a target that must be explicitly tested, not claimed implemented from older frontend helpers.
+- The export must disclose Session/Method/pair, selected history range, UTC timestamps, fees/precision and source/profile assumptions, pending/open/unresolved states, partial exit handling, snapshot/committed revision and report generation timestamp. Financial content must match the immutable account ledger and not depend on which replay control was clicked.
+- **Privacy and rights:** strict authenticated account ownership for each export request/download; no guessed URLs, cross-tenant access, raw market tick dataset redistribution or future-data leakage. Rate-limit and bound streaming/large jobs, clean temporary files safely and protect CSV cells against formula injection.
+- Free/Pro downgrade or entitlement expiry must **not destroy historical research**; owned basic result export should remain available during read-only account access, subject to retention and applicable account security.
+- The normative formats, integrity tests and acceptance are defined in the [Commercial V1 Export Results contract](acceptance/RIKSORA-COMMERCIAL-V1-TARGETS.md#f1-export-backtest-results--commercial-v1-owner-2026-11-15).
+
 ## Free results — Basic Statistics
 
 Free results should provide enough evidence for the user to understand the session rather than functioning as a crippled demo.
