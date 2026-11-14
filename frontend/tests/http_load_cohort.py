@@ -16,6 +16,32 @@ def _cpu_times():
     return sum(v), idle
 
 
+def _role_ticks(cgroup, api_pid, chart_pid, driver_pid):
+    """Cumulative CPU ticks and RSS per role for the live processes of the cgroup (QA measurement only)."""
+    roles = {}
+    page = os.sysconf('SC_PAGE_SIZE')
+    try:
+        pids = [int(x) for x in (cgroup / 'cgroup.procs').read_text().split()]
+    except OSError:
+        return roles
+    for pid in pids:
+        try:
+            raw = Path(f'/proc/{pid}/stat').read_text(); close = raw.rfind(')')
+            comm = raw[raw.find('(') + 1:close]; f = raw[close + 2:].split()
+            ticks, rss = int(f[11]) + int(f[12]), int(f[21]) * page
+            cmd = Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0', b' ')[:300]
+        except (OSError, ValueError, IndexError):
+            continue
+        if pid == api_pid: role = 'api_process'
+        elif pid == chart_pid: role = 'chart_service'
+        elif pid == driver_pid: role = 'load_driver'
+        elif comm.startswith('postgres'): role = 'postgres'
+        elif b'cloud.worker import serve' in cmd: role = 'native_worker'
+        else: role = 'other'
+        r = roles.setdefault(role, dict(ticks=0, rss=0, procs=0)); r['ticks'] += ticks; r['rss'] += rss; r['procs'] += 1
+    return roles
+
+
 def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources, nearest_rank, cycles, think_ms, stagger_ms, proc_snapshot=None):
     import psycopg
     began_res = system_resources()
@@ -75,12 +101,13 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
         ready = json.loads(chart_proc.stdout.readline())
         chart_args = ['--chart-url', f"http://127.0.0.1:{ready['port']}"]
     proc = subprocess.Popen([sys.executable, '-I', str(DRIVER), '--url', url, '--traders', str(cohort_size), '--cycles', str(cycles),
-                             '--think-ms', str(think_ms), '--stagger-ms', str(stagger_ms)] + chart_args,
+                             '--think-ms', str(think_ms), '--stagger-ms', str(stagger_ms)] + chart_args + (['--patient'] if os.environ.get('RIKSORA_QA_HTTP_PATIENT') == '1' else []),
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, start_new_session=True)
     summary = {}
     phase = {'measuring': False}
     cg = Path(began_res['cgroupPath']) if began_res.get('cgroupPath') else None
     snaps = {}
+    roles_series = []
 
     def sampler():
         last = _cpu_times(); high = 0
@@ -95,6 +122,8 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             now = _cpu_times(); dt, di = now[0] - last[0], now[1] - last[1]; last = now
             pct = 100 * (dt - di) / dt if dt else 0; cpu_pct.append(pct)
             high = high + 1 if pct > 80 else 0
+            if cg is not None:
+                roles_series.append((time.monotonic(), _role_ticks(cg, os.getpid(), chart_proc.pid if chart_proc else None, proc.pid)))
             if high >= 5:
                 stop['reason'] = 'CAPACITY_CPU_GATE_80PCT'; _kill(); return
             try:
@@ -134,6 +163,19 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             snaps['after'] = proc_snapshot([proc.pid], cg)
         except Exception:
             pass
+    role_report = {}
+    if len(roles_series) >= 3:
+        tck = os.sysconf('SC_CLK_TCK'); t_first, r_first = roles_series[0]; t_last, r_last = roles_series[-1]
+        for role in sorted({k for _, r in roles_series for k in r}):
+            series = [r.get(role, {}).get('ticks', 0) for _, r in roles_series]
+            times = [t for t, _ in roles_series]
+            per_sec = [(series[i] - series[i - 1]) / tck / max(1e-6, times[i] - times[i - 1]) for i in range(1, len(series))]
+            per_sec = [x for x in per_sec if x >= 0]
+            role_report[role] = dict(avgCores=round((series[-1] - series[0]) / tck / max(1e-6, t_last - t_first), 3),
+                                     p95Cores=round(sorted(per_sec)[int(0.95 * (len(per_sec) - 1))], 3) if per_sec else None,
+                                     maxCores=round(max(per_sec), 3) if per_sec else None,
+                                     peakRssMb=round(max(r.get(role, {}).get('rss', 0) for _, r in roles_series) / 2**20, 1),
+                                     maxProcesses=max(r.get(role, {}).get('procs', 0) for _, r in roles_series), samples=len(per_sec))
     driver_acct = {}
     try:
         st = Path(f'/proc/{proc.pid}/stat').read_text(); f = st[st.rfind(')') + 2:].split()
@@ -161,7 +203,7 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             d = max(0, snaps['after'][who + 'CpuTicks'] - snaps['before'][who + 'CpuTicks'])
             cpu_by[who] = dict(cpuSeconds=round(d / ticks, 2), coresAverage=round(d / ticks / elapsed, 3))
         cpu_by['note'] = 'service = API + in-process queue workers (one OS process); generator = HTTP driver; CPU of exited processes is not included'
-    report['capacity'] = dict(driverProcess=driver_acct, chartServiceProcess=chart_acct, processCpu=cpu_by, measuredSeconds=round(elapsed, 1),
+    report['capacity'] = dict(cpuByRole=role_report, driverProcess=driver_acct, chartServiceProcess=chart_acct, processCpu=cpu_by, measuredSeconds=round(elapsed, 1),
         measurementKind='HTTP_DRIVER_NO_BROWSER_SYNTHETIC', cohortSize=cohort_size, stopReason=stop['reason'], driver=summary,
         host=dict(memAvailableMinBytes=min((s['memAvailableBytes'] for s in samples), default=None),
                   cgroupMemoryPeakBytes=max((s['cgroup'].get('memoryPeakBytes') or 0 for s in samples), default=None),

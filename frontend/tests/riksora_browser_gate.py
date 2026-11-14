@@ -1125,7 +1125,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tools', type=Path, default=REPOSITORY/'frontend/tests/browser-tools')
     parser.add_argument('--browser-cache', type=Path)
-    parser.add_argument('--capacity-cohort', type=int, choices=(1,2,5,10,20,50),
+    parser.add_argument('--capacity-cohort', type=int, choices=(1,2,5,10,12,15,18,20,30,50,75,100),
                         help='concurrent real-browser synthetic product users; requires bounded systemd cgroup')
     parser.add_argument('--worker-count', type=int, choices=(1,2,3,4), default=1,
                         help='bounded cloud job workers for capacity acceptance only')

@@ -129,6 +129,8 @@ class Trader:
         self.conn = None
         self.rng = random.Random(n)
         self.chart = None
+        self.max_retries = dict(QUEUE_CAPACITY=45, RESEARCH_BUSY=8, SERVICE_BUSY=8)
+        self.recovered = 0
 
     def _conn(self):
         if self.conn is None:
@@ -187,6 +189,10 @@ class Trader:
         self.token = b['access_token']
         return None
 
+    def patience(self, detail):
+        # Frontend policy is 45 (QUEUE_CAPACITY) / 8 retries; a patient trader keeps waiting (about 5 minutes) when --patient is set.
+        return self.max_retries.get(detail, 8)
+
     def wait_job(self, root, first):
         jid = first['jobId']; attempt = 0; t0 = time.perf_counter()
         value = first
@@ -199,6 +205,26 @@ class Trader:
         if value.get('state') == 'SUCCEEDED':
             return value.get('result'), None, ms
         return None, 'job:' + str(value.get('state')) + ':' + str((value.get('result') or {}).get('detail') or (value.get('result') or {}).get('error') or ''), ms
+
+    def submit(self, step, path, body, job):
+        """POST/GET with the frontend's busy policy (same job id on RESEARCH_BUSY/QUEUE_CAPACITY/SERVICE_BUSY), patience set by max_retries."""
+        retries = 0
+        while True:
+            status, value = self.call(step['method'], path, body, step['contentType'], job=job)
+            detail = value.get('detail') if isinstance(value, dict) else None
+            if status in (429, 503) and detail in ('RESEARCH_BUSY', 'QUEUE_CAPACITY', 'SERVICE_BUSY'):
+                with self.stats.l:
+                    self.stats.busy[detail] = self.stats.busy.get(detail, 0) + 1
+                if retries < self.patience(detail):
+                    try:
+                        hint = min(3.0, max(0.0, float(self.retry_after)))
+                    except (TypeError, ValueError):
+                        hint = 0.0
+                    time.sleep(max(hint, min(0.8, 0.05 * 2 ** retries)) + self.rng.random() * 0.025); retries += 1
+                    continue
+                with self.stats.l:
+                    self.stats.busy_unrecovered += 1
+            return status, value
 
     def cycle(self, fresh_session):
         """One full recorded trader journey (workspace .. journal). Returns (ok, reason)."""
@@ -220,30 +246,25 @@ class Trader:
                     body = body.replace(k, v)
             job = str(uuid.uuid4()) if step['job'] else None
             t0 = time.perf_counter()
-            retries = 0
-            while True:
-                status, value = self.call(step['method'], path, body, step['contentType'], job=job)
-                detail = value.get('detail') if isinstance(value, dict) else None
-                if status in (429, 503) and detail in ('RESEARCH_BUSY', 'QUEUE_CAPACITY', 'SERVICE_BUSY'):
-                    # Same policy as the frontend client: explicit pre-admission refusal, retry with the same job id.
-                    with self.stats.l:
-                        self.stats.busy[detail] = self.stats.busy.get(detail, 0) + 1
-                    if retries < (45 if detail == 'QUEUE_CAPACITY' else 8):
-                        try:
-                            hint = min(3.0, max(0.0, float(self.retry_after)))
-                        except (TypeError, ValueError):
-                            hint = 0.0
-                        time.sleep(max(hint, min(0.8, 0.05 * 2 ** retries)) + self.rng.random() * 0.025); retries += 1
-                        continue
-                    with self.stats.l:
-                        self.stats.busy_unrecovered += 1
-                break
-            logical_ms = (time.perf_counter() - t0) * 1000
+            t_first = time.perf_counter()
+            status, value = self.submit(step, path, body, job)
             if step['job']:
-                if status != 202 or not isinstance(value, dict) or value.get('jobId') != job:
-                    return False, f'step{index}:{route_key(step["method"], path)}:submit:{status}'
-                value, error, wait_ms = self.wait_job(path.split('/research/')[0] + '/research', value)
-                logical_ms = (time.perf_counter() - t0) * 1000
+                recoveries = 0
+                while True:
+                    if status != 202 or not isinstance(value, dict) or value.get('jobId') != job:
+                        return False, f'step{index}:{route_key(step["method"], path)}:submit:{status}'
+                    value, error, wait_ms = self.wait_job(path.split('/research/')[0] + '/research', value)
+                    if error == 'poll:404' and recoveries < 3:
+                        # The finished job row was pruned (queue keeps the 15 newest finished jobs) before this trader polled it.
+                        # Client-side recovery, NOT current frontend behaviour: resubmit the same request with the same job/command ids;
+                        # the financial commands are idempotent by command/request id (permanent receipts).
+                        recoveries += 1; self.recovered += 1
+                        with self.stats.l:
+                            self.stats.recoveries[route_key(step['method'], path)] = self.stats.recoveries.get(route_key(step['method'], path), 0) + 1
+                        status, value = self.submit(step, path, body, job)
+                        continue
+                    break
+                logical_ms = (time.perf_counter() - t_first) * 1000
                 self.stats.record_job(route_key(step['method'], path), logical_ms, error)
                 if error:
                     return False, f'step{index}:{route_key(step["method"], path)}:{error}'
@@ -271,6 +292,7 @@ class Stats:
         self.cycle_ms, self.failures, self.completed = [], [], 0
         self.busy, self.busy_unrecovered = {}, 0
         self.chart_errors = 0
+        self.recoveries = {}
 
     def record(self, route, status, ms, err, timed):
         if not timed or self.t_start is None:
@@ -300,7 +322,7 @@ def main():
     ap.add_argument('--url', required=True); ap.add_argument('--traders', type=int, required=True)
     ap.add_argument('--cycles', type=int, default=3); ap.add_argument('--think-ms', type=int, default=1000)
     ap.add_argument('--stagger-ms', type=int, default=0)
-    ap.add_argument('--chart-url', default=None); ap.add_argument('--chart-history', type=int, default=5000)
+    ap.add_argument('--patient', action='store_true'); ap.add_argument('--chart-url', default=None); ap.add_argument('--chart-history', type=int, default=5000)
     a = ap.parse_args()
     u = urllib.parse.urlsplit(a.url)
     template = json.loads(TEMPLATE.read_text())
@@ -323,6 +345,9 @@ def main():
         emit({'summary': {'status': 'SETUP_FAILED', 'failures': setup_fail[:10]}}); return
     barrier = threading.Barrier(a.traders + 1)
 
+    if a.patient:
+        for t in traders:
+            t.max_retries = dict(QUEUE_CAPACITY=400, RESEARCH_BUSY=400, SERVICE_BUSY=400)
     chart_threads = []
     if a.chart_url:
         cu = urllib.parse.urlsplit(a.chart_url)
@@ -357,7 +382,7 @@ def main():
     emit({'summary': {
         'status': 'DONE', 'traders': a.traders, 'cyclesPerTrader': a.cycles, 'thinkMs': a.think_ms, 'staggerMs': a.stagger_ms,
         'wallSeconds': round(wall, 2), 'completedCycles': stats.completed, 'failedTraders': len(stats.failures),
-        'chartEnabled': bool(a.chart_url), 'chartErrors': stats.chart_errors, 'chartCandlesLoadedPerTimeframe': (traders[0].chart.candles if a.chart_url else None), 'failures': stats.failures[:10], 'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'statusCounts': stats.status, 'transportErrors': stats.errors,
+        'chartEnabled': bool(a.chart_url), 'chartErrors': stats.chart_errors, 'retentionRecoveries': stats.recoveries, 'chartCandlesLoadedPerTimeframe': (traders[0].chart.candles if a.chart_url else None), 'failures': stats.failures[:10], 'busyRefusals': stats.busy, 'busyUnrecovered': stats.busy_unrecovered, 'statusCounts': stats.status, 'transportErrors': stats.errors,
         'journeysPerMinute': round(stats.completed / wall * 60, 2),
         'cycleSeconds': {'p50': pct([x / 1000 for x in stats.cycle_ms], 50), 'p95': pct([x / 1000 for x in stats.cycle_ms], 95),
                          'max': round(max(stats.cycle_ms) / 1000, 2) if stats.cycle_ms else None},
