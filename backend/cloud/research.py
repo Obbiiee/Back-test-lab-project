@@ -516,6 +516,22 @@ def install(app):
             partial(chart.page, user.id, workspace_id, session_id, timeframe=timeframe, limit=limit, before=before), limiter=chart_limiter)
         return Response(canonical_bytes(value), media_type='application/json', headers={'X-Content-Type-Options': 'nosniff'})
 
+    async def _lifecycle(workspace_id, session_id, user, trashed):
+        from . import session_lifecycle
+        def scope(db, actor, workspace):
+            owner(WorkspaceUnit(db, actor, workspace).role)         # membership verified, OWNER required, like every write route
+        return Response(canonical_bytes(await anyio.to_thread.run_sync(partial(
+            session_lifecycle.set_trashed, app.state.dsn, user.id, workspace_id, session_id, trashed, scope=scope), limiter=limiter)),
+            media_type='application/json')
+
+    @app.post(prefix + '/sessions/{session_id}/trash')
+    async def trash_session(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
+        return await _lifecycle(workspace_id, session_id, user, True)
+
+    @app.post(prefix + '/sessions/{session_id}/restore')
+    async def restore_session(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
+        return await _lifecycle(workspace_id, session_id, user, False)
+
     @app.get(prefix + '/sessions/{session_id}/metering/storage')
     async def storage_metrics(workspace_id: uuid.UUID, session_id: str, user: User = Depends(current)):
         return await execute(user, workspace_id, 'storage_metrics', session_id)

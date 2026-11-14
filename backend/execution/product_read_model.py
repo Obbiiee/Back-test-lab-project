@@ -68,6 +68,7 @@ def sessions(db, workspace_id, *, limit=25, after=None, method_id=None):
         "JOIN btl.tick_sessions s ON s.workspace_id=r.workspace_id AND s.session_id=r.session_id "
         "JOIN btl.tick_methods m ON m.workspace_id=r.workspace_id AND m.method_id=r.method_id "
         "WHERE r.workspace_id=%s AND (%s::text IS NULL OR r.session_id>%s) "
+        "AND NOT EXISTS (SELECT 1 FROM btl.session_lifecycle l WHERE l.workspace_id=r.workspace_id AND l.session_id=r.session_id AND l.trashed_at IS NOT NULL) "
         "AND (%s::text IS NULL OR r.method_id=%s) "
         "ORDER BY r.session_id LIMIT %s",
         (workspace_id, after, after, method_id, method_id, limit + 1),
