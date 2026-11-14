@@ -51,3 +51,22 @@ Not run: `stitch-analytics` (needs `backend/venv` + msgspec), `market` suite (de
 
 ## E. Final V1 readiness: **BLOCKED** for a paid launch
 Blocked by D1, D3, D4, D5 and D6. Engine correctness on the real-data slices measured, the chart/export slices and the synthetic capacity knee are proven within the stated scope. Not ready to be called Commercial V1; any public statement stays limited to what is proven above.
+
+
+## F. Update 2026-11-15 (after the owner approved the recommendations)
+Implemented and tested after sections A–E were written (branch `claude/dual-engine-v1-20261114`):
+| Item | Result | Evidence |
+|---|---|---|
+| Frontend CSV download (Journal) | DONE | `exportSessionCsv`, button in `AlphaJournal.jsx`, `tick-alpha.test.mjs` PASS, vite build OK (`cacad3b`) |
+| Hosted chart uses `BTL-CHART-HISTORY-PAGE-1` (up to 5,000 earlier candles) | DONE at unit level; real-browser check NOT RUN | `chartHistoryBars`/`mergeHistoryBars`, tests PASS |
+| Free/Pro server-side window admission | IMPLEMENTED, **opt-in** (`BTL_ENTITLEMENT_ENFORCE=1` + `BTL_ENTITLEMENT_RESET_TIMEZONE`), default OFF | `cloud/entitlements.py`, migration 033, `tests/test_entitlements.py` (Free one window/day, retry idempotent, tenant separation, PAID order makes Pro, REVERSED order removes Pro) |
+| Session trash/restore (default path) | DONE | `cloud/session_lifecycle.py`, migration 034, 30-day restore, owner only, list hides trashed; `tests/test_session_lifecycle.py`; 22 research-session and 17 cloud-research regression tests pass |
+| Audit trail | DONE (append-only) | migration 035, `cloud/audit.py`; export, trash/restore and refused window claims recorded |
+| Billing model | Already matches the recommendation: fixed-duration plan, PAID order = Pro until expiry (no auto-renew), REVERSED/HOLD removes Pro, orders list = invoice history. Not new code; proven by the entitlement refund test (sandbox ledger only) |
+| Cross-month real-data parity | PASS 6/6 (eventheavy, pending_tight, scalp_tight over 2024-01..02 and 2024-02..03; up to 203 fills; baseline = Claude v1 = Claude v2) | `~/bench/chain2/cross/` |
+
+Limits stated honestly:
+- Entitlement gate: the claim is per request body; a creation that fails inside the queue after admission keeps the claim (an idempotent retry with the same body is not charged twice). The spec's open-position boundary rule and viewable-context rule are not implemented. Gate is not enabled by default because launch configuration and the billing source (sandbox ledger) are owner/production decisions.
+- Trash/restore: no permanent purge (needs owner erasure/retention decision because financial evidence tables are immutable by design).
+- Still OWNER/credential bound: PDF export (dependency), account deletion/export policy, Terms/Privacy text, monitoring/alerting stack, R2 backup test, real-data sessions through the product worker (needs 16 instrument profiles and a gated private-QA rights class), Google/Midtrans sandbox keys, GitHub credentials, licensing.
+Readiness stays **BLOCKED** for a paid launch.
