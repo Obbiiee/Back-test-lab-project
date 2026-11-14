@@ -22,4 +22,9 @@ for (const name of readdirSync(path.join(root, 'dist/assets'))) {
   assert.ok(!content.includes('PHASE16-CORRUPT-PRESERVE') && !content.includes('Seed incomplete legacy account'), 'QA seed code must never enter production.');
 }
 assert.ok(statSync(path.join(root,'dist/market/decade/manifest.json')).isFile(), 'Historical replay catalog must ship.');
+if (process.env.BTL_REQUIRE_DECADE === '1') {
+  // Chunks are not tracked in Git; a release that requires history must contain every file the catalog lists.
+  const catalog = JSON.parse(read('dist/market/decade/manifest.json'));
+  for (const chunks of Object.values(catalog.frames)) for (const chunk of chunks) assert.ok(statSync(path.join(root, 'dist/market/decade', chunk.path)).isFile(), 'Missing history chunk ' + chunk.path);
+}
 console.log('PASS local v1.0 package/lock identity, installed chart, production build/history catalog, preserved distribution licenses and excluded QA seeds.');

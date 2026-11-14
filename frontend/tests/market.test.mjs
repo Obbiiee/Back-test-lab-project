@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {aggregateCandles,addQuote,bucketTime,parseQuote} from '../src/market/candles.js';
 import {positionStats} from '../src/drawings/position.js';
 import {parseHistDataCSV, mergeHistory, validateHistory, decodeHistoryRows} from '../src/market/history.js';
-import {readFileSync} from 'node:fs';
+import {readFileSync, existsSync} from 'node:fs';
 let bars=[];
 for(const [time,price] of [[0,100],[30,105],[60,98],[120,110]]) bars=addQuote(bars,{time,price});
 assert.deepEqual(aggregateCandles(bars,'3m'),[{time:0,open:100,high:110,low:98,close:110,volume:0}]);
@@ -48,6 +48,14 @@ for(const timeframe of ['1m','3m','5m','15m','30m','1h','2h','4h','D','W','M']) 
 console.log(`PASS: EST-to-UTC, historical validation, provider seam and all timeframes; ${snapshot.count} actual historical candles.`);
 const root=new URL('../public/market/decade/',import.meta.url);
 const catalog=JSON.parse(readFileSync(new URL('manifest.json',root),'utf8'));
+// The decade chunks are generated locally (npm run history:decade) and are not tracked in Git.
+// Absence is reported loudly; BTL_REQUIRE_DECADE=1 turns it into a failure (release gate).
+const firstChunk=catalog.frames['1m'][0].path;
+if(!existsSync(new URL(firstChunk,root))) {
+  assert.ok(process.env.BTL_REQUIRE_DECADE!=='1','BTL_REQUIRE_DECADE=1 but the decade archive is not present; run npm run history:decade.');
+  console.log('SKIP: decade chunk check NOT RUN - archive not present (generate with npm run history:decade; set BTL_REQUIRE_DECADE=1 to require it).');
+  process.exit(0);
+}
 let total=0;
 for(const [frame,chunks] of Object.entries(catalog.frames)) {
   let previous=-Infinity;

@@ -15,3 +15,12 @@ References:
 - https://www.histdata.com/f-a-q/data-files-detailed-specification/
 
 Validation: production build, lint, market and drawing tests. Market tests inspect every published chunk across all 11 timeframes for count, OHLC validity, coverage and non-overlapping timestamps.
+
+## Not tracked in Git
+
+The roughly 266 MB of per-month, per-timeframe JSON chunks in `frontend/public/market/decade/` are a generated archive and are no longer tracked in Git. `frontend/public/market/decade/manifest.json` stays tracked as the provenance record (coverage, original archive SHA-256 values, source and download time). The chunks are ignored by `.gitignore`.
+
+- Rebuild locally with `npm run history:decade` from `frontend` (uses the provider's normal public download form; ZIPs are cached in `.history-downloads`).
+- `node tests/market.test.mjs` reports `SKIP: decade chunk check NOT RUN` when the archive is absent. Set `BTL_REQUIRE_DECADE=1` to make absence a failure; `npm run audit:release` then also requires every chunk listed in the manifest to be present in `dist/`.
+- The VPS release archive already excludes `frontend/public/market`, so the deployment package is unchanged.
+- Removing the files from the tree stops future growth; they remain in Git history. Shrinking existing clones needs a separate, owner-authorised history rewrite and was NOT done.
