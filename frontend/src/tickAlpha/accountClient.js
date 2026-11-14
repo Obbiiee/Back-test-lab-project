@@ -1,5 +1,24 @@
 import {clearShellCache} from '../pwa.js';
 // Existing same-origin HTTPS identity. Bearer tokens live only in this closure.
+// Server refusals of the Free plan limits and the Free window boundary: say what is limited and when it resets (all times UTC).
+const RESET_FORMAT={year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC',timeZoneName:'short'};
+export function entitlementRefusal(body){
+  const code=body?.detail;
+  const at=typeof body?.resetsAt==='string'&&!Number.isNaN(Date.parse(body.resetsAt))?new Date(body.resetsAt).toLocaleString('en',RESET_FORMAT):null;
+  const messages={
+    SESSION_MONTH_LIMIT:`Free plan: one new Session per calendar month (UTC).${at?` Your next Session is available from ${at}.`:''} Existing Sessions stay open.`,
+    WINDOW_DAY_LIMIT:`Free plan: one newly opened historical month per day (UTC).${at?` Another month can be opened from ${at}.`:''} Continuing a month you already opened is free.`,
+    ACTIVATION_IN_PROGRESS:'Another Session is still being created. Wait a moment and check your Sessions before trying again.',
+    WINDOW_ENDED:'This Free window has ended: new orders cannot be opened. Open positions can still be resolved.',
+    WINDOW_BOUNDARY:'This step would cross the end of your Free window. Step to the boundary, or use Jump to Next Event while an order is open.',
+    WINDOW_ENDED_CONTINUATION_ONLY:'This Free window has ended. Only Jump to Next Event (with an open position), Close, Cancel and End are available.',
+    PENDING_AT_WINDOW_END:'A pending order is still waiting at the end of your Free window. Cancel it before continuing.',
+    PENDING_NEAR_WINDOW_END:'A pending order could fill after your Free window ends. Cancel it or step to the boundary first.',
+    WINDOW_COMPLETED:'This Free window is complete: no open or pending orders remain.',
+    TRASH_EXPIRED:'The 30-day restore window for this Session has passed.',
+  };
+  return messages[code]?{code,message:messages[code]}:null;
+}
 export function createAccountClient({fetcher=fetch,secure=()=>window.location.protocol==='https:',onExpired=()=>{}}={}){
   let token=null,subject=null,generation=0;
   const waitRetry=(milliseconds,signal)=>{
@@ -52,6 +71,8 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
       }
       if(response.status===401){const had=token!==null;token=null;subject=null;generation++;if(had&&authenticated)onExpired();}
       // Never surface rejected payloads/passwords/tokens or raw server errors.
+      const entitlement=response.status===409?entitlementRefusal(rejected):null;
+      if(entitlement)throw Object.assign(Error(entitlement.message),{status:409,code:entitlement.code});
       throw Object.assign(Error(({400:'The request was refused. Check your details and verification.',401:'Sign in again.',403:'This action is not permitted.',404:'This workspace or record is unavailable.',409:'The saved record changed. Reload before retrying.',422:'Check the supplied fields.',426:'Account access requires HTTPS.',429:'The service is busy. Wait and retry.'})[response.status]||'Account service unavailable.'),{status:response.status,...(code?{code}:{})});
     }
     const value=response.status===204?null:as==='text'?await response.text():as==='blob'?await response.blob():await response.json();

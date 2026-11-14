@@ -394,12 +394,13 @@ try{
     // Mobile viewport: no horizontal page scroll on the main screens and the replay workspace still opens.
     phase='mobile_viewport';
     await page.setViewportSize({width:390,height:844});
-    for(const screen of ['Sessions','Journal','Analytics']){
-      await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:screen,exact:true}).click();
+    // On a phone the main navigation is the bottom tab bar (Methods, Sessions, Replay, Analysis, Account).
+    for(const screen of ['Methods','Sessions','Analysis']){
+      await page.getByRole('link',{name:screen,exact:true}).last().click();
       await page.waitForTimeout(800);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
     }
-    await page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:'Sessions',exact:true}).click();
+    await page.getByRole('link',{name:'Sessions',exact:true}).last().click();
     await page.getByRole('button',{name:/Continue replay|Open replay/}).first().click();
     await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
