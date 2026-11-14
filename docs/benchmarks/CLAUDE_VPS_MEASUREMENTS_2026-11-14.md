@@ -66,3 +66,29 @@ Cohort 10 hold time was 227 s versus 37 s at cohort 5: the 10-user run paces aut
 - **Hypothesis:** the same behaviour on real EURUSD, at 16 instruments x 34 months, and above 10 traders.
 - **Prototype only:** the S3/R2 adapter and `r2_acceptance.py`; the object store here is a local directory.
 - **Needs production-like acceptance:** real R2 counts and egress, Claude objects in the browser path, Codex side-by-side on the same oracle, load above 10, real-data rights.
+
+## E. Follow-up (2026-11-14): 3 repeats, cohort 20, seam-on run — all SYNTHETIC, same host
+Raw reports: `docs/benchmarks/vps-cohorts/repeats/`. Same harness and settings as section C (2 workers, auth limit 30/min, real Chromium per trader, cgroup 4 GiB / 400% CPU for cohorts 1-10).
+Guard: host MemAvailable < 20% of RAM kills the run (never tripped); harness gates (MemAvailable >= 10 GiB, disk, no swap) unchanged.
+
+### E1. Repeats (3 runs per cohort, 12/12 PASS, 0 busy 429/503). Median (min-max)
+| Cohort | Hold s | cgroup mem peak GiB | Host MemAvailable min GiB | PG max queued | cgroup CPU cores avg | Worst per-route p99 ms |
+|---:|---|---|---|---:|---|---|
+| 1 | 23.95 (23.68-23.96) | 0.61 (0.60-0.63) | 13.87 (13.67-13.88) | 1 | 0.71 | 127 (127-143) |
+| 2 | 24.71 (24.56-25.68) | 0.85 (0.84-0.87) | 13.65 (13.35-13.65) | 2 | 1.29 | 212 (197-251) |
+| 5 | 31.19 (30.51-31.28) | 1.69 (1.67-1.70) | 12.79 (12.55-12.80) | 3 | 2.43 | 546 (543-593) |
+| 10 | 226.56 (226.31-227.16) | 2.59 (2.58-2.61) | 11.91 (11.75-11.93) | 7 | 0.81 | 641 (480-685) |
+Cohort 10 hold time and CPU average are dominated by auth pacing (30/min limit), not by compute load. The worst-route p99 is the journal pages route.
+
+### E2. Cohort 20 — FAILED twice, recorded as NOT PASSED
+Harness caps the cgroup at 5 GiB, so cohort 20 ran with MemoryMax=5G (cohort 10 peaked at 2.6 GiB; roughly linear growth predicts ~5 GiB).
+- Run 1: 19/20 reached the last step; one trader's UI timed out (30 s, `logout_resume`, "My Methods" heading). No OOM, no resource gate trip. `BROWSER_JOURNEY_FAILED`.
+- Run 2: harness stop gate `CAPACITY_RESOURCE_STOP` (MemAvailable below the existing 10 GiB gate).
+Cohort 50 was not attempted (prior gate failed). No gate or timeout was changed to pass.
+
+### E3. Seam-on cohort 5
+`BTL_CLAUDE_OHLC_ROOT` set with a synthetic 2019-12 store: cohort 5 PASS, but **no object in the store was read** (atime unchanged): the browser gate journey never requests past-chart history, so this run does NOT measure the Claude chart path in the browser. Only proof: enabling the seam does not break the journey. Browser time-to-first-chart with Claude objects remains NOT MEASURED.
+
+### E4. Capacity statement (this host, synthetic, product baseline, label: measured on real browsers, needs production-like acceptance)
+Proven: 10 concurrent active traders, 3/3 repeat PASS, no failures, memory peak 2.6 GiB, MemAvailable min 11.8 GiB.
+Not proven / failed: 20 (2 of 2 attempts failed against existing gates). So the proven ceiling here is 10, the upper limit is between 10 and 20 under the existing gates. Not inferred: real-market data, longer sessions, the Claude chart path, sustained (not 1-journey) activity, real R2.
