@@ -58,4 +58,4 @@ Advertised target (Commercial targets section 1): 16 instruments x 34 months fro
 All options remain blocked by the rights state (UNKNOWN for 544 of 544) and by the 15 missing instrument specifications. Chart history for months before the tradable window can still be shown as read-only context from the prehistory OHLC (display only).
 
 ## 6. Data size on the VPS SSD (measured)
-Compact tick v2 (16 pairs x 34 months): 3.9 GB; precomputed nine-timeframe OHLC store: 1.8 GB; M1 BID prehistory objects: see `du` in the ops log; total disk 197 GB with about 91% free.
+Compact tick v2 (16 pairs x 34 months): 3.7 GiB; precomputed nine-timeframe OHLC store: 1.8 GiB; M1 BID prehistory objects: 549 MiB; EURUSD compact v1 (kept as the lossless-comparison reference): 817 MiB; disk 197 GB, 22 GB used (12%).
