@@ -20,6 +20,24 @@ export function historyPage(view,page,timeframe,offset){
   if(bars.some(bar=>bar.time<start||bar.time%duration!==0||bar.time+duration>end))throw Error('Past candle context crosses the Session boundary');
   return bars;
 }
+// BTL-CHART-HISTORY-PAGE-1 candles (exact decimal strings, completed bars only) -> chart bars; same geometry checks as revealed bars.
+export function chartHistoryBars(page,view,timeframe){
+  if(page?.artifact!=='BTL-CHART-HISTORY-PAGE-1'||page.executionAuthority!==false||page.timeframe!==timeframe||!Array.isArray(page.candles)||page.candles.length>1000)
+    throw Error('Invalid chart history page');
+  const through=BigInt(view.state.throughNs);
+  const bars=displayBars({...view,chart:{priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable:false,timeframe,candles:page.candles}});
+  // Only bars that already ended at the committed cursor may be shown from history.
+  const duration=timeframe==='D'?86400:parseInt(timeframe,10)*(timeframe.endsWith('h')?3600:60);
+  if(bars.some(bar=>BigInt(bar.time+duration)*1000000000n>through))throw Error('Chart history crosses the committed cursor');
+  return bars;
+}
+// Older history first, then the revealed window; a revealed bar replaces a history bar of the same open time. Result is strictly ascending.
+export function mergeHistoryBars(history,revealed){
+  const byTime=new Map();
+  for(const bar of history)byTime.set(bar.time,bar);
+  for(const bar of revealed)byTime.set(bar.time,bar);
+  return [...byTime.values()].sort((a,b)=>a.time-b.time);
+}
 export function displayBars(view){
   const chart=view.chart;
   if(!chart||chart.priceBasis!=='EXACT_REVEALED_MID_DISPLAY_ONLY'||chart.volumeAvailable!==false

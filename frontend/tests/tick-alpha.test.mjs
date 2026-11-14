@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {exportSessionCsv,loadChartBars,api,command,replayObservedTo,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
-import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
+import {displayBars,chartHistoryBars,mergeHistoryBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
 import {createAccountClient,setAccountTransport,clearAccountTransport,accountStorageKey} from '../src/tickAlpha/accountClient.js';
 
@@ -536,4 +536,19 @@ console.log('PASS past OHLC context identity, exact price display, Session bound
   await assert.rejects(()=>loadChartBars('s1','7m'),/invalid/);
   clearAccountTransport();
   await assert.rejects(()=>exportSessionCsv('s1'),/Sign in/);
+}
+
+{
+  const T=1700000000-(1700000000%3600)+7200;               // cursor two hours after an hour boundary
+  const view={state:{throughNs:String(BigInt(T)*1000000000n)}};
+  const candle=(time,o)=>({time,open:o,high:o,low:o,close:o});
+  const page={artifact:'BTL-CHART-HISTORY-PAGE-1',executionAuthority:false,timeframe:'1h',candles:[candle(T-7200,'1.1'),candle(T-3600,'1.2')]};
+  assert.deepEqual(chartHistoryBars(page,view,'1h').map(bar=>bar.time),[T-7200,T-3600]);
+  assert.throws(()=>chartHistoryBars({...page,candles:[candle(T-3600,'1.1'),candle(T,'1.2')]},view,'1h'),/cursor|Unrevealed/);   // a bar that ends after the cursor
+  assert.throws(()=>chartHistoryBars({...page,executionAuthority:true},view,'1h'),/Invalid/);
+  assert.throws(()=>chartHistoryBars({...page,timeframe:'5m'},view,'1h'),/Invalid/);
+  const merged=mergeHistoryBars(chartHistoryBars(page,view,'1h'),[{time:T-3600,open:9,high:9,low:9,close:9},{time:T,open:2,high:2,low:2,close:2}]);
+  assert.deepEqual(merged.map(bar=>bar.time),[T-7200,T-3600,T]);
+  assert.equal(merged[1].open,9,'a revealed bar replaces the history bar of the same open time');
+  console.log('PASS hosted chart history: cursor-bound bars, merge with revealed window, no execution authority.');
 }

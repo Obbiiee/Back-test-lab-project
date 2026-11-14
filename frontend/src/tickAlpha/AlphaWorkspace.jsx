@@ -7,8 +7,8 @@ import IndicatorControls from '../components/IndicatorControls.jsx';
 import {productionRegistry} from '../indicators/productionRegistry.js';
 import {DRAWING_SPECS} from '../drawings/DrawingTypes.js';
 import {IndicatorPreferences} from '../workspacePreferences.js';
-import {displayBars,historyPage,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
-import {api,sessionPath} from './client.js';
+import {displayBars,historyPage,chartHistoryBars,mergeHistoryBars,TIMEFRAMES,replayTarget,seekTarget} from './display.js';
+import {loadChartBars,api,sessionPath} from './client.js';
 import {emitLocal} from './measurement.js';
 import {accountStorageKey,accountTransport} from './accountClient.js';
 // Stable identity: a fresh object per render re-ran the candle/indicator sync on every UI change.
@@ -54,7 +54,27 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   useEffect(()=>{
     const controller=new AbortController();
     const key=`${view.metadata.id}:${timeframe}`;
-    if(!view.replayStepNs||accountTransport())return;
+    if(accountTransport()){
+      // Hosted product: authenticated, cursor-bound pages of completed bars from the server (up to 5,000 candles; the server says when history is exhausted).
+      const loadHosted=async()=>{
+        const loaded=[];let before=null;
+        setPast({key,bars:[],status:'Loading earlier candles…'});
+        try{
+          for(let requests=0;requests<8&&loaded.length<5000;requests++){
+            const page=await loadChartBars(view.metadata.id,timeframe,{limit:1000,before});
+            const bars=chartHistoryBars(page,view,timeframe);
+            if(controller.signal.aborted)return;
+            loaded.unshift(...bars);
+            if(!page.hasMore||page.nextBefore===null)break;
+            before=page.nextBefore;
+          }
+          const capped=loaded.slice(-5000);
+          if(!controller.signal.aborted)setPast({key,bars:capped,status:capped.length?`Earlier candles: ${capped.length} recorded bars; derived display data, never execution evidence.`:'No earlier candles are available for this Session.'});
+        }catch(error){if(!controller.signal.aborted)setPast({key,bars:[],status:`Earlier candles unavailable: ${error.message}.`});}
+      };
+      void loadHosted();return()=>controller.abort();
+    }
+    if(!view.replayStepNs)return;
     const load=async()=>{
       const loaded=[];let offset=0;
       setPast({key,bars:[],status:'Loading the previous month of candle context…'});
@@ -117,7 +137,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
   },[]);
   const openOrders=(view.analysis?.orders??[]).filter(order=>['PENDING','ACTIVE','UNRESOLVED'].includes(order.status));
-  const bars=useMemo(()=>[...(past.key===historyKey?past.bars:[]),...displayBars(view)],[view,past,historyKey]);
+  const bars=useMemo(()=>mergeHistoryBars(past.key===historyKey?past.bars:[],displayBars(view)),[view,past,historyKey]);
   const indicatorError=useCallback(error=>onNotice(error.message),[onNotice]);
   const changeInstances=value=>{
     if(value.length>16){onNotice('At most 16 indicators can be displayed.');return;}
