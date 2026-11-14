@@ -4,7 +4,7 @@ import {resolve,join} from 'node:path';
 const root=resolve(new URL('../../',import.meta.url).pathname);
 const tools=resolve(process.env.RIKSORA_BROWSER_TOOLS||join(root,'frontend/tests/browser-tools'));
 const {chromium}=await import(pathToFileURL(join(tools,'node_modules/playwright/index.mjs')));
-const server=await chromium.launchServer({headless:true,host:'127.0.0.1',chromiumSandbox:process.env.RIKSORA_QA_NO_SANDBOX!=='1'});
+const server=await chromium.launchServer({headless:true,host:'127.0.0.1',chromiumSandbox:process.env.RIKSORA_QA_NO_SANDBOX!=='1',args:process.env.RIKSORA_QA_E2E_COVERAGE==='1'?['--host-resolver-rules=MAP riksora-landing.test 127.0.0.1']:[]});
 process.stdout.write(JSON.stringify({wsEndpoint:server.wsEndpoint()})+'\n');
 let closing=false;
 const close=async()=>{

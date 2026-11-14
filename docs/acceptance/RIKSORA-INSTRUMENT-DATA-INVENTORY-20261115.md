@@ -45,3 +45,17 @@ Product Sessions are bound to one monthly dataset (`startPeriod`), so the pendin
 
 ## 4. Real-data acceptance verdict
 **BLOCKED** at admission (item 6/7): rights UNKNOWN, 15 instrument profiles missing, product path synthetic-only by design. Synthetic acceptance continues (queue/worker recovery 26/26, browser journey, entitlement, window guard, export). Required to unblock: (a) owner-approved data-use class for private QA sessions with explicit label; (b) citable instrument specifications for 15 instruments (or an owner decision to launch fewer instruments); (c) a restated SKU window; (d) a two-month provider if cross-month continuation is a Commercial V1 requirement.
+
+
+## 5. SKU options for owner approval (the target SKU is NOT changed by this document)
+Advertised target (Commercial targets section 1): 16 instruments x 34 months from 2023-01 to 2025-10 = 544 instrument-months. Available and verified tick data: 2024-01 to 2026-10. Months 2023-01..2023-12 exist only as M1 BID OHLC (derived display data, never execution authority), so they cannot be tradable sessions.
+| Option | Window | Instrument-months with verified ticks | Status |
+|---|---|---|---|
+| A. As advertised | 2023-01..2025-10 | 352 of 544 (2024-01..2025-10 only) | NOT satisfiable; 2023 has no tick data |
+| B. Same end date, narrower start | 2024-01..2025-10 | 352 | satisfiable on data; needs the rights decision |
+| C. What the data covers | 2024-01..2026-10 | 544 | satisfiable on data; changes the advertised window |
+| D. Fewer instruments (any window) | owner picks the instruments whose specifications are citable | k x months | needs instrument specifications; XAUUSD already has an observed profile |
+All options remain blocked by the rights state (UNKNOWN for 544 of 544) and by the 15 missing instrument specifications. Chart history for months before the tradable window can still be shown as read-only context from the prehistory OHLC (display only).
+
+## 6. Data size on the VPS SSD (measured)
+Compact tick v2 (16 pairs x 34 months): 3.9 GB; precomputed nine-timeframe OHLC store: 1.8 GB; M1 BID prehistory objects: see `du` in the ops log; total disk 197 GB with about 91% free.

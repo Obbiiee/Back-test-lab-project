@@ -28,7 +28,9 @@ VERSION = '1.64.1'
 MAX_AUTH_START_DELAY_MS = 240_000
 STEPS = ('login_screen', 'login_workspace', 'method', 'session_replay',
          'order_receipt', 'jump_entry_exit_journal_analytics', 'logout_login_resume')
-if os.environ.get('RIKSORA_QA_E2E_EXTRA') == '1':   # opt-in extended journey: ledger CSV/PDF content, Trash/Restore, mobile viewport
+if os.environ.get('RIKSORA_QA_E2E_COVERAGE') == '1':   # opt-in coverage journey (replaces the base journey after login): landing, methods, nine timeframes, ...
+    STEPS = ('login_screen', 'login_workspace', 'cov_landing', 'cov_methods', 'cov_session_free_style', 'cov_nine_timeframes')
+elif os.environ.get('RIKSORA_QA_E2E_EXTRA') == '1':   # opt-in extended journey: ledger CSV/PDF content, Trash/Restore, mobile viewport
     STEPS += ('export_csv_ledger', 'export_pdf_report', 'trash_restore', 'mobile_viewport')
 
 

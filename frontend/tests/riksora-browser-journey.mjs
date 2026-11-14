@@ -44,7 +44,7 @@ if(browserEndpoint){
   if(endpoint.protocol!=='ws:'||endpoint.hostname!=='127.0.0.1'||endpoint.port===''||endpoint.username||endpoint.password)
     throw Error('LOCAL_BROWSER_HOST_REQUIRED');
   browser=await chromium.connect(browserEndpoint);
-}else browser=await chromium.launch({headless:true,chromiumSandbox:process.env.RIKSORA_QA_NO_SANDBOX!=='1'});
+}else browser=await chromium.launch({headless:true,chromiumSandbox:process.env.RIKSORA_QA_NO_SANDBOX!=='1',args:process.env.RIKSORA_QA_E2E_COVERAGE==='1'?['--host-resolver-rules=MAP riksora-landing.test 127.0.0.1']:[]});
 const context=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1440,height:1000}});
 const page=await context.newPage();page.setDefaultTimeout(20000);
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -176,6 +176,79 @@ try{
     const release=await read();if(release?.start!==true||!Number.isSafeInteger(release.delayMs??0)||
       (release.delayMs??0)<0||(release.delayMs??0)>30000)throw Error('COHORT_START_REFUSED');
     if(release.delayMs)await new Promise(resolve=>setTimeout(resolve,release.delayMs));
+  }
+  if(process.env.RIKSORA_QA_E2E_COVERAGE==='1'){
+    const fsp=await import('node:fs/promises');
+    const shot=async name=>page.screenshot({path:join(evidence,name+'.png')});
+    const mainNav=label=>page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:label,exact:true});
+    const newMethod=async(name,{protocol=false,condition='Trend aligned',checklist=false}={})=>{
+      phase='cov_method_'+name;
+      const first=page.getByRole('link',{name:'Create your first Method'});
+      if(await first.count())await first.click();else await page.getByRole('link',{name:/New Method/}).first().click();
+      await page.getByLabel('Method name').fill(name);
+      if(protocol){
+        await page.getByRole('radio',{name:'Protocol'}).click().catch(async()=>page.getByRole('button',{name:'Protocol',exact:true}).click());
+        await page.getByLabel('Condition 1').fill(condition);
+        const sw=page.getByRole('checkbox',{name:/Checklist enforcement/});
+        if(checklist!==await sw.isChecked())await sw.click({force:true});
+      }
+      await page.getByRole('button',{name:'Save Method',exact:true}).click();
+      await expect(page.getByRole('heading',{name})).toBeVisible();
+    };
+    const newSession=async(methodName,sessionName)=>{
+      phase='cov_session_'+sessionName;
+      await page.getByRole('button',{name:'New Session',exact:true}).first().click();
+      await page.locator('.rk-wizard .rk-combo button.rk-combo-trigger').click();
+      await page.getByRole('option',{name:new RegExp(methodName)}).click();
+      for(let i=0;i<3;i++)await page.getByRole('button',{name:'Continue',exact:true}).click();
+      await page.getByLabel('Session name').fill(sessionName);
+      await page.getByRole('button',{name:'Continue',exact:true}).click();
+      await page.getByRole('button',{name:'Create Session',exact:true}).click();
+      await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
+      await expect(page.getByRole('button',{name:'Step ticks',exact:true})).toBeEnabled({timeout:60000});
+    };
+    const terminal=()=>page.getByRole('region',{name:'Trading and Analysis'});
+    const revision=async()=>Number(await terminal().getAttribute('data-revision'));
+    const stepOnce=async()=>{const before=await revision();const b=page.getByRole('button',{name:'Step ticks',exact:true});await b.click();await expect.poll(revision,{timeout:95000}).toBeGreaterThanOrEqual(before);await expect(b).toBeEnabled({timeout:95000});};
+    // ---- Landing (hosted home on a non-local host name), in its own context so the session under test is untouched
+    phase='cov_landing';
+    {
+      const landingContext=await browser.newContext({ignoreHTTPSErrors:true,serviceWorkers:'block',viewport:{width:1280,height:900}});
+      await landingContext.route('**/*',route=>new URL(route.request().url()).hostname==='riksora-landing.test'?route.continue():route.abort());
+      const landing=await landingContext.newPage();
+      await landing.goto(`https://riksora-landing.test:${url.port}/`);
+      await landing.waitForLoadState('domcontentloaded');
+      await landing.waitForTimeout(1500);
+      await landing.screenshot({path:join(evidence,'landing.png')});
+      const text=await landing.locator('body').innerText();
+      await fsp.writeFile(join(evidence,'landing.txt'),text.slice(0,4000));
+      expect(text.toLowerCase()).toContain('riksora');
+      await landingContext.close();
+    }
+    step('cov_landing');
+    await newMethod('Cov Free Style');
+    await newMethod('Cov Protocol',{protocol:true,condition:'Trend aligned'});
+    step('cov_methods');
+    await newSession('Cov Free Style','Cov FS session');
+    step('cov_session_free_style');
+    // ---- nine timeframes: every one must load without error and keep the replay time
+    phase='cov_timeframes';
+    const select=page.getByLabel('Chart timeframe');
+    const tfs=await select.locator('option').allTextContents();
+    expect(tfs).toEqual(['1m','3m','5m','15m','30m','1h','2h','4h','D']);
+    const timeBefore=await page.getByText(/Replay time \(UTC\)/).first().innerText();
+    for(const tf of tfs){
+      await select.selectOption(tf);
+      await expect(select).toHaveValue(tf);
+      await expect(select).toBeEnabled({timeout:95000});
+      await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible();
+    }
+    expect(await page.getByText(/Replay time \(UTC\)/).first().innerText()).toBe(timeBefore);
+    await select.selectOption('1m');await expect(select).toBeEnabled({timeout:95000});
+    await shot('cov-timeframes');
+    step('cov_nine_timeframes');
+    process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),transientBusyCount:0,apiResponseCount,pageErrorCount:errors.length,failedRequests:requestFailures.length,steps:completedSteps})+'\n');
+    await context.close();await browser.close();process.exit(0);
   }
   phase='method_create';await page.getByRole('link',{name:'Create your first Method'}).click();
   await page.getByLabel('Method name').fill('Synthetic browser method');
