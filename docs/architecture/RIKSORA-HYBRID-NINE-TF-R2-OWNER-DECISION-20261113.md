@@ -1,4 +1,18 @@
-# RIKSORA — Owner architecture decision: VPS tick execution + nine precomputed OHLC timeframes in private Cloudflare R2
+# RIKSORA — Latest owner storage override, 2026-11-15: nine chart timeframes on VPS
+
+> **CURRENT OWNER DECISION / TARGET ONLY:** Commercial V1 stores *both* the immutable canonical Bid/Ask tick source and all precomputed nine chart OHLC timeframes (M1/M3/M5/M15/M30/H1/H2/H4/D1) on the **RIKSORA VPS local persistent SSD/filesystem**, with logical separation of tick/derived OHLC/PostgreSQL/worker scratch/backups. **Cloudflare R2 is no longer the chosen active chart store or a prerequisite for V1.** The historical 2026-11-13 R2 decision preserved below has been **SUPERSEDED ONLY WHERE IT REQUIRES R2 PLACEMENT, R2 publication, R2 chart costs, R2 credentials or R2-specific test gates.** Its requirements for precomputation, exact nine TFs, 5,000 rolling chart-cached bars per selected TF (including D1), truthful source rights and provenance, safe server-side replay clipping, tick-only financial authority, no-lookahead, MID/BID compatibility, worker correctness and tenant security are **still binding**.
+>
+> **New active pipeline:** qualified versioned Tick source (VPS SSD) → offline deterministic candle builder → compressed immutable local Parquet OHLC for all nine timeframes + version/source hashes/manifests/indexes, partitioned by pair/timeframe/period → authenticated VPS chart API with entitlement + Session ownership + server replay cursor enforcement → bounded pages/chart cache; active forming candle is derived only from tick prefix already revealed by financial engine. Historical qualified OHLC-only 2021–2022 also stored locally and used for chart/indicator warmup only. Browser never needs full tick history and never receives unauthorized complete future candle H/L/C.
+>
+> **Storage/operational acceptance:** before asserting that the VPS is large enough, record **actual** filesystem/volume capacity, used/free bytes, CPU/RAM availability, tick+OHLC footprint for all approved pairs/periods, PostgreSQL and WAL growth, scratch/temp needs, concurrent reader I/O, egress and safe free-space thresholds; evaluate backup/restore in an **independent failure domain** (backup should not exist only on the same VPS), immutable/atomic OHLC publication, corruption validation, retention, metrics/alerts and controlled rollback. Avoid per-user dataset duplication and per-switch regeneration; use shared qualified objects and cache with bounded memory. Optional future R2 archival/backup requires a later explicit decision and must not be smuggled in as a live dependency.
+>
+> **Status:** OWNER-SELECTED, **NOT YET IMPLEMENTED OR BENCHMARK-ACCEPTED**, no external data acquisition/license approval, production disk migration/deployment or frozen financial contract alteration. Protect unpublished local commits.
+
+---
+
+## Historical architecture decision — 2026-11-13 (R2 placement superseded by 2026-11-15)
+
+### RIKSORA — Owner architecture decision: VPS tick execution + nine precomputed OHLC timeframes in private Cloudflare R2
 
 Date: 2026-11-13
 Status: **OWNER-SELECTED TARGET ARCHITECTURE; NOT IMPLEMENTED / NOT COMMERCIALLY ACCEPTED**
