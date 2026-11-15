@@ -10,6 +10,19 @@ Labels: **ME** = I can do it on this VPS without new authority; **OWNER** = only
 - Capacity so far (synthetic, same-host, V2 opt-in): 20 staggered and 8 simultaneous 262,144-tick Sessions pass; Journal/export 10-16 s under load is the open UX defect. No external-generator or HTTPS-path measurement yet.
 - Backups exist only on the same disk; no offsite, no `fail2ban`, 64 pending OS updates, firewall status unverified (needs root).
 
+## 0b. CORRECTION (owner, 2026-11-15): Phase 0 comes BEFORE any go-live work
+Go-live (phases B-F below) must not start until we know what we sell, how good it is, and what it costs. Order: **P0 product definition -> P1 quality -> P2 cost -> P3 price and limits -> P4 infrastructure maturity -> only then phases A-F.**
+
+| Phase | Question | Known today | Missing | Work (ME unless stated) |
+|---|---|---|---|---|
+| **P0 Inventory** ("barang") | How many sellable units exist? | Verified tick data: 16 pairs x 34 months (2024-01..2026-10) = 544 instrument-months, 1,331,417,302 ticks, verifier problems 0; M1 BID prehistory 2020-11..2023-12 (display only). The advertised window 2023-01..2025-10 is satisfiable for only 352 of 544 (2023 has no ticks) | **Sellable today = 0**: rights UNKNOWN for 544/544, 15 of 16 instrument profiles missing (only XAUUSD has one), real data is refused by the product admission by design | Generate a sellable-unit catalogue (instrument x month x tick/OHLC) with a status per row (READY / BLOCKED + reason). OWNER: rights decision, instrument specifications, choose SKU option A-D from the data-inventory doc |
+| **P1 Quality** | How good is each unit? | File integrity and hashes, crossed-quote and ordering checks, lossless compact format, financial parity of engines, deterministic replay, recovery after SIGKILL | Accuracy against an independent reference source, gap/completeness statistics per month, spread realism, slippage/commission/latency profile, single-provider risk | Compute a per-dataset quality scorecard from the 544 datasets (gaps, duplicates, spread distribution, outliers, session coverage; private QA only). OWNER: second reference source |
+| **P2 Cost** | What does it cost to run and to sell? | Variable CPU: 110-324 core-s per 262,144-tick Session (synthetic, measured); DB about 13 MB and WAL about 23 MB per Session | Fixed costs (VPS, domain, SMTP, backup storage, **data licence**, payment fees, legal, support, tax), per-persona costs, chart/export costs, HTTPS-path costs | Cost model sheet: fixed (OWNER supplies numbers) + variable (measured per persona in the isolated benchmark) -> cost per Session, per trader-month (light/medium/heavy/abusive), break-even |
+| **P3 Price and limits** | What do we charge and cap? | Free/Pro rules exist in code (1 new Session per month, 1 history-window activation per day) | Prices, margins, caps, market price research | Public-price research for comparable tools, price tiers from P2 + margin, product caps (active Sessions, max Session length, export quota) from measured capacity |
+| **P4 Infrastructure maturity** | Is the platform solid enough to carry paying users? | Single node, queue and worker recovery proven, V2 prototype, 8 simultaneous traders OK | Persistent PostgreSQL, HTTPS-path capacity, Journal latency, offsite backup, monitoring, hardening | Items in Phases B and E below, run on staging, not production |
+
+Exit rule for P0-P3: a one-page **product sheet** the owner signs off: number of sellable units, quality scorecard, cost per trader-month with stated assumptions, price and caps.
+
 ## 1. Phase A — decisions the owner must make (blocks everything below)
 | # | Decision | Why it blocks |
 |---|---|---|
