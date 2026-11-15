@@ -169,7 +169,8 @@ class TickExecutionPostgresTests(unittest.TestCase):
                 'WHERE workspace_id=%s AND session_id=%s',
                 (self.scope.workspace_id, session),
             ).fetchone()
-        self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1, 0, 1))
+        # analytics projection format 2 (exact-ratio totalR, f6ab2c3): the head is upgraded 1->2 when the projection is rewritten
+        self.assertEqual(head, (1, h.state['nextEventIndex'], h.state['eventHash'], 1, 0, 2))
         events = [unpack(row[3], row[4]) for row in indexed]
         self.assertEqual([row[2] for row in indexed], [event['kind'] for event in events])
         self.assertEqual(events[0]['kind'], 'ORDER_ACCEPTED')

@@ -106,14 +106,19 @@ def main():
         fx = cloud_fixture.CloudResearchTests('test_member_read_only_then_revocation_and_logout')
         fx.setUp(start_workers=True)                                     # real lifespan: queue workers + native worker pool
         try:
-            traders = []
-            for i in range(a.traders):                                    # accounts are created before the measured window (auth is rate limited to 30/min/IP)
-                actor, headers = fx.account()
-                ws = fx.client.post('/api/v1/workspaces', headers=headers, json={'name': f'cap-{i}'}).json()['id']
-                root_path = f'/api/v1/workspaces/{ws}/research'
-                record = method()
-                assert fx.client.post(root_path + '/methods', headers=headers, json=record).status_code == 200
-                traders.append(dict(i=i, headers=headers, path=root_path, method=record['id'], actor=actor, ws=ws)); time.sleep(2.3)
+            traders = [dict(i=i) for i in range(a.traders)]
+            create_lock = threading.Lock()
+
+            def provision(tr):                                           # at ARRIVAL: bearer tokens live 1800 s (session_seconds), so a run longer than that needs fresh logins
+                with create_lock:
+                    actor, headers = fx.account()
+                    ws = fx.client.post('/api/v1/workspaces', headers=headers, json={'name': f"cap-{tr['i']}"}).json()['id']
+                    root_path = f'/api/v1/workspaces/{ws}/research'
+                    record = method()
+                    assert fx.client.post(root_path + '/methods', headers=headers, json=record).status_code == 200
+                    tr.update(headers=headers, path=root_path, method=record['id'], actor=actor, ws=ws)
+                    time.sleep(2.3)                                      # auth admission is 30/min/IP
+
             base = db_numbers(dsn)
             latencies, retries, lock = collections.defaultdict(list), collections.Counter(), threading.Lock()
             outcomes = [None] * a.traders
@@ -127,6 +132,7 @@ def main():
             def trader(tr, arrival):
                 client = fx.client
                 time.sleep(max(0, arrival - (time.monotonic() - run_start)))
+                provision(tr)
                 t_sub = time.monotonic(); out = dict(trader=tr['i'], arrivalS=round(arrival, 1), failures=[])
                 try:
                     def post(url, body, job=None):
@@ -208,8 +214,8 @@ def main():
                 waits = []
                 for (raw,) in db.execute("SELECT queue_metrics FROM btl.research_jobs WHERE operation='replay_run' AND queue_metrics IS NOT NULL").fetchall():
                     try:
-                        m = json.loads(bytes(raw)); waits.append(float(m.get('queueWaitMs', m.get('waitMs', 0))) / 1000)
-                    except (ValueError, TypeError):
+                        m = json.loads(bytes(raw)); waits.append(float(m['waitMicroseconds']) / 1e6)
+                    except (ValueError, TypeError, KeyError):
                         pass
                 states = dict(db.execute("SELECT state,count(*) FROM btl.research_jobs GROUP BY state").fetchall())
             done = [o for o in outcomes if o and not o['failures']]
