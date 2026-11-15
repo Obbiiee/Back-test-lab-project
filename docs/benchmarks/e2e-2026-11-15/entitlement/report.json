@@ -1,0 +1,1220 @@
+{
+  "schemaVersion": 1,
+  "artifact": "RIKSORA-PRIVATE-SYNTHETIC-BROWSER-GATE-1",
+  "status": "PASS",
+  "classification": "SYNTHETIC_QA_NOT_HISTORICAL_OR_PRODUCTION_ACCEPTANCE",
+  "steps": [
+    "login_screen",
+    "login_workspace",
+    "ent_enforced",
+    "ent_first_session",
+    "ent_second_refused",
+    "ent_logout_login_consistent",
+    "ent_pro_unlocks",
+    "ent_refund_downgrade",
+    "ent_utc_turnover",
+    "ent_idor_no_claims"
+  ],
+  "progress": [],
+  "cohortSize": 1,
+  "capacityTest": false,
+  "authIpRateLimit": 30,
+  "certificate": "LOCAL_SELF_SIGNED_VERIFICATION_BYPASSED",
+  "apiTransport": "UNCHANGED_REAL_BACKEND_RESPONSES_FORWARDED",
+  "cleanup": true,
+  "qaHarnessSha256": "312b117f8a02a1278128eac10b060bd7080deb474ef98171df42aee33ee4d611",
+  "playwrightVersion": "1.64.1",
+  "frontendInputSha256": "6eaa99b4f38023a47ae80533aa6e89689c13ccc5b892e807de296cda5341bf96",
+  "buildSha256": "edb606871bb42769962d0bab3afb31e1dd1db5ec340e628da04b28411d365db1",
+  "sourceCommit": "1ad1441b26629ee212a43923b84b748492054a2f",
+  "workingTreeDirty": true,
+  "runtimeMethodProjectionSelect": true,
+  "syntheticFixture": {
+    "label": "Synthetic/Test \u2014 authored deterministic ticks; not market history",
+    "datasetId": "synthetic:local-alpha-v1",
+    "datasetVersion": "e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32",
+    "sourceManifestSha256": "e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32",
+    "canonicalTickRows": 2048,
+    "canonicalTickRowsSha256": "5d2eefc52ceb9b613be7de7a11749dd479be267927268035fe991282699e1fad",
+    "parquetManifestSha256": "8986f66ab61d1527a7fb37774e2d031ce3bc7faab62c7b3c63a5e180990b323c",
+    "parquetBytes": 202132
+  },
+  "apiTrace": [
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/providers",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 27.41132300000004,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "status": 201,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 107.25673699999993,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 47.03250800000001,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 129.88507000000004,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 29.59970700000008,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/identities",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 50.42633999999998,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 47.88047800000004,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces",
+      "status": 201,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 43.79440100000011,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 35.779427000000396,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/capabilities",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 40.90516800000023,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/catalog",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 63.63992199999984,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 51.821128000000044,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 51.04117899999983,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/methods",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 59.930271000000175,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/catalog",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 55.88534299999992,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 58.65208500000017,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 60.50392899999997,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 62.935005000000274,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 56.339064000000235,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 68.4114499999996,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 48.7415630000005,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 41.57093099999929,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 42.10515399999986,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 45.35215799999969,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/catalog",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 59.55450700000074,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 52.31042600000001,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 51.75684600000022,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 52.38682200000039,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 52.673697000000175,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 409,
+      "code": "SESSION_MONTH_LIMIT",
+      "jumpStatus": null,
+      "durationMs": 64.22042499999952,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "status": 204,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 57.138230999998996,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 127.888551,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 29.632628999999724,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/identities",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 50.393998999999894,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 50.547109000001,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/capabilities",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 35.56901800000014,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/catalog",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 47.63685499999883,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 50.804598000000624,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 50.515628999999535,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 409,
+      "code": "SESSION_MONTH_LIMIT",
+      "jumpStatus": null,
+      "durationMs": 71.25666199999978,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 62.81804299999931,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 45.48469000000114,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 45.73387399999956,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 44.665115000001606,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/catalog",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 58.65484999999899,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 56.04637899999943,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 58.187824000000546,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 62.01844500000152,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 63.46149400000104,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 409,
+      "code": "SESSION_MONTH_LIMIT",
+      "jumpStatus": null,
+      "durationMs": 70.75159300000087,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 51.19115299999976,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 47.55820600000152,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 54.26427500000136,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 54.10243899999841,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 67.59236499999679,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 38.25969500000065,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+      "status": 202,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 44.07487300000139,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 48.314973000000464,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/catalog",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 61.500701999997545,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 51.3837280000007,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 51.00478899999871,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 58.38236300000062,
+      "serverTiming": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+      "status": 200,
+      "code": null,
+      "jumpStatus": null,
+      "durationMs": 58.992200000000594,
+      "serverTiming": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/workspaces/{id}/research/sessions",
+      "status": 409,
+      "code": "SESSION_MONTH_LIMIT",
+      "jumpStatus": null,
+      "durationMs": 65.8032699999967,
+      "serverTiming": null
+    }
+  ],
+  "browserVersion": "156.0.8078.4",
+  "cohortResults": [
+    {
+      "user": 1,
+      "status": "PASS",
+      "apiTrace": [
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/providers",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 27.41132300000004,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/register",
+          "status": 201,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 107.25673699999993,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/verify",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 47.03250800000001,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/login",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 129.88507000000004,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/me",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 29.59970700000008,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/identities",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 50.42633999999998,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 47.88047800000004,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces",
+          "status": 201,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 43.79440100000011,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 35.779427000000396,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/capabilities",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 40.90516800000023,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/catalog",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 63.63992199999984,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 51.821128000000044,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 51.04117899999983,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/methods",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 59.930271000000175,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/catalog",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 55.88534299999992,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 58.65208500000017,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 60.50392899999997,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 62.935005000000274,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 56.339064000000235,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 68.4114499999996,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 48.7415630000005,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 41.57093099999929,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 42.10515399999986,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 45.35215799999969,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/catalog",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 59.55450700000074,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 52.31042600000001,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 51.75684600000022,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 52.38682200000039,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 52.673697000000175,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 409,
+          "code": "SESSION_MONTH_LIMIT",
+          "jumpStatus": null,
+          "durationMs": 64.22042499999952,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/logout",
+          "status": 204,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 57.138230999998996,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/login",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 127.888551,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/me",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 29.632628999999724,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/identities",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 50.393998999999894,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 50.547109000001,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/capabilities",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 35.56901800000014,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/catalog",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 47.63685499999883,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 50.804598000000624,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 50.515628999999535,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 409,
+          "code": "SESSION_MONTH_LIMIT",
+          "jumpStatus": null,
+          "durationMs": 71.25666199999978,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 62.81804299999931,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 45.48469000000114,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 45.73387399999956,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 44.665115000001606,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/catalog",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 58.65484999999899,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 56.04637899999943,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 58.187824000000546,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 62.01844500000152,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 63.46149400000104,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 409,
+          "code": "SESSION_MONTH_LIMIT",
+          "jumpStatus": null,
+          "durationMs": 70.75159300000087,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 51.19115299999976,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 47.55820600000152,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 54.26427500000136,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 54.10243899999841,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 67.59236499999679,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 38.25969500000065,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions/{id}/view",
+          "status": 202,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 44.07487300000139,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/jobs/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 48.314973000000464,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/catalog",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 61.500701999997545,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 51.3837280000007,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 51.00478899999871,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 58.38236300000062,
+          "serverTiming": null
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/workspaces/{id}/research/method-families/{id}/versions",
+          "status": 200,
+          "code": null,
+          "jumpStatus": null,
+          "durationMs": 58.992200000000594,
+          "serverTiming": null
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/workspaces/{id}/research/sessions",
+          "status": 409,
+          "code": "SESSION_MONTH_LIMIT",
+          "jumpStatus": null,
+          "durationMs": 65.8032699999967,
+          "serverTiming": null
+        }
+      ],
+      "pageErrorCount": 0,
+      "failedRequests": 0,
+      "steps": [
+        "login_screen",
+        "login_workspace",
+        "ent_enforced",
+        "ent_first_session",
+        "ent_second_refused",
+        "ent_logout_login_consistent",
+        "ent_pro_unlocks",
+        "ent_refund_downgrade",
+        "ent_utc_turnover",
+        "ent_idor_no_claims"
+      ]
+    }
+  ],
+  "seconds": "28.867712271981873"
+}

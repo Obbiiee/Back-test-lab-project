@@ -33,8 +33,46 @@ if os.environ.get('RIKSORA_QA_E2E_COVERAGE') == '1':   # opt-in coverage journey
              'cov_indicators', 'cov_drawing', 'cov_free_style_quick', 'cov_free_style_planned_limit', 'cov_jump_resolution',
              'cov_free_style_manual_close', 'cov_journal_statistics', 'cov_export', 'cov_protocol_pending_limit_stop', 'cov_protocol_cancel',
              'cov_protocol_jump_locked_exit', 'cov_position_planner', 'cov_idor')
+elif os.environ.get('RIKSORA_QA_E2E_ENTITLEMENT') == '1':   # opt-in: Free/Pro journey with the entitlement gate ACTIVE (commercial-like profile)
+    STEPS = ('login_screen', 'login_workspace', 'ent_enforced', 'ent_first_session', 'ent_second_refused', 'ent_logout_login_consistent',
+             'ent_pro_unlocks', 'ent_refund_downgrade', 'ent_utc_turnover', 'ent_idor_no_claims')
 elif os.environ.get('RIKSORA_QA_E2E_EXTRA') == '1':   # opt-in extended journey: ledger CSV/PDF content, Trash/Restore, mobile viewport
     STEPS += ('export_csv_ledger', 'export_pdf_report', 'trash_restore', 'mobile_viewport')
+
+
+def qa_hook(dsn, app, item):
+    """Local QA-only hooks the entitlement journey may ask the parent for (whitelisted; they touch only the harness's own disposable database)."""
+    import uuid as _uuid
+    import psycopg
+    need = item.get('need')
+    if need == 'qa_enforced':
+        return dict(enforced=getattr(app.state, 'entitlements', None) is not None)
+    email = item.get('email')
+    if not (isinstance(email, str) and email.endswith('@example.com')):
+        return dict(error='EMAIL_REFUSED')
+    with psycopg.connect(dsn) as db:
+        row = db.execute("SELECT id FROM btl.users WHERE email=%s", (email,)).fetchone()
+        if row is None:
+            return dict(error='UNKNOWN_USER')
+        actor = row[0]
+        if need == 'qa_grant_pro':
+            import time
+            now = int(time.time())
+            db.execute("INSERT INTO btl.sandbox_billing_orders(order_id,actor_id,request_id,merchant_id,plan_version,amount_idr,duration_seconds,phase,transaction_id,paid_at,expires_at,revision) "
+                       "VALUES (%s,%s,%s,'qa','qa-plan',1000,2592000,'PAID',%s,%s,%s,1)",
+                       ('btl-sbx-' + _uuid.uuid4().hex, actor, _uuid.uuid4(), 'qa-' + _uuid.uuid4().hex, now - 10, now - 10 + 2592000))
+            return dict(ok=True)
+        if need == 'qa_reverse_pro':
+            db.execute("UPDATE btl.sandbox_billing_orders SET phase='REVERSED', revision=revision+1 WHERE actor_id=%s AND phase='PAID'", (actor,))
+            return dict(ok=True)
+        if need == 'qa_turn_utc':           # simulate the UTC day and month turning over: earlier periods no longer count
+            db.execute("UPDATE btl.entitlement_claims SET period='2000-01-'||substr(claim_key,1,6) WHERE actor_id=%s AND kind='WINDOW'", (actor,))
+            db.execute("UPDATE btl.entitlement_claims SET period='2000-01-'||substr(claim_key,1,6) WHERE actor_id=%s AND kind='SESSION'", (actor,))
+            return dict(ok=True)
+        if need == 'qa_claims':
+            n = db.execute("SELECT count(*) FROM btl.entitlement_claims WHERE actor_id=%s AND status IN ('RESERVED','COMMITTED')", (actor,)).fetchone()[0]
+            return dict(active=int(n))
+    return dict(error='UNKNOWN_HOOK')
 
 
 def preflight(repository, tools):
@@ -510,6 +548,9 @@ def run_browser(environment, tools, browser_cache, evidence, report, cohort_size
                             process.stdin.flush()
                         elif item.get('need') == 'recovery' and item.get('email') == email:
                             process.stdin.write(json.dumps(dict(token=delivery.token(email, 'recovery')))+'\n')
+                            process.stdin.flush()
+                        elif str(item.get('need', '')).startswith('qa_') and os.environ.get('RIKSORA_QA_E2E_ENTITLEMENT') == '1':
+                            process.stdin.write(json.dumps(qa_hook(dsn, app, item))+'\n')
                             process.stdin.flush()
                         elif 'apiEvent' in item:
                             event = sanitize_api_event(item)

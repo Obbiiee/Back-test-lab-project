@@ -177,7 +177,7 @@ try{
       (release.delayMs??0)<0||(release.delayMs??0)>30000)throw Error('COHORT_START_REFUSED');
     if(release.delayMs)await new Promise(resolve=>setTimeout(resolve,release.delayMs));
   }
-  if(process.env.RIKSORA_QA_E2E_COVERAGE==='1'){
+  if(process.env.RIKSORA_QA_E2E_COVERAGE==='1'||process.env.RIKSORA_QA_E2E_ENTITLEMENT==='1'){
     const fsp=await import('node:fs/promises');
     const shot=async name=>page.screenshot({path:join(evidence,name+'.png')});
     const mainNav=label=>page.getByRole('navigation',{name:'Main'}).getByRole('link',{name:label,exact:true});
@@ -200,7 +200,7 @@ try{
     });
     const newSession=guarded(async(methodName,sessionName)=>{
       phase='cov_session_'+sessionName;
-      await page.getByRole('button',{name:'New Session',exact:true}).first().click();
+      await page.getByRole('button',{name:'New Session',exact:true}).or(page.getByRole('link',{name:/New Session/})).first().click();
       await page.locator('.rk-wizard .rk-combo button.rk-combo-trigger').click();
       await page.getByRole('option',{name:new RegExp(methodName)}).click();
       for(let i=0;i<3;i++)await page.getByRole('button',{name:'Continue',exact:true}).click();
@@ -213,6 +213,7 @@ try{
     const terminal=()=>page.getByRole('region',{name:'Trading and Analysis'});
     const revision=async()=>Number(await terminal().getAttribute('data-revision'));
     const stepOnce=async()=>{const before=await revision();const b=page.getByRole('button',{name:'Step ticks',exact:true});await b.click();await expect.poll(revision,{timeout:95000}).toBeGreaterThanOrEqual(before);await expect(b).toBeEnabled({timeout:95000});};
+    if(process.env.RIKSORA_QA_E2E_COVERAGE==='1'){
     // ---- Landing (hosted home on a non-local host name), in its own context so the session under test is untouched
     phase='cov_landing';
     {
@@ -484,6 +485,100 @@ try{
       await fsp.writeFile(join(evidence,'cov-idor.json'),JSON.stringify({attacks:outcome,anonymousExport:401},null,1));
     }
     step('cov_idor');
+    }
+    if(process.env.RIKSORA_QA_E2E_ENTITLEMENT==='1')try{
+      const hook=async(need,extra={})=>{process.stdout.write(JSON.stringify({need,...extra})+'\n');return await read();};
+      const nextMonthText=()=>{const n=new Date();return new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth()+1,1)).toLocaleString('en',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC',timeZoneName:'short'});};
+      const tryCreate=async(methodName,name)=>{
+        await page.getByRole('button',{name:'New Session',exact:true}).or(page.getByRole('link',{name:/New Session/})).first().click();
+        await page.locator('.rk-wizard .rk-combo button.rk-combo-trigger').click();
+        await page.getByRole('option',{name:new RegExp(methodName)}).click();
+        for(let i=0;i<3;i++)await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.getByLabel('Session name').fill(name);
+        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.getByRole('button',{name:'Create Session',exact:true}).click();
+        const created=page.getByRole('region',{name:'Tick replay workspace'});
+        const alert=page.getByRole('alert').first();
+        const outcome=await Promise.race([created.waitFor({state:'visible',timeout:95000}).then(()=> 'created'),alert.waitFor({state:'visible',timeout:95000}).then(()=> 'refused')]);
+        if(outcome==='created')return {outcome};
+        return {outcome,text:await page.locator('body').innerText()};
+      };
+      expect((await hook('qa_enforced')).enforced).toBe(true);step('ent_enforced');
+      await newMethod('Ent Free Style');
+      await newSession('Ent Free Style','Ent session 1');
+      step('ent_first_session');
+      await page.getByRole('link',{name:/^Back to /}).click();
+      const refused=await tryCreate('Ent Free Style','Ent session 2');
+      expect(refused.outcome).toBe('refused');
+      expect(refused.text).toContain('one new Session per calendar month (UTC)');
+      expect(refused.text).toContain(nextMonthText());
+      await shot('ent-refused');
+      step('ent_second_refused');
+      phase='ent_logout';
+      // logout / login: the same state and the same refusal; the first Session is still there
+      await page.keyboard.press('Escape');
+      await mainNav('Sessions').click();
+      await page.getByRole('navigation',{name:'Account and help'}).getByRole('link',{name:'Account',exact:true}).click();
+      await page.getByRole('button',{name:'Sign out',exact:true}).click();
+      await expect(page.getByRole('tab',{name:'Sign in',exact:true})).toBeVisible();
+      await page.getByLabel('Email',{exact:true}).fill(config.email);await page.getByLabel('Password',{exact:true}).fill(config.password);
+      await page.getByRole('button',{name:'Sign in',exact:true}).click();
+      await page.getByRole('button',{name:/Synthetic browser acceptance/}).click();
+      await mainNav('Sessions').click();
+      await expect(page.getByRole('link',{name:'Ent session 1'}).first()).toBeVisible({timeout:60000});
+      await expect(page.getByRole('link',{name:'Ent session 2'})).toHaveCount(0);
+      const again=await tryCreate('Ent Free Style','Ent session 2');
+      expect(again.outcome).toBe('refused');expect(again.text).toContain(nextMonthText());
+      step('ent_logout_login_consistent');
+      phase='ent_pro';
+      // Pro (a PAID, unexpired order on the server) unlocks a second Session immediately
+      expect((await hook('qa_grant_pro',{email:config.email})).ok).toBe(true);
+      await mainNav('Sessions').click();
+      const pro=await tryCreate('Ent Free Style','Ent session 2');
+      expect(pro.outcome).toBe('created');
+      step('ent_pro_unlocks');
+      phase='ent_refund';
+      // refund: Pro is revoked at once, the earlier Sessions and their ledgers stay
+      expect((await hook('qa_reverse_pro',{email:config.email})).ok).toBe(true);
+      await page.getByRole('link',{name:/^Back to /}).click();
+      const third=await tryCreate('Ent Free Style','Ent session 3');
+      expect(third.outcome).toBe('refused');expect(third.text).toContain('one new Session per calendar month (UTC)');
+      await page.keyboard.press('Escape');
+      await mainNav('Sessions').click();
+      await expect(page.getByRole('link',{name:'Ent session 1'}).first()).toBeVisible();
+      await expect(page.getByRole('link',{name:'Ent session 2'}).first()).toBeVisible();
+      await page.getByRole('button',{name:/Continue replay|Open replay/}).first().click();
+      await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
+      step('ent_refund_downgrade');
+      phase='ent_utc';
+      // UTC turnover: earlier periods stop counting, a new Session is allowed again (and takes one token)
+      expect((await hook('qa_turn_utc',{email:config.email})).ok).toBe(true);
+      await page.getByRole('link',{name:/^Back to /}).click();
+      const reset=await tryCreate('Ent Free Style','Ent session 3');
+      expect(reset.outcome).toBe('created');
+      await page.getByRole('link',{name:/^Back to /}).click();
+      const afterReset=await tryCreate('Ent Free Style','Ent session 4');
+      expect(afterReset.outcome).toBe('refused');
+      step('ent_utc_turnover');
+      phase='ent_idor';
+      // IDOR on the quota: a second account cannot reserve or consume anything in the first account's workspace
+      const base=url.origin;
+      const post=(path,token,data)=>context.request.post(base+path,{headers:token?{Authorization:'Bearer '+token}:{},data,maxRedirects:0,failOnStatusCode:false});
+      expect((await post('/api/v1/auth/register',null,{email:config.email2,password:config.password})).status()).toBe(201);
+      process.stdout.write(JSON.stringify({need:'verification',email:config.email2})+'\n');
+      expect((await post('/api/v1/auth/verify',null,{token:(await read()).token})).status()).toBe(200);
+      const login2=await context.request.post(base+'/api/v1/auth/login',{form:{username:config.email2,password:config.password},failOnStatusCode:false});
+      const tokenB=(await login2.json()).access_token;
+      const before=(await hook('qa_claims',{email:config.email})).active;
+      const attempt=await post(`/api/v1/workspaces/${seen.ws}/research/sessions`,tokenB,{id:'session:attack',name:'attack',methodId:'method:x',initialBalance:'10000',startPeriod:'2020-01'});
+      expect([401,403,404,422]).toContain(attempt.status());
+      expect((await attempt.text())).not.toContain('SESSION_MONTH_LIMIT');
+      expect((await hook('qa_claims',{email:config.email})).active).toBe(before);
+      expect((await hook('qa_claims',{email:config.email2})).active).toBe(0);
+      const ent2=await context.request.get(`${base}/api/v1/workspaces/${seen.ws}/research/entitlements`,{headers:{Authorization:'Bearer '+tokenB},failOnStatusCode:false});
+      expect([403,404]).toContain(ent2.status());
+      step('ent_idor_no_claims');
+    }catch(error){await page.screenshot({path:join(evidence,'ent-failure.png')}).catch(()=>{});await fsp.writeFile(join(evidence,'ent-failure.txt'),String(error)+'\n'+await page.locator('body').innerText().catch(()=>'')).catch(()=>{});throw error;}
     process.stdout.write(JSON.stringify({complete:true,browserVersion:browser.version(),transientBusyCount:0,apiResponseCount,pageErrorCount:errors.length,failedRequests:requestFailures.length,steps:completedSteps})+'\n');
     await context.close();await browser.close();process.exit(0);
   }
@@ -491,7 +586,7 @@ try{
   await page.getByLabel('Method name').fill('Synthetic browser method');
   await page.getByRole('button',{name:'Save Method',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic browser method'})).toBeVisible();step('method');
-  phase='session_wizard_open';await page.getByRole('button',{name:'New Session',exact:true}).first().click();
+  phase='session_wizard_open';await page.getByRole('button',{name:'New Session',exact:true}).or(page.getByRole('link',{name:/New Session/})).first().click();
   phase='session_method_select';await page.locator('.rk-wizard .rk-combo button.rk-combo-trigger').click();
   await page.getByRole('option',{name:/Synthetic browser method/}).click();
   phase='session_instrument_continue';await page.getByRole('button',{name:'Continue',exact:true}).click();
