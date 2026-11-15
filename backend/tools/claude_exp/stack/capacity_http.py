@@ -152,12 +152,18 @@ def stage(a):
                   budget=dict(sutCpuQuotaPct=a.sut_cpu, sutMemoryMax=a.sut_mem, sutCores=a.sut_cores, generatorCpuQuotaPct=a.drv_cpu, generatorMemoryMax=a.drv_mem, generatorCores=a.drv_cores,
                               note='same-host, affinity-isolated, loopback HTTP without TLS/proxy; affinity is not exclusive CPU'), gates={})
     # ---------- preflight ----------
+    # wait (bounded) until the host is quiet: instantaneous host CPU over 5 s, not the lagging 1-minute load average
+    quiet = None
+    for _ in range(40):
+        _c, p0 = host_cpu(None); time.sleep(5); quiet, _p = host_cpu(p0)
+        if quiet is not None and quiet < 10:
+            break
     mi = meminfo()
     busy = subprocess.run(['pgrep', '-f', r'^[^ ]*python[^ ]* .*(capacity_http_driver|capacity_20|long_session_driver)'], capture_output=True, text=True).stdout.split()
     pre = dict(memAvailableGiB=round(mi['MemAvailable'] / 2**20, 2), swapUsedKiB=mi['SwapTotal'] - mi['SwapFree'], diskFreeGB=round(shutil.disk_usage('/').free / 2**30, 1),
-               otherBenchmarkPids=busy, load1=os.getloadavg()[0])
+               otherBenchmarkPids=busy, load1=os.getloadavg()[0], hostCpuPctBeforeStart=None if quiet is None else round(quiet, 1))
     result['preflight'] = pre
-    if pre['memAvailableGiB'] < 4 or pre['swapUsedKiB'] > 0 or pre['diskFreeGB'] < 40 or busy or pre['load1'] > 1.5:
+    if pre['memAvailableGiB'] < 4 or pre['swapUsedKiB'] > 0 or pre['diskFreeGB'] < 40 or busy or (quiet is None or quiet >= 10):
         result['abortedByPreflight'] = True
         (run / 'result.json').write_text(json.dumps(result, indent=1)); print(json.dumps(result, indent=1)); return 2
     sut_unit, drv_unit = f'btl-sut-{ts}', f'btl-drv-{ts}'
