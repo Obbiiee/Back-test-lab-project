@@ -169,7 +169,7 @@ def _environment(dsn):
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
-                            'BTL_TICK_SESSION_STORAGE_FORMAT', *monthly_names,
+                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', *monthly_names,
                             *catalog_names, *s3_names)}
     if monthly_root is not None:
         environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
@@ -179,6 +179,12 @@ def _environment(dsn):
     require(environment.get('BTL_TICK_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
             'tickStateStorageFormat','REFUSED_STATE_VERSION')
     require(environment.get('BTL_QA_TIMELINE_LOG_CODEC') in (None, 'raw', 'zlib-1'), 'logCodec')
+    for name in ('BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS'):          # numeric tuning of the replay-run segment length only
+        if name in environment:
+            try:
+                float(environment[name])
+            except ValueError:
+                raise ContractError('INVALID_INPUT', name) from None
     environment['BTL_WORKER_DATABASE'] = dsn
     require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')
     environment['BTL_WORKER_MAX_JOBS'] = str(MAX_JOBS)
@@ -309,10 +315,10 @@ def pooled_invoke(dsn, payload, *, deadline=DEADLINE):
     # The configured catalog and its admitted handles live in one controller
     # process. Keep observed-family work on the warmed slot instead of causing
     # a second full archive admission in a parallel cold slot.
-    observed_family = (type(payload) is dict and payload.get('operation') in ('apply', 'replay_to', 'jump_next_event')
+    observed_family = (type(payload) is dict and payload.get('operation') in ('apply', 'replay_to', 'replay_run', 'jump_next_event')
                        and type(payload.get('args')) is list and len(payload['args']) == 2
                        and type(payload['args'][1]) is dict
-                      and payload['args'][1].get('artifact') in ('BTL-OBSERVED-EXECUTION-COMMAND-1', 'BTL-OBSERVED-REPLAY-TO-1', 'BTL-JUMP-NEXT-EVENT-1'))
+                      and payload['args'][1].get('artifact') in ('BTL-OBSERVED-EXECUTION-COMMAND-1', 'BTL-OBSERVED-REPLAY-TO-1', 'BTL-REPLAY-RUN-1', 'BTL-JUMP-NEXT-EVENT-1'))
     candidates = (_slots[0],) if observed_family and os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG') else _slots
     slot = next((candidate for candidate in candidates if candidate.lock.acquire(False)), None)
     if slot is None:
@@ -377,7 +383,7 @@ def invoke(dsn, payload, *, deadline=DEADLINE):
 
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
-    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'jump_next_event', 'command_result'), 'workerOperation')
+    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'replay_run', 'jump_next_event', 'command_result'), 'workerOperation')
     return pooled_invoke(dsn, dict(schemaVersion=1, actor=str(actor_id), workspace=str(workspace_id),
                             operation=operation, args=list(args), write=write))
 
@@ -389,7 +395,7 @@ def _execute(raw):
         require(len(raw) <= 32768, 'workerInput')
         request = json.loads(raw)
         require(request.get('schemaVersion') == 1 and
-                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'jump_next_event', 'command_result'), 'workerInput')
+                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'replay_run', 'jump_next_event', 'command_result'), 'workerInput')
         from .research import run as authorized_run
         result = authorized_run(os.environ['BTL_WORKER_DATABASE'], uuid.UUID(request['actor']),
                                 uuid.UUID(request['workspace']), request['operation'],

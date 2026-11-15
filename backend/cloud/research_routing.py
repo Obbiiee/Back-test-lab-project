@@ -74,4 +74,4 @@ def observed_route(operation, args, catalog, monthly_catalog=None):
         if monthly_catalog is not None and (raw['sourceKey'], raw.get('period')) in monthly_catalog._entries:
             return False
         return True
-    return operation in ('replay_to', 'jump_next_event')
+    return operation in ('replay_to', 'replay_run', 'jump_next_event')

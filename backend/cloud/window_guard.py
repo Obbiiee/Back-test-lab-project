@@ -22,18 +22,14 @@ class WindowRefused(ContractError):
 
 
 def live_orders(dsn, workspace_id, actor_id, session_id):
-    from application.models import TrustedScope
-    from execution.research import ResearchApplication
-    from infrastructure.database import connect
-    app = ResearchApplication(dsn, TrustedScope(str(workspace_id), str(actor_id)))
-    try:
-        with connect(dsn) as db:
-            _meta, _method, state, _checkpoint = app._session(db, session_id)
-        orders = state["orders"].values()
-        return dict(throughNs=int(state["throughNs"]), active=sum(o["status"] == "ACTIVE" for o in orders),
-                    pending=sum(o["status"] == "PENDING" for o in orders), ended=bool(state["ended"]))
-    finally:
-        app.close()
+    """Committed order counts and cursor of a Session. Goes through the same authorised runner as every other read, so it works for every session model
+    (fixture, synthetic Monthly, observed) with that model's own source pins; it never builds a provider by itself."""
+    from .research import run
+    view = run(dsn, actor_id, workspace_id, "inspect", (session_id,))
+    state = view["state"]
+    orders = state["orders"].values()
+    return dict(throughNs=int(state["throughNs"]), active=sum(o["status"] == "ACTIVE" for o in orders),
+                pending=sum(o["status"] == "PENDING" for o in orders), ended=bool(state["ended"]))
 
 
 def check(entitlements, dsn, actor_id, workspace_id, session_id, kind, target_ns=None):

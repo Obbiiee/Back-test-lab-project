@@ -36,8 +36,8 @@ MAX_JOB_ATTEMPTS = 3
 LEASE_SECONDS = 30
 HEARTBEAT_SECONDS = 5
 QUEUE_TTL_SECONDS = 60
-OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to', 'jump_next_event'))
-MUTATING_OPERATIONS = frozenset(('create_session', 'replay', 'replay_to', 'jump_next_event'))
+OPERATIONS = frozenset(('create_session', 'workspace', 'bootstrap', 'chart_history', 'replay', 'replay_to', 'replay_run', 'jump_next_event'))
+MUTATING_OPERATIONS = frozenset(('create_session', 'replay', 'replay_to', 'replay_run', 'jump_next_event'))
 
 _CLAIM_NEXT_JOB = """
 SELECT j.* FROM btl.research_jobs j
@@ -52,7 +52,7 @@ WHERE j.state='QUEUED'
       SELECT 1 FROM btl.research_jobs r
       WHERE r.actor_id=j.actor_id AND r.state='RUNNING'
   )
-ORDER BY CASE WHEN j.operation='replay_to'
+ORDER BY CASE WHEN j.operation IN ('replay_to','replay_run')
                 AND j.created_at>statement_timestamp()-interval '5 seconds'
               THEN 1 ELSE 0 END,
          t.last_claimed_at NULLS FIRST,j.created_at,j.id
@@ -86,10 +86,10 @@ def _reap_expired_leases(db):
         )
         UPDATE btl.research_jobs j SET
             state = CASE
-                WHEN j.cancel_requested_at IS NOT NULL AND j.operation NOT IN ('replay','replay_to','jump_next_event','create_session') THEN 'CANCELLED'
+                WHEN j.cancel_requested_at IS NOT NULL AND j.operation NOT IN ('replay','replay_to','replay_run','jump_next_event','create_session') THEN 'CANCELLED'
                 WHEN j.cancel_requested_at IS NOT NULL THEN 'RECONCILE_REQUIRED'
                 WHEN j.attempts < %s THEN 'QUEUED'
-                WHEN j.operation IN ('replay','replay_to','jump_next_event','create_session') THEN 'RECONCILE_REQUIRED'
+                WHEN j.operation IN ('replay','replay_to','replay_run','jump_next_event','create_session') THEN 'RECONCILE_REQUIRED'
                 ELSE 'FAILED'
             END,
             expires_at = CASE WHEN j.cancel_requested_at IS NULL AND j.attempts < %s
@@ -106,7 +106,7 @@ def _reap_expired_leases(db):
 def _expire_queued(db):
     return db.execute("""
         UPDATE btl.research_jobs SET
-            state=CASE WHEN operation IN ('replay','replay_to','jump_next_event','create_session') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,
+            state=CASE WHEN operation IN ('replay','replay_to','replay_run','jump_next_event','create_session') THEN 'RECONCILE_REQUIRED' ELSE 'EXPIRED' END,
             finished_at=clock_timestamp()
         WHERE state='QUEUED' AND expires_at < clock_timestamp()
     """).rowcount
@@ -156,6 +156,16 @@ def replay_to_request(raw, session_id):
     uint(raw['targetNs'])
     require(type(raw['timeframe']) is str and raw['timeframe'] in ('1m','3m','5m','15m','30m','1h','2h','4h','D'), 'timeframe')
     return raw
+
+
+def replay_run_next(request, result):
+    from execution.replay_run import next_request
+    return next_request(request, result)
+
+
+def replay_run_request(raw, session_id):
+    from execution.replay_run import validate_request
+    return validate_request(raw, session_id)
 
 
 def jump_next_event_request(raw, session_id):
@@ -215,6 +225,8 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
         require(type(args[1]) is dict, 'request')
     if operation == 'replay_to':
         replay_to_request(args[1], args[0])
+    elif operation == 'replay_run':
+        replay_run_request(args[1], args[0])
     elif operation == 'jump_next_event':
         jump_next_event_request(args[1], args[0])
     payload = {'schemaVersion': 1, 'operation': operation, 'args': list(args)}
@@ -223,15 +235,17 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
     digest = content_hash(payload)
     with connect(dsn) as db:
         unit = scoped(db, actor_id, workspace_id)
-        if operation in ('replay', 'replay_to', 'jump_next_event', 'create_session'):
+        if operation in ('replay', 'replay_to', 'replay_run', 'jump_next_event', 'create_session'):
             owner(unit.role)
-        if operation in ('replay', 'replay_to', 'jump_next_event'):
+        if operation in ('replay', 'replay_to', 'replay_run', 'jump_next_event'):
             session_artifact = _persisted_session_artifact(db, str(workspace_id), args[0])
             if operation == 'replay':
                 replay_command(args[1], args[0], session_artifact)
             elif operation == 'replay_to':
                 require(session_artifact == 'BTL-OBSERVED-RESEARCH-SESSION-1',
                         'replayTo', 'REFUSED_OBSERVED_OPERATION')
+            elif operation == 'replay_run':
+                pass                                    # both session models are allowed; the controller applies the ordinary ADVANCE command
             else:
                 jump_next_event_request(args[1], args[0])
         # Serialize inexpensive count/admission across all API processes.
@@ -374,6 +388,7 @@ def work_one(dsn, runner):
         heartbeat_thread = Thread(target=heartbeat, name=f"btl-job-heartbeat-{row['id']}", daemon=True)
         heartbeat_thread.start()
         worker_metrics_raw = worker_metrics_hash = None
+        continuation = None
         try:
             try:
                 payload = json.loads(bytes(row['input']))
@@ -391,6 +406,13 @@ def work_one(dsn, runner):
                 # The native worker applies its 30s execution deadline after
                 # any bounded pinned-source re-admission. Keep that separate
                 # startup allowance from the queue transaction's wall time.
+            elif row['operation'] == 'replay_run':
+                result = runner(dsn, row['actor_id'], row['workspace_id'], 'replay_run', tuple(args), write=True)
+                if result.get('more') is True:
+                    # Durable continuation: the next segment gets a deterministic job id, so a retry of this job names the same follow-on and can never fork the chain.
+                    next_args = [args[0], replay_run_next(args[1], result)]
+                    continuation = dict(jobId=str(uuid.uuid5(uuid.NAMESPACE_URL, f"btl-replay-run:{row['id']}")), args=next_args)
+                    result = {**result, 'continuationJobId': continuation['jobId']}
             elif row['operation'] == 'jump_next_event':
                 result = runner(dsn, row['actor_id'], row['workspace_id'], 'jump_next_event', tuple(args), write=True)
             elif row['operation'] == 'create_session':
@@ -433,6 +455,11 @@ def work_one(dsn, runner):
                 lease_owner=NULL,lease_until=NULL,heartbeat_at=NULL
             WHERE id=%s AND state='RUNNING' AND lease_owner=%s
         """, (state, raw, worker_metrics_raw, worker_metrics_hash, row['id'], lease_owner))
+        if continuation is not None and state == 'SUCCEEDED' and not cancelled:
+            # Same transaction as the finalisation above: either both the result and the follow-on exist, or neither (a lease retry then redoes the segment, which is idempotent).
+            payload_next = {'schemaVersion': 1, 'operation': 'replay_run', 'args': continuation['args']}
+            db.execute("INSERT INTO btl.research_jobs(id,actor_id,workspace_id,operation,input,input_hash,state) VALUES (%s,%s,%s,'replay_run',%s,%s,'QUEUED') ON CONFLICT (id) DO NOTHING",
+                       (continuation['jobId'], row['actor_id'], row['workspace_id'], canonical_bytes(payload_next), content_hash(payload_next)))
         return True
 
 

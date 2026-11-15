@@ -526,6 +526,11 @@ class ObservedResearchApplication:
                     sessionId=session_id,targetNs=str(target),throughNs=state['throughNs'],advances=advances,
                     targetReached=int(state['throughNs'])>=target,view=view)
 
+    def replay_run(self,session_id,raw):
+        """One segment of a durable multi-chunk replay (execution/replay_run.py); the queue chains the next segment."""
+        from .replay_run import run_chunks
+        return run_chunks(self,connect,session_id,raw,command_artifact='BTL-OBSERVED-EXECUTION-COMMAND-1')
+
     def workspace(self,session_id,raw):
         keys(raw,'timeframe')
         return self.inspect(session_id,raw['timeframe'])

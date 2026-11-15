@@ -838,6 +838,11 @@ class ResearchApplication:
             self._session(db,session_id)
         return self.controller.apply(self.scope,command)
 
+    def replay_run(self, session_id, raw):
+        """One segment of a durable multi-chunk replay (execution/replay_run.py); the queue chains the next segment."""
+        from .replay_run import run_chunks
+        return run_chunks(self, connect, session_id, raw, command_artifact="BTL-TICK-EXECUTION-COMMAND-1")
+
     def jump_next_event(self, session_id, raw):
         """Commit one bounded canonical ADVANCE chunk toward the next event."""
         validate_jump_request(raw, session_id)

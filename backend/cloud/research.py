@@ -279,7 +279,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             validate_source_selection(args[0],catalog,monthly_catalog)
         observed=_observed_route(operation,args,catalog,monthly_catalog);session_id=None
         session_metadata=None
-        if operation in ('replay_to','jump_next_event'):
+        if operation in ('replay_to','replay_run','jump_next_event'):
             session_id=args[0] if args else None
         elif operation not in ('catalog','create_method','create_session'):
             if operation in ('review','create_session') and args and type(args[0]) is dict:session_id=args[0].get('sessionId')
@@ -733,6 +733,21 @@ def install(app):
             try:job_id=uuid.UUID(job_id)
             except ValueError:require(False,'jobId')
         return await execute(user,workspace_id,'replay_to',session_id,raw,write=True,job_id=job_id)
+
+    @app.post(prefix + '/sessions/{session_id}/replay-run')
+    async def replay_run(workspace_id: uuid.UUID, session_id: str, request: Request,
+                         user: User = Depends(current)):
+        """Durable multi-chunk replay: one request, many short committed ADVANCE chunks, chained server-side (see execution/replay_run.py)."""
+        raw = await json_body(request)
+        queue.replay_run_request(raw, session_id)
+        refused = await _window_guard(user, workspace_id, session_id, 'ADVANCE', raw['targetNs'])
+        if refused is not None:
+            return refused
+        job_id = request.headers.get('x-btl-job')
+        if job_id is not None:
+            try:job_id = uuid.UUID(job_id)
+            except ValueError:require(False, 'jobId')
+        return await execute(user, workspace_id, 'replay_run', session_id, raw, write=True, job_id=job_id)
 
     @app.post(prefix + '/sessions/{session_id}/jump-next-event')
     async def jump_next_event(workspace_id: uuid.UUID, session_id: str, request: Request,
