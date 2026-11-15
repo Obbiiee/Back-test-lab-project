@@ -54,12 +54,13 @@ class Metrics:
         self.bytes_out = 0
         self.expected_refusals = collections.Counter()
         self.persona_lat = collections.defaultdict(list)
+        self.conn_retries = collections.Counter()
 
     def summary(self):
         return dict(
             latencySeconds={k: dict(n=len(v), p50=pct(v, 50), p95=pct(v, 95), p99=pct(v, 99), max=round(max(v), 3)) for k, v in sorted(self.lat.items())},
             outcomes={f'{k}:{o}': n for (k, o), n in sorted(self.count.items())}, admissionRefusals=dict(self.admission), clientRecoveries=dict(self.recovered),
-            unsupported=dict(self.unsupported), expectedRefusals=dict(self.expected_refusals), ticksAdvanced=self.ticks, trades=self.trades, jumps=self.jumps,
+            unsupported=dict(self.unsupported), connectionRetries=dict(self.conn_retries), expectedRefusals=dict(self.expected_refusals), ticksAdvanced=self.ticks, trades=self.trades, jumps=self.jumps,
             requests=self.requests, bytesIn=self.bytes_in, bytesOut=self.bytes_out)
 
 
@@ -69,6 +70,7 @@ class Trader:
         self.think_scale, self.ip = think_scale, ip
         self.headers, self.root, self.method_id = {}, None, None
         self.rng = random.Random(base_seed)
+        self.chart_unsupported = False
         self.trace = []                  # outcome classes, deterministic per (persona, seed)
         self.facts = []
 
@@ -86,7 +88,14 @@ class Trader:
             if body is not None:
                 h['Content-Type'] = 'application/json'
                 self.m.bytes_out += len(body)
-            r = await self.c.request(verb, url, content=body, data=data, headers=h)
+            try:
+                r = await self.c.request(verb, url, content=body, data=data, headers=h)
+            except (httpx.ReadError, httpx.RemoteProtocolError, httpx.ConnectError, httpx.WriteError) as error:
+                self.m.conn_retries[type(error).__name__] += 1          # client recovery (stale keep-alive); same job/command ids make the retry idempotent
+                if attempts <= 3:
+                    await asyncio.sleep(0.2 * attempts)
+                    continue
+                raise
             self.m.requests += 1
             self.m.bytes_in += len(r.content)
             code = None
@@ -315,10 +324,11 @@ class Trader:
         elif which == 'sessions':
             await self.req('sessions.list', 'GET', f'{self.root}/sessions')
         elif which == 'chart':
-            if self.m.unsupported['chart-bars'] < 1:
-                tf = self.rng.choice(['1m', '5m', '15m', '1h', '4h'])
+            tf = self.rng.choice(['1m', '5m', '15m', '1h', '4h'])          # always drawn: the action sequence must not depend on other traders
+            if not self.chart_unsupported:
                 r = await self.req('chart-bars', 'GET', f'{self.root}/sessions/{sid}/chart-bars?timeframe={tf}&limit=512')
                 if r.status_code >= 400:
+                    self.chart_unsupported = True
                     self.m.unsupported['chart-bars'] += 1
             await self.req('view', 'GET', f'{self.root}/sessions/{sid}')
         elif which == 'entitlements':
