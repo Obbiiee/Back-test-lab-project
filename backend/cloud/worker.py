@@ -169,7 +169,7 @@ def _environment(dsn):
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
-                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', *monthly_names,
+                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', 'BTL_TICK_CHECKPOINT_FORMAT', *monthly_names,
                             *catalog_names, *s3_names)}
     if monthly_root is not None:
         environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
@@ -179,6 +179,7 @@ def _environment(dsn):
     require(environment.get('BTL_TICK_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
             'tickStateStorageFormat','REFUSED_STATE_VERSION')
     require(environment.get('BTL_QA_TIMELINE_LOG_CODEC') in (None, 'raw', 'zlib-1'), 'logCodec')
+    require(environment.get('BTL_TICK_CHECKPOINT_FORMAT') in (None, '', 'v1', 'compact-v2'), 'checkpointFormat', 'REFUSED_STATE_VERSION')
     for name in ('BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS'):          # numeric tuning of the replay-run segment length only
         if name in environment:
             try:

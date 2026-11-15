@@ -6,15 +6,25 @@ controller; each forward step streams pages, never copies the entire dataset.
 from copy import deepcopy
 from itertools import groupby, islice, chain
 import json
+import os
 
 from contracts.canonical import _CanonicalArrayAccumulator, canonical_bytes, content_hash
 from contracts.primitives import require
-from .contracts import uint, keys, tag, validate_chunk, CanonicalTick
+from .contracts import uint, keys, tag, validate_chunk, CanonicalTick, TickManifest
 from .provider import Cancellation, validate_provider, empty_diagnostics, diagnostic_counts
 
 
 TIMELINE_VERSION = "BTL-TICK-TIMELINE-1"
+COMPACT_CHECKPOINT = "BTL-TICK-COMPACT-CHECKPOINT-1"          # additive, opt-in (BTL_TICK_CHECKPOINT_FORMAT=compact-v2); the V1 {cursor, advanceTargets} stays readable
 CURSOR_FIELDS="datasetId datasetVersion timelineVersion generation revision sessionStartNs throughNs pendingTargetNs visiblePrefixHash nextGroupIndex lastGroupId"
+
+
+_ACCEPTED_SOURCES = {}          # (datasetId, datasetVersion, manifest hash) -> accepted diagnostic records; process-local, bounded
+
+
+def compact_requested(provider):
+    """New Sessions use the compact (V2) checkpoint only when the operator opted in AND the source can resume by event index. Existing V1 Sessions keep reading as V1."""
+    return os.environ.get("BTL_TICK_CHECKPOINT_FORMAT") == "compact-v2" and getattr(provider, "supports_index_resume", False) is True
 
 
 def make_group(rows, version):
@@ -54,11 +64,23 @@ class TickTimeline:
     seek/resume stream from source; checkpoints store advance acknowledgements,
     not hidden quotes. No caller can advance through the consumer view.
     """
-    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0"):
+    def __init__(self, provider, dataset_id, dataset_version, session_start_ns="0", *, compact=False):
         self.__provider = provider
         diagnostics=[]
-        self.__manifest = validate_provider(provider, dataset_id, dataset_version,
-                                            diagnostic_sink=lambda r:diagnostics.append(canonical_bytes(dict(schemaVersion=1,artifact="BTL-TICK-DIAGNOSTIC-CACHE-1",record=r))))
+        indexed = getattr(provider, "supports_index_resume", False) is True
+        key = (dataset_id, dataset_version, content_hash(provider.describe(dataset_id, dataset_version))) if indexed else None
+        if key is not None and key in _ACCEPTED_SOURCES:
+            # Content-addressed source already accepted in this process: the full offline acceptance scan (O(dataset)) is not repeated per timeline. Integrity is still
+            # enforced on every read (each chunk is validated against the manifest hashes in __rows), so a source whose bytes changed cannot be read.
+            self.__manifest = TickManifest.from_wire(provider.describe(dataset_id, dataset_version), dataset_version)
+            diagnostics = list(_ACCEPTED_SOURCES[key])
+        else:
+            self.__manifest = validate_provider(provider, dataset_id, dataset_version,
+                                                diagnostic_sink=lambda r:diagnostics.append(canonical_bytes(dict(schemaVersion=1,artifact="BTL-TICK-DIAGNOSTIC-CACHE-1",record=r))))
+            if key is not None:
+                if len(_ACCEPTED_SOURCES) >= 8:
+                    _ACCEPTED_SOURCES.pop(next(iter(_ACCEPTED_SOURCES)))
+                _ACCEPTED_SOURCES[key] = tuple(diagnostics)
         self.__diagnostic_records=tuple(diagnostics)
         self.__id, self.__version = dataset_id, dataset_version
         self.__generation = 0
@@ -66,6 +88,10 @@ class TickTimeline:
         self.__start = uint(session_start_ns)
         self.__schedule = []
         self.__cancel_epoch = 0
+        require(not compact or getattr(provider, 'supports_index_resume', False) is True, 'checkpointFormat', 'REFUSED_COMPACT_UNSUPPORTED')
+        self.__compact = compact
+        self.__chain = content_hash(dict(schemaVersion=1, artifact='BTL-TICK-ADVANCE-CHAIN-1', datasetVersion=dataset_version, sessionStartNs=str(self.__start)))
+        self.__advance_count = 0
         self.__initialize()
 
     def __initialize(self):
@@ -82,6 +108,7 @@ class TickTimeline:
                              throughNs=str(self.__start), pendingTargetNs=None, visiblePrefixHash=content_hash(initial),
                              nextGroupIndex="0", lastGroupId=None)
         self.__revealed_diagnostics = set()
+        self.__revealed_events = 0
 
     @property
     def cursor(self):
@@ -97,7 +124,39 @@ class TickTimeline:
             return self.cursor
         return RevealedView(read,cursor)
 
-    def __rows(self):
+    def __chunk_starts(self):
+        starts, total = [], 0
+        for chunk in self.__manifest.wire["chunks"]:
+            starts.append(total)
+            total += chunk["eventCount"]
+        return starts
+
+    def __rows(self, start_event=0):
+        if start_event:
+            # Index resume (compact checkpoint): begin at the manifest chunk that contains the first unrevealed event, validate that whole chunk exactly like a
+            # sequential read, and drop the events that were already revealed. Cost is one chunk plus the manifest, not the revealed history.
+            metadata = self.__manifest.wire["chunks"]
+            starts = self.__chunk_starts()
+            chunk_index = max(i for i, v in enumerate(starts) if v <= start_event)
+            skip, index, buffer = start_event - starts[chunk_index], starts[chunk_index], []
+            while True:
+                page = self.__provider.read_page(self.__id, self.__version, None, 64, start_index=index)
+                tag(page, "BTL-TICK-PAGE-1", "datasetId datasetVersion events diagnostics nextToken endOfDataset")
+                require(type(page["events"]) is list and len(page["events"]) <= 64 and page["datasetId"] == self.__id and page["datasetVersion"] == self.__version, "page", "VERSION_MISMATCH")
+                for row in page["events"]:
+                    buffer.append(row); index += 1
+                    require(chunk_index < len(metadata), "chunk", "EXTRA_EVENT")
+                    if len(buffer) == metadata[chunk_index]["eventCount"]:
+                        chunk = dict(schemaVersion=1, artifact="BTL-TICK-CHUNK-1", datasetId=self.__id, datasetVersion=self.__version, chunkIndex=str(chunk_index), events=buffer)
+                        ticks = validate_chunk(chunk, self.__manifest)
+                        for tick in (ticks[skip:] if skip else ticks):
+                            yield tick.wire
+                        skip, chunk_index, buffer = 0, chunk_index + 1, []
+                if page["endOfDataset"]:
+                    require(not buffer and chunk_index == len(metadata), "chunks", "TRUNCATED_DATASET")
+                    break
+                require(page["events"], "page", "NO_PROGRESS")
+            return
         token, chunk_index, buffer = None, 0, []
         metadata = self.__manifest.wire["chunks"]
         while True:
@@ -123,8 +182,8 @@ class TickTimeline:
             require(page["nextToken"] is not None and page["nextToken"] != token, "token", "NO_PROGRESS")
             token = page["nextToken"]
 
-    def __groups(self):
-        for time, rows in groupby(self.__rows(), lambda r: r["timeNs"]):
+    def __groups(self, start_event=0):
+        for time, rows in groupby(self.__rows(start_event), lambda r: r["timeNs"]):
             collected = []
             for row in rows:
                 collected.append(row)
@@ -247,12 +306,18 @@ class TickTimeline:
             self.__revealed_diagnostics.add((record["sourceId"], record["rawOrdinal"], record["code"]))
         if not noop:
             self.__schedule.append(target_ns)
+            self.__advance_count += 1
+            self.__chain = content_hash(dict(schemaVersion=1, artifact='BTL-TICK-ADVANCE-CHAIN-1', previousHash=self.__chain, targetNs=target_ns))
+            self.__revealed_events += sum(len(g["events"]) for g in groups)
         return deepcopy(result)
 
     def __restore_iterator(self):
-        self.__iterator = self.__groups()
-        for _ in range(int(self.__cursor["nextGroupIndex"])):
-            require(next(self.__iterator, None) is not None, "cursor", "TRUNCATED_DATASET")
+        if self.__compact:
+            self.__iterator = self.__groups(self.__revealed_events)             # position known: no re-walk of the revealed history
+        else:
+            self.__iterator = self.__groups()
+            for _ in range(int(self.__cursor["nextGroupIndex"])):
+                require(next(self.__iterator, None) is not None, "cursor", "TRUNCATED_DATASET")
         self.__pending, self.__has_pending = None, False
 
     def next_group(self, expected_cursor, cancellation=None):
@@ -316,11 +381,34 @@ class TickTimeline:
 
     def checkpoint(self):
         require(self.__active,"timeline","REPLACED_TIMELINE")
+        if self.__compact:
+            return self.compact_checkpoint()
         # Controller-private acknowledgements are not market-consumer data.
         return {"cursor": self.cursor, "advanceTargets": list(self.__schedule)}
 
+    def compact_checkpoint(self):
+        """Constant-size checkpoint: cursor (hash chain head and group index included), the position of the next unrevealed source event, and a commitment to the full
+        advance schedule (count and hash chain) instead of the schedule itself. Nothing needed for audit is dropped: the schedule is reproducible from the committed
+        commands (every ADVANCE target is in tick_commands) and the chain head binds it."""
+        require(self.__active,"timeline","REPLACED_TIMELINE")
+        manifest = self.__manifest.wire
+        return dict(schemaVersion=1, formatVersion=2, artifact=COMPACT_CHECKPOINT,
+                    sourcePin=dict(datasetId=self.__id, datasetVersion=self.__version, manifestHash=content_hash(manifest)),
+                    cursor=self.cursor, eventsRevealed=str(self.__revealed_events), advanceCount=str(self.__advance_count), advanceChainHash=self.__chain)
+
+    def migrate_to_compact(self):
+        """Switch a timeline that was restored from a V1 checkpoint to emit V2 checkpoints from now on (state is already complete: it was rebuilt by the V1 replay)."""
+        require(getattr(self.__provider, 'supports_index_resume', False) is True, 'checkpointFormat', 'REFUSED_COMPACT_UNSUPPORTED')
+        self.__compact = True
+
+    @property
+    def is_compact(self):
+        return self.__compact
+
     @classmethod
     def resume(cls, provider, checkpoint):
+        if type(checkpoint) is dict and checkpoint.get("artifact") == COMPACT_CHECKPOINT:
+            return cls.resume_compact(provider, checkpoint)
         keys(checkpoint, "cursor advanceTargets")
         cursor = checkpoint["cursor"]
         tag(cursor,"BTL-TICK-CURSOR-1",CURSOR_FIELDS)
@@ -333,3 +421,43 @@ class TickTimeline:
             result.advance_through(target, result.cursor)
         require(result.cursor == cursor, "resume", "INVALID_CHECKPOINT")
         return result
+
+    @classmethod
+    def resume_compact(cls, provider, checkpoint):
+        """Resume from a V2 checkpoint WITHOUT replaying the advance history: bind to the pinned source, restore the cursor, start the iterator at the recorded event."""
+        keys(checkpoint, "schemaVersion formatVersion artifact sourcePin cursor eventsRevealed advanceCount advanceChainHash")
+        require(checkpoint["schemaVersion"] == 1 and checkpoint["formatVersion"] == 2 and checkpoint["artifact"] == COMPACT_CHECKPOINT, "checkpoint", "SCHEMA_MISMATCH")
+        cursor, pin = checkpoint["cursor"], checkpoint["sourcePin"]
+        keys(pin, "datasetId datasetVersion manifestHash")
+        tag(cursor, "BTL-TICK-CURSOR-1", CURSOR_FIELDS)
+        require(cursor["artifact"] == "BTL-TICK-CURSOR-1" and cursor["schemaVersion"] == 1 and cursor["timelineVersion"] == TIMELINE_VERSION, "cursor", "SCHEMA_MISMATCH")
+        require((pin["datasetId"], pin["datasetVersion"]) == (cursor["datasetId"], cursor["datasetVersion"]), "sourcePin", "REFUSED_DATASET_VERSION")
+        result = cls(provider, cursor["datasetId"], cursor["datasetVersion"], cursor["sessionStartNs"], compact=True)
+        require(content_hash(result.__manifest.wire) == pin["manifestHash"], "sourcePin", "REFUSED_DATASET_VERSION")        # the source cannot be swapped silently
+        events = uint(checkpoint["eventsRevealed"]); count = uint(checkpoint["advanceCount"])
+        require(events <= sum(c["eventCount"] for c in result.__manifest.wire["chunks"]), "eventsRevealed", "INVALID_CHECKPOINT")
+        require((events == 0) == (cursor["nextGroupIndex"] == "0"), "eventsRevealed", "INVALID_CHECKPOINT")
+        result.__generation = uint(cursor["generation"])
+        result.__initialize()
+        result.__cursor = deepcopy(cursor)
+        result.__revealed_events, result.__advance_count, result.__chain = int(events), int(count), checkpoint["advanceChainHash"]
+        result.__iterator = result.__groups(result.__revealed_events)
+        result.__pending, result.__has_pending = None, False
+        # Position proof: the group that ends just before the recorded event must be exactly the cursor's last revealed group (wrong log/position/source is refused).
+        if events:
+            last = result.__last_revealed_group(events)
+            require(last is not None and last["groupId"] == cursor["lastGroupId"] and last["timeNs"] <= cursor["throughNs"], "position", "INVALID_CHECKPOINT")
+        return result
+
+    def __last_revealed_group(self, events):
+        """The atomic group whose last event is event number `events`-1, rebuilt from validated chunks (same validation and grouping as a sequential read)."""
+        starts = self.__chunk_starts()
+        chunk = max(i for i, v in enumerate(starts) if v <= events - 1)
+        while True:
+            first = starts[chunk]
+            ticks = list(islice(self.__rows(first), events - first)) if first else list(islice(self.__rows(0), events))
+            last_time = ticks[-1]["timeNs"]
+            rows = [r for r in ticks if r["timeNs"] == last_time]
+            if len(rows) < len(ticks) or chunk == 0:
+                return make_group(rows, self.__version)
+            chunk -= 1                                                        # the group may start in an earlier chunk

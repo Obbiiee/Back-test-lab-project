@@ -683,12 +683,17 @@ class MonthlyParquetProvider:
                 "dataset", "VERSION_MISMATCH")
         return deepcopy(self._source_manifest)
 
-    def read_page(self, dataset_id, dataset_version, after_token=None, max_events=64):
+    supports_index_resume = True      # read_page(start_index=...) serves a page starting at a global event index (compact checkpoint resume)
+
+    def read_page(self, dataset_id, dataset_version, after_token=None, max_events=64, *, start_index=None):
         self.describe(dataset_id, dataset_version)
         require(type(max_events) is int and 1 <= max_events <= 64, "max_events", "ARTIFACT_LIMIT")
         require(not self._source_manifest["diagnostics"], "diagnostics", "INCOMPLETE_DIAGNOSTICS")
         start = 0
         token_group = None
+        if start_index is not None:
+            require(after_token is None and type(start_index) is int and 0 <= start_index <= self.manifest["eventCount"], "startIndex", "INVALID_PAGE_TOKEN")
+            start = start_index
         if after_token is not None:
             tag(after_token, "BTL-TICK-PAGE-TOKEN-1", "datasetVersion sourceIndex afterRawOrdinal")
             require(after_token["datasetVersion"] == dataset_version, "token", "VERSION_MISMATCH")

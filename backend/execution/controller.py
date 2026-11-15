@@ -1,7 +1,7 @@
 """Private provider -> timeline acknowledgement -> pure reducer -> durable commit."""
 from contracts.models import MethodPolicy
 from contracts.primitives import require, revision
-from ticks.timeline import TickTimeline
+from ticks.timeline import TickTimeline, compact_requested
 from .contracts import MAX_STEPS, command_wire, seed_state, profile_wire
 from .engine import submit, advance, emit, coverage_complete
 from .next_event import scan_next_group
@@ -24,7 +24,7 @@ class ExecutionController:
         require((profile["providerId"],profile["feedId"],profile["feedInstrumentId"]) ==
                 (manifest["providerId"],manifest["feedId"],manifest["instrumentId"]), "profileFeed")
         start = manifest["range"]["startNs"]
-        timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version, start)
+        timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version, start, compact=compact_requested(provider))
         policy = policy or MethodPolicy("fixture:free", "0"*64, "FREE_STYLE", False, ())
         state = seed_state(session_id, provider.dataset_id, provider.dataset_version, start, profile, policy, balance)
         self.__store.create(scope, state, timeline.checkpoint())
@@ -40,13 +40,13 @@ class ExecutionController:
             if indexed:
                 self.__fixture_cache.validate_checkpoint(checkpoint)
             else:
-                require(len(checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureRecovery", "REFUSED_RECOVERY_LIMIT")
+                require(len(checkpoint.get("advanceTargets", ())) <= MAX_STEPS, "fixtureRecovery", "REFUSED_RECOVERY_LIMIT")      # V2 checkpoints carry no schedule
             next_state, events = submit(state, command)
             replay = None
             next_checkpoint = checkpoint
             if command["kind"] == "ADVANCE":
                 if not indexed:
-                    require(len(checkpoint["advanceTargets"]) < MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
+                    require(len(checkpoint.get("advanceTargets", ())) < MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 if self.__fixture_cache is None:
                     timeline = TickTimeline.resume(self.__provider, checkpoint)
                     ack = timeline.advance_through(command["payload"]["targetNs"], timeline.cursor)
@@ -64,7 +64,7 @@ class ExecutionController:
                 else:
                     ack, next_checkpoint = self.__fixture_cache.reveal(scope, command['sessionId'], checkpoint, command['payload']['targetNs'], seek=True)
                 if not indexed:
-                    require(len(next_checkpoint["advanceTargets"]) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
+                    require(len(next_checkpoint.get("advanceTargets", ())) <= MAX_STEPS, "fixtureSteps", "REFUSED_RECOVERY_LIMIT")
                 next_state["throughNs"] = ack["throughNs"]
                 next_state["nextGroupIndex"] = ack["cursor"]["nextGroupIndex"]
                 emit(next_state, events, "SESSION_SEEK", classification="ACCEPTED_COMMAND", throughNs=ack["throughNs"])

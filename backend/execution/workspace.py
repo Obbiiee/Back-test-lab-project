@@ -12,7 +12,7 @@ from time import perf_counter_ns
 from application.models import TrustedScope
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require, identifier
-from ticks.timeline import TickTimeline
+from ticks.timeline import TickTimeline, compact_requested
 from qa_timing import record_qa_timing
 from .contracts import text, MAX_STEPS
 from .research_fixture import research_provider
@@ -72,12 +72,14 @@ class FixtureTimelineCache:
     def _key(self, scope, session, checkpoint):
         require(type(scope) is TrustedScope, 'scope', 'SCOPE_REQUIRED')
         identifier(session, 'sessionId')
-        require(len(checkpoint['advanceTargets']) <= MAX_STEPS, 'steps', 'REFUSED_RECOVERY_LIMIT')
+        require(len(checkpoint.get('advanceTargets', ())) <= MAX_STEPS, 'steps', 'REFUSED_RECOVERY_LIMIT')
         raw = canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-TIMELINE-CACHE-1','checkpoint':checkpoint})
         return (self.__provider_identity, scope.workspace_id, session,
                 content_hash({'schemaVersion':1,'artifact':'BTL-PRIVATE-CACHE-KEY-1','checkpoint':checkpoint})), raw
 
     def _past(self, timeline):
+        if callable(getattr(self.__provider, 'read_revealed_window', None)):
+            return ()                      # the display window is served by the provider (indexed, verified row groups); no O(history) rebuild
         started = perf_counter_ns()
         consumer = timeline.consumer()
         end = int(consumer.cursor['nextGroupIndex'])
@@ -156,6 +158,11 @@ class FixtureTimelineCache:
                 if gate.users == 0 and _FIXTURE_RESTORE_GATES.get(key) is gate:
                     del _FIXTURE_RESTORE_GATES[key]
 
+    def _migrate(self, timeline):
+        """A Session restored from a V1 checkpoint starts emitting V2 checkpoints at its next accepted step when the operator opted in (V1 rows stay untouched)."""
+        if not timeline.is_compact and compact_requested(self.__provider):
+            timeline.migrate_to_compact()
+
     def seed(self, scope, session, timeline):
         # Called only after the actual seed transaction commits.
         groups = self._past(timeline)
@@ -186,6 +193,7 @@ class FixtureTimelineCache:
             groups = self._past(timeline)
         else:
             ack = timeline.advance_through(target, timeline.cursor)
+            self._migrate(timeline)
             groups = entry.groups + tuple(canonical_bytes({'schemaVersion':1,'artifact':'BTL-PRIVATE-PAST-GROUP-1','group':group}) for group in ack['groups'])
         with self.__lock:
             self._publish(scope, session, timeline, groups)
@@ -195,6 +203,7 @@ class FixtureTimelineCache:
         """Read one bounded controller-private page without changing the accepted cache tip."""
         key, entry = self._entry(scope, session, checkpoint, take=True)
         ack = entry.timeline.advance_through(target, entry.timeline.cursor, stop_when=stop_when)
+        self._migrate(entry.timeline)
         next_checkpoint = entry.timeline.checkpoint()
         if ack['targetNs'] == entry.timeline.cursor['throughNs']:
             token = (key, ack['targetNs'])

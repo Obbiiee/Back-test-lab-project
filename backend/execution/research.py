@@ -12,7 +12,7 @@ from contracts.canonical import content_hash, canonical_bytes
 from contracts.models import MethodPolicy, Command, SessionContext, Observation, validate_command
 from contracts.primitives import require, identifier, revision, digest
 from ticks.contracts import keys, tag, TickManifest
-from ticks.timeline import TickTimeline
+from ticks.timeline import TickTimeline, compact_requested
 from infrastructure.database import connect
 from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity, MAX_ORDERS
 from .controller import ExecutionController
@@ -387,7 +387,7 @@ class ResearchApplication:
                     require(prior[0] == sha, "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
                     self._session(db,raw["id"])
                 else:
-                    timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(start))
+                    timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(start), compact=compact_requested(self.__provider))
                     timeline.seek(str(warmup))
                     state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])
                     self.store._insert(db,self.scope,state,timeline.checkpoint())

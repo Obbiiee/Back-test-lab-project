@@ -263,5 +263,23 @@ class DurableRun(unittest.TestCase):
         self.assertEqual(ok.status_code, 202, ok.text)
 
 
+@unittest.skipUnless(DSN, 'Real isolated PostgreSQL required; skip is not PASS')
+class DurableRunCompactCheckpoint(DurableRun):
+    """The same durable-run guarantees with new Sessions on the compact (V2) checkpoint."""
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.pins = {**cls.pins, 'BTL_TICK_CHECKPOINT_FORMAT': 'compact-v2'}
+
+    def test_sessions_really_use_the_v2_checkpoint(self):
+        sid = self.new_session()
+        with connect(self.dsn) as db:
+            row = db.execute("SELECT payload,content_hash FROM btl.tick_checkpoints WHERE session_id=%s ORDER BY revision DESC LIMIT 1", (sid,)).fetchone()
+        from execution.postgres import unpack
+        controller = unpack(*row)["controller"]
+        self.assertEqual(controller["artifact"], "BTL-TICK-COMPACT-CHECKPOINT-1")
+        self.assertNotIn("advanceTargets", controller)
+
+
 if __name__ == "__main__":
     unittest.main()
