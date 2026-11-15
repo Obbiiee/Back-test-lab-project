@@ -11,6 +11,7 @@ import os
 from contracts.canonical import _CanonicalArrayAccumulator, canonical_bytes, content_hash
 from contracts.primitives import require
 from .contracts import uint, keys, tag, validate_chunk, CanonicalTick, TickManifest
+from . import source_acceptance
 from .provider import Cancellation, validate_provider, empty_diagnostics, diagnostic_counts
 
 
@@ -74,6 +75,13 @@ class TickTimeline:
             # enforced on every read (each chunk is validated against the manifest hashes in __rows), so a source whose bytes changed cannot be read.
             self.__manifest = TickManifest.from_wire(provider.describe(dataset_id, dataset_version), dataset_version)
             diagnostics = list(_ACCEPTED_SOURCES[key])
+        elif key is not None and source_acceptance.directory() is not None:
+            # Admitted offline (see ticks/source_acceptance.py): check the record against the pinned manifest hash instead of re-scanning the whole source in a request.
+            diagnostics = list(source_acceptance.load(source_acceptance.directory(), dataset_id, dataset_version, key[2]))
+            self.__manifest = TickManifest.from_wire(provider.describe(dataset_id, dataset_version), dataset_version)
+            if len(_ACCEPTED_SOURCES) >= 8:
+                _ACCEPTED_SOURCES.pop(next(iter(_ACCEPTED_SOURCES)))
+            _ACCEPTED_SOURCES[key] = tuple(diagnostics)
         else:
             self.__manifest = validate_provider(provider, dataset_id, dataset_version,
                                                 diagnostic_sink=lambda r:diagnostics.append(canonical_bytes(dict(schemaVersion=1,artifact="BTL-TICK-DIAGNOSTIC-CACHE-1",record=r))))

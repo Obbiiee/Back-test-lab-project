@@ -150,5 +150,45 @@ class Migration(unittest.TestCase):
         self.assertEqual(len(s_cps), len(c_cps))
 
 
+    def test_a_rewritten_checkpoint_pointing_at_the_wrong_position_is_refused_and_changes_nothing(self):
+        from contracts.primitives import ContractError
+        from execution.postgres import pack
+        os.environ["BTL_TICK_CHECKPOINT_FORMAT"] = "compact-v2"
+        try:
+            sid = "session:" + uuid.uuid4().hex
+            app = self.app()
+            app.create_session(dict(id=sid, name="tamper", methodId=self.method["id"], initialBalance="10000", startPeriod="2020-01"))
+            st = app.summary(sid)
+            app.apply(sid, cmd(sid, st, "ADVANCE", {"targetNs": self.manifest["range"]["startNs"]}))
+            self.advance(app, sid, 3)
+            app.close()
+            with connect(self.dsn) as db:
+                revision, payload, sha = db.execute("SELECT revision,payload,content_hash FROM btl.tick_checkpoints WHERE session_id=%s ORDER BY revision DESC LIMIT 1", (sid,)).fetchone()
+            wire = unpack(payload, sha)
+            controller = wire["controller"]
+            self.assertEqual(controller["artifact"], "BTL-TICK-COMPACT-CHECKPOINT-1")
+            before = self.rows(sid)
+            for change in (dict(eventsRevealed=str(int(controller["eventsRevealed"]) + 1)), dict(sourcePin=dict(controller["sourcePin"], manifestHash="1" * 64))):
+                forged = dict(wire, controller=dict(controller, **change))
+                raw, digest = pack(forged)
+                with connect(self.dsn) as db:
+                    db.execute("ALTER TABLE btl.tick_checkpoints DISABLE TRIGGER USER")
+                    db.execute("UPDATE btl.tick_checkpoints SET payload=%s, content_hash=%s WHERE session_id=%s AND revision=%s", (raw, digest, sid, revision))
+                    db.execute("ALTER TABLE btl.tick_checkpoints ENABLE TRIGGER USER")
+                app = self.app()
+                try:
+                    with self.assertRaises(ContractError, msg=str(change)):
+                        self.advance(app, sid, 1)
+                finally:
+                    app.close()
+                self.assertEqual(self.rows(sid)[1:], before[1:], "no command, event or receipt was written")
+                with connect(self.dsn) as db:                                       # restore the genuine row for the next forgery
+                    db.execute("ALTER TABLE btl.tick_checkpoints DISABLE TRIGGER USER")
+                    db.execute("UPDATE btl.tick_checkpoints SET payload=%s, content_hash=%s WHERE session_id=%s AND revision=%s", (payload, sha, sid, revision))
+                    db.execute("ALTER TABLE btl.tick_checkpoints ENABLE TRIGGER USER")
+        finally:
+            os.environ.pop("BTL_TICK_CHECKPOINT_FORMAT", None)
+
+
 if __name__ == "__main__":
     unittest.main()

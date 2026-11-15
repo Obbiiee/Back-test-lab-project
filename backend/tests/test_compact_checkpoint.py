@@ -143,5 +143,33 @@ class RefusalsSizeAndCost(unittest.TestCase):
         self.assertEqual(TickTimeline.resume(self.provider, cp2).cursor, v1.cursor)
 
 
+class SourceAdmission(unittest.TestCase):
+    def test_admitted_source_skips_the_scan_missing_or_forged_record_is_refused(self):
+        from ticks import source_acceptance, timeline as tl
+        provider, tmp, manifest = build(TICKS)
+        self.addCleanup(tmp.cleanup)
+        folder = os.path.join(tmp.name, "accepted")
+        key_hash = content_hash(provider.describe(provider.dataset_id, provider.dataset_version))
+        with patch.dict(os.environ, {"BTL_SOURCE_ACCEPTANCE_DIR": folder}):
+            tl._ACCEPTED_SOURCES.clear()
+            with self.assertRaises(ContractError) as missing:                          # directory configured, source never admitted: fail closed, no scan in a request
+                TickTimeline(provider, provider.dataset_id, provider.dataset_version, manifest["range"]["startNs"], compact=True)
+            self.assertEqual(missing.exception.code, "REFUSED_SOURCE_NOT_ADMITTED")
+            record = source_acceptance.accept_offline(provider, provider.dataset_id, provider.dataset_version, folder)
+            self.assertEqual(record["manifestHash"], key_hash)
+            tl._ACCEPTED_SOURCES.clear()
+            with patch("ticks.timeline.validate_provider", side_effect=AssertionError("full scan must not run")):
+                t0 = time.perf_counter()
+                timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version, manifest["range"]["startNs"], compact=True)
+                self.assertLess(time.perf_counter() - t0, 1.0)
+                timeline.advance_through(str(int(manifest["range"]["startNs"]) + 10 * 60_000_000_000), timeline.cursor)   # reads still validate chunks
+            path = source_acceptance._path(folder, key_hash)
+            forged = json.loads(path.read_text()); forged["diagnostics"] = ["x"]
+            path.write_text(json.dumps(forged))
+            tl._ACCEPTED_SOURCES.clear()
+            with self.assertRaises(ContractError):
+                TickTimeline(provider, provider.dataset_id, provider.dataset_version, manifest["range"]["startNs"], compact=True)
+
+
 if __name__ == "__main__":
     unittest.main()

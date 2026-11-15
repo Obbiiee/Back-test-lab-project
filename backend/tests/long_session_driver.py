@@ -93,6 +93,12 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False, 
                 root = os.path.join(tmp, 'monthly')
                 parquet = write_monthly_parquet(root, iter_events(ticks, manifest), manifest, expected_version=version, row_group_size=8192 if ticks > 8192 else 128)
                 result['sourceBuildSeconds'] = round(time.monotonic() - t0, 2)
+                if os.environ.get('BTL_ADMIT_SOURCES') == '1':          # offline source admission (the full acceptance scan, once, outside any request deadline)
+                    from market_data.monthly_parquet import MonthlyParquetProvider
+                    from ticks import source_acceptance
+                    adm = os.path.join(tmp, 'accepted'); os.environ['BTL_SOURCE_ACCEPTANCE_DIR'] = adm
+                    prov = MonthlyParquetProvider(root, expected_dataset_id=manifest['datasetId'], expected_dataset_version=version, expected_manifest_hash=parquet['manifestHash'])
+                    ta = time.monotonic(); source_acceptance.accept_offline(prov, manifest['datasetId'], version, adm); result['sourceAdmissionSeconds'] = round(time.monotonic() - ta, 1)
                 pins = {'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1', 'BTL_QA_SYNTHETIC_MONTHLY_ROOT': root, 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': manifest['datasetId'],
                         'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': version, 'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': parquet['manifestHash'], 'BTL_TICK_SESSION_STORAGE_FORMAT': 'compact-v1'}
                 with patch.dict(os.environ, pins):
