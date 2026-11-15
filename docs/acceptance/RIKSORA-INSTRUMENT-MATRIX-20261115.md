@@ -40,3 +40,6 @@ Consequences kept explicit: no real-data scenario beyond the already authorised 
 | Beta C | 2024-01..2026-10 | 16 | 544 | UNKNOWN | 15 missing | possible after licence and specifications |
 | Beta D | 2024-01..2025-10 or longer | XAUUSD only (observed profile exists; Dukascopy source, personal-use text) | 22 to 34 | UNKNOWN, adverse text | profile exists | smallest gap but depends on a Dukascopy written agreement |
 | Beta E | any | the 15 HistData pairs | 22 to 34 each | UNKNOWN, silent terms | 15 missing | depends on the HistData operator's written answer |
+
+## 7. Beta option for approval (separate from the original target)
+Original target 2023-01..2025-10 is kept unchanged. A separate Beta option, 2024-01..2025-10, covers 352 of the 544 original instrument-months (22 months x 16) with verified tick data; it is not in effect until the owner approves it, and every month still fails the data-rights gate (UNKNOWN) and the 15-profile gate. No real source is used for commercial acceptance.

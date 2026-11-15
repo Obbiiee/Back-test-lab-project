@@ -1,0 +1,32 @@
+{
+ "ticks": 16384,
+ "sourceBuildSeconds": 6.38,
+ "stoppedBy": {
+  "state": "RECONCILE_REQUIRED",
+  "detail": "{'attempt': 1, 'cancellation': 'NOT_REQUESTED', 'heartbeatAt': None, 'jobId': '9bc54718-d9f8-5972-ac21-d6d0a078f354', 'result': None, 'schemaVersion': 1, 'state': 'RECONCILE_REQUIRED'}"
+ },
+ "mode": "run",
+ "segments": 1,
+ "chunks": 200,
+ "runWallSeconds": 15.0,
+ "segmentSeconds": {
+  "p50": 12.14,
+  "max": 12.14
+ },
+ "workerCpuSeconds": -8.4,
+ "workerPeakRssMb": 0.0,
+ "reachedTarget": false,
+ "parentCpuSeconds": 0.7,
+ "setupSeconds": 8.9,
+ "wallSeconds": 23.9,
+ "db": {
+  "dbBytes": 1835008,
+  "walBytes": 1374864,
+  "checkpointRows": 257,
+  "checkpointMaxBytes": 7130,
+  "checkpointTotalBytes": 1108889,
+  "eventRows": 1,
+  "eventBytes": 986,
+  "commandRows": 256
+ }
+}

@@ -1,0 +1,48 @@
+{
+ "ticks": 8192,
+ "sourceBuildSeconds": 2.81,
+ "mode": "run",
+ "segments": 1,
+ "chunks": 128,
+ "runWallSeconds": 7.9,
+ "segmentSeconds": {
+  "p50": 7.85,
+  "max": 7.85
+ },
+ "workerCpuSeconds": 6.2,
+ "workerPeakRssMb": 135.1,
+ "reachedTarget": true,
+ "parentCpuSeconds": 0.3,
+ "setupSeconds": 4.5,
+ "wallSeconds": 12.4,
+ "db": {
+  "dbBytes": 1261568,
+  "walBytes": 651440,
+  "checkpointRows": 131,
+  "checkpointMaxBytes": 4536,
+  "checkpointTotalBytes": 383995,
+  "eventRows": 3,
+  "eventBytes": 5162,
+  "commandRows": 130
+ },
+ "facts": {
+  "through": "1580833860000000000",
+  "balance": "10000.7",
+  "trades": 1,
+  "net": "0.7",
+  "orders": [
+   [
+    "CLOSED",
+    "1998.9",
+    "1999.6",
+    "0.7"
+   ]
+  ]
+ },
+ "control": {
+  "seconds": 14.0,
+  "chunks": 128,
+  "equal": true,
+  "revisionEqual": true
+ }
+}

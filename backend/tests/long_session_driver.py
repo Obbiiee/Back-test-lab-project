@@ -43,7 +43,26 @@ def db_numbers(dsn):
     return dict(dbBytes=size, walBytes=wal, checkpointRows=ck[0], checkpointMaxBytes=ck[1], checkpointTotalBytes=ck[2], eventRows=ev[0], eventBytes=ev[1], commandRows=cm)
 
 
-def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False):
+def worker_children():
+    """(cpu seconds, peak RSS MiB) summed over the live native worker slot processes (QA measurement only)."""
+    from cloud import worker
+    cpu, rss, tick = 0.0, 0.0, os.sysconf('SC_CLK_TCK')
+    for slot in worker._slots:
+        proc = getattr(slot, 'process', None)
+        if proc is None or proc.poll() is not None:
+            continue
+        try:
+            stat = open(f'/proc/{proc.pid}/stat').read(); f = stat[stat.rfind(')') + 2:].split()
+            cpu += (int(f[11]) + int(f[12])) / tick
+            for line in open(f'/proc/{proc.pid}/status'):
+                if line.startswith('VmHWM'):
+                    rss = max(rss, int(line.split()[1]) / 1024)
+        except OSError:
+            pass
+    return cpu, rss
+
+
+def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False, mode='chunk-jobs'):
     import functools; log = functools.partial(print, file=__import__('sys').stderr)
     import tests.test_cloud_research as cloud_fixture
     from cloud import worker
@@ -72,7 +91,19 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False):
                     assert client.post(path + '/methods', headers=headers, json=record).status_code == 200
                     before = db_numbers(dsn)
                     cpu0, wall0 = time.process_time(), time.monotonic()
-                    sid = 'session:' + uuid.uuid4().hex
+                    def make_session():
+                        sid_ = 'session:' + uuid.uuid4().hex
+                        assert work(post_job('/sessions', {'id': sid_, 'name': 'long', 'methodId': record['id'], 'initialBalance': '10000', 'startPeriod': '2020-01'}))['state'] == 'SUCCEEDED'
+                        st_ = client.get(path + '/sessions/' + sid_ + '/summary', headers=headers).json()
+                        c_ = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1', 'sessionId': sid_, 'commandId': 'command:' + uuid.uuid4().hex, 'expectedRevision': st_['revision'], 'kind': 'ADVANCE', 'payload': {'targetNs': manifest['range']['startNs']}}
+                        assert work(post_job('/sessions/' + sid_ + '/commands', c_))['state'] == 'SUCCEEDED'
+                        v_ = client.get(path + '/sessions/' + sid_, headers=headers).json()
+                        r_ = dict(sessionId=sid_, requestId='order:' + uuid.uuid4().hex, expectedRevision=v_['state']['revision'], planId='plan:' + uuid.uuid4().hex, planRevision=0,
+                                  draft=dict(side='LONG', orderType='LIMIT', workflow='PLANNED', entry='1998.90', quantity='0.01', sl='1998.00', tp='1999.50', riskPercent='1', observations=[]))
+                        rv_ = client.post(path + '/reviews', headers=headers, json=r_)
+                        assert rv_.status_code == 200, rv_.text
+                        assert client.post(path + '/sessions/' + sid_ + '/confirm', headers=headers, json={'reviewId': r_['requestId'], 'reviewHash': rv_.json()['reviewHash']}).status_code == 200
+                        return sid_
 
                     phases = {'submit': 0.0, 'work': 0.0, 'jobget': 0.0, 'summary': 0.0}
 
@@ -92,22 +123,59 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False):
                         assert queued.status_code == 202, queued.text
                         return job_id
 
-                    job = work(post_job('/sessions', {'id': sid, 'name': 'long', 'methodId': record['id'], 'initialBalance': '10000', 'startPeriod': '2020-01'}))
-                    assert job['state'] == 'SUCCEEDED', job
-                    view = client.get(path + '/sessions/' + sid, headers=headers).json()
-                    start_ns = manifest['range']['startNs']
-                    cmd = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1', 'sessionId': sid, 'commandId': 'command:' + uuid.uuid4().hex,
-                           'expectedRevision': view['state']['revision'], 'kind': 'ADVANCE', 'payload': {'targetNs': start_ns}}
-                    job = work(post_job('/sessions/' + sid + '/commands', cmd))
-                    assert job['state'] == 'SUCCEEDED', job
-                    view = client.get(path + '/sessions/' + sid, headers=headers).json()
-                    review = dict(sessionId=sid, requestId='order:' + uuid.uuid4().hex, expectedRevision=view['state']['revision'], planId='plan:' + uuid.uuid4().hex, planRevision=0,
-                                  draft=dict(side='LONG', orderType='LIMIT', workflow='PLANNED', entry='1998.90', quantity='0.01', sl='1998.00', tp='1999.50', riskPercent='1', observations=[]))
-                    reviewed = client.post(path + '/reviews', headers=headers, json=review)
-                    assert reviewed.status_code == 200, reviewed.text
-                    assert client.post(path + '/sessions/' + sid + '/confirm', headers=headers, json={'reviewId': review['requestId'], 'reviewHash': reviewed.json()['reviewHash']}).status_code == 200
+                    sid = make_session()
                     target = str(int(manifest['range']['endNs']) - 1)
                     jobs, job_seconds, refusals = 0, [], {}
+                    if mode == 'run':                            # ONE request; the queue chains the segments
+                        from execution import replay_run as rr
+                        cpu_w0, _r0 = worker_children()
+                        progress = client.get(path + '/sessions/' + sid + '/summary', headers=headers).json()
+                        request = dict(schemaVersion=1, artifact=rr.REQUEST_ARTIFACT, runId=uuid.uuid4().hex, segment=0, sessionId=sid, expectedRevision=progress['revision'], targetNs=target)
+                        t_run = time.monotonic()
+                        job = post_job('/sessions/' + sid + '/replay-run', request)
+                        segments = []
+                        while True:
+                            t = time.monotonic()
+                            done = work(job)
+                            if done['state'] != 'SUCCEEDED':
+                                result['stoppedBy'] = dict(state=done['state'], detail=str(done)[:500]); break
+                            segments.append(dict(seconds=round(time.monotonic() - t, 2), chunks=done['result']['chunks'], through=done['result']['throughNs']))
+                            if time.monotonic() - t_run > deadline_s:
+                                result['stoppedBy'] = 'DEADLINE'; break
+                            if not done['result'].get('continuationJobId'):
+                                break
+                            job = done['result']['continuationJobId']
+                        cpu_w1, rss_w = worker_children()
+                        final = client.get(path + '/sessions/' + sid + '/summary', headers=headers).json()
+                        result.update(mode='run', segments=len(segments), chunks=sum(x['chunks'] for x in segments), runWallSeconds=round(time.monotonic() - t_run, 1),
+                                      segmentSeconds=dict(p50=sorted(x['seconds'] for x in segments)[len(segments) // 2], max=max(x['seconds'] for x in segments)) if segments else None,
+                                      workerCpuSeconds=round(cpu_w1 - cpu_w0, 1), workerPeakRssMb=round(rss_w, 1), reachedTarget=int(final['throughNs']) >= int(target),
+                                      parentCpuSeconds=round(time.process_time() - cpu0, 1), setupSeconds=round(t_run - wall0, 1), wallSeconds=round(time.monotonic() - wall0, 1))
+                        after = db_numbers(dsn)
+                        result['db'] = {k: after[k] - before[k] if k in ('dbBytes', 'walBytes') else after[k] for k in after}
+                        if result['reachedTarget']:
+                            journal = client.get(path + '/sessions/' + sid + '/journal', headers=headers).json()
+                            result['facts'] = dict(through=final['throughNs'], balance=final['balance'], trades=final['completedTrades'], net=final['netCashChange'],
+                                                   orders=[(o['status'], o.get('entryPrice'), o.get('exitPrice'), o.get('net')) for o in journal['orders']])
+                            # chronological control: same source, same action sequence, ordinary one-chunk ADVANCE commands in one hot process
+                            from cloud.research import _synthetic_monthly_provider
+                            from application.models import TrustedScope
+                            from execution.research import ResearchApplication
+                            cid = make_session()
+                            capp = ResearchApplication(dsn, TrustedScope(str(fixture.workspace), str(fixture.actor)), synthetic_provider=_synthetic_monthly_provider(), state_storage_format='compact-v1')
+                            t_c = time.monotonic(); chunks_c = 0
+                            while True:
+                                st = capp.summary(cid)
+                                if int(st['throughNs']) >= int(target):
+                                    break
+                                capp.apply(cid, {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1', 'sessionId': cid, 'commandId': 'command:' + uuid.uuid4().hex,
+                                                 'expectedRevision': st['revision'], 'kind': 'ADVANCE', 'payload': {'targetNs': target}}); chunks_c += 1
+                            cs = client.get(path + '/sessions/' + cid + '/summary', headers=headers).json()
+                            cj = client.get(path + '/sessions/' + cid + '/journal', headers=headers).json()
+                            ctrl = dict(through=cs['throughNs'], balance=cs['balance'], trades=cs['completedTrades'], net=cs['netCashChange'],
+                                        orders=[(o['status'], o.get('entryPrice'), o.get('exitPrice'), o.get('net')) for o in cj['orders']])
+                            result['control'] = dict(seconds=round(time.monotonic() - t_c, 1), chunks=chunks_c, equal=ctrl == result['facts'], revisionEqual=cs['revision'] == final['revision'])
+                        return result
                     if direct:                                   # engine + durable commit only: no HTTP, no queue, no native worker (diagnosis)
                         from cloud.research import run as research_run, _synthetic_monthly_provider
                         from application.models import TrustedScope
@@ -158,9 +226,9 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False):
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(); ap.add_argument('--ticks', type=int, required=True); ap.add_argument('--out'); ap.add_argument('--max-jobs', type=int, default=4000); ap.add_argument('--direct', action='store_true')
+    ap = argparse.ArgumentParser(); ap.add_argument('--ticks', type=int, required=True); ap.add_argument('--out'); ap.add_argument('--max-jobs', type=int, default=4000); ap.add_argument('--direct', action='store_true'); ap.add_argument('--mode', default='chunk-jobs', choices=('chunk-jobs', 'run'))
     args = ap.parse_args()
-    out = run_tier(args.ticks, max_jobs=args.max_jobs, direct=args.direct)
+    out = run_tier(args.ticks, max_jobs=args.max_jobs, direct=args.direct, mode=args.mode)
     print(json.dumps(out, indent=1, default=str))
     if args.out:
         open(args.out, 'w').write(json.dumps(out, indent=1, default=str))
