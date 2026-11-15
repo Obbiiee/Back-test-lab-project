@@ -43,6 +43,16 @@ def db_numbers(dsn):
     return dict(dbBytes=size, walBytes=wal, checkpointRows=ck[0], checkpointMaxBytes=ck[1], checkpointTotalBytes=ck[2], eventRows=ev[0], eventBytes=ev[1], commandRows=cm)
 
 
+def normalised_events(dsn, sid):
+    import re
+    from execution.postgres import unpack
+    with psycopg.connect(dsn) as db:
+        raw = [unpack(p, h) for p, h in db.execute("SELECT payload,content_hash FROM btl.tick_events WHERE session_id=%s ORDER BY sequence", (sid,)).fetchall()]
+    text = json.dumps(raw, sort_keys=True); seen = {}
+    text = re.sub(r"(?:session|order|command|c|jump):[0-9a-f]{32}", lambda m: seen.setdefault(m.group(0), "ID%d" % len(seen)), text)
+    return re.sub(r"[0-9a-f]{64}", "H", text)
+
+
 def worker_children():
     """(cpu seconds, peak RSS MiB) summed over the live native worker slot processes (QA measurement only)."""
     from cloud import worker
@@ -132,8 +142,11 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False, 
                         progress = client.get(path + '/sessions/' + sid + '/summary', headers=headers).json()
                         request = dict(schemaVersion=1, artifact=rr.REQUEST_ARTIFACT, runId=uuid.uuid4().hex, segment=0, sessionId=sid, expectedRevision=progress['revision'], targetNs=target)
                         t_run = time.monotonic()
+                        start_ns = int(manifest['range']['startNs'])
+                        mid = str(start_ns + int((int(target) - start_ns) * 0.6))
+                        request['targetNs'] = mid                    # phase 1: up to 60 %, then a cold restart, then the rest
                         job = post_job('/sessions/' + sid + '/replay-run', request)
-                        segments = []
+                        segments, phase2 = [], False
                         while True:
                             t = time.monotonic()
                             done = work(job)
@@ -143,7 +156,27 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False, 
                             if time.monotonic() - t_run > deadline_s:
                                 result['stoppedBy'] = 'DEADLINE'; break
                             if not done['result'].get('continuationJobId'):
-                                break
+                                if phase2 or done['result']['targetReached'] is False or int(done['result']['throughNs']) >= int(target):
+                                    break
+                                # cold restart: the native worker processes (and their timeline caches) are killed; the next segment must rebuild from PostgreSQL only
+                                cpu_mid, _r = worker_children()
+                                from cloud import worker as _w
+                                _w.close()
+                                phase2 = True
+                                progress = client.get(path + '/sessions/' + sid + '/summary', headers=headers).json()
+                                request = dict(schemaVersion=1, artifact=rr.REQUEST_ARTIFACT, runId=uuid.uuid4().hex, segment=0, sessionId=sid, expectedRevision=progress['revision'], targetNs=target)
+                                t_cold = time.monotonic()
+                                job = post_job('/sessions/' + sid + '/replay-run', request)
+                                done2 = work(job)
+                                result['coldRestart'] = dict(firstSegmentSeconds=round(time.monotonic() - t_cold, 2), chunks=done2['result']['chunks'], state=done2['state'],
+                                                             steadySecondsPerChunk=round(sorted(x['seconds'] / max(1, x['chunks']) for x in segments)[len(segments) // 2], 3) if segments else None)
+                                if done2['state'] != 'SUCCEEDED':
+                                    result['stoppedBy'] = dict(state=done2['state'], detail=str(done2)[:400]); break
+                                segments.append(dict(seconds=round(time.monotonic() - t_cold, 2), chunks=done2['result']['chunks'], through=done2['result']['throughNs']))
+                                if not done2['result'].get('continuationJobId'):
+                                    break
+                                job = done2['result']['continuationJobId']
+                                continue
                             job = done['result']['continuationJobId']
                         cpu_w1, rss_w = worker_children()
                         final = client.get(path + '/sessions/' + sid + '/summary', headers=headers).json()
@@ -174,7 +207,7 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False, 
                             cj = client.get(path + '/sessions/' + cid + '/journal', headers=headers).json()
                             ctrl = dict(through=cs['throughNs'], balance=cs['balance'], trades=cs['completedTrades'], net=cs['netCashChange'],
                                         orders=[(o['status'], o.get('entryPrice'), o.get('exitPrice'), o.get('net')) for o in cj['orders']])
-                            result['control'] = dict(seconds=round(time.monotonic() - t_c, 1), chunks=chunks_c, equal=ctrl == result['facts'], revisionEqual=cs['revision'] == final['revision'])
+                            result['control'] = dict(seconds=round(time.monotonic() - t_c, 1), chunks=chunks_c, equal=ctrl == result['facts'], revisionEqual=cs['revision'] == final['revision'], eventsEqual=normalised_events(dsn, cid) == normalised_events(dsn, sid))
                         return result
                     if direct:                                   # engine + durable commit only: no HTTP, no queue, no native worker (diagnosis)
                         from cloud.research import run as research_run, _synthetic_monthly_provider
