@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "artifact": "RIKSORA-PRIVATE-SYNTHETIC-BROWSER-GATE-1",
+  "status": "PASS",
+  "classification": "SYNTHETIC_QA_NOT_HISTORICAL_OR_PRODUCTION_ACCEPTANCE",
+  "steps": [],
+  "progress": [],
+  "cohortSize": 20,
+  "capacityTest": true,
+  "authIpRateLimit": 1200,
+  "certificate": "LOCAL_SELF_SIGNED_VERIFICATION_BYPASSED",
+  "apiTransport": "UNCHANGED_REAL_BACKEND_RESPONSES_FORWARDED",
+  "cleanup": true,
+  "qaHarnessSha256": "312b117f8a02a1278128eac10b060bd7080deb474ef98171df42aee33ee4d611",
+  "playwrightVersion": "1.64.1",
+  "frontendInputSha256": "6eaa99b4f38023a47ae80533aa6e89689c13ccc5b892e807de296cda5341bf96",
+  "buildSha256": "edb606871bb42769962d0bab3afb31e1dd1db5ec340e628da04b28411d365db1",
+  "sourceCommit": "9bc2d186b170ac7a015ded1b2bc740d8b5ffe0ce",
+  "workingTreeDirty": true,
+  "workerCount": 4,
+  "runtimeMethodProjectionSelect": true,
+  "qaTimingEnabled": true,
+  "syntheticFixture": {
+    "label": "Synthetic/Test \u2014 authored deterministic ticks; not market history",
+    "datasetId": "synthetic:local-alpha-v1",
+    "datasetVersion": "e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32",
+    "sourceManifestSha256": "e39482a3a1325ecf8aaee8c787f9cf4e996c30be068616bfecd8f6e15bfabc32",
+    "canonicalTickRows": 2048,
+    "canonicalTickRowsSha256": "5d2eefc52ceb9b613be7de7a11749dd479be267927268035fe991282699e1fad",
+    "parquetManifestSha256": "8986f66ab61d1527a7fb37774e2d031ce3bc7faab62c7b3c63a5e180990b323c",
+    "parquetBytes": 202132
+  },
+  "workerPool": {
+    "queueWorkers": 4,
+    "nativeSlots": 4,
+    "exchangeThreads": 4
+  },
+  "postgresWalBytesDuringMeasurement": 4137704,
+  "capacity": {
+    "budget": "5cpu14g (owner addendum 2026-11-14)",
+    "cpuByRole": {
+      "api_process": {
+        "avgCores": 0.143,
+        "p95Cores": 0.237,
+        "maxCores": 0.356,
+        "peakRssMb": 173.4,
+        "maxProcesses": 1,
+        "samples": 399
+      },
+      "load_driver": {
+        "avgCores": 0.002,
+        "p95Cores": 0.01,
+        "maxCores": 0.02,
+        "peakRssMb": 30.2,
+        "maxProcesses": 1,
+        "samples": 399
+      },
+      "native_worker": {
+        "avgCores": 0.083,
+        "p95Cores": 0.693,
+        "maxCores": 1.426,
+        "peakRssMb": 275.5,
+        "maxProcesses": 2,
+        "samples": 399
+      },
+      "postgres": {
+        "avgCores": 0.015,
+        "p95Cores": 0.03,
+        "maxCores": 0.04,
+        "peakRssMb": 158.9,
+        "maxProcesses": 12,
+        "samples": 399
+      }
+    },
+    "driverProcess": {
+      "cpuSeconds": 0.95
+    },
+    "chartServiceProcess": {},
+    "processCpu": {
+      "service": {
+        "cpuSeconds": 91.37,
+        "coresAverage": 0.226
+      },
+      "postgres": {
+        "cpuSeconds": 6.06,
+        "coresAverage": 0.015
+      },
+      "generator": {
+        "cpuSeconds": 0.0,
+        "coresAverage": 0.0
+      },
+      "note": "service = API + in-process queue workers (one OS process); generator = HTTP driver; CPU of exited processes is not included"
+    },
+    "measuredSeconds": 405.1,
+    "measurementKind": "HTTP_DRIVER_NO_BROWSER_SYNTHETIC",
+    "cohortSize": 20,
+    "stopReason": null,
+    "driver": {
+      "status": "DONE",
+      "model": "OPEN_POISSON",
+      "offeredRatePerSecond": 0.0333,
+      "arrivals": 20,
+      "poolExhausted": true,
+      "completedJourneys": 20,
+      "failedJourneys": 0,
+      "failedTraders": 0,
+      "failures": [],
+      "offeredWallSeconds": 373.7,
+      "wallSeconds": 404.4,
+      "journeySeconds": {
+        "p50": 29.7,
+        "p95": 31.3,
+        "p99": 33.3,
+        "max": 33.3
+      },
+      "busyRefusals": {},
+      "busyUnrecovered": 0,
+      "retentionRecoveries": {},
+      "jobErrors": {},
+      "httpLatencyMs": {
+        "GET /api/v1/workspaces": {
+          "n": 20,
+          "p50": 40.0,
+          "p95": 44.5,
+          "p99": 48.9
+        },
+        "GET /api/v1/workspaces/{id}/capabilities": {
+          "n": 20,
+          "p50": 38.2,
+          "p95": 50.9,
+          "p99": 54.0
+        },
+        "GET /api/v1/workspaces/{id}/research/catalog": {
+          "n": 60,
+          "p50": 52.2,
+          "p95": 64.6,
+          "p99": 72.1
+        },
+        "GET /api/v1/workspaces/{id}/research/jobs/{id}": {
+          "n": 162,
+          "p50": 41.9,
+          "p95": 59.2,
+          "p99": 73.6
+        },
+        "GET /api/v1/workspaces/{id}/research/method-families": {
+          "n": 60,
+          "p50": 42.4,
+          "p95": 59.7,
+          "p99": 82.1
+        },
+        "GET /api/v1/workspaces/{id}/research/method-families/{method}": {
+          "n": 40,
+          "p50": 40.8,
+          "p95": 48.2,
+          "p99": 49.0
+        },
+        "GET /api/v1/workspaces/{id}/research/method-families/{method}/versions": {
+          "n": 40,
+          "p50": 40.3,
+          "p95": 51.5,
+          "p99": 88.9
+        },
+        "GET /api/v1/workspaces/{id}/research/sessions": {
+          "n": 60,
+          "p50": 41.4,
+          "p95": 50.2,
+          "p99": 61.2
+        },
+        "GET /api/v1/workspaces/{id}/research/sessions/{session}/journal/pages": {
+          "n": 40,
+          "p50": 109.9,
+          "p95": 130.5,
+          "p99": 139.1
+        },
+        "POST /api/v1/workspaces": {
+          "n": 20,
+          "p50": 45.7,
+          "p95": 51.6,
+          "p99": 76.6
+        },
+        "POST /api/v1/workspaces/{id}/research/methods": {
+          "n": 20,
+          "p50": 55.5,
+          "p95": 68.8,
+          "p99": 71.3
+        },
+        "POST /api/v1/workspaces/{id}/research/reviews": {
+          "n": 20,
+          "p50": 65.2,
+          "p95": 72.9,
+          "p99": 89.2
+        },
+        "POST /api/v1/workspaces/{id}/research/sessions": {
+          "n": 20,
+          "p50": 46.3,
+          "p95": 54.6,
+          "p99": 62.6
+        },
+        "POST /api/v1/workspaces/{id}/research/sessions/{session}/commands": {
+          "n": 20,
+          "p50": 44.0,
+          "p95": 53.2,
+          "p99": 54.6
+        },
+        "POST /api/v1/workspaces/{id}/research/sessions/{session}/confirm": {
+          "n": 20,
+          "p50": 75.6,
+          "p95": 85.4,
+          "p99": 94.8
+        },
+        "POST /api/v1/workspaces/{id}/research/sessions/{session}/jump-next-event": {
+          "n": 40,
+          "p50": 44.8,
+          "p95": 51.1,
+          "p99": 53.3
+        },
+        "POST /api/v1/workspaces/{id}/research/sessions/{session}/view": {
+          "n": 80,
+          "p50": 45.3,
+          "p95": 57.5,
+          "p99": 102.2
+        }
+      }
+    },
+    "host": {
+      "memAvailableMinBytes": 14676058112,
+      "cgroupMemoryPeakBytes": 504467456,
+      "cgroupCpuCoresAverage": 0.465,
+      "hostCpuBusyPercent": {
+        "p50": 8.7893864013267,
+        "p95": 20.792079207920793,
+        "max": 41.7
+      },
+      "cgroupCpuThrottledUsec": 0
+    },
+    "queue": {
+      "maxQueued": 1,
+      "maxRunning": 2,
+      "maxFailed": 0,
+      "maxOldestQueuedSeconds": 0.2
+    }
+  },
+  "seconds": "414.0342346879188"
+}

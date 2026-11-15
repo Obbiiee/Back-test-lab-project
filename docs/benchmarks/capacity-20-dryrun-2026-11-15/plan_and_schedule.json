@@ -1,0 +1,184 @@
+{
+ "feasibility": {
+  "ticks": 262144,
+  "traders": 20,
+  "workers": 4,
+  "bounds": {
+   "maxSteps": 256,
+   "groupsPerAdvance": 64,
+   "workers": 2,
+   "queueTtlSeconds": 60,
+   "workerDeadlineSeconds": 30,
+   "globalAdmission": 16,
+   "perUserAdmission": 2
+  },
+  "perJobEngineSeconds": [
+   209.7,
+   403.3
+  ],
+  "hourComputeCoreSecondsEngineOnly": [
+   4194,
+   8066
+  ],
+  "averageCoresNeededEngineOnly": [
+   1.17,
+   2.24
+  ],
+  "workerSlotCoreSecondsAvailable": 14400,
+  "engineComputeFitsWorkerSlots": true,
+  "verdict": "BLOCKED_BY_CONTRACT",
+  "blockers": [
+   "a Session can persist at most MAX_STEPS x groups-per-advance = 256 x 64 = 16384 timestamp groups; 262144 ticks need at least that many groups when every tick has its own timestamp (REFUSED_RECOVERY_LIMIT observed at 16,320 and 65,536 ticks)",
+   "one job needs 210-403 s of single-core engine time but the native job deadline is 30 s (only chunked continuation can bridge this, and it is capped by the checkpoint budget above)"
+  ]
+ },
+ "schedule": {
+  "seed": 20261115,
+  "hourSeconds": 3600,
+  "normalLoad": [
+   {
+    "trader": 1,
+    "arrivalS": 54.151,
+    "ticks": 262144
+   },
+   {
+    "trader": 2,
+    "arrivalS": 265.625,
+    "ticks": 262144
+   },
+   {
+    "trader": 3,
+    "arrivalS": 497.926,
+    "ticks": 262144
+   },
+   {
+    "trader": 4,
+    "arrivalS": 658.997,
+    "ticks": 262144
+   },
+   {
+    "trader": 5,
+    "arrivalS": 828.902,
+    "ticks": 262144
+   },
+   {
+    "trader": 6,
+    "arrivalS": 963.291,
+    "ticks": 262144
+   },
+   {
+    "trader": 7,
+    "arrivalS": 1205.537,
+    "ticks": 262144
+   },
+   {
+    "trader": 8,
+    "arrivalS": 1400.294,
+    "ticks": 262144
+   },
+   {
+    "trader": 9,
+    "arrivalS": 1521.411,
+    "ticks": 262144
+   },
+   {
+    "trader": 10,
+    "arrivalS": 1654.624,
+    "ticks": 262144
+   },
+   {
+    "trader": 11,
+    "arrivalS": 1970.765,
+    "ticks": 262144
+   },
+   {
+    "trader": 12,
+    "arrivalS": 2158.596,
+    "ticks": 262144
+   },
+   {
+    "trader": 13,
+    "arrivalS": 2318.161,
+    "ticks": 262144
+   },
+   {
+    "trader": 14,
+    "arrivalS": 2383.166,
+    "ticks": 262144
+   },
+   {
+    "trader": 15,
+    "arrivalS": 2642.745,
+    "ticks": 262144
+   },
+   {
+    "trader": 16,
+    "arrivalS": 2727.009,
+    "ticks": 262144
+   },
+   {
+    "trader": 17,
+    "arrivalS": 2977.878,
+    "ticks": 262144
+   },
+   {
+    "trader": 18,
+    "arrivalS": 3149.088,
+    "ticks": 262144
+   },
+   {
+    "trader": 19,
+    "arrivalS": 3396.733,
+    "ticks": 262144
+   },
+   {
+    "trader": 20,
+    "arrivalS": 3568.526,
+    "ticks": 262144
+   }
+  ],
+  "burstOfEight": [
+   {
+    "trader": 2,
+    "arrivalS": 3.365,
+    "ticks": 262144
+   },
+   {
+    "trader": 5,
+    "arrivalS": 3.649,
+    "ticks": 262144
+   },
+   {
+    "trader": 6,
+    "arrivalS": 3.666,
+    "ticks": 262144
+   },
+   {
+    "trader": 8,
+    "arrivalS": 5.448,
+    "ticks": 262144
+   },
+   {
+    "trader": 7,
+    "arrivalS": 6.288,
+    "ticks": 262144
+   },
+   {
+    "trader": 1,
+    "arrivalS": 7.18,
+    "ticks": 262144
+   },
+   {
+    "trader": 4,
+    "arrivalS": 7.734,
+    "ticks": 262144
+   },
+   {
+    "trader": 3,
+    "arrivalS": 8.518,
+    "ticks": 262144
+   }
+  ],
+  "activityMix": "after submitting, each trader polls its job and keeps using chart pages, Journal/Analytics reads and save/resume at the driver's think-time (see http_driver.py)"
+ }
+}
