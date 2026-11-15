@@ -193,6 +193,14 @@ def run_tier(ticks, *, max_jobs=4000, deadline_s=3000, log=print, direct=False, 
                         after = db_numbers(dsn)
                         result['db'] = {k: after[k] - before[k] if k in ('dbBytes', 'walBytes') else after[k] for k in after}
                         if result['reachedTarget']:
+                            for label, url in (('journalPage', '/journal/pages?limit=32'), ('export', '/export?format=csv'), ('journalFull', '/journal')):
+                                tj = time.monotonic(); rj = client.get(path + '/sessions/' + sid + url, headers=headers); result['seconds_' + label] = round(time.monotonic() - tj, 2); result['status_' + label] = rj.status_code
+                            if os.environ.get('BTL_PROFILE_JOURNAL') == '1':      # diagnostic only: in-process profile of the same read the worker runs
+                                import cProfile, pstats, io
+                                from cloud import research as cloud_research
+                                pr = cProfile.Profile(); pr.enable()
+                                cloud_research.run(dsn, fixture.actor, uuid.UUID(fixture.workspace), 'journal_page', (sid, {'limit': 32, 'cursor': None}))
+                                pr.disable(); buf = io.StringIO(); pstats.Stats(pr, stream=buf).sort_stats('cumulative').print_stats(25); result['profileJournalPage'] = buf.getvalue()
                             journal = client.get(path + '/sessions/' + sid + '/journal', headers=headers).json()
                             result['facts'] = dict(through=final['throughNs'], balance=final['balance'], trades=final['completedTrades'], net=final['netCashChange'],
                                                    orders=[(o['status'], o.get('entryPrice'), o.get('exitPrice'), o.get('net')) for o in journal['orders']])

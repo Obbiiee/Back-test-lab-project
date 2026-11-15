@@ -1,0 +1,63 @@
+{
+ "ticks": 16384,
+ "sourceBuildSeconds": 7.35,
+ "sourceAdmissionSeconds": 7.1,
+ "coldRestart": {
+  "firstSegmentSeconds": 9.5,
+  "chunks": 103,
+  "state": "SUCCEEDED",
+  "steadySecondsPerChunk": 0.068
+ },
+ "mode": "run",
+ "segments": 2,
+ "chunks": 257,
+ "runWallSeconds": 20.2,
+ "segmentSeconds": {
+  "p50": 10.54,
+  "max": 10.54
+ },
+ "workerCpuSeconds": 6.2,
+ "workerPeakRssMb": 198.4,
+ "reachedTarget": true,
+ "parentCpuSeconds": 0.8,
+ "setupSeconds": 2.9,
+ "wallSeconds": 23.1,
+ "db": {
+  "dbBytes": 2015232,
+  "walBytes": 1346424,
+  "checkpointRows": 260,
+  "checkpointMaxBytes": 2497,
+  "checkpointTotalBytes": 497656,
+  "eventRows": 3,
+  "eventBytes": 5164,
+  "commandRows": 259
+ },
+ "seconds_journalPage": 3.4,
+ "status_journalPage": 200,
+ "seconds_export": 3.37,
+ "status_export": 200,
+ "seconds_journalFull": 3.3,
+ "status_journalFull": 200,
+ "profileJournalPage": "         19958488 function calls (18281570 primitive calls) in 11.271 seconds\n\n   Ordered by: cumulative time\n   List reduced from 397 to 25 due to restriction <25>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000   11.298   11.298 /home/developer/projects/Back-test-lab-project/backend/cloud/research.py:185(run)\n        1    0.003    0.003   11.277   11.277 /home/developer/projects/Back-test-lab-project/backend/execution/research.py:651(journal_page)\n        1    0.000    0.000   11.262   11.262 /home/developer/projects/Back-test-lab-project/backend/execution/research.py:542(_indexed_journal_page)\n        2    0.014    0.007   11.253    5.626 /home/developer/projects/Back-test-lab-project/backend/execution/workspace.py:220(window)\n        2    0.056    0.028   11.238    5.619 /home/developer/projects/Back-test-lab-project/backend/market_data/monthly_parquet.py:816(read_revealed_window)\n        4    0.016    0.004    8.548    2.137 /home/developer/projects/Back-test-lab-project/backend/market_data/monthly_parquet.py:585(_read_row_group)\n        4    0.241    0.060    8.530    2.133 /home/developer/projects/Back-test-lab-project/backend/market_data/monthly_parquet.py:604(_read_row_group_file)\n   114720    0.335    0.000    6.953    0.000 /home/developer/projects/Back-test-lab-project/backend/contracts/canonical.py:105(canonical_bytes)\n    16384    0.141    0.000    6.495    0.000 /home/developer/projects/Back-test-lab-project/backend/market_data/monthly_parquet.py:117(_row_to_event)\n1789674/114720    2.698    0.000    6.037    0.000 /home/developer/projects/Back-test-lab-project/backend/contracts/canonical.py:39(_normalize)\n        1    0.000    0.000    5.485    5.485 /home/developer/projects/Back-test-lab-project/backend/execution/research.py:405(_quote)\n    16384    0.097    0.000    4.281    0.000 /home/developer/projects/Back-test-lab-project/backend/ticks/contracts.py:113(from_wire)\n    16384    0.218    0.000    4.083    0.000 /home/developer/projects/Back-test-lab-project/backend/ticks/contracts.py:134(_validate)\n    16384    0.079    0.000    2.623    0.000 /home/developer/projects/Back-test-lab-project/backend/ticks/timeline.py:31(make_group)\n  2905812    1.316    0.000    2.075    0.000 /home/developer/projects/Back-test-lab-project/backend/contracts/canonical.py:33(_text)\n    32768    0.140    0.000    1.713    0.000 /home/developer/projects/Back-test-lab-project/backend/market_data/monthly_parquet.py:80(_json_object)\n    16391    0.032    0.000    1.643    0.000 /home/developer/projects/Back-test-lab-project/backend/ticks/contracts.py:71(tag)\n    32780    0.045    0.000    1.129    0.000 /home/developer/projects/Back-test-lab-project/backend/contracts/canonical.py:113(content_hash)\n    49162    0.176    0.000    1.006    0.000 /home/developer/.local/share/uv/python/cpython-3.13.18-linux-x86_64-gnu/lib/python3.13/json/__init__.py:304(loads)\n   262734    0.443    0.000    0.850    0.000 {built-in method builtins.all}\n    32768    0.067    0.000    0.724    0.000 /home/developer/projects/Back-test-lab-project/backend/ticks/contracts.py:87(price)\n    16384    0.025    0.000    0.635    0.000 /home/developer/projects/Back-test-lab-project/backend/ticks/contracts.py:96(event_id)\n    49162    0.122    0.000    0.577    0.000 /home/developer/.local/share/uv/python/cpython-3.13.18-linux-x86_64-gnu/lib/python3.13/json/decoder.py:340(decode)\n    65575    0.271    0.000    0.552    0.000 /home/developer/projects/Back-test-lab-project/backend/contracts/primitives.py:34(decimal)\n   722586    0.305    0.000    0.546    0.000 {built-in method builtins.isinstance}\n\n\n",
+ "facts": {
+  "through": "1581325380000000000",
+  "balance": "10000.7",
+  "trades": 1,
+  "net": "0.7",
+  "orders": [
+   [
+    "CLOSED",
+    "1998.9",
+    "1999.6",
+    "0.7"
+   ]
+  ]
+ },
+ "control": {
+  "seconds": 24.0,
+  "chunks": 256,
+  "equal": true,
+  "revisionEqual": false,
+  "eventsEqual": true
+ }
+}

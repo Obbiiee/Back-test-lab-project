@@ -176,6 +176,32 @@ class MonthlyParquetTests(unittest.TestCase):
         self.assertEqual([group["timeNs"] for group in prefix["groups"]],
                          [str(JAN_LAST - 2), str(JAN_LAST), str(FEB_FIRST)])
 
+    def test_revealed_window_pruning_equals_the_unpruned_reference_for_every_frontier_and_size(self):
+        """Display-window pruning must return exactly the last N whole timestamp groups, including groups that straddle row groups."""
+        base = JAN_LAST - 1000
+        stamps = [0, 1, 1, 1, 2, 3, 3, 4, 5, 5, 5, 5, 6, 7, 7, 8, 9, 9, 10, 11, 11, 11, 12]
+        events = [dict(ordinal=str(i), timeNs=str(base + t), bid="1.%d1" % i, ask="2.%d1" % i, sequence=None) for i, t in enumerate(stamps)]
+        source = SyntheticTickProvider(events, chunk_size=4)
+        manifest = source.describe(source.dataset_id, source.dataset_version)
+        wire, token = [], None
+        while True:
+            page = source.read_page(source.dataset_id, source.dataset_version, token, 64)
+            wire.extend(page["events"])
+            if page["endOfDataset"]:
+                break
+            token = page["nextToken"]
+        for row_group_size in (1, 2, 3, 5, 7, 40):
+            root = Path(self.tmp.name) / ("prune%d" % row_group_size)
+            written = write_monthly_parquet(root, iter(wire), manifest, expected_version=source.dataset_version, row_group_size=row_group_size)
+            provider = MonthlyParquetProvider(root, expected_manifest_hash=written["manifestHash"])
+            for through in range(base - 1, base + 14):
+                reference_groups = list(provider.iter_groups(base, through + 1)) if through >= base else []
+                for count in (1, 2, 3, 5, 40):
+                    expected = [dict(group) for group in reference_groups[-count:]]
+                    actual = provider.read_revealed_window(through, count)
+                    self.assertEqual([g["timeNs"] for g in actual], [g["timeNs"] for g in expected], (row_group_size, through, count))
+                    self.assertEqual([[e["bid"] for e in g["events"]] for g in actual], [[e["bid"] for e in g["events"]] for g in expected], (row_group_size, through, count))
+
     def test_indexed_revealed_window_is_clipped_and_keeps_cross_month_timestamp_groups_atomic(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
             expected_version=self.source.dataset_version, row_group_size=1)

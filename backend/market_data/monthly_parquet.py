@@ -9,6 +9,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from copy import deepcopy
 from datetime import datetime, timezone
+import collections
 import hashlib
 import json
 import os
@@ -398,6 +399,8 @@ def write_monthly_parquet(root, events, source_manifest, *, expected_version=Non
         reservation.unlink(missing_ok=True)
 
 
+VERIFIED_ROW_GROUP_CACHE_ENTRIES = 2
+
 class MonthlyParquetProvider:
     """Read only requested UTC months and row groups; verify canonical rows."""
     def __init__(self, root, *, expected_dataset_id=None, expected_dataset_version=None,
@@ -462,7 +465,7 @@ class MonthlyParquetProvider:
         self._dataset_id = manifest["datasetId"]
         self._dataset_version = manifest["datasetVersion"]
         self.manifest_hash = supplied_hash
-        self._verified_row_group_cache = None
+        self._verified_row_group_cache = collections.OrderedDict()   # bounded LRU of hash-verified row groups (see VERIFIED_ROW_GROUP_CACHE_ENTRIES)
         require(type(manifest.get("sourceIdentity")) is list and
                 1 <= len(manifest["sourceIdentity"]) <= 128,
                 "sourceIdentity", "SCHEMA_MISMATCH")
@@ -584,10 +587,23 @@ class MonthlyParquetProvider:
 
     def _read_row_group(self, path, file_entry, group_entry):
         cache_key = (self.manifest_hash, path, group_entry["index"])
-        cached = self._verified_row_group_cache
-        if cached is not None and cached[0] == cache_key:
-            _key, events, timestamps, global_indices = cached
-            return events, timestamps, global_indices
+        cached = self._verified_row_group_cache.get(cache_key)
+        if cached is not None:
+            self._verified_row_group_cache.move_to_end(cache_key)
+            return cached
+        parquet = self._open_parquet(path)
+        try:
+            events, timestamps, global_indices = self._read_row_group_file(
+                parquet, file_entry, group_entry)
+        finally:
+            parquet.close()
+        # Keep a small bounded LRU of already hash-verified canonical row groups (two
+        # entries: the month-start pointer check and the newest group no longer evict
+        # each other). Keyed by the pinned manifest hash, so a different source can never hit.
+        self._verified_row_group_cache[cache_key] = (events, timestamps, global_indices)
+        while len(self._verified_row_group_cache) > VERIFIED_ROW_GROUP_CACHE_ENTRIES:
+            self._verified_row_group_cache.popitem(last=False)
+        return events, timestamps, global_indices
         parquet = self._open_parquet(path)
         try:
             events, timestamps, global_indices = self._read_row_group_file(
@@ -839,6 +855,20 @@ class MonthlyParquetProvider:
                 visible = [event for event in events if int(event["timeNs"]) <= through_ns]
                 if not visible:
                     continue
+                # Display-only pruning with an identical result: this row group can
+                # contribute at most ``maximum_groups`` selected groups, one extra
+                # group to prove the boundary and one more that a merge with the
+                # newer row group may consume. Older timestamps in the same row group
+                # can never be selected, so they are not grouped or re-hashed.
+                kept, distinct, previous_time = 0, 0, None
+                for event in reversed(visible):
+                    if event["timeNs"] != previous_time:
+                        distinct += 1
+                        if distinct > maximum_groups + 2:
+                            break
+                        previous_time = event["timeNs"]
+                    kept += 1
+                visible = visible[len(visible) - kept:]
                 forward_groups = []
                 current_time = None
                 current_events = []
