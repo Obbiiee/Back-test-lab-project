@@ -1,0 +1,105 @@
+{
+ "ticks": 262144,
+ "traders": 20,
+ "workers": 4,
+ "mode": "normal",
+ "seed": 20261115,
+ "budget": "5 vCPU / 14 GiB cgroup (owner addendum 2026-11-14)",
+ "sourcePrepSeconds": 624.7,
+ "wallSeconds": 3974.3,
+ "completedTraders": 20,
+ "failedTraders": [],
+ "endToEndSeconds": {
+  "p50": 419.0,
+  "p95": 430.1,
+  "p99": 440.7,
+  "max": 440.7
+ },
+ "queueWaitSeconds": {
+  "n": 200,
+  "p50": 0.093,
+  "p95": 0.242,
+  "p99": 0.293,
+  "max": 0.447546
+ },
+ "jobStates": {
+  "SUCCEEDED": 210
+ },
+ "retries": {},
+ "latencyMs": {
+  "submit": {
+   "n": 60,
+   "p50": 44,
+   "p95": 470,
+   "p99": 514
+  },
+  "poll": {
+   "n": 3898,
+   "p50": 38,
+   "p95": 363,
+   "p99": 501
+  },
+  "summary": {
+   "n": 701,
+   "p50": 156,
+   "p95": 837,
+   "p99": 1060
+  },
+  "view": {
+   "n": 20,
+   "p50": 118,
+   "p95": 686,
+   "p99": 2132
+  },
+  "review": {
+   "n": 20,
+   "p50": 112,
+   "p95": 133,
+   "p99": 1871
+  },
+  "journal": {
+   "n": 20,
+   "p50": 10242,
+   "p95": 10894,
+   "p99": 12409
+  },
+  "export": {
+   "n": 20,
+   "p50": 10315,
+   "p95": 10861,
+   "p99": 10981
+  }
+ },
+ "financialParityAcrossTraders": true,
+ "facts": {
+  "balance": "10000.7",
+  "net": "0.7",
+  "orders": [
+   [
+    "CLOSED",
+    "1998.9",
+    "1999.6",
+    "0.7"
+   ]
+  ],
+  "trades": 1
+ },
+ "workerCpuSecondsTotal": 6482.0,
+ "workerPeakRssMb": 268.9,
+ "db": {
+  "dbBytes": 254926848,
+  "walBytes": 463884408,
+  "checkpointRows": 81980,
+  "checkpointMaxBytes": 2497,
+  "checkpointTotalBytes": 157372320,
+  "eventRows": 60,
+  "eventBytes": 103320,
+  "commandRows": 81960
+ },
+ "hostSamples": {
+  "maxHostCpu": 61.7,
+  "minMemAvailableGiB": 13.23,
+  "p95HostCpu": 58.3
+ },
+ "costPerTraderWorkerCoreSeconds": 324.1
+}

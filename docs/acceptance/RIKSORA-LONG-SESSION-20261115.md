@@ -1,5 +1,8 @@
 # RIKSORA — durable long-session engine: audit, implementation and measured limits (2026-11-15)
 
+> **SUPERSEDED 2026-11-15 (sections 4-6 below are historical, kept unedited):** the MAX_STEPS=256 blocker was addressed by the opt-in Compact Checkpoint V2. All tiers 2,048 to 262,144 ticks PASS through API, durable queue, PostgreSQL and native worker; see `RIKSORA-COMPACT-CHECKPOINT-V2-20261115.md`. V2 is a prototype and is not promoted to the production path; the 20-trader result is reported there / in the capacity section.
+
+
 Status: **IMPLEMENTATION REGISTER, not an architecture authority.** SYNTHETIC / TEST ONLY measurements on riksora_vps1 (disposable PostgreSQL 17). Evidence: `~/bench/long/*.json` copies under `docs/benchmarks/long-session-2026-11-15/`.
 
 ## 1. Limits found in the code (Phase 2)
