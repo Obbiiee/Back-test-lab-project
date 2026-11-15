@@ -163,6 +163,11 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             if proc_snapshot and cg:
                 snaps['before'] = proc_snapshot([proc.pid], cg)
             phase['measuring'] = True; t_run = time.monotonic()
+            try:
+                with psycopg.connect(dsn) as _w:
+                    snaps['wal0'] = int(_w.execute("SELECT pg_wal_lsn_diff(pg_current_wal_lsn(),'0/0')").fetchone()[0])
+            except Exception:
+                snaps['wal0'] = None
         elif 'summary' in item:
             summary = item['summary']
     if proc_snapshot and cg and phase['measuring']:
@@ -170,6 +175,15 @@ def run_http_cohort(*, url, delivery, cohort_size, report, dsn, system_resources
             snaps['after'] = proc_snapshot([proc.pid], cg)
         except Exception:
             pass
+    wal_bytes = None
+    try:
+        with psycopg.connect(dsn) as _w:
+            wal1 = int(_w.execute("SELECT pg_wal_lsn_diff(pg_current_wal_lsn(),'0/0')").fetchone()[0])
+        if snaps.get('wal0') is not None:
+            wal_bytes = wal1 - snaps['wal0']
+    except Exception:
+        wal_bytes = None
+    report['postgresWalBytesDuringMeasurement'] = wal_bytes
     role_report = {}
     if len(roles_series) >= 3:
         tck = os.sysconf('SC_CLK_TCK'); t_first, r_first = roles_series[0]; t_last, r_last = roles_series[-1]
