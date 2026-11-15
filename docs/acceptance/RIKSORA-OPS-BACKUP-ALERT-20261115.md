@@ -1,0 +1,17 @@
+# RIKSORA — encrypted off-box backup and light alerting (2026-11-15)
+
+Status: operational design with tested tooling; not an architecture authority. No cloud provider is required; Cloudflare R2 is optional.
+
+## Backup (tested on a disposable database and a throw-away key)
+`backend/tools/ops_backup.py` (test `tests/test_ops_backup.py`): `pg_dump -Fc` -> GnuPG public-key encryption (the VPS holds only the public key; the private key stays off the VPS) -> SHA-256 of the ciphertext -> upload through a command the owner configures -> only then the marker file that `ops_metrics.py` watches is touched. Tested: a failing upload leaves the marker untouched; the plaintext dump is deleted before upload and no temporary plaintext remains; the remote copy is ciphertext; decrypting with the private key, hash-checking and restoring into an empty database gives equal row counts for users, workspaces, tick events and audit events.
+Setup the owner does once (no secret goes through chat):
+1. On the laptop: `gpg --quick-generate-key backups@riksora default default 2y`, export the PUBLIC key, keep the private key and its passphrase in the owner's password manager and on one offline copy.
+2. On the VPS: `gpg --import riksora-backup-public.asc`; create `/home/developer/.config/riksora/backup.env` (mode 0600) with `BTL_DATABASE_URL`, `BTL_BACKUP_RECIPIENT`, `BTL_BACKUP_MARKER`, and `BTL_BACKUP_UPLOAD_CMD`, for example `scp -i /home/developer/.ssh/backup_key {file} backup@storage-host:riksora/` or an `rclone copyto {file} remote:riksora/` for any S3-compatible, SFTP or WebDAV target (R2 is one possible target, not a requirement). The upload credential is write-only and lives in a 0600 file or an ssh key that can only append.
+3. Schedule: `15 2 * * * set -a; . ~/.config/riksora/backup.env; set +a; ~/tools/venv313/bin/python ~/projects/Back-test-lab-project/backend/tools/ops_backup.py`.
+4. Retention on the target: 7 daily, 4 weekly, 6 monthly; WAL archive for point-in-time recovery (already proven locally: 706 MB, 11.9 s) can be shipped the same way (`archive_command` calling the same upload command) when an RPO below 24 h is required.
+5. Monthly restore test on a disposable instance from the newest remote copy; a failed test is a CRIT by hand until a marker for restore tests exists.
+Not tested: a real remote target, WAL shipping off-box, configuration (service env) backup beyond the repository (the configuration is the 0600 env files and systemd units; copy them into the same encrypted archive when they exist).
+
+## Alerting (tested with a stubbed command)
+`backend/tools/ops_metrics.py` makes the snapshot and the OK/WARN/CRIT decision; `backend/tools/ops_alert.py` (test `tests/test_ops_alert.py`) runs it every minute, calls `BTL_ALERT_CMD` once per incident (a worse status or a recovery notifies at once, repeats are suppressed for an hour) and stores no credential. Cron: `* * * * * . ~/.config/riksora/alert.env; ~/tools/venv313/bin/python ~/projects/Back-test-lab-project/backend/tools/ops_alert.py`. `BTL_ALERT_CMD` is the owner's choice, e.g. `curl -fsS -d {message} https://ntfy.example/riksora` with the secret in the URL file or header file the command reads.
+Covered: CPU load, memory, swap, disk, PostgreSQL reachability, queue depth and oldest wait, failed jobs per hour, backup age. Not covered: API latency percentiles and per-worker crash events (visible only as failed-job counts) until a reverse proxy with access logs exists.
