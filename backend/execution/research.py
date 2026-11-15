@@ -850,8 +850,10 @@ class ResearchApplication:
             _meta, _method, state, _checkpoint = self._session(db, session_id)
             from .free_window import free_window_end
             window_end = free_window_end(db, self.scope.workspace_id, session_id)
+            from .jump_next_event import committed_jump
+            recovered = committed_jump(db, self.scope.workspace_id, session_id, raw) and state['revision'] == raw['expectedRevision'] + 1
         live = any(order['status'] in ('PENDING', 'ACTIVE') for order in state['orders'].values())
-        if not live or state['ended'] or state['unresolved']:
+        if (not live or state['ended'] or state['unresolved']) and not recovered:
             view = self.inspect(session_id, raw['timeframe'])
             return jump_result(raw, status='NO_ACTIVE_ORDERS', through_ns=state['throughNs'],
                 advances=0, processed_groups=0, events=[], view=view)
@@ -889,7 +891,8 @@ class ResearchApplication:
                 'revision', 'REFUSED_STALE_REVISION')
         events = saved['events']
         event_found = any(event['kind'] in FINANCIAL_EVENT_KINDS for event in events)
-        progressed = int(state_after['nextGroupIndex']) > int(state['nextGroupIndex']) or int(state_after['throughNs']) > int(state['throughNs'])
+        # a recovered retry's committed command advanced by definition (it created the revision); the pre-command state is not re-read
+        progressed = recovered or int(state_after['nextGroupIndex']) > int(state['nextGroupIndex']) or int(state_after['throughNs']) > int(state['throughNs'])
         at_end = int(state_after['throughNs']) >= int(target)
         status = ('EVENT_FOUND' if event_found else 'NO_EVENT_UNTIL_SESSION_END' if at_end
                   else 'SEARCHING' if progressed else 'NO_EVENT_UNTIL_SESSION_END')

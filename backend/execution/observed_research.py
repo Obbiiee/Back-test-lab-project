@@ -441,8 +441,10 @@ class ObservedResearchApplication:
         validate_jump_request(raw,session_id)
         with connect(self.dsn) as db:
             _meta,_method,state,_checkpoint=self._session(db,session_id)
+            from .jump_next_event import committed_jump
+            recovered=committed_jump(db,self.scope.workspace_id,session_id,raw) and state['revision']==raw['expectedRevision']+1
         live=any(order['status'] in ('PENDING','ACTIVE') for order in state['orders'].values())
-        if not live or state['ended'] or state['unresolved']:
+        if (not live or state['ended'] or state['unresolved']) and not recovered:
             view=self.inspect(session_id,raw['timeframe'])
             return jump_result(raw,status='NO_ACTIVE_ORDERS',through_ns=state['throughNs'],
                 advances=0,processed_groups=0,events=[],view=view)

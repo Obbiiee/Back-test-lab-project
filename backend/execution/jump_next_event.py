@@ -38,3 +38,11 @@ def result(request, *, status, through_ns, advances, processed_groups, events, v
     return dict(schemaVersion=1, artifact=RESULT_ARTIFACT, requestId=request["requestId"],
                 sessionId=request["sessionId"], status=status, throughNs=str(through_ns),
                 advances=advances, processedGroups=processed_groups, events=events, view=view)
+
+
+def committed_jump(db, workspace_id, session_id, raw):
+    """True when THIS request's command was already committed (a retry after the worker died, or after the response was lost). The retry must then return the
+    original outcome built from that committed command, not a verdict about the state it left behind (e.g. NO_ACTIVE_ORDERS after the exit it filled)."""
+    row = db.execute("SELECT revision FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
+                     (str(workspace_id), session_id, f"jump:{raw['requestId']}:r{raw['expectedRevision']}")).fetchone()
+    return row is not None and int(row[0]) == int(raw["expectedRevision"]) + 1
