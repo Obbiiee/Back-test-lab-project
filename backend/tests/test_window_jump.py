@@ -40,16 +40,17 @@ class WindowJumpTests(unittest.TestCase):
         self.app.close(); self.f.client.close()
 
     # -------------------------------------------------------------------------------------------------------------
-    def session(self, m, *, end_steps=None):
+    def session(self, m, *, end_steps=None, end_ns=None):
         """A Session; with end_steps it is a Free-window Session whose window ends end_steps after its start (via a real claim row), otherwise a control."""
         sid = "session:" + uuid.uuid4().hex
         self.app.create_session(dict(id=sid, name="wj", methodId=m["id"], initialBalance="10000", startPeriod="2020-01"))
-        if end_steps is not None:
+        if end_steps is not None or end_ns is not None:
             start = int(self.state(sid)["throughNs"])
+            window_end = start + end_ns if end_ns is not None else start + end_steps * STEP_NS
             with connect(DSN) as db:
                 db.execute("INSERT INTO btl.entitlement_claims(actor_id,kind,claim_key,period,tier,status,workspace_id,session_id,window_start_ns,window_end_ns) "
                            "VALUES (%s,'SESSION',%s,%s,'FREE','COMMITTED',%s,%s,%s,%s)",
-                           (self.f.actor, uuid.uuid4().hex + "0" * 32, "2020-01-" + uuid.uuid4().hex[:6], self.f.workspace, sid, start, start + end_steps * STEP_NS))
+                           (self.f.actor, uuid.uuid4().hex + "0" * 32, "2020-01-" + uuid.uuid4().hex[:6], self.f.workspace, sid, start, window_end))
         return sid
 
     def state(self, sid):
@@ -126,6 +127,24 @@ class WindowJumpTests(unittest.TestCase):
         self.assertEqual(self.live(pro), [("ACTIVE", "LONG")])
         self.advance_to(control, int(self.state(pro)["throughNs"]))
         self.assertEqual((self.live(control), self.state(control)["balance"]), (self.live(pro), self.state(pro)["balance"]))
+
+    def test_the_fill_tick_decides_exactly_at_the_boundary(self):
+        """The planned LIMIT fills on the tick 22 steps after the start. The window is ticks with time < end: the fill tick is inside when end = fill + 1 ns,
+        outside when end = fill, and outside when the window ends earlier. Each case equals a chronological replay under the same entitlement."""
+        fill = 22 * STEP_NS
+        for label, end_ns, fills in (("last tick before the boundary", fill + 1, True), ("tick exactly at the boundary", fill, False), ("one ns before the fill tick", fill - 1, False),
+                                     ("well after the fill", fill + 10 * STEP_NS, True), ("well before the fill", 5 * STEP_NS, False)):
+            free, control = self.session(self.proto, end_ns=end_ns), self.session(self.proto)
+            for sid in (free, control):
+                self.open_order(sid, dict(orderType="LIMIT", workflow="PLANNED", entry="2005", sl="2003", quantity=None, riskPercent=None), plan="plan:wj")
+            status, _ = self.jump_until_done(free)
+            if fills:
+                self.assertEqual((status, self.live(free)), ("EVENT_FOUND", [("ACTIVE", "LONG")]), label)
+            else:
+                self.assertEqual((status, self.live(free)), ("NO_EVENT_UNTIL_SESSION_END", [("PENDING", "LONG")]), label)
+            self.advance_to(control, int(self.state(free)["throughNs"]))
+            self.assertEqual((self.state(control)["throughNs"], self.live(control), self.state(control)["balance"]),
+                             (self.state(free)["throughNs"], self.live(free), self.state(free)["balance"]), label)
 
     def test_active_position_keeps_its_lifecycle_and_equals_chronological_replay(self):
         for kind_side, draft in (("sl", dict(side="LONG", entry="2006.10", sl="2005.5", tp="2010")), ("tp", dict(side="SHORT", entry="2006.00", sl="2008", tp="2005.0"))):
