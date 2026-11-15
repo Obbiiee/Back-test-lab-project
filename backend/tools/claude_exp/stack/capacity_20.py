@@ -124,7 +124,15 @@ def main():
             outcomes = [None] * a.traders
 
             def call(kind, fn):
-                t = time.monotonic(); r = fn(); dt = time.monotonic() - t
+                t = time.monotonic(); r = fn()
+                # Client recovery, reported separately: the product refuses with 503 SERVICE_BUSY + Retry-After when its shared DB budget is exhausted; the existing frontend retries those (bounded).
+                for attempt in range(8):
+                    if r.status_code != 503 or '"SERVICE_BUSY"' not in r.text:
+                        break
+                    with lock:
+                        retries['clientRecovery:' + kind + ':SERVICE_BUSY'] += 1
+                    time.sleep(min(5.0, float(r.headers.get('Retry-After', '1'))) + 0.2 * attempt); r = fn()
+                dt = time.monotonic() - t
                 with lock:
                     latencies[kind].append(dt)
                 return r
@@ -155,6 +163,8 @@ def main():
                             if j.status_code == 404:
                                 raise RuntimeError('job pruned')
                             body = j.json()
+                            if 'state' not in body:
+                                raise RuntimeError(f'poll {job} -> HTTP {j.status_code} {str(body)[:300]}')
                             if body['state'] in ('SUCCEEDED',):
                                 return body
                             if body['state'] not in ('QUEUED', 'RUNNING'):
@@ -165,7 +175,7 @@ def main():
 
                     sid = 'session:' + uuid.uuid4().hex
                     wait(post('/sessions', {'id': sid, 'name': 'cap', 'methodId': tr['method'], 'initialBalance': '10000', 'startPeriod': '2020-01'}))
-                    st = client.get(tr['path'] + f'/sessions/{sid}/summary', headers=tr['headers']).json()
+                    st = call('summary', lambda: client.get(tr['path'] + f'/sessions/{sid}/summary', headers=tr['headers'])).json()
                     wait(post(f'/sessions/{sid}/commands', {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1', 'sessionId': sid, 'commandId': 'command:' + uuid.uuid4().hex,
                                                             'expectedRevision': st['revision'], 'kind': 'ADVANCE', 'payload': {'targetNs': manifest['range']['startNs']}}))
                     view = call('view', lambda: client.get(tr['path'] + f'/sessions/{sid}', headers=tr['headers'])).json()
@@ -174,7 +184,7 @@ def main():
                     reviewed = call('review', lambda: client.post(tr['path'] + '/reviews', headers=tr['headers'], json=review)).json()
                     assert client.post(tr['path'] + f'/sessions/{sid}/confirm', headers=tr['headers'], json={'reviewId': review['requestId'], 'reviewHash': reviewed['reviewHash']}).status_code == 200
                     t_run = time.monotonic()
-                    st = client.get(tr['path'] + f'/sessions/{sid}/summary', headers=tr['headers']).json()
+                    st = call('summary', lambda: client.get(tr['path'] + f'/sessions/{sid}/summary', headers=tr['headers'])).json()
                     request = dict(schemaVersion=1, artifact=rr.REQUEST_ARTIFACT, runId=uuid.uuid4().hex, segment=0, sessionId=sid, expectedRevision=st['revision'], targetNs=str(int(manifest['range']['endNs']) - 1))
                     job, segments = post(f'/sessions/{sid}/replay-run', request), 0
                     while True:
@@ -185,7 +195,10 @@ def main():
                             break
                         job = nxt
                     out.update(runSeconds=round(time.monotonic() - t_run, 1), segments=segments)
-                    summary = call('summary', lambda: client.get(tr['path'] + f'/sessions/{sid}/summary', headers=tr['headers'])).json()
+                    sresp = call('summary', lambda: client.get(tr['path'] + f'/sessions/{sid}/summary', headers=tr['headers']))
+                    summary = sresp.json()
+                    if 'balance' not in summary:
+                        raise RuntimeError(f'final summary -> HTTP {sresp.status_code} {str(summary)[:300]}')
                     journal = call('journal', lambda: client.get(tr['path'] + f'/sessions/{sid}/journal/pages?limit=32', headers=tr['headers'])).json()
                     call('export', lambda: client.get(tr['path'] + f'/sessions/{sid}/export?format=csv', headers=tr['headers']))
                     out.update(facts=dict(balance=summary['balance'], trades=summary['completedTrades'], net=summary['netCashChange'], orders=[(o['status'], o.get('entryPrice'), o.get('exitPrice'), o.get('net')) for o in journal['orders']]),

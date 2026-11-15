@@ -1,0 +1,140 @@
+{
+ "ticks": 262144,
+ "traders": 8,
+ "workers": 4,
+ "mode": "burst",
+ "seed": 20261115,
+ "budget": "5 vCPU / 14 GiB cgroup (owner addendum 2026-11-14)",
+ "sourcePrepSeconds": 584.6,
+ "wallSeconds": 781.0,
+ "completedTraders": 4,
+ "failedTraders": [
+  {
+   "trader": 0,
+   "arrivalS": 1.5,
+   "failures": [
+    "KeyError: 'balance'"
+   ],
+   "runSeconds": 697.2,
+   "segments": 29,
+   "endToEndSeconds": 745.8
+  },
+  {
+   "trader": 4,
+   "arrivalS": 6.8,
+   "failures": [
+    "KeyError: 'state'"
+   ],
+   "endToEndSeconds": 681.6
+  },
+  {
+   "trader": 5,
+   "arrivalS": 8.8,
+   "failures": [
+    "KeyError: 'state'"
+   ],
+   "endToEndSeconds": 672.3
+  },
+  {
+   "trader": 7,
+   "arrivalS": 9.9,
+   "failures": [
+    "KeyError: 'state'"
+   ],
+   "endToEndSeconds": 666.3
+  }
+ ],
+ "endToEndSeconds": {
+  "p50": 739.2,
+  "p95": 756.8,
+  "p99": 756.8,
+  "max": 756.8
+ },
+ "queueWaitSeconds": {
+  "n": 233,
+  "p50": 12.672,
+  "p95": 13.514,
+  "p99": 14.063,
+  "max": 17.928933
+ },
+ "jobStates": {
+  "SUCCEEDED": 249
+ },
+ "retries": {},
+ "latencyMs": {
+  "submit": {
+   "n": 24,
+   "p50": 110,
+   "p95": 229,
+   "p99": 338
+  },
+  "poll": {
+   "n": 2518,
+   "p50": 38,
+   "p95": 88,
+   "p99": 267
+  },
+  "summary": {
+   "n": 457,
+   "p50": 155,
+   "p95": 244,
+   "p99": 1445
+  },
+  "view": {
+   "n": 8,
+   "p50": 128,
+   "p95": 609,
+   "p99": 609
+  },
+  "review": {
+   "n": 8,
+   "p50": 159,
+   "p95": 195,
+   "p99": 195
+  },
+  "journal": {
+   "n": 5,
+   "p50": 21247,
+   "p95": 24446,
+   "p99": 24446
+  },
+  "export": {
+   "n": 5,
+   "p50": 25128,
+   "p95": 29727,
+   "p99": 29727
+  }
+ },
+ "financialParityAcrossTraders": true,
+ "facts": {
+  "balance": "10000.7",
+  "net": "0.7",
+  "orders": [
+   [
+    "CLOSED",
+    "1998.9",
+    "1999.6",
+    "0.7"
+   ]
+  ],
+  "trades": 1
+ },
+ "workerCpuSecondsTotal": 2352.2,
+ "workerPeakRssMb": 284.5,
+ "db": {
+  "dbBytes": 108756992,
+  "walBytes": 187336040,
+  "checkpointRows": 32792,
+  "checkpointMaxBytes": 2497,
+  "checkpointTotalBytes": 62948928,
+  "eventRows": 24,
+  "eventBytes": 41328,
+  "commandRows": 32784
+ },
+ "hostSamples": {
+  "maxHostCpu": 83.1,
+  "minMemAvailableGiB": 13.17,
+  "p95HostCpu": 76.0
+ },
+ "costPerTraderWorkerCoreSeconds": 588.0
+}

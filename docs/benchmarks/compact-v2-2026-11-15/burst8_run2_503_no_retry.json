@@ -1,0 +1,122 @@
+{
+ "ticks": 262144,
+ "traders": 8,
+ "workers": 4,
+ "mode": "burst",
+ "seed": 20261115,
+ "budget": "5 vCPU / 14 GiB cgroup (owner addendum 2026-11-14)",
+ "sourcePrepSeconds": 556.9,
+ "wallSeconds": 820.8,
+ "completedTraders": 6,
+ "failedTraders": [
+  {
+   "trader": 1,
+   "arrivalS": 1.9,
+   "failures": [
+    "RuntimeError: poll f874f908-1fa4-50b4-b31a-5603bf4da42a -> HTTP 503 {'detail': 'SERVICE_BUSY'}"
+   ],
+   "endToEndSeconds": 719.3
+  },
+  {
+   "trader": 4,
+   "arrivalS": 6.8,
+   "failures": [
+    "RuntimeError: poll c7375c94-24f5-5341-80d7-295d833e95db -> HTTP 503 {'detail': 'SERVICE_BUSY', 'schemaVersion': 1}"
+   ],
+   "endToEndSeconds": 701.5
+  }
+ ],
+ "endToEndSeconds": {
+  "p50": 772.2,
+  "p95": 796.9,
+  "p99": 796.9,
+  "max": 796.9
+ },
+ "queueWaitSeconds": {
+  "n": 250,
+  "p50": 12.661,
+  "p95": 13.092,
+  "p99": 14.045,
+  "max": 17.687913
+ },
+ "jobStates": {
+  "SUCCEEDED": 266
+ },
+ "retries": {},
+ "latencyMs": {
+  "submit": {
+   "n": 24,
+   "p50": 68,
+   "p95": 224,
+   "p99": 230
+  },
+  "poll": {
+   "n": 2681,
+   "p50": 39,
+   "p95": 123,
+   "p99": 529
+  },
+  "summary": {
+   "n": 488,
+   "p50": 155,
+   "p95": 576,
+   "p99": 1229
+  },
+  "view": {
+   "n": 8,
+   "p50": 134,
+   "p95": 609,
+   "p99": 609
+  },
+  "review": {
+   "n": 8,
+   "p50": 110,
+   "p95": 259,
+   "p99": 259
+  },
+  "journal": {
+   "n": 6,
+   "p50": 9939,
+   "p95": 15139,
+   "p99": 15139
+  },
+  "export": {
+   "n": 6,
+   "p50": 9433,
+   "p95": 14417,
+   "p99": 14417
+  }
+ },
+ "financialParityAcrossTraders": true,
+ "facts": {
+  "balance": "10000.7",
+  "net": "0.7",
+  "orders": [
+   [
+    "CLOSED",
+    "1998.9",
+    "1999.6",
+    "0.7"
+   ]
+  ],
+  "trades": 1
+ },
+ "workerCpuSecondsTotal": 2557.9,
+ "workerPeakRssMb": 288.4,
+ "db": {
+  "dbBytes": 109330432,
+  "walBytes": 184752728,
+  "checkpointRows": 32792,
+  "checkpointMaxBytes": 2497,
+  "checkpointTotalBytes": 62948928,
+  "eventRows": 24,
+  "eventBytes": 41328,
+  "commandRows": 32784
+ },
+ "hostSamples": {
+  "maxHostCpu": 87.3,
+  "minMemAvailableGiB": 13.34,
+  "p95HostCpu": 82.8
+ },
+ "costPerTraderWorkerCoreSeconds": 426.3
+}

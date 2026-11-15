@@ -87,3 +87,23 @@ Finding (in-process cProfile, `docs/benchmarks/compact-v2-2026-11-15/journal_pro
 Changes (display read only; execution, reducer, hashes and returned data unchanged): tail pruning in `read_revealed_window` (keeps `maximum_groups + 2` distinct timestamps) and a two-entry LRU for verified row groups (key still includes the pinned manifest hash). Tests: pruning equals the unpruned reference for 6 row-group sizes x 15 frontiers x 5 window sizes incl. groups straddling row groups; a mutation (pruning limit too small) makes it fail. Regression of 16 touched suites: PASS (EXIT 0).
 Measured (idle host, one request, synthetic): cold page 3.3-3.4 s -> about 3.0 s at 16k; repeated reads in a warm process 3.4 s -> 0.02-0.27 s. At 65,536 ticks the cold read is still about 3.0 s, i.e. bounded and independent of tick count (about 16k rows are validated per cold request), but not small. The 10 s p50 seen in the 20-trader run was the same cold path on a CPU shared with replay workers.
 Not fixed (needs owner decision, touches the row-group integrity path): avoid per-row canonical validation for display by verifying the row-group hash over raw bytes and converting only the needed rows, or persist the last quote with the committed revision. Status: IMPROVED, SLO still undefined.
+
+## 9. Burst of 8 simultaneous traders (SYNTHETIC, V2 opt-in, 4 workers, 5 vCPU / 14 GiB cgroup)
+Same harness and workload as section 7, `--burst`: 8 traders arrive within about 10 s (account creation is serialised by the 30/min auth limit, so effective arrival is a little wider), each runs one 262,144-tick Session. Evidence: `docs/benchmarks/compact-v2-2026-11-15/burst8_*`.
+
+| Run | Result | Cause |
+|---|---|---|
+| 1 | 4/8, undiagnosed | harness did not record the failing response (KeyError on `state`/`balance`) |
+| 2 | 6/8 | `GET /jobs/{id}` answered **503 SERVICE_BUSY** (+ `Retry-After: 1`); the harness treated it as fatal |
+| 3 | **8/8**, 0 failures | harness retries SERVICE_BUSY up to 8 times, as the existing frontend does (`accountClient.js`, retryLimit 8) |
+
+Run 3: end-to-end p50 749 s, p95 769 s, max 769 s (spread under 3 %, i.e. no starvation of any trader); queue wait p50 12.7 s, p95 13.1 s, p99 13.9 s, max 21.2 s (8 sessions contending for 4 workers; far below the 60 s TTL); jobs 250 SUCCEEDED; financial parity identical across all 8 (balance 10000.7, one closed trade); worker CPU 2,378 core-s, peak RSS 280 MB; host CPU max 84.8 % (p95 80.6 %), MemAvailable min 13.1 GiB, no swap, no gate tripped; DB +109 MB, WAL +185 MB, checkpoint max 2,497 B.
+**Client recovery reported separately:** 5 SERVICE_BUSY retries (3 on job polls, 2 on summary reads). SERVICE_BUSY is the product's designed admission refusal (shared DB budget), so under an 8-trader burst some reads are refused once and succeed on retry; without client retry (run 2) 2 of 8 travellers failed.
+**Journal page / CSV export under burst:** p50 15.8 s / 16.0 s, p95 18.1 s / 22.8 s (cold display read competing for CPU, section 8). This is the weakest measured path.
+Limits: still synthetic ticks, one trade profile, in-process HTTP driver (no browser/TLS), one host; the 20-trader simultaneous cohort was NOT run (largest simultaneous cohort measured: 8).
+
+## 10. Final verdict - commercial capacity gate (separate from Commercial V1)
+**PARTIAL / prototype, not PASS.**
+- Proven (synthetic, this host, V2 opt-in): one 262,144-tick Session through API, durable queue, PostgreSQL and native worker with financial parity; 20 staggered traders 20/20 with no failures; 8 simultaneous traders 8/8 (with bounded client retry on SERVICE_BUSY), queue wait about 13 s, resource headroom remains.
+- Not proven: 20 simultaneous traders; real browser/TLS path; real market data; an accepted Journal/export latency (10-16 s under load, SLO undefined, owner decision); behaviour with the production-default V1 format (V2 is not promoted).
+- Commercial V1 overall stays **BLOCKED** (data rights, 16-instrument profiles, payment sandbox, login, remote backup and CI keep their separate gates). No GO is claimed.
