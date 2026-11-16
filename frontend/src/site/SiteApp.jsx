@@ -173,7 +173,7 @@ function Contact({t}) {
     <h1 id="ct-h">{t.contact.title}</h1><p className="site-lead">{t.contact.lead}</p>
     <dl className="site-facts">
       <dt>{t.contact.email}</dt><dd>{b.email ? <a href={`mailto:${b.email}`}>{b.email}</a> : '—'}</dd>
-      <dt>{t.contact.phone}</dt><dd>{b.phone || '—'}</dd>
+      {b.phone && <><dt>{t.contact.phone}</dt><dd>{b.phone}</dd></>}
       <dt>{t.contact.address}</dt><dd>{b.address || '—'}</dd>
       {b.supportHours && <><dt>{t.contact.hours}</dt><dd>{b.supportHours}</dd></>}
       {b.responseTime && <><dt>{t.contact.response}</dt><dd>{b.responseTime}</dd></>}

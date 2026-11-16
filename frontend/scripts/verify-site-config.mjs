@@ -12,7 +12,7 @@ need(text(SITE.business.legalName), 'business.legalName is missing');
 need(text(SITE.business.legalForm), 'business.legalForm is missing');
 need(text(SITE.business.address), 'business.address is missing');
 need(text(SITE.business.email) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(SITE.business.email), 'business.email is missing or invalid');
-need(text(SITE.business.phone), 'business.phone is missing');
+// business.phone is optional: contact by email only is accepted (a phone number is still recommended for payment-gateway reviewers)
 for (const period of ['monthly', 'yearly']) {
   need(Number.isInteger(SITE.pro[period].priceIdr) && SITE.pro[period].priceIdr > 0, `pro.${period}.priceIdr (integer Rupiah) is missing`);
   need(Number.isInteger(SITE.pro[period].periodDays) && SITE.pro[period].periodDays > 0, `pro.${period}.periodDays is missing`);

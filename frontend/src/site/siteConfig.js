@@ -11,8 +11,8 @@ export const SITE = {
     legalName: null,                  // nama usaha / nama pemilik sesuai dokumen Midtrans
     legalForm: null,                  // 'Perorangan' | 'CV' | 'PT' ...
     address: null,                    // alamat lengkap yang boleh ditampilkan
-    email: null,                      // email dukungan
-    phone: null,                      // nomor telepon / WhatsApp dukungan
+    email: 'risoralabs@gmail.com',    // email dukungan (owner, 2026-11-16)
+    phone: null,                      // opsional: nomor telepon / WhatsApp dukungan (belum ada)
     supportHours: null,               // mis. 'Senin-Jumat 09.00-17.00 WIB'
     responseTime: null,               // mis. 'maksimal 2 hari kerja'
     nib: null,                        // opsional; tampil bila diisi
