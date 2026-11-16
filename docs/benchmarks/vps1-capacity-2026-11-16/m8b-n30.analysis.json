@@ -1,0 +1,227 @@
+{
+ "scriptSeconds": {
+  "p50": 190.9,
+  "p95": 625.2,
+  "max": 717.0
+ },
+ "pgConnectionsMax": 26,
+ "admissionConfig": {
+  "dbBudget": 12,
+  "apiActive": 8,
+  "apiWait": 16,
+  "clientOpt": false,
+  "fixtureCache": 16,
+  "dbPool": true
+ },
+ "clientRecoveriesDetail": {
+  "summary": 3,
+  "jump.poll": 1,
+  "order.review": 3,
+  "view": 1
+ },
+ "resultShapes": {
+  "session.create": [
+   "artifact",
+   "eventWindowStart",
+   "events",
+   "label",
+   "metadata",
+   "method",
+   "quote",
+   "schemaVersion",
+   "state"
+  ],
+  "advance": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "step": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "play": [
+   "artifact",
+   "balance",
+   "chunks",
+   "ended",
+   "more",
+   "nextGroupIndex",
+   "revision",
+   "runId",
+   "schemaVersion",
+   "segment",
+   "sessionId",
+   "targetNs"
+  ],
+  "jump": [
+   "advances",
+   "artifact",
+   "events",
+   "processedGroups",
+   "requestId",
+   "schemaVersion",
+   "sessionId",
+   "status",
+   "throughNs",
+   "view"
+  ]
+ },
+ "summariesSaved": null,
+ "directSlotsConfigured": 3,
+ "directSlotUtilisation": 0.128,
+ "directSlotWaitMs": {
+  "p50": 0.08,
+  "p95": 3.082,
+  "p99": 55.464,
+  "max": 176.9
+ },
+ "directRequests": 4114,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   0.0947,
+   0.2781,
+   0.3958
+  ],
+  "journal": [
+   0.0683,
+   0.2535,
+   0.309
+  ],
+  "analytics": [
+   0.0519,
+   0.3109,
+   0.454
+  ],
+  "view": [
+   0.0827,
+   0.283,
+   1.0947
+  ],
+  "jump": [
+   0.037,
+   0.1896,
+   0.2449
+  ],
+  "step": [
+   0.0585,
+   0.2266,
+   0.3062
+  ],
+  "order.confirm": [
+   0.1127,
+   0.3228,
+   0.3786
+  ],
+  "close": [
+   0.1056,
+   0.322,
+   0.5123
+  ],
+  "export.csv": [
+   0.2251,
+   0.424,
+   0.424
+  ]
+ },
+ "name": "m8b-n30",
+ "traders": 30,
+ "wall": 720.4,
+ "scripts": 40,
+ "parityEqual": 40,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 0.77,
+ "sutNetCores": 0.57,
+ "throttled": 1,
+ "sutPeakMb": 969,
+ "byComponent": {
+  "apiAndOther": 233.6,
+  "postgresql": 67.6,
+  "financialWorker": 166.7
+ },
+ "p95": {
+  "journal": 0.2535,
+  "analytics": 0.3109,
+  "jump": 0.1896,
+  "step": 0.2266,
+  "summary": 0.2781,
+  "view": 0.283,
+  "export.csv": 0.424,
+  "step.complete": 1.7097,
+  "play.complete": 7.4694,
+  "order.confirm": 0.3228,
+  "close": 0.322
+ },
+ "queue": {
+  "maxQueued": 9,
+  "maxAge": 3.5,
+  "wait": {
+   "n": 943,
+   "p50": 0.147,
+   "p95": 0.941,
+   "p99": 1.492,
+   "max": 5.112
+  },
+  "states": {
+   "SUCCEEDED": 943
+  }
+ },
+ "admissionRefusals": {
+  "SERVICE_BUSY:dbBudget": 7,
+  "SERVICE_BUSY:apiAdmission": 1
+ },
+ "recoveries": {
+  "summary": 3,
+  "jump.poll": 1,
+  "order.review": 3,
+  "view": 1
+ },
+ "requests": 6569,
+ "reqPerSec": 9.1,
+ "expectedRefusals": {
+  "CLOSE:503": 60
+ },
+ "generator": {
+  "cpuSeconds": 19.75,
+  "peakRssMb": 109.1,
+  "eventLoopLagMs": {
+   "p50": 0.3,
+   "p95": 1.5,
+   "max": 48.1
+  }
+ },
+ "hostMaxCpu": 51.6,
+ "hostMinMemGiB": 13.54,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": true,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": true
+}

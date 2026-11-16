@@ -1,0 +1,246 @@
+{
+ "scriptSeconds": {
+  "p50": 359.8,
+  "p95": 654.5,
+  "max": 728.2
+ },
+ "pgConnectionsMax": 18,
+ "admissionConfig": {
+  "dbBudget": 24,
+  "apiActive": 8,
+  "apiWait": 16,
+  "clientOpt": false,
+  "fixtureCache": 16,
+  "dbPool": false
+ },
+ "clientRecoveriesDetail": {
+  "step.poll": 7,
+  "summary": 20,
+  "session.create.poll": 1,
+  "setup:register": 2,
+  "setup:login": 1,
+  "setup:workspace": 2,
+  "view": 3,
+  "advance.poll": 3,
+  "step": 3,
+  "order.review": 3,
+  "sessions.list": 1,
+  "close": 1,
+  "journal": 1
+ },
+ "resultShapes": {
+  "session.create": [
+   "artifact",
+   "eventWindowStart",
+   "events",
+   "label",
+   "metadata",
+   "method",
+   "quote",
+   "schemaVersion",
+   "state"
+  ],
+  "advance": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "step": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "play": [
+   "artifact",
+   "balance",
+   "chunks",
+   "ended",
+   "more",
+   "nextGroupIndex",
+   "revision",
+   "runId",
+   "schemaVersion",
+   "segment",
+   "sessionId",
+   "targetNs"
+  ],
+  "jump": [
+   "advances",
+   "artifact",
+   "events",
+   "processedGroups",
+   "requestId",
+   "schemaVersion",
+   "sessionId",
+   "status",
+   "throughNs",
+   "view"
+  ]
+ },
+ "summariesSaved": null,
+ "directSlotsConfigured": 3,
+ "directSlotUtilisation": 0.43,
+ "directSlotWaitMs": {
+  "p50": 1.517,
+  "p95": 143.882,
+  "p99": 212.251,
+  "max": 621.1
+ },
+ "directRequests": 6219,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   0.5215,
+   0.989,
+   1.4964
+  ],
+  "journal": [
+   0.6135,
+   1.1919,
+   2.0615
+  ],
+  "analytics": [
+   0.3765,
+   0.7668,
+   0.8531
+  ],
+  "view": [
+   0.5459,
+   1.0146,
+   2.0907
+  ],
+  "jump": [
+   0.5571,
+   0.9715,
+   1.2785
+  ],
+  "step": [
+   0.4464,
+   0.9031,
+   1.2687
+  ],
+  "order.confirm": [
+   0.6057,
+   1.119,
+   1.4977
+  ],
+  "close": [
+   0.5809,
+   1.0737,
+   1.6338
+  ],
+  "export.csv": [
+   0.761,
+   0.8975,
+   0.8975
+  ]
+ },
+ "name": "m4-n50",
+ "traders": 50,
+ "wall": 735.9,
+ "scripts": 58,
+ "parityEqual": 58,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 1.73,
+ "sutNetCores": 1.52,
+ "throttled": 6,
+ "sutPeakMb": 979,
+ "byComponent": {
+  "apiAndOther": 376.2,
+  "postgresql": 40.2,
+  "financialWorker": 283.0
+ },
+ "p95": {
+  "journal": 1.1919,
+  "analytics": 0.7668,
+  "jump": 0.9715,
+  "step": 0.9031,
+  "summary": 0.989,
+  "view": 1.0146,
+  "export.csv": 0.8975,
+  "step.complete": 3.2169,
+  "play.complete": 10.2065,
+  "order.confirm": 1.119,
+  "close": 1.0737
+ },
+ "queue": {
+  "maxQueued": 15,
+  "maxAge": 7.7,
+  "wait": {
+   "n": 1449,
+   "p50": 0.207,
+   "p95": 2.956,
+   "p99": 5.34,
+   "max": 8.714
+  },
+  "states": {
+   "SUCCEEDED": 1449
+  }
+ },
+ "admissionRefusals": {
+  "setup:SERVICE_BUSY": 9,
+  "SERVICE_BUSY:apiAdmission": 53,
+  "QUEUE_CAPACITY": 1
+ },
+ "recoveries": {
+  "step.poll": 7,
+  "summary": 20,
+  "session.create.poll": 1,
+  "setup:register": 2,
+  "setup:login": 1,
+  "setup:workspace": 2,
+  "view": 3,
+  "advance.poll": 3,
+  "step": 3,
+  "order.review": 3,
+  "sessions.list": 1,
+  "close": 1,
+  "journal": 1
+ },
+ "requests": 10378,
+ "reqPerSec": 14.1,
+ "expectedRefusals": {
+  "CLOSE:503": 63
+ },
+ "generator": {
+  "cpuSeconds": 32.45,
+  "peakRssMb": 111.7,
+  "eventLoopLagMs": {
+   "p50": 0.5,
+   "p95": 1.8,
+   "max": 38.1
+  }
+ },
+ "hostMaxCpu": 65.7,
+ "hostMinMemGiB": 13.58,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": true,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": true
+}

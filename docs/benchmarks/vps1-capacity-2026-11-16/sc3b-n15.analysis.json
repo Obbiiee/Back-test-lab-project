@@ -1,0 +1,137 @@
+{
+ "directSlotsConfigured": "default(3), timing off",
+ "directSlotUtilisation": null,
+ "directSlotWaitMs": {
+  "p50": null,
+  "p95": null,
+  "p99": null,
+  "max": 0
+ },
+ "directRequests": 0,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   0.0738,
+   0.1685,
+   0.245
+  ],
+  "journal": [
+   0.0725,
+   0.1056,
+   0.1272
+  ],
+  "analytics": [
+   0.0628,
+   0.1043,
+   0.1243
+  ],
+  "view": [
+   0.0749,
+   0.1906,
+   0.5842
+  ],
+  "jump": [
+   0.0633,
+   0.1087,
+   0.1145
+  ],
+  "step": [
+   0.0404,
+   0.1159,
+   0.1643
+  ],
+  "order.confirm": [
+   0.0827,
+   0.1782,
+   0.2635
+  ],
+  "close": [
+   0.0788,
+   0.1881,
+   0.2291
+  ],
+  "export.csv": [
+   0.1369,
+   0.2924,
+   0.2924
+  ]
+ },
+ "name": "sc3b-n15",
+ "traders": 15,
+ "wall": 708.7,
+ "scripts": 17,
+ "parityEqual": 17,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 0.54,
+ "sutNetCores": 0.4,
+ "throttled": 0,
+ "sutPeakMb": 704,
+ "byComponent": {
+  "apiAndOther": 107.4,
+  "postgresql": 14.6,
+  "financialWorker": 62.3
+ },
+ "p95": {
+  "journal": 0.1056,
+  "analytics": 0.1043,
+  "jump": 0.1087,
+  "step": 0.1159,
+  "summary": 0.1685,
+  "view": 0.1906,
+  "export.csv": 0.2924,
+  "step.complete": 0.5579,
+  "play.complete": 5.5336,
+  "order.confirm": 0.1782,
+  "close": 0.1881
+ },
+ "queue": {
+  "maxQueued": 2,
+  "maxAge": 0.2,
+  "wait": {
+   "n": 446,
+   "p50": 0.091,
+   "p95": 0.247,
+   "p99": 0.398,
+   "max": 0.574
+  },
+  "states": {
+   "SUCCEEDED": 446
+  }
+ },
+ "admissionRefusals": {},
+ "recoveries": {},
+ "requests": 2934,
+ "reqPerSec": 4.1,
+ "expectedRefusals": {
+  "CLOSE:503": 15
+ },
+ "generator": {
+  "cpuSeconds": 8.47,
+  "peakRssMb": 107.3,
+  "eventLoopLagMs": {
+   "p50": 0.3,
+   "p95": 1.2,
+   "max": 3.8
+  }
+ },
+ "hostMaxCpu": 45.0,
+ "hostMinMemGiB": 13.59,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": true,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": true
+}

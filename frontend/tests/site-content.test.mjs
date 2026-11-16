@@ -5,7 +5,7 @@ import {existsSync, readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname, resolve} from 'node:path';
 import {COPY, CLAIMS, fill, LANGS} from '../src/site/content.js';
-import {FREE_LIMITS, RESET, formatIdr} from '../src/site/plans.js';
+import {FREE_LIMITS, RESET, formatIdr, activePromo, currentPrice} from '../src/site/plans.js';
 import {SITE} from '../src/site/siteConfig.js';
 import {entryRoute} from '../src/entryRoute.js';
 
@@ -70,6 +70,22 @@ assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=account'}),
 assert.equal(entryRoute({hostname: 'riksora.example', search: '?legacy=local'}), 'site');
 
 // 8. the config never contains a made-up price: it is null or a positive integer
-assert.ok(SITE.pro.priceIdr === null || (Number.isInteger(SITE.pro.priceIdr) && SITE.pro.priceIdr > 0));
+for (const period of ['monthly', 'yearly']) {
+  assert.ok(Number.isInteger(SITE.pro[period].priceIdr) && SITE.pro[period].priceIdr > 0 && Number.isInteger(SITE.pro[period].periodDays));
+}
+assert.equal(SITE.pro.yearly.priceIdr, SITE.pro.monthly.priceIdr * 12, 'yearly list price is 12 x monthly');
+assert.equal(SITE.pro.monthly.periodDays, 30); assert.equal(SITE.pro.yearly.periodDays, 365);
+// promotion: shown only inside its dated window; the list price is shown only when a promotion really lowers the price
+const withPromo = (startsOn, endsOn) => ({pro: {...SITE.pro, promo: {monthlyIdr: 87000, yearlyIdr: 400000, startsOn, endsOn}}});
+assert.equal(activePromo(withPromo(null, null), '2026-12-01'), null);
+assert.equal(activePromo(withPromo('2026-12-01', '2026-12-31'), '2026-11-30'), null);
+assert.equal(activePromo(withPromo('2026-12-01', '2026-12-31'), '2027-01-01'), null);
+assert.ok(activePromo(withPromo('2026-12-01', '2026-12-31'), '2026-12-15'));
+assert.deepEqual(currentPrice(withPromo(null, null), 'monthly', '2026-12-15'), {priceIdr: 137000, listPriceIdr: null, savingPercent: 0, periodDays: 30, endsOn: null});
+const promoted = currentPrice(withPromo('2026-12-01', '2026-12-31'), 'monthly', '2026-12-15');
+assert.deepEqual([promoted.priceIdr, promoted.listPriceIdr, promoted.savingPercent], [87000, 137000, 36]);
+assert.equal(currentPrice(withPromo('2026-12-01', '2026-12-31'), 'yearly', '2026-12-15').priceIdr, 400000);
+// a promotion that does not lower the price is ignored, never displayed as a discount
+assert.equal(currentPrice({pro: {...SITE.pro, promo: {monthlyIdr: 137000, yearlyIdr: 1644000, startsOn: '2026-12-01', endsOn: '2026-12-31'}}}, 'monthly', '2026-12-15').listPriceIdr, null);
 assert.equal(SITE.pro.autoRenew, false);
 console.log('site content tests passed');

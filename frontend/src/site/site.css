@@ -58,3 +58,5 @@
 .site-footer p{max-width:980px;margin:6px auto;color:var(--rk-muted-on-navy,#c3d6f2)}
 @media (max-width:640px){.site-nav nav{order:3;width:100%;margin:0}.site-facts{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:no-preference){.site-pill,.site-primary,.site-secondary{transition:transform .15s}.site-pill:hover,.site-primary:hover,.site-secondary:hover{transform:translateY(-1px)}}
+.site-was{color:var(--rk-muted-on-white,#4a5b75);font-size:1rem;font-weight:600}
+.site-promo{display:inline-block;background:var(--rk-yellow,#ffce55);color:var(--rk-navy,#061a3c);font-weight:800;border-radius:999px;padding:2px 12px;font-size:.85rem;margin:0 0 8px}

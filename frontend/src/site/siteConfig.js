@@ -15,8 +15,12 @@ export const SITE = {
     nib: null,                        // opsional; tampil bila diisi
   },
   pro: {
-    priceIdr: null,                   // integer Rupiah per periode, mis. 99000
-    periodDays: null,                 // lama satu periode Pro dalam hari, mis. 30
+    // Owner-stated prices (2026-11-16). The yearly price is 12 x the monthly price. Server plans must match (checked by the release gate).
+    monthly: {priceIdr: 137000, periodDays: 30},
+    yearly: {priceIdr: 1644000, periodDays: 365},
+    // Promotion shown ONLY between these two dates (ISO, UTC) so a "normal price" is never displayed when it was not actually charged.
+    // Owner-stated promo prices: Rp 87.000 per month and Rp 400.000 per year. Fill startsOn/endsOn to switch it on.
+    promo: {monthlyIdr: 87000, yearlyIdr: 400000, startsOn: null, endsOn: null},
     taxNote: null,                    // mis. 'Harga sudah termasuk PPN' | 'Harga belum termasuk PPN'
     autoRenew: false,                 // implementasi saat ini: pembelian sekali bayar per periode, tidak diperpanjang otomatis
   },

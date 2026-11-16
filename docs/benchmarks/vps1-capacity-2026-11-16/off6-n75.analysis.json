@@ -1,0 +1,248 @@
+{
+ "scriptSeconds": {
+  "p50": 663.9,
+  "p95": 765.1,
+  "max": 779.4
+ },
+ "pgConnectionsMax": 22,
+ "admissionConfig": {
+  "dbBudget": 24,
+  "apiActive": 16,
+  "apiWait": 32,
+  "clientOpt": false,
+  "fixtureCache": 16,
+  "dbPool": false
+ },
+ "clientRecoveriesDetail": {
+  "method.create": 3,
+  "order.confirm": 2,
+  "session.create": 8,
+  "advance": 16,
+  "advance.poll": 11,
+  "session.create.poll": 14,
+  "setup:workspace": 6,
+  "setup:register": 6,
+  "setup:login": 7,
+  "summary": 7,
+  "setup:verify": 8,
+  "order.review": 1,
+  "step": 23,
+  "play": 1
+ },
+ "resultShapes": {
+  "session.create": [
+   "artifact",
+   "eventWindowStart",
+   "events",
+   "label",
+   "metadata",
+   "method",
+   "quote",
+   "schemaVersion",
+   "state"
+  ],
+  "advance": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "step": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "jump": [
+   "advances",
+   "artifact",
+   "events",
+   "processedGroups",
+   "requestId",
+   "schemaVersion",
+   "sessionId",
+   "status",
+   "throughNs",
+   "view"
+  ],
+  "play": [
+   "artifact",
+   "balance",
+   "chunks",
+   "ended",
+   "more",
+   "nextGroupIndex",
+   "revision",
+   "runId",
+   "schemaVersion",
+   "segment",
+   "sessionId",
+   "targetNs"
+  ]
+ },
+ "summariesSaved": null,
+ "directSlotsConfigured": 3,
+ "directSlotUtilisation": 0.837,
+ "directSlotWaitMs": {
+  "p50": 531.188,
+  "p95": 974.85,
+  "p99": 1207.792,
+  "max": 2158.4
+ },
+ "directRequests": 8548,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   1.5308,
+   2.4676,
+   2.9026
+  ],
+  "journal": [
+   1.8905,
+   2.8842,
+   3.1454
+  ],
+  "analytics": [
+   1.7489,
+   2.4928,
+   2.6373
+  ],
+  "view": [
+   1.6555,
+   2.5688,
+   3.1805
+  ],
+  "jump": [
+   1.1149,
+   1.6647,
+   1.9485
+  ],
+  "step": [
+   0.9441,
+   1.6901,
+   2.4452
+  ],
+  "order.confirm": [
+   1.6741,
+   2.7322,
+   3.1884
+  ],
+  "close": [
+   1.7127,
+   2.6195,
+   2.9673
+  ],
+  "export.csv": [
+   1.5375,
+   1.7762,
+   2.2911
+  ]
+ },
+ "name": "off6-n75",
+ "traders": 75,
+ "wall": 789.4,
+ "scripts": 75,
+ "parityEqual": 75,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 2.64,
+ "sutNetCores": 2.4,
+ "throttled": 0,
+ "sutPeakMb": 1053,
+ "byComponent": {
+  "apiAndOther": 701.6,
+  "postgresql": 61.3,
+  "financialWorker": 450.0
+ },
+ "p95": {
+  "journal": 2.8842,
+  "analytics": 2.4928,
+  "jump": 1.6647,
+  "step": 1.6901,
+  "summary": 2.4676,
+  "view": 2.5688,
+  "export.csv": 1.7762,
+  "step.complete": 3.1772,
+  "play.complete": 10.6205,
+  "order.confirm": 2.7322,
+  "close": 2.6195
+ },
+ "queue": {
+  "maxQueued": 16,
+  "maxAge": 9.7,
+  "wait": {
+   "n": 2015,
+   "p50": 0.211,
+   "p95": 3.204,
+   "p99": 5.925,
+   "max": 10.646
+  },
+  "states": {
+   "SUCCEEDED": 2015
+  }
+ },
+ "admissionRefusals": {
+  "SERVICE_BUSY:apiAdmission": 80,
+  "setup:SERVICE_BUSY": 48,
+  "QUEUE_CAPACITY": 92
+ },
+ "recoveries": {
+  "method.create": 3,
+  "order.confirm": 2,
+  "session.create": 8,
+  "advance": 16,
+  "advance.poll": 11,
+  "session.create.poll": 14,
+  "setup:workspace": 6,
+  "setup:register": 6,
+  "setup:login": 7,
+  "summary": 7,
+  "setup:verify": 8,
+  "order.review": 1,
+  "step": 23,
+  "play": 1
+ },
+ "requests": 13934,
+ "reqPerSec": 17.7,
+ "expectedRefusals": {
+  "CLOSE:503": 43
+ },
+ "generator": {
+  "cpuSeconds": 48.75,
+  "peakRssMb": 113.7,
+  "eventLoopLagMs": {
+   "p50": 0.8,
+   "p95": 2.1,
+   "max": 45.9
+  }
+ },
+ "hostMaxCpu": 73.0,
+ "hostMinMemGiB": 13.54,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": false,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": false,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": false
+}

@@ -84,7 +84,7 @@ export const COPY = {
       free: {name: 'Free', price: 'Rp 0', per: 'selamanya', features: [
         '1 Sesi baru per bulan kalender (UTC)', '1 bulan historis baru diaktifkan per hari (UTC)', 'Melanjutkan Sesi yang ada tidak mengurangi kuota',
         'Memakai ulang bulan yang sudah diaktifkan tidak mengurangi kuota', 'Replay tick, order, Jump, jurnal, analitik, dan ekspor CSV/PDF']},
-      pro: {name: 'Pro', per: 'per periode', features: [
+      pro: {name: 'Pro', monthlyName: 'Pro Bulanan', yearlyName: 'Pro Tahunan', perMonth: 'per bulan (30 hari)', perYear: 'per tahun (365 hari)', was: 'harga normal', saving: 'hemat', until: 'sampai', per: 'per periode', features: [
         'Sesi baru tanpa batas kuota', 'Bulan historis baru tanpa batas kuota', 'Semua fitur Free',
         'Aktif sampai masa berlaku habis, tidak diperpanjang otomatis']},
       pending: 'Harga akan diumumkan', buy: 'Masuk untuk membeli Pro',
@@ -170,7 +170,7 @@ export const COPY = {
       free: {name: 'Free', price: 'Rp 0', per: 'forever', features: [
         '1 new Session per calendar month (UTC)', '1 newly activated historical month per day (UTC)', 'Continuing an existing Session uses no quota',
         'Re-using an already activated month uses no quota', 'Tick replay, orders, Jump, journal, analytics and CSV/PDF export']},
-      pro: {name: 'Pro', per: 'per period', features: [
+      pro: {name: 'Pro', monthlyName: 'Pro Monthly', yearlyName: 'Pro Yearly', perMonth: 'per month (30 days)', perYear: 'per year (365 days)', was: 'regular price', saving: 'save', until: 'until', per: 'per period', features: [
         'New Sessions with no quota', 'Newly activated historical months with no quota', 'Everything in Free',
         'Active until the period ends, no automatic renewal']},
       pending: 'Price to be announced', buy: 'Sign in to buy Pro',

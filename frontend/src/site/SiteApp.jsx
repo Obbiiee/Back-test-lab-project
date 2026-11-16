@@ -4,7 +4,7 @@ import './site.css';
 import {RiksoraMark} from '../tickAlpha/AlphaBrand.jsx';
 import {SITE} from './siteConfig.js';
 import {COPY, CLAIMS, fill} from './content.js';
-import {FREE_LIMITS, formatIdr} from './plans.js';
+import {FREE_LIMITS, formatIdr, currentPrice} from './plans.js';
 
 export const PAGES = ['home', 'pricing', 'about', 'contact', 'terms', 'privacy', 'refund'];
 
@@ -61,9 +61,25 @@ function Footer({t, lang}) {
   </footer>;
 }
 
+function ProCard({t, period, withCta}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const price = currentPrice(SITE, period, today);
+  const p = t.pricing.pro;
+  return <article className="site-plan site-plan-pro">
+    <h3>{period === 'monthly' ? p.monthlyName : p.yearlyName}</h3>
+    <p className="site-price">
+      {price
+        ? <>{price.listPriceIdr && <s className="site-was" aria-label={`${p.was} ${formatIdr(price.listPriceIdr)}`}>{formatIdr(price.listPriceIdr)}</s>} {formatIdr(price.priceIdr)} <small>{period === 'monthly' ? p.perMonth : p.perYear}</small></>
+        : <span className="site-pending">{t.pricing.pending}</span>}
+    </p>
+    {price && price.listPriceIdr && <p className="site-promo">{p.saving} {price.savingPercent}% · {p.until} {price.endsOn}</p>}
+    <ul>{p.features.map(item => <li key={item}>{item}</li>)}</ul>
+    {SITE.pro.taxNote && <p className="site-fine">{SITE.pro.taxNote}</p>}
+    {withCta && <a className="site-primary" href={account}>{t.pricing.buy}</a>}
+  </article>;
+}
+
 function PlanCards({t, withCta = true}) {
-  const price = formatIdr(SITE.pro.priceIdr);
-  const period = SITE.pro.periodDays ? `${SITE.pro.periodDays} ${t.lang === 'en' ? 'days' : 'hari'}` : null;
   return <div className="site-plans">
     <article className="site-plan">
       <h3>{t.pricing.free.name}</h3>
@@ -71,13 +87,8 @@ function PlanCards({t, withCta = true}) {
       <ul>{t.pricing.free.features.map(item => <li key={item}>{item}</li>)}</ul>
       {withCta && <a className="site-secondary" href={account}>{t.hero.primary}</a>}
     </article>
-    <article className="site-plan site-plan-pro">
-      <h3>{t.pricing.pro.name}</h3>
-      <p className="site-price">{price ? <>{price} <small>/ {period || t.pricing.pro.per}</small></> : <span className="site-pending">{t.pricing.pending}</span>}</p>
-      <ul>{t.pricing.pro.features.map(item => <li key={item}>{item}</li>)}</ul>
-      {SITE.pro.taxNote && <p className="site-fine">{SITE.pro.taxNote}</p>}
-      {withCta && <a className="site-primary" href={account}>{t.pricing.buy}</a>}
-    </article>
+    <ProCard t={t} period="monthly" withCta={withCta}/>
+    <ProCard t={t} period="yearly" withCta={withCta}/>
   </div>;
 }
 

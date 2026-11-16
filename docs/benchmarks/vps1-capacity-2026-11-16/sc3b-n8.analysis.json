@@ -1,0 +1,139 @@
+{
+ "directSlotsConfigured": "default(3), timing off",
+ "directSlotUtilisation": null,
+ "directSlotWaitMs": {
+  "p50": null,
+  "p95": null,
+  "p99": null,
+  "max": 0
+ },
+ "directRequests": 0,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {
+  "RemoteProtocolError": 1
+ },
+ "latencyP50P95P99": {
+  "summary": [
+   0.057,
+   0.1147,
+   0.1351
+  ],
+  "journal": [
+   0.0652,
+   0.112,
+   0.112
+  ],
+  "analytics": [
+   0.0564,
+   0.0835,
+   0.0997
+  ],
+  "view": [
+   0.0592,
+   0.0818,
+   1.4055
+  ],
+  "jump": [
+   0.0361,
+   0.0469,
+   0.0469
+  ],
+  "step": [
+   0.0341,
+   0.0542,
+   0.0706
+  ],
+  "order.confirm": [
+   0.071,
+   0.1113,
+   0.1475
+  ],
+  "close": [
+   0.0694,
+   0.1126,
+   0.184
+  ],
+  "export.csv": [
+   0.0981,
+   0.1311,
+   0.1311
+  ]
+ },
+ "name": "sc3b-n8",
+ "traders": 8,
+ "wall": 710.5,
+ "scripts": 10,
+ "parityEqual": 10,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 0.37,
+ "sutNetCores": 0.24,
+ "throttled": 0,
+ "sutPeakMb": 681,
+ "byComponent": {
+  "apiAndOther": 72.2,
+  "postgresql": 11.2,
+  "financialWorker": 35.5
+ },
+ "p95": {
+  "journal": 0.112,
+  "analytics": 0.0835,
+  "jump": 0.0469,
+  "step": 0.0542,
+  "summary": 0.1147,
+  "view": 0.0818,
+  "export.csv": 0.1311,
+  "step.complete": 0.4493,
+  "play.complete": 5.4036,
+  "order.confirm": 0.1113,
+  "close": 0.1126
+ },
+ "queue": {
+  "maxQueued": 1,
+  "maxAge": 0.3,
+  "wait": {
+   "n": 270,
+   "p50": 0.071,
+   "p95": 0.192,
+   "p99": 0.226,
+   "max": 0.256
+  },
+  "states": {
+   "SUCCEEDED": 270
+  }
+ },
+ "admissionRefusals": {},
+ "recoveries": {},
+ "requests": 1736,
+ "reqPerSec": 2.4,
+ "expectedRefusals": {
+  "CLOSE:503": 7
+ },
+ "generator": {
+  "cpuSeconds": 5.6,
+  "peakRssMb": 107.1,
+  "eventLoopLagMs": {
+   "p50": 0.3,
+   "p95": 1.1,
+   "max": 4.1
+  }
+ },
+ "hostMaxCpu": 31.9,
+ "hostMinMemGiB": 13.61,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": true,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": true
+}

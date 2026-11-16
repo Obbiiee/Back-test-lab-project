@@ -8,3 +8,22 @@ export const INCLUDED_IN_BOTH = ['replay', 'orders', 'jump', 'journal', 'analyti
 export function formatIdr(value) {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? 'Rp ' + value.toLocaleString('id-ID') : null;
 }
+
+// Promotion window: the promo price is shown only when both dates are set and today (UTC, ISO date) falls inside [startsOn, endsOn].
+export function activePromo(site, todayIso) {
+  const promo = site.pro.promo;
+  if (!promo || !/^\d{4}-\d{2}-\d{2}$/.test(promo.startsOn || '') || !/^\d{4}-\d{2}-\d{2}$/.test(promo.endsOn || '')) return null;
+  if (todayIso < promo.startsOn || todayIso > promo.endsOn) return null;
+  return promo;
+}
+// What a customer pays for one period right now, and the list price when a promotion lowers it.
+export function currentPrice(site, period, todayIso) {
+  const plan = site.pro[period];
+  if (!plan || !Number.isInteger(plan.priceIdr)) return null;
+  const promo = activePromo(site, todayIso);
+  const promoPrice = promo ? promo[period === 'monthly' ? 'monthlyIdr' : 'yearlyIdr'] : null;
+  if (Number.isInteger(promoPrice) && promoPrice < plan.priceIdr) {
+    return {priceIdr: promoPrice, listPriceIdr: plan.priceIdr, savingPercent: Math.round(100 * (plan.priceIdr - promoPrice) / plan.priceIdr), periodDays: plan.periodDays, endsOn: promo.endsOn};
+  }
+  return {priceIdr: plan.priceIdr, listPriceIdr: null, savingPercent: 0, periodDays: plan.periodDays, endsOn: null};
+}

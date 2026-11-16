@@ -1,0 +1,153 @@
+{
+ "directSlotsConfigured": 3,
+ "directSlotUtilisation": 0.235,
+ "directSlotWaitMs": {
+  "p50": 0.14,
+  "p95": 92.982,
+  "p99": 146.03,
+  "max": 211.4
+ },
+ "directRequests": 4426,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   0.2182,
+   0.4973,
+   1.3708
+  ],
+  "journal": [
+   0.1648,
+   0.5106,
+   1.4739
+  ],
+  "analytics": [
+   0.1256,
+   0.4119,
+   0.4498
+  ],
+  "view": [
+   0.207,
+   0.5444,
+   1.3819
+  ],
+  "jump": [
+   0.1212,
+   0.2744,
+   0.3008
+  ],
+  "step": [
+   0.1746,
+   0.4354,
+   0.5897
+  ],
+  "order.confirm": [
+   0.2882,
+   0.5508,
+   1.5403
+  ],
+  "close": [
+   0.2654,
+   0.5663,
+   0.6858
+  ],
+  "export.csv": [
+   0.4835,
+   0.7087,
+   0.7087
+  ]
+ },
+ "name": "lad-t3-n35",
+ "traders": 35,
+ "wall": 719.7,
+ "scripts": 40,
+ "parityEqual": 40,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 1.24,
+ "sutNetCores": 1.07,
+ "throttled": 1,
+ "sutPeakMb": 926,
+ "byComponent": {
+  "apiAndOther": 261.7,
+  "postgresql": 30.8,
+  "financialWorker": 183.6
+ },
+ "p95": {
+  "journal": 0.5106,
+  "analytics": 0.4119,
+  "jump": 0.2744,
+  "step": 0.4354,
+  "summary": 0.4973,
+  "view": 0.5444,
+  "export.csv": 0.7087,
+  "step.complete": 1.8099,
+  "play.complete": 6.6995,
+  "order.confirm": 0.5508,
+  "close": 0.5663
+ },
+ "queue": {
+  "maxQueued": 7,
+  "maxAge": 3.4,
+  "wait": {
+   "n": 1022,
+   "p50": 0.154,
+   "p95": 1.092,
+   "p99": 1.961,
+   "max": 4.237
+  },
+  "states": {
+   "SUCCEEDED": 1022
+  }
+ },
+ "admissionRefusals": {
+  "SERVICE_BUSY:dbBudget": 51,
+  "SERVICE_BUSY:apiAdmission": 19
+ },
+ "recoveries": {
+  "summary": 31,
+  "close": 4,
+  "step.poll": 2,
+  "order.review": 10,
+  "order.confirm": 9,
+  "play": 1,
+  "step": 6,
+  "journal": 1,
+  "view": 2,
+  "session.create.poll": 1,
+  "play.poll": 1,
+  "cancel": 1
+ },
+ "requests": 7156,
+ "reqPerSec": 9.9,
+ "expectedRefusals": {
+  "CLOSE:503": 39
+ },
+ "generator": {
+  "cpuSeconds": 21.44,
+  "peakRssMb": 109.1,
+  "eventLoopLagMs": {
+   "p50": 0.4,
+   "p95": 1.6,
+   "max": 6.4
+  }
+ },
+ "hostMaxCpu": 61.7,
+ "hostMinMemGiB": 13.39,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": true,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": true
+}

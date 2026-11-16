@@ -1,0 +1,81 @@
+{
+ "name": "sc2-n8",
+ "traders": 8,
+ "wall": 708.6,
+ "scripts": 9,
+ "parityEqual": 9,
+ "parityBad": [],
+ "errors": [
+  "ReadError: "
+ ],
+ "sutCpuCores": 0.31,
+ "sutNetCores": 0.17,
+ "throttled": 0,
+ "sutPeakMb": 548,
+ "byComponent": {
+  "apiAndOther": 61.7,
+  "postgresql": 9.0,
+  "financialWorker": 31.5
+ },
+ "p95": {
+  "journal": 0.1154,
+  "analytics": 0.0784,
+  "jump": 0.0599,
+  "step": 0.0631,
+  "summary": 0.1126,
+  "view": 0.081,
+  "export.csv": 0.1296,
+  "step.complete": 0.4595,
+  "play.complete": 5.3603,
+  "order.confirm": 0.1157,
+  "close": 0.1414
+ },
+ "queue": {
+  "maxQueued": 2,
+  "maxAge": 0.3,
+  "wait": {
+   "n": 269,
+   "p50": 0.103,
+   "p95": 0.233,
+   "p99": 0.269,
+   "max": 0.561
+  },
+  "states": {
+   "SUCCEEDED": 269
+  }
+ },
+ "admissionRefusals": {},
+ "recoveries": {},
+ "requests": 1720,
+ "reqPerSec": 2.4,
+ "expectedRefusals": {
+  "CLOSE:503": 7
+ },
+ "generator": {
+  "cpuSeconds": 5.42,
+  "peakRssMb": 107.0,
+  "eventLoopLagMs": {
+   "p50": 0.3,
+   "p95": 1.0,
+   "max": 3.4
+  }
+ },
+ "hostMaxCpu": 29.0,
+ "hostMinMemGiB": 13.92,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": false,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": true,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": false
+}
