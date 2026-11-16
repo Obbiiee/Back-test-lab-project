@@ -18,7 +18,20 @@ from .contracts import text, MAX_STEPS
 from .research_fixture import research_provider
 
 WINDOW_GROUPS = 1024
-FIXTURE_CACHE_ENTRIES = 16
+FIXTURE_CACHE_ENTRIES_DEFAULT = 16
+
+
+def fixture_cache_entries():
+    """Per-process verified timeline cache size. Default 16 (contract); BTL_FIXTURE_CACHE_ENTRIES (1..512) is a QA/operator knob that changes only how often a session is restored, never any result."""
+    import os
+    raw = os.environ.get('BTL_FIXTURE_CACHE_ENTRIES')
+    if raw is None or raw == '':
+        return FIXTURE_CACHE_ENTRIES_DEFAULT
+    require(raw.isascii() and raw.isdigit() and 1 <= int(raw) <= 512, 'fixtureCacheEntries', 'INVALID_INPUT')
+    return int(raw)
+
+
+FIXTURE_CACHE_ENTRIES = fixture_cache_entries()
 TIMEFRAMES = {'1m':60, '3m':180, '5m':300, '15m':900, '30m':1800,
               '1h':3600, '2h':7200, '4h':14400, 'D':86400}
 

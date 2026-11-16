@@ -180,8 +180,10 @@ def stage(a):
     for flag, env in ((a.db_budget, 'BTL_DB_BUDGET'), (a.api_limit, 'BTL_API_ADMISSION_LIMIT'), (a.api_wait, 'BTL_API_ADMISSION_WAIT_LIMIT')):
         if flag is not None:
             sut_env[env] = str(flag); sut_env['BTL_BENCH_QA_TIMING'] = '1'
+    if a.fixture_cache is not None:
+        sut_env['BTL_FIXTURE_CACHE_ENTRIES'] = str(a.fixture_cache); sut_env['BTL_BENCH_QA_TIMING'] = '1'
     result['directSlots'] = a.direct_slots if a.direct_slots is not None else 'default(3), timing off'
-    result['admissionConfig'] = dict(dbBudget=a.db_budget or 12, apiActive=a.api_limit or 8, apiWait=a.api_wait or 16, clientOpt=bool(a.client_opt))
+    result['admissionConfig'] = dict(dbBudget=a.db_budget or 12, apiActive=a.api_limit or 8, apiWait=a.api_wait or 16, clientOpt=bool(a.client_opt), fixtureCache=a.fixture_cache or 16)
     sp = subprocess.Popen(sut_cmd, stdout=sut_log, stderr=subprocess.STDOUT, env=sut_env)
     t0 = time.monotonic()
     while not (run / 'work' / 'READY').exists():
@@ -285,7 +287,7 @@ if __name__ == '__main__':
     s = sub.add_parser('stage'); s.add_argument('--name', required=True); s.add_argument('--spec', required=True); s.add_argument('--mode', default='load'); s.add_argument('--ticks', type=int, default=65536)
     s.add_argument('--workers', type=int, default=3); s.add_argument('--seed', type=int, default=1); s.add_argument('--duration', type=float, default=120); s.add_argument('--ramp', type=float, default=10)
     s.add_argument('--think-scale', type=float, default=1.0); s.add_argument('--idle', type=int, default=15); s.add_argument('--direct-slots', type=int, default=None)
-    s.add_argument('--db-budget', type=int, default=None); s.add_argument('--api-limit', type=int, default=None); s.add_argument('--api-wait', type=int, default=None); s.add_argument('--client-opt', type=int, default=0)
+    s.add_argument('--db-budget', type=int, default=None); s.add_argument('--api-limit', type=int, default=None); s.add_argument('--api-wait', type=int, default=None); s.add_argument('--client-opt', type=int, default=0); s.add_argument('--fixture-cache', type=int, default=None)
     s.add_argument('--port', type=int, default=8101); s.add_argument('--pg-port', type=int, default=54431)
     s.add_argument('--sut-cpu', default='400'); s.add_argument('--sut-mem', default='11G'); s.add_argument('--sut-cores', default='0-3')
     s.add_argument('--drv-cpu', default='100'); s.add_argument('--drv-mem', default='2G'); s.add_argument('--drv-cores', default='4')
