@@ -3,8 +3,9 @@ import os
 import secrets
 import unittest
 import uuid
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event
+from threading import Event, Lock
 import time
 from unittest.mock import patch
 
@@ -25,16 +26,26 @@ class CloudResearchTests(unittest.TestCase):
     def setUpClass(cls):
         migrate(DSN)
 
-    def setUp(self):
+    def setUp(self, start_workers=True):
         self.delivery = RecordingDelivery()
         requested_users = int(os.environ.get('BTL_QA_VIRTUAL_TRADER_USERS', '5'))
         self.app = create_app(DSN, secrets.token_urlsafe(48), self.delivery,
                               rate_limit=max(200, requested_users * 20))
         self.client = client(self.app)
+        # TestClient only runs FastAPI lifespan hooks when entered as a context
+        # manager. The product's queued 202 contract relies on those durable
+        # workers, so integration tests must exercise the real lifecycle too.
+        self._client_lifespan = self.client if start_workers else None
+        if self._client_lifespan is not None:
+            self._client_lifespan.__enter__()
         self.actor, self.headers = self.account()
         self.workspace = self.client.post('/api/v1/workspaces', headers=self.headers,
                                           json={'name': 'Isolated research QA'}).json()['id']
         self.root = '/api/v1/workspaces/' + self.workspace + '/research'
+
+    def tearDown(self):
+        if self._client_lifespan is not None:
+            self._client_lifespan.__exit__(None, None, None)
 
     def account(self, email=None):
         email = email or (uuid.uuid4().hex + '@example.com')
@@ -45,6 +56,29 @@ class CloudResearchTests(unittest.TestCase):
         login = self.client.post('/api/v1/auth/login', data={'username': email, 'password': PASSWORD})
         self.assertEqual(login.status_code, 200, login.text)
         return registered.json()['id'], {'Authorization': 'Bearer ' + login.json()['access_token']}
+
+    def completed_job_result(self, response, root=None, headers=None):
+        """Resolve the API's documented immediate-or-durable-job response."""
+        self.assertIn(response.status_code, (200, 202), response.text)
+        if response.status_code == 200:
+            return response.json()
+        body = response.json()
+        self.assertIn(body.get('state'), ('QUEUED', 'RUNNING'), body)
+        job_id = body.get('jobId')
+        self.assertIsInstance(job_id, str)
+        root = root or self.root
+        headers = headers or self.headers
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            current = self.client.get(root + '/jobs/' + job_id, headers=headers)
+            self.assertEqual(current.status_code, 200, current.text)
+            value = current.json()
+            if value['state'] == 'SUCCEEDED':
+                self.assertIsInstance(value.get('result'), dict)
+                return value['result']
+            self.assertIn(value['state'], ('QUEUED', 'RUNNING'), value)
+            time.sleep(.01)
+        self.fail('Durable research job did not complete before its bounded test deadline')
 
     def test_summary_requires_identity_membership_and_hides_foreign_session(self):
         app = ResearchApplication(DSN, TrustedScope(self.workspace,self.actor))
@@ -140,6 +174,89 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(self.client.get(self.root + '/sessions?limit=51', headers=self.headers).status_code, 422)
         app.close()
 
+    def test_job_status_poll_has_reserved_thread_capacity_during_direct_reads(self):
+        from cloud import queue
+
+        session_ids = ['session:poll-isolation-' + uuid.uuid4().hex for _ in range(2)]
+        job = queue.submit(DSN, uuid.UUID(self.actor), uuid.UUID(self.workspace), uuid.uuid4(),
+                           'workspace', (session_ids[0], {'timeframe': '1m'}))
+        readers_started = Event()
+        both_reads_running = __import__('threading').Barrier(2, action=readers_started.set)
+        release_reads = Event()
+
+        def blocked_read(*_args, **_kwargs):
+            both_reads_running.wait(timeout=5)
+            if not release_reads.wait(timeout=5):
+                raise TimeoutError('QA_DIRECT_READ_RELEASE_TIMEOUT')
+            return {'artifact': 'QA-DIRECT-READ-1'}
+
+        paths = [self.root + '/catalog' for _session_id in session_ids]
+        try:
+            with patch('cloud.research.run', side_effect=blocked_read):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    reads = [pool.submit(self.client.get, path, headers=self.headers) for path in paths]
+                    started = readers_started.wait(5)
+                    if not started:
+                        release_reads.set()
+                        outcomes = [future.result(timeout=10) for future in reads]
+                        self.fail(f'direct-read fixtures did not occupy both bounded slots: {outcomes!r}')
+                    self.app.state.qa_timing = True
+                    try:
+                        poll = self.client.get(self.root + '/jobs/' + str(job['jobId']), headers=self.headers)
+                    finally:
+                        self.app.state.qa_timing = False
+                    self.assertEqual(poll.status_code, 200, poll.text)
+                    self.assertIn(poll.json()['state'], ('QUEUED', 'RUNNING'))
+                    self.assertRegex(poll.headers.get('server-timing', ''),
+                                     r'^queue-thread-wait;dur=[0-9.]+, queue-query;dur=[0-9.]+, db-admission;dur=[0-9.]+, db-connect;dur=[0-9.]+, db-sql;dur=[0-9.]+, db-transaction-exit;dur=[0-9.]+, db-sql-count;desc=[0-9]+$')
+                    self.assertGreater(int(poll.headers['server-timing'].split('db-sql-count;desc=')[1]), 0)
+                    release_reads.set()
+                    responses = [future.result(timeout=10) for future in reads]
+                    self.assertEqual([response.status_code for response in responses], [200, 200])
+            self.app.state.qa_timing = True
+            try:
+                timed = self.client.get(self.root + '/catalog', headers=self.headers)
+            finally:
+                self.app.state.qa_timing = False
+            self.assertEqual(timed.status_code, 200, timed.text)
+            self.assertRegex(timed.headers.get('server-timing', ''),
+                             r'^research-admission;dur=[0-9.]+, research-thread-wait;dur=[0-9.]+, research-operation;dur=[0-9.]+, research-thread-cpu;dur=[0-9.]+, db-admission;dur=[0-9.]+, db-connect;dur=[0-9.]+, db-sql;dur=[0-9.]+, db-transaction-exit;dur=[0-9.]+, fixture-cache-lock-wait;dur=[0-9.]+, fixture-restore-gate-wait;dur=[0-9.]+, fixture-timeline-resume;dur=[0-9.]+, fixture-past-read;dur=[0-9.]+, db-sql-count;desc=[0-9]+, research-serialization;dur=[0-9.]+$')
+            self.assertGreater(int(timed.headers['server-timing'].split('db-sql-count;desc=')[1].split(',')[0]), 0)
+        finally:
+            release_reads.set()
+
+    def test_committed_analysis_projection_is_reused_across_research_instances(self):
+        from execution.research import ResearchApplication
+        from execution.analysis_cache import COMMITTED_ANALYSIS_CACHE
+
+        app = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
+        record = method()
+        app.create_method(record)
+        session_id = 'session:analysis-cache-' + uuid.uuid4().hex
+        app.create_session({'id': session_id, 'name': 'Analysis cache QA',
+                            'methodId': record['id'], 'initialBalance': '10000',
+                            'startPeriod': '2020-01'})
+        try:
+            first = app.workspace(session_id, {'timeframe': '1m'})
+            self.assertEqual(first['analysis']['status'], 'COMPLETE')
+            key = COMMITTED_ANALYSIS_CACHE.key(dsn=DSN, workspace_id=self.workspace,
+                session_id=session_id, revision=first['state']['revision'],
+                event_head=first['state']['eventHash'], quote=first['quote'])
+            entry = COMMITTED_ANALYSIS_CACHE.get(key)
+            self.assertEqual(entry['artifact'], 'BTL-COMMITTED-ANALYSIS-CACHE-1')
+        finally:
+            app.close()
+
+        resumed = ResearchApplication(DSN, TrustedScope(self.workspace, self.actor))
+        try:
+            with patch('execution.research.project', side_effect=AssertionError('projection cache miss')):
+                page = resumed.journal_page(session_id, {'limit': 32, 'cursor': None})
+            self.assertEqual(page['artifact'], 'BTL-TICK-JOURNAL-PAGE-1')
+            self.assertEqual(page['financialAuthority'], 'COMMITTED_EVENTS_ONLY')
+            self.assertEqual(page['totalOrders'], 0)
+        finally:
+            resumed.close()
+
     def test_method_analytics_pools_positive_committed_synthetic_trades_only(self):
         from fractions import Fraction
         from execution.contracts import text
@@ -150,12 +267,18 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(saved_method.status_code, 200, saved_method.text)
 
         def advance(session_id, steps):
-            state = app.inspect(session_id)['state']
-            command = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
-                       'sessionId': session_id, 'commandId': 'analytics-advance:' + uuid.uuid4().hex,
-                       'expectedRevision': state['revision'], 'kind': 'ADVANCE',
-                       'payload': {'targetNs': str(int(state['throughNs']) + steps * STEP_NS)}}
-            return app.apply(session_id, command)
+            target = int(app.inspect(session_id)['state']['throughNs']) + steps * STEP_NS
+            for _ in range(512):
+                view = app.inspect(session_id)
+                state = view['state']
+                if int(state['throughNs']) >= target or state['ended']:
+                    return view
+                command = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1',
+                           'sessionId': session_id, 'commandId': 'analytics-advance:' + uuid.uuid4().hex,
+                           'expectedRevision': state['revision'], 'kind': 'ADVANCE',
+                           'payload': {'targetNs': str(target)}}
+                app.apply(session_id, command)
+            self.fail('Synthetic analytics advance did not reach its requested tick target')
 
         def completed_trade(label, *, pre_advance, post_fill_advance, side='LONG'):
             session_id = 'session:analytics-' + label + '-' + uuid.uuid4().hex
@@ -164,8 +287,7 @@ class CloudResearchTests(unittest.TestCase):
                                'startPeriod': '2020-01'}
             created = self.client.post(self.root + '/sessions', headers=self.headers,
                                        json=session_payload)
-            self.assertEqual(created.status_code, 200, created.text)
-            view = created.json()
+            view = self.completed_job_result(created)
             if pre_advance:
                 view = advance(session_id, pre_advance)
             request = review_request(view)
@@ -199,13 +321,12 @@ class CloudResearchTests(unittest.TestCase):
                      'payload': {'orderId': order_id, 'quantity': None}}
             app.apply(session_id, close)
             advance(session_id, 1)  # close at a later committed quote
-            final = app.inspect(session_id)['state']
-            self.assertEqual(final['orders'][order_id]['status'], 'CLOSED')
             journal = self.client.get(self.root + '/sessions/' + session_id + '/journal',
                                       headers=self.headers)
             self.assertEqual(journal.status_code, 200, journal.text)
             self.assertEqual(journal.json()['financialAuthority'], 'COMMITTED_EVENTS_ONLY')
             self.assertEqual([order['id'] for order in journal.json()['orders']], [order_id])
+            self.assertEqual(journal.json()['orders'][0]['status'], 'CLOSED')
             analysis = app.workspace(session_id, {'timeframe': '1m'})['analysis']
             self.assertEqual(analysis['status'], 'COMPLETE')
             self.assertEqual(len(analysis['completed']), 1)
@@ -370,25 +491,28 @@ class CloudResearchTests(unittest.TestCase):
                 successor=dict(original,id='method-version:'+uuid.uuid4().hex,name=f'Version {index+2}')
                 add_version(db,self.workspace,original['id'],{'expectedRevision':revision,'method':successor})
                 expected.append(successor['id']);revision+=1
-        first=self.client.get(self.root+'/method-families/'+original['id']+'?version_limit=50',headers=self.headers)
+        version_path=self.root+'/method-families/'+original['id']+'/versions'
+        first=self.client.get(version_path,params={'limit':50},headers=self.headers)
         self.assertEqual(first.status_code,200,first.text)
-        family=first.json()['family']
-        self.assertEqual(family['latestVersion'],129)
-        self.assertEqual([row['version'] for row in family['versions']],list(range(1,51)))
-        self.assertEqual(family['nextVersionCursor'],50)
-        second=self.client.get(self.root+'/method-families/'+original['id']+
-            '?version_limit=50&after_version=50',headers=self.headers)
+        first_page=first.json()
+        self.assertEqual([row['version'] for row in first_page['versions']],list(range(1,51)))
+        self.assertIsNotNone(first_page['nextCursor'])
+        second=self.client.get(version_path,params={'limit':50,'cursor':first_page['nextCursor']},headers=self.headers)
         self.assertEqual(second.status_code,200,second.text)
-        second_family=second.json()['family']
-        self.assertEqual([row['version'] for row in second_family['versions']],list(range(51,101)))
-        self.assertEqual(second_family['nextVersionCursor'],100)
-        final=self.client.get(self.root+'/method-families/'+original['id']+
-            '?version_limit=50&after_version=100',headers=self.headers)
+        second_page=second.json()
+        self.assertEqual([row['version'] for row in second_page['versions']],list(range(51,101)))
+        self.assertIsNotNone(second_page['nextCursor'])
+        final=self.client.get(version_path,params={'limit':50,'cursor':second_page['nextCursor']},headers=self.headers)
         self.assertEqual(final.status_code,200,final.text)
-        final_family=final.json()['family']
-        self.assertEqual([row['methodId'] for row in final_family['versions']],expected[100:])
-        self.assertIsNone(final_family['nextVersionCursor'])
-        self.assertTrue(final_family['versionsComplete'])
+        final_page=final.json()
+        self.assertEqual([row['methodId'] for row in final_page['versions']],expected[100:])
+        self.assertIsNone(final_page['nextCursor'])
+        self.assertTrue(final_page['complete'])
+        detail=self.client.get(self.root+'/method-families/'+original['id'],headers=self.headers)
+        self.assertEqual(detail.status_code,200,detail.text)
+        detail_family=detail.json()['family']
+        self.assertTrue(detail_family['versionsTruncated'])
+        self.assertEqual([row['version'] for row in detail_family['versions']],list(range(2,130)))
 
     def test_paginated_journal_route_keeps_workspace_authority_and_financial_projection(self):
         app=ResearchApplication(DSN,TrustedScope(self.workspace,self.actor))
@@ -419,8 +543,7 @@ class CloudResearchTests(unittest.TestCase):
         payload = {'id': 'session:' + uuid.uuid4().hex, 'name': 'Scoped fixture', 'methodId': m['id'],
                    'initialBalance': '10000', 'startPeriod': '2020-01'}
         created = self.client.post(self.root + '/sessions', headers=self.headers, json=payload)
-        self.assertEqual(created.status_code, 200, created.text)
-        view = created.json()
+        view = self.completed_job_result(created)
         path = self.root + '/sessions/' + payload['id']
         review_body = review_request(view)
         reviewed = self.client.post(self.root + '/reviews', headers=self.headers, json=review_body)
@@ -457,8 +580,7 @@ class CloudResearchTests(unittest.TestCase):
         created = self.client.post(self.root + '/sessions', headers=self.headers, json={
             'id': session_id, 'name': 'Concurrent confirm QA', 'methodId': record['id'],
             'initialBalance': '10000', 'startPeriod': '2020-01'})
-        self.assertEqual(created.status_code, 200, created.text)
-        review = review_request(created.json())
+        review = review_request(self.completed_job_result(created))
         reviewed = self.client.post(self.root + '/reviews', headers=self.headers, json=review)
         self.assertEqual(reviewed.status_code, 200, reviewed.text)
         pin = {'reviewId': review['requestId'], 'reviewHash': reviewed.json()['reviewHash']}
@@ -514,9 +636,9 @@ class CloudResearchTests(unittest.TestCase):
             request = {'id': trader.session_id, 'name': f'Virtual trader {trader.ordinal} QA',
                        'methodId': trader.method_id, 'initialBalance': '10000', 'startPeriod': '2020-01'}
             created_session = self.client.post(root + '/sessions', headers=headers, json=request)
-            self.assertEqual(created_session.status_code, 200, created_session.text)
+            created_session_result = self.completed_job_result(created_session, root, headers)
 
-            review = review_request(created_session.json())
+            review = review_request(created_session_result)
             review['requestId'] = trader.command_id
             reviewed = self.client.post(root + '/reviews', headers=headers, json=review)
             self.assertEqual(reviewed.status_code, 200, reviewed.text)
@@ -607,7 +729,7 @@ class CloudResearchTests(unittest.TestCase):
         session_id = 'session:' + uuid.uuid4().hex
         session = {'id': session_id, 'name': 'Owner metering scope', 'methodId': record['id'],
                    'initialBalance': '10000', 'startPeriod': '2020-01'}
-        self.assertEqual(self.client.post(self.root + '/sessions', headers=self.headers, json=session).status_code, 200)
+        self.completed_job_result(self.client.post(self.root + '/sessions', headers=self.headers, json=session))
         target = '/api/v1/workspaces/' + self.workspace + '/members'
         self.assertEqual(self.client.post(target, headers=self.headers, json={'userId': member}).status_code, 204)
         self.assertEqual(self.client.get(self.root + '/catalog', headers=header).status_code, 200)
@@ -644,6 +766,53 @@ class CloudResearchTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         response = self.client.post(self.root + '/methods', headers={**self.headers, 'X-BTL-Source': 'historical'}, json=method())
         self.assertEqual(response.status_code, 422)
+
+    def test_bounded_research_admission_waits_for_active_reads(self):
+        from cloud import research
+        import httpx
+        self.assertEqual(research.DIRECT_READ_WAIT_SECONDS, 20)
+        self.assertEqual(research.DIRECT_MUTATION_WAIT_SECONDS, 20)
+        self.assertEqual(research.DIRECT_OPERATION_CONCURRENCY, 3)
+        first_three_entered, fourth_entered, release = Event(), Event(), Event()
+        calls = 0
+        calls_lock = Lock()
+
+        def held(*_args, **_kwargs):
+            nonlocal calls
+            with calls_lock:
+                calls += 1
+                current = calls
+            if current == 3:
+                first_three_entered.set()
+            if current == 4:
+                fourth_entered.set()
+            self.assertTrue(release.wait(8))
+            return {'artifact': 'BTL-METHOD-FAMILY-PAGE-1', 'items': [], 'complete': True,
+                    'nextCursor': None}
+
+        path = self.root + '/method-families'
+        async def exercise():
+            transport=httpx.ASGITransport(app=self.app)
+            async with httpx.AsyncClient(transport=transport,base_url='https://testserver') as client:
+                async def get():
+                    return await client.get(path,headers=self.headers)
+                with patch('cloud.research.run', held):
+                    requests=[asyncio.create_task(get()) for _ in range(3)]
+                    try:
+                        self.assertTrue(await asyncio.to_thread(first_three_entered.wait,5),
+                                        'three bounded research slots should be used')
+                        fourth=asyncio.create_task(get())
+                        await asyncio.sleep(.1)
+                        self.assertFalse(fourth_entered.is_set(),
+                                         'fourth read must wait instead of bypassing the cap')
+                        release.set()
+                        requests.append(fourth)
+                        return await asyncio.wait_for(asyncio.gather(*requests),24)
+                    finally:
+                        release.set()
+        responses=asyncio.run(exercise())
+        self.assertEqual([response.status_code for response in responses], [200, 200, 200, 200])
+        self.assertEqual(calls, 4)
 
     def test_verified_user_lock_covers_inner_commit_not_only_preflight(self):
         entered, release = Event(), Event()

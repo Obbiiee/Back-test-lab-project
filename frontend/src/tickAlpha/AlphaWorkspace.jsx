@@ -27,7 +27,7 @@ const DRAWING_GROUPS=[
 const POSITION_TYPES=new Set(['long-position','short-position']);
 const toolName=type=>DRAWING_SPECS[type]?.name||({'long-position':'Long Position','short-position':'Short Position'})[type]||type.replaceAll('-',' ');
 
-export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onNotice,onPriceSelect,onPlanDrawing,objectsOpen,onToggleObjects,lead=null,trail=null}){
+export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimeframe,onReplay,onJump,canJump=false,onNotice,onPriceSelect,onPlanDrawing,objectsOpen,onToggleObjects,lead=null,trail=null}){
   const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
   const [savedIndicators]=useState(()=>{
     const store=new IndicatorPreferences(()=>globalThis.localStorage,workspaceKey,productionRegistry);
@@ -41,6 +41,8 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
   const capped=useMemo(()=>capIndicators(instances,phone),[instances,phone]);
   const [preferences,setPreferences]=useState({showGrid:true,showCrosshair:true,showVolume:false});
   const [speed,setSpeed]=useState(4),[playToken,setPlayToken]=useState(null);
+  const [jumping,setJumping]=useState(false),[jumpProgress,setJumpProgress]=useState(null);
+  const cancelJump=useRef(false);
   const seekInput=useRef(null);
   const [floating,setFloating]=useState(false),[replayOffset,setReplayOffset]=useState({x:0,y:0});
   const playing=playToken===pauseToken;
@@ -126,6 +128,16 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
     setPlayToken(null);
     try{onReplay('SEEK',seekTarget(seekInput.current.value));}catch(error){onNotice(error.message);}
   };
+  const startJump=async()=>{
+    if(jumping||busy||playing||!canJump)return;
+    cancelJump.current=false;setPlayToken(null);setJumping(true);setJumpProgress('Starting bounded event search…');
+    try{
+      const result=await onJump({view,cancelled:()=>cancelJump.current,
+        onProgress:value=>setJumpProgress(`Searching · ${new Date(Number(BigInt(value.throughNs)/1000000n)).toISOString().replace('T',' ').slice(0,19)} UTC · ${value.processedGroups} tick groups in this step`)});
+      if(cancelJump.current&&result?.status==='SEARCHING')onNotice('Search stopped after the current committed chunk. Session progress is saved; press Jump to Next Event to continue.');
+    }catch(error){onNotice(error.message||'Next event search stopped. Reload the Session before retrying.');
+    }finally{setJumping(false);setJumpProgress(null);}
+  };
   return <section className={`alpha-chart-workspace${fullscreen?' is-fullscreen':''}`} aria-label="Tick replay workspace">
     <div className="alpha-chart-header">
       {lead}
@@ -156,6 +168,8 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
       <button onClick={()=>{setFloating(!floating);setReplayOffset({x:0,y:0});}}>{floating?'Dock replay':'Float replay'}</button>
       <button disabled={busy&&!playing||view.state.ended} aria-pressed={playing} aria-keyshortcuts="Space" title="Space" onClick={()=>{setPlayToken(playing?null:pauseToken);emitLocal(playing?'replay_paused':'replay_started');}}>{playing?'Pause replay':'Play replay'}</button>
       <button disabled={busy||playing||view.state.ended} aria-keyshortcuts="Shift+ArrowRight" title={`Shift+→ · requests observed quotes through ${new Date(Number(BigInt(replayTarget(view,speed))/1000000n)).toISOString()}`} onClick={()=>onReplay('ADVANCE',replayTarget(view,speed))}>{view.pendingReplayTargetNs?'Continue saved replay':'Step ticks'}</button>
+      {!jumping?<button disabled={busy||playing||view.state.ended||!canJump} onClick={()=>void startJump()} title={canJump?'Process committed tick groups until the next trading event':'Add a pending or active order to search for its next event'}>Jump to Next Event</button>:<button onClick={()=>{cancelJump.current=true;setJumpProgress('Stopping after the current durable chunk…');}}>Cancel search</button>}
+      {jumping&&<span className="alpha-step-target" role="status" aria-live="polite">{jumpProgress}</span>}
       <span className="alpha-step-target">{view.pendingReplayTargetNs?'Saved target:':'Next target:'} {new Date(Number(BigInt(replayTarget(view,speed))/1000000n)).toISOString().slice(11,19)} UTC</span>
       <label>Replay speed<select aria-label="Replay speed" disabled={busy||playing} value={speed} onChange={e=>setSpeed(Number(e.target.value))}><option value={1}>1 interval / step</option><option value={4}>4 intervals / step</option><option value={16}>16 intervals / step</option></select></label>
       <details className="alpha-seek" onToggle={event=>{if(event.currentTarget.open&&seekInput.current)seekInput.current.value=new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19);}}><summary>Go to time</summary><div><label>Seek (UTC)<input ref={seekInput} aria-label="Seek UTC" type="datetime-local" step="1" disabled={busy||playing} defaultValue={new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,19)}/></label><button disabled={busy||playing} onClick={stopAndSeek}>Seek replay</button></div></details>

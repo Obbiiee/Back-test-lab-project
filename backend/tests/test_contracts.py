@@ -1,12 +1,17 @@
 import ast
+import hashlib
 import json
+import random
 import unittest
 from dataclasses import FrozenInstanceError, replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 from pathlib import Path
 
-from contracts.canonical import canonical_bytes, content_hash, decimal_text, utc_text
+import msgspec
+
+from contracts.canonical import (_CanonicalArrayAccumulator, _normalize, canonical_bytes,
+                                  content_hash, decimal_text, utc_text)
 from contracts.primitives import ContractError, assert_current, decimal, revision
 from contracts.models import (Observation, MethodPolicy, SessionContext, Command, ReviewedRequest, Receipt,
                               EvidenceEvent, Passport, LineageEntry, ResearchJobInput, TemporalObservation,
@@ -38,6 +43,83 @@ def decode(value):
 
 
 class CanonicalTests(unittest.TestCase):
+    def test_incremental_array_limits_match_full_canonical_envelope(self):
+        rng = random.Random(61012)
+
+        def compare(elements):
+            accumulator = _CanonicalArrayAccumulator("BTL-TICK-STEP-CHECK-1", "groups")
+            accepted = []
+            for element in elements:
+                candidate = accepted + [element]
+                envelope = {"schemaVersion": 1, "artifact": "BTL-TICK-STEP-CHECK-1",
+                            "groups": candidate}
+                try:
+                    canonical_bytes(envelope)
+                except ContractError as expected:
+                    with self.assertRaises(ContractError) as actual:
+                        accumulator.append(element)
+                    self.assertEqual((actual.exception.code, actual.exception.field),
+                                     (expected.code, expected.field))
+                    return
+                accumulator.append(element)
+                accepted = candidate
+            self.assertEqual(len(accepted), len(elements))
+
+        elements = []
+        for index in range(90):
+            elements.append({"groupId": f"group:{index}", "timeNs": str(index),
+                             "events": [rng.choice((None, True, False, rng.randint(0, 2**40),
+                                                     "λ", "🧪", "quote\\\""))
+                                        for _ in range(rng.randrange(1, 24))]})
+        compare(elements)
+        compare([[index for index in range(2048)] for _ in range(12)])
+        compare([{"payload": "x" * 65000} for _ in range(20)])
+
+    def test_msgspec_encoding_is_byte_and_hash_identical_for_normalized_json(self):
+        rng = random.Random(42017)
+        strings = ("", "plain", "λ", "🧪", "\u2028", "\x00\x08\t\n\f\r\\\"")
+
+        def value(depth=0):
+            if depth >= 5 or rng.randrange(4) == 0:
+                return rng.choice((None, True, False, rng.randint(-(2**45), 2**45),
+                                   rng.choice(strings)))
+            if rng.randrange(2):
+                return [value(depth + 1) for _ in range(rng.randrange(5))]
+            keys = rng.sample(("a", "Z", "ä", "🧪", "\u2028", "key"), rng.randrange(6))
+            return {key: value(depth + 1) for key in keys}
+
+        for _ in range(250):
+            candidate = {"schemaVersion": 1, "payload": value(),
+                         "ordering": {"ä": 1, "A": 2, "🧪": 3, "\u2028": 4}}
+            normalized = _normalize(candidate)
+            reference = json.dumps(normalized, sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"), allow_nan=False).encode("utf-8")
+            encoded = msgspec.json.encode(normalized, order="deterministic")
+            self.assertEqual(encoded, reference)
+            self.assertEqual(canonical_bytes(candidate), reference)
+            self.assertEqual(content_hash(candidate), hashlib.sha256(reference).hexdigest())
+
+    def test_msgspec_encoder_matches_legacy_oracle_for_decimal_time_and_empty_values(self):
+        cases = [
+            {"schemaVersion": 1, "positiveZero": Decimal("0.000"),
+             "negativeZero": Decimal("-0.000000"), "scaled": Decimal("1.230000"),
+             "tiny": Decimal("1e-27"), "empty": [], "nullable": None,
+             "flags": [True, False]},
+            {"schemaVersion": 1,
+             "utc": datetime(2026, 11, 12, 9, 8, 7, 123456, tzinfo=timezone.utc),
+             "offset": datetime(2026, 11, 12, 12, 8, 7, 123456,
+                                tzinfo=timezone(timedelta(hours=3))),
+             "nested": {"z": Decimal("-12.3400"), "a": [Decimal("2.50")] }},
+        ]
+        for candidate in cases:
+            with self.subTest(candidate=candidate):
+                normalized = _normalize(candidate)
+                oracle = json.dumps(normalized, sort_keys=True, ensure_ascii=False,
+                    separators=(",", ":"), allow_nan=False).encode("utf-8")
+                self.assertEqual(canonical_bytes(candidate), oracle)
+                self.assertEqual(hashlib.sha256(canonical_bytes(candidate)).hexdigest(),
+                                 hashlib.sha256(oracle).hexdigest())
+
     def test_independent_golden_vectors(self):
         vectors = json.loads((Path(__file__).parent / "fixtures" / "contract_hash_vectors.json").read_text(encoding="utf-8"))
         for v in vectors:
@@ -186,7 +268,7 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ContractError): TemporalObservation(datetime(2024, 1, 1), "1")
 
     def test_framework_independence(self):
-        allowed = {"re", "datetime", "decimal", "hashlib", "json", "collections", "dataclasses", "fractions"}
+        allowed = {"re", "datetime", "decimal", "hashlib", "json", "collections", "dataclasses", "fractions", "msgspec"}
         for path in (Path(__file__).parents[1] / "contracts").glob("*.py"):
             for node in ast.walk(ast.parse(path.read_text())):
                 if isinstance(node, ast.Import):

@@ -1,6 +1,7 @@
 """Offline package constraints, not container runtime acceptance."""
-import json,tempfile,unittest,sys,zipfile,hashlib,subprocess
+import json,tempfile,unittest,sys,zipfile,hashlib,subprocess,os
 from pathlib import Path
+from unittest.mock import patch
 import yaml
 sys.path.insert(0,str(Path(__file__).resolve().parents[3]/'backend'))
 from deploy.vps.settings import runtime,images,site,read_json,ConfigurationError
@@ -30,10 +31,21 @@ class PackageTests(unittest.TestCase):
         data=yaml.safe_load((ROOT/'deploy/vps/compose.yaml').read_text(encoding='utf-8'));services=data['services']
         self.assertNotIn('ports',services['db']);self.assertNotIn('ports',services['api'])
         self.assertEqual(services['api']['network_mode'],'service:gateway');self.assertEqual(services['api']['secrets'],['runtime_config'])
+        self.assertEqual(services['api']['environment']['BTL_RESEARCH_WORKERS'],'${BTL_RESEARCH_WORKERS:-2}')
         self.assertEqual(services['operator']['secrets'],['owner_config']);self.assertEqual(services['operator']['profiles'],['ops'])
         self.assertTrue(data['networks']['database']['internal']);self.assertTrue(services['api']['read_only']);self.assertIn('ALL',services['api']['cap_drop'])
         self.assertEqual(services['api']['depends_on']['db']['condition'],'service_healthy')
         caddy=(ROOT/'deploy/vps/Caddyfile').read_text(encoding='utf-8');self.assertIn('admin off',caddy);self.assertIn('127.0.0.1:8001',caddy);self.assertIn('header_up X-Forwarded-For {remote_host}',caddy)
+
+    def test_runtime_preserves_only_validated_worker_pool_setting(self):
+        from deploy.vps.runtime import configure_environment
+        with patch.dict(os.environ,{'BTL_RESEARCH_WORKERS':'4','BTL_AUTH_SECRET':'must-be-cleared'},clear=True):
+            configure_environment({'BTL_DATABASE_URL':'runtime-config'})
+            self.assertEqual(os.environ['BTL_RESEARCH_WORKERS'],'4')
+            self.assertEqual(os.environ['BTL_DATABASE_URL'],'runtime-config')
+            self.assertNotIn('BTL_AUTH_SECRET',os.environ)
+        with patch.dict(os.environ,{'BTL_RESEARCH_WORKERS':'5'},clear=True):
+            with self.assertRaises(ValueError):configure_environment({'BTL_DATABASE_URL':'runtime-config'})
     def test_context_excludes_private_data_and_secrets(self):
         ignore=(ROOT/'.dockerignore').read_text(encoding='utf-8')
         for path in ('frontend/public/market','**/*.csv','**/*.sqlite*','**/.git','**/runtime.json','**/owner.json','**/db_password','backend/tests','**/venv'):self.assertIn(path,ignore)

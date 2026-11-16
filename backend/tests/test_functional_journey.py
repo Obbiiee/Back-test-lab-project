@@ -13,7 +13,7 @@ from psycopg import sql
 
 from cloud.app import create_app
 from contracts.canonical import content_hash
-from deploy.vps.google_staging import create_google_demo_app, grant_google_demo_runtime
+from deploy.vps.google_staging import create_google_demo_app, create_google_staging_app, grant_google_demo_runtime
 from identity.google_store import grant_google_runtime
 from execution.research_fixture_v2 import START_NS, STEP_NS
 from market_data.instruments import INSTRUMENTS
@@ -249,15 +249,22 @@ class FunctionalJourneyTests(unittest.TestCase):
         qa.client.close()
 
     def test_authentication_keeps_strict_rate_limit_without_blocking_replay_namespace(self):
-        app=create_google_demo_app(self.runtime,secrets.token_urlsafe(48),
+        app=create_google_staging_app(self.runtime,secrets.token_urlsafe(48),workspace_metadata=True,
+            rate_limit=30,
             google_client_id=google_fixture.CLIENT,google_client_secret=google_fixture.SECRET,
             google_redirect_uri=google_fixture.REDIRECT)
         http=TestClient(app,base_url='https://testserver',client=('192.0.2.200',50000))
+        # OAuth callback is a credential-completing endpoint and remains under
+        # the default strict 30/IP/min bucket. These invalid callbacks make no
+        # provider network calls and fail closed in the local test app.
         for _ in range(30):
-            self.assertEqual(http.get('/api/v1/auth/providers').status_code,200)
-        refused=http.get('/api/v1/auth/providers',headers={'X-Forwarded-For':'192.0.2.201'})
+            self.assertEqual(http.get('/api/v1/auth/google/callback').status_code,400)
+        refused=http.get('/api/v1/auth/google/callback',headers={'X-Forwarded-For':'192.0.2.201'})
         self.assertEqual(refused.status_code,429)
         self.assertEqual(refused.headers['retry-after'],'60')
+        # Routine auth reads use the global API bound, not the sensitive auth
+        # bucket, and do not block product routes under the default limit.
+        self.assertEqual(http.get('/api/v1/auth/providers').status_code,200)
         self.assertEqual(http.get('/api/v1/workspaces').status_code,401)
         http.close()
 

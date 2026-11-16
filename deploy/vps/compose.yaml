@@ -47,6 +47,8 @@ services:
         PYTHON_IMAGE: ${BTL_PYTHON_IMAGE:?Supply immutable python image digest}
     restart: unless-stopped
     network_mode: service:gateway
+    environment:
+      BTL_RESEARCH_WORKERS: ${BTL_RESEARCH_WORKERS:-2}
     depends_on:
       gateway:
         condition: service_started

@@ -5,14 +5,59 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from time import perf_counter_ns
 
 import psycopg
+from psycopg import Cursor, Connection
 from psycopg import sql
 from contracts.primitives import require
+from qa_timing import capture_qa_timing, current_qa_timing, record_qa_timing
 from .codec import fingerprint
 from .resources import DATABASE
 
 MIGRATIONS = Path(__file__).with_name("migrations")
+
+
+@contextmanager
+def capture_database_timing():
+    """Collect bounded, identity-free PostgreSQL timing for explicit QA probes."""
+    with capture_qa_timing() as metrics:
+        yield metrics
+
+
+class _TimedCursor(Cursor):
+    """QA-only cursor timing; never records SQL text or parameters."""
+    def execute(self, query, params=None, *, prepare=None, binary=None):
+        started = perf_counter_ns()
+        try:
+            return super().execute(query, params, prepare=prepare, binary=binary)
+        finally:
+            metrics = current_qa_timing()
+            if metrics is not None:
+                record_qa_timing("sqlNs", perf_counter_ns() - started)
+                record_qa_timing("sqlCount", 1)
+
+    def executemany(self, query, params_seq, *, returning=False):
+        started = perf_counter_ns()
+        try:
+            return super().executemany(query, params_seq, returning=returning)
+        finally:
+            metrics = current_qa_timing()
+            if metrics is not None:
+                record_qa_timing("sqlNs", perf_counter_ns() - started)
+                record_qa_timing("sqlCount", 1)
+
+
+class _TimedConnection(Connection):
+    """Measure transaction-context finalization only for an active QA scope."""
+    def __exit__(self, exc_type, exc, tb):
+        started = perf_counter_ns()
+        try:
+            return super().__exit__(exc_type, exc, tb)
+        finally:
+            metrics = current_qa_timing()
+            if metrics is not None:
+                record_qa_timing("transactionExitNs", perf_counter_ns() - started)
 
 
 def _libpq_env(dsn):
@@ -30,8 +75,19 @@ def _libpq_env(dsn):
 @contextmanager
 def connect(dsn):
     # Caller config owns TLS and credentials. Bound connect/lock/query waits.
+    metrics = current_qa_timing()
+    admission_started = perf_counter_ns() if metrics is not None else None
     with DATABASE.claim():
-        with psycopg.connect(dsn, connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000") as db:
+        if metrics is not None:
+            record_qa_timing("admissionNs", perf_counter_ns() - admission_started)
+        connect_started = perf_counter_ns() if metrics is not None else None
+        connect_type = _TimedConnection if metrics is not None else psycopg
+        kwargs = dict(connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000")
+        if metrics is not None:
+            kwargs["cursor_factory"] = _TimedCursor
+        with connect_type.connect(dsn, **kwargs) as db:
+            if metrics is not None:
+                record_qa_timing("connectNs", perf_counter_ns() - connect_started)
             yield db
 
 

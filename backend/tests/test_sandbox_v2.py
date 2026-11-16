@@ -169,6 +169,10 @@ class SandboxV2Tests(unittest.TestCase):
             self.assertTrue(value['durable'])
             run(access,uuid.UUID(self.actor),uuid.UUID(self.ws),'create_session',(self.raw('session:runtime'),))
             self.assertEqual(run(access,uuid.UUID(self.actor),uuid.UUID(self.ws),'access',())['savedSessions'],2)
+            with restricted(DSN) as db:
+                self.assertEqual(db.execute('SELECT count(*) FROM btl.product_method_versions WHERE workspace_id=%s',(self.ws,)).fetchone()[0],1)
+        with self.assertRaises(psycopg.DatabaseError):
+            with restricted(DSN) as db:db.execute("UPDATE btl.product_method_versions SET version=version WHERE workspace_id=%s",(self.ws,))
         for table in ('v2_access_windows','sandbox_access_events','v2_access_accounts'):
             with self.assertRaises(psycopg.DatabaseError):
                 with restricted(DSN) as db:db.execute('DELETE FROM btl.'+table)

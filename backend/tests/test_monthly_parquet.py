@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 import pyarrow.parquet as pq
@@ -10,6 +11,8 @@ import pyarrow.parquet as pq
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import ContractError
 from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
+from application.models import TrustedScope
+from execution.workspace import FixtureTimelineCache
 from ticks.contracts import TickManifest, chunk_content, event_id
 from ticks.provider import SyntheticTickProvider
 from ticks.provider import validate_provider
@@ -102,6 +105,55 @@ class MonthlyParquetTests(unittest.TestCase):
                             for call in batch_calls))
         self.assertGreaterEqual(len(batch_calls), 2)
 
+    def test_page_resume_reuses_verified_token_row_group_across_pages(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=2)
+        provider = MonthlyParquetProvider(self.root,
+            expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        first = provider.read_page(provider.dataset_id, provider.dataset_version,
+            max_events=1)
+        with patch.object(provider, "_read_row_group_file",
+                wraps=provider._read_row_group_file) as read:
+            second = provider.read_page(provider.dataset_id, provider.dataset_version,
+                first["nextToken"], max_events=1)
+        self.assertEqual(read.call_count, 0)
+        self.assertEqual(second["events"], [self.wire_events[1]])
+
+    def test_page_resume_seeks_to_late_token_group_without_scanning_prefix(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=1)
+        provider = MonthlyParquetProvider(self.root,
+            expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        first = provider.read_page(provider.dataset_id, provider.dataset_version,
+            max_events=3)
+        self.assertEqual(first["events"], self.wire_events[:3])
+        with patch.object(provider, "_read_row_group_file",
+                wraps=provider._read_row_group_file) as read:
+            next_page = provider.read_page(provider.dataset_id, provider.dataset_version,
+                first["nextToken"], max_events=1)
+        # The token row group is already verified in the bounded cache; only
+        # the following row group is read. Prefix row groups are not rescanned.
+        self.assertEqual(read.call_count, 1)
+        self.assertEqual(next_page["events"], [self.wire_events[3]])
+
+    def test_page_mutation_does_not_change_cached_verified_rows(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=2)
+        provider = MonthlyParquetProvider(self.root,
+            expected_dataset_id=self.source.dataset_id,
+            expected_dataset_version=self.source.dataset_version,
+            expected_manifest_hash=manifest["manifestHash"])
+        first = provider.read_page(provider.dataset_id, provider.dataset_version,
+            max_events=1)
+        first["events"][0]["bid"] = "0"
+        second = provider.read_page(provider.dataset_id, provider.dataset_version,
+            first["nextToken"], max_events=1)
+        self.assertEqual(second["events"], [self.wire_events[1]])
+
     def test_monthly_provider_replays_original_pages_and_timeline(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
                                          expected_version=self.source.dataset_version, row_group_size=2)
@@ -123,6 +175,29 @@ class MonthlyParquetTests(unittest.TestCase):
         prefix = timeline.advance_through(str(FEB_FIRST), timeline.cursor)
         self.assertEqual([group["timeNs"] for group in prefix["groups"]],
                          [str(JAN_LAST - 2), str(JAN_LAST), str(FEB_FIRST)])
+
+    def test_indexed_revealed_window_is_clipped_and_keeps_cross_month_timestamp_groups_atomic(self):
+        manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,
+            expected_version=self.source.dataset_version, row_group_size=1)
+        provider = MonthlyParquetProvider(self.root, expected_manifest_hash=manifest["manifestHash"])
+        self.assertEqual(provider.read_revealed_window(JAN_LAST - 3, 4), [])
+        last_january = provider.read_revealed_window(JAN_LAST, 1)
+        self.assertEqual(len(last_january), 1)
+        self.assertEqual(last_january[0]["timeNs"], str(JAN_LAST))
+        self.assertEqual([row["bid"] for row in last_january[0]["events"]], ["1.002", "1.003"])
+        through_february = provider.read_revealed_window(FEB_FIRST, 3)
+        timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version)
+        expected = timeline.advance_through(str(FEB_FIRST), timeline.cursor)["groups"]
+        self.assertEqual(through_february, expected)
+        self.assertTrue(all(int(group["timeNs"]) <= FEB_FIRST for group in through_february))
+        cache = FixtureTimelineCache(provider, allow_injected_synthetic=True)
+        scope = TrustedScope("workspace:monthly-window:"+uuid.uuid4().hex, "fixture:operator")
+        with patch("execution.workspace.TickTimeline.resume",
+                   side_effect=AssertionError("indexed window must not reconstruct timeline")):
+            actual = cache.window(scope, "session:monthly-window", timeline.checkpoint())
+            quote = cache.window(scope, "session:monthly-window", timeline.checkpoint(), last_only=True)
+        self.assertEqual(actual, expected)
+        self.assertEqual(quote, expected[-1:])
 
     def test_immutable_publish_and_manifest_pin_fail_closed(self):
         manifest = write_monthly_parquet(self.root, iter(self.wire_events), self.manifest,

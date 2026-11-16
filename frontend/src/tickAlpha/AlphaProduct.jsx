@@ -1,8 +1,8 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {api,id,sessionPath,sourceContext,createMethodVersion,setMethodArchived,
-  loadMethodFamily,loadMethodVersionPage} from './client.js';
-import {money,kindLabel,utc,lastSession} from './productData.js';
+import {api,id,sourceContext,createMethodVersion,setMethodArchived,
+  loadMethodFamily,loadMethodSessionPage,loadMethodVersionPage,noticeText} from './client.js';
+import {money,kindLabel,utc,lastSession,useMethodFamilyRead,useMethodRead,useSessionRead} from './productData.js';
 import {linkTo,navigate,METHOD_TABS} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
 import Segmented from './AlphaSegmented.jsx';
@@ -37,23 +37,17 @@ export function SessionTable({sessions,catalog,onOpen,caption}){
 
 function ContinueCard({catalog,onOpen}){
   const remembered=lastSession();
-  const session=catalog.sessions.find(s=>s.id===remembered);
-  const [state,setState]=useState({status:session?'loading':'none'});
-  useEffect(()=>{
-    if(!session)return;
-    let live=true;
-    api(sessionPath(session.id)).then(value=>{if(live)setState({status:'ready',value});},()=>{if(live)setState({status:'error'});});
-    return()=>{live=false;};
-  },[session]);
-  if(!session)return null;
-  const method=catalog.methods.find(m=>m.id===session.methodId);
+  const record=useSessionRead(remembered,0);
+  if(record.status!=='ready')return null;
+  const {metadata:session,method,state}=record.value;
+  const methodName=method?.name??catalog.methods.find(m=>m.id===session.methodId)?.name;
   return <section className="rk-continue" aria-labelledby="rk-continue-h">
     <div><p className="rk-eyebrow">Continue research · last opened on this device</p><h2 id="rk-continue-h">{session.name}</h2>
       <dl className="rk-facts">
-        <div><dt>Method</dt><dd>{method?.name||'Unavailable'}</dd></div>
-        <div><dt>Instrument</dt><dd>{catalog.profile.instrumentId}</dd></div>
-        <div><dt>Replay time</dt><dd className="rk-num">{state.status==='ready'?utc(state.value.state.throughNs):state.status==='loading'?'Loading…':'Unavailable'}</dd></div>
-        <div><dt>Saved revision</dt><dd className="rk-num">{state.status==='ready'?state.value.state.revision:'—'}</dd></div>
+        <div><dt>Method</dt><dd>{methodName||'Unavailable'}</dd></div>
+        <div><dt>Instrument</dt><dd>{state.profile?.instrumentId??catalog.profile.instrumentId}</dd></div>
+        <div><dt>Replay time</dt><dd className="rk-num">{utc(state.throughNs)}</dd></div>
+        <div><dt>Saved revision</dt><dd className="rk-num">{state.revision}</dd></div>
       </dl>
     </div>
     <button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(session.id)}>Resume replay</button>
@@ -77,6 +71,7 @@ export function MyMethods({catalog,onOpen}){
   const newMethod=<a className="rk-btn rk-btn-primary" {...linkTo({screen:'method-new'})}><Icon name="plus" size={18}/><span>New Method</span></a>;
   if(!catalog.methods.length)return <>
     <PageHead eyebrow="Dashboard" title="My Methods" lead="A Method is the set of rules you want to test. Every Session replays one Method on real-time-ordered history."/>
+    <ContinueCard catalog={catalog} onOpen={onOpen}/>
     <section className="rk-first-use" aria-labelledby="rk-first-h">
       <h2 id="rk-first-h">Create your first Method</h2>
       <p>Write the idea down before you replay, so the result tests the idea and not hindsight.</p>
@@ -114,7 +109,22 @@ export function MyMethods({catalog,onOpen}){
 
 const RISK=['0.5','1','2'],RR=['1.5','2','3'];
 export function MethodNew({catalog,route,onSaved}){
-  const family=catalog.methodFamilies?.find(item=>item.familyId===route.family);
+  const familyId=route.family;
+  const [attempt,setAttempt]=useState(0);
+  const hosted=Boolean(accountTransport());
+  const record=useMethodFamilyRead(hosted?familyId:null,attempt);
+  if(!familyId)return <MethodEditor catalog={catalog} onSaved={onSaved}/>;
+  const back={label:'My Methods',to:{screen:'methods'}};
+  if(record.status!=='ready'||record.value.archived)return <>
+    <PageHead back={back} title="New Method version"/>
+    {record.status==='loading'?<StatePanel kind="loading" title="Loading the Method family…"/>
+      :record.status==='error'?<StatePanel kind="error" title="The Method family could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{record.message}</p></StatePanel>
+      :<StatePanel kind="unavailable" title={record.value?.archived?'Unarchive this Method before creating a version':'Sign in to create a Method version'}/>}
+  </>;
+  return <MethodEditor key={record.value.familyId} catalog={catalog} family={record.value} onSaved={onSaved}/>;
+}
+
+function MethodEditor({catalog,family,onSaved}){
   const initial=family?.current;
   const [kind,setKind]=useState(initial?.kind||'FREE_STYLE'),[name,setName]=useState(initial?.name||''),[risk,setRisk]=useState(initial?.riskPercent||'1'),[rr,setRr]=useState(initial?.rr||'2');
   const [checklist,setChecklist]=useState(initial?.checklistOn??true),[conditions,setConditions]=useState(initial?.conditions?.map(item=>item.label)||['']);
@@ -167,7 +177,20 @@ export function MethodNew({catalog,route,onSaved}){
 }
 
 export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
-  const method=catalog.methods.find(m=>m.id===route.method);
+  const listed=catalog.methods.find(method=>method.id===route.method);
+  const [attempt,setAttempt]=useState(0);
+  const record=useMethodRead(!listed&&accountTransport()?route.method:null,attempt);
+  const method=listed??record.value;
+  const back={label:'My Methods',to:{screen:'methods'}};
+  if(!method)return <><PageHead back={back} title="Method"/>
+    {record.status==='loading'?<StatePanel kind="loading" title="Loading the saved Method…"/>
+      :record.status==='error'?<StatePanel kind="error" title="The Method could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{record.message}</p></StatePanel>
+      :<StatePanel kind="unavailable" title="Choose a Method" action={<a className="rk-btn" {...linkTo(back.to)}>My Methods</a>}/>}
+  </>;
+  return <MethodDetails key={method.id} method={method} catalog={catalog} route={route} onOpen={onOpen} onNewSession={onNewSession} onLifecycle={onLifecycle}/>;
+}
+
+function MethodDetails({method,catalog,route,onOpen,onNewSession,onLifecycle}){
   const familySummary=catalog.methodFamilies?.find(item=>item.familyId===method?.methodFamilyId||item.versions?.some(version=>version.methodId===route.method));
   const [lifecycleError,setLifecycleError]=useState('');
   const [lifecycleBusy,setLifecycleBusy]=useState(false);
@@ -182,15 +205,19 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     return()=>{live=false;};
   },[familyId]);
   const family=familyDetail?.familyId===familyId?familyDetail:familySummary;
-  if(!method)return <><PageHead back={{label:'My Methods',to:{screen:'methods'}}} title="Method unavailable"/><StatePanel kind="unavailable" title="This Method is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>It may belong to another workspace or account. Nothing was changed.</p></StatePanel></>;
+  const version=method.methodVersion??family?.versions.find(item=>item.methodId===method.id)?.version;
   const tab=route.tab;
   const newSession=<button type="button" className="rk-btn rk-btn-primary" onClick={event=>onNewSession(method.id,event)}><Icon name="plus" size={18}/><span>New Session</span></button>;
   const createVersion=family&&!family.archived?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method-new',family:family.familyId})}>Create new version</a>:null;
   async function changeLifecycle(archived){
     if(!family||lifecycleBusy)return;
     setLifecycleBusy(true);setLifecycleError('');
-    try{await setMethodArchived(family,archived);await onLifecycle?.();}
-    catch(error){setLifecycleError(error.message);setLifecycleBusy(false);}
+    try{
+      await setMethodArchived(family,archived);
+      setFamilyDetail(await loadMethodFamily(family.familyId));
+      await onLifecycle?.();
+    }catch(error){setLifecycleError(error.message);}
+    finally{setLifecycleBusy(false);}
   }
   async function loadMoreVersions(){
     if(!family?.nextVersionCursor||versionBusy)return;
@@ -201,24 +228,27 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
         nextVersionCursor:result.nextCursor,versions:[...current.versions,...result.versions]}:current);
     }catch(error){setVersionError(error.message);}finally{setVersionBusy(false);}
   }
-  const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
+  const hosted=Boolean(accountTransport());
+  const labels={overview:'Overview',sessions:hosted?'Sessions':`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
+  const sessionLink={screen:'method',method:method.id,tab:'sessions'};
   return <>
-    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={family?`${kindLabel(method.kind)} · v${family.versions.find(version=>version.methodId===method.id)?.version||family.latestVersion}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
+    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={version?`${kindLabel(method.kind)} · v${version}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
     {lifecycleError&&<p className="rk-error" role="alert">{lifecycleError}</p>}
     <nav className="rk-tabs" aria-label="Method sections">{METHOD_TABS.map(key=><a key={key} aria-current={tab===key?'page':undefined} {...linkTo({screen:'method',method:method.id,tab:key})}>{labels[key]}</a>)}</nav>
     {tab==='overview'&&<div className="rk-grid-2">
       <section className="rk-card" aria-labelledby="rk-ov-h"><h2 id="rk-ov-h">At a glance</h2><dl className="rk-facts">
         <div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>
-        <div><dt>Sessions</dt><dd className="rk-num">{sessions.length}</dd></div>
+        <div><dt>Sessions</dt><dd>{hosted?<a {...linkTo(sessionLink)}>View Sessions</a>:sessions.length}</dd></div>
         <div><dt>Data</dt><dd>{sourceLine(catalog)}</dd></div>
         <div><dt>Rules</dt><dd>{method.kind==='PROTOCOL'?`Risk ${method.riskPercent}% · R:R ${method.rr} · checklist ${method.checklistOn?'on':'off'}`:'Chosen per order'}</dd></div>
       </dl><p className="rk-note">A written hypothesis and last-used time are not recorded by the service yet.</p></section>
-      <section className="rk-card" aria-labelledby="rk-ov-s"><div className="rk-section-head"><h2 id="rk-ov-s">Sessions</h2>{sessions.length>0&&<a {...linkTo({screen:'method',method:method.id,tab:'sessions'})}>See all</a>}</div>
+      <section className="rk-card" aria-labelledby="rk-ov-s"><div className="rk-section-head"><h2 id="rk-ov-s">Sessions</h2>{(hosted||sessions.length>0)&&<a {...linkTo(sessionLink)}>See all</a>}</div>
         {sessions.length?<ul className="rk-mini-list">{sessions.slice(-3).reverse().map(s=><li key={s.id}><span><strong>{s.name}</strong><small>{catalog.profile.instrumentId} · from {s.startPeriod} · {money(s.initialBalance)}</small></span><button type="button" className="rk-btn rk-btn-small" onClick={()=>onOpen(s.id)} aria-label={`Open replay for ${s.name}`}>Open</button></li>)}</ul>
-          :<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>A Session replays this Method on one instrument from a start month, with its own balance and journal.</p></StatePanel>}
+          :hosted?<p className="rk-note">Review the saved Sessions for this Method version.</p>
+          :<StatePanel kind="empty" title="No Sessions yet" action={!family?.archived&&newSession}><p>A Session replays this Method on one instrument from a start month, with its own balance and journal.</p></StatePanel>}
       </section>
     </div>}
-    {tab==='sessions'&&(sessions.length?<SessionTable sessions={sessions} catalog={catalog} onOpen={onOpen} caption={`Sessions of ${method.name}`}/>:<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>Create a Session to start replaying this Method.</p></StatePanel>)}
+    {tab==='sessions'&&<MethodSessions method={method} catalog={catalog} localSessions={sessions} onOpen={onOpen} emptyAction={!family?.archived&&newSession}/>}
     {tab==='analytics'&&<MethodAnalytics method={method} sessions={sessions}/>}
     {tab==='rules'&&<section className="rk-card" aria-labelledby="rk-rules-h"><h2 id="rk-rules-h">Rules</h2>
       <dl className="rk-facts"><div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>{method.kind==='PROTOCOL'&&<><div><dt>Locked risk per trade</dt><dd className="rk-num">{method.riskPercent}%</dd></div><div><dt>Locked reward : risk</dt><dd className="rk-num">{method.rr}</dd></div><div><dt>Checklist enforcement</dt><dd>{method.checklistOn?'On: orders need every condition assessed':'Off: conditions are recorded only'}</dd></div></>}</dl>
@@ -230,6 +260,35 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
       <details className="rk-provenance"><summary>Provenance</summary><dl className="rk-facts"><div><dt>Method id</dt><dd><code>{method.id}</code></dd></div>{sessions[0]&&<div><dt>Rule hash (pinned by Sessions)</dt><dd><code>{sessions[0].methodHash}</code></dd></div>}</dl></details>
       <p className="rk-note">Rules stay fixed after saving so earlier evidence keeps its meaning. {family?`Family ${family.familyId} · revision ${family.revision} · ${family.versions.length} immutable version${family.versions.length===1?'':'s'}.`:'Local Methods are immutable.'}</p>
     </section>}
+  </>;
+}
+
+function MethodSessions({method,catalog,localSessions,onOpen,emptyAction}){
+  const hosted=Boolean(accountTransport());
+  const [after,setAfter]=useState(null);
+  const [attempt,setAttempt]=useState(0);
+  const [result,setResult]=useState(null);
+  useEffect(()=>{
+    if(!hosted)return;
+    const controller=new AbortController();
+    loadMethodSessionPage(method.id,after,{signal:controller.signal}).then(
+      page=>{if(!controller.signal.aborted)setResult({after,attempt,page});},
+      error=>{if(!controller.signal.aborted)setResult({after,attempt,error:noticeText(error.message)});},
+    );
+    return()=>controller.abort();
+  },[after,attempt,hosted,method.id]);
+  const current=result?.after===after&&result.attempt===attempt?result:null;
+  if(hosted&&!current)return <StatePanel kind="loading" title="Loading Sessions for this Method…"/>;
+  if(hosted&&current.error)return <StatePanel kind="error" title="Sessions could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{current.error}</p></StatePanel>;
+  const page=current?.page;
+  const sessions=hosted?page.items:localSessions;
+  return <>
+    {sessions.length?<SessionTable sessions={sessions} catalog={catalog} onOpen={onOpen} caption={`Sessions of ${method.name}`}/>
+      :<StatePanel kind="empty" title={after?'No more Sessions':'No Sessions yet'} action={!after&&emptyAction}/>}
+    {hosted&&(after||!page.complete)&&<nav className="rk-form-actions" aria-label="Method Session pages">
+      {after&&<button type="button" className="rk-btn" onClick={()=>setAfter(null)}>First page</button>}
+      {!page.complete&&<button type="button" className="rk-btn" onClick={()=>setAfter(page.nextCursor)}>Next page</button>}
+    </nav>}
   </>;
 }
 
@@ -252,7 +311,7 @@ function MethodAnalytics({method,sessions}){
     {state.status==='ready'&&state.value.status!=='COMPLETE'&&<StatePanel kind="unavailable" title="Method analytics is unavailable"><p>{state.value.reason??'No complete compatible Session projection is available.'} No partial aggregate is shown.</p></StatePanel>}
     {state.status==='ready'&&state.value.status==='COMPLETE'&&<>
       <section className="rk-card" aria-labelledby="rk-ma-h"><h2 id="rk-ma-h">Committed position results</h2>
-        <p className="rk-note">Pooled completed positions from {state.value.includedSessions.length} compatible Sessions. Account balances and equity curves remain separate.</p>
+        <p className="rk-note">Pooled completed positions from {state.value.includedSessionCount??state.value.includedSessions.length} compatible Sessions. Account balances and equity curves remain separate.</p>
         <dl className="rk-metrics" aria-label="Pooled Method results">
           <div><dt>Completed positions</dt><dd className="rk-num">{state.value.metrics.tradeCount}</dd></div>
           <div><dt>Trade net ({state.value.accountCurrency||'currency unavailable'})</dt><dd className="rk-num">{state.value.completedTradeNet}</dd></div>
@@ -262,41 +321,36 @@ function MethodAnalytics({method,sessions}){
           <div><dt>Mean R</dt><dd className="rk-num">{ratioLabel(state.value.metrics.averageR)}</dd><dd className="rk-sub">{state.value.metrics.rEligible} eligible · {state.value.metrics.rExcluded} excluded</dd></div>
         </dl>
       </section>
-      {!!state.value.excludedSessions.length&&<section className="rk-card"><h2>Excluded Sessions</h2><ul className="rk-mini-list">{state.value.excludedSessions.map(item=><li key={item.sessionId}><span><strong>{item.sessionId}</strong><small>{item.reason}</small></span></li>)}</ul></section>}
+      {!!state.value.excludedSessions.length&&<section className="rk-card"><h2>Excluded Sessions</h2>{state.value.excludedSessionsTruncated&&<p className="rk-note">Showing {state.value.excludedSessions.length} of {state.value.excludedSessionCount} excluded Sessions.</p>}<ul className="rk-mini-list">{state.value.excludedSessions.map(item=><li key={item.sessionId}><span><strong>{item.sessionId}</strong><small>{item.reason}</small></span></li>)}</ul></section>}
     </>}
-    {sessions.length>0&&<section className="rk-card" aria-labelledby="rk-ma-sessions"><h2 id="rk-ma-sessions">Analytics per Session</h2><p className="rk-note">Each Session retains its own committed analytics and balance path.</p>
+    {(key||sessions.length>0)&&<section className="rk-card" aria-labelledby="rk-ma-sessions"><h2 id="rk-ma-sessions">Analytics per Session</h2><p className="rk-note">Each Session retains its own committed analytics and balance path.</p>
+      {key&&<a className="rk-btn rk-btn-small" {...linkTo({screen:'method',method:method.id,tab:'sessions'})}>Browse all Sessions for this Method</a>}
       <ul className="rk-mini-list">{sessions.map(s=><li key={s.id}><span><strong>{s.name}</strong><small>from {s.startPeriod} · {money(s.initialBalance)} starting balance</small></span><a className="rk-btn rk-btn-small" {...linkTo({screen:'analytics',method:method.id,of:s.id})} aria-label={`Analytics for ${s.name}`}>Session analytics</a></li>)}</ul></section>}
   </div>;
 }
 
 export function Analytics({catalog,route}){
-  const methodId=route.method||catalog.sessions.find(s=>s.id===route.analyticsSession)?.methodId||'';
-  const sessions=catalog.sessions.filter(s=>!methodId||s.methodId===methodId);
   const sessionId=route.analyticsSession;
-  const session=catalog.sessions.find(s=>s.id===sessionId);
-  const [result,setResult]=useState({key:null});
   const [attempt,setAttempt]=useState(0);
-  const key=session?`${session.id}:${attempt}`:null;
-  useEffect(()=>{
-    if(!key)return;
-    let live=true;
-    api(sessionPath(key.slice(0,key.lastIndexOf(':')))+'/view',{timeframe:'1m'}).then(view=>{if(live)setResult({key,status:'ready',view});},error=>{if(live)setResult({key,status:'error',message:error.message});});
-    return()=>{live=false;};
-  },[key]);
-  const state=result.key===key?result:{status:'loading'};
+  const state=useSessionRead(sessionId,attempt,{analytics:true});
+  const view=state.value;
+  const session=view?.metadata??catalog.sessions.find(s=>s.id===sessionId);
+  const methodId=session?.methodId||route.method||'';
+  const sessions=catalog.sessions.filter(s=>!methodId||s.methodId===methodId);
+  const methodInCatalog=catalog.methods.some(method=>method.id===methodId);
   const pick=next=>navigate({screen:'analytics',...next});
   return <>
     <PageHead eyebrow="Analytics" title="Research analytics" lead="Pick a Method and a Session. Statistics come from committed positions only."/>
     <div className="rk-toolbar" role="group" aria-label="Analytics scope">
-      <label className="rk-select">Method<select value={methodId} onChange={e=>pick({method:e.target.value||undefined})}><option value="">All Methods</option>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-      <label className="rk-select">Session<select value={session?.id||''} onChange={e=>pick({method:methodId||undefined,of:e.target.value||undefined})}><option value="">Choose a Session</option>{sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      {methodId&&<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:methodId,tab:'analytics'})}>Method analytics</a>}
+      <label className="rk-select">Method<select value={methodId} onChange={e=>pick({method:e.target.value||undefined})}><option value="">All Methods</option>{methodId&&!methodInCatalog&&<option value={methodId}>{view?.method?.name??'Linked Method'}</option>}{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+      <label className="rk-select">Session<select value={sessionId||''} onChange={e=>pick({method:methodId||undefined,of:e.target.value||undefined})}><option value="">Choose a Session</option>{sessionId&&!sessions.some(s=>s.id===sessionId)&&<option value={sessionId}>{session?.name??'Linked Session'}</option>}{sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      {methodInCatalog&&<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:methodId,tab:'analytics'})}>Method analytics</a>}
     </div>
-    {!catalog.sessions.length?<StatePanel kind="empty" title="No Sessions to analyse" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Analytics appear after you create a Session and close at least one position.</p></StatePanel>
-      :!session?<StatePanel kind="empty" title={sessionId?'This Session is not in this workspace':'Choose a Session'}><p>{sessionId?'It may belong to another workspace. Pick one from the list.':'Session analytics show one Session at a time, so independent balances are never mixed.'}</p></StatePanel>
+    {!sessionId&&!catalog.sessions.length?<StatePanel kind="empty" title="No Sessions to analyse" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Analytics appear after you create a Session and close at least one position.</p></StatePanel>
+      :!sessionId?<StatePanel kind="empty" title="Choose a Session"><p>Session analytics show one Session at a time.</p></StatePanel>
       :state.status==='loading'?<StatePanel kind="loading" title="Loading committed analytics…"/>
       :state.status==='error'?<StatePanel kind="error" title="Analytics could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message} Nothing was changed.</p></StatePanel>
-      :<SessionAnalytics view={state.view} catalog={catalog}/>}
+      :<SessionAnalytics view={view} catalog={catalog}/>}
   </>;
 }
 
@@ -304,7 +358,7 @@ function SessionAnalytics({view,catalog}){
   const analysis=view.analysis;
   if(!analysis||analysis.status!=='COMPLETE')return <StatePanel kind="unavailable" title="Analytics unavailable for this Session"><p>{analysis?.reason??'The service has no compatible analysis for this Session.'} No partial history is shown as a complete result.</p></StatePanel>;
   const {metrics,account}=analysis;
-  const scope=[['Session',view.metadata.name],['Method',`${view.method.name} · ${kindLabel(view.method.kind)}`],['Instrument',catalog.profile.instrumentId],['Range',`${view.metadata.startPeriod} → ${utc(view.state.throughNs)}`],['Completed positions',String(metrics.tradeCount)],['Unresolved / expired',`${metrics.unresolved} / ${metrics.expired}`]];
+  const scope=[['Session',view.metadata.name],['Method',`${view.method.name} · ${kindLabel(view.method.kind)}`],['Instrument',view.state.profile?.instrumentId??catalog.profile.instrumentId],['Range',`${view.metadata.startPeriod} → ${utc(view.state.throughNs)}`],['Completed positions',String(metrics.tradeCount)],['Unresolved / expired',`${metrics.unresolved} / ${metrics.expired}`]];
   const secondary=[['Wins / losses / breakeven',`${metrics.wins} / ${metrics.losses} / ${metrics.breakeven}`],['Average win (USD)',ratioLabel(metrics.averageWin)],['Average loss (USD)',ratioLabel(metrics.averageLoss)],['Longest win / loss streak',`${metrics.maxWinStreak} / ${metrics.maxLossStreak}`],['Mean R',`${ratioLabel(metrics.averageR)} · ${metrics.rEligible} eligible / ${metrics.rExcluded} excluded`],['Commission (USD)',account.commission],['Starting balance',money(view.state.initialBalance)],['Committed balance now',money(account.balance)]];
   return <div className="rk-stack">
     <dl className="rk-scope" aria-label="Scope">{scope.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>

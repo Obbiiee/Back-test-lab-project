@@ -1,5 +1,10 @@
 // Financial values stay exact strings across hosted and loopback transports.
 const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
+// Research jobs may use the repository's 60 s durable queue TTL and then its
+// 30 s worker deadline. Keep the client alive through both bounds plus one
+// 5 s polling/transport observation margin; a 30 s client abort orphaned
+// valid reads under concurrent traders and left the UI on a stale revision.
+const PRODUCT_JOB_DEADLINE_MS=95000;
 import {accountTransport,isAccountPage} from './accountClient.js';
 import {isLocalReview} from '../tickReview/LocalOrigin.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
@@ -25,14 +30,14 @@ export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
     const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const mutating=replay||(path==='/sessions'&&body!==undefined)||/\/replay-to$/.test(path);
+    const mutating=replay||(path==='/sessions'&&body!==undefined)||/\/(?:replay-to|jump-next-event)$/.test(path);
     const queuedRead=/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
     // The queue reuses completed results by job ID. A new read must see the
     // current committed revision; only retries of a mutation reuse its ID.
     const jobId=mutating?await durableJobId(account,path,body):queuedRead?crypto.randomUUID():undefined;
-    const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
+    const bounded=signal?AbortSignal.any([signal,AbortSignal.timeout(PRODUCT_JOB_DEADLINE_MS)]):AbortSignal.timeout(PRODUCT_JOB_DEADLINE_MS);
     const uncertain=()=>Object.assign(Error('UNKNOWN: durable operation outcome is not yet known. Reconcile its job or authoritative Session/receipt before retrying.'),{code:'UNKNOWN',jobId});
-    let value;
+    let value,pollAttempt=0;
     try{value=await account.client.request(account.root+path,{method:body===undefined?'GET':'POST',body,signal:bounded,jobId});}
     catch(error){
       const definitiveRefusal=[400,401,403,404,409,422,426,429].includes(error?.status);
@@ -54,10 +59,16 @@ export async function api(path,body,{signal}={}){
         throw Object.assign(Error(`Research job ended in ${value.state}.`),{code:value.state,jobId});
       }
       try{
+        // Queue wait can approach the explicit 60 s TTL. Fixed synchronized
+        // 1 s polling made each waiting browser issue dozens of redundant
+        // status reads and saturated API admission during concurrent cohorts.
+        // Spread read-only polls gradually, with a strict 3.25 s ceiling.
+        const pollDelay=Math.min(3000,1000+pollAttempt*500)+Math.floor(Math.random()*251);
+        pollAttempt++;
         await new Promise((resolve,reject)=>{
           if(bounded.aborted)return reject(bounded.reason);
           const abort=()=>{clearTimeout(timer);reject(bounded.reason);};
-          const timer=setTimeout(()=>{bounded.removeEventListener('abort',abort);resolve();},1000);
+          const timer=setTimeout(()=>{bounded.removeEventListener('abort',abort);resolve();},pollDelay);
           bounded.addEventListener('abort',abort,{once:true});
         });
         value=await account.client.request(account.root+'/jobs/'+jobId,{signal:bounded});
@@ -88,6 +99,25 @@ export async function api(path,body,{signal}={}){
   return value;
 }
 export function sessionPath(session){return `/sessions/${encodeURIComponent(session)}`;}
+
+export async function loadSessionWithMetadata(sessionId,{analytics=false,signal}={}){
+  if(typeof sessionId!=='string'||!sessionId)throw Error('Choose a Session.');
+  const path=sessionPath(sessionId);
+  const view=analytics
+    ?await api(`${path}/view`,{timeframe:'1m'},{signal})
+    :await api(path,undefined,{signal});
+  if(view?.metadata?.id!==sessionId||typeof view.metadata.name!=='string'||
+     typeof view.metadata.methodId!=='string'||!view.state)
+    throw Error('The service returned an invalid Session.');
+  return view;
+}
+
+export async function loadMethodRecord(methodId,{signal}={}){
+  const value=await api(`/methods/${encodeURIComponent(methodId)}`,undefined,{signal});
+  if(value?.artifact!=='BTL-METHOD-1'||value.method?.id!==methodId||typeof value.method.name!=='string')
+    throw Error('The service returned an invalid Method.');
+  return value.method;
+}
 export function orderHistoryPagePath(sessionId,{limit=64,afterSequence=null,revision=null}={}){
   if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>256)
     throw Error('Invalid order history page request.');
@@ -222,14 +252,30 @@ export function command(view,kind,payload){
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
-async function productPage(path,artifact,after=null,project=value=>value){
+async function productPage(path,artifact,after=null,project=value=>value,{signal}={}){
   const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
-  const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
+  const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`,undefined,{signal});
   if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
     throw Error('Unsupported workspace page; no state was imported.');
   if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===after))
     throw Error('Workspace pagination did not advance.');
   return {...page,items:page.items.map(project)};
+}
+
+export async function loadMethodSessionPage(methodId,after=null,{signal}={}){
+  if(!accountTransport())throw Error('Sign in to view Sessions for this Method.');
+  const page=await productPage(`/sessions?${new URLSearchParams({methodId})}`,'BTL-SESSION-PAGE-1',after,
+    item=>item?.metadata,{signal});
+  const seen=new Set(after===null?[]:[after]);
+  if(page.items.length>50)throw Error('The service returned too many Sessions.');
+  for(const item of page.items){
+    if(item?.methodId!==methodId||typeof item.id!=='string'||!item.id||seen.has(item.id))
+      throw Error('The service returned an invalid Session page for this Method.');
+    seen.add(item.id);
+  }
+  if(page.complete?page.nextCursor!==null:!page.items.length||page.nextCursor!==page.items.at(-1).id)
+    throw Error('The service returned an invalid Session page cursor.');
+  return page;
 }
 
 export async function loadProductCatalog(){
@@ -283,11 +329,11 @@ export async function loadMoreProductCatalog(catalog,kind){
   throw Error('Unknown workspace page.');
 }
 
-export async function loadJournalPage(sessionId,cursor=null){
+export async function loadJournalPage(sessionId,cursor=null,{signal}={}){
   if(typeof sessionId!=='string'||!sessionId)throw Error('Journal Session is unavailable.');
   const query=new URLSearchParams({limit:'32'});if(cursor)query.set('cursor',cursor);
-  const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`);
-  if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
+  const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`,undefined,{signal});
+  if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||page.sessionId!==sessionId||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
       !Number.isSafeInteger(page.totalOrders)||typeof page.complete!=='boolean')
     throw Error('Unsupported Journal page; no state was imported.');
   if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===cursor))
@@ -315,14 +361,23 @@ export async function loadMethodVersionPage(familyId,cursor=null){
   return page;
 }
 
-export async function loadMethodFamily(familyId){
+export async function loadMethodFamilyRecord(familyId,{signal}={}){
   if(typeof familyId!=='string'||!familyId)throw Error('Method family is unavailable.');
-  const [detail,page]=await Promise.all([
-    api(`/method-families/${encodeURIComponent(familyId)}`),loadMethodVersionPage(familyId),
-  ]);
-  if(detail.artifact!=='BTL-METHOD-FAMILY-1'||detail.family?.familyId!==familyId)
+  const value=await api(`/method-families/${encodeURIComponent(familyId)}`,undefined,{signal});
+  const family=value?.family;
+  if(value?.artifact!=='BTL-METHOD-FAMILY-1'||family?.familyId!==familyId||
+     !Number.isSafeInteger(family.revision)||!Number.isSafeInteger(family.latestVersion)||
+     typeof family.archived!=='boolean'||!family.current||family.current.id!==family.latestMethodId)
     throw Error('Unsupported Method family; no state was imported.');
-  return {...detail.family,versions:page.versions,nextVersionCursor:page.nextCursor,revision:page.revision};
+  return family;
+}
+
+export async function loadMethodFamily(familyId){
+  const [detail,page]=await Promise.all([
+    loadMethodFamilyRecord(familyId),loadMethodVersionPage(familyId),
+  ]);
+  if(detail.revision!==page.revision)throw Error('Method versions changed. Reload and try again.');
+  return {...detail,versions:page.versions,nextVersionCursor:page.nextCursor};
 }
 
 export async function setMethodArchived(family,archived){

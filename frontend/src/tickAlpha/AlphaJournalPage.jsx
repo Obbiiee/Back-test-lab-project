@@ -1,6 +1,7 @@
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
-import {money,utc,lastSession} from './productData.js';
+import {money,utc,lastSession,useSessionRead} from './productData.js';
+import {ratioLabel} from './annotations.js';
 import {linkTo,navigate,setLeaveGuard} from './productRoute.js';
 import {readDraft,writeDraft,clearDraft,isDirty,tagList,tagText} from './noteDrafts.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
@@ -75,13 +76,22 @@ function NoteEditor({order,note,sessionId,path,onSaved,onDirty,onReload}){
 }
 
 export default function AlphaJournalPage({catalog,route,onOpen}){
-  const sessionId=route.analyticsSession||(catalog.sessions.some(s=>s.id===lastSession())?lastSession():null);
-  const session=catalog.sessions.find(s=>s.id===sessionId)||null;
+  const previousSession=lastSession();
+  const sessionId=route.analyticsSession||(catalog.sessions.some(s=>s.id===previousSession)?previousSession:null);
+  return <JournalSelection key={sessionId} catalog={catalog} sessionId={sessionId} onOpen={onOpen}/>;
+}
+
+function JournalSelection({catalog,sessionId,onOpen}){
+  const listedSession=catalog.sessions.find(s=>s.id===sessionId);
   const [attempt,setAttempt]=useState(0);
-  const [result,setResult]=useState({key:null});
+  const [linkAttempt,setLinkAttempt]=useState(0);
+  const linked=useSessionRead(listedSession?null:sessionId,linkAttempt);
+  const session=listedSession??linked.value?.metadata;
+  const [result,setResult]=useState({status:'loading'});
   const [side,setSide]=useState('ALL');
   const [status,setStatus]=useState(null);
   const [query,setQuery]=useState('');
+  const deferredQuery=useDeferredValue(query);
   const [dirty,setDirty]=useState(()=>new Map()); // orderId → 'kept' | 'lost'
   const [loadingMore,setLoadingMore]=useState(false);
   const [pageError,setPageError]=useState('');
@@ -106,16 +116,19 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
     return()=>{release();globalThis.removeEventListener('beforeunload',unload);};
   },[dirty.size]);
   useEffect(()=>{if(leaving)stay.current?.focus();},[leaving]);
-  const key=`${sessionId}:${attempt}`;
   const path=session?sessionPath(session.id)+'/journal':null;
+  const journalSessionId=session?.id;
   useEffect(()=>{
-    if(!sessionId)return undefined;
-    let live=true;
-    loadJournalPage(sessionId).then(value=>{if(live)setResult({key,status:'ready',value});},failure=>{if(live)setResult({key,status:'error',message:noticeText(failure.message)});});
-    return()=>{live=false;};
-  },[sessionId,key]);
+    if(!journalSessionId)return undefined;
+    const controller=new AbortController();
+    loadJournalPage(journalSessionId,null,{signal:controller.signal}).then(
+      value=>{if(!controller.signal.aborted)setResult({attempt,status:'ready',value});},
+      failure=>{if(!controller.signal.aborted)setResult({attempt,status:'error',message:noticeText(failure.message)});},
+    );
+    return()=>controller.abort();
+  },[journalSessionId,attempt]);
   // A reload after a stale-note refusal keeps the page (and open editors) mounted.
-  const state=result.key===key?result:result.key?.startsWith(`${sessionId}:`)&&result.status==='ready'?result:{status:'loading'};
+  const state=result.attempt===attempt||result.status==='ready'?result:{status:'loading'};
   const journal=state.status==='ready'?state.value:null;
   const loadMore=async()=>{
     if(!session||!journal?.nextCursor||loadingMore)return;
@@ -123,7 +136,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
     try{
       const page=await loadJournalPage(session.id,journal.nextCursor);
       setResult(previous=>{
-        if(previous.key!==key||previous.status!=='ready')return previous;
+        if(previous.attempt!==attempt||previous.status!=='ready')return previous;
         const orders=new Map(previous.value.orders.map(order=>[order.id,order]));
         for(const order of page.orders)orders.set(order.id,order);
         const notes=new Map(previous.value.notes.map(note=>[note.orderId,note]));
@@ -134,18 +147,21 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
     finally{setLoadingMore(false);}
   };
   const statuses=useMemo(()=>[...new Set((journal?.orders??[]).map(order=>order.status))].sort(),[journal]);
+  const notesByOrder=useMemo(()=>new Map((journal?.notes??[]).map(note=>[note.orderId,note])),[journal?.notes]);
   const rows=useMemo(()=>{
     if(!journal)return [];
-    const q=query.trim().toLowerCase();
+    const q=deferredQuery.trim().toLowerCase();
     return journal.orders.filter(order=>{
       if(side!=='ALL'&&order.side!==side)return false;
       if(status&&order.status!==status)return false;
       if(!q)return true;
-      const note=journal.notes.find(item=>item.orderId===order.id);
+      const note=notesByOrder.get(order.id);
       return [note?.text,...(note?.tags??[]),order.orderType,order.status].filter(Boolean).some(text=>text.toLowerCase().includes(q));
     }).slice().reverse();
-  },[journal,side,status,query]);
-  const sessionOptions=catalog.sessions.slice().reverse().map(s=>({value:s.id,label:s.name,description:catalog.methods.find(m=>m.id===s.methodId)?.name}));
+  },[journal,notesByOrder,side,status,deferredQuery]);
+  const pickerSessions=catalog.sessions.slice().reverse();
+  if(session&&!listedSession)pickerSessions.unshift(session);
+  const sessionOptions=pickerSessions.map(s=>({value:s.id,label:s.name,description:catalog.methods.find(m=>m.id===s.methodId)?.name}));
   const picker=<div className="rk-toolbar-combo rk-toolbar-combo-wide"><SearchableSelect label="Session" placeholder="Search or select Session" searchPlaceholder="Search Sessions…" options={sessionOptions} value={session?.id??null}
     onChange={value=>navigate({screen:'journal',of:value||undefined})} noOptionsText="No Sessions yet."/></div>;
   const savedNote=value=>setResult(previous=>({...previous,value:{...previous.value,notes:[...previous.value.notes.filter(item=>item.orderId!==value.orderId),value]}}));
@@ -161,8 +177,10 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
   return <>{leaveDialog}<PageHead eyebrow="Research" title="Journal" lead="Committed orders of one Session with your notes. Notes never change fills or cash."
       actions={session&&<button type="button" className="rk-btn" onClick={()=>leaveThen(()=>onOpen(session.id))}>Open replay</button>}/>
     <div className="rk-toolbar">{picker}</div>
-    {!catalog.sessions.length?<StatePanel kind="empty" title="Nothing journaled yet" action={<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new'})}>New Session</a>}><p>Journals start when you confirm the first order in a Session.</p></StatePanel>
-      :!session?<StatePanel kind="empty" title={sessionId?'This Session is not in this workspace':'Choose a Session'}><p>{sessionId?'Pick one from the list above.':'A journal across all Sessions needs a server list that is not published yet, so pick one Session.'}</p></StatePanel>
+    {!sessionId&&!catalog.sessions.length?<StatePanel kind="empty" title="Nothing journaled yet" action={<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new'})}>New Session</a>}><p>Journals start when you confirm the first order in a Session.</p></StatePanel>
+      :!sessionId?<StatePanel kind="empty" title="Choose a Session"><p>Pick one Session to view its journal.</p></StatePanel>
+      :linked.status==='error'?<StatePanel kind="error" title="The Session could not load" action={<button type="button" className="rk-btn" onClick={()=>setLinkAttempt(n=>n+1)}>Retry</button>}><p>{linked.message}</p></StatePanel>
+      :!session?<StatePanel kind="loading" title="Loading the saved Session…"/>
       :state.status==='loading'?<StatePanel kind="loading" title="Loading the journal…"/>
       :state.status==='error'?<StatePanel kind="error" title="The journal could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message}</p></StatePanel>
       :!journal.orders.length?<StatePanel kind="empty" title="No orders yet" action={<button type="button" className="rk-btn rk-btn-primary" onClick={()=>leaveThen(()=>onOpen(session.id))}>Open replay</button>}><p>Review and confirm an order in replay; it appears here with room for a note.</p></StatePanel>
@@ -174,7 +192,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
           <span className="rk-count" role="status">{rows.length} shown · {journal.orders.length} loaded of {journal.totalOrders}</span>
         </div>
         {rows.length?<ol className="rk-journal" aria-label={`Orders in ${session.name}`}>{rows.map(order=>{
-          const note=journal.notes.find(item=>item.orderId===order.id);
+          const note=notesByOrder.get(order.id);
           return <li key={order.id} className="rk-card rk-journal-item">
             <div className="rk-journal-head"><span className={`rk-side rk-side-${order.side==='LONG'?'buy':'sell'}`}>{order.side==='LONG'?'Long':'Short'}</span><strong>{order.orderType.charAt(0)+order.orderType.slice(1).toLowerCase()}</strong><span className="rk-tag">{order.status.toLowerCase().replaceAll('_',' ')}</span><span className="rk-num rk-journal-time">{utc(order.entryTimeNs)}</span></div>
             <dl className="rk-facts rk-journal-facts">
@@ -182,7 +200,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
               <div><dt>Lots</dt><dd className="rk-num">{dash(order.quantity)}</dd></div>
               <div><dt>SL / TP</dt><dd className="rk-num">{dash(order.sl)} / {dash(order.tp)}</dd></div>
               <div><dt>Net cash change</dt><dd className="rk-num">{money(order.netCashChange)}</dd></div>
-              <div><dt>R multiple</dt><dd className="rk-num" title={order.rMultiple===null?order.rReason:undefined}>{order.rMultiple===null?'—':order.rMultiple}</dd></div>
+              <div><dt>R multiple</dt><dd className="rk-num" title={order.rMultiple===null?order.rReason:undefined}>{order.rMultiple===null?'—':ratioLabel(order.rMultiple)}</dd></div>
             </dl>
             <NoteEditor key={order.id} order={order} note={note} sessionId={session.id} path={path} onSaved={savedNote} onDirty={onDirty} onReload={()=>setAttempt(n=>n+1)}/>
           </li>;})}</ol>

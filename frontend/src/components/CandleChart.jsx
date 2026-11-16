@@ -61,6 +61,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   const primitiveDrawings = useDrawingTools({ chart: chartForOverlay, series: seriesForOverlay, candles, mode: drawingMode, onModeChange: onDrawingModeChange, timeframe: sessionId?.split('-').at(-1), container: chartContainer, workspace: drawingWorkspace, tickSize: Number(priceStep) > 0 ? Number(priceStep) : 0.001 });
   const markersRef = useRef(null);
   const volumeSeriesRef = useRef(null);
+  const volumeHasDataRef = useRef(false);
   const priceLinesRef = useRef([]);
   const [objectBridge] = useState(() => new ChartObjectBridge());
   const [persistence] = useState(() => new LegacyObjectPersistence());
@@ -182,6 +183,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       seriesRef.current = null;
       previousCandlesRef.current = [];
       volumeSeriesRef.current = null;
+      volumeHasDataRef.current = false;
       markersRef.current = null;
       priceLinesRef.current = [];
     };
@@ -410,12 +412,19 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   }, [selectedDrawingId, onDrawingModeChange, deleteSelectedDrawing, commitDrawings, drawingMode, keepDrawing, undoDrawing, redoDrawing]);
 
   useEffect(() => {
+    const placing = Boolean(RISK_REWARD_TOOLS[drawingMode] || DRAWING_SPECS[drawingMode]);
+    const crosshairVisible = chartPreferences.showCrosshair && drawingMode !== "cursor-arrow";
+    chartRef.current?.applyOptions({
+      handleScroll: { pressedMouseMove: !placing, horzTouchDrag: !placing, vertTouchDrag: !placing },
+      handleScale: { mouseWheel: true },
+      crosshair: { vertLine: { visible: crosshairVisible }, horzLine: { visible: crosshairVisible } },
+    });
+  }, [drawingMode, chartPreferences.showCrosshair]);
+
+  useEffect(() => {
     const chart = chartRef.current, series = seriesRef.current;
     if (!chart || !series) return;
     const tool = RISK_REWARD_TOOLS[drawingMode];
-    const placing = Boolean(tool) || DRAWING_SPECS[drawingMode];
-    chart.applyOptions({ handleScroll: { pressedMouseMove: !placing, horzTouchDrag: !placing, vertTouchDrag: !placing }, handleScale: { mouseWheel: true } });
-    chart.applyOptions({ crosshair: { vertLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" }, horzLine: { visible: chartPreferences.showCrosshair && drawingMode !== "cursor-arrow" } } });
     function pointFor(param) {
       if (!param.point || (param.paneIndex !== undefined && param.paneIndex !== 0)
         || param.point.y < 0 || param.point.y > chart.paneSize(0).height) return null;
@@ -439,7 +448,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     placementRef.current = handleChartClick;
     chart.subscribeClick(handleChartClick);
     return () => { chart.unsubscribeClick(handleChartClick); placementRef.current = null; };
-  }, [drawingMode, onDrawingModeChange, onPriceSelect, commitDrawings, candles, keepDrawing, chartPreferences.showCrosshair, objectBridge]);
+  }, [drawingMode, onDrawingModeChange, onPriceSelect, commitDrawings, candles, keepDrawing, objectBridge]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -455,13 +464,6 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     syncCandleSeries(series, isNewSession ? [] : previousCandlesRef.current, candles, transition);
     previousCandlesRef.current = candles;
     indicatorEngine.setCandles(candles);
-    if (volumeAvailable) volumeSeriesRef.current?.setData(candles.map((candle) => ({
-      time: candle.time,
-      value: Number(candle.volume ?? 0),
-      color: candle.close >= candle.open ? "#22c99a66" : "#f0647466",
-    })));
-    else volumeSeriesRef.current?.setData([]);
-
     const previousFirst = previousFirstCandleRef.current;
     const prepended = previousFirst != null && candles[0]?.time < previousFirst ? candles.findIndex(bar => bar.time === previousFirst) : 0;
     if (candles.length && (isNewSession || previousCount === 0 || (previousCount < 60 && prepended > 0))) {
@@ -479,7 +481,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     viewportSessionRef.current = viewportKey;
     previousCandleCountRef.current = candles.length;
     previousFirstCandleRef.current = candles[0]?.time ?? null;
-  }, [candles, viewportKey, indicatorEngine, transition, volumeAvailable]);
+  }, [candles, viewportKey, indicatorEngine, transition]);
 
   useEffect(() => {
     const scale=chartRef.current?.timeScale();
@@ -492,6 +494,22 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
   useEffect(() => {
     volumeSeriesRef.current?.applyOptions({ visible: showVolume });
   }, [showVolume]);
+
+  useEffect(() => {
+    const volume = volumeSeriesRef.current;
+    if (!volume) return;
+    if (!showVolume || !candles.length) {
+      if (volumeHasDataRef.current) volume.setData([]);
+      volumeHasDataRef.current = false;
+      return;
+    }
+    volume.setData(candles.map(candle => ({
+      time: candle.time,
+      value: Number(candle.volume ?? 0),
+      color: candle.close >= candle.open ? "#22c99a66" : "#f0647466",
+    })));
+    volumeHasDataRef.current = true;
+  }, [candles, showVolume]);
 
   // Alpha research presentation uses official chart options; no chart remount,
   // data/projection mutation, series replacement or drawing lifecycle change.

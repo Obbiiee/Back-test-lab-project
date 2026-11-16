@@ -3,6 +3,7 @@ from copy import deepcopy
 from collections import OrderedDict
 import hashlib
 import json
+import logging
 from threading import RLock
 from uuid import uuid4
 
@@ -27,7 +28,12 @@ COMPACT_RECEIPT = "BTL-TICK-EXECUTION-COMPACT-RESULT-1"
 COMPACT_RECOVERY_INTERVAL = 128
 _COMPACT_CACHE = OrderedDict()
 _COMPACT_CACHE_LOCK = RLock()
-_COMPACT_CACHE_MAX = 4
+# Keep the compact snapshot cache bounded but large enough to retain the
+# ten independently active Sessions in the local Product acceptance cohort.
+# Eviction only costs replaying verified checkpoint deltas; the cache is never
+# used as financial authority.
+_COMPACT_CACHE_MAX = 16
+log = logging.getLogger(__name__)
 
 
 def pack(value):
@@ -276,7 +282,7 @@ class PostgresExecutionStore:
         db.execute(
             "INSERT INTO btl.tick_journal_projection_heads "
             "(workspace_id,session_id,format_version,through_sequence,event_hash,analytics_format_version) "
-            "VALUES (%s,%s,1,%s,%s,1)",
+            "VALUES (%s,%s,1,%s,%s,2)",
             (workspace, session, state["nextEventIndex"], state["eventHash"]),
         )
         metric_projection = initial_metric_projection(
@@ -348,7 +354,11 @@ class PostgresExecutionStore:
                 if unpack(prior[2], prior[3]).get("artifact") == COMPACT_RECEIPT:
                     return self._compact_receipt(command, prior, db, workspace, session)
                 return unpack(prior[2], prior[3])
-            require(command["expectedRevision"] == state["revision"], "revision", "REFUSED_STALE_REVISION")
+            if command["expectedRevision"] != state["revision"]:
+                log.warning("stale_revision_refused requestType=%s sessionDigest=%s expectedRevision=%s actualRevision=%s status=%s",
+                            command["kind"], hashlib.sha256(session.encode()).hexdigest()[:16],
+                            command["expectedRevision"], state["revision"], "REFUSED_STALE_REVISION")
+                require(False, "revision", "REFUSED_STALE_REVISION")
             next_state, next_checkpoint, events, replay = operation(deepcopy(state), deepcopy(checkpoint))
             require(len(events) <= MAX_EVENTS, "events", "REFUSED_EVENT_LIMIT")
             require(next_state["revision"] == state["revision"] and
@@ -565,6 +575,7 @@ class PostgresExecutionStore:
             else:
                 stored = stored_wire
             state, checkpoint = stored["state"], stored["controller"]
+            parent_event_count = state['nextEventIndex']
             snapshot(state, checkpoint)
             require(not state["unresolved"] and not state["ended"], "forkPoint", "REFUSED_FORK_POINT")
             logical_checkpoint_hash = pack(snapshot(state, checkpoint))[1]
@@ -610,6 +621,10 @@ class PostgresExecutionStore:
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace,child_session,command["commandId"],event["eventId"],event["sequence"],event_raw,event_hash))
             append_journal_order_index(db, workspace, child_session, fork_base_state, state, events)
+            if events and events[0]['kind'] == 'SESSION_FORKED':
+                from .journal_order_index import seed_fork_orders
+                seed_fork_orders(db, workspace, parent_session, parent_event_count,
+                                 child_session, state, events[0])
             if compact_mode:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",(workspace,child_session,1,checkpoint_raw,checkpoint_hash))
             else:
@@ -625,6 +640,11 @@ def grant_execution_runtime(dsn, role):
     with connect(dsn) as db:
         db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints,btl.tick_terminal_orders,btl.tick_recovery_bases TO {}").format(sql.Identifier(role)))
+        # Product Method lifecycle metadata is part of Session admission. Keep
+        # immutable version rows append-only for the runtime role; the family
+        # row is the guarded mutable pointer/archive state.
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.product_method_versions TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.product_method_families TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_events TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.tick_journal_projection_heads TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_journal_order_projection TO {}").format(sql.Identifier(role)))

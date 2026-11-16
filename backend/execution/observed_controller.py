@@ -5,6 +5,8 @@ from .observed_profile import ObservedExecutionProfile
 from .observed_admission import AdmittedObservedSource
 from .observed_kernel import apply,command_wire,seed_state,order_limits
 from .observed_session_dispatch import dispatch_observed_session
+from .next_event import scan_next_group
+from .engine import coverage_complete
 
 
 class ObservedExecutionController:
@@ -49,6 +51,23 @@ class ObservedExecutionController:
             return self.store.commit(scope,command,before,proposed,cp,events,replay,archive_records=archive_records)
         proposed,events=apply(state,command,order_retention_policy=self.order_retention_policy,**kwargs)
         return self.store.commit(scope,command,before,proposed,cp,events,replay)
+
+    def preview_next_event(self,scope,state,checkpoint,target_ns):
+        source=self._source(ObservedExecutionProfile.from_wire(state['profile']))
+        ack=source.cache.preview(checkpoint,target_ns)
+        supported,candidate=scan_next_group(state,ack['groups'])
+        safe_batch=(supported and candidate is None and not ack['diagnostics']['records'] and
+                    coverage_complete(ack['coverage'],int(state['throughNs']),int(ack['throughNs'])))
+        if candidate is not None and supported:
+            target=ack['groups'][candidate]['timeNs']
+        elif safe_batch and ack['groups']:
+            target=ack['throughNs']
+        elif ack['groups']:
+            target=ack['groups'][0]['timeNs']
+        else:
+            target=ack['throughNs']
+        return dict(targetNs=str(target),previewGroups=len(ack['groups']),
+                    exhaustedThroughBoundary=ack['exhaustedThroughBoundary'])
 
     def inspect(self,scope,session_id,after_sequence=0,maximum=64):
         return self.store.inspect(scope,session_id,after_sequence,maximum)

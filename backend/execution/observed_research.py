@@ -35,6 +35,8 @@ from .analytics_projection import (initial_projection,analytics_view,completed_t
     encode_trade_cursor,decode_trade_cursor,ARTIFACT as ANALYTICS_PROJECTION_ARTIFACT)
 from .postgres import pack,unpack
 from .research import method_policy,label
+from .jump_next_event import (FINANCIAL_EVENT_KINDS, advance_command as jump_advance_command,
+    result as jump_result, validate_request as validate_jump_request)
 from .bootstrap import bootstrap as descriptive_bootstrap,validate_seed
 
 META='BTL-OBSERVED-RESEARCH-SESSION-1'
@@ -433,6 +435,52 @@ class ObservedResearchApplication:
         require(raw.get('sessionId')==session_id and raw.get('kind') in ('ADVANCE','CANCEL','CLOSE','END'),'command','REFUSED_COMMAND')
         with connect(self.dsn) as db:self._session(db,session_id)
         return self.controller.apply(self.scope,raw)
+
+    def jump_next_event(self,session_id,raw):
+        """Search one bounded page using the Session's pinned observed source."""
+        validate_jump_request(raw,session_id)
+        with connect(self.dsn) as db:
+            _meta,_method,state,_checkpoint=self._session(db,session_id)
+        live=any(order['status'] in ('PENDING','ACTIVE') for order in state['orders'].values())
+        if not live or state['ended'] or state['unresolved']:
+            view=self.inspect(session_id,raw['timeframe'])
+            return jump_result(raw,status='NO_ACTIVE_ORDERS',through_ns=state['throughNs'],
+                advances=0,processed_groups=0,events=[],view=view)
+        source=self.catalog.resolve(state['profileHash']);source.assert_current()
+        target=str(source.observed._end_ns-1)
+        require(state['revision'] in (raw['expectedRevision'],raw['expectedRevision']+1),
+                'revision','REFUSED_STALE_REVISION')
+        if state['revision']==raw['expectedRevision']:
+            preview=self.controller.preview_next_event(self.scope,state,_checkpoint,target)
+            if not preview['previewGroups'] and int(state['throughNs'])>=int(target):
+                view=self.inspect(session_id,raw['timeframe'])
+                return jump_result(raw,status='NO_EVENT_UNTIL_SESSION_END',through_ns=state['throughNs'],
+                    advances=0,processed_groups=0,events=[],view=view)
+            advance_target=preview['targetNs']
+        else:
+            advance_target=state['throughNs']
+        command=jump_advance_command({**raw,'targetNs':advance_target},raw['expectedRevision'],
+            'BTL-OBSERVED-EXECUTION-COMMAND-1')
+        saved=self.controller.apply(self.scope,command)
+        state_after=saved['state']
+        require(state_after['revision']==raw['expectedRevision']+1,
+                'revision','REFUSED_STALE_REVISION')
+        current=self.controller.inspect(self.scope,session_id,state_after['nextEventIndex'],1)['state']
+        require(current['revision']==state_after['revision'],'revision','REFUSED_STALE_REVISION')
+        start_sequence=saved.get('eventFromSequence',state['nextEventIndex'])
+        committed=self.controller.inspect(self.scope,session_id,start_sequence,256)
+        require(committed['state']['revision']==state_after['revision'] and
+                committed.get('nextEventSequence') is None,
+                'events','REFUSED_RESPONSE_LIMIT')
+        events=committed['events']
+        event_found=any(event['kind'] in FINANCIAL_EVENT_KINDS for event in events)
+        replay=saved.get('replay') or {}
+        at_end=(state_after['throughNs']>=target or replay.get('exhaustedThroughBoundary') is True)
+        status='EVENT_FOUND' if event_found else 'NO_EVENT_UNTIL_SESSION_END' if at_end else 'SEARCHING'
+        view=self.inspect(session_id,raw['timeframe'])
+        require(view['state']['revision']==state_after['revision'],'revision','REFUSED_STALE_REVISION')
+        return jump_result(raw,status=status,through_ns=state_after['throughNs'],advances=1,
+            processed_groups=max(0,int(state_after['nextGroupIndex'])-int(state['nextGroupIndex'])),events=events,view=view)
 
     def replay_to(self,session_id,raw):
         """Advance to a UTC target in bounded, individually durable 64-group commands."""

@@ -70,8 +70,9 @@ assert.equal(defaultPeriod(unknownVersion),null);
 assert.equal(periodAvailability({...dto,availability:null},'XAUUSD',false).mode,'published');
 assert.equal(monthLabel('2025-01'),'January 2025');
 
-// The wizard must not reintroduce a range guess, and the POST payload stays unchanged.
+// The wizard keeps the selected instrument in its UI event; TickAlpha maps the
+// approved fields into the unchanged Session API payload.
 const wizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
 assert.doesNotMatch(wizard,/maxPeriod|slice\(0,4\)/);
-assert.match(wizard,/onCreate\(\{name:finalName,methodId:method\.id,initialBalance:balance,startPeriod:/);
+assert.match(wizard,/onCreate\(\{name:finalName,methodId:method\.id,symbol:instrument,initialBalance:balance,\s*startPeriod:/);
 console.log('period availability: ok');

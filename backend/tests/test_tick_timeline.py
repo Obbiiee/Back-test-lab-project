@@ -45,6 +45,36 @@ class Proxy:
 
 
 class TickTimelineTests(unittest.TestCase):
+    def test_stop_callback_emits_exact_atomic_prefix_and_resumes_without_skips(self):
+        rows = [row(index, 100 + index * 100) for index in range(6)]
+        normal_provider, normal = timeline(rows)
+        normal_prefix = normal.advance_through("300", normal.cursor)
+        provider, actual = timeline(rows)
+        inspected = []
+
+        def stop(group):
+            inspected.append(group["timeNs"])
+            return group["timeNs"] == "300"
+
+        candidate = actual.advance_through("600", actual.cursor, stop_when=stop)
+        self.assertEqual(inspected, ["100", "200", "300"])
+        self.assertEqual([group["timeNs"] for group in candidate["groups"]],
+                         ["100", "200", "300"])
+        self.assertEqual(candidate["throughNs"], normal_prefix["throughNs"])
+        self.assertEqual(candidate["cursor"]["visiblePrefixHash"],
+                         normal_prefix["cursor"]["visiblePrefixHash"])
+
+        rest = []
+        while True:
+            page = actual.advance_through("600", actual.cursor)
+            rest.extend(page["groups"])
+            if page["exhaustedThroughBoundary"]:
+                break
+        expected = normal_prefix["groups"] + rest
+        self.assertEqual([group["timeNs"] for group in expected],
+                         ["100", "200", "300", "400", "500", "600"])
+        self.assertEqual(provider.dataset_version, normal_provider.dataset_version)
+
     def test_wire_factory_keeps_full_validation_and_matches_constructor_oracle(self):
         from copy import deepcopy
         p=SyntheticTickProvider([row(0,100)])

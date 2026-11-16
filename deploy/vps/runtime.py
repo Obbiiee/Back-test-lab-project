@@ -5,6 +5,16 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'backend'))
 from deploy.vps.settings import read_json,runtime,need,ConfigurationError
 
+def configure_environment(config):
+    # Worker count is a non-secret, bounded deployment setting. Preserve only
+    # this validated value across the secret-config environment reset.
+    from cloud.worker_config import ENVIRONMENT_VARIABLE,parse_worker_count
+    worker_count=parse_worker_count(os.environ.get(ENVIRONMENT_VARIABLE))
+    for key in list(os.environ):
+        if key.startswith('BTL_'):del os.environ[key]
+    os.environ.update(config)
+    os.environ[ENVIRONMENT_VARIABLE]=str(worker_count)
+
 def database_guard(dsn):
     from infrastructure.database import connect,MIGRATIONS
     from infrastructure.codec import fingerprint
@@ -28,9 +38,7 @@ def main():
     need(sys.argv[1:]==['serve'],'OPERATION')
     config=runtime(read_json('/run/secrets/runtime_config'))
     # Remove inherited secret/proxy overrides; this deployment has one explicit trust boundary.
-    for key in list(os.environ):
-        if key.startswith('BTL_'):del os.environ[key]
-    os.environ.update(config)
+    configure_environment(config)
     database_guard(config['BTL_DATABASE_URL'])
     import uvicorn
     from cloud.app import from_environment

@@ -367,6 +367,8 @@
 .tick-alpha .rk-toolbar-combo-wide{flex:1 1 360px;max-width:520px}
 .tick-alpha .rk-journal{list-style:none;margin:0;padding:0;display:grid;gap:12px}
 .tick-alpha .rk-journal-item{display:flex;flex-direction:column;gap:12px}
+.tick-alpha .rk-journal-item{content-visibility:auto;contain-intrinsic-block-size:auto 256px}
+.tick-alpha .alpha-chart-loading{display:grid;place-items:center;min-block-size:min(360px,55dvh);background:var(--rk-navy);color:#fff;text-align:center}
 .tick-alpha .rk-journal-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .tick-alpha .rk-journal-time{margin-left:auto;font-size:13px;color:var(--rk-muted-on-white)}
 .tick-alpha .rk-side{border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800}

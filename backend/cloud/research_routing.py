@@ -5,7 +5,7 @@ from contracts.primitives import require, ContractError
 LOCAL_SESSION = 'BTL-LOCAL-SESSION-1'
 OBSERVED_SESSION = 'BTL-OBSERVED-RESEARCH-SESSION-1'
 MONTHLY_PROVIDER_OPERATIONS = frozenset((
-    'create_session', 'inspect', 'workspace', 'bootstrap', 'replay', 'chart_history'))
+    'create_session', 'inspect', 'workspace', 'bootstrap', 'replay', 'jump_next_event', 'chart_history'))
 
 
 def monthly_provider_required(operation):
@@ -74,4 +74,4 @@ def observed_route(operation, args, catalog, monthly_catalog=None):
         if monthly_catalog is not None and (raw['sourceKey'], raw.get('period')) in monthly_catalog._entries:
             return False
         return True
-    return operation == 'replay_to'
+    return operation in ('replay_to', 'jump_next_event')
