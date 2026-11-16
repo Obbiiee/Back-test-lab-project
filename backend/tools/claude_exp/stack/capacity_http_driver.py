@@ -55,12 +55,15 @@ class Metrics:
         self.expected_refusals = collections.Counter()
         self.persona_lat = collections.defaultdict(list)
         self.conn_retries = collections.Counter()
+        self.slot_wait_ms = []
+        self.slot_hold_ms = 0.0
+        self.direct_requests = 0
 
     def summary(self):
         return dict(
             latencySeconds={k: dict(n=len(v), p50=pct(v, 50), p95=pct(v, 95), p99=pct(v, 99), max=round(max(v), 3)) for k, v in sorted(self.lat.items())},
             outcomes={f'{k}:{o}': n for (k, o), n in sorted(self.count.items())}, admissionRefusals=dict(self.admission), clientRecoveries=dict(self.recovered),
-            unsupported=dict(self.unsupported), connectionRetries=dict(self.conn_retries), expectedRefusals=dict(self.expected_refusals), ticksAdvanced=self.ticks, trades=self.trades, jumps=self.jumps,
+            unsupported=dict(self.unsupported), connectionRetries=dict(self.conn_retries), directSlots=dict(requests=self.direct_requests, holdSecondsTotal=round(self.slot_hold_ms / 1000, 2), waitMs=dict(p50=pct(self.slot_wait_ms, 50), p95=pct(self.slot_wait_ms, 95), p99=pct(self.slot_wait_ms, 99), max=round(max(self.slot_wait_ms or [0]), 1))), expectedRefusals=dict(self.expected_refusals), ticksAdvanced=self.ticks, trades=self.trades, jumps=self.jumps,
             requests=self.requests, bytesIn=self.bytes_in, bytesOut=self.bytes_out)
 
 
@@ -98,6 +101,17 @@ class Trader:
                 raise
             self.m.requests += 1
             self.m.bytes_in += len(r.content)
+            st = r.headers.get('server-timing')
+            if st and 'research-admission' in st:
+                d = {}
+                for part in st.split(','):
+                    name, _, dur = part.strip().partition(';dur=')
+                    if dur:
+                        try: d[name] = float(dur)
+                        except ValueError: pass
+                self.m.direct_requests += 1
+                self.m.slot_wait_ms.append(d.get('research-admission', 0.0))
+                self.m.slot_hold_ms += d.get('research-thread-wait', 0.0) + d.get('research-operation', 0.0) + d.get('research-serialization', 0.0)
             code = None
             if r.status_code in (429, 503):
                 try:

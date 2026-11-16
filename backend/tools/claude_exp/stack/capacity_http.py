@@ -68,6 +68,8 @@ def sut(a):
     from cloud.app import create_app
     secret = 'cap-benchmark-secret-' + 'x' * 64
     app = create_app(ls.dsn('btl_app', ls.APP_PW, a.pg_port), secret, ls.Outbox(work / 'outbox.jsonl'), rate_limit=30, sandbox_reset_timezone='UTC')
+    if os.environ.get('BTL_BENCH_QA_TIMING') == '1':
+        app.state.qa_timing = True                       # Server-Timing headers (slot wait / hold); identical for every compared configuration
     config = uvicorn.Config(app, host='127.0.0.1', port=a.port, proxy_headers=True, forwarded_allow_ips='127.0.0.1', access_log=False, log_level='warning')
     server = uvicorn.Server(config)
 
@@ -172,7 +174,11 @@ def stage(a):
     scope = ['systemd-run', '--user', '--scope', '--quiet', '--expand-environment=no']
     sut_cmd = scope + [f'--unit={sut_unit}', '-p', f'CPUQuota={a.sut_cpu}%', '-p', f'MemoryMax={a.sut_mem}', '-p', 'MemorySwapMax=0', 'taskset', '-c', a.sut_cores,
                        PY, str(HERE), 'sut', '--ticks', str(a.ticks), '--workers', str(a.workers), '--port', str(port), '--pg-port', str(pg_port), '--work', str(run / 'work')]
-    sp = subprocess.Popen(sut_cmd, stdout=sut_log, stderr=subprocess.STDOUT, env=dict(os.environ, PATH=f'{PG_BIN}:{os.environ["PATH"]}', BTL_PG_BIN=str(PG_BIN)))
+    sut_env = dict(os.environ, PATH=f'{PG_BIN}:{os.environ["PATH"]}', BTL_PG_BIN=str(PG_BIN))
+    if a.direct_slots is not None:
+        sut_env['BTL_DIRECT_OPERATION_CONCURRENCY'] = str(a.direct_slots); sut_env['BTL_BENCH_QA_TIMING'] = '1'
+    result['directSlots'] = a.direct_slots if a.direct_slots is not None else 'default(3), timing off'
+    sp = subprocess.Popen(sut_cmd, stdout=sut_log, stderr=subprocess.STDOUT, env=sut_env)
     t0 = time.monotonic()
     while not (run / 'work' / 'READY').exists():
         if sp.poll() is not None or time.monotonic() - t0 > 1800:
@@ -271,7 +277,7 @@ if __name__ == '__main__':
     s.add_argument('--pg-port', type=int, default=54431); s.add_argument('--work', required=True); s.set_defaults(f=sut)
     s = sub.add_parser('stage'); s.add_argument('--name', required=True); s.add_argument('--spec', required=True); s.add_argument('--mode', default='load'); s.add_argument('--ticks', type=int, default=65536)
     s.add_argument('--workers', type=int, default=3); s.add_argument('--seed', type=int, default=1); s.add_argument('--duration', type=float, default=120); s.add_argument('--ramp', type=float, default=10)
-    s.add_argument('--think-scale', type=float, default=1.0); s.add_argument('--idle', type=int, default=15)
+    s.add_argument('--think-scale', type=float, default=1.0); s.add_argument('--idle', type=int, default=15); s.add_argument('--direct-slots', type=int, default=None)
     s.add_argument('--port', type=int, default=8101); s.add_argument('--pg-port', type=int, default=54431)
     s.add_argument('--sut-cpu', default='400'); s.add_argument('--sut-mem', default='11G'); s.add_argument('--sut-cores', default='0-3')
     s.add_argument('--drv-cpu', default='100'); s.add_argument('--drv-mem', default='2G'); s.add_argument('--drv-cores', default='4')

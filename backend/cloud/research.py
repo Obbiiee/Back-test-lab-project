@@ -33,7 +33,17 @@ _MONTHLY_PIN=None
 _MONTHLY_CATALOGS=OrderedDict()
 DIRECT_MUTATION_WAIT_SECONDS = 20
 DIRECT_READ_WAIT_SECONDS = 20
-DIRECT_OPERATION_CONCURRENCY = 3
+DIRECT_OPERATION_CONCURRENCY = 3     # contract default; an operator may raise it with BTL_DIRECT_OPERATION_CONCURRENCY (1..8, QA-approved values only)
+
+
+def direct_operation_concurrency():
+    """Direct (read/write, non-queued) operation slots. Default stays 3; the API admission (8 active, 16 waiting), DB budget, queue admission 16/2, TTL and deadline are NOT changed."""
+    import os
+    raw = os.environ.get('BTL_DIRECT_OPERATION_CONCURRENCY')
+    if raw is None or raw == '':
+        return DIRECT_OPERATION_CONCURRENCY
+    require(raw.isascii() and raw.isdigit() and 1 <= int(raw) <= 8, 'directOperationConcurrency', 'INVALID_INPUT')
+    return int(raw)
 
 
 def _operator_catalog(dsn):
@@ -354,8 +364,9 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
 def install(app):
     prefix = '/api/v1/workspaces/{workspace_id}/research'
     current = app.state.current_user
-    admission = anyio.Semaphore(DIRECT_OPERATION_CONCURRENCY)
-    limiter = anyio.CapacityLimiter(DIRECT_OPERATION_CONCURRENCY)
+    direct_slots = direct_operation_concurrency()
+    admission = anyio.Semaphore(direct_slots)
+    limiter = anyio.CapacityLimiter(direct_slots)
     # Reserve bounded thread capacity for durable job status polls so they do
     # not queue behind direct research reads or submission transactions.
     job_status_limiter = anyio.CapacityLimiter(2)

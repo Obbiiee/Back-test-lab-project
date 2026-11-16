@@ -36,7 +36,15 @@ def analyze(path):
         'queueFence': q.get('maxQueued', 0) <= SLO['maxQueuedFence'] and not any(k for k in (q.get('jobStates') or {}) if k not in ('SUCCEEDED',) and (q['jobStates'][k] > 0)),
     }
     idle = d['idleBaseline']['sutCpuSeconds'] / d['idleBaseline']['seconds']
-    out = dict(name=d['name'], traders=d['driver']['traders'], wall=d['wallSeconds'], scripts=compared, parityEqual=ok_par, parityBad=bad_par[:5], errors=[e.get('error') for e in errors][:4],
+    ds = (m.get('directSlots') or {}); slots = d.get('directSlots')
+    slots_n = slots if isinstance(slots, int) else 3
+    util = round(ds.get('holdSecondsTotal', 0) / max(1e-9, slots_n * secs), 3) if ds.get('requests') else None
+    p50 = lambda k: (lat.get(k) or {}).get('p50'); p99 = lambda k: (lat.get(k) or {}).get('p99')
+    started = compared + len(errors)
+    out = dict(directSlotsConfigured=slots, directSlotUtilisation=util, directSlotWaitMs=ds.get('waitMs'), directRequests=ds.get('requests'),
+               journeySuccessRate=round(compared / started, 4) if started else None, connectionRetries=m.get('connectionRetries'),
+               latencyP50P95P99={k: [p50(k), p95(k), p99(k)] for k in ('summary', 'journal', 'analytics', 'view', 'jump', 'step', 'order.confirm', 'close', 'export.csv')},
+               name=d['name'], traders=d['driver']['traders'], wall=d['wallSeconds'], scripts=compared, parityEqual=ok_par, parityBad=bad_par[:5], errors=[e.get('error') for e in errors][:4],
                sutCpuCores=round(d['sut']['cpuSecondsTotal'] / secs, 2), sutNetCores=round(d['sut']['cpuSecondsTotal'] / secs - idle, 2), throttled=d['sut'].get('nrThrottled'), sutPeakMb=d['sut']['memoryPeakMb'],
                byComponent=d['sut']['byComponentCpuSeconds'], p95={k: p95(k) for k in ('journal', 'analytics', 'jump', 'step', 'summary', 'view', 'export.csv', 'step.complete', 'play.complete', 'order.confirm', 'close')},
                queue=dict(maxQueued=q.get('maxQueued'), maxAge=q.get('maxOldestQueuedAgeSeconds'), wait=q.get('waitSeconds'), states=q.get('jobStates')),
