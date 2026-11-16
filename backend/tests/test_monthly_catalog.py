@@ -36,13 +36,14 @@ class MonthlyCatalogTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def catalog_file(self, *, eligibility='SYNTHETIC', evidence=None, root=None):
+    def catalog_file(self, *, eligibility='SYNTHETIC', evidence=None, root=None, aliases=()):
         source, manifest = self.dataset
         value = dict(schemaVersion=1, artifact=CATALOG_ARTIFACT, catalogVersion=1,
             sources=[dict(key='source:synthetic', period='2024-01', label='Synthetic January',
                 root=str(root or self.root), datasetId=source.dataset_id,
                 datasetVersion=source.dataset_version, manifestSha256=manifest['manifestHash'],
                 eligibility=eligibility, eligibilityEvidenceSha256=evidence)])
+        value['sources'].extend({**value['sources'][0], **alias} for alias in aliases)
         path = Path(self.temp.name) / 'monthly-catalog.json'
         raw = canonical_bytes(value)
         path.write_bytes(raw)
@@ -73,6 +74,20 @@ class MonthlyCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.public(), [])
         with self.assertRaises(ContractError):
             catalog.resolve('source:synthetic', '2024-01')
+
+    def test_cached_provider_still_checks_month_and_rights_for_each_selector(self):
+        path, sha = self.catalog_file(aliases=(
+            dict(period='2024-03'),
+            dict(key='source:licensed', eligibility='RIGHTS_EVIDENCE_PINNED',
+                 eligibilityEvidenceSha256='a' * 64),
+        ))
+        catalog = MonthlyParquetCatalog(path, sha)
+        self.addCleanup(catalog.close)
+        catalog.resolve('source:synthetic', '2024-01', verify_file=False)
+        with self.assertRaisesRegex(ContractError, 'REFUSED_SOURCE_NOT_AVAILABLE'):
+            catalog.resolve('source:synthetic', '2024-03', verify_file=False)
+        with self.assertRaisesRegex(ContractError, 'REFUSED_SOURCE'):
+            catalog.resolve('source:licensed', '2024-01', verify_file=False)
 
     def test_catalog_hash_and_file_permissions_are_pinned(self):
         path, sha = self.catalog_file()

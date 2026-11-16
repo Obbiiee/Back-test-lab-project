@@ -127,7 +127,7 @@ class CloudResearchTests(unittest.TestCase):
                 self.assertEqual(created['state']['throughNs'], str(december))
                 self.assertEqual(created['quote']['timeNs'], str(december))
                 self.assertEqual(invoke('summary', session)['balance'], '10000')
-                review = review_request(created)
+                review = review_request(created, protocol=True)
                 review['draft'].update(side='LONG', orderType='LIMIT', workflow='PLANNED',
                     entry='1999', quantity=None, sl='1997', tp='2001', riskPercent='1')
                 reviewed = invoke('review', review, write=True)

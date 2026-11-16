@@ -107,29 +107,30 @@ class MonthlyParquetCatalog:
                     expected_dataset_id=entry['datasetId'],
                     expected_dataset_version=entry['datasetVersion'],
                     expected_manifest_hash=entry['manifestSha256'])
-                manifest = provider.manifest
-                require(any(item['month'] == period for item in manifest['files']),
-                        'monthlyPeriod', 'REFUSED_SOURCE_NOT_AVAILABLE')
-                rights = manifest['sourceRights']
-                if entry['eligibility'] == 'SYNTHETIC':
-                    selected_file = next(item for item in manifest['files']
-                                         if item['month'] == period)
-                    require(rights['class'] == 'SYNTHETIC' and
-                            manifest['sourceManifest']['evidenceClass'] == 'SYNTHETIC_CONTRACT_ONLY' and
-                            manifest['eventCount'] <= 4096 and not manifest['diagnostics'] and
-                            selected_file['bytes'] <= MAX_SYNTHETIC_SOURCE_BYTES,
-                            'monthlyEligibility', 'REFUSED_SOURCE')
-                    from execution.research_fixture import research_profile
-                    profile = research_profile()
-                    require((manifest['providerId'], manifest['feedId'], manifest['instrumentId']) ==
-                            (profile['providerId'], profile['feedId'], profile['feedInstrumentId']),
-                            'monthlyProfile', 'REFUSED_SOURCE')
-                else:
-                    require(rights['class'] == 'PUBLIC_GRANTED' and
-                            rights.get('evidenceHash') is not None and
-                            entry['eligibilityEvidenceSha256'] == rights['evidenceHash'] and
-                            manifest['sourceManifest']['evidenceClass'] != 'SYNTHETIC_CONTRACT_ONLY',
-                            'monthlyEligibility', 'REFUSED_SOURCE')
+            manifest = provider.manifest
+            # A cached manifest can serve several selectors. The selected month
+            # and entitlement evidence belong to each selector, not the cache.
+            selected_file = next((item for item in manifest['files'] if item['month'] == period), None)
+            require(selected_file is not None, 'monthlyPeriod', 'REFUSED_SOURCE_NOT_AVAILABLE')
+            rights = manifest['sourceRights']
+            if entry['eligibility'] == 'SYNTHETIC':
+                require(rights['class'] == 'SYNTHETIC' and
+                        manifest['sourceManifest']['evidenceClass'] == 'SYNTHETIC_CONTRACT_ONLY' and
+                        manifest['eventCount'] <= 4096 and not manifest['diagnostics'] and
+                        selected_file['bytes'] <= MAX_SYNTHETIC_SOURCE_BYTES,
+                        'monthlyEligibility', 'REFUSED_SOURCE')
+                from execution.research_fixture import research_profile
+                profile = research_profile()
+                require((manifest['providerId'], manifest['feedId'], manifest['instrumentId']) ==
+                        (profile['providerId'], profile['feedId'], profile['feedInstrumentId']),
+                        'monthlyProfile', 'REFUSED_SOURCE')
+            else:
+                require(rights['class'] == 'PUBLIC_GRANTED' and
+                        rights.get('evidenceHash') is not None and
+                        entry['eligibilityEvidenceSha256'] == rights['evidenceHash'] and
+                        manifest['sourceManifest']['evidenceClass'] != 'SYNTHETIC_CONTRACT_ONLY',
+                        'monthlyEligibility', 'REFUSED_SOURCE')
+            if cache_key not in self._providers:
                 self._providers[cache_key] = provider
                 while len(self._providers) > MAX_PROVIDER_CACHE:
                     self._providers.popitem(last=False)
