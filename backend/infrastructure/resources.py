@@ -3,6 +3,7 @@
 Operator must budget the sum across processes below PostgreSQL max_connections
 with reserved headroom. No DSN, subject or request data enters these counters.
 """
+import os
 from contextlib import contextmanager
 from threading import Lock
 
@@ -36,12 +37,26 @@ class Budget:
             return dict(limit=self.limit, active=self.active, peak=self.peak, rejected=self.rejected)
 
 
-DATABASE = Budget(12)
+def _env_int(name, default, low, high):
+    """Optional QA/operator knob. Unset or empty keeps the contract default; anything else must be an ASCII integer in range (fail closed)."""
+    raw = os.environ.get(name)
+    if raw is None or raw == '':
+        return default
+    require(raw.isascii() and raw.isdigit() and low <= int(raw) <= high, name, 'INVALID_INPUT')
+    return int(raw)
+
+
+DB_BUDGET_DEFAULT, API_ADMISSION_DEFAULT, API_WAIT_DEFAULT = 12, 8, 16
+# BTL_DB_BUDGET: per-process PostgreSQL connection budget (default 12). The operator must keep the sum across processes below max_connections.
+DATABASE = Budget(_env_int('BTL_DB_BUDGET', DB_BUDGET_DEFAULT, 1, 64))
 
 
 class ApiAdmission:
     """Bound active API work and a small wait queue before body/DB allocation."""
-    def __init__(self, app, limit=8, wait_limit=16, wait_seconds=10):
+    def __init__(self, app, limit=None, wait_limit=None, wait_seconds=10):
+        # BTL_API_ADMISSION_LIMIT (default 8 active) and BTL_API_ADMISSION_WAIT_LIMIT (default 16 waiting) are QA/operator knobs; defaults are the contract values.
+        limit = _env_int('BTL_API_ADMISSION_LIMIT', API_ADMISSION_DEFAULT, 1, 64) if limit is None else limit
+        wait_limit = _env_int('BTL_API_ADMISSION_WAIT_LIMIT', API_WAIT_DEFAULT, 0, 64) if wait_limit is None else wait_limit
         require(type(limit) is int and 1 <= limit <= 64, 'apiAdmissionLimit')
         require(type(wait_limit) is int and 0 <= wait_limit <= 64, 'apiAdmissionWaitLimit')
         require(type(wait_seconds) in (int, float) and 0 < wait_seconds <= 30,

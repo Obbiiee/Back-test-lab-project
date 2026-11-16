@@ -177,7 +177,11 @@ def stage(a):
     sut_env = dict(os.environ, PATH=f'{PG_BIN}:{os.environ["PATH"]}', BTL_PG_BIN=str(PG_BIN))
     if a.direct_slots is not None:
         sut_env['BTL_DIRECT_OPERATION_CONCURRENCY'] = str(a.direct_slots); sut_env['BTL_BENCH_QA_TIMING'] = '1'
+    for flag, env in ((a.db_budget, 'BTL_DB_BUDGET'), (a.api_limit, 'BTL_API_ADMISSION_LIMIT'), (a.api_wait, 'BTL_API_ADMISSION_WAIT_LIMIT')):
+        if flag is not None:
+            sut_env[env] = str(flag); sut_env['BTL_BENCH_QA_TIMING'] = '1'
     result['directSlots'] = a.direct_slots if a.direct_slots is not None else 'default(3), timing off'
+    result['admissionConfig'] = dict(dbBudget=a.db_budget or 12, apiActive=a.api_limit or 8, apiWait=a.api_wait or 16, clientOpt=bool(a.client_opt))
     sp = subprocess.Popen(sut_cmd, stdout=sut_log, stderr=subprocess.STDOUT, env=sut_env)
     t0 = time.monotonic()
     while not (run / 'work' / 'READY').exists():
@@ -199,7 +203,7 @@ def stage(a):
     # ---------- driver ----------
     drv_cmd = scope + [f'--unit={drv_unit}', '-p', f'CPUQuota={a.drv_cpu}%', '-p', f'MemoryMax={a.drv_mem}', '-p', 'MemorySwapMax=0', 'taskset', '-c', a.drv_cores,
                        PY, str(HERE.with_name('capacity_http_driver.py')), '--port', str(port), '--source', str(run / 'work' / 'source.json'), '--outbox', str(run / 'work' / 'outbox.jsonl'),
-                       '--spec', a.spec, '--mode', a.mode, '--seed', str(a.seed), '--duration', str(a.duration), '--ramp', str(a.ramp), '--think-scale', str(a.think_scale), '--out', str(run / 'driver.json')]
+                       '--spec', a.spec, '--mode', a.mode, '--seed', str(a.seed), '--duration', str(a.duration), '--ramp', str(a.ramp), '--think-scale', str(a.think_scale), '--client-opt', str(a.client_opt), '--out', str(run / 'driver.json')]
     drv_log = open(run / 'driver.log', 'w')
     base = read_kv(sut_cg / 'cpu.stat'); base_t = time.monotonic()
     import psycopg
@@ -219,6 +223,7 @@ def stage(a):
         drv_cg = None
     last_d, last_dpeak = {}, None
     prev, hot, series, qmax, qage = None, 0, [], 0, 0.0
+    pg_max = 0
     tripped = None
     while dp.poll() is None:
         time.sleep(2)
@@ -233,9 +238,11 @@ def stage(a):
         s = read_kv(sut_cg / 'cpu.stat')
         q = db("SELECT count(*) FILTER (WHERE state='QUEUED'), coalesce(extract(epoch from now()-min(created_at) FILTER (WHERE state='QUEUED')),0), count(*) FILTER (WHERE state='RUNNING') FROM btl.research_jobs")
         qd, qa, running = (q[0] if q else (0, 0, 0))
+        pgc = (db("SELECT count(*) FROM pg_stat_activity WHERE datname='btl'") or [[0]])[0][0]
+        pg_max = max(pg_max, pgc)
         qmax, qage = max(qmax, qd), max(qage, float(qa))
         series.append(dict(t=round(time.monotonic() - base_t, 1), hostCpu=None if cpu is None else round(cpu, 1), memAvailGiB=round(m['MemAvailable'] / 2**20, 2),
-                           sutCpuS=round((s.get('usage_usec', 0) - base.get('usage_usec', 0)) / 1e6, 1), sutMemMb=round(int((sut_cg / 'memory.current').read_text()) / 2**20), queued=qd, running=running))
+                           sutCpuS=round((s.get('usage_usec', 0) - base.get('usage_usec', 0)) / 1e6, 1), sutMemMb=round(int((sut_cg / 'memory.current').read_text()) / 2**20), queued=qd, running=running, pgConns=pgc))
         for bad, why in ((m['MemAvailable'] < 2**20, 'MemAvailable < 1 GiB'), (m['SwapTotal'] - m['SwapFree'] > 0, 'swap in use'), (shutil.disk_usage('/').free < 30 * 2**30, 'free disk < 30 GB'),
                          (hot >= 5, 'host CPU > 97% for 10 s'), (ev.get('oom_kill', 0) > 0, 'SUT oom_kill')):
             if bad:
@@ -254,7 +261,7 @@ def stage(a):
     dcpu, dpeak = last_d, last_dpeak
     result.update(wallSeconds=round(wall, 1), stoppedByGate=tripped, sut=dict(
         cpuSecondsTotal=round((s.get('usage_usec', 0) - base.get('usage_usec', 0)) / 1e6, 1), throttledUsec=s.get('throttled_usec'), nrThrottled=s.get('nr_throttled'), memoryPeakMb=None if peak is None else round(peak / 2**20),
-        byComponentCpuSeconds={k: round(v, 1) for k, v in procs.total.items()}, byComponentRssPeakMb={k: round(v) for k, v in procs.rss_peak.items()}),
+        byComponentCpuSeconds={k: round(v, 1) for k, v in procs.total.items()}, byComponentRssPeakMb={k: round(v) for k, v in procs.rss_peak.items()}, pgConnectionsMax=pg_max),
         generator=dict(cgroupCpuSeconds=round(dcpu.get('usage_usec', 0) / 1e6, 1), cgroupMemoryPeakMb=None if dpeak is None else round(dpeak / 2**20), note='generator cost is NOT counted in the SUT'),
         database=dict(sizeBytes=dbq[0][0] if dbq else None, checkpointRows=dbq[0][1] if dbq else None, checkpointBytes=dbq[0][2] if dbq else None, eventRows=dbq[0][3] if dbq else None,
                       eventBytes=dbq[0][4] if dbq else None, walBytes=int(wal1 - wal0)),
@@ -278,6 +285,7 @@ if __name__ == '__main__':
     s = sub.add_parser('stage'); s.add_argument('--name', required=True); s.add_argument('--spec', required=True); s.add_argument('--mode', default='load'); s.add_argument('--ticks', type=int, default=65536)
     s.add_argument('--workers', type=int, default=3); s.add_argument('--seed', type=int, default=1); s.add_argument('--duration', type=float, default=120); s.add_argument('--ramp', type=float, default=10)
     s.add_argument('--think-scale', type=float, default=1.0); s.add_argument('--idle', type=int, default=15); s.add_argument('--direct-slots', type=int, default=None)
+    s.add_argument('--db-budget', type=int, default=None); s.add_argument('--api-limit', type=int, default=None); s.add_argument('--api-wait', type=int, default=None); s.add_argument('--client-opt', type=int, default=0)
     s.add_argument('--port', type=int, default=8101); s.add_argument('--pg-port', type=int, default=54431)
     s.add_argument('--sut-cpu', default='400'); s.add_argument('--sut-mem', default='11G'); s.add_argument('--sut-cores', default='0-3')
     s.add_argument('--drv-cpu', default='100'); s.add_argument('--drv-mem', default='2G'); s.add_argument('--drv-cores', default='4')

@@ -41,7 +41,10 @@ def analyze(path):
     util = round(ds.get('holdSecondsTotal', 0) / max(1e-9, slots_n * secs), 3) if ds.get('requests') else None
     p50 = lambda k: (lat.get(k) or {}).get('p50'); p99 = lambda k: (lat.get(k) or {}).get('p99')
     started = compared + len(errors)
-    out = dict(directSlotsConfigured=slots, directSlotUtilisation=util, directSlotWaitMs=ds.get('waitMs'), directRequests=ds.get('requests'),
+    secs_list = sorted(r['seconds'] for r in dr.get('results', []) if r.get('seconds') is not None and r.get('result'))
+    pc = lambda q: secs_list[min(len(secs_list) - 1, int(q / 100 * (len(secs_list) - 1) + .5))] if secs_list else None
+    out = dict(scriptSeconds=dict(p50=pc(50), p95=pc(95), max=secs_list[-1] if secs_list else None), pgConnectionsMax=d['sut'].get('pgConnectionsMax'), admissionConfig=d.get('admissionConfig'), clientRecoveriesDetail=m.get('clientRecoveries'), resultShapes=m.get('resultShapes'), summariesSaved=(m.get('outcomes') or {}).get('summary:saved'),
+               directSlotsConfigured=slots, directSlotUtilisation=util, directSlotWaitMs=ds.get('waitMs'), directRequests=ds.get('requests'),
                journeySuccessRate=round(compared / started, 4) if started else None, connectionRetries=m.get('connectionRetries'),
                latencyP50P95P99={k: [p50(k), p95(k), p99(k)] for k in ('summary', 'journal', 'analytics', 'view', 'jump', 'step', 'order.confirm', 'close', 'export.csv')},
                name=d['name'], traders=d['driver']['traders'], wall=d['wallSeconds'], scripts=compared, parityEqual=ok_par, parityBad=bad_par[:5], errors=[e.get('error') for e in errors][:4],

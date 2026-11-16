@@ -55,6 +55,7 @@ class Metrics:
         self.expected_refusals = collections.Counter()
         self.persona_lat = collections.defaultdict(list)
         self.conn_retries = collections.Counter()
+        self.shapes = {}
         self.slot_wait_ms = []
         self.slot_hold_ms = 0.0
         self.direct_requests = 0
@@ -63,17 +64,19 @@ class Metrics:
         return dict(
             latencySeconds={k: dict(n=len(v), p50=pct(v, 50), p95=pct(v, 95), p99=pct(v, 99), max=round(max(v), 3)) for k, v in sorted(self.lat.items())},
             outcomes={f'{k}:{o}': n for (k, o), n in sorted(self.count.items())}, admissionRefusals=dict(self.admission), clientRecoveries=dict(self.recovered),
-            unsupported=dict(self.unsupported), connectionRetries=dict(self.conn_retries), directSlots=dict(requests=self.direct_requests, holdSecondsTotal=round(self.slot_hold_ms / 1000, 2), waitMs=dict(p50=pct(self.slot_wait_ms, 50), p95=pct(self.slot_wait_ms, 95), p99=pct(self.slot_wait_ms, 99), max=round(max(self.slot_wait_ms or [0]), 1))), expectedRefusals=dict(self.expected_refusals), ticksAdvanced=self.ticks, trades=self.trades, jumps=self.jumps,
+            unsupported=dict(self.unsupported), connectionRetries=dict(self.conn_retries), resultShapes=self.shapes, directSlots=dict(requests=self.direct_requests, holdSecondsTotal=round(self.slot_hold_ms / 1000, 2), waitMs=dict(p50=pct(self.slot_wait_ms, 50), p95=pct(self.slot_wait_ms, 95), p99=pct(self.slot_wait_ms, 99), max=round(max(self.slot_wait_ms or [0]), 1))), expectedRefusals=dict(self.expected_refusals), ticksAdvanced=self.ticks, trades=self.trades, jumps=self.jumps,
             requests=self.requests, bytesIn=self.bytes_in, bytesOut=self.bytes_out)
 
 
 class Trader:
-    def __init__(self, client, outbox, index, persona, base_seed, metrics, source, think_scale, ip):
+    def __init__(self, client, outbox, index, persona, base_seed, metrics, source, think_scale, ip, opt=False):
         self.c, self.outbox, self.i, self.persona, self.m, self.src = client, outbox, index, persona, metrics, source
         self.think_scale, self.ip = think_scale, ip
         self.headers, self.root, self.method_id = {}, None, None
         self.rng = random.Random(base_seed)
         self.chart_unsupported = False
+        self.opt = opt                   # client request reduction (QA flag): cached revision/through + adaptive polling; default off = baseline behaviour
+        self.cache, self.ewma = {}, {}
         self.trace = []                  # outcome classes, deterministic per (persona, seed)
         self.facts = []
 
@@ -150,6 +153,8 @@ class Trader:
             return None
         job = r.json().get('jobId')
         t0, interval = time.monotonic(), 0.4
+        if self.opt:
+            interval = max(0.12, min(0.6, self.ewma.get(kind, 0.4) * 0.9))
         while time.monotonic() - t0 < 600:
             await asyncio.sleep(interval)
             interval = min(2.0, interval * 1.3)
@@ -159,6 +164,9 @@ class Trader:
             b = j.json()
             if b.get('state') == 'SUCCEEDED':
                 self.m.lat[kind + '.complete'].append(time.monotonic() - t0)
+                if self.opt:
+                    self.ewma[kind] = 0.7 * self.ewma.get(kind, 0.4) + 0.3 * (time.monotonic() - t0)
+                self.m.shapes.setdefault(kind, sorted((b.get('result') or {}).keys())[:12] if isinstance(b.get('result'), dict) else None)
                 return b
             if b.get('state') not in ('QUEUED', 'RUNNING'):
                 self.m.count[(kind, 'job_' + str(b.get('state')))] += 1
@@ -217,6 +225,39 @@ class Trader:
         self.method_id = record['id']
 
     # ---------------- product actions ----------------
+    def _find(self, obj, key, depth=0):
+        if isinstance(obj, dict):
+            if key in obj and isinstance(obj[key], (int, str)) and not isinstance(obj[key], bool):
+                return obj[key]
+            if depth < 3:
+                for v in obj.values():
+                    found = self._find(v, key, depth + 1)
+                    if found is not None:
+                        return found
+        return None
+
+    def learn(self, sid, body):
+        """Client optimisation: keep revision/through from a committed result instead of re-reading the summary; unknown shape = drop the cache."""
+        if not self.opt:
+            return
+        rev, thr = self._find(body, 'revision'), self._find(body, 'throughNs')
+        if rev is not None and thr is not None:
+            self.cache[sid] = dict(revision=int(rev), throughNs=str(thr))
+        else:
+            self.cache.pop(sid, None)
+
+    async def state(self, sid):
+        if self.opt and sid in self.cache:
+            self.m.count[('summary', 'saved')] += 1
+            return self.cache[sid]
+        st = await self.summary(sid)
+        if st and self.opt:
+            self.cache[sid] = dict(revision=st['revision'], throughNs=st['throughNs'])
+        return st
+
+    async def after(self, sid):
+        return None if self.opt else await self.summary(sid)
+
     async def summary(self, sid, kind='summary'):
         r = await self.req(kind, 'GET', f'{self.root}/sessions/{sid}/summary')
         return r.json() if r.status_code == 200 else None
@@ -233,17 +274,29 @@ class Trader:
         return sid
 
     async def command(self, sid, kind_cmd, payload, revision, kind='command'):
-        cmd = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1', 'sessionId': sid, 'commandId': 'command:' + uuid.uuid4().hex,
-               'expectedRevision': revision, 'kind': kind_cmd, 'payload': payload}
-        r = await self.req(kind, 'POST', f'{self.root}/sessions/{sid}/commands', json_body=cmd, job=str(uuid.uuid4()))
-        if r.status_code in (200, 202):
-            body = await self.wait_job(kind, r)
-            return body is not None
-        self.m.expected_refusals[f'{kind_cmd}:{r.status_code}'] += 1
+        for attempt in (1, 2):
+            cmd = {'schemaVersion': 1, 'artifact': 'BTL-TICK-EXECUTION-COMMAND-1', 'sessionId': sid, 'commandId': 'command:' + uuid.uuid4().hex,
+                   'expectedRevision': revision, 'kind': kind_cmd, 'payload': payload}
+            r = await self.req(kind, 'POST', f'{self.root}/sessions/{sid}/commands', json_body=cmd, job=str(uuid.uuid4()))
+            if r.status_code in (200, 202):
+                body = await self.wait_job(kind, r)
+                self.learn(sid, body)
+                return body is not None
+            if r.status_code == 409 and self.opt and attempt == 1:       # stale cached revision: refresh once (client recovery, reported)
+                self.m.recovered['stale-revision'] += 1
+                self.cache.pop(sid, None)
+                st = await self.summary(sid)
+                if not st:
+                    return False
+                revision = st['revision']
+                continue
+            self.m.expected_refusals[f'{kind_cmd}:{r.status_code}'] += 1
+            self.cache.pop(sid, None)
+            return False
         return False
 
     async def step(self, sid, ticks):
-        st = await self.summary(sid)
+        st = await self.state(sid)
         if not st:
             return None
         target = min(int(st['throughNs']) + ticks * STEP_NS, int(self.src['endNs']) - 1)
@@ -252,10 +305,10 @@ class Trader:
         ok = await self.command(sid, 'ADVANCE', {'targetNs': str(target)}, st['revision'], kind='step')
         self.m.ticks += ticks if ok else 0
         self.trace.append('step_ok' if ok else 'step_refused')
-        return await self.summary(sid)
+        return await self.after(sid)
 
     async def play(self, sid, ticks):
-        st = await self.summary(sid)
+        st = await self.state(sid)
         if not st:
             return None
         target = min(int(st['throughNs']) + ticks * STEP_NS, int(self.src['endNs']) - 1)
@@ -288,24 +341,26 @@ class Trader:
                     self.trace.append('play_failed'); return None
             break
         self.m.lat['play.complete'].append(time.monotonic() - t0)
+        self.learn(sid, res)
         self.m.ticks += ticks
         self.trace.append('play_ok')
-        return await self.summary(sid)
+        return await self.after(sid)
 
     async def jump(self, sid):
-        st = await self.summary(sid)
+        st = await self.state(sid)
         if not st:
             return None
         body = {'schemaVersion': 1, 'artifact': 'BTL-JUMP-NEXT-EVENT-1', 'requestId': uuid.uuid4().hex, 'sessionId': sid, 'expectedRevision': st['revision'], 'timeframe': '1m'}
         r = await self.req('jump', 'POST', f'{self.root}/sessions/{sid}/jump-next-event', json_body=body, job=str(uuid.uuid4()))
         res = await self.wait_job('jump', r)
+        self.learn(sid, res)
         ok = res is not None
         self.m.jumps += 1 if ok else 0
         self.trace.append('jump_ok' if ok else 'jump_refused')
-        return await self.summary(sid)
+        return await self.after(sid)
 
     async def order(self, sid, side='LONG', market=True, qty='0.1', entry='2000', sl=None, tp=None, order_id=None, dup=False):
-        st = await self.summary(sid)
+        st = await self.state(sid)
         if not st:
             return None
         rid = order_id or 'order:' + uuid.uuid4().hex
@@ -313,10 +368,17 @@ class Trader:
                      sl=sl, tp=tp, riskPercent='1', observations=[])
         review = dict(sessionId=sid, requestId=rid, expectedRevision=st['revision'], planId=None if market else 'plan:cap', planRevision=None if market else 0, draft=draft)
         r = await self.req('order.review', 'POST', f'{self.root}/reviews', json_body=review)
+        if r.status_code == 409 and self.opt:                       # stale cached revision: refresh once
+            self.m.recovered['stale-revision'] += 1
+            self.cache.pop(sid, None)
+            st = await self.summary(sid)
+            review['expectedRevision'] = st['revision']
+            r = await self.req('order.review', 'POST', f'{self.root}/reviews', json_body=review)
         if r.status_code != 200:
             self.m.expected_refusals[f'review:{r.status_code}'] += 1
             self.trace.append('review_refused'); return None
         confirm = {'reviewId': rid, 'reviewHash': r.json()['reviewHash']}
+        self.cache.pop(sid, None)                                  # confirm commits OPEN: the cached revision is no longer valid
         c = await self.req('order.confirm', 'POST', f'{self.root}/sessions/{sid}/confirm', json_body=confirm, job=str(uuid.uuid4()))
         if dup:                                   # double click: identical retry must not create a second order
             await self.req('order.confirm', 'POST', f'{self.root}/sessions/{sid}/confirm', json_body=confirm, job=str(uuid.uuid4()))
@@ -329,7 +391,7 @@ class Trader:
         return rid if ok else None
 
     async def close(self, sid, order_id):
-        st = await self.summary(sid)
+        st = await self.state(sid)
         if not st:
             return False
         ok = await self.command(sid, 'CLOSE', {'orderId': order_id, 'quantity': None}, st['revision'], kind='close')
@@ -337,7 +399,7 @@ class Trader:
         return ok
 
     async def cancel(self, sid, order_id):
-        st = await self.summary(sid)
+        st = await self.state(sid)
         if not st:
             return False
         ok = await self.command(sid, 'CANCEL', {'orderId': order_id}, st['revision'], kind='cancel')
@@ -465,15 +527,16 @@ async def run_trader(i, persona, offset, a, outbox, client, metrics, source, res
     try:
         while True:
             seed = a.seed * 1000 + PERSONAS.index(persona) * 10 + ((instance + offset) % a.seed_variants)
-            t = Trader(client, outbox, i, persona, seed, metrics, source, a.think_scale, ip)
+            t = Trader(client, outbox, i, persona, seed, metrics, source, a.think_scale, ip, opt=bool(a.client_opt))
             if instance == 0:
                 await t.setup()
             else:                                    # reuse account of the first instance
                 t.headers, t.root, t.method_id = first.headers, first.root, first.method_id
             if instance == 0:
                 first = t
+            t_s = time.monotonic()
             res = await t.script()
-            results.append(dict(persona=persona, trader=i, seed=seed, instance=instance, result=res))
+            results.append(dict(persona=persona, trader=i, seed=seed, instance=instance, result=res, seconds=round(time.monotonic() - t_s, 1)))
             instance += 1
             if a.mode == 'ref' or time.monotonic() >= deadline:
                 break
@@ -517,5 +580,6 @@ if __name__ == '__main__':
     ap.add_argument('--spec', required=True, help='persona:count,... e.g. swing:2,scalper:2')
     ap.add_argument('--mode', choices=('ref', 'load'), default='load'); ap.add_argument('--seed', type=int, default=1); ap.add_argument('--seed-variants', type=int, default=3)
     ap.add_argument('--duration', type=float, default=120); ap.add_argument('--ramp', type=float, default=10); ap.add_argument('--think-scale', type=float, default=1.0)
+    ap.add_argument('--client-opt', type=int, default=0, help='1 = client request reduction (cached revision, no trailing summaries, adaptive polling)')
     ap.add_argument('--out', required=True)
     asyncio.run(main_async(ap.parse_args()))
