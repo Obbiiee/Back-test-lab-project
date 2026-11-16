@@ -121,7 +121,9 @@ class Trader:
                 if r.status_code == 429 and not code:
                     code = 'RATE_LIMIT'
             if code and (code in ADMISSION or r.status_code == 429):
-                self.m.admission[code] += 1
+                # which limit refused: the DB-budget path answers canonical JSON with schemaVersion, the API admission gate does not
+                label = code + (':dbBudget' if (code == 'SERVICE_BUSY' and 'schemaVersion' in r.text) else ':apiAdmission' if code == 'SERVICE_BUSY' else '')
+                self.m.admission[label] += 1
                 refused = True
                 limit = 45 if code == 'QUEUE_CAPACITY' else 8
                 if attempts <= limit:
@@ -167,11 +169,30 @@ class Trader:
         lo, hi = PERSONA_THINK[self.persona]
         await asyncio.sleep(self.rng.uniform(lo, hi) * self.think_scale)
 
+    async def _retry(self, label, fn):
+        """Sign-up / login / workspace calls: bounded client recovery on SERVICE_BUSY like the frontend; every refusal is counted and reported."""
+        for attempt in range(1, 10):
+            r = await fn()
+            self.m.requests += 1
+            self.m.bytes_in += len(r.content)
+            if r.status_code in (429, 503):
+                try:
+                    code = r.json().get('detail') or 'RATE_LIMIT'
+                except ValueError:
+                    code = 'HTTP' + str(r.status_code)
+                self.m.admission['setup:' + str(code)] += 1
+                await asyncio.sleep(min(5.0, float(r.headers.get('Retry-After', '1'))) + 0.1 * attempt)
+                continue
+            if attempt > 1:
+                self.m.recovered['setup:' + label] += 1
+            return r
+        return r
+
     # ---------------- account ----------------
     async def setup(self):
         email = f'{uuid.uuid4().hex}@example.com'
         h = {'X-Forwarded-For': self.ip, 'X-Forwarded-Proto': 'https'}
-        r = await self.c.post('/api/v1/auth/register', json={'email': email, 'password': PASSWORD}, headers=h)
+        r = await self._retry('register', lambda: self.c.post('/api/v1/auth/register', json={'email': email, 'password': PASSWORD}, headers=h))
         assert r.status_code == 201, r.text
         token = None
         for _ in range(100):
@@ -184,11 +205,12 @@ class Trader:
                 break
             await asyncio.sleep(0.1)
         assert token, 'verification token missing'
-        assert (await self.c.post('/api/v1/auth/verify', json={'token': token}, headers=h)).status_code == 200
-        r = await self.c.post('/api/v1/auth/login', data={'username': email, 'password': PASSWORD}, headers=h)
+        assert (await self._retry('verify', lambda: self.c.post('/api/v1/auth/verify', json={'token': token}, headers=h))).status_code == 200
+        r = await self._retry('login', lambda: self.c.post('/api/v1/auth/login', data={'username': email, 'password': PASSWORD}, headers=h))
         assert r.status_code == 200, r.text
         self.headers = {'Authorization': 'Bearer ' + r.json()['access_token']}
-        ws = (await self.c.post('/api/v1/workspaces', json={'name': f'cap-{self.i}'}, headers={**h, **self.headers})).json()['id']
+        wr = await self._retry('workspace', lambda: self.c.post('/api/v1/workspaces', json={'name': f'cap-{self.i}'}, headers={**h, **self.headers}))
+        ws = wr.json()['id']
         self.root = f'/api/v1/workspaces/{ws}/research'
         record = method()
         assert (await self.req('method.create', 'POST', self.root + '/methods', json_body=record)).status_code == 200
