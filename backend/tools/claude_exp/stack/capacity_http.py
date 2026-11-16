@@ -217,6 +217,7 @@ def stage(a):
         except Exception:
             return []
     wal0 = (db("SELECT pg_wal_lsn_diff(pg_current_wal_lsn(),'0/0')") or [[0]])[0][0]
+    sess0 = (db("SELECT sessions FROM pg_stat_database WHERE datname='btl'") or [[0]])[0][0]
     dp = subprocess.Popen(drv_cmd, stdout=drv_log, stderr=subprocess.STDOUT)
     time.sleep(1.5)
     try:
@@ -254,6 +255,7 @@ def stage(a):
     wall = time.monotonic() - base_t
     s = read_kv(sut_cg / 'cpu.stat'); peak = int((sut_cg / 'memory.peak').read_text()) if (sut_cg / 'memory.peak').exists() else None
     wal1 = (db("SELECT pg_wal_lsn_diff(pg_current_wal_lsn(),'0/0')") or [[0]])[0][0]
+    sess1 = (db("SELECT sessions FROM pg_stat_database WHERE datname='btl'") or [[0]])[0][0]
     dbq = db("SELECT pg_database_size('btl'), (SELECT count(*) FROM btl.tick_checkpoints), (SELECT coalesce(sum(octet_length(payload)),0) FROM btl.tick_checkpoints), (SELECT count(*) FROM btl.tick_events), (SELECT coalesce(sum(octet_length(payload)),0) FROM btl.tick_events)")
     states = dict(db("SELECT state,count(*) FROM btl.research_jobs GROUP BY state"))
     ops = {r[0]: dict(n=r[1]) for r in db("SELECT operation,count(*) FROM btl.research_jobs GROUP BY operation")}
@@ -263,7 +265,7 @@ def stage(a):
     dcpu, dpeak = last_d, last_dpeak
     result.update(wallSeconds=round(wall, 1), stoppedByGate=tripped, sut=dict(
         cpuSecondsTotal=round((s.get('usage_usec', 0) - base.get('usage_usec', 0)) / 1e6, 1), throttledUsec=s.get('throttled_usec'), nrThrottled=s.get('nr_throttled'), memoryPeakMb=None if peak is None else round(peak / 2**20),
-        byComponentCpuSeconds={k: round(v, 1) for k, v in procs.total.items()}, byComponentRssPeakMb={k: round(v) for k, v in procs.rss_peak.items()}, pgConnectionsMax=pg_max),
+        byComponentCpuSeconds={k: round(v, 1) for k, v in procs.total.items()}, byComponentRssPeakMb={k: round(v) for k, v in procs.rss_peak.items()}, pgConnectionsMax=pg_max, pgSessionsOpened=int(sess1 - sess0)),
         generator=dict(cgroupCpuSeconds=round(dcpu.get('usage_usec', 0) / 1e6, 1), cgroupMemoryPeakMb=None if dpeak is None else round(dpeak / 2**20), note='generator cost is NOT counted in the SUT'),
         database=dict(sizeBytes=dbq[0][0] if dbq else None, checkpointRows=dbq[0][1] if dbq else None, checkpointBytes=dbq[0][2] if dbq else None, eventRows=dbq[0][3] if dbq else None,
                       eventBytes=dbq[0][4] if dbq else None, walBytes=int(wal1 - wal0)),
