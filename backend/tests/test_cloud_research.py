@@ -80,6 +80,79 @@ class CloudResearchTests(unittest.TestCase):
             time.sleep(.01)
         self.fail('Durable research job did not complete before its bounded test deadline')
 
+    def test_monthly_catalog_session_reopens_across_year_boundary(self):
+        from datetime import datetime, timezone
+        import hashlib
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from cloud.research import run
+        from contracts.canonical import canonical_bytes
+        from market_data.monthly_catalog import CATALOG_ARTIFACT, MonthlyParquetCatalog
+        from market_data.monthly_parquet import write_monthly_parquet
+        from ticks.provider import SyntheticTickProvider
+
+        december = int(datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc).timestamp()) * 10**9
+        january = december + 10**9
+        provider = SyntheticTickProvider([
+            dict(ordinal='0', timeNs=str(december), bid='2000', ask='2000.1', sequence='0'),
+            dict(ordinal='1', timeNs=str(january), bid='1998', ask='1998.1', sequence='1'),
+            dict(ordinal='2', timeNs=str(january + 10**9), bid='2002', ask='2002.1', sequence='2'),
+        ], dataset_id='synthetic:hosted-year-boundary', trusted=True, execution_fixture=True)
+        manifest = provider.describe(provider.dataset_id, provider.dataset_version)
+        events = provider.read_page(provider.dataset_id, provider.dataset_version, max_events=64)['events']
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'parquet'
+            parquet = write_monthly_parquet(root, iter(events), manifest, row_group_size=1,
+                                           expected_version=provider.dataset_version)
+            catalog_path = Path(temporary) / 'catalog.json'
+            selector = dict(key='source:year-boundary', period='2023-12', label='December QA',
+                root=str(root), datasetId=provider.dataset_id, datasetVersion=provider.dataset_version,
+                manifestSha256=parquet['manifestHash'], eligibility='SYNTHETIC', eligibilityEvidenceSha256=None)
+            raw = canonical_bytes(dict(schemaVersion=1, artifact=CATALOG_ARTIFACT,
+                                       catalogVersion=1, sources=[selector]))
+            catalog_path.write_bytes(raw)
+            catalog_path.chmod(0o400)
+            catalog_hash = hashlib.sha256(raw).hexdigest()
+
+            def invoke(operation, *args, write=False):
+                return run(DSN, self.actor, self.workspace, operation, args, write=write)
+
+            catalog = MonthlyParquetCatalog(catalog_path, catalog_hash)
+            self.addCleanup(catalog.close)
+            with patch('cloud.research._monthly_catalog', return_value=catalog):
+                record = invoke('create_method', method(), write=True)
+                session = 'session:year-boundary:' + uuid.uuid4().hex
+                created = invoke('create_session', dict(id=session, name='Year boundary QA', methodId=record['id'],
+                    initialBalance='10000', sourceKey=selector['key'], startPeriod='2023-12', period='2023-12'), write=True)
+                self.assertEqual(created['state']['throughNs'], str(december))
+                self.assertEqual(created['quote']['timeNs'], str(december))
+                self.assertEqual(invoke('summary', session)['balance'], '10000')
+                review = review_request(created)
+                review['draft'].update(side='LONG', orderType='LIMIT', workflow='PLANNED',
+                    entry='1999', quantity=None, sl='1997', tp='2001', riskPercent='1')
+                reviewed = invoke('review', review, write=True)
+                invoke('confirm', session, dict(reviewId=review['requestId'], reviewHash=reviewed['reviewHash']), write=True)
+                before = invoke('workspace', session, {'timeframe':'1m'})
+                self.assertEqual(before['state']['orders'][review['requestId']]['status'], 'PENDING')
+            catalog.close()
+
+            cold = MonthlyParquetCatalog(catalog_path, catalog_hash)
+            self.addCleanup(cold.close)
+            with patch('cloud.research._monthly_catalog', return_value=cold):
+                def advance(view, target):
+                    command = dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-COMMAND-1',
+                                   sessionId=session, commandId='advance:'+uuid.uuid4().hex,
+                                   expectedRevision=view['state']['revision'], kind='ADVANCE',
+                                   payload={'targetNs':str(target)})
+                    return invoke('apply', session, command, write=True)
+
+                filled = advance(before, january)
+                self.assertEqual(filled['state']['orders'][review['requestId']]['status'], 'ACTIVE')
+                closed = advance(filled, january + 10**9)
+                self.assertEqual(closed['state']['orders'][review['requestId']]['status'], 'CLOSED')
+                self.assertEqual(invoke('workspace', session, {'timeframe':'1m'})['state'], closed['state'])
+                self.assertEqual(invoke('summary', session)['completedTrades'], 1)
+
     def test_summary_requires_identity_membership_and_hides_foreign_session(self):
         app = ResearchApplication(DSN, TrustedScope(self.workspace,self.actor))
         m=method();app.create_method(m)

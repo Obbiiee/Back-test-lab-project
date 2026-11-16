@@ -265,9 +265,10 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             return collect(db, str(workspace_id), args[0])
         catalog=_operator_catalog(dsn)
         monthly_catalog=_monthly_catalog(dsn)
+        source_family = None
         if operation=='create_session':
             require(len(args)==1 and type(args[0]) is dict,'sessionRequest','INVALID_INPUT')
-            validate_source_selection(args[0],catalog,monthly_catalog)
+            source_family = validate_source_selection(args[0],catalog,monthly_catalog)
         observed=_observed_route(operation,args,catalog,monthly_catalog);session_id=None
         session_metadata=None
         if operation in ('replay_to','jump_next_event'):
@@ -285,15 +286,13 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
                     observed=session_metadata.get('artifact')=='BTL-OBSERVED-RESEARCH-SESSION-1'
                 except (TypeError,ValueError,UnicodeError):
                     raise ContractError('CORRUPT_RECORD','session')
-        if monthly_catalog is not None and operation=='create_session' and args and type(args[0]) is dict:
+        if source_family == 'MONTHLY_SYNTHETIC':
             request=args[0]
-            if 'sourceKey' in request:
-                selection=monthly_catalog.selection(request['sourceKey'],request.get('period'))
-                require(selection['eligibility']=='SYNTHETIC','monthlyEligibility','REFUSED_SOURCE')
-                monthly_provider=monthly_catalog.resolve(request['sourceKey'],request['period'])
-                monthly_source_key,monthly_period=request['sourceKey'],request['period']
-            else:
-                monthly_provider=None;monthly_source_key=monthly_period=None
+            monthly_source_key,monthly_period=request['sourceKey'],request['period']
+            monthly_provider=monthly_catalog.resolve(monthly_source_key,monthly_period)
+            # The hosted selector was validated above. The local Session schema
+            # stores its equivalent startPeriod and pins the manifest itself.
+            args=({key: value for key, value in request.items() if key != 'period'},)
         elif monthly_catalog is not None and type(session_metadata) is dict and 'sourceKey' in session_metadata:
             monthly_source_key=session_metadata['sourceKey'];monthly_period=session_metadata['startPeriod']
             selection=monthly_catalog.selection(monthly_source_key,monthly_period)
@@ -310,7 +309,7 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             require(catalog is not None and observed,'replayTo','REFUSED_OBSERVED_OPERATION')
         if operation=='jump_next_event' and observed:
             require(catalog is not None,'jumpNextEvent','REFUSED_OBSERVED_OPERATION')
-        monthly = None if observed else _synthetic_monthly_provider()
+        monthly = None if observed or monthly_source_key is not None else _synthetic_monthly_provider()
         if observed:
             from execution.observed_research import ObservedResearchApplication
             archive_codec='none'

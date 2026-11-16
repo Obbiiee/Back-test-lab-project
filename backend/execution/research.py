@@ -76,11 +76,12 @@ class ResearchApplication:
                 'monthlySource', 'REFUSED_SOURCE')
         if monthly_source_key is not None:
             selected = monthly_catalog.selection(monthly_source_key, monthly_period)
-            require(selected['eligibility'] == 'SYNTHETIC' and
-                    selected['manifestSha256'] == self.__provider.manifest_hash and
-                    (selected['datasetId'], selected['datasetVersion']) ==
-                    (self.__provider.dataset_id, self.__provider.dataset_version),
-                    'monthlySource', 'REFUSED_SOURCE')
+            require(selected['eligibility'] == 'SYNTHETIC', 'monthlySource', 'REFUSED_SOURCE')
+            if synthetic_provider is not None:
+                require(selected['manifestSha256'] == synthetic_provider.manifest_hash and
+                        (selected['datasetId'], selected['datasetVersion']) ==
+                        (synthetic_provider.dataset_id, synthetic_provider.dataset_version),
+                        'monthlySource', 'REFUSED_SOURCE')
         self.__profile = historical_source.profile if historical_source else research_profile()
         self.__label = historical_source.label if historical_source else "SYNTHETIC / TEST ONLY"
         self.__start = historical_source.start_ns if historical_source else START_NS
@@ -356,7 +357,9 @@ class ResearchApplication:
         else:
             require('sourceKey' not in raw,
                     'monthlySource', 'REFUSED_SOURCE')
-        if self.__historical:
+        if monthly:
+            start = warmup = self.__provider.first_time_for_month(raw['startPeriod'])
+        elif self.__historical:
             start = self.__historical.start_for_period(raw["startPeriod"])
             warmup = start + 1800*1000000000
         else:
