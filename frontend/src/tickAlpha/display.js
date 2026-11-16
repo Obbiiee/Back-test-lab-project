@@ -68,3 +68,14 @@ export function sessionInstrument(view){
     feed:typeof profile.feedInstrumentId==='string'&&profile.feedInstrumentId!==profile.instrumentId?profile.feedInstrumentId:null,
     provider:typeof profile.providerId==='string'?profile.providerId:null};
 }
+// Exact decimal spread from two wire strings (no float): ask - bid, at the finer of the two precisions.
+export function spreadLabel(bid,ask){
+  const ok=value=>typeof value==='string'&&/^[0-9]+(?:[.][0-9]+)?$/.test(value);
+  if(!ok(bid)||!ok(ask))return null;
+  const places=Math.max((bid.split('.')[1]??'').length,(ask.split('.')[1]??'').length);
+  const scale=value=>{const [whole,fraction='']=value.split('.');return BigInt(whole+fraction.padEnd(places,'0'));};
+  const difference=scale(ask)-scale(bid);
+  if(difference<0n)return null;
+  const text=difference.toString().padStart(places+1,'0');
+  return places?text.slice(0,-places)+'.'+text.slice(-places):text;
+}

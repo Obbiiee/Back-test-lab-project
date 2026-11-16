@@ -1,5 +1,5 @@
 import '../workspace/designTokens.css';
-import {useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
@@ -14,6 +14,8 @@ import {SessionsPage,SessionOverview,CatalogPage} from './AlphaSessionPages.jsx'
 import AlphaTicketEstimate from './AlphaTicketEstimate.jsx';
 import {targetForRR} from './orderEstimate.js';
 import AlphaTerminal from './AlphaTerminal.jsx';
+import AlphaTradeToast from './AlphaTradeToast.jsx';
+import {tradeEvents} from './replay.js';
 import AlphaJournal from './AlphaJournal.jsx';
 import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
@@ -29,6 +31,7 @@ import {rememberSession} from './productData.js';
 import {useRoute,navigate,linkTo,accountLink,setLeaveGuard} from './productRoute.js';
 import {classifyConfirmError,committedReceipt,classifyCommandResult,UNKNOWN_TEXT} from './confirmOutcome.js';
 import './tickAlpha.css';
+import './alphaReplayStrip.css';
 import {isAccountPage} from './accountClient.js';
 
 const initialPlan=view=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:view?.quote?.ask??'2000',sl:view?.replayStepNs?'':'1998',tp:view?.replayStepNs?'':'2004',
@@ -43,6 +46,10 @@ export default function TickAlpha(){
   // Identity of a confirmation with no definitive answer (see confirmOutcome.js).
   const [unverified,setUnverified]=useState(null);
   const flight=useRef(false),returnFocus=useRef(null);
+  // Latest committed view for chained replay calls (a render may not have happened between them).
+  const viewRef=useRef(null),[tradeEvent,setTradeEvent]=useState(null);
+  useEffect(()=>{viewRef.current=view;},[view]);
+  const dismissTrade=useCallback(()=>setTradeEvent(null),[]);
   const [connecting,setConnecting]=useState(true);
   const creationId=useRef(null);
   const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
@@ -225,7 +232,7 @@ export default function TickAlpha(){
       :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
     </AlphaShell>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
-      <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
+      <div className="alpha-workspace"><AlphaWorkspace onPause={()=>setPauseToken(n=>n+1)} lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
         trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {view.method.name} · {view.method.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         canJump={!view.state.ended&&!view.state.unresolved&&(view.analysis?.orders??[]).some(order=>['PENDING','ACTIVE'].includes(order.status))}
@@ -242,7 +249,8 @@ export default function TickAlpha(){
                result.view?.metadata?.id!==current.metadata.id||!Number.isSafeInteger(result.view?.state?.revision)||
                result.view?.state?.revision<current.state.revision||result.view?.state?.throughNs!==result.throughNs)
               throw Error('Next event result could not be verified. Reload the saved Session before continuing.');
-            current=result.view;processed+=result.processedGroups;setView(current);
+            {const events=tradeEvents(current,result.view);if(events.length)setTradeEvent(events.at(-1));}
+            current=result.view;viewRef.current=current;processed+=result.processedGroups;setView(current);
             onProgress({throughNs:result.throughNs,processedGroups:processed});
             if(result.status==='SEARCHING')continue;
             if(result.status==='EVENT_FOUND'){
@@ -258,22 +266,25 @@ export default function TickAlpha(){
           return {status:'SEARCHING',view:current};
         })}
         onReplay={(kind,targetNs)=>run(async()=>{
+          const baseView=viewRef.current??view;
           let saved;
-          if(kind==='SEEK'&&isAccountPage()&&view.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'){
-            const result=await replayObservedTo(view,targetNs,timeframe);
+          if(kind==='SEEK'&&isAccountPage()&&baseView.metadata.artifact==='BTL-OBSERVED-RESEARCH-SESSION-1'){
+            const result=await replayObservedTo(baseView,targetNs,timeframe);
             saved=result.view;
             if(!result.targetReached)setNotice('Replay saved a bounded part of the jump. Continue saved replay to reach the target.');
           }else{
-            await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
-            saved=await loadWorkspace(view.metadata.id);
+            await api(sessionPath(baseView.metadata.id)+'/commands',command(baseView,kind,{targetNs}));
+            saved=await loadWorkspace(baseView.metadata.id);
           }
-          setView(saved);
-          if(saved.state.nextGroupIndex!==view.state.nextGroupIndex)emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
+          viewRef.current=saved;setView(saved);
+          if(saved.state.nextGroupIndex!==baseView.state.nextGroupIndex)emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
           if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
-          const tradeCount=saved.analysis?.metrics?.tradeCount, previousTradeCount=view.analysis?.metrics?.tradeCount;
+          const tradeCount=saved.analysis?.metrics?.tradeCount, previousTradeCount=baseView.analysis?.metrics?.tradeCount;
           if(tradeCount!=null&&previousTradeCount!=null&&tradeCount>previousTradeCount)emitLocal('order_outcome_committed');
-          if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
-          return true;
+          const revealed=saved.state.nextGroupIndex!==baseView.state.nextGroupIndex,reached=BigInt(saved.state.throughNs)>=BigInt(targetNs);
+          {const events=tradeEvents(baseView,saved);if(events.length)setTradeEvent(events.at(-1));}
+          if(kind==='ADVANCE'&&!revealed&&!reached){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
+          return {view:saved,reached,revealed};
         })} onPriceSelect={price=>{setPauseToken(n=>n+1);setPicked({price,at:Date.now()});}} onPlanDrawing={drawing=>{
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
@@ -291,6 +302,7 @@ export default function TickAlpha(){
       <button disabled={!view} onClick={()=>setTerminalRequest({tab:'Analysis',id:Date.now()})}><Icon name="analytics"/><span>Analysis</span></button>
       <a {...accountLink()}><Icon name="smile"/><span>Account</span></a>
     </nav>}
+    {view&&<AlphaTradeToast event={tradeEvent} onDismiss={dismissTrade}/>}
     <footer><p className="alpha-status-line" role="status" aria-live="polite">{noticeText(notice)||(busy?'Processing your request… Replay and order controls will unlock when it finishes.':catalog?`${isAccountPage()?'Verified workspace research':'Private local research'} · source limitations available in Data source`:'Service required. No fallback market feed.')}</p></footer>
     {dialog==='feedback'&&<WorkspaceModal returnFocusRef={returnFocus} label="Optional research feedback" onClose={()=>setDialog(null)}><AlphaFeedback onClose={()=>setDialog(null)}/></WorkspaceModal>}
     {dialog==='source'&&<WorkspaceModal returnFocusRef={returnFocus} label="Data source" onClose={()=>setDialog(null)}><AlphaSourceDetails historical={sourceContext()==='historical'} account={isAccountPage()} catalog={catalog} view={view} onClose={()=>setDialog(null)}/></WorkspaceModal>}

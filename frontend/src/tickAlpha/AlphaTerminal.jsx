@@ -18,7 +18,7 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback,request}){
   const [seenRequest,setSeenRequest]=useState(request);
   if(request!==seenRequest){setSeenRequest(request);if(request)setTab(request.tab);}
   useEffect(()=>{if(request)root.current?.scrollIntoView({block:'start',behavior:'smooth'});},[request]);
-  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
+  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));const loaded=store.load();return {store,height:store.raw===null?24:loaded};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);

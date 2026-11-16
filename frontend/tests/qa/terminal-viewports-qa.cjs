@@ -39,7 +39,7 @@ const VIEWPORTS = [[320, 640], [375, 667], [390, 844], [768, 1024], [1024, 768],
     must(over <= 0, 'overflow ' + over);
     const chart = await page.locator('.candle-chart canvas').first().boundingBox();
     must(chart && chart.width > 150 && chart.height > 100, 'chart ' + JSON.stringify(chart));
-    must(inside(await page.locator('.alpha-replay-controls').boundingBox(), w, h), 'replay controls outside the viewport');
+    must(inside(await page.locator('.alpha-replay-strip').boundingBox(), w, h), 'replay controls outside the viewport');
     const buy = page.locator('.alpha-order-bar button[aria-label^="Buy at Ask"]');
     await buy.scrollIntoViewIfNeeded(); await buy.click(); await page.locator('.alpha-ticket').waitFor();
     const review = page.getByRole('button', { name: 'Review order' }); await review.scrollIntoViewIfNeeded(); await review.click();
