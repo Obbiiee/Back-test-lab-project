@@ -13,7 +13,7 @@ ExecStart=%h/tools/caddy/caddy run --config %h/projects/Back-test-lab-project/de
 ExecReload=%h/tools/caddy/caddy reload --config %h/projects/Back-test-lab-project/deploy/site/Caddyfile --adapter caddyfile
 Restart=on-failure
 RestartSec=5
-NoNewPrivileges=true
+# NoNewPrivileges is deliberately NOT set: it would stop the file capability (setcap cap_net_bind_service) from letting Caddy bind ports 80/443.
 PrivateTmp=true
 
 [Install]
