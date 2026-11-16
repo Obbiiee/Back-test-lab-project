@@ -49,6 +49,16 @@ export default function TickAlpha(){
     setFocusState(value);
     try{if(value&&!document.fullscreenElement)void document.documentElement.requestFullscreen?.().catch(()=>{});else if(!value&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{});}catch{/* CSS focus still applies */}
   },[]);
+  // Small popovers (info, Go to time, Session settings, drawing groups) are exclusive and close on an
+  // outside press or Escape.
+  useEffect(()=>{
+    const POPOVERS='.tick-alpha details.alpha-info-pop[open],.tick-alpha details.alpha-seek[open],.tick-alpha details.alpha-session-menu[open],.tick-alpha details.alpha-drawing-group[open]';
+    const closeOutside=target=>document.querySelectorAll(POPOVERS).forEach(item=>{if(!target||!item.contains(target))item.open=false;});
+    const onPress=event=>closeOutside(event.target);
+    const onEscape=event=>{if(event.key==='Escape')closeOutside(null);};
+    document.addEventListener('pointerdown',onPress);document.addEventListener('keydown',onEscape);
+    return()=>{document.removeEventListener('pointerdown',onPress);document.removeEventListener('keydown',onEscape);};
+  },[]);
   useEffect(()=>{
     const onFullscreen=()=>{if(!document.fullscreenElement)setFocusState(false);};
     const onKey=event=>{if(event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('[role=dialog]'))setFocusState(false);};

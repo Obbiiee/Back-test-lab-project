@@ -59,7 +59,7 @@
   .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;background:transparent;padding:0 4px;border-radius:0;color:var(--lab-text-secondary,#9fb0c6)}
   .tick-alpha.is-session .alpha-replay-controls .alpha-seek{position:relative}
   .tick-alpha.is-session .alpha-replay-controls .alpha-seek>summary{min-height:26px;display:inline-flex;align-items:center;padding:0 8px;cursor:pointer;font-size:12px}
-  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div,.tick-alpha.is-session .alpha-info-pop>div{position:absolute;z-index:40;bottom:calc(100% + 6px);top:auto;left:0;width:260px;padding:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--cf-line);border-radius:8px;background:var(--lab-surface-secondary,#151b26);box-shadow:0 8px 24px #0006}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div,.tick-alpha.is-session .alpha-info-pop>div{position:absolute;z-index:40;bottom:calc(100% + 6px);top:auto;left:0;width:260px;padding:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;background:var(--lp-panel,#0c2655);color:var(--lp-ice,#d9eafe);box-shadow:0 8px 24px #0006}
   .tick-alpha.is-session .alpha-info-pop{position:relative}
   .tick-alpha.is-session .alpha-info-pop>summary{min-height:26px;min-width:26px;display:inline-grid;place-items:center;border:1px solid var(--cf-line);border-radius:50%;cursor:pointer;font:700 12px/1 serif;list-style:none}
   .tick-alpha.is-session .alpha-info-pop>div{top:calc(100% + 6px);bottom:auto;left:auto;right:0;width:min(360px,80vw);font-size:12px}
@@ -128,14 +128,14 @@
   .tick-alpha.is-session .alpha-chart-header .alpha-focus-toggle span{display:none}
   .tick-alpha.is-session .alpha-tf-buttons{display:none}
   .tick-alpha.is-session .alpha-tf-select{display:inline-block}
-  .tick-alpha.is-session .alpha-info-pop>div{position:fixed;left:10px;right:10px;top:96px;bottom:auto;width:auto;padding:12px;border-radius:14px;background:#131a27;color:var(--rk-white);border:2px solid #2b4878;z-index:60}
+  .tick-alpha.is-session .alpha-info-pop>div{position:fixed;left:10px;right:10px;top:96px;bottom:auto;width:auto;padding:12px;border-radius:14px;background:#0c2655;color:#d9eafe;border:1px solid #2b4878;z-index:60}
   .tick-alpha.is-session .alpha-info-pop>summary{min-width:40px;min-height:40px;display:inline-grid;place-items:center;border-radius:50%;list-style:none;background:#131a27}
   .tick-alpha.is-session .alpha-chart-body{flex:1 1 0;min-height:0;position:relative}
   .tick-alpha.is-session .alpha-chart-host{flex:1 1 0;min-width:0;min-height:0;height:auto;position:relative;overflow:hidden}
   .tick-alpha.is-session .alpha-replay-controls{flex:none;max-width:100%;overflow-x:auto;overflow-y:hidden;margin:4px 8px;scrollbar-width:none}
   .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{font-size:11px;white-space:nowrap;color:#52627a;padding:0 6px}
   .tick-alpha.is-session .alpha-replay-controls .alpha-replay-play{display:inline-flex;align-items:center;gap:6px}
-  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div{position:fixed;left:10px;right:10px;bottom:calc(150px + env(safe-area-inset-bottom));z-index:60;padding:12px;display:flex;flex-direction:column;gap:8px;border-radius:14px;background:#fff;color:var(--rk-navy);box-shadow:0 8px 24px #0006}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div{position:fixed;left:10px;right:10px;width:auto;bottom:calc(150px + env(safe-area-inset-bottom));z-index:60;padding:12px;display:flex;flex-direction:column;gap:8px;border-radius:14px;background:#0c2655;color:#d9eafe;border:1px solid #2b4878;box-shadow:0 8px 24px #0006}
   .tick-alpha.is-session .alpha-replay-controls .alpha-replay-speed{font-size:12px;gap:4px;color:#52627a}
   .tick-alpha.is-session>.alpha-order-bar{position:static;padding:6px 10px}
   .tick-alpha.is-session>.alpha-order-bar .alpha-quick-side{min-height:52px}
@@ -161,4 +161,49 @@
 @media (max-width:760px){
   .tick-alpha.is-session.is-focus .alpha-focus-toggle{order:-1;margin-left:0;margin-right:4px}
   .tick-alpha.is-session.is-focus .alpha-focus-toggle span{display:inline}
+}
+
+/* One popover surface for every small menu (info, Go to time, Session settings). */
+.tick-alpha.is-session .alpha-session-menu .alpha-context{background:var(--lp-panel,#0c2655);border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;color:var(--lp-ice,#d9eafe);box-shadow:0 8px 24px #0006}
+.tick-alpha.is-session .alpha-session-menu .alpha-context label{color:var(--lp-muted,#a9bddb)}
+
+/* Chart-owned popups (Indicators dialog, drawing settings) were legacy neutral grey/green. They
+   take the Alpha surfaces: dialogs = light card with blue lip (like order/journal), small panels
+   over the plot = navy popover. Scoped to .tick-alpha so the legacy workspace is untouched. */
+.tick-alpha .dialog-backdrop>.overlay-indicator-dialog{background:#f3f8ff;color:var(--rk-navy,#061a3c);border:0;border-radius:24px;box-shadow:0 8px 0 #1378f5;padding:20px}
+.tick-alpha .overlay-indicator-dialog :is(h2,h3,p,label,span,small,strong){color:inherit}
+.tick-alpha .overlay-indicator-dialog button{background:#fff;color:var(--rk-navy,#061a3c);border:2px solid var(--rk-ice,#d9eafe);border-radius:999px;font-weight:800;min-height:36px;padding:0 14px}
+.tick-alpha .overlay-indicator-dialog button:hover:not(:disabled){border-color:#9ec5fb;background:#fff}
+.tick-alpha .overlay-indicator-dialog header button{background:transparent;border:0;font-size:22px;min-height:36px}
+.tick-alpha .overlay-indicator-dialog :is(input,select){background:#fff;color:var(--rk-navy,#061a3c);border:2px solid var(--rk-ice,#d9eafe);border-radius:12px;min-height:40px;box-sizing:border-box}
+.tick-alpha .overlay-indicator-dialog form{border-top:2px solid var(--rk-ice,#d9eafe)}
+.tick-alpha .overlay-indicator-dialog form button[type=submit]{background:var(--rk-blue-strong,#1378f5);color:#fff;border-color:transparent}
+.tick-alpha .overlay-indicator-dialog [role=alert]{color:#9e2b33}
+.tick-alpha .drawing-settings{background:var(--lp-panel,#0c2655);border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;box-shadow:0 8px 24px #0006;color:var(--lp-ice,#d9eafe)}
+.tick-alpha .drawing-settings label{color:var(--lp-muted,#a9bddb)}
+.tick-alpha .drawing-settings :is(input,select){background:#0e1a33;color:#fff;border:1px solid var(--lp-line-2,#2b4878);border-radius:8px}
+.tick-alpha .drawing-settings>button[type=submit]{background:var(--rk-blue-strong,#1378f5);color:#fff;border:0;border-radius:999px}
+.tick-alpha .drawing-settings button{border-radius:999px}
+.tick-alpha .overlay-indicator-dialog>header{background:transparent;color:inherit;padding:0;border:0;border-radius:0;min-height:0}
+/* Drawing group menus: full-width labelled items (the 34px tool-button size above is for rail icons only). */
+.tick-alpha.is-session .alpha-drawing-group>div{width:190px;max-width:calc(100vw - 60px)}
+.tick-alpha.is-session .alpha-drawing-group>div button{display:block;width:100%;height:auto;min-height:38px;padding:0 12px;text-align:left;white-space:nowrap}
+/* Objects panel: same navy surface as the tool rail and toolbar. */
+.tick-alpha.is-session .alpha-object-panel{background:var(--lp-panel,#0c2655);color:var(--lp-ice,#d9eafe);border-left:1px solid var(--lp-line-2,#2b4878);padding:10px}
+.tick-alpha.is-session .alpha-object-panel h2{font-size:14px;margin:0 0 6px;color:#fff}
+.tick-alpha.is-session .alpha-object-panel p{font-size:12px;margin:0 0 8px;color:var(--lp-muted,#a9bddb)}
+.tick-alpha.is-session .alpha-object-panel>div{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--lp-line,#1d3560)}
+.tick-alpha.is-session .alpha-object-panel button{min-height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--lp-line-2,#2b4878);background:#0e1a33;color:#fff;font-size:12px;font-weight:700;text-transform:capitalize}
+.tick-alpha.is-session .alpha-object-panel>div>button:first-child{flex:1 1 100%;text-align:left}
+/* Floating drawing controls (undo/redo/Lock/Hide) follow the same navy popover surface. */
+.tick-alpha .primitive-drawing-controls{background:var(--lp-panel,#0c2655);border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;box-shadow:0 8px 24px #0006}
+.tick-alpha .primitive-drawing-controls button{background:#0e1a33;color:#fff;border:1px solid var(--lp-line-2,#2b4878);border-radius:999px}
+.tick-alpha .primitive-drawing-controls button:hover:not(:disabled){background:#12305e}
+@media (max-width:760px){
+  .tick-alpha .dialog-backdrop>.overlay-indicator-dialog{width:100%;max-width:none;box-sizing:border-box;border-radius:24px 24px 0 0;box-shadow:0 -4px 0 #1378f5;padding-bottom:calc(20px + env(safe-area-inset-bottom));max-height:80dvh}
+}
+@media (max-width:760px){
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div button{background:var(--rk-blue-strong,#1378f5);color:#fff;border:0;border-radius:999px;min-height:44px}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div :is(input,label){width:100%;box-sizing:border-box;color:#d9eafe}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div input{background:#0e1a33;border:1px solid #2b4878;color:#fff}
 }

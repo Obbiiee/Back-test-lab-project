@@ -56,6 +56,10 @@ block), the `@media(min-width:761)` overflow block, `is-wide` height hacks, the 
 Remaining: dead *declarations* inside shared rules were left untouched where mixed with live
 ones; phone/laptop themes still carry decorative styling (not geometry).
 
+## Popup / dialog alignment (follow-up pass)
+
+One language everywhere: dialogs = light card with blue lip (order, review, journal, news, source, pair, tools, **Indicators**, now restyled); small popovers = navy panel (info, Go to time, Session settings, drawing-group menus, **Objects panel**, drawing settings, floating drawing controls). Fixed: drawing-group menu items were squeezed to 34 px; Indicators dialog was legacy grey and narrow on phone (now full-width bottom sheet); Go to time popup was white on phone; popovers now exclusive and close on outside press or Escape. Checked programmatically at 1000×700 and 390×844: every dialog inside the viewport. Not re-shot at every size; screenshots in this folder predate this pass.
+
 ## Chart plot size (CSS px; plot = `.alpha-chart-host`)
 
 | Viewport | Before | After (default) | After (Focus) |
