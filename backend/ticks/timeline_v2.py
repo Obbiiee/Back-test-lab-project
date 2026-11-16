@@ -636,11 +636,19 @@ class IndexedTickTimeline:
                     covered = index+1
             require(covered == wanted, "prefix", "INCOMPLETE_ATOMIC_BOUNDARY")
         else:
+            # Reuse the last validated block within this read. Fetch its
+            # bounded canonical bytes again so edits cannot bypass validation.
+            verified_hash = verified_raw = verified_block = None
             for index, block_hash, offset in self.__db.execute("SELECT groupIndex,blockHash,recordOffset FROM position_lookup WHERE groupIndex>=? AND groupIndex<? ORDER BY groupIndex", (start, wanted)):
                 stored = self.__read_block(block_hash)
                 require(stored is not None, "log", "INCOMPLETE_INGESTION")
-                block = decode_v2(stored)
-                require(hash_v2(block) == block_hash and block["artifact"] == "BTL-TICK-POSITION-LOG-2"
+                if block_hash != verified_hash or stored != verified_raw:
+                    block = decode_v2(stored)
+                    require(hash_v2(block) == block_hash, "membership", "IDENTITY_CONFLICT")
+                    verified_hash, verified_raw, verified_block = block_hash, stored, block
+                else:
+                    block = verified_block
+                require(block["artifact"] == "BTL-TICK-POSITION-LOG-2"
                         and block["datasetId"] == self.__id and block["datasetVersion"] == self.__version
                         and block["timelineVersion"] == VERSION and block["generation"] == str(self.__generation), "membership", "IDENTITY_CONFLICT")
                 require(0 <= offset < len(block["records"]), "membership", "CORRUPT_INDEX_POINTER")
