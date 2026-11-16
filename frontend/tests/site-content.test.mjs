@@ -61,7 +61,9 @@ for (const page of ['terms', 'privacy', 'refund']) {
     }
   }
 }
-assert.match(fill('{{brand}} {{legalName}}', {brand: 'B', business: {legalName: 'PT X'}, domain: 'd', refund: {}}), /B PT X/);
+assert.match(fill('{{brand}} {{operator}}', {brand: 'B', business: {publicName: 'X Labs', legalForm: 'Perorangan'}, domain: 'd', refund: {}}), /B X Labs \(usaha perorangan\)/);
+// the owner's personal name must never appear in anything the public site renders
+assert.ok(!JSON.stringify([SITE, COPY]).toLowerCase().includes('[REDACTED]'));
 
 // 7. routing: hosted visitors reach the public site; the account page keeps working; local review pages stay local
 assert.equal(entryRoute({hostname: 'riksora.example', search: ''}), 'site');

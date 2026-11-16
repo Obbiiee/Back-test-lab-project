@@ -37,7 +37,7 @@ export const CLAIMS = [
 const REQUIRED = '[diisi oleh pemilik]';
 export const fill = (text, site) => text
   .replaceAll('{{brand}}', site.brand)
-  .replaceAll('{{legalName}}', site.business.legalName || REQUIRED)
+  .replaceAll('{{operator}}', site.business.publicName ? site.business.publicName + (site.business.legalForm ? ' (usaha ' + site.business.legalForm.toLowerCase() + ')' : '') : REQUIRED)
   .replaceAll('{{email}}', site.business.email || REQUIRED)
   .replaceAll('{{address}}', site.business.address || REQUIRED)
   .replaceAll('{{domain}}', site.domain || REQUIRED)
@@ -107,19 +107,19 @@ export const COPY = {
     legalDraft: 'DRAF untuk ditinjau pemilik dan penasihat hukum. Belum disetujui untuk dipublikasikan.',
     updated: 'Terakhir diperbarui',
     terms: {title: 'Syarat dan Ketentuan', sections: [
-      ['1. Layanan', ['{{brand}} ({{domain}}) adalah layanan simulasi backtest berbasis data tick historis, dikelola oleh {{legalName}}. Layanan ini untuk berlatih dan riset.']],
+      ['1. Layanan', ['{{brand}} ({{domain}}) adalah layanan simulasi backtest berbasis data tick historis, dikelola oleh {{operator}}. Layanan ini untuk berlatih dan riset.']],
       ['2. Bukan nasihat investasi', ['Layanan ini tidak menyediakan nasihat investasi, rekomendasi transaksi, atau eksekusi order di pasar sungguhan. Semua saldo dan order adalah simulasi.', 'Kinerja masa lalu tidak menjamin hasil di masa depan. Hasil simulasi dapat berbeda dari trading nyata.']],
       ['3. Akun', ['Anda bertanggung jawab atas kerahasiaan akun dan atas aktivitas di dalamnya. Anda harus memberikan informasi yang benar dan berusia di atas 18 tahun atau cakap hukum menurut hukum yang berlaku.']],
       ['4. Paket Free dan Pro', ['Free dibatasi satu Sesi baru per bulan kalender UTC dan satu bulan historis baru per hari UTC. Pro tidak dibatasi kuota tersebut.', 'Pro dibeli per periode, tidak diperpanjang otomatis, dan aktif sampai masa berlakunya habis. Harga dan periode tercantum di halaman Harga.']],
       ['5. Pembayaran', ['Pembayaran diproses oleh Midtrans dalam Rupiah. Kami tidak menyimpan data kartu atau rekening Anda.', 'Pro aktif setelah pembayaran terkonfirmasi lunas oleh penyedia pembayaran.']],
       ['6. Penggunaan yang dilarang', ['Dilarang mengganggu layanan, mengakses data pengguna lain, mengambil data secara massal, atau memakai layanan untuk tujuan melanggar hukum.']],
-      ['7. Data dan hak kekayaan intelektual', ['Perangkat lunak dan antarmuka adalah milik {{legalName}}. Data pasar historis tunduk pada ketentuan sumbernya dan tidak boleh disalin atau didistribusikan ulang. Catatan Sesi Anda adalah milik Anda.']],
+      ['7. Data dan hak kekayaan intelektual', ['Perangkat lunak dan antarmuka adalah milik {{operator}}. Data pasar historis tunduk pada ketentuan sumbernya dan tidak boleh disalin atau didistribusikan ulang. Catatan Sesi Anda adalah milik Anda.']],
       ['8. Ketersediaan dan perubahan', ['Layanan masih dalam tahap awal. Kami dapat mengubah fitur, kuota, atau harga dengan pemberitahuan yang wajar; perubahan harga tidak berlaku surut pada periode Pro yang sudah dibayar.']],
       ['9. Batas tanggung jawab', ['Sejauh diizinkan hukum, kami tidak bertanggung jawab atas kerugian yang timbul dari keputusan trading yang Anda ambil berdasarkan hasil simulasi.']],
       ['10. Penghentian', ['Anda dapat berhenti memakai layanan kapan saja. Kami dapat menangguhkan akun yang melanggar ketentuan ini.']],
       ['11. Hukum yang berlaku dan kontak', ['Ketentuan ini tunduk pada hukum Republik Indonesia. Pertanyaan dapat dikirim ke {{email}}.']]]},
     privacy: {title: 'Kebijakan Privasi', sections: [
-      ['1. Pengelola data', ['{{legalName}} ({{address}}) mengelola data pribadi Anda untuk menjalankan {{brand}}. Kontak: {{email}}.']],
+      ['1. Pengelola data', ['{{operator}} ({{address}}) mengelola data pribadi Anda untuk menjalankan {{brand}}. Kontak: {{email}}.']],
       ['2. Data yang kami kumpulkan', ['Email dan kata sandi (disimpan dalam bentuk hash), pengenal akun Google bila Anda masuk dengan Google, Sesi, order, dan catatan simulasi yang Anda buat, status paket dan riwayat pesanan, serta catatan keamanan dasar (misalnya waktu dan alamat IP untuk membatasi penyalahgunaan).', 'Kami tidak menyimpan data kartu atau rekening; itu ditangani Midtrans.']],
       ['3. Tujuan penggunaan', ['Menyediakan layanan simulasi, mengelola akun dan paket, memproses pembayaran, menjaga keamanan, dan menanggapi permintaan dukungan.']],
       ['4. Pihak ketiga', ['Midtrans (pemrosesan pembayaran), Google (masuk dengan Google, opsional), serta penyedia infrastruktur hosting dan email yang kami gunakan. Kami tidak menjual data pribadi Anda.']],

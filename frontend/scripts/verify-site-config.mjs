@@ -8,7 +8,7 @@ const need = (ok, message) => { if (!ok) problems.push(message); };
 const text = value => typeof value === 'string' && value.trim().length > 2;
 
 need(text(SITE.domain) && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(SITE.domain), 'domain (public https domain) is missing or invalid');
-need(text(SITE.business.legalName), 'business.legalName is missing');
+need(text(SITE.business.publicName), 'business.publicName (name shown on the site) is missing');
 need(text(SITE.business.legalForm), 'business.legalForm is missing');
 need(text(SITE.business.address), 'business.address is missing');
 need(text(SITE.business.email) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(SITE.business.email), 'business.email is missing or invalid');

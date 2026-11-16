@@ -42,7 +42,7 @@ function Footer({t, lang}) {
   return <footer className="site-footer">
     <div className="site-footer-grid">
       <div>
-        <strong>{b.legalName || SITE.brand}</strong>
+        <strong>{b.publicName || SITE.brand}</strong>
         {b.legalForm && <span>{b.legalForm}</span>}
         {b.address && <span>{b.address}</span>}
         {b.email && <span><a href={`mailto:${b.email}`}>{b.email}</a></span>}
@@ -59,7 +59,7 @@ function Footer({t, lang}) {
       </nav>
     </div>
     <p>{t.footer.disclaimer}</p>
-    <p>© {new Date().getFullYear()} {b.legalName || SITE.brand}. {t.footer.rights}</p>
+    <p>© {new Date().getFullYear()} {b.publicName || SITE.brand}. {t.footer.rights}</p>
   </footer>;
 }
 
@@ -158,7 +158,7 @@ function About({t}) {
     <ul className="site-list">{t.about.principles.map(item => <li key={item}>{item}</li>)}</ul>
     <h2>{t.about.identityTitle}</h2>
     <dl className="site-facts">
-      <dt>{t.lang === 'en' ? 'Name' : 'Nama'}</dt><dd>{b.legalName || '—'}</dd>
+      <dt>{t.lang === 'en' ? 'Name' : 'Nama'}</dt><dd>{b.publicName || '—'}</dd>
       {b.legalForm && <><dt>{t.lang === 'en' ? 'Form' : 'Bentuk usaha'}</dt><dd>{b.legalForm}</dd></>}
       {b.nib && <><dt>NIB</dt><dd>{b.nib}</dd></>}
       <dt>{t.contact.address}</dt><dd>{b.address || '—'}</dd>

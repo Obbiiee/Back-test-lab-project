@@ -8,7 +8,7 @@ export const SITE = {
   launchState: 'preview',
   domain: 'riksora.com',              // owner's domain (2026-11-16)
   business: {
-    legalName: '[REDACTED] [REDACTED] [REDACTED]',  // nama pemilik (usaha perorangan); HARUS sama persis dengan KTP yang diunggah ke Midtrans
+    publicName: 'RIKSORA Labs',        // nama yang tampil di situs (owner memilih tidak menampilkan nama pribadi; identitas pemilik hanya untuk dokumen Midtrans)
     legalForm: 'Perorangan',          // usaha perorangan (belum terdaftar sebagai badan usaha)
     address: 'Majalengka, Jawa Barat, Indonesia',   // alamat yang boleh tampil (owner memilih tingkat kota)
     email: 'risoralabs@gmail.com',    // email dukungan (owner, 2026-11-16)
