@@ -47,3 +47,13 @@ export function eventSignature(view){
 }
 export const hasWatchedOrders=view=>Boolean(view.analysis?.status==='COMPLETE'&&view.analysis.orders.some(o=>['PENDING','ACTIVE'].includes(o.status)));
 export const utcLabel=ns=>new Date(Number(BigInt(ns)/1000000n)).toISOString().replace('T',' ').replace(/\.\d{3}Z$/,' UTC');
+// Service limits are transient: the request was refused before any commit, so the same step is retried.
+export const isLimitError=message=>message==='LOCAL_BUSY'||message==='RATE_LIMITED';
+export const limitDelayMs=(message,retry)=>Math.min(10000,(message==='RATE_LIMITED'?1500:500)*2**retry);
+export const pause=(milliseconds,signal)=>new Promise((resolve,reject)=>{
+  if(signal?.aborted)return reject(Error('Cancelled'));
+  const done=()=>{clearTimeout(timer);signal?.removeEventListener('abort',stop);resolve();};
+  const stop=()=>{clearTimeout(timer);reject(Error('Cancelled'));};
+  const timer=setTimeout(done,milliseconds);
+  signal?.addEventListener('abort',stop,{once:true});
+});

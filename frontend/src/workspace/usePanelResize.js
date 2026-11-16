@@ -42,5 +42,6 @@ export default function usePanelResize(initialHeight = 150, extraReservedHeight 
     setHeight(current => keyboardPanelHeight(current, event.key, event.shiftKey, window.innerHeight - extraReservedHeight, window.innerWidth, restoreHeight.current));
   };
   const restore = () => setHeight(clampPanel(restoreHeight.current, window.innerHeight - extraReservedHeight, window.innerWidth));
-  return { height, state: panelState(height), start, keyDown, restore, ...panelBounds(window.innerHeight - extraReservedHeight, window.innerWidth) };
+  const collapse = () => setHeight(COLLAPSED_HEIGHT);
+  return { height, state: panelState(height), start, keyDown, restore, collapse, ...panelBounds(window.innerHeight - extraReservedHeight, window.innerWidth) };
 }

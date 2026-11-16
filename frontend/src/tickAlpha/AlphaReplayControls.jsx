@@ -27,6 +27,7 @@ export default function AlphaReplayControls({view,timeframe,busy,pauseToken,pend
       const before=current.view;
       const result=await current.onAdvance('ADVANCE',playbackTarget(before.state.throughNs,current.rate,scale),{});
       if(!active)return;
+      if(result===undefined){timer=setTimeout(tick,PLAY_INTERVAL_MS);return;}
       if(!result||result.view.state.ended){setPlaying(false);if(result?.view.state.ended)onNotice('End of the dataset reached. Replay stopped.');return;}
       scale=widenScale(scale,result.view.state.nextGroupIndex!==before.state.nextGroupIndex,current.timeframe,current.rate);
       timer=setTimeout(tick,PLAY_INTERVAL_MS);
@@ -45,11 +46,12 @@ export default function AlphaReplayControls({view,timeframe,busy,pauseToken,pend
     setPlaying(false);setActivity(name);setProgress('');
     try{await work(controller);}finally{abort.current=null;inFlight.current=false;setActivity('');}
   };
-  const stepTick=()=>guarded('step',async()=>{await onAdvance('ADVANCE',replayTarget(latest.current.view,1),{});});
+  const busyNotice=result=>{if(result===undefined)onNotice('Another request is still running. Try again in a moment.');return result;};
+  const stepTick=()=>guarded('step',async()=>{busyNotice(await onAdvance('ADVANCE',replayTarget(latest.current.view,1),{}));});
   const candle=()=>guarded('candle',async controller=>{
     const target=candleTarget(latest.current.view.state.throughNs,latest.current.timeframe);
     setProgress(`Revealing ticks to ${utcLabel(target)}…`);
-    const result=await onAdvance('ADVANCE',target,{signal:controller.signal,onProgress:saved=>setProgress(`Revealed through ${utcLabel(saved.state.throughNs)}…`)});
+    const result=busyNotice(await onAdvance('ADVANCE',target,{signal:controller.signal,onProgress:saved=>setProgress(`Revealed through ${utcLabel(saved.state.throughNs)}…`)}));
     if(result?.cancelled)onNotice('Cancelled. The replay cursor stays at the last committed position; use Continue to finish the same target.');
     else if(result&&!result.reached&&!result.view.state.ended)onNotice('The candle target was not reached; try Next candle again.');
   });
@@ -61,7 +63,7 @@ export default function AlphaReplayControls({view,timeframe,busy,pauseToken,pend
     let current=latest.current.view;const base=eventSignature(current);
     for(let index=0;index<JUMP_MAX_CHUNKS;index++){
       if(controller.signal.aborted){onNotice('Jump cancelled. Replay stays at the last committed cursor.');return;}
-      const result=await onAdvance('ADVANCE',candleTarget(current.state.throughNs,latest.current.timeframe),{signal:controller.signal});
+      const result=busyNotice(await onAdvance('ADVANCE',candleTarget(current.state.throughNs,latest.current.timeframe),{signal:controller.signal}));
       if(!result)return;
       if(result.cancelled){onNotice('Jump cancelled. Replay stays at the last committed cursor.');return;}
       current=result.view;setProgress(`${index+1} ${timeframeLabel(latest.current.timeframe)} candle(s) · ${utcLabel(current.state.throughNs)}`);

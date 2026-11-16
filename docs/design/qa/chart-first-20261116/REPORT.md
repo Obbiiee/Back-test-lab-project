@@ -99,6 +99,12 @@ change and was not made.
   `test:stitch-analytics` using the existing backend venv via a junction).
 * Backend Python/PostgreSQL suites: NOT RUN (no PostgreSQL here).
 
+## Follow-up fixes (second audit)
+
+Phone **Chart** button now collapses the terminal (it was a no-op); a click while another request runs now says so instead of doing nothing, and Play simply skips that tick; chart timeframe is remembered per Session across reload; `LOCAL_BUSY`/`RATE_LIMITED` are retried with bounded back-off (harness: 3 refusals then success) and a stale revision is reconciled by reloading the Session before continuing the same target.
+
+Still open: needs the real backend — account-transport behaviour of hundreds of sequential commands, the 256-advance-target limit of non-indexed fixture Sessions at Play cadence, loss of the saved target if browser storage is cleared while the server holds a pending target (`ADVANCE_IN_PROGRESS`), a lighter view endpoint to avoid reloading chart+analysis per partial advance. No automated browser tests are committed (manual QA only).
+
 ## Roadmap (P2, not built)
 
 Multi-chart layouts, social strategies, drag-to-modify live orders, exact-tick landing for Jump

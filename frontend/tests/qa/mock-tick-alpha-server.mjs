@@ -84,7 +84,7 @@ function close(s, o, px, t, reason) {
 const reviews = new Map();
 const send = (res, code, body) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }); res.end(JSON.stringify(body)); };
 const catalog = () => ({ schemaVersion: 1, label: 'SYNTHETIC / TEST ONLY', startPeriod: '2020-01', methods: [...methods.values()], sessions: [...sessions.values()].map(s => ({ id: s.id, name: s.name, methodId: s.methodId })) });
-let delay = 0;
+let delay = 0, failN = 0, failCode = 'RATE_LIMITED';
 http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
   const url = new URL(req.url, 'http://x'); let body = ''; for await (const c of req) body += c; body = body ? JSON.parse(body) : undefined;
@@ -92,6 +92,7 @@ http.createServer(async (req, res) => {
   if (delay) await new Promise(r => setTimeout(r, delay));
   try {
     let m;
+    if (path === '/__fail') { failN = Number(url.searchParams.get('n') || 0); failCode = url.searchParams.get('code') || 'RATE_LIMITED'; return send(res, 200, { schemaVersion: 1, failN }); }
     if (path === '/__delay') { delay = Number(url.searchParams.get('ms') || 0); return send(res, 200, { schemaVersion: 1, delay }); }
     if (path === '/catalog') return send(res, 200, catalog());
     if (path === '/methods') { methods.set(body.id, { ...body }); return send(res, 200, { schemaVersion: 1 }); }
@@ -106,6 +107,7 @@ http.createServer(async (req, res) => {
       if (m[2] === 'confirm') { const r = reviews.get(body.reviewId), p = r.command.payload; s.orders.push({ id: 'order:' + (s.orders.length + s.completed.length + 1), status: 'PENDING', side: p.side, orderType: p.orderType, entry: p.entry, sl: p.sl, tp: p.tp, quantity: p.quantity, remaining: p.quantity, entryPrice: null, entryTimeNs: null });
         s.revision++; return send(res, 200, { schemaVersion: 1 }); }
       if (m[2] === 'commands') {
+        if (failN > 0) { failN--; return send(res, 429, { detail: failCode }); }
         if (String(body.expectedRevision) !== String(s.revision)) return send(res, 409, { detail: 'REFUSED_STALE_REVISION' });
         if (body.kind === 'ADVANCE' || body.kind === 'SEEK') { if (body.kind === 'SEEK' && BigInt(body.payload.targetNs) < BigInt(s.through)) return send(res, 409, { detail: 'REFUSED_REWIND_REQUIRES_FORK' }); let done = reveal(s, body.payload.targetNs); while (body.kind === 'SEEK' && !done) done = reveal(s, body.payload.targetNs); /* real timeline.seek loops internally */ return send(res, 200, { schemaVersion: 1, replay: { throughNs: s.through, exhaustedThroughBoundary: done } }); }
         const o = s.orders.find(x => x.id === body.payload.orderId);

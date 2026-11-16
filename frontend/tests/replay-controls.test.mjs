@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {candleTarget,playbackTarget,widenScale,eventSignature,hasWatchedOrders,SPEEDS,PLAY_INTERVAL_MS,timeframeLabel,utcLabel} from '../src/tickAlpha/replay.js';
-import {readPending,writePending} from '../src/tickAlpha/replayPending.js';
+import {isLimitError,limitDelayMs,pause,candleTarget,playbackTarget,widenScale,eventSignature,hasWatchedOrders,SPEEDS,PLAY_INTERVAL_MS,timeframeLabel,utcLabel} from '../src/tickAlpha/replay.js';
+import {readPending,writePending,readTimeframe,writeTimeframe} from '../src/tickAlpha/replayPending.js';
 
 const ns=iso=>String(BigInt(Date.parse(iso))*1000000n);
 const last=iso=>String(BigInt(Date.parse(iso))*1000000n-1n); // last nanosecond before iso
@@ -74,6 +74,20 @@ writePending('k',null);assert.equal(readPending('k'),null);
 globalThis.localStorage={getItem(){throw Error('denied');},setItem(){throw Error('denied');},removeItem(){throw Error('denied');}};
 assert.equal(readPending('k'),null);writePending('k',{kind:'SEEK',target:'5'});
 
+// Transient service limits are retried with bounded back-off; other errors are not.
+assert.equal(isLimitError('RATE_LIMITED'),true);assert.equal(isLimitError('LOCAL_BUSY'),true);assert.equal(isLimitError('REFUSED_STALE_REVISION'),false);
+assert.deepEqual([0,1,2,5,9].map(retry=>limitDelayMs('LOCAL_BUSY',retry)),[500,1000,2000,10000,10000]);
+assert.equal(limitDelayMs('RATE_LIMITED',0),1500);
+await pause(5,undefined);
+const controller=new AbortController();const waiting=pause(60000,controller.signal);controller.abort();
+await assert.rejects(()=>waiting,/Cancelled/);
+await assert.rejects(()=>pause(5,AbortSignal.abort()),/Cancelled/);
+
+// Timeframe preference: only known timeframes are stored or read.
+{const kv=new Map();globalThis.localStorage={getItem:key=>kv.get(key)??null,setItem:(key,value)=>kv.set(key,value),removeItem:key=>kv.delete(key)};
+assert.equal(readTimeframe('t'),null);writeTimeframe('t','1h');assert.equal(readTimeframe('t'),'1h');
+writeTimeframe('t','7m');assert.equal(readTimeframe('t'),'1h');kv.set('t','bogus');assert.equal(readTimeframe('t'),null);}
+
 // Source contracts of the replay UI (no second engine, no OHLC settlement, cleanup).
 const controls=readFileSync(new URL('../src/tickAlpha/AlphaReplayControls.jsx',import.meta.url),'utf8');
 assert.ok(controls.includes("onAdvance('ADVANCE'")&&controls.includes("onAdvance('SEEK'"),'every replay action is a backend ADVANCE/SEEK');
@@ -82,5 +96,6 @@ assert.ok(!/\b(high|low|open|close)\b\s*[<>]=?/.test(controls),'no candle compar
 assert.ok(controls.includes('abort.current?.abort()'));
 const workspace=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),'utf8');
 assert.ok(workspace.includes('flight.current')&&workspace.includes('savePending(sessionId,{kind,target:targetNs})'));
+assert.ok(workspace.includes('isLimitError(error.message)')&&workspace.includes('REFUSED_STALE_REVISION'),'limits are retried and a stale revision is reconciled, never blindly replayed');
 assert.ok(workspace.includes('Replay made no progress'),'a stalled partial advance is refused, not retried forever');
 console.log('PASS replay controls: UTC candle targets (all timeframes, gaps, boundaries), playback-rate semantics, event detection, pending-target persistence and source contracts.');

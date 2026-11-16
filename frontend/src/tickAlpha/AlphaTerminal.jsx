@@ -22,9 +22,9 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback,focus=null}
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   // A phone session-bar request (Positions, Results) opens a collapsed terminal.
-  const restoreRef=useRef(null);
-  useEffect(()=>{restoreRef.current=panel.restore;});
-  useEffect(()=>{if(focus?.tab)restoreRef.current?.();},[focus]);
+  const panelActions=useRef(null);
+  useEffect(()=>{panelActions.current={restore:panel.restore,collapse:panel.collapse};});
+  useEffect(()=>{if(focus?.collapse)panelActions.current?.collapse();else if(focus?.tab)panelActions.current?.restore();},[focus]);
   const evidence=view.analysis;
   if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
   const {account,metrics,provenance}=evidence;

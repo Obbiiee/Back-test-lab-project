@@ -13,7 +13,8 @@ import AlphaJournal from './AlphaJournal.jsx';
 import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
 import {emitLocal} from './measurement.js';
-import {readPending,writePending} from './replayPending.js';
+import {readPending,writePending,readTimeframe,writeTimeframe} from './replayPending.js';
+import {isLimitError,limitDelayMs,pause} from './replay.js';
 import Icon from '../workspace/WorkspaceIcon.jsx';
 import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
@@ -38,7 +39,8 @@ export default function TickAlpha(){
   const flight=useRef(false),returnFocus=useRef(null);
   const [connecting,setConnecting]=useState(true);
   const creationId=useRef(null);
-  const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
+  const timeframeKey=session=>accountStorageKey('timeframe:'+session);
+  const [timeframe,setTimeframe]=useState(()=>{const selected=typeof window==='undefined'?null:new URL(window.location.href).searchParams.get('session');return (selected&&readTimeframe(accountStorageKey('timeframe:'+selected)))||'1m';}),[pauseToken,setPauseToken]=useState(0);
   const [orderAction,setOrderAction]=useState(null);
   const [selectedMethod,setSelectedMethod]=useState('');
   const [focus,setFocusState]=useState(false),[drawRequest,setDrawRequest]=useState(null),[terminalFocus,setTerminalFocus]=useState(null),[pairQuery,setPairQuery]=useState('');
@@ -65,17 +67,19 @@ export default function TickAlpha(){
     document.addEventListener('fullscreenchange',onFullscreen);window.addEventListener('keydown',onKey);
     return()=>{document.removeEventListener('fullscreenchange',onFullscreen);window.removeEventListener('keydown',onKey);};
   },[]);
-  const focusTerminal=tab=>{setTerminalFocus({tab,id:id('tab')});requestAnimationFrame(()=>document.querySelector('.tick-alpha .alpha-terminal')?.scrollIntoView({behavior:'smooth',block:'start'}));};
+  const focusTerminal=tab=>{setTerminalFocus({tab,id:id('tab')});};
   const openPanel=(name,event)=>{if(name==="pair")setPairQuery("");if(event)returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog(name);};
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
   useEffect(()=>{
     let mounted=true;
     (async()=>{try{
       const selected=new URL(window.location.href).searchParams.get('session');
-      const result=await loadResearchContext(selected,{active:()=>mounted});
+      const result=await loadResearchContext(selected,{active:()=>mounted,timeframe});
       if(result){setCatalog(result.catalog);setView(result.view);emitLocal('workspace_opened');}
     }catch(error){if(mounted)setNotice(error.message);}finally{if(mounted)setConnecting(false);}})();
     return ()=>{mounted=false;};
+  // The saved timeframe is read once for the first load; later changes go through onTimeframe.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   const run=async action=>{
     if(flight.current)return;
@@ -84,7 +88,8 @@ export default function TickAlpha(){
   };
   const reopen=async session=>{
     setPauseToken(n=>n+1);
-    const saved=await loadWorkspace(session);setView(saved);setSelectedMethod(saved.method.id);selectSessionUrl(session);setReview(null);setDialog(null);setOrderAction(null);
+    const savedTimeframe=readTimeframe(timeframeKey(session))||timeframe;
+    const saved=await loadWorkspace(session,savedTimeframe);setTimeframe(savedTimeframe);setView(saved);setSelectedMethod(saved.method.id);selectSessionUrl(session);setReview(null);setDialog(null);setOrderAction(null);
     setPlan(initialPlan(saved));setPlanRevision(0);
     setNotice('Session reopened from its committed state.');
     emitLocal('session_restored');
@@ -104,8 +109,19 @@ export default function TickAlpha(){
     savePending(sessionId,{kind,target:targetNs});
     try{
     for(let attempt=0;attempt<1000;attempt++){
-      await api(sessionPath(sessionId)+'/commands',command(current,kind,{targetNs}));
-      const saved=await loadWorkspace(sessionId);
+      let saved=null;
+      for(let retry=0;saved===null;retry++){
+        try{
+          await api(sessionPath(sessionId)+'/commands',command(current,kind,{targetNs}));
+          saved=await loadWorkspace(sessionId);
+        }catch(error){
+          if(retry>=6||signal?.aborted)throw error;
+          if(isLimitError(error.message)){await pause(limitDelayMs(error.message,retry),signal);continue;}
+          // The command may have committed before the failure; the same target is safe to continue.
+          if(error.message==='REFUSED_STALE_REVISION'){saved=await loadWorkspace(sessionId);if(saved.state.revision===current.state.revision)throw error;break;}
+          throw error;
+        }
+      }
       viewRef.current=saved;setView(saved);
       if(saved.state.nextGroupIndex!==current.state.nextGroupIndex){
         emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
@@ -198,7 +214,7 @@ export default function TickAlpha(){
       })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><button type="button" className="alpha-pair-pill" aria-label="Pair XAUUSD, show pairs" onClick={event=>openPanel('pair',event)}><span aria-hidden="true">Au</span>XAUUSD<span aria-hidden="true">▾</span></button><p><strong>XAUUSD</strong><span className="alpha-source-credit"> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button></span> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
       <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} drawRequest={drawRequest} focus={focus} onFocus={setFocus} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onPause={()=>setPauseToken(n=>n+1)} onNotice={setNotice}
-        onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
+        onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);writeTimeframe(timeframeKey(view.metadata.id),tf);})}
         onAdvance={advanceTo} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
@@ -208,7 +224,7 @@ export default function TickAlpha(){
       <div className="alpha-order-bar"><button type="button" className="alpha-quick-side alpha-quick-sell" aria-label={`Sell at Bid ${view.quote?.bid??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'SHORT')}><span>Sell</span><strong>{view.quote?.bid??'—'}</strong></button><button type="button" className="alpha-quick-side alpha-quick-buy" aria-label={`Buy at Ask ${view.quote?.ask??'unavailable'}`} disabled={busy||view.state.unresolved||!view.quote} onClick={event=>openTicket(event,'LONG')}><span>Buy</span><strong>{view.quote?.ask??'—'}</strong></button><button disabled={busy||view.state.unresolved} onClick={event=>openTicket(event)}>New order</button><span>{view.state.unresolved?'Evidence unresolved · no invented fill':'Review before confirmation'}</span></div>
       <AlphaTerminal key={view.metadata.id} view={view} busy={busy} focus={terminalFocus} onAction={requestAction} onFeedback={event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('feedback');}}/>
       <nav className="alpha-phone-bar" aria-label="Session views">
-        <button type="button" onClick={()=>document.querySelector('.tick-alpha .alpha-chart-workspace')?.scrollIntoView({behavior:'smooth',block:'start'})}><Icon name="candles"/><span>Chart</span></button>
+        <button type="button" onClick={()=>setTerminalFocus({collapse:true,id:id('tab')})}><Icon name="candles"/><span>Chart</span></button>
         <button type="button" onClick={()=>focusTerminal('Open positions')}><Icon name="order"/><span>Positions</span></button>
         <button type="button" onClick={event=>openPanel('journal',event)}><Icon name="journal"/><span>Journal</span></button>
         <button type="button" onClick={()=>focusTerminal('Analysis')}><Icon name="analytics"/><span>Results</span></button>
