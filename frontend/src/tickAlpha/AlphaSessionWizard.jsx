@@ -15,7 +15,7 @@ const BALANCES=['10000','50000','100000'];
 const DECIMAL=/^\d{1,12}(\.\d{1,2})?$/;
 const PERIOD_CODES=['REFUSED_HISTORICAL_PERIOD','REFUSED_FIXTURE_PERIOD'];
 
-export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
+export default function AlphaSessionWizard({catalog,route,busy,error,onCreate,onLoadMore}){
   const historical=sourceContext()==='historical';
   const [step,setStep]=useState(0);
   const [methodId,setMethodId]=useState(()=>catalog.methods.some(m=>m.id===route.method)?route.method:null);
@@ -56,6 +56,7 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
     <form className="rk-card rk-form rk-wizard" onSubmit={submit} noValidate>
       {step===0&&<fieldset className="rk-wizard-step"><legend>Which Method should this Session replay?</legend>
         <MethodPicker methods={catalog.methods} value={methodId} onChange={setMethodId} disabled={busy}/>
+        {catalog.productPagination?.methods?.complete===false&&<button type="button" className="rk-btn rk-btn-quiet" disabled={busy||!onLoadMore} onClick={()=>onLoadMore?.('methods')}>{busy?'Loading…':'Load more Methods'}</button>}
         {method&&<p className="rk-wizard-note">{method.kind==='PROTOCOL'?`Protocol rules are copied into the Session: risk ${method.riskPercent}% and R:R ${method.rr}, planned entries only. They cannot be changed inside the Session.`:'Free Style: quick or planned orders, with stop and target chosen per order.'}</p>}
       </fieldset>}
       {step===1&&<fieldset className="rk-wizard-step"><legend>What do you want to replay?</legend>

@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
-import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,noticeText,sourceContext,pagePath} from './client.js';
+import {api,id,sessionPath,selectSessionUrl,loadResearchContext,loadProductCatalog,loadMoreProductCatalog,noticeText,sourceContext,pagePath} from './client.js';
 import {command,replayObservedTo} from './client.js';
 import {sessionInstrument} from './display.js';
 import AlphaWorkspace from './AlphaWorkspace.jsx';
@@ -77,6 +77,7 @@ export default function TickAlpha(){
     flight.current=true;setBusy(true);setNotice('');
     try{return await action()??true;}catch(error){setNotice(error.message);return false;}finally{flight.current=false;setBusy(false);}
   };
+  const loadMoreProduct=kind=>run(async()=>setCatalog(await loadMoreProductCatalog(catalog,kind)));
   const reopen=async (session,{push=true}={})=>{
     setPauseToken(n=>n+1);
     const saved=await loadWorkspace(session);setView(saved);setSelectedMethod(saved.method.id);rememberSession(session);if(push)navigate({screen:'replay',session});else selectSessionUrl(session);setReview(null);setDialog(null);setOrderAction(null);
@@ -217,19 +218,19 @@ export default function TickAlpha(){
       {!catalog?(connecting?<StatePanel level={1} kind="loading" title="Connecting to your workspace…"/>:<StatePanel level={1} kind={isAccountPage()?'unavailable':'offline'} title={isAccountPage()?'Workspace service unavailable':'Local service unavailable'} action={<button className="rk-btn rk-btn-primary" disabled={busy||connecting} onClick={()=>run(async()=>{
         setConnecting(true);try{const result=await loadResearchContext(route.screen==='replay'?route.session:null,{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button>}><p>{isAccountPage()?'Retry, or sign out and sign in again. Nothing was changed.':'Start the local alpha service and database, then retry. Saved Sessions are kept.'}</p></StatePanel>)
-      :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='methods'?<MyMethods catalog={catalog} busy={busy} onOpen={sessionId=>run(()=>reopen(sessionId))} onLoadMore={loadMoreProduct}/>
       :route.screen==='method-new'?<MethodNew key={route.family||'new'} catalog={catalog} route={route} onSaved={async methodId=>{setCatalog(await loadProductCatalog());setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice(route.family?'New immutable Method version saved.':'Method saved. Create a Session to start replay.');}}/>
-      :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onLifecycle={async()=>setCatalog(await loadProductCatalog())} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
-      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
+      :route.screen==='method'?<MethodOverview catalog={catalog} route={route} busy={busy} onLifecycle={async()=>setCatalog(await loadProductCatalog())} onOpen={sessionId=>run(()=>reopen(sessionId))} onLoadMore={loadMoreProduct} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
+      :route.screen==='sessions'?<SessionsPage catalog={catalog} busy={busy} onOpen={sessionId=>run(()=>reopen(sessionId))} onLoadMore={loadMoreProduct}/>
       :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
+      :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession} onLoadMore={loadMoreProduct}/>
       :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>
       :route.screen==='journal'?<AlphaJournalPage catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
-      :route.screen==='analytics'?<Analytics catalog={catalog} route={route}/>
+      :route.screen==='analytics'?<Analytics catalog={catalog} route={route} busy={busy} onLoadMore={loadMoreProduct}/>
       :route.screen==='replay'&&route.session?(busy||!notice?<StatePanel level={1} kind="loading" title="Opening Session…"/>:<StatePanel level={1} kind="unavailable" title="This Session could not be opened" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>{noticeText(notice)} Nothing was changed.</p></StatePanel>)
       :route.screen==='help'?<HelpPage catalog={catalog} onSource={openSource} onFeedback={event=>{returnFocus.current=event?.currentTarget??null;setDialog('feedback');}}/>
       :route.screen==='account'?<LocalAccountPage catalog={catalog}/>
-      :<Placeholder catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>}
+      :<Placeholder catalog={catalog} busy={busy} onOpen={sessionId=>run(()=>reopen(sessionId))} onLoadMore={loadMoreProduct}/>}
     </AlphaShell>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
       <div className="alpha-workspace"><AlphaWorkspace onPause={()=>setPauseToken(n=>n+1)} lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}

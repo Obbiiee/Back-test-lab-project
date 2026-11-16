@@ -12,15 +12,17 @@ import {SessionTable} from './AlphaProduct.jsx';
 // service does not publish (counts per Session, other instruments, trash) is
 // stated as unavailable instead of being estimated.
 
-export function SessionsPage({catalog,onOpen}){
+export function SessionsPage({catalog,onOpen,onLoadMore,busy=false}){
   const [query,setQuery]=useState('');
   const [methodId,setMethodId]=useState(null);
-  const [sort,setSort]=useState('newest');
+  const [sort,setSort]=useState('period');
+  const sessionsComplete=catalog.productPagination?.sessions?.complete!==false;
   const rows=useMemo(()=>{
     const q=query.trim().toLowerCase();
     const methodName=id=>catalog.methods.find(m=>m.id===id)?.name||'';
     const list=catalog.sessions.filter(s=>(!methodId||s.methodId===methodId)&&(!q||s.name.toLowerCase().includes(q)||methodName(s.methodId).toLowerCase().includes(q)));
-    const ordered=sort==='name'?list.slice().sort((a,b)=>a.name.localeCompare(b.name)):list.slice().reverse();
+    const ordered=sort==='name'?list.slice().sort((a,b)=>a.name.localeCompare(b.name)):
+      list.slice().sort((a,b)=>b.startPeriod.localeCompare(a.startPeriod)||b.id.localeCompare(a.id));
     return ordered;
   },[catalog,query,methodId,sort]);
   const newSession=<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new',method:methodId||undefined})}><Icon name="plus" size={18}/><span>New Session</span></a>;
@@ -30,30 +32,34 @@ export function SessionsPage({catalog,onOpen}){
     <div className="rk-toolbar">
       <label className="rk-search"><span className="alpha-sr-only">Search Sessions</span><Icon name="search" size={18}/><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search Sessions or Methods"/></label>
       <div className="rk-toolbar-combo"><MethodPicker methods={catalog.methods} value={methodId} onChange={setMethodId} label="Method" placeholder="All Methods" clearable/></div>
-      <label className="rk-select">Sort<select value={sort} onChange={event=>setSort(event.target.value)}><option value="newest">Newest first</option><option value="name">Name A–Z</option></select></label>
-      <span className="rk-count" role="status">{rows.length} of {catalog.sessions.length}</span>
+      <label className="rk-select">Sort<select value={sort} onChange={event=>setSort(event.target.value)}><option value="period">Start month · latest first</option><option value="name">Name A–Z</option></select></label>
+      <span className="rk-count" role="status">{rows.length} of {catalog.sessions.length} loaded{!sessionsComplete?' · more available':''}</span>
     </div>
     {rows.length?<SessionTable sessions={rows} catalog={catalog} onOpen={onOpen} caption="Sessions"/>
       :<StatePanel kind="filtered" title="No Session matches" action={<button type="button" className="rk-btn" onClick={()=>{setQuery('');setMethodId(null);}}>Clear filters</button>}><p>Try another name or show all Methods.</p></StatePanel>}
+    {!sessionsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('sessions')}>{busy?'Loading…':'Load more Sessions'}</button>}
+    {catalog.productPagination?.methods?.complete===false&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('methods')}>{busy?'Loading…':'Load more Methods for filtering'}</button>}
   </>;
 }
 
 export function SessionOverview({catalog,route,onOpen}){
   const sessionId=route.analyticsSession;
-  const session=catalog.sessions.find(s=>s.id===sessionId)||null;
+  const listedSession=catalog.sessions.find(s=>s.id===sessionId)||null;
   const [attempt,setAttempt]=useState(0);
   const [result,setResult]=useState({key:null});
   const key=`${sessionId}:${attempt}`;
   useEffect(()=>{
-    if(!session)return undefined;
+    if(!sessionId)return undefined;
     let live=true;
-    api(sessionPath(session.id)).then(value=>{if(live)setResult({key,status:'ready',value});},error=>{if(live)setResult({key,status:'error',message:error.message});});
+    api(sessionPath(sessionId)).then(value=>{if(live)setResult({key,status:'ready',value});},error=>{if(live)setResult({key,status:'error',message:error.message});});
     return()=>{live=false;};
-  },[session,key]);
-  if(!session)return <><PageHead back={{label:'Sessions',to:{screen:'sessions'}}} title="Session unavailable"/>
-    <StatePanel kind="unavailable" title="This Session is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'sessions'})}>All Sessions</a>}><p>It may belong to another workspace or the link is incomplete.</p></StatePanel></>;
-  const method=catalog.methods.find(m=>m.id===session.methodId);
+  },[sessionId,key]);
   const state=result.key===key?result:{status:'loading'};
+  const session=listedSession||(state.status==='ready'?state.value.metadata:null);
+  if(!session)return <><PageHead back={{label:'Sessions',to:{screen:'sessions'}}} title={state.status==='loading'?'Loading Session…':'Session unavailable'}/>
+    {state.status==='loading'?<StatePanel kind="loading" title="Loading saved Session"/>:<StatePanel kind="unavailable" title="This Session is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'sessions'})}>All Sessions</a>}><p>{state.message||'It may belong to another workspace or the link is incomplete.'}</p></StatePanel>}
+  </>;
+  const method=catalog.methods.find(m=>m.id===session.methodId)||state.value?.method;
   const saved=state.status==='ready'?state.value.state:null;
   return <><PageHead back={method?{label:method.name,to:{screen:'method',method:method.id}}:{label:'Sessions',to:{screen:'sessions'}}} eyebrow="Session" title={session.name}
       actions={<><button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(session.id)}><Icon name="candles" size={18}/><span>Resume replay</span></button><a className="rk-btn" {...linkTo({screen:'analytics',method:session.methodId,of:session.id})}>Analytics</a></>}/>

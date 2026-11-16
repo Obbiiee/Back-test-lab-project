@@ -17,6 +17,8 @@ function sourceLine(catalog){
   const p=catalog.profile;
   return `${p.instrumentId} · ${sourceContext()==='historical'?'historical quotes':'synthetic test feed'} · ${p.providerId}/${p.feedId}`;
 }
+const productHasMore=(catalog,kind)=>catalog.productPagination?.[kind]?.complete===false;
+const byStartMonth=(items)=>items.slice().sort((a,b)=>b.startPeriod.localeCompare(a.startPeriod)||b.id.localeCompare(a.id));
 
 function SessionRow({session,catalog,onOpen}){
   return <tr>
@@ -38,30 +40,35 @@ export function SessionTable({sessions,catalog,onOpen,caption}){
 function ContinueCard({catalog,onOpen}){
   const remembered=lastSession();
   const session=catalog.sessions.find(s=>s.id===remembered);
-  const [state,setState]=useState({status:session?'loading':'none'});
+  const [state,setState]=useState({key:remembered,status:remembered?'loading':'none'});
   useEffect(()=>{
-    if(!session)return;
+    if(!remembered)return;
     let live=true;
-    api(sessionPath(session.id)).then(value=>{if(live)setState({status:'ready',value});},()=>{if(live)setState({status:'error'});});
+    api(sessionPath(remembered)).then(value=>{if(live)setState({key:remembered,status:'ready',value});},()=>{if(live)setState({key:remembered,status:'error'});});
     return()=>{live=false;};
-  },[session]);
-  if(!session)return null;
-  const method=catalog.methods.find(m=>m.id===session.methodId);
+  },[remembered]);
+  if(!remembered)return null;
+  const requestState=state.key===remembered?state:{status:'loading'};
+  const saved=state.key===remembered&&state.status==='ready'?state.value:null;
+  const metadata=session||saved?.metadata;
+  if(!metadata&&state.status==='error')return null;
+  const method=catalog.methods.find(m=>m.id===metadata?.methodId)||saved?.method;
   return <section className="rk-continue" aria-labelledby="rk-continue-h">
-    <div><p className="rk-eyebrow">Continue research · last opened on this device</p><h2 id="rk-continue-h">{session.name}</h2>
+    <div><p className="rk-eyebrow">Continue research · last opened on this device</p><h2 id="rk-continue-h">{metadata?.name||'Loading last opened Session…'}</h2>
       <dl className="rk-facts">
         <div><dt>Method</dt><dd>{method?.name||'Unavailable'}</dd></div>
-        <div><dt>Instrument</dt><dd>{catalog.profile.instrumentId}</dd></div>
-        <div><dt>Replay time</dt><dd className="rk-num">{state.status==='ready'?utc(state.value.state.throughNs):state.status==='loading'?'Loading…':'Unavailable'}</dd></div>
-        <div><dt>Saved revision</dt><dd className="rk-num">{state.status==='ready'?state.value.state.revision:'—'}</dd></div>
+        <div><dt>Instrument</dt><dd>{catalog.profile?.instrumentId||saved?.state?.profile?.instrumentId||'Unavailable'}</dd></div>
+        <div><dt>Replay time</dt><dd className="rk-num">{saved?utc(saved.state.throughNs):requestState.status==='error'?'Unavailable':'Loading…'}</dd></div>
+        <div><dt>Saved revision</dt><dd className="rk-num">{saved?saved.state.revision:requestState.status==='error'?'Unavailable':'—'}</dd></div>
       </dl>
     </div>
-    <button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(session.id)}>Resume replay</button>
+    <button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(remembered)}>Resume replay</button>
   </section>;
 }
 
-export function MyMethods({catalog,onOpen}){
+export function MyMethods({catalog,onOpen,onLoadMore,busy=false}){
   const [query,setQuery]=useState(''),[type,setType]=useState('ALL'),[sort,setSort]=useState('name'),[showArchived,setShowArchived]=useState(false);
+  const methodsComplete=!productHasMore(catalog,'methods'),sessionsComplete=!productHasMore(catalog,'sessions');
   const counts=useMemo(()=>{const map=new Map();for(const s of catalog.sessions)map.set(s.methodId,(map.get(s.methodId)||0)+1);return map;},[catalog.sessions]);
   const familyCounts=useMemo(()=>new Map((catalog.methodFamilies||[]).map(family=>[
     family.familyId,family.versions.reduce((sum,version)=>sum+(counts.get(version.methodId)||0),0),
@@ -91,24 +98,27 @@ export function MyMethods({catalog,onOpen}){
     <PageHead eyebrow="Dashboard" title="My Methods" lead="Open a Method to see its Sessions, rules and analytics." actions={newMethod}/>
     <ContinueCard catalog={catalog} onOpen={onOpen}/>
     <dl className="rk-summary" aria-label="Research summary">
-      <div><dt>Methods</dt><dd className="rk-num">{catalog.methods.length}</dd></div>
-      <div><dt>Sessions</dt><dd className="rk-num">{catalog.sessions.length}</dd></div>
+      <div><dt>{methodsComplete?'Methods':'Methods loaded'}</dt><dd className="rk-num">{methodsComplete?catalog.methods.length:`≥${catalog.methods.length}`}</dd></div>
+      <div><dt>{sessionsComplete?'Sessions':'Sessions loaded'}</dt><dd className="rk-num">{sessionsComplete?catalog.sessions.length:`≥${catalog.sessions.length}`}</dd></div>
       <div><dt>Data</dt><dd>{catalog.label}</dd></div>
     </dl>
     <div className="rk-toolbar" role="search">
       <label className="rk-search"><Icon name="search" size={18}/><span className="alpha-sr-only">Search Methods</span><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search Methods"/></label>
       <Segmented className="rk-filter" label="Method type" value={type} onChange={setType} options={[['ALL','All'],['FREE_STYLE','Free Style'],['PROTOCOL','Protocol']]}/>
-      <label className="rk-select">Sort<select value={sort} onChange={e=>setSort(e.target.value)}><option value="name">Name A–Z</option><option value="sessions">Most Sessions</option></select></label>
+      <label className="rk-select">Sort<select value={sort} onChange={e=>setSort(e.target.value)}><option value="name">Name A-Z</option><option value="sessions">Most loaded Sessions</option></select></label>
       {accountTransport()&&catalog.methodFamilies?.some(family=>family.archived)&&<label className="rk-switch"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/><span aria-hidden="true"/>Show archived</label>}
-      <span className="rk-count" aria-live="polite">{visible.length} of {catalog.methods.length}</span>
+      <span className="rk-count" aria-live="polite">{visible.length} of {catalog.methods.length} loaded{!methodsComplete?' · more available':''}</span>
     </div>
+    {!sessionsComplete&&sort==='sessions'&&<p className="rk-note">Session counts and this sort order use the Sessions loaded so far. Load every Session page for a complete comparison.</p>}
     {visible.length?<ul className="rk-method-grid" aria-label="Methods">{visible.map(m=>{const n=familyCounts.get(m.methodFamilyId)||counts.get(m.id)||0;const family=catalog.methodFamilies?.find(item=>item.familyId===m.methodFamilyId);const versionIds=new Set(family?.versions.map(version=>version.methodId)||[m.id]);const resume=catalog.sessions.find(s=>s.id===lastSession()&&versionIds.has(s.methodId));return <li key={m.id}><article className="rk-method-card">
-      <div className="rk-method-head"><span className="rk-avatar" aria-hidden="true">{m.name.charAt(0).toUpperCase()}</span><div><h2><a {...linkTo({screen:'method',method:m.id})}>{m.name}</a></h2><p>{n} {n===1?'Session':'Sessions'}{n?` · ${catalog.profile.instrumentId}`:''}{family?` · v${family.latestVersion}`:''}{m.methodArchived?' · Archived':''}</p></div><span className={`rk-tag rk-tag-${m.kind==='PROTOCOL'?'protocol':'free'}`}>{kindLabel(m.kind)}</span></div>
+      <div className="rk-method-head"><span className="rk-avatar" aria-hidden="true">{m.name.charAt(0).toUpperCase()}</span><div><h2><a {...linkTo({screen:'method',method:m.id})}>{m.name}</a></h2><p>{!sessionsComplete?'at least ':''}{n} {family?`${n===1?'Session':'Sessions'} on latest version`:n===1?'Session':'Sessions'}{n?` · ${catalog.profile.instrumentId}`:''}{family?` · v${family.latestVersion}`:''}{m.methodArchived?' · Archived':''}</p></div><span className={`rk-tag rk-tag-${m.kind==='PROTOCOL'?'protocol':'free'}`}>{kindLabel(m.kind)}</span></div>
       <p className="rk-method-rules">{m.kind==='PROTOCOL'?`Risk ${m.riskPercent}% · R:R ${m.rr} · checklist ${m.checklistOn?'on':'off'} · ${m.conditions.length} ${m.conditions.length===1?'condition':'conditions'}`:'Quick or planned orders; stop and target chosen per order.'}</p>
       <div className="rk-method-foot"><a className="rk-btn" {...linkTo({screen:'method',method:m.id})}>Open</a>{resume?<button type="button" className="rk-btn rk-btn-quiet" onClick={()=>onOpen(resume.id)}>Resume</button>:!n&&!m.methodArchived?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:m.id,tab:'sessions'})}>New Session</a>:null}</div>
     </article></li>;})}</ul>:<StatePanel kind="filtered" title="No Method matches" action={<button type="button" className="rk-btn" onClick={()=>{setQuery('');setType('ALL');}}>Clear search</button>}><p>Your Methods are still saved. Clear the search or filter to see them.</p></StatePanel>}
-    {catalog.sessions.length>0&&<section className="rk-section" aria-labelledby="rk-sessions-h"><div className="rk-section-head"><h2 id="rk-sessions-h">Sessions</h2><a {...linkTo({screen:'sessions'})}>All Sessions</a></div>
-      <SessionTable sessions={catalog.sessions.slice(-5).reverse()} catalog={catalog} onOpen={onOpen} caption="Latest saved Sessions"/></section>}
+    {!methodsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('methods')}>{busy?'Loading…':'Load more Methods'}</button>}
+    {!sessionsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('sessions')}>{busy?'Loading…':'Load more Sessions'}</button>}
+    {catalog.sessions.length>0&&<section className="rk-section" aria-labelledby="rk-sessions-h"><div className="rk-section-head"><h2 id="rk-sessions-h">Sessions by start month</h2><a {...linkTo({screen:'sessions'})}>All Sessions</a></div>
+      <SessionTable sessions={byStartMonth(catalog.sessions).slice(0,5)} catalog={catalog} onOpen={onOpen} caption="Sessions ordered by start month"/></section>}
   </>;
 }
 
@@ -166,13 +176,29 @@ export function MethodNew({catalog,route,onSaved}){
   </>;
 }
 
-export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
-  const method=catalog.methods.find(m=>m.id===route.method);
+export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle,onLoadMore,busy=false}){
+  const listedMethod=catalog.methods.find(m=>m.id===route.method)||null;
+  const [methodAttempt,setMethodAttempt]=useState(0),[methodLookup,setMethodLookup]=useState({key:null});
+  const methodKey=`${route.method}:${methodAttempt}`;
+  useEffect(()=>{
+    if(listedMethod||!route.method||!accountTransport())return undefined;
+    let live=true;
+    api(`/methods/${encodeURIComponent(route.method)}`).then(value=>{
+      if(!live)return;
+      if(value?.artifact!=='BTL-METHOD-1'||value.method?.id!==route.method){setMethodLookup({key:methodKey,status:'error',message:'Unsupported Method response.'});return;}
+      setMethodLookup({key:methodKey,status:'ready',method:value.method});
+    },error=>{if(live)setMethodLookup({key:methodKey,status:'error',message:error.message});});
+    return()=>{live=false;};
+  },[listedMethod,route.method,methodKey]);
+  const lookedUp=methodLookup.key===methodKey?methodLookup:null;
+  const lookupState=lookedUp||(!accountTransport()?{status:'error',message:'The Method is not listed in this local workspace.'}:null);
+  const method=listedMethod|| (lookedUp?.status==='ready'?lookedUp.method:null);
   const familySummary=catalog.methodFamilies?.find(item=>item.familyId===method?.methodFamilyId||item.versions?.some(version=>version.methodId===route.method));
   const [lifecycleError,setLifecycleError]=useState('');
   const [lifecycleBusy,setLifecycleBusy]=useState(false);
   const [familyDetail,setFamilyDetail]=useState(null),[versionError,setVersionError]=useState(''),[versionBusy,setVersionBusy]=useState(false);
   const sessions=useMemo(()=>catalog.sessions.filter(s=>s.methodId===route.method),[catalog.sessions,route.method]);
+  const sessionsComplete=!productHasMore(catalog,'sessions');
   const familyId=familySummary?.familyId;
   useEffect(()=>{
     if(!familyId||!accountTransport())return;
@@ -182,7 +208,9 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     return()=>{live=false;};
   },[familyId]);
   const family=familyDetail?.familyId===familyId?familyDetail:familySummary;
-  if(!method)return <><PageHead back={{label:'My Methods',to:{screen:'methods'}}} title="Method unavailable"/><StatePanel kind="unavailable" title="This Method is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>It may belong to another workspace or account. Nothing was changed.</p></StatePanel></>;
+  if(!method)return <><PageHead back={{label:'My Methods',to:{screen:'methods'}}} title={lookupState?.status==='error'?'Method unavailable':'Loading Method…'}/>
+    {lookupState?.status==='error'?<StatePanel kind="unavailable" title="This Method could not be loaded" action={<>{accountTransport()&&<button type="button" className="rk-btn" onClick={()=>setMethodAttempt(value=>value+1)}>Retry</button>}<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a></>}><p>{lookupState.message||'It may belong to another workspace or account.'}</p></StatePanel>:<StatePanel kind="loading" title="Loading Method details"/>}
+  </>;
   const tab=route.tab;
   const newSession=<button type="button" className="rk-btn rk-btn-primary" onClick={event=>onNewSession(method.id,event)}><Icon name="plus" size={18}/><span>New Session</span></button>;
   const createVersion=family&&!family.archived?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method-new',family:family.familyId})}>Create new version</a>:null;
@@ -201,7 +229,8 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
         nextVersionCursor:result.nextCursor,versions:[...current.versions,...result.versions]}:current);
     }catch(error){setVersionError(error.message);}finally{setVersionBusy(false);}
   }
-  const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
+  const sessionCount=`${sessionsComplete?'':'≥'}${sessions.length}`;
+  const labels={overview:'Overview',sessions:`Sessions (${sessionCount})`,analytics:'Analytics',rules:'Rules'};
   return <>
     <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={family?`${kindLabel(method.kind)} · v${family.versions.find(version=>version.methodId===method.id)?.version||family.latestVersion}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
     {lifecycleError&&<p className="rk-error" role="alert">{lifecycleError}</p>}
@@ -209,17 +238,19 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     {tab==='overview'&&<div className="rk-grid-2">
       <section className="rk-card" aria-labelledby="rk-ov-h"><h2 id="rk-ov-h">At a glance</h2><dl className="rk-facts">
         <div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>
-        <div><dt>Sessions</dt><dd className="rk-num">{sessions.length}</dd></div>
+        <div><dt>Sessions{sessionsComplete?'':' loaded'}</dt><dd className="rk-num">{sessionCount}</dd></div>
         <div><dt>Data</dt><dd>{sourceLine(catalog)}</dd></div>
         <div><dt>Rules</dt><dd>{method.kind==='PROTOCOL'?`Risk ${method.riskPercent}% · R:R ${method.rr} · checklist ${method.checklistOn?'on':'off'}`:'Chosen per order'}</dd></div>
       </dl><p className="rk-note">A written hypothesis and last-used time are not recorded by the service yet.</p></section>
       <section className="rk-card" aria-labelledby="rk-ov-s"><div className="rk-section-head"><h2 id="rk-ov-s">Sessions</h2>{sessions.length>0&&<a {...linkTo({screen:'method',method:method.id,tab:'sessions'})}>See all</a>}</div>
-        {sessions.length?<ul className="rk-mini-list">{sessions.slice(-3).reverse().map(s=><li key={s.id}><span><strong>{s.name}</strong><small>{catalog.profile.instrumentId} · from {s.startPeriod} · {money(s.initialBalance)}</small></span><button type="button" className="rk-btn rk-btn-small" onClick={()=>onOpen(s.id)} aria-label={`Open replay for ${s.name}`}>Open</button></li>)}</ul>
+        {sessions.length?<ul className="rk-mini-list">{byStartMonth(sessions).slice(0,3).map(s=><li key={s.id}><span><strong>{s.name}</strong><small>{catalog.profile.instrumentId} · from {s.startPeriod} · {money(s.initialBalance)}</small></span><button type="button" className="rk-btn rk-btn-small" onClick={()=>onOpen(s.id)} aria-label={`Open replay for ${s.name}`}>Open</button></li>)}</ul>
           :<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>A Session replays this Method on one instrument from a start month, with its own balance and journal.</p></StatePanel>}
+        {!sessionsComplete&&<p className="rk-note">This list includes the Sessions loaded so far.</p>}
       </section>
     </div>}
-    {tab==='sessions'&&(sessions.length?<SessionTable sessions={sessions} catalog={catalog} onOpen={onOpen} caption={`Sessions of ${method.name}`}/>:<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>Create a Session to start replaying this Method.</p></StatePanel>)}
-    {tab==='analytics'&&<MethodAnalytics method={method} sessions={sessions}/>}
+    {tab==='sessions'&&(sessions.length?<SessionTable sessions={byStartMonth(sessions)} catalog={catalog} onOpen={onOpen} caption={`Sessions of ${method.name}`}/>:<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>Create a Session to start replaying this Method.</p></StatePanel>)}
+    {tab==='sessions'&&!sessionsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('sessions')}>{busy?'Loading…':'Load more Sessions'}</button>}
+    {tab==='analytics'&&<MethodAnalytics method={method} sessions={sessions} sessionsComplete={sessionsComplete} busy={busy} onLoadMore={onLoadMore}/>}
     {tab==='rules'&&<section className="rk-card" aria-labelledby="rk-rules-h"><h2 id="rk-rules-h">Rules</h2>
       <dl className="rk-facts"><div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>{method.kind==='PROTOCOL'&&<><div><dt>Locked risk per trade</dt><dd className="rk-num">{method.riskPercent}%</dd></div><div><dt>Locked reward : risk</dt><dd className="rk-num">{method.rr}</dd></div><div><dt>Checklist enforcement</dt><dd>{method.checklistOn?'On: orders need every condition assessed':'Off: conditions are recorded only'}</dd></div></>}</dl>
       {method.kind==='PROTOCOL'&&<><h3>Conditions</h3><ol className="rk-rule-list">{method.conditions.map(c=><li key={c.id}>{c.label}</li>)}</ol></>}
@@ -233,7 +264,7 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
   </>;
 }
 
-function MethodAnalytics({method,sessions}){
+function MethodAnalytics({method,sessions,sessionsComplete,onLoadMore,busy=false}){
   const [result,setResult]=useState({key:null});
   const [attempt,setAttempt]=useState(0);
   const key=accountTransport()?`${method.id}:${attempt}`:null;
@@ -265,18 +296,18 @@ function MethodAnalytics({method,sessions}){
       {!!state.value.excludedSessions.length&&<section className="rk-card"><h2>Excluded Sessions</h2><ul className="rk-mini-list">{state.value.excludedSessions.map(item=><li key={item.sessionId}><span><strong>{item.sessionId}</strong><small>{item.reason}</small></span></li>)}</ul></section>}
     </>}
     {sessions.length>0&&<section className="rk-card" aria-labelledby="rk-ma-sessions"><h2 id="rk-ma-sessions">Analytics per Session</h2><p className="rk-note">Each Session retains its own committed analytics and balance path.</p>
-      <ul className="rk-mini-list">{sessions.map(s=><li key={s.id}><span><strong>{s.name}</strong><small>from {s.startPeriod} · {money(s.initialBalance)} starting balance</small></span><a className="rk-btn rk-btn-small" {...linkTo({screen:'analytics',method:method.id,of:s.id})} aria-label={`Analytics for ${s.name}`}>Session analytics</a></li>)}</ul></section>}
+      <ul className="rk-mini-list">{byStartMonth(sessions).map(s=><li key={s.id}><span><strong>{s.name}</strong><small>from {s.startPeriod} · {money(s.initialBalance)} starting balance</small></span><a className="rk-btn rk-btn-small" {...linkTo({screen:'analytics',method:method.id,of:s.id})} aria-label={`Analytics for ${s.name}`}>Session analytics</a></li>)}</ul>
+      {!sessionsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('sessions')}>{busy?'Loading…':'Load more Sessions'}</button>}</section>}
   </div>;
 }
 
-export function Analytics({catalog,route}){
-  const methodId=route.method||catalog.sessions.find(s=>s.id===route.analyticsSession)?.methodId||'';
-  const sessions=catalog.sessions.filter(s=>!methodId||s.methodId===methodId);
+export function Analytics({catalog,route,onLoadMore,busy=false}){
   const sessionId=route.analyticsSession;
-  const session=catalog.sessions.find(s=>s.id===sessionId);
+  const listedSession=catalog.sessions.find(s=>s.id===sessionId)||null;
+  const sessionsComplete=!productHasMore(catalog,'sessions');
   const [result,setResult]=useState({key:null});
   const [attempt,setAttempt]=useState(0);
-  const key=session?`${session.id}:${attempt}`:null;
+  const key=sessionId?`${sessionId}:${attempt}`:null;
   useEffect(()=>{
     if(!key)return;
     let live=true;
@@ -284,16 +315,22 @@ export function Analytics({catalog,route}){
     return()=>{live=false;};
   },[key]);
   const state=result.key===key?result:{status:'loading'};
+  const session=listedSession||(state.status==='ready'?{...state.view.metadata,methodId:state.view.method.id}:null);
+  const methodId=route.method||session?.methodId||'';
+  const sessions=catalog.sessions.filter(s=>!methodId||s.methodId===methodId);
   const pick=next=>navigate({screen:'analytics',...next});
   return <>
     <PageHead eyebrow="Analytics" title="Research analytics" lead="Pick a Method and a Session. Statistics come from committed positions only."/>
     <div className="rk-toolbar" role="group" aria-label="Analytics scope">
       <label className="rk-select">Method<select value={methodId} onChange={e=>pick({method:e.target.value||undefined})}><option value="">All Methods</option>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-      <label className="rk-select">Session<select value={session?.id||''} onChange={e=>pick({method:methodId||undefined,of:e.target.value||undefined})}><option value="">Choose a Session</option>{sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <label className="rk-select">Session<select value={session?.id||''} onChange={e=>pick({method:methodId||undefined,of:e.target.value||undefined})}><option value="">Choose a Session</option>{session&&!listedSession&&<option value={session.id}>{session.name}</option>}{sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
       {methodId&&<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:methodId,tab:'analytics'})}>Method analytics</a>}
     </div>
-    {!catalog.sessions.length?<StatePanel kind="empty" title="No Sessions to analyse" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Analytics appear after you create a Session and close at least one position.</p></StatePanel>
-      :!session?<StatePanel kind="empty" title={sessionId?'This Session is not in this workspace':'Choose a Session'}><p>{sessionId?'It may belong to another workspace. Pick one from the list.':'Session analytics show one Session at a time, so independent balances are never mixed.'}</p></StatePanel>
+    {catalog.productPagination?.methods?.complete===false&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('methods')}>{busy?'Loading…':'Load more Methods'}</button>}
+    {!sessionsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('sessions')}>{busy?'Loading…':'Load more Sessions'}</button>}
+    {!catalog.sessions.length&&!sessionId?<StatePanel kind="empty" title="No Sessions to analyse" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Analytics appear after you create a Session and close at least one position.</p></StatePanel>
+      :!session&&state.status==='loading'?<StatePanel kind="loading" title="Loading committed analytics."/>
+      :!session?<StatePanel kind="empty" title={sessionId?(sessionsComplete?'This Session is not in this workspace':'Load more Sessions to find it'):'Choose a Session'}><p>{sessionId?(sessionsComplete?'It may belong to another workspace. Pick one from the list.':'This Session is not in the pages loaded so far. Load another page, then choose it from the list.'):'Session analytics show one Session at a time, so independent balances are never mixed.'}</p></StatePanel>
       :state.status==='loading'?<StatePanel kind="loading" title="Loading committed analytics…"/>
       :state.status==='error'?<StatePanel kind="error" title="Analytics could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message} Nothing was changed.</p></StatePanel>
       :<SessionAnalytics view={state.view} catalog={catalog}/>}
@@ -324,7 +361,10 @@ function SessionAnalytics({view,catalog}){
 }
 
 // Replay tab without a Session (Help and Account moved to AlphaHelp.jsx in CP4).
-export function Placeholder({catalog,onOpen}){
+export function Placeholder({catalog,onOpen,onLoadMore,busy=false}){
+  const sessionsComplete=!productHasMore(catalog,'sessions');
   return <><PageHead eyebrow="Replay" title="Replay needs a Session" lead="Pick a Session to continue from its saved replay time, or open a Method to start a new one."/>
-    {catalog.sessions.length?<SessionTable sessions={catalog.sessions.slice().reverse()} catalog={catalog} onOpen={onOpen} caption="Sessions you can replay"/>:<StatePanel kind="empty" title="No Sessions yet" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Create a Method, then a Session inside it.</p></StatePanel>}</>;
+    {catalog.sessions.length?<SessionTable sessions={byStartMonth(catalog.sessions)} catalog={catalog} onOpen={onOpen} caption="Sessions ordered by start month"/>:<StatePanel kind="empty" title="No Sessions yet" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Create a Method, then a Session inside it.</p></StatePanel>}
+    {!sessionsComplete&&<button type="button" className="rk-btn rk-btn-quiet" disabled={!onLoadMore||busy} onClick={()=>onLoadMore?.('sessions')}>{busy?'Loading…':'Load more Sessions'}</button>}
+  </>;
 }
