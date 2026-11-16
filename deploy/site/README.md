@@ -12,6 +12,11 @@ Only the static build of `frontend/` (`npm run build:release` output) from `~/si
 2. Open inbound TCP 80 and 443: in the VPS provider's firewall/security-group panel, and in `ufw` only if it is active (`sudo ufw status`; `sudo ufw allow 80,443/tcp`). SSH rules stay untouched.
 3. (Optional) put an email for certificate-expiry notices in `~/.config/riksora-site.env` as `ACME_EMAIL=...` and add `email {$ACME_EMAIL}` to the Caddyfile global block.
 
+## Lessons from the first start (2026-11-16)
+- `NoNewPrivileges=true` AND `PrivateTmp=true` (and the other sandboxing options) in a **user** unit imply `no_new_privs`, which stops the `setcap` file capability from letting Caddy bind 80/443 (`bind: permission denied`). The unit therefore uses neither.
+- With `setcap` done, ufw open for 80,443 and DNS pointing here, Caddy obtained the Let's Encrypt certificates for `riksora.com` and `www.riksora.com` on its first start. `~/site/dist` currently holds a neutral holding page (noindex) until the real build replaces it.
+- If the Caddy binary is replaced, run the `setcap` command again (capabilities are lost on replacement).
+
 ## Start (agent or owner, no root)
 ```
 mkdir -p ~/.config/systemd/user ~/site

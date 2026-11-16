@@ -14,7 +14,7 @@ ExecReload=%h/tools/caddy/caddy reload --config %h/projects/Back-test-lab-projec
 Restart=on-failure
 RestartSec=5
 # NoNewPrivileges is deliberately NOT set: it would stop the file capability (setcap cap_net_bind_service) from letting Caddy bind ports 80/443.
-PrivateTmp=true
+# PrivateTmp and the other sandboxing options are deliberately NOT used: in a user unit they imply no_new_privs, which also blocks the file capability.
 
 [Install]
 WantedBy=default.target
