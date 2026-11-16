@@ -1,0 +1,60 @@
+/* Public marketing and legal pages. Uses the existing brand tokens (riksoraBrand.css); mobile first; focus and contrast follow the product pages. */
+.site{min-height:100vh;background:var(--rk-soft,#f3f8ff);color:var(--rk-ink,#061a3c);font-family:var(--rk-font-ui);line-height:1.6}
+.site *{box-sizing:border-box}
+.site a{color:var(--rk-blue-strong,#0f67d8)}
+.site a:focus-visible,.site summary:focus-visible{outline:3px solid var(--rk-yellow,#ffce55);outline-offset:2px;border-radius:6px}
+.site-skip{position:absolute;left:-999px;top:8px;background:#fff;padding:8px 12px;border-radius:8px;z-index:20}
+.site-skip:focus{left:8px}
+.site-nav{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:12px 20px;background:var(--rk-navy,#061a3c);color:#fff;position:sticky;top:0;z-index:10}
+.site-nav a{color:#fff;text-decoration:none}
+.site-brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em}
+.site-brand small{display:block;font-size:.62rem;letter-spacing:.14em;color:var(--rk-muted-on-navy,#c3d6f2);font-weight:600}
+.site-nav nav{display:flex;flex-wrap:wrap;gap:6px 18px;margin-inline:auto}
+.site-nav nav a{padding:6px 2px;border-bottom:2px solid transparent}
+.site-nav nav a[aria-current=page]{border-color:var(--rk-yellow,#ffce55)}
+.site-nav-actions{display:flex;align-items:center;gap:12px}
+.site-lang{font-size:.9rem;color:var(--rk-muted-on-navy,#c3d6f2)!important}
+.site-pill,.site-primary{display:inline-block;background:var(--rk-yellow,#ffce55);color:var(--rk-navy,#061a3c)!important;font-weight:800;text-decoration:none;padding:10px 18px;border-radius:999px}
+.site-secondary{display:inline-block;border:2px solid var(--rk-blue-strong,#0f67d8);color:var(--rk-blue-strong,#0f67d8)!important;font-weight:700;text-decoration:none;padding:8px 18px;border-radius:999px;background:#fff}
+.site-hero{padding:56px 20px 40px;max-width:980px;margin:0 auto}
+.site-badge{display:inline-block;background:var(--rk-ice,#d9eafe);color:var(--rk-navy,#061a3c);font-weight:700;border-radius:999px;padding:4px 14px;margin:0 0 16px}
+.site-hero h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.1;margin:0 0 16px;color:var(--rk-navy,#061a3c)}
+.site-lead{font-size:1.15rem;color:var(--rk-muted-on-white,#4a5b75);max-width:720px}
+.site-actions{display:flex;flex-wrap:wrap;gap:12px;margin:24px 0 12px}
+.site-fine{font-size:.85rem;color:var(--rk-muted-on-white,#4a5b75)}
+.site-section{padding:40px 20px;max-width:980px;margin:0 auto}
+.site-alt{max-width:none;background:#fff;border-block:1px solid var(--rk-line-card,#d9eafe)}
+.site-alt>*{max-width:940px;margin-inline:auto}
+.site h2{font-size:1.6rem;margin:0 0 12px;color:var(--rk-navy,#061a3c)}
+.site h3{margin:0 0 6px;font-size:1.1rem}
+.site-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:16px}
+.site-grid article,.site-plan{background:var(--rk-soft,#f3f8ff);border:1px solid var(--rk-line-card,#d9eafe);border-radius:16px;padding:18px}
+.site-steps{list-style:none;padding:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.site-steps li{background:#fff;border:1px solid var(--rk-line-card,#d9eafe);border-radius:16px;padding:18px}
+.site-steps span{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--rk-blue,#1378f5);color:#fff;font-weight:800;margin-bottom:8px}
+.site-plans{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin:16px 0}
+.site-plan{background:#fff}
+.site-plan-pro{border:2px solid var(--rk-blue,#1378f5)}
+.site-price{font-size:1.9rem;font-weight:800;margin:4px 0 12px}
+.site-price small{font-size:.9rem;font-weight:600;color:var(--rk-muted-on-white,#4a5b75)}
+.site-pending{font-size:1.1rem;color:var(--rk-muted-on-white,#4a5b75)}
+.site-plan ul,.site-list{padding-left:20px}
+.site-plan li,.site-list li{margin:6px 0}
+.site details{background:var(--rk-soft,#f3f8ff);border:1px solid var(--rk-line-card,#d9eafe);border-radius:12px;padding:12px 16px;margin:10px 0}
+.site summary{cursor:pointer;font-weight:700}
+.site-page{max-width:820px;margin:0 auto;padding:40px 20px 56px}
+.site-page h1{font-size:2rem;margin:0 0 12px}
+.site-facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px}
+.site-facts dt{font-weight:700}
+.site-facts dd{margin:0}
+.site-draft{background:#fff3d1;border:1px solid #e6c36a;border-radius:10px;padding:10px 14px;color:#4b3a00}
+.site-legal section{margin-top:20px}
+.site-link{font-weight:700}
+.site-footer{background:var(--rk-navy,#061a3c);color:var(--rk-text-soft-on-navy,#e6edf7);padding:28px 20px;font-size:.92rem}
+.site-footer a{color:#fff}
+.site-footer-grid{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;max-width:980px;margin:0 auto 14px}
+.site-footer-grid>div{display:flex;flex-direction:column;gap:2px}
+.site-footer nav{display:flex;flex-direction:column;gap:4px}
+.site-footer p{max-width:980px;margin:6px auto;color:var(--rk-muted-on-navy,#c3d6f2)}
+@media (max-width:640px){.site-nav nav{order:3;width:100%;margin:0}.site-facts{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:no-preference){.site-pill,.site-primary,.site-secondary{transition:transform .15s}.site-pill:hover,.site-primary:hover,.site-secondary:hover{transform:translateY(-1px)}}

@@ -91,7 +91,7 @@ const superseded=replacing.load('slow',base.report);
 assert.equal((await replacing.load(base.artifact,base.report)).report.status,base.status);
 slowFinish(bytes(base.artifact));await assert.rejects(()=>superseded,{name:'AbortError'});
 assert.equal(entryRoute({hostname:'localhost',search:'?tick-review=local'}),'review');
-assert.equal(entryRoute({hostname:'research.example',search:'?tick-review=local'}),'hosted-home');
+assert.equal(entryRoute({hostname:'research.example',search:'?tick-review=local'}),'site');
 for(const file of ['ReviewImport.js','LocalTickReview.jsx','TickReviewEntry.jsx']){
   const source=readFileSync(new URL('../src/tickReview/'+file,import.meta.url),'utf8');
   assert(!/from ['"].*(?:trading\/|market\/|drawings\/)/.test(source));

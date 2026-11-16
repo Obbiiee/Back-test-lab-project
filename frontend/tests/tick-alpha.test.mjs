@@ -403,7 +403,7 @@ assert.equal(entryRoute({hostname:'127.0.0.1',search:'?legacy=local'}),'legacy')
 assert.equal(entryRoute({hostname:'[::1]',search:'?tick-alpha=exness'}),'workspace');
 for(const search of ['', '?legacy=local', '?tick-alpha=local', '?tick-alpha=exness',
   '?tick-review=local', '?trading-ux=prototype']){
-  assert.equal(entryRoute({hostname:'research.example',search}),'hosted-home',search);
+  assert.equal(entryRoute({hostname:'research.example',search}),'site',search);
 }
 assert.equal(entryRoute({hostname:'research.example',
   search:'?page=account&session=saved&legacy=local'}),'account');

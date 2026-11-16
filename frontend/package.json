@@ -59,7 +59,10 @@
     "test:note-drafts": "node tests/note-drafts.test.mjs",
     "test:confirm-outcome": "node tests/confirm-outcome.test.mjs",
     "test:indicator-window": "node tests/indicator-window.test.mjs",
-    "test:indicator-cap": "node tests/indicator-cap.test.mjs"
+    "test:indicator-cap": "node tests/indicator-cap.test.mjs",
+    "test:site": "node tests/site-content.test.mjs",
+    "verify:site": "node scripts/verify-site-config.mjs",
+    "build:release": "node scripts/verify-site-config.mjs --release && vite build"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
