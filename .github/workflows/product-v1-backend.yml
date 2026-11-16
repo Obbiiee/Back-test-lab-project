@@ -23,7 +23,7 @@ permissions:
 jobs:
   backend-contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -110,3 +110,22 @@ jobs:
         run: >-
           python -m unittest -v
           tests.test_functional_journey.FunctionalJourneyTests.test_single_instrument_product_v1_login_trade_journal_analytics_resume
+      - name: Install PostgreSQL 16 client for native recovery tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client-16
+      - name: Run full backend discovery in a fresh database
+        timeout-minutes: 35
+        working-directory: backend
+        env:
+          BTL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/btl_v1_full
+          BTL_PG_BIN: /usr/lib/postgresql/16/bin
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+          admin = psycopg.conninfo.make_conninfo(os.environ['BTL_TEST_DATABASE_URL'], dbname='postgres')
+          with psycopg.connect(admin, autocommit=True) as db:
+              db.execute('CREATE DATABASE btl_v1_full')
+          PY
+          python -B -m unittest discover -s tests -v
