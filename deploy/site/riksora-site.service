@@ -1,0 +1,20 @@
+# systemd USER unit (the developer user has lingering enabled, so it survives logout and reboots of the session manager).
+# Install:  mkdir -p ~/.config/systemd/user && cp riksora-site.service ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now riksora-site
+[Unit]
+Description=riksora.com static site (Caddy)
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=SITE_ROOT=%h/site/dist
+Environment=SITE_LOG=%h/site/access.log
+EnvironmentFile=-%h/.config/riksora-site.env
+ExecStart=%h/tools/caddy/caddy run --config %h/projects/Back-test-lab-project/deploy/site/Caddyfile --adapter caddyfile
+ExecReload=%h/tools/caddy/caddy reload --config %h/projects/Back-test-lab-project/deploy/site/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
