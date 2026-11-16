@@ -34,7 +34,7 @@ import './tickAlpha.css';
 import './alphaReplayStrip.css';
 import {isAccountPage} from './accountClient.js';
 
-const initialPlan=view=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:view?.quote?.ask??'2000',sl:view?.replayStepNs?'':'1998',tp:view?.replayStepNs?'':'2004',
+const initialPlan=view=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:view?.quote?.ask??'',sl:'',tp:'',
   quantity:'0.1',riskPercent:'1',observations:[]});
 
 export default function TickAlpha(){

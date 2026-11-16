@@ -31,7 +31,7 @@ export default function AlphaShell({route,label,children}){
     </aside>
     <div className="rk-main" id="rk-main">{children}</div>
     <nav className="rk-tabbar" aria-label="App sections">
-      {PHONE.map(([key,text,icon])=><a key={key} aria-current={active(route,key)?'page':undefined} {...linkTo({screen:key})}><Icon name={icon}/><span>{text}</span></a>)}
+      {PHONE.map(([key,text,icon])=>{const needsSession=key==='replay'&&!route.session;const destination=needsSession?{screen:'sessions'}:{screen:key};return <a key={key} aria-current={active(route,key)?'page':undefined} aria-label={needsSession?'Choose a Session to replay':text} title={needsSession?'Choose a saved Session to replay':undefined} {...linkTo(destination)}><Icon name={icon}/><span>{text}</span></a>;})}
       <a aria-current={route.screen==='account'?'page':undefined} {...accountLink()}><Icon name="smile"/><span>Account</span></a>
     </nav>
   </div>;
