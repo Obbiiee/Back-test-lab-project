@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   backend-contracts:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
@@ -119,6 +119,7 @@ jobs:
         working-directory: backend
         env:
           BTL_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/btl_v1_full
+          BTL_MIGRATION_RECONCILIATION_DSN: postgresql://postgres:postgres@127.0.0.1:5432/btl_v1_migration
           BTL_PG_BIN: /usr/lib/postgresql/16/bin
         run: |
           python - <<'PY'
@@ -127,5 +128,6 @@ jobs:
           admin = psycopg.conninfo.make_conninfo(os.environ['BTL_TEST_DATABASE_URL'], dbname='postgres')
           with psycopg.connect(admin, autocommit=True) as db:
               db.execute('CREATE DATABASE btl_v1_full')
+              db.execute('CREATE DATABASE btl_v1_migration')
           PY
           python -B -m unittest discover -s tests -v
