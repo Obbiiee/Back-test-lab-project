@@ -1,5 +1,12 @@
 # RIKSORA V1 — frozen-architecture integration register
 
+## Product frontend links and Method Session pages — 2026-11-16
+
+- Session overview, Journal and Analytics resolve direct links outside the first catalog page. Sign-in restores the selected Session ID. The last Session can be resumed from My Methods even when absent from the catalog page.
+- Hosted Method details, version creation and the New Session wizard read the requested Method or family by ID. A missing or archived family cannot open the version editor as a new Method. Revision changes between family and version reads are refused.
+- The hosted Method Sessions tab requests at most 50 rows per page for the selected immutable Method version and does not present the catalog preview as a full list. Method Analytics uses the server's included count and labels truncated exclusion details.
+- PASS: focused product pages, Analytics pages and Tick Alpha regressions, ESLint for changed files, and Vite production build. Desktop 1440 px and phone 375 px Edge checks exercised direct Session, Journal and Analytics links, scoped refusal, HTTPS sign-in and return to a linked Session, Method and family lookup, the New Session wizard, and navigation to a second Method Session page with synthetic API responses. Real PostgreSQL/worker and complete frontend design acceptance are NOT RUN for these changes.
+
 ## Owner Commercial V1 acceptance target — 2026-11-13
 
 The explicit capacity, performance, correctness, market-rights, billing, backup and GO/HOLD acceptance gates are in [RIKSORA Commercial V1 — Capacity Target & Definition of Done](RIKSORA-COMMERCIAL-V1-TARGETS.md). Target: **20 simultaneous active traders**, four planned worker slots on a 6-vCPU/16-GiB VPS, **five active traders per worker as a planning ratio only**, and two reproducible 60-minute financial-active cohorts. This is **NOT TESTED/NOT ACCEPTED** as a VPS or commercial capacity claim; older functional ten-browser PASS and local engine-only results do not meet this gate. Continue using this integration register for implementation evidence and AI_CONTEXT for operational authorization.

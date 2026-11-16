@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {loadProductCatalog,loadMoreProductCatalog,loadJournalPage,createMethodVersion,setMethodArchived,
-  loadMethodFamily,loadMethodFamilyRecord,loadMethodRecord,loadMethodVersionPage,loadSessionWithMetadata} from '../src/tickAlpha/client.js';
+  loadMethodFamily,loadMethodFamilyRecord,loadMethodRecord,loadMethodSessionPage,loadMethodVersionPage,loadSessionWithMetadata} from '../src/tickAlpha/client.js';
 import {setAccountTransport,clearAccountTransport} from '../src/tickAlpha/accountClient.js';
 import {readRoute,routeHref} from '../src/tickAlpha/productRoute.js';
 
@@ -51,6 +51,15 @@ const client={subject:()=>subject,request:async (path,options={})=>{
   if(path.endsWith('/sessions?limit=50'))return {schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',
     items:[{metadata:{id:'session:one',name:'Synthetic QA',methodId:'method:000',startPeriod:'2020-01',initialBalance:'10000'},
       revision:4,financialCountsStatus:'NOT_COMPUTED_ON_LIST'}],complete:true,nextCursor:null};
+  if(path.endsWith('/sessions?methodId=method%3A050&limit=50'))return {
+    schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',items:[{metadata:{id:'session:linked',methodId:'method:050'}}],
+    complete:false,nextCursor:'session:linked'};
+  if(path.endsWith('/sessions?methodId=method%3A050&limit=50&after=session%3Alinked'))return {
+    schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',items:[{metadata:{id:'session:older',methodId:'method:050'}}],
+    complete:true,nextCursor:null};
+  if(path.endsWith('/sessions?methodId=method%3Amismatch&limit=50'))return {
+    schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',items:[{metadata:{id:'session:linked',methodId:'method:050'}}],
+    complete:true,nextCursor:null};
   if(path.endsWith('/sessions/session%3Alinked')||path.endsWith('/sessions/session%3Alinked/view')){
     const analytics=path.endsWith('/view');
     assert.equal(options.method,analytics?'POST':'GET');
@@ -100,6 +109,12 @@ try{
   assert.equal(linked.metadata.name,'Outside the first page');
   const analytics=await loadSessionWithMetadata('session:linked',{analytics:true});
   assert.equal(analytics.analysis.status,'COMPLETE');
+  const methodSessions=await loadMethodSessionPage('method:050');
+  assert.equal(methodSessions.items[0].id,'session:linked');
+  const following=await loadMethodSessionPage('method:050',methodSessions.nextCursor);
+  assert.equal(following.items[0].id,'session:older');
+  assert.equal(following.complete,true);
+  await assert.rejects(loadMethodSessionPage('method:mismatch'),/invalid Session page/);
   await assert.rejects(loadSessionWithMetadata('session:mismatch'),/invalid Session/);
   await assert.rejects(loadSessionWithMetadata('session:private'),{status:404});
   await assert.rejects(loadJournalPage('session:mismatch'),/Unsupported Journal page/);

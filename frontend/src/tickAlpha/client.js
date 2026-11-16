@@ -252,14 +252,30 @@ export function command(view,kind,payload){
     commandId:id('command'),expectedRevision:view.state.revision,kind,payload};
 }
 
-async function productPage(path,artifact,after=null,project=value=>value){
+async function productPage(path,artifact,after=null,project=value=>value,{signal}={}){
   const query=new URLSearchParams({limit:'50'});if(after)query.set('after',after);
-  const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`);
+  const page=await api(`${path}${path.includes('?')?'&':'?'}${query}`,undefined,{signal});
   if(page.artifact!==artifact||!Array.isArray(page.items)||typeof page.complete!=='boolean')
     throw Error('Unsupported workspace page; no state was imported.');
   if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===after))
     throw Error('Workspace pagination did not advance.');
   return {...page,items:page.items.map(project)};
+}
+
+export async function loadMethodSessionPage(methodId,after=null,{signal}={}){
+  if(!accountTransport())throw Error('Sign in to view Sessions for this Method.');
+  const page=await productPage(`/sessions?${new URLSearchParams({methodId})}`,'BTL-SESSION-PAGE-1',after,
+    item=>item?.metadata,{signal});
+  const seen=new Set(after===null?[]:[after]);
+  if(page.items.length>50)throw Error('The service returned too many Sessions.');
+  for(const item of page.items){
+    if(item?.methodId!==methodId||typeof item.id!=='string'||!item.id||seen.has(item.id))
+      throw Error('The service returned an invalid Session page for this Method.');
+    seen.add(item.id);
+  }
+  if(page.complete?page.nextCursor!==null:!page.items.length||page.nextCursor!==page.items.at(-1).id)
+    throw Error('The service returned an invalid Session page cursor.');
+  return page;
 }
 
 export async function loadProductCatalog(){

@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
 import {api,id,sourceContext,createMethodVersion,setMethodArchived,
-  loadMethodFamily,loadMethodVersionPage} from './client.js';
+  loadMethodFamily,loadMethodSessionPage,loadMethodVersionPage,noticeText} from './client.js';
 import {money,kindLabel,utc,lastSession,useMethodFamilyRead,useMethodRead,useSessionRead} from './productData.js';
 import {linkTo,navigate,METHOD_TABS} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
@@ -228,7 +228,9 @@ function MethodDetails({method,catalog,route,onOpen,onNewSession,onLifecycle}){
         nextVersionCursor:result.nextCursor,versions:[...current.versions,...result.versions]}:current);
     }catch(error){setVersionError(error.message);}finally{setVersionBusy(false);}
   }
-  const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
+  const hosted=Boolean(accountTransport());
+  const labels={overview:'Overview',sessions:hosted?'Sessions':`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
+  const sessionLink={screen:'method',method:method.id,tab:'sessions'};
   return <>
     <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={version?`${kindLabel(method.kind)} · v${version}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
     {lifecycleError&&<p className="rk-error" role="alert">{lifecycleError}</p>}
@@ -236,16 +238,17 @@ function MethodDetails({method,catalog,route,onOpen,onNewSession,onLifecycle}){
     {tab==='overview'&&<div className="rk-grid-2">
       <section className="rk-card" aria-labelledby="rk-ov-h"><h2 id="rk-ov-h">At a glance</h2><dl className="rk-facts">
         <div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>
-        <div><dt>Sessions</dt><dd className="rk-num">{sessions.length}</dd></div>
+        <div><dt>Sessions</dt><dd>{hosted?<a {...linkTo(sessionLink)}>View Sessions</a>:sessions.length}</dd></div>
         <div><dt>Data</dt><dd>{sourceLine(catalog)}</dd></div>
         <div><dt>Rules</dt><dd>{method.kind==='PROTOCOL'?`Risk ${method.riskPercent}% · R:R ${method.rr} · checklist ${method.checklistOn?'on':'off'}`:'Chosen per order'}</dd></div>
       </dl><p className="rk-note">A written hypothesis and last-used time are not recorded by the service yet.</p></section>
-      <section className="rk-card" aria-labelledby="rk-ov-s"><div className="rk-section-head"><h2 id="rk-ov-s">Sessions</h2>{sessions.length>0&&<a {...linkTo({screen:'method',method:method.id,tab:'sessions'})}>See all</a>}</div>
+      <section className="rk-card" aria-labelledby="rk-ov-s"><div className="rk-section-head"><h2 id="rk-ov-s">Sessions</h2>{(hosted||sessions.length>0)&&<a {...linkTo(sessionLink)}>See all</a>}</div>
         {sessions.length?<ul className="rk-mini-list">{sessions.slice(-3).reverse().map(s=><li key={s.id}><span><strong>{s.name}</strong><small>{catalog.profile.instrumentId} · from {s.startPeriod} · {money(s.initialBalance)}</small></span><button type="button" className="rk-btn rk-btn-small" onClick={()=>onOpen(s.id)} aria-label={`Open replay for ${s.name}`}>Open</button></li>)}</ul>
-          :<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>A Session replays this Method on one instrument from a start month, with its own balance and journal.</p></StatePanel>}
+          :hosted?<p className="rk-note">Review the saved Sessions for this Method version.</p>
+          :<StatePanel kind="empty" title="No Sessions yet" action={!family?.archived&&newSession}><p>A Session replays this Method on one instrument from a start month, with its own balance and journal.</p></StatePanel>}
       </section>
     </div>}
-    {tab==='sessions'&&(sessions.length?<SessionTable sessions={sessions} catalog={catalog} onOpen={onOpen} caption={`Sessions of ${method.name}`}/>:<StatePanel kind="empty" title="No Sessions yet" action={newSession}><p>Create a Session to start replaying this Method.</p></StatePanel>)}
+    {tab==='sessions'&&<MethodSessions method={method} catalog={catalog} localSessions={sessions} onOpen={onOpen} emptyAction={!family?.archived&&newSession}/>}
     {tab==='analytics'&&<MethodAnalytics method={method} sessions={sessions}/>}
     {tab==='rules'&&<section className="rk-card" aria-labelledby="rk-rules-h"><h2 id="rk-rules-h">Rules</h2>
       <dl className="rk-facts"><div><dt>Type</dt><dd>{kindLabel(method.kind)}</dd></div>{method.kind==='PROTOCOL'&&<><div><dt>Locked risk per trade</dt><dd className="rk-num">{method.riskPercent}%</dd></div><div><dt>Locked reward : risk</dt><dd className="rk-num">{method.rr}</dd></div><div><dt>Checklist enforcement</dt><dd>{method.checklistOn?'On: orders need every condition assessed':'Off: conditions are recorded only'}</dd></div></>}</dl>
@@ -257,6 +260,35 @@ function MethodDetails({method,catalog,route,onOpen,onNewSession,onLifecycle}){
       <details className="rk-provenance"><summary>Provenance</summary><dl className="rk-facts"><div><dt>Method id</dt><dd><code>{method.id}</code></dd></div>{sessions[0]&&<div><dt>Rule hash (pinned by Sessions)</dt><dd><code>{sessions[0].methodHash}</code></dd></div>}</dl></details>
       <p className="rk-note">Rules stay fixed after saving so earlier evidence keeps its meaning. {family?`Family ${family.familyId} · revision ${family.revision} · ${family.versions.length} immutable version${family.versions.length===1?'':'s'}.`:'Local Methods are immutable.'}</p>
     </section>}
+  </>;
+}
+
+function MethodSessions({method,catalog,localSessions,onOpen,emptyAction}){
+  const hosted=Boolean(accountTransport());
+  const [after,setAfter]=useState(null);
+  const [attempt,setAttempt]=useState(0);
+  const [result,setResult]=useState(null);
+  useEffect(()=>{
+    if(!hosted)return;
+    const controller=new AbortController();
+    loadMethodSessionPage(method.id,after,{signal:controller.signal}).then(
+      page=>{if(!controller.signal.aborted)setResult({after,attempt,page});},
+      error=>{if(!controller.signal.aborted)setResult({after,attempt,error:noticeText(error.message)});},
+    );
+    return()=>controller.abort();
+  },[after,attempt,hosted,method.id]);
+  const current=result?.after===after&&result.attempt===attempt?result:null;
+  if(hosted&&!current)return <StatePanel kind="loading" title="Loading Sessions for this Method…"/>;
+  if(hosted&&current.error)return <StatePanel kind="error" title="Sessions could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{current.error}</p></StatePanel>;
+  const page=current?.page;
+  const sessions=hosted?page.items:localSessions;
+  return <>
+    {sessions.length?<SessionTable sessions={sessions} catalog={catalog} onOpen={onOpen} caption={`Sessions of ${method.name}`}/>
+      :<StatePanel kind="empty" title={after?'No more Sessions':'No Sessions yet'} action={!after&&emptyAction}/>}
+    {hosted&&(after||!page.complete)&&<nav className="rk-form-actions" aria-label="Method Session pages">
+      {after&&<button type="button" className="rk-btn" onClick={()=>setAfter(null)}>First page</button>}
+      {!page.complete&&<button type="button" className="rk-btn" onClick={()=>setAfter(page.nextCursor)}>Next page</button>}
+    </nav>}
   </>;
 }
 
@@ -279,7 +311,7 @@ function MethodAnalytics({method,sessions}){
     {state.status==='ready'&&state.value.status!=='COMPLETE'&&<StatePanel kind="unavailable" title="Method analytics is unavailable"><p>{state.value.reason??'No complete compatible Session projection is available.'} No partial aggregate is shown.</p></StatePanel>}
     {state.status==='ready'&&state.value.status==='COMPLETE'&&<>
       <section className="rk-card" aria-labelledby="rk-ma-h"><h2 id="rk-ma-h">Committed position results</h2>
-        <p className="rk-note">Pooled completed positions from {state.value.includedSessions.length} compatible Sessions. Account balances and equity curves remain separate.</p>
+        <p className="rk-note">Pooled completed positions from {state.value.includedSessionCount??state.value.includedSessions.length} compatible Sessions. Account balances and equity curves remain separate.</p>
         <dl className="rk-metrics" aria-label="Pooled Method results">
           <div><dt>Completed positions</dt><dd className="rk-num">{state.value.metrics.tradeCount}</dd></div>
           <div><dt>Trade net ({state.value.accountCurrency||'currency unavailable'})</dt><dd className="rk-num">{state.value.completedTradeNet}</dd></div>
@@ -289,9 +321,10 @@ function MethodAnalytics({method,sessions}){
           <div><dt>Mean R</dt><dd className="rk-num">{ratioLabel(state.value.metrics.averageR)}</dd><dd className="rk-sub">{state.value.metrics.rEligible} eligible · {state.value.metrics.rExcluded} excluded</dd></div>
         </dl>
       </section>
-      {!!state.value.excludedSessions.length&&<section className="rk-card"><h2>Excluded Sessions</h2><ul className="rk-mini-list">{state.value.excludedSessions.map(item=><li key={item.sessionId}><span><strong>{item.sessionId}</strong><small>{item.reason}</small></span></li>)}</ul></section>}
+      {!!state.value.excludedSessions.length&&<section className="rk-card"><h2>Excluded Sessions</h2>{state.value.excludedSessionsTruncated&&<p className="rk-note">Showing {state.value.excludedSessions.length} of {state.value.excludedSessionCount} excluded Sessions.</p>}<ul className="rk-mini-list">{state.value.excludedSessions.map(item=><li key={item.sessionId}><span><strong>{item.sessionId}</strong><small>{item.reason}</small></span></li>)}</ul></section>}
     </>}
-    {sessions.length>0&&<section className="rk-card" aria-labelledby="rk-ma-sessions"><h2 id="rk-ma-sessions">Analytics per Session</h2><p className="rk-note">Each Session retains its own committed analytics and balance path.</p>
+    {(key||sessions.length>0)&&<section className="rk-card" aria-labelledby="rk-ma-sessions"><h2 id="rk-ma-sessions">Analytics per Session</h2><p className="rk-note">Each Session retains its own committed analytics and balance path.</p>
+      {key&&<a className="rk-btn rk-btn-small" {...linkTo({screen:'method',method:method.id,tab:'sessions'})}>Browse all Sessions for this Method</a>}
       <ul className="rk-mini-list">{sessions.map(s=><li key={s.id}><span><strong>{s.name}</strong><small>from {s.startPeriod} · {money(s.initialBalance)} starting balance</small></span><a className="rk-btn rk-btn-small" {...linkTo({screen:'analytics',method:method.id,of:s.id})} aria-label={`Analytics for ${s.name}`}>Session analytics</a></li>)}</ul></section>}
   </div>;
 }
