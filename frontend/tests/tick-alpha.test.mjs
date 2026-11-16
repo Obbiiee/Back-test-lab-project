@@ -479,7 +479,8 @@ assert.ok(ui.includes("api('/sessions',{id:creationId.current"),'Session creatio
 assert.ok(ui.includes("dialog==='ticket'"));
 assert.ok(ui.includes("+'/jump-next-event'"));
 assert.ok(ui.includes("artifact:'BTL-JUMP-NEXT-EVENT-1'"));
-const workspaceUi=readFileSync(new URL('../src/tickAlpha/AlphaWorkspace.jsx',import.meta.url),'utf8');
+// The replay controls moved out of the workspace file into AlphaReplayControls; the contract checks cover both.
+const workspaceUi=readFileSync(new URL('../src/tickAlpha/AlphaWorkspace.jsx',import.meta.url),'utf8')+readFileSync(new URL('../src/tickAlpha/AlphaReplayControls.jsx',import.meta.url),'utf8');
 assert.ok(workspaceUi.includes('Jump to Next Event')&&workspaceUi.includes('Cancel search'));
 assert.ok(workspaceUi.includes('role="status" aria-live="polite"'));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
