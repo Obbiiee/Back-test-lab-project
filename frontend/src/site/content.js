@@ -52,6 +52,7 @@ export const COPY = {
       badge: 'Simulator backtest berbasis tick', title: 'Latihan trading di pasar kemarin, dengan hasil yang bisa dipercaya.',
       lead: 'RIKSORA Backtest Lab memutar ulang data tick bid/ask historis. Anda menulis aturan, menjalankan Sesi, lalu server menghitung hasilnya dari bukti tick, bukan dari tebakan pada candle.',
       primary: 'Mulai gratis', secondary: 'Lihat harga',
+      previewPrimary: 'Minta akses beta',
       caption: 'Simulasi untuk berlatih. Tanpa uang sungguhan, tanpa eksekusi di broker, bukan nasihat investasi.'},
     purpose: {
       title: 'Untuk apa produk ini dibuat',
@@ -95,6 +96,7 @@ export const COPY = {
         'Status Pro hanya berasal dari pembayaran yang sudah lunas dan belum kedaluwarsa, dan ditegakkan oleh server.',
         'Pro tidak diperpanjang otomatis.'],
       payTitle: 'Pembayaran', payLead: 'Pembayaran diproses oleh Midtrans. RIKSORA tidak menyimpan data kartu atau rekening Anda.', payMethods: 'Metode pembayaran', taxNone: 'Informasi pajak akan dicantumkan sebelum pembelian.'},
+    preview: {nav: 'Akses beta', title: 'Aplikasi belum dibuka untuk umum', body: ['RIKSORA Backtest Lab sedang dalam tahap beta tertutup. Pendaftaran dan pembelian Pro belum tersedia.', 'Halaman Harga menunjukkan paket yang akan tersedia. Untuk meminta akses beta atau bertanya, hubungi kami lewat halaman Kontak.'], cta: 'Ke halaman Kontak', buyNote: 'Pembelian Pro belum dibuka. Harga di atas adalah harga paket saat aplikasi dibuka.'},
     about: {title: 'Tentang RIKSORA', body: [
       'RIKSORA Backtest Lab adalah simulator backtest berbasis tick untuk trader yang ingin berlatih dan menguji aturan dengan jujur.',
       'Kami percaya hasil latihan hanya berguna bila prosesnya jujur: tanpa mengintip masa depan, tanpa menebak isian order, dan dengan bukti yang bisa ditelusuri.',
@@ -138,6 +140,7 @@ export const COPY = {
       badge: 'Tick-based backtest simulator', title: 'Practice trading on yesterday’s market, with results you can trust.',
       lead: 'RIKSORA Backtest Lab replays historical bid/ask tick data. You write your rules, run a Session, and the server computes the result from tick evidence, not from guesses on candles.',
       primary: 'Start free', secondary: 'See pricing',
+      previewPrimary: 'Request beta access',
       caption: 'Simulation for practice. No real money, no broker execution, not investment advice.'},
     purpose: {
       title: 'Why this product exists',
@@ -181,6 +184,7 @@ export const COPY = {
         'Pro status comes only from a paid, unexpired payment and is enforced by the server.',
         'Pro does not renew automatically.'],
       payTitle: 'Payment', payLead: 'Payments are processed by Midtrans. RIKSORA does not store your card or account details.', payMethods: 'Payment methods', taxNone: 'Tax information will be shown before purchase.'},
+    preview: {nav: 'Beta access', title: 'The application is not open to the public yet', body: ['RIKSORA Backtest Lab is in a closed beta. Registration and Pro purchases are not available yet.', 'The Pricing page shows the plans that will be available. To request beta access or ask a question, use the Contact page.'], cta: 'Go to Contact', buyNote: 'Pro purchases are not open yet. The prices above are the plan prices when the application opens.'},
     about: {title: 'About RIKSORA', body: [
       'RIKSORA Backtest Lab is a tick-based backtest simulator for traders who want to practice and test rules honestly.',
       'We believe practice is only useful when the process is honest: no peeking at the future, no guessing order fills, and evidence you can trace.',

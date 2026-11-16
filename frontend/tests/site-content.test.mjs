@@ -66,7 +66,9 @@ assert.match(fill('{{brand}} {{legalName}}', {brand: 'B', business: {legalName: 
 // 7. routing: hosted visitors reach the public site; the account page keeps working; local review pages stay local
 assert.equal(entryRoute({hostname: 'riksora.example', search: ''}), 'site');
 assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=pricing'}), 'site');
-assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=account'}), 'account');
+assert.equal(SITE.launchState, 'preview');
+assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=account'}), 'site');      // preview: no sign-in against an API that is not public
+assert.equal(entryRoute({hostname: 'localhost', search: '?page=account'}), 'account');          // local review keeps the real account page
 assert.equal(entryRoute({hostname: 'riksora.example', search: '?legacy=local'}), 'site');
 
 // 8. the config never contains a made-up price: it is null or a positive integer

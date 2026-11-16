@@ -6,7 +6,8 @@ import {SITE} from './siteConfig.js';
 import {COPY, CLAIMS, fill} from './content.js';
 import {FREE_LIMITS, formatIdr, currentPrice, yearlySavingPercent} from './plans.js';
 
-export const PAGES = ['home', 'pricing', 'about', 'contact', 'terms', 'privacy', 'refund'];
+export const PAGES = ['home', 'pricing', 'about', 'contact', 'terms', 'privacy', 'refund', 'account'];
+const preview = SITE.launchState !== 'live';
 
 export function siteLang(search) {
   const value = new URLSearchParams(search).get('lang');
@@ -18,6 +19,7 @@ export function sitePage(search) {
 }
 const href = (page, lang) => (page === 'home' ? '/' : `/?page=${page}`) + (lang === 'en' ? (page === 'home' ? '?lang=en' : '&lang=en') : '');
 const account = '/?page=account';
+const entry = (lang) => (preview ? href('contact', lang) : account);
 
 function Header({t, lang, page}) {
   return <header className="site-nav">
@@ -30,7 +32,7 @@ function Header({t, lang, page}) {
     </nav>
     <div className="site-nav-actions">
       <a className="site-lang" href={href(page, t.other)} hrefLang={t.other} lang={t.other}>{t.otherLabel}</a>
-      <a className="site-pill" href={account}>{t.nav.open}</a>
+      <a className="site-pill" href={entry(lang)}>{preview ? t.preview.nav : t.nav.open}</a>
     </div>
   </header>;
 }
@@ -76,7 +78,7 @@ function ProCard({t, period, withCta}) {
     {price && period === 'yearly' && yearlySavingPercent(SITE) > 0 && <p className="site-promo">{p.saving} {yearlySavingPercent(SITE)}% {p.vsMonthly} · {p.perMonthEquivalent} {formatIdr(Math.round(price.priceIdr / 12))} / {t.lang === 'en' ? 'month' : 'bulan'}</p>}
     <ul>{p.features.map(item => <li key={item}>{item}</li>)}</ul>
     {SITE.pro.taxNote && <p className="site-fine">{SITE.pro.taxNote}</p>}
-    {withCta && <a className="site-primary" href={account}>{t.pricing.buy}</a>}
+    {withCta && (preview ? <p className="site-fine">{t.preview.buyNote}</p> : <a className="site-primary" href={account}>{t.pricing.buy}</a>)}
   </article>;
 }
 
@@ -86,7 +88,7 @@ function PlanCards({t, withCta = true}) {
       <h3>{t.pricing.free.name}</h3>
       <p className="site-price">{t.pricing.free.price} <small>{t.pricing.free.per}</small></p>
       <ul>{t.pricing.free.features.map(item => <li key={item}>{item}</li>)}</ul>
-      {withCta && <a className="site-secondary" href={account}>{t.hero.primary}</a>}
+      {withCta && <a className="site-secondary" href={entry(t.lang)}>{preview ? t.hero.previewPrimary : t.hero.primary}</a>}
     </article>
     <ProCard t={t} period="monthly" withCta={withCta}/>
     <ProCard t={t} period="yearly" withCta={withCta}/>
@@ -99,7 +101,7 @@ function Home({t, lang}) {
       <p className="site-badge">{t.hero.badge}</p>
       <h1>{t.hero.title}</h1>
       <p className="site-lead">{t.hero.lead}</p>
-      <div className="site-actions"><a className="site-primary" href={account}>{t.hero.primary}</a><a className="site-secondary" href={href('pricing', lang)}>{t.hero.secondary}</a></div>
+      <div className="site-actions"><a className="site-primary" href={entry(lang)}>{preview ? t.hero.previewPrimary : t.hero.primary}</a><a className="site-secondary" href={href('pricing', lang)}>{t.hero.secondary}</a></div>
       <p className="site-fine">{t.hero.caption}</p>
     </section>
     <section id="purpose" className="site-section" aria-labelledby="purpose-h">
@@ -180,6 +182,14 @@ function Contact({t}) {
   </section>;
 }
 
+function Preview({t, lang}) {
+  return <section className="site-page" aria-labelledby="pv-h">
+    <h1 id="pv-h">{t.preview.title}</h1>
+    {t.preview.body.map(text => <p key={text}>{text}</p>)}
+    <p><a className="site-primary" href={href('contact', lang)}>{t.preview.cta}</a></p>
+  </section>;
+}
+
 function Legal({t, page}) {
   const doc = COPY.id[page];                       // legal text exists in Indonesian only
   const approved = SITE.legalApproval[page];
@@ -194,7 +204,7 @@ function Legal({t, page}) {
 export default function SiteApp({location}) {
   const lang = siteLang(location.search), page = sitePage(location.search), t = COPY[lang];
   useEffect(() => {
-    const names = {home: t.hero.badge, pricing: t.pricing.title, about: t.about.title, contact: t.contact.title, terms: COPY.id.terms.title, privacy: COPY.id.privacy.title, refund: COPY.id.refund.title};
+    const names = {account: t.preview.title, home: t.hero.badge, pricing: t.pricing.title, about: t.about.title, contact: t.contact.title, terms: COPY.id.terms.title, privacy: COPY.id.privacy.title, refund: COPY.id.refund.title};
     document.title = page === 'home' ? `${SITE.brand} — ${t.hero.badge}` : `${names[page]} — ${SITE.brand}`;
     document.documentElement.lang = page === 'terms' || page === 'privacy' || page === 'refund' ? 'id' : lang;
   }, [lang, page, t]);
@@ -207,6 +217,7 @@ export default function SiteApp({location}) {
       {page === 'about' && <About t={t}/>}
       {page === 'contact' && <Contact t={t}/>}
       {['terms', 'privacy', 'refund'].includes(page) && <Legal t={t} page={page}/>}
+      {page === 'account' && <Preview t={t} lang={lang}/>}
     </main>
     <Footer t={t} lang={lang}/>
   </div>;

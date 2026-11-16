@@ -3,6 +3,9 @@
 // Prices must equal the server plan (BTL_BILLING_AMOUNT_IDR / BTL_BILLING_DURATION_SECONDS); the same release checklist compares them.
 export const SITE = {
   brand: 'RIKSORA Backtest Lab',
+  // 'preview': the application is not open to the public yet; the site shows product, prices and policies and replaces sign-in with a beta-access notice.
+  // 'live': sign-in and Buy Pro are offered. Switch only when the app, billing (multi-plan) and the production payment switch are approved and deployed.
+  launchState: 'preview',
   domain: 'riksora.com',              // owner's domain (2026-11-16)
   business: {
     legalName: null,                  // nama usaha / nama pemilik sesuai dokumen Midtrans
