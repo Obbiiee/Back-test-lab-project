@@ -1,4 +1,4 @@
-# Commercial V1 integration candidate - 2026-11-16
+# Validation checkpoint — Commercial V1 integration candidate (2026-11-16)
 
 [Draft PR #58](https://github.com/Obbiiee/Back-test-lab-project/pull/58) branches from the chart-first port of #53 and includes published main. The merge uses the #57 UI for AlphaAccount, AlphaTerminal, AlphaWorkspace and TickAlpha; it retains the removal of AlphaSessions. Certifi, Vite and Zod match the security-patched pins, including the additional #53 runtime dependencies. Dense timeline block reuse uses the bounded reader from #53 and preserves the range and shared-source paths. AI_HANDOFF was restored from readable tracked history.
 
