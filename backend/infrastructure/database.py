@@ -73,10 +73,11 @@ def _libpq_env(dsn):
 
 
 @contextmanager
-def connect(dsn):
+def connect(dsn, *, pooled=True):
     # Caller config owns TLS and credentials. Bound connect/lock/query waits.
+    # pooled=False: the caller relies on the connection's LIFETIME (a session-level advisory lock fences a worker slot until the connection closes).
     from . import db_pool
-    if db_pool.enabled():                           # QA flag BTL_DB_POOL=1 (default off): reuse cleanly returned connections
+    if pooled and db_pool.enabled():                           # QA flag BTL_DB_POOL=1 (default off): reuse cleanly returned connections
         with _connect_pooled(dsn) as db:
             yield db
         return

@@ -53,6 +53,9 @@ def _healthy(conn, entry):
     return now - entry.created < MAX_AGE_SECONDS and entry.uses < MAX_USES
 
 
+_HOLDS_SESSION_LOCK = "SELECT 1 FROM pg_locks WHERE pid = pg_backend_pid() AND locktype = 'advisory' LIMIT 1"
+
+
 class SyncPool:
     def __init__(self):
         self.lock = threading.Lock()
@@ -92,6 +95,14 @@ class SyncPool:
         entry.uses += 1
         entry.last = time.monotonic()
         if not _healthy(entry.conn, entry):
+            self._discard(entry)
+            return
+        try:                                            # a session-level advisory lock outlives the transaction: closing the connection is the only correct release
+            holds = entry.conn.execute(_HOLDS_SESSION_LOCK).fetchone() is not None
+            entry.conn.rollback()
+        except psycopg.Error:
+            holds = True
+        if holds:
             self._discard(entry)
             return
         with self.lock:
@@ -152,6 +163,14 @@ class AsyncPool:
         entry.uses += 1
         entry.last = time.monotonic()
         if not _healthy(entry.conn, entry):
+            await self._discard(entry)
+            return
+        try:
+            holds = (await (await entry.conn.execute(_HOLDS_SESSION_LOCK)).fetchone()) is not None
+            await entry.conn.rollback()
+        except psycopg.Error:
+            holds = True
+        if holds:
             await self._discard(entry)
             return
         self._check_loop()

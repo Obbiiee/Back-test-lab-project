@@ -80,6 +80,24 @@ class SyncPool(unittest.TestCase):
             self.assertNotEqual(self.pid(), pid)
             self.assertGreaterEqual(db_pool.SYNC.stats['discarded'], 1)
 
+    def test_a_connection_holding_a_session_advisory_lock_is_closed_never_pooled(self):
+        with patch.dict(os.environ, {'BTL_DB_POOL': '1'}):
+            with connect(DSN) as db:
+                self.assertTrue(db.execute('SELECT pg_try_advisory_lock(2020, 9901)').fetchone()[0])
+            # the pool must have closed that connection, which released the lock for everyone else
+            with psycopg.connect(DSN) as other:
+                self.assertTrue(other.execute('SELECT pg_try_advisory_lock(2020, 9901)').fetchone()[0])
+                other.execute('SELECT pg_advisory_unlock(2020, 9901)')
+            self.assertGreaterEqual(db_pool.SYNC.stats['discarded'], 1)
+
+    def test_pooled_false_keeps_the_connection_lifetime_contract(self):
+        with patch.dict(os.environ, {'BTL_DB_POOL': '1'}):
+            with connect(DSN, pooled=False) as db:
+                self.assertTrue(db.execute('SELECT pg_try_advisory_lock(2020, 9902)').fetchone()[0])
+            with psycopg.connect(DSN) as other:                   # connection closed on exit: lock gone
+                self.assertTrue(other.execute('SELECT pg_try_advisory_lock(2020, 9902)').fetchone()[0])
+                other.execute('SELECT pg_advisory_unlock(2020, 9902)')
+
     def test_active_budget_still_applies(self):
         with patch.dict(os.environ, {'BTL_DB_POOL': '1'}):
             held = []

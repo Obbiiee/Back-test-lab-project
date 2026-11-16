@@ -326,7 +326,7 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
 
 def work_one(dsn, runner):
     """Claim durably, heartbeat a short lease, and finalize by lease fencing token."""
-    with connect(dsn) as db:
+    with connect(dsn, pooled=False) as db:                  # the session-level slot lock lives exactly as long as this connection: never pooled
         db.row_factory = dict_row
         slot = next((i for i in range(WORKERS) if db.execute(
             'SELECT pg_try_advisory_lock(2020,%s) AS acquired', (310+i,)).fetchone()['acquired']), None)
