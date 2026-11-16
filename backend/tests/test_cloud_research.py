@@ -149,8 +149,10 @@ class CloudResearchTests(unittest.TestCase):
                 filled = advance(before, january)
                 self.assertEqual(filled['state']['orders'][review['requestId']]['status'], 'ACTIVE')
                 closed = advance(filled, january + 10**9)
-                self.assertEqual(closed['state']['orders'][review['requestId']]['status'], 'CLOSED')
                 self.assertEqual(invoke('workspace', session, {'timeframe':'1m'})['state'], closed['state'])
+                orders = invoke('journal', session)['orders']
+                self.assertEqual([(row['id'], row['status'], row['exitReason']) for row in orders],
+                                 [(review['requestId'], 'CLOSED', 'TP')])
                 self.assertEqual(invoke('summary', session)['completedTrades'], 1)
 
     def test_summary_requires_identity_membership_and_hides_foreign_session(self):

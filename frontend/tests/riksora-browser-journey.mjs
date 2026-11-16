@@ -270,6 +270,8 @@ try{
   await jumpButton.click({timeout:95000});
   await expect.poll(async()=>Number(await terminal.getAttribute('data-revision')),{timeout:95000}).toBeGreaterThan(beforeExitRevision);
   phase='trade_close_closed_trades_tab';
+  const restoreTerminal=terminal.getByRole('button',{name:'Restore trading terminal'});
+  if(await restoreTerminal.isVisible())await restoreTerminal.click();
   await terminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   phase='trade_close_committed_row';
   await expect(terminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1,{timeout:95000});
@@ -331,6 +333,8 @@ try{
   await page.getByRole('button',{name:'Resume replay',exact:true}).click();
   await expect(page.getByRole('region',{name:'Tick replay workspace'})).toBeVisible({timeout:95000});
   const resumedTerminal=page.getByRole('region',{name:'Trading and Analysis'});
+  const restoreResumedTerminal=resumedTerminal.getByRole('button',{name:'Restore trading terminal'});
+  if(await restoreResumedTerminal.isVisible())await restoreResumedTerminal.click();
   await resumedTerminal.getByRole('button',{name:'Closed trades',exact:true}).click();
   await expect(resumedTerminal.getByRole('table',{name:'Closed trades'}).locator('tr[data-order-id]')).toHaveCount(1,{timeout:95000});
   await Promise.allSettled(apiBodyReads);
