@@ -8,9 +8,9 @@ export const SITE = {
   launchState: 'preview',
   domain: 'riksora.com',              // owner's domain (2026-11-16)
   business: {
-    legalName: null,                  // nama usaha / nama pemilik sesuai dokumen Midtrans
-    legalForm: null,                  // 'Perorangan' | 'CV' | 'PT' ...
-    address: null,                    // alamat lengkap yang boleh ditampilkan
+    legalName: '[REDACTED] [REDACTED] [REDACTED]',  // nama pemilik (usaha perorangan); HARUS sama persis dengan KTP yang diunggah ke Midtrans
+    legalForm: 'Perorangan',          // usaha perorangan (belum terdaftar sebagai badan usaha)
+    address: 'Majalengka, Jawa Barat, Indonesia',   // alamat yang boleh tampil (owner memilih tingkat kota)
     email: 'risoralabs@gmail.com',    // email dukungan (owner, 2026-11-16)
     phone: null,                      // opsional: nomor telepon / WhatsApp dukungan (belum ada)
     supportHours: null,               // mis. 'Senin-Jumat 09.00-17.00 WIB'
@@ -31,8 +31,8 @@ export const SITE = {
     methods: null,                    // metode yang benar-benar diaktifkan di akun Midtrans, mis. ['QRIS','Transfer bank (Virtual Account)','E-wallet','Kartu']
   },
   refund: {
-    windowDays: null,                 // jendela pengembalian dana dalam hari (keputusan owner)
-    conditions: null,                 // syarat pengembalian dana (keputusan owner), teks pendek
+    windowDays: 7,                    // diserahkan owner kepada Claude (2026-11-16); ubah di sini bila ingin lain
+    conditions: 'Pro belum dipakai untuk membuat Sesi di luar kuota Free sejak pembayaran; pembayaran ganda atau Pro yang tidak aktif setelah pembayaran lunas dikembalikan penuh',
   },
   legalApproval: {                    // diisi owner setelah teks ditinjau (penasihat hukum disarankan); tanggal ISO, mis. '2026-12-01'
     terms: null, privacy: null, refund: null,
