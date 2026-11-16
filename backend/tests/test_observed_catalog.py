@@ -20,8 +20,8 @@ BASE=json.loads((Path(__file__).parent/'fixtures/observed_profile_vectors.json')
 
 class ObservedCatalogTests(unittest.TestCase):
     def setUp(self):
-        platform_os=SimpleNamespace(**os.__dict__,O_NOFOLLOW=getattr(os,'O_NOFOLLOW',0),
-                                    O_NONBLOCK=getattr(os,'O_NONBLOCK',0))
+        platform_os=SimpleNamespace(**{**vars(os), 'O_NOFOLLOW':getattr(os,'O_NOFOLLOW',0),
+                                      'O_NONBLOCK':getattr(os,'O_NONBLOCK',0)})
         if os.name=='nt':
             native_fstat=os.fstat
             def windows_fstat(fd):
