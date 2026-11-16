@@ -3,6 +3,7 @@ name: Product V1 backend contracts
 on:
   pull_request:
     branches:
+      - main
       - codex/product-integration-v1-20261106
     paths:
       - "backend/**"
@@ -83,6 +84,14 @@ jobs:
           tests.test_observed_postgres.ObservedPostgresTests.test_nonempty_sidecar_is_not_admitted_by_empty_catalog_capability
           tests.test_observed_postgres.ObservedPostgresTests.test_observed_research_application_method_session_review_statistics_journal
           tests.test_migration_reconciliation
+      - name: Verify replay recovery and Monthly Parquet boundaries on PostgreSQL
+        working-directory: backend
+        run: >-
+          python -m unittest -v
+          tests.test_research_sessions.ResearchSessionTests.test_workspace_reports_committed_pending_target_after_reopen
+          tests.test_cloud_research.CloudResearchTests.test_monthly_catalog_session_reopens_across_year_boundary
+          tests.test_p0_local_integration.P0LocalIntegrationTests.test_jump_reads_monthly_parquet_across_partition_boundary
+          tests.test_tick_storage_v2.TickStorageV2Tests.test_revealed_batch_reuses_verified_position_blocks_and_refuses_mutation
       - name: Create isolated Product journey database
         working-directory: backend
         run: |
