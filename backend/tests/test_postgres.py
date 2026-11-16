@@ -141,9 +141,14 @@ class PostgresTests(unittest.TestCase):
             for source in MIGRATIONS.glob("*.sql"):
                 shutil.copy(source, folder)
             first = sorted(Path(folder).glob("*.sql"))[0]
-            first.write_bytes(first.read_bytes().replace(b"\n", b"\r\n"))
+            # A CRLF checkout must not manufacture CRCRLF in the positive fixture.
+            baseline = first.read_bytes().replace(b"\r\n", b"\n")
+            first.write_bytes(baseline.replace(b"\n", b"\r\n"))
             migrate(DSN, Path(folder))  # Platform checkout line endings are not drift.
-            first.write_bytes(first.read_bytes() + b"\n-- changed historical migration\n")
+            first.write_bytes(baseline.replace(b"\n", b"\r\r\n"))
+            with self.assertRaisesRegex(ContractError, "MIGRATION_DRIFT"):
+                migrate(DSN, Path(folder))
+            first.write_bytes(baseline + b"\n-- changed historical migration\n")
             with self.assertRaisesRegex(ContractError, "MIGRATION_DRIFT"):
                 migrate(DSN, Path(folder))
 

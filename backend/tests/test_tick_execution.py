@@ -3,6 +3,7 @@ from copy import deepcopy
 from decimal import Decimal, localcontext
 from fractions import Fraction
 import unittest
+from unittest.mock import patch
 
 from application.models import TrustedScope
 from contracts.canonical import content_hash, canonical_bytes
@@ -14,6 +15,47 @@ from execution.engine import advance, submit
 from ticks.provider import SyntheticTickProvider
 from ticks.timeline import TickTimeline
 from tests.test_execution_goldens import goldens
+
+
+class CompactSnapshotCacheTests(unittest.TestCase):
+    def test_compact_cache_retains_ten_active_sessions_and_remains_bounded(self):
+        from execution.postgres import (
+            _COMPACT_CACHE, _COMPACT_CACHE_MAX, PostgresExecutionStore,
+        )
+
+        original = deepcopy(_COMPACT_CACHE)
+        try:
+            _COMPACT_CACHE.clear()
+            store = PostgresExecutionStore('cache-test-dsn')
+            expected = {}
+            for index in range(10):
+                workspace = f'workspace:{index}'
+                session = f'session:{index}'
+                state = {'schemaVersion': 1, 'index': index, 'revision': index}
+                controller = {'cursor': index}
+                chain_hash = f'chain:{index}'
+                store._cache_write(workspace, session, state, controller, chain_hash)
+                expected[(workspace, session)] = (state, controller, chain_hash)
+
+            self.assertGreaterEqual(_COMPACT_CACHE_MAX, 10)
+            self.assertLessEqual(len(_COMPACT_CACHE), _COMPACT_CACHE_MAX)
+            for (workspace, session), (state, controller, chain_hash) in expected.items():
+                pointer = {
+                    'revision': state['revision'],
+                    'stateHash': content_hash(state),
+                    'chainHash': chain_hash,
+                    'controller': controller,
+                }
+                self.assertEqual(store._cache_read(workspace, session, pointer), state)
+
+            for index in range(_COMPACT_CACHE_MAX):
+                store._cache_write(f'workspace:extra:{index}', f'session:extra:{index}',
+                                   {'schemaVersion': 1, 'index': index, 'revision': index},
+                                   {'cursor': index}, f'chain:extra:{index}')
+            self.assertEqual(len(_COMPACT_CACHE), _COMPACT_CACHE_MAX)
+        finally:
+            _COMPACT_CACHE.clear()
+            _COMPACT_CACHE.update(original)
 
 
 class MemoryStore:
@@ -145,7 +187,12 @@ def assert_case(test, case, h):
     if "reason" in case:
         test.assertIn(case["reason"], [e["detail"].get("reason") for e in inspected["events"]])
     if "orderStatus" in case:
-        test.assertEqual(inspected["state"]["orders"]["order:1"]["status"], case["orderStatus"])
+        from execution.analysis import project
+        # Use the controller's committed event view so the same golden can
+        # validate both in-memory and durable PostgreSQL adapters.
+        history=project(inspected["state"],iter(inspected["events"]),None)
+        archived=next(row for row in history['orders'] if row['id']=='order:1')
+        test.assertEqual(archived["status"], case["orderStatus"])
     if "exitNets" in case:
         test.assertEqual([e["detail"]["netRealized"] for e in fills if e["kind"] == "EXIT_FILL"],case["exitNets"])
     if case.get("chronologyLimited"):
@@ -155,10 +202,162 @@ def assert_case(test, case, h):
 
 
 class TickExecutionTests(unittest.TestCase):
+    def test_next_event_preview_clamps_to_first_committed_financial_boundary(self):
+        from execution.workspace import FixtureTimelineCache
+        from execution.jump_next_event import advance_command
+        case=next(value for value in goldens()['scenarios'] if value['id']=='buy-limit-improvement')
+        provider=provider_for(case);scope=TrustedScope('fixture:jump-workspace','fixture:jump-actor')
+        session='fixture:jump-session';store=MemoryStore()
+        cache=FixtureTimelineCache(provider,allow_injected_synthetic=True)
+        controller=ExecutionController(store,provider,cache)
+        controller.create(scope,session,profile_for(case))
+        opening=command(session,'order:1',0,'OPEN',open_plan(case['open']))
+        controller.apply(scope,opening)
+        request=dict(schemaVersion=1,artifact='BTL-JUMP-NEXT-EVENT-1',requestId='d'*32,
+                     sessionId=session,expectedRevision=1,timeframe='1m')
+        end=int(provider.describe(provider.dataset_id,provider.dataset_version)['range']['endNs'])-1
+
+        def next_jump(expected):
+            saved,checkpoint=store.sessions[(scope.workspace_id,session)]
+            preview=controller.preview_next_event(scope,saved,checkpoint,str(end))
+            raw=advance_command({**request,'targetNs':preview['targetNs']},expected,
+                                'BTL-TICK-EXECUTION-COMMAND-1')
+            return preview,controller.apply(scope,raw)
+
+        _, checkpoint = store.sessions[(scope.workspace_id, session)]
+        _, timeline_entry = cache._entry(scope, session, checkpoint)
+        with patch.object(timeline_entry.timeline, 'advance_through',
+                          wraps=timeline_entry.timeline.advance_through) as traversals:
+            first_preview,first=next_jump(1)
+            self.assertEqual(traversals.call_count,1,
+                             'The committed ADVANCE should reuse the verified Jump preview traversal')
+        self.assertEqual(first_preview['targetNs'],'1')
+        self.assertEqual(first_preview['previewGroups'],1,
+                         'Jump preview should stop at the first causal financial candidate')
+        self.assertEqual([event['kind'] for event in first['events']],['ENTRY_FILL'])
+        _, checkpoint = store.sessions[(scope.workspace_id, session)]
+        _, timeline_entry = cache._entry(scope, session, checkpoint)
+        with patch.object(timeline_entry.timeline, 'advance_through',
+                          wraps=timeline_entry.timeline.advance_through) as traversals:
+            second_preview,second=next_jump(2)
+            self.assertEqual(traversals.call_count,1,
+                             'The committed exit ADVANCE should reuse its verified Jump traversal')
+        self.assertEqual(second_preview['targetNs'],'2')
+        self.assertEqual(second_preview['previewGroups'],1,
+                         'Jump preview should stop at the first causal exit candidate')
+        self.assertEqual([event['kind'] for event in second['events']],['EXIT_FILL'])
+
+        normal=Harness(provider_for(case),profile_for(case),session=session,
+                       scope=TrustedScope('fixture:normal-workspace','fixture:normal-actor'))
+        normal.call('OPEN',open_plan(case['open']),name='order:1')
+        normal.through(str(end))
+        jumped=controller.inspect(scope,session,maximum=256)
+        ordinary=normal.controller.inspect(normal.scope,normal.session,maximum=256)
+        financial=lambda rows:[(event['kind'],event['orderId'],event['detail']) for event in rows
+                               if event['classification']=='SIMULATED_FILL']
+        self.assertEqual(financial(jumped['events']),financial(ordinary['events']))
+        self.assertEqual(jumped['state']['balance'],ordinary['state']['balance'])
+        self.assertEqual(jumped['state']['realizedGross'],ordinary['state']['realizedGross'])
+
+    def test_jump_golden_parity_for_pending_protection_and_tie_events(self):
+        from execution.workspace import FixtureTimelineCache
+        from execution.jump_next_event import advance_command
+        case_ids={'market-long','market-short','buy-limit-improvement','sell-limit-improvement',
+            'buy-stop-gap','sell-stop-gap','long-sl-gap','short-sl-gap','long-tp-gap',
+            'short-tp-gap','activation-same-event-exit','trusted-tie',
+            'equivalent-untrusted-tie','changing-untrusted-tie'}
+        for case in goldens()['scenarios']:
+            if case['id'] not in case_ids:
+                continue
+            with self.subTest(case=case['id']):
+                provider=provider_for(case)
+                scope=TrustedScope('fixture:jump-parity-workspace','fixture:jump-parity-actor')
+                session='fixture:jump-parity-session'
+                store=MemoryStore()
+                controller=ExecutionController(store,provider,FixtureTimelineCache(
+                    provider,allow_injected_synthetic=True))
+                controller.create(scope,session,profile_for(case))
+                controller.apply(scope,command(session,'order:1',0,'OPEN',open_plan(case['open'])))
+                normal=Harness(provider_for(case),profile_for(case),session=session,scope=scope)
+                normal.call('OPEN',open_plan(case['open']),name='order:1')
+                end=int(provider.describe(provider.dataset_id,provider.dataset_version)['range']['endNs'])-1
+                request=dict(schemaVersion=1,artifact='BTL-JUMP-NEXT-EVENT-1',requestId='e'*32,
+                    sessionId=session,timeframe='1m')
+                for _ in range(64):
+                    saved,checkpoint=store.sessions[(scope.workspace_id,session)]
+                    if saved['unresolved'] or saved['ended']:
+                        break
+                    preview=controller.preview_next_event(scope,saved,checkpoint,str(end))
+                    if not preview['previewGroups'] and int(saved['throughNs'])>=end:
+                        break
+                    receipt=controller.apply(scope,advance_command({**request,
+                        'targetNs':preview['targetNs']},saved['revision'],
+                        'BTL-TICK-EXECUTION-COMMAND-1'))
+                    if not receipt['events'] and int(receipt['state']['throughNs'])<=int(saved['throughNs']):
+                        break
+                normal.through(str(end))
+                jumped=controller.inspect(scope,session,maximum=256)
+                ordinary=normal.controller.inspect(normal.scope,normal.session,maximum=256)
+                financial=lambda rows:[(event['kind'],event['orderId'],event['detail']) for event in rows
+                    if event['classification']=='SIMULATED_FILL']
+                self.assertEqual(financial(jumped['events']),financial(ordinary['events']))
+                self.assertEqual(jumped['state']['balance'],ordinary['state']['balance'])
+                self.assertEqual(jumped['state']['realizedGross'],ordinary['state']['realizedGross'])
+
     def test_all_authored_financial_goldens(self):
         for case in goldens()["scenarios"]:
             with self.subTest(case=case["id"]):
                 assert_case(self,case,exercise(case))
+
+    def test_terminal_orders_leave_hot_state_and_cumulative_orders_are_unbounded(self):
+        from execution.analysis import project
+        from execution.terminal_order_archive import GENESIS, record, terminal_orders, verify
+        case=goldens()["scenarios"][0];h=Harness(provider_for(case))
+        genesis=deepcopy(h.state);plan=open_plan(case["open"])
+        archived=[];previous=GENESIS
+        for index in range(240):
+            order_id=f'order:{index}'
+            h.call('OPEN',plan,name=order_id)
+            self.assertEqual(set(h.state['orders']),{order_id})
+            before=deepcopy(h.state)
+            first=len(h.store.events[(h.scope.workspace_id,h.session)])
+            h.call('CANCEL',dict(orderId=order_id),name=f'cancel:{index}')
+            self.assertEqual(h.state['orders'],{})
+            events=h.store.events[(h.scope.workspace_id,h.session)][first:]
+            values=terminal_orders(before,h.state,events)
+            archived_order=record(session_id=h.session,sequence=index,revision=h.state['revision'],
+                order_id=order_id,order=values[order_id]['order'],events=values[order_id]['events'],
+                previous_hash=previous)
+            verify(archived_order,session_id=h.session,sequence=index,previous_hash=previous)
+            archived.append(archived_order);previous=archived_order['recordHash']
+        self.assertEqual(h.state['nextEventIndex'],480)
+        self.assertEqual(len(archived),240)
+        self.assertEqual(archived[-1]['order']['status'],'CANCELLED')
+        result=project(h.state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
+        self.assertEqual(result['status'],'COMPLETE')
+        self.assertEqual(result['metrics']['tradeCount'],0)
+        self.assertEqual(len(result['orders']),240)
+
+    def test_closed_order_archive_projection_preserves_financial_event_details(self):
+        from execution.terminal_order_archive import terminal_orders, record, verify, GENESIS
+        case=next(row for row in goldens()['scenarios'] if row['id']=='partial-then-full-fixed-commission')
+        h=Harness(provider_for(case),profile=profile_for(case))
+        h.call('OPEN',open_plan(case['open']),name='trade:archive')
+        h.through(1)
+        h.call('CLOSE',dict(orderId='trade:archive',quantity='0.04'))
+        h.through(2)
+        h.call('CLOSE',dict(orderId='trade:archive',quantity=None))
+        before=deepcopy(h.state);first=len(h.store.events[(h.scope.workspace_id,h.session)])
+        h.through(3);after=h.state
+        events=h.store.events[(h.scope.workspace_id,h.session)][first:]
+        projected=terminal_orders(before,after,events)['trade:archive']
+        archived=record(session_id=h.session,sequence=0,revision=after['revision'],
+            order_id='trade:archive',order=projected['order'],events=projected['events'],
+            previous_hash=GENESIS)
+        verify(archived,session_id=h.session,sequence=0,previous_hash=GENESIS)
+        self.assertEqual(archived['order']['status'],'CLOSED')
+        self.assertEqual([event['kind'] for event in archived['terminalEvents']],['EXIT_FILL'])
+        self.assertEqual(archived['terminalEvents'][0]['detail']['gross'],'18')
 
     def test_exact_rounding_risk_sizing_and_profile_refusal(self):
         with localcontext() as ctx:
@@ -275,7 +474,9 @@ class TickExecutionTests(unittest.TestCase):
         for size in (None,"0.1"):
             with self.assertRaisesRegex(ContractError,"PROTOCOL_BLOCKED"):h.call("CLOSE",{"orderId":"order","quantity":size})
         h.through(2);self.assertEqual(h.state["balance"],"10250")
-        self.assertEqual(h.controller.inspect(h.scope,h.session,maximum=256)["state"]["orders"]["order"]["observations"],[{"conditionId":"condition","outcome":"PASS"}])
+        from execution.analysis import project
+        history=project(h.state,iter(h.store.events[(h.scope.workspace_id,h.session)]),None)
+        self.assertEqual(history['orders'][0]["observations"],[{"conditionId":"condition","outcome":"PASS"}])
 
     def test_equivalent_no_action_untrusted_group_and_size_bounds(self):
         case=dict(rows=[[1,"100","101"],[1,"101","102"],[2,"105","106"]])

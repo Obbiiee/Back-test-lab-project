@@ -3,23 +3,34 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from decimal import Decimal
 from fractions import Fraction
+import hashlib
 import json
+import logging
 
 from application.models import TrustedScope
 from contracts.canonical import content_hash, canonical_bytes
 from contracts.models import MethodPolicy, Command, SessionContext, Observation, validate_command
 from contracts.primitives import require, identifier, revision, digest
-from ticks.contracts import keys, tag
+from ticks.contracts import keys, tag, TickManifest
 from ticks.timeline import TickTimeline
 from infrastructure.database import connect
-from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity
+from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity, MAX_ORDERS
 from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
 from .workspace import FixtureTimelineCache, display_candles, TIMEFRAMES
-from .analysis import project, metrics, planned_risk, excursions, ratio, RESEARCH_VERSION, MAX_ANALYSIS_EVENTS
-from .journal import validate_note, request as journal_request, MAX_JOURNAL_ORDERS
+from .analysis import (project, metrics, planned_risk, excursions, ratio,
+                       RESEARCH_VERSION, ANALYSIS_VERSION, MAX_ANALYSIS_EVENTS)
+from .journal import (validate_note, request as journal_request, MAX_JOURNAL_ORDERS,
+                      MAX_JOURNAL_PAGE_SIZE, MAX_JOURNAL_READ_ORDERS,
+                      encode_cursor, decode_cursor)
 from .bootstrap import bootstrap as descriptive_bootstrap, validate_seed
+from .availability import catalog_availability, eligible_start_month
+from .journal_order_index import verify_projection as verify_journal_order_projection
+from .jump_next_event import (FINANCIAL_EVENT_KINDS, advance_command as jump_advance_command,
+                              result as jump_result, validate_request as validate_jump_request)
+
+log = logging.getLogger(__name__)
 
 
 def label(value):
@@ -42,22 +53,47 @@ def method_policy(record):
 
 class ResearchApplication:
     """Single-user local operator; no public identity/tenant composition."""
-    def __init__(self, dsn, scope=None, *, historical_source=None):
+    def __init__(self, dsn, scope=None, *, historical_source=None, synthetic_provider=None,
+                 state_storage_format="compact-v1", monthly_catalog=None,
+                 monthly_source_key=None, monthly_period=None):
+        require(historical_source is None or synthetic_provider is None, 'source', 'IDENTITY_CONFLICT')
+        if synthetic_provider is not None:
+            manifest = TickManifest.from_wire(
+                synthetic_provider.describe(synthetic_provider.dataset_id, synthetic_provider.dataset_version),
+                synthetic_provider.dataset_version).wire
+            require(manifest['evidenceClass'] == 'SYNTHETIC_CONTRACT_ONLY' and
+                    manifest['rights']['class'] == 'SYNTHETIC',
+                    'syntheticProvider', 'REFUSED_SOURCE')
         self.dsn = dsn
         self.scope = scope or TrustedScope("local:exness:"+historical_source.version if historical_source else "fixture:local-alpha", "fixture:local-operator")
         self.__historical = historical_source
-        self.__provider = historical_source or research_provider()
+        self.__provider = historical_source or synthetic_provider or research_provider()
+        self.__monthly_catalog = monthly_catalog
+        self.__monthly_source_key = monthly_source_key
+        self.__monthly_period = monthly_period
+        require((monthly_source_key is None) == (monthly_period is None) and
+                (monthly_source_key is None or monthly_catalog is not None),
+                'monthlySource', 'REFUSED_SOURCE')
+        if monthly_source_key is not None:
+            selected = monthly_catalog.selection(monthly_source_key, monthly_period)
+            require(selected['eligibility'] == 'SYNTHETIC', 'monthlySource', 'REFUSED_SOURCE')
+            if synthetic_provider is not None:
+                require(selected['manifestSha256'] == synthetic_provider.manifest_hash and
+                        (selected['datasetId'], selected['datasetVersion']) ==
+                        (synthetic_provider.dataset_id, synthetic_provider.dataset_version),
+                        'monthlySource', 'REFUSED_SOURCE')
         self.__profile = historical_source.profile if historical_source else research_profile()
         self.__label = historical_source.label if historical_source else "SYNTHETIC / TEST ONLY"
         self.__start = historical_source.start_ns if historical_source else START_NS
         self.__warmup = self.__start + 1800*1000000000 if historical_source else WARMUP_NS
         self.__period = historical_source.start_period if historical_source else "2020-01"
-        self.store = PostgresExecutionStore(dsn)
+        self.store = PostgresExecutionStore(dsn, state_storage_format=state_storage_format)
         if historical_source:
             from .historical import IndexedTimelineCache
             self.__timeline_cache = IndexedTimelineCache(historical_source)
         else:
-            self.__timeline_cache = FixtureTimelineCache(self.__provider)
+            self.__timeline_cache = FixtureTimelineCache(self.__provider,
+                allow_injected_synthetic=synthetic_provider is not None)
         self.controller = ExecutionController(self.store, self.__provider, self.__timeline_cache)
 
     def close(self):
@@ -82,37 +118,208 @@ class ResearchApplication:
                               (self.scope.workspace_id, session_id)).fetchone()
         require(meta_row is not None, "session", "RESOURCE_UNAVAILABLE")
         meta = unpack(*meta_row[:2])
-        tag(meta, "BTL-LOCAL-SESSION-1", "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance")
+        monthly = 'sourceKey' in meta or 'monthlyManifestHash' in meta
+        tag(meta, "BTL-LOCAL-SESSION-1", "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance" +
+            (" sourceKey monthlyManifestHash" if monthly else ""))
         require(meta["id"] == session_id and meta["methodId"] == meta_row[2], "session", "CORRUPT_RECORD")
         method = self._method(db, meta["methodId"])
         policy = method_policy(method)
-        row = db.execute("SELECT payload,content_hash,revision FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s" + (" FOR UPDATE" if lock else ""),
+        row = db.execute("SELECT payload,content_hash,revision,dataset_version,profile_hash FROM btl.tick_sessions WHERE workspace_id=%s AND session_id=%s" + (" FOR UPDATE" if lock else ""),
                          (self.scope.workspace_id, session_id)).fetchone()
         require(row is not None, "state", "CORRUPT_RECORD")
-        saved = unpack(*row[:2]); state, checkpoint = saved["state"], saved["controller"]
+        saved = self.store.read_session(db, self.scope, session_id, row)
+        state, checkpoint = saved["state"], saved["controller"]
         snapshot(state, checkpoint)
         require(state["sessionId"] == session_id and state["revision"] == row[2] and
                 state["policy"] == policy_wire(policy) and meta["methodHash"] == policy.definition_hash and
                 (meta["datasetId"],meta["datasetVersion"],meta["profileHash"],meta["initialBalance"]) ==
                 (state["datasetId"],state["datasetVersion"],state["profileHash"],state["initialBalance"]), "sessionPins", "CORRUPT_RECORD")
-        require(state["datasetId"] == self.__provider.dataset_id and state["datasetVersion"] == self.__provider.dataset_version,
-                "dataset", "REFUSED_DATASET_VERSION")
+        if monthly:
+            require(self.__monthly_catalog is not None,
+                    'monthlySource', 'REFUSED_SOURCE_NOT_AVAILABLE')
+            selected = self.__monthly_catalog.selection(meta['sourceKey'], meta['startPeriod'])
+            require(selected['eligibility'] == 'SYNTHETIC' and
+                    selected['manifestSha256'] == meta['monthlyManifestHash'] and
+                    (meta['datasetId'], meta['datasetVersion']) ==
+                    (selected['datasetId'], selected['datasetVersion']) and
+                    (state['datasetId'], state['datasetVersion']) ==
+                    (selected['datasetId'], selected['datasetVersion']),
+                    'monthlySource', 'REFUSED_SOURCE')
+        else:
+            require(state["datasetId"] == self.__provider.dataset_id and state["datasetVersion"] == self.__provider.dataset_version,
+                    "dataset", "REFUSED_DATASET_VERSION")
         return meta, method, state, checkpoint
 
     def catalog(self):
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-            methods = db.execute("SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 129", (self.scope.workspace_id,)).fetchall()
-            sessions = db.execute("SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 129", (self.scope.workspace_id,)).fetchall()
-            require(len(methods) <= 128 and len(sessions) <= 128, "catalog", "REFUSED_CATALOG_LIMIT")
+            # Compatibility response is a bounded prefix. Product screens use
+            # the authenticated keyset page routes for complete catalogs.
+            methods = db.execute("SELECT payload,content_hash FROM btl.tick_methods WHERE workspace_id=%s ORDER BY method_id LIMIT 128", (self.scope.workspace_id,)).fetchall()
+            sessions = db.execute("SELECT payload,content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s ORDER BY session_id LIMIT 128", (self.scope.workspace_id,)).fetchall()
             parsed = [unpack(*row) for row in methods]
             for value in parsed:
                 method_policy(value)
             metas = [unpack(*row) for row in sessions]
             for meta in metas:
                 self._session(db, meta["id"])
-            return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=metas,
-                        label=self.__label, profile=self.__profile, startPeriod=self.__period)
+            public_metas = [{key: value for key, value in meta.items()
+                             if key != 'monthlyManifestHash'} for meta in metas]
+            return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=public_metas,
+                        label=self.__label, profile=self.__profile, startPeriod=self.__period,
+                        availability=self.availability(),
+                        monthlySources=[] if self.__monthly_catalog is None else self.__monthly_catalog.public())
+
+    def availability(self):
+        return catalog_availability(instrument_id=self.__profile["instrumentId"],
+                                    dataset_id=self.__provider.dataset_id,
+                                    dataset_version=self.__provider.dataset_version,
+                                    start_period=self.__period,
+                                    synthetic=self.__historical is None)
+
+    def assert_start_month_available(self, period):
+        require(eligible_start_month(self.availability(), self.__profile["instrumentId"], period),
+                "period", "REFUSED_SOURCE_NOT_AVAILABLE")
+
+    def command_result(self, session_id, command_id):
+        """Read the durable command receipt or conservatively report uncertainty."""
+        identifier(session_id, "sessionId")
+        identifier(command_id, "commandId")
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            _meta, _method, state, _checkpoint = self._session(db, session_id)
+            row = db.execute(
+                "SELECT revision,command_hash,payload,content_hash FROM btl.tick_commands "
+                "WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
+                (self.scope.workspace_id, session_id, command_id)).fetchone()
+            if row is not None:
+                review_row = db.execute(
+                    "SELECT payload,content_hash FROM btl.tick_order_reviews "
+                    "WHERE workspace_id=%s AND session_id=%s AND review_id=%s",
+                    (self.scope.workspace_id, session_id, command_id)).fetchone()
+                require(review_row is not None, "review", "CORRUPT_RECORD")
+                reviewed = unpack(*review_row)
+                command = reviewed.get("command", {})
+                receipt_wire = unpack(row[2], row[3])
+                if receipt_wire.get("artifact") == "BTL-TICK-EXECUTION-COMPACT-RESULT-1":
+                    receipt = self.store._compact_receipt(command, row, db,
+                                                          self.scope.workspace_id, session_id)
+                else:
+                    receipt = receipt_wire
+                require(receipt.get("artifact") == "BTL-TICK-EXECUTION-RESULT-1" and
+                        receipt.get("commandId") == command_id and
+                        receipt.get("commandHash") == row[1] and receipt.get("durable") is True and
+                        receipt.get("state", {}).get("sessionId") == session_id and
+                        receipt["state"].get("revision") == row[0], "receipt", "CORRUPT_RECORD")
+                expected_revision = command.get("expectedRevision")
+                require(command.get("commandId") == command_id and
+                        command.get("sessionId") == session_id and type(expected_revision) is int and
+                        expected_revision + 1 == receipt["state"]["revision"] and
+                        content_hash(command) == row[1], "review", "CORRUPT_RECORD")
+                return dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
+                            sessionId=session_id, commandId=command_id, status="COMMITTED",
+                            currentRevision=state["revision"], reviewHash=review_row[1], receipt=receipt)
+
+            review_row = db.execute(
+                "SELECT payload,content_hash FROM btl.tick_order_reviews "
+                "WHERE workspace_id=%s AND session_id=%s AND review_id=%s",
+                (self.scope.workspace_id, session_id, command_id)).fetchone()
+            if review_row is None:
+                return dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
+                            sessionId=session_id, commandId=command_id, status="UNKNOWN",
+                            reason="REVIEW_OR_COMMAND_NOT_VISIBLE", currentRevision=state["revision"])
+
+            reviewed = unpack(*review_row)
+            command = reviewed.get("command", {})
+            require(command.get("commandId") == command_id and command.get("sessionId") == session_id,
+                    "review", "CORRUPT_RECORD")
+            expected_revision = command.get("expectedRevision")
+            revision(expected_revision, "expectedRevision")
+            require(command_id not in state["orders"], "receipt", "CORRUPT_RECORD")
+            common = dict(schemaVersion=1, artifact="BTL-TICK-COMMAND-STATUS-1",
+                          sessionId=session_id, commandId=command_id, reviewHash=review_row[1],
+                          expectedRevision=expected_revision, currentRevision=state["revision"])
+            if state["revision"] > expected_revision:
+                return dict(**common, status="NOT_COMMITTED", reason="SESSION_REVISION_ADVANCED")
+            return dict(**common, status="UNKNOWN", reason="NO_DURABLE_COMMAND_AT_REVIEW_REVISION")
+
+    def summary(self, session_id):
+        """One committed, scoped snapshot; no timeline, quote or event replay."""
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            meta, _method, state, _checkpoint = self._session(db, session_id)
+            head = db.execute(
+                'SELECT format_version,through_sequence,event_hash,closed_order_count '
+                'FROM btl.tick_journal_projection_heads WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id, session_id)).fetchone()
+            if head is None:
+                completed_trades = 0
+                rows = db.execute('SELECT payload,content_hash FROM btl.tick_events '
+                    'WHERE workspace_id=%s AND session_id=%s ORDER BY sequence',
+                    (self.scope.workspace_id, session_id))
+                for raw, sha in rows:
+                    event = unpack(raw, sha)
+                    if event.get('kind') == 'EXIT_FILL' and event.get('detail', {}).get('remaining') == '0':
+                        completed_trades += 1
+            else:
+                require(head[:3] == (1, state['nextEventIndex'], state['eventHash']) and
+                        type(head[3]) is int and head[3] >= 0,
+                        'sessionAnalyticsHead', 'CORRUPT_RECORD')
+                completed_trades = head[3]
+            return dict(schemaVersion=1, artifact="BTL-SESSION-SUMMARY-1",
+                        sessionId=meta["id"], revision=state["revision"],
+                        throughNs=state["throughNs"], datasetId=state["datasetId"],
+                        datasetVersion=state["datasetVersion"], profileHash=state["profileHash"],
+                        accountCurrency=state["profile"]["accountCurrency"],
+                        initialBalance=state["initialBalance"], balance=state["balance"],
+                        netCashChange=text(Fraction(state["balance"])-Fraction(state["initialBalance"])),
+                        completedTrades=completed_trades,
+                        unresolved=state["unresolved"], ended=state["ended"],
+                        model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
+
+    def method_analytics(self, method_id):
+        """Pool completed committed positions across compatible Sessions only.
+
+        Session metadata is read in fixed-size keyset batches. One Session's
+        verified event fold is reduced immediately into exact aggregate totals;
+        completed rows are never retained across the Method's lifetime.
+        """
+        from .method_analytics_projection import (MethodAnalyticsAccumulator,
+            METHOD_SESSION_BATCH, legacy_session_item)
+        identifier(method_id, 'methodId')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            method = self._method(db, method_id)
+            policy = method_policy(method)
+            aggregate = MethodAnalyticsAccumulator(method_id, policy.definition_hash)
+            after = ''
+            while True:
+                rows = db.execute(
+                    'SELECT session_id FROM btl.tick_research_sessions '
+                    'WHERE workspace_id=%s AND method_id=%s AND session_id>%s '
+                    'ORDER BY session_id LIMIT %s',
+                    (self.scope.workspace_id, method_id, after,
+                     METHOD_SESSION_BATCH + 1)).fetchall()
+                more = len(rows) > METHOD_SESSION_BATCH
+                for (session_id,) in rows[:METHOD_SESSION_BATCH]:
+                    after = session_id
+                    meta, _method, state, _checkpoint = self._session(db, session_id)
+                    require(meta.get('artifact') == 'BTL-LOCAL-SESSION-1' and
+                            meta.get('methodHash') == policy.definition_hash,
+                            'methodSession', 'CORRUPT_RECORD')
+                    unit = (state['profileHash'], state['engineVersion'],
+                            state['profile']['accountCurrency'])
+                    aggregate.observe_unit(unit)
+                    analysis = self._committed_analysis(db, state)
+                    if analysis['status'] != 'COMPLETE':
+                        aggregate.exclude(dict(sessionId=session_id,
+                            reason=analysis.get('reason', 'ANALYSIS_UNAVAILABLE')))
+                        continue
+                    aggregate.include(legacy_session_item(state, analysis['completed']))
+                if not more:
+                    break
+                require(rows and after, 'methodSessions', 'CORRUPT_RECORD')
+            return aggregate.result()
 
     def create_method(self, raw):
         raw = deepcopy(raw)
@@ -126,15 +333,33 @@ class ResearchApplication:
             if prior:
                 require(prior[0] == sha, "methodId", "REFUSED_IDEMPOTENCY_CONFLICT")
                 return self._method(db,raw["id"])
-            count = db.execute("SELECT count(*) FROM btl.tick_methods WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
-            require(count < 128, "methods", "REFUSED_CATALOG_LIMIT")
             db.execute("INSERT INTO btl.tick_methods VALUES (%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],blob,sha))
+            from .method_analytics_store import initialize_rollup
+            initialize_rollup(db, self.scope.workspace_id, raw["id"], policy.definition_hash)
+            from .product_method_lifecycle import register_first_version
+            register_first_version(db, self.scope.workspace_id, raw["id"])
         return raw
 
     def create_session(self, raw):
-        keys(raw, "id name methodId initialBalance startPeriod")
+        require(type(raw) is dict and {'id','name','methodId','initialBalance','startPeriod'} <= set(raw) and
+                set(raw) <= {'id','name','methodId','initialBalance','startPeriod','sourceKey'},
+                'sessionRequest', 'SCHEMA_MISMATCH')
         identifier(raw["id"], "sessionId"); label(raw["name"])
-        if self.__historical:
+        monthly = self.__monthly_source_key is not None
+        if monthly:
+            require(raw.get('sourceKey') == self.__monthly_source_key and
+                    raw['startPeriod'] == self.__monthly_period,
+                    'monthlySource', 'REFUSED_SOURCE')
+            selected = self.__monthly_catalog.selection(self.__monthly_source_key, self.__monthly_period)
+            require(selected['eligibility'] == 'SYNTHETIC' and
+                    selected['manifestSha256'] == self.__provider.manifest_hash,
+                    'monthlySource', 'REFUSED_SOURCE')
+        else:
+            require('sourceKey' not in raw,
+                    'monthlySource', 'REFUSED_SOURCE')
+        if monthly:
+            start = warmup = self.__provider.first_time_for_month(raw['startPeriod'])
+        elif self.__historical:
             start = self.__historical.start_for_period(raw["startPeriod"])
             warmup = start + 1800*1000000000
         else:
@@ -145,6 +370,8 @@ class ResearchApplication:
         try:
             with connect(self.dsn) as db:
                 self._catalog_lock(db)
+                from .product_method_lifecycle import require_active_method
+                require_active_method(db, self.scope.workspace_id, raw["methodId"])
                 method = self._method(db, raw["methodId"]); policy = method_policy(method)
                 state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
                                    str(start), self.__profile, policy, raw["initialBalance"])
@@ -152,6 +379,9 @@ class ResearchApplication:
                 meta = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-1", id=raw["id"], name=label(raw["name"]), methodId=raw["methodId"],
                             methodHash=policy.definition_hash, datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
                             profileHash=state["profileHash"], startPeriod=raw["startPeriod"], initialBalance=state["initialBalance"])
+                if monthly:
+                    meta['sourceKey'] = self.__monthly_source_key
+                    meta['monthlyManifestHash'] = selected['manifestSha256']
                 blob, sha = pack(meta)
                 prior = db.execute("SELECT content_hash FROM btl.tick_research_sessions WHERE workspace_id=%s AND session_id=%s", (self.scope.workspace_id,raw["id"])).fetchone()
                 if prior:
@@ -160,13 +390,13 @@ class ResearchApplication:
                     require(prior[0] == sha, "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
                     self._session(db,raw["id"])
                 else:
-                    count = db.execute("SELECT count(*) FROM btl.tick_research_sessions WHERE workspace_id=%s",(self.scope.workspace_id,)).fetchone()[0]
-                    require(count < 128, "sessions", "REFUSED_CATALOG_LIMIT")
                     timeline = self.__timeline_cache.new_timeline(self.scope, raw["id"], start) if self.__historical else TickTimeline(self.__provider, self.__provider.dataset_id, self.__provider.dataset_version, str(start))
                     timeline.seek(str(warmup))
                     state.update(throughNs=timeline.cursor["throughNs"], nextGroupIndex=timeline.cursor["nextGroupIndex"])
                     self.store._insert(db,self.scope,state,timeline.checkpoint())
                     db.execute("INSERT INTO btl.tick_research_sessions VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["id"],raw["methodId"],blob,sha))
+                    from .method_analytics_store import require_rebuild
+                    require_rebuild(db, self.scope.workspace_id, raw["methodId"])
             if timeline is not None:
                 self.__timeline_cache.seed(self.scope, raw['id'], timeline)
                 seeded = True
@@ -194,23 +424,19 @@ class ResearchApplication:
                               (self.scope.workspace_id,session_id)).fetchall()
             view = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=meta, method=method, state=state,
                         events=[unpack(*row) for row in reversed(rows)], eventWindowStart=max(0,state["nextEventIndex"]-256),
-                        quote=self._quote(state,checkpoint), label=self.__label)
+                        quote=self._quote(state,checkpoint), label=self.__label,
+                        pendingReplayTargetNs=checkpoint['cursor']['pendingTargetNs'])
             if self.__historical:
                 view['replayStepNs'] = '1000000000'
             if timeframe is not None:
                 groups = self.__timeline_cache.window(self.scope, session_id, checkpoint)
                 start = max(0,int(state['nextGroupIndex'])-len(groups))
                 view['chart'] = display_candles(groups,state['throughNs'],timeframe,start)
-                def committed_events():
-                    # Small bounded pages from this same repeatable-read snapshot.
-                    # Refusal above the projection budget occurs before this generator runs.
-                    for offset in range(0, min(state['nextEventIndex'], MAX_ANALYSIS_EVENTS), 256):
-                        page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
-                            (self.scope.workspace_id,session_id,offset)).fetchall()
-                        for row in page:
-                            yield unpack(*row)
-                view['analysis'] = project(state, committed_events(), view['quote'])
-                self._research_risk(db, state, view['analysis'])
+                # Reuse the immutable committed projection shared with the
+                # Journal path. The cache is keyed by persisted Session
+                # revision, event head, and revealed quote; it never drives
+                # fills, cash, replay, or command acceptance.
+                view['analysis'] = self._committed_analysis(db,state,view['quote'])
                 self._research_excursions(state,view['analysis'],groups)
             return view
 
@@ -270,14 +496,32 @@ class ResearchApplication:
         return self.inspect(session_id, raw['timeframe'])
 
     def _committed_analysis(self, db, state, quote=None):
+        from .analysis_cache import COMMITTED_ANALYSIS_CACHE
+        cache_key = COMMITTED_ANALYSIS_CACHE.key(
+            dsn=self.dsn, workspace_id=self.scope.workspace_id,
+            session_id=state['sessionId'], revision=state['revision'],
+            event_head=state['eventHash'], quote=quote)
+        cached = COMMITTED_ANALYSIS_CACHE.get(cache_key)
+        if (type(cached) is dict and cached.get('schemaVersion') == 1 and
+                cached.get('artifact') == 'BTL-COMMITTED-ANALYSIS-CACHE-1' and
+                type(cached.get('analysis')) is dict):
+            provenance = cached['analysis'].get('provenance')
+            if (type(provenance) is dict and
+                    (provenance.get('sessionId'), provenance.get('revision'), provenance.get('eventHead'),
+                     provenance.get('datasetVersion')) ==
+                    (state['sessionId'], state['revision'], state['eventHash'], state['datasetVersion'])):
+                return cached['analysis']
+
         def events():
-            for offset in range(0,min(state['nextEventIndex'],MAX_ANALYSIS_EVENTS),256):
+            for offset in range(0,state['nextEventIndex'],256):
                 page = db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT 256',
                                   (self.scope.workspace_id,state['sessionId'],offset)).fetchall()
                 for row in page:
                     yield unpack(*row)
         analysis = project(state, events(), quote)
         self._research_risk(db,state,analysis)
+        COMMITTED_ANALYSIS_CACHE.put(cache_key,{
+            'schemaVersion':1,'artifact':'BTL-COMMITTED-ANALYSIS-CACHE-1','analysis':analysis})
         return analysis
 
     def bootstrap(self, session_id, raw):
@@ -292,12 +536,104 @@ class ResearchApplication:
         result['provenance']=analysis['provenance']
         return result
 
-    def _journal_projection(self, db, state, checkpoint):
+    def _journal_projection(self, db, state, checkpoint, max_orders=MAX_JOURNAL_ORDERS):
         require(state['nextEventIndex'] <= MAX_ANALYSIS_EVENTS, 'journal', 'REFUSED_ANALYSIS_LIMIT')
         analysis = self._committed_analysis(db,state,self._quote(state,checkpoint))
         self._research_excursions(state,analysis,self.__timeline_cache.window(self.scope,state['sessionId'],checkpoint) if analysis['completed'] else [])
-        require(len(analysis['orders']) <= MAX_JOURNAL_ORDERS,'journal','REFUSED_JOURNAL_LIMIT')
+        require(len(analysis['orders']) <= max_orders,'journal','REFUSED_JOURNAL_LIMIT')
         return analysis
+
+    def _indexed_journal_page(self, db, state, checkpoint, after_order_id, limit,
+                              exact_order_id=None):
+        """Read a page from the transactionally maintained, hash-checked index."""
+        if state['parent'] is not None:
+            return None
+        head = db.execute(
+            'SELECT format_version,through_sequence,event_hash,order_count '
+            'FROM btl.tick_journal_projection_heads '
+            'WHERE workspace_id=%s AND session_id=%s',
+            (self.scope.workspace_id, state['sessionId']),
+        ).fetchone()
+        if head is None or head[:3] != (1, state['nextEventIndex'], state['eventHash']):
+            return None
+        select = (
+            'SELECT p.order_id,p.order_status,p.last_sequence,p.event_id,p.payload,p.content_hash,'
+            'i.event_kind,i.projection_hash,e.payload,e.content_hash '
+            'FROM btl.tick_journal_order_projection p '
+            'JOIN btl.tick_journal_order_events i '
+            'ON (i.workspace_id,i.session_id,i.order_id,i.sequence,i.event_id)='
+            '(p.workspace_id,p.session_id,p.order_id,p.last_sequence,p.event_id) '
+            'JOIN btl.tick_events e '
+            'ON (e.workspace_id,e.session_id,e.sequence,e.event_id)='
+            '(p.workspace_id,p.session_id,p.last_sequence,p.event_id) '
+            'WHERE p.workspace_id=%s AND p.session_id=%s AND '
+        )
+        if exact_order_id is not None:
+            identifier(exact_order_id, 'orderId')
+            rows = db.execute(select + 'p.order_id=%s LIMIT 1',
+                (self.scope.workspace_id, state['sessionId'], exact_order_id)).fetchall()
+        else:
+            rows = db.execute(select + 'p.order_id COLLATE "C">%s COLLATE "C" '
+                'ORDER BY p.order_id COLLATE "C" LIMIT %s',
+                (self.scope.workspace_id, state['sessionId'], after_order_id or '', limit + 1)).fetchall()
+
+        quote = self._quote(state, checkpoint)
+        mark_available = (not state['unresolved'] and quote is not None and
+                          int(quote['timeNs']) <= int(state['throughNs']))
+        orders, completed = [], []
+        for (order_id, status, sequence, event_id, raw, digest_value, event_kind,
+             projection_hash, event_raw, event_digest) in rows[:limit]:
+            require(sequence < state['nextEventIndex'], 'journalProjectionSequence', 'CORRUPT_RECORD')
+            projection = verify_journal_order_projection(raw, digest_value,
+                session_id=state['sessionId'], order_id=order_id, status=status,
+                sequence=sequence, event_id=event_id)
+            require(projection['contentHash'] == projection_hash,
+                    'journalProjectionLedgerBinding', 'CORRUPT_RECORD')
+            event = unpack(event_raw, event_digest)
+            require(event['sequence'] == sequence and event['eventId'] == event_id and
+                    event['kind'] == event_kind and event['sessionId'] == state['sessionId'] and
+                    (event['datasetId'], event['datasetVersion'], event['profileHash'],
+                     event['methodHash'], event['engineVersion']) ==
+                    (state['datasetId'], state['datasetVersion'], state['profileHash'],
+                     state['policy']['definitionHash'], state['engineVersion']) and
+                    event['eventId'] == content_hash({key: value for key, value in event.items()
+                                                       if key != 'eventId'}) and
+                    (event.get('orderId') == order_id or
+                     event['kind'] == 'UNRESOLVED' and order_id in event['detail']['affectedOrderIds']),
+                    'journalProjectionEvent', 'CORRUPT_RECORD')
+            order = projection['order']
+            if status in ('PENDING', 'ACTIVE'):
+                stored = state['orders'].get(order_id)
+                require(stored is not None and all(order[key] == stored[key] for key in
+                    ('status','quantity','remaining','entryPrice','entryFillRef','side','entry','sl','tp',
+                     'orderType','workflow')), 'journalProjectionActiveOrder', 'CORRUPT_RECORD')
+                order['exitRequested'] = stored['exitRequest'] is not None
+                order['unrealizedIndicative'] = None
+                if status == 'ACTIVE' and mark_available:
+                    liquidation = Fraction(quote['bid'] if order['side'] == 'LONG' else quote['ask'])
+                    mark = ((1 if order['side'] == 'LONG' else -1) *
+                        (liquidation - Fraction(order['entryPrice'])) *
+                        Fraction(state['profile']['contractSize']) * Fraction(order['remaining']))
+                    order['unrealizedIndicative'] = text(mark)
+            else:
+                require(order_id not in state['orders'],
+                        'journalProjectionTerminalOrder', 'CORRUPT_RECORD')
+            orders.append(order)
+            if status == 'CLOSED':
+                completed.append(order)
+
+        analysis = dict(status='COMPLETE', orders=orders, completed=completed,
+            metrics=metrics(completed), provenance=dict(sessionId=state['sessionId'],
+                revision=state['revision'], datasetId=state['datasetId'],
+                datasetVersion=state['datasetVersion'], engineVersion=state['engineVersion'],
+                profileHash=state['profileHash'], methodHash=state['policy']['definitionHash'],
+                eventHead=state['eventHash'], researchVersion=RESEARCH_VERSION,
+                analysisVersion=ANALYSIS_VERSION,
+                model='SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION'))
+        self._research_risk(db, state, analysis)
+        groups = self.__timeline_cache.window(self.scope, state['sessionId'], checkpoint) if completed else []
+        self._research_excursions(state, analysis, groups)
+        return dict(analysis=analysis, total=int(head[3]), more=len(rows) > limit)
 
     def journal(self, session_id):
         with connect(self.dsn) as db:
@@ -315,6 +651,93 @@ class ResearchApplication:
                 notes.append(value)
             return dict(schemaVersion=1,artifact='BTL-TICK-JOURNAL-1',provenance=analysis['provenance'],orders=analysis['orders'],notes=notes,
                         financialAuthority='COMMITTED_EVENTS_ONLY',notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
+    def journal_page(self, session_id, raw):
+        keys(raw, 'limit cursor')
+        limit = raw['limit']
+        require(type(limit) is int and 1 <= limit <= MAX_JOURNAL_PAGE_SIZE,
+                'limit', 'INVALID_INPUT')
+        cursor = raw['cursor']
+        require(cursor is None or type(cursor) is str, 'cursor', 'INVALID_CURSOR')
+        requested_revision, after_order_id = (None, None) if cursor is None else decode_cursor(cursor, session_id)
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            _meta, _method, state, checkpoint = self._session(db, session_id)
+            if requested_revision is not None:
+                require(requested_revision == state['revision'], 'cursor', 'STALE_REVISION')
+            indexed_page = self._indexed_journal_page(db, state, checkpoint,
+                                                       after_order_id, limit)
+            if indexed_page is None:
+                analysis = self._journal_projection(db, state, checkpoint, MAX_ORDERS)
+                orders = sorted(analysis['orders'], key=lambda row: row['id'])
+                require(len(orders) <= MAX_JOURNAL_READ_ORDERS,
+                        'journal', 'REFUSED_JOURNAL_LIMIT')
+                if after_order_id is not None:
+                    orders = [row for row in orders if row['id'] > after_order_id]
+                page = orders[:limit]
+                more = len(orders) > len(page)
+                total_orders = len(analysis['orders'])
+            else:
+                analysis = indexed_page['analysis']
+                page = analysis['orders']
+                more = indexed_page['more']
+                total_orders = indexed_page['total']
+                require(total_orders <= MAX_JOURNAL_READ_ORDERS,
+                        'journal', 'REFUSED_JOURNAL_LIMIT')
+            order_ids = [row['id'] for row in page]
+            indexed = {row['id']: row for row in page}
+            notes = []
+            if order_ids:
+                saved = db.execute(
+                    'SELECT payload,content_hash,note_revision,order_id FROM btl.tick_journal_notes '
+                    'WHERE workspace_id=%s AND session_id=%s AND order_id=ANY(%s) ORDER BY order_id LIMIT %s',
+                    (self.scope.workspace_id, session_id, order_ids, limit + 1)).fetchall()
+                require(len(saved) <= limit, 'journalNotes', 'CORRUPT_RECORD')
+                for blob, sha, note_revision, order_id in saved:
+                    value = validate_note(unpack(blob, sha), state, indexed)
+                    require((value['orderId'], value['noteRevision']) == (order_id, note_revision),
+                            'journalNote', 'CORRUPT_RECORD')
+                    notes.append(value)
+            next_cursor = encode_cursor(session_id, state['revision'], page[-1]['id']) if more and page else None
+            return dict(schemaVersion=1, artifact='BTL-TICK-JOURNAL-PAGE-1', sessionId=session_id,
+                        revision=state['revision'], totalOrders=total_orders, orders=page,
+                        notes=notes, nextCursor=next_cursor, complete=next_cursor is None,
+                        provenance=analysis['provenance'], financialAuthority='COMMITTED_EVENTS_ONLY',
+                        notesAuthority='MUTABLE_RESEARCH_ANNOTATION')
+
+    def order_history_page(self, session_id, raw):
+        keys(raw,'limit afterSequence revision')
+        return self.store.order_history_page(self.scope,session_id,
+            after_sequence=raw['afterSequence'],revision_pin=raw['revision'],limit=raw['limit'])
+
+    def analytics_page(self, session_id, raw):
+        """Bounded compatibility page over a verified committed-event projection."""
+        require(type(raw) is dict and set(raw)=={'limit','offset','revision'},
+                'analyticsPage','SCHEMA_MISMATCH')
+        limit,offset,revision_pin=raw['limit'],raw['offset'],raw['revision']
+        require(type(limit) is int and 1<=limit<=64,'limit','INVALID_INPUT')
+        require(type(offset) is int and offset>=0,'offset','INVALID_CURSOR')
+        require(revision_pin is None or (type(revision_pin) is int and revision_pin>=0),
+                'revision','INVALID_CURSOR')
+        with connect(self.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            _meta,_method,state,checkpoint=self._session(db,session_id)
+            require(revision_pin is None or revision_pin==state['revision'],
+                    'revision','STALE_REVISION')
+            analysis=self._committed_analysis(db,state,self._quote(state,checkpoint))
+            require(analysis['status']=='COMPLETE','analysis','REFUSED_ANALYSIS_LIMIT')
+            total=len(analysis['completed'])
+            require(offset<=total,'offset','INVALID_CURSOR')
+            completed=analysis['completed'][offset:offset+limit]
+            next_offset=offset+len(completed) if offset+len(completed)<total else None
+            return dict(schemaVersion=1,artifact='BTL-OBSERVED-ANALYTICS-PAGE-1',
+                sessionId=session_id,revision=state['revision'],status='COMPLETE',
+                metrics=analysis['metrics'],completed=completed,nextTradeOffset=next_offset,
+                nextCursor=None,account=analysis['account'],equity=analysis['equity'],
+                equityWindowStart=analysis['metrics']['equityWindowStart'],
+                annotations=analysis['annotations'],
+                annotationWindowStart=analysis['annotationWindowStart'],
+                provenance=analysis['provenance'])
 
     def save_note(self, session_id, raw):
         journal_request(raw)
@@ -353,7 +776,11 @@ class ResearchApplication:
                 reviewed = unpack(*prior)
                 require(reviewed["requestHash"] == request_hash,"requestId","REFUSED_IDEMPOTENCY_CONFLICT")
                 return dict(review=reviewed,reviewHash=prior[1])
-            require(raw["expectedRevision"] == state["revision"],"revision","REFUSED_STALE_REVISION")
+            if raw["expectedRevision"] != state["revision"]:
+                log.warning("stale_revision_refused requestType=REVIEW sessionDigest=%s expectedRevision=%s actualRevision=%s status=%s",
+                            hashlib.sha256(raw["sessionId"].encode()).hexdigest()[:16],
+                            raw["expectedRevision"], state["revision"], "REFUSED_STALE_REVISION")
+                require(False,"revision","REFUSED_STALE_REVISION")
             require(not state["ended"] and not state["unresolved"],"session","REFUSED_UNRESOLVED_SESSION")
             draft = deepcopy(raw["draft"])
             keys(draft,"side orderType workflow entry quantity sl tp riskPercent observations")
@@ -394,8 +821,6 @@ class ResearchApplication:
                             throughNs=state["throughNs"],riskBasis=state["balance"],model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
             reviewed['researchRisk'] = planned_risk(state,command)
             blob, sha = pack(reviewed)
-            count = db.execute("SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s",(self.scope.workspace_id,raw["sessionId"])).fetchone()[0]
-            require(count < 256,"reviews","REFUSED_REVIEW_LIMIT")
             db.execute("INSERT INTO btl.tick_order_reviews VALUES (%s,%s,%s,%s,%s)",(self.scope.workspace_id,raw["sessionId"],raw["requestId"],blob,sha))
         return dict(review=reviewed,reviewHash=sha)
 
@@ -416,3 +841,53 @@ class ResearchApplication:
         with connect(self.dsn) as db:
             self._session(db,session_id)
         return self.controller.apply(self.scope,command)
+
+    def jump_next_event(self, session_id, raw):
+        """Commit one bounded canonical ADVANCE chunk toward the next event."""
+        validate_jump_request(raw, session_id)
+        with connect(self.dsn) as db:
+            _meta, _method, state, _checkpoint = self._session(db, session_id)
+        live = any(order['status'] in ('PENDING', 'ACTIVE') for order in state['orders'].values())
+        if not live or state['ended'] or state['unresolved']:
+            view = self.inspect(session_id, raw['timeframe'])
+            return jump_result(raw, status='NO_ACTIVE_ORDERS', through_ns=state['throughNs'],
+                advances=0, processed_groups=0, events=[], view=view)
+        end_exclusive = int(self.__provider.describe(state['datasetId'], state['datasetVersion'])['range']['endNs'])
+        target = str(end_exclusive - 1)
+        require(state['revision'] in (raw['expectedRevision'], raw['expectedRevision'] + 1),
+                'revision', 'REFUSED_STALE_REVISION')
+        if state['revision'] == raw['expectedRevision']:
+            preview = self.controller.preview_next_event(self.scope, state, _checkpoint, target)
+            # Timestamp alone cannot prove the source is exhausted: the cursor
+            # may still point at an unrevealed atomic group with that timestamp.
+            if not preview['previewGroups'] and int(state['throughNs']) >= int(target):
+                view = self.inspect(session_id, raw['timeframe'])
+                return jump_result(raw, status='NO_EVENT_UNTIL_SESSION_END',
+                    through_ns=state['throughNs'], advances=0, processed_groups=0,
+                    events=[], view=view)
+            advance_target = preview['targetNs']
+        else:
+            # Recovery after the command committed but its queue result was
+            # lost: the accepted throughNs is the exact idempotent command target.
+            advance_target = state['throughNs']
+        command = jump_advance_command({**raw, 'targetNs': advance_target}, raw['expectedRevision'],
+                                       'BTL-TICK-EXECUTION-COMMAND-1')
+        # Exact retries reuse this command id. The store returns its original
+        # durable receipt before checking a stale revision; no second ADVANCE
+        # or financial mutation is created.
+        saved = self.controller.apply(self.scope, command)
+        state_after = saved['state']
+        current = self.controller.inspect(self.scope, session_id, state_after['nextEventIndex'], 1)['state']
+        require(current['revision'] == state_after['revision'],
+                'revision', 'REFUSED_STALE_REVISION')
+        events = saved['events']
+        event_found = any(event['kind'] in FINANCIAL_EVENT_KINDS for event in events)
+        progressed = int(state_after['nextGroupIndex']) > int(state['nextGroupIndex']) or int(state_after['throughNs']) > int(state['throughNs'])
+        at_end = int(state_after['throughNs']) >= int(target)
+        status = ('EVENT_FOUND' if event_found else 'NO_EVENT_UNTIL_SESSION_END' if at_end
+                  else 'SEARCHING' if progressed else 'NO_EVENT_UNTIL_SESSION_END')
+        view = self.inspect(session_id, raw['timeframe'])
+        require(view['state']['revision'] == state_after['revision'], 'revision', 'REFUSED_STALE_REVISION')
+        return jump_result(raw, status=status, through_ns=state_after['throughNs'], advances=1,
+            processed_groups=max(0, int(state_after['nextGroupIndex']) - int(state['nextGroupIndex'])),
+            events=events, view=view)

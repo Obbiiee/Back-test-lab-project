@@ -13,6 +13,9 @@ export default function AlphaTicketEstimate({plan,view}){
       {cell('R:R',estimate.rr?`1 : ${estimate.rr}`:null)}
       {cell('≈ Lots',estimate.lots)}
     </dl>
+    {estimate.riskMoney&&estimate.rewardMoney&&Number(estimate.rr)>0&&<div className="alpha-rr-bar" aria-hidden="true">
+      <span className="alpha-rr-loss" style={{flexGrow:1}}>1R</span><span className="alpha-rr-profit" style={{flexGrow:Math.min(Number(estimate.rr),6)}}>{estimate.rr}R</span>
+    </div>}
     <p>{estimate.reason??`Stop ${estimate.stopTicks} ticks${estimate.targetTicks?` · target ${estimate.targetTicks} ticks`:''} · ${plan.riskPercent}% of saved balance $${view.state.balance}.`} Estimate only; the review shows the exact values.</p>
   </section>;
 }

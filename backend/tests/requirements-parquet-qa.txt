@@ -1,0 +1,3 @@
+# Optional isolated benchmark tooling only; not application requirements.
+pyarrow==26.0.0
+duckdb==2.0.0

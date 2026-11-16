@@ -1,0 +1,143 @@
+"""Read-only bounded-memory observed ledger fold; no source/quote/settlement access."""
+from collections import deque
+from copy import deepcopy
+from fractions import Fraction
+from contracts.canonical import content_hash
+from contracts.primitives import require
+from ticks.contracts import uint
+from execution.contracts import open_payload,policy_from_wire,text
+from execution.engine import protective
+from execution.observed_profile import ObservedExecutionProfile,MODEL
+from execution.observed_finance import exit_amount
+from execution.observed_kernel import validate_state,STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1
+from execution.analysis import metrics as committed_metrics
+from execution.observed_postgres import check_events,QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE,PROGRESS_BASE
+from collections import OrderedDict
+from threading import RLock
+from infrastructure.database import connect
+from execution.postgres import scoped,unpack
+from execution.observed_postgres import read_snapshot
+
+
+def ratio(v):return dict(numerator=str(v.numerator),denominator=str(v.denominator))
+
+
+class LedgerFold:
+    """Independent event projection; finance curve is bounded, order history is complete.
+
+    QA archive sessions keep the active canonical state bounded and reconcile
+    terminal order records against this event fold. Analysis may materialize
+    historical trades for a response, but never writes them back into hot state.
+    """
+    def __init__(self,genesis,order_retention_policy=None):
+        validate_state(genesis,order_retention_policy=order_retention_policy);require(genesis['revision']==0 and genesis['nextEventIndex']==0 and genesis['orders']=={} and genesis['balance']==genesis['initialBalance'] and not genesis['unresolved'] and not genesis['ended'],'genesis','CORRUPT_RECORD')
+        seed=dict(schemaVersion=1,artifact='BTL-OBSERVED-EXECUTION-SEED-1',sessionId=genesis['sessionId'],profileHash=genesis['profileHash'],policy=genesis['policy'],startNs=genesis['startNs'],initialBalance=genesis['initialBalance'])
+        require(content_hash(seed)==genesis['eventHash'],'genesisHash','CORRUPT_RECORD')
+        self.genesis=deepcopy(genesis);self.order_retention_policy=deepcopy(order_retention_policy);self.profile=ObservedExecutionProfile.from_wire(genesis['profile']);self.next=0;self.head=genesis['eventHash'];self.orders={};self.entry_times={};self.exit_times={};self.entry_refs={};self.exit_refs={};self.exit_prices={};self.exit_reasons={};self.exact_gross={};self.exit_counts={};self.exit_sequences={}
+        self.balance=self.peak=Fraction(genesis['initialBalance']);self.gross=self.max_dd=self.max_dd_rate=Fraction(0);self.curve=deque(maxlen=256);self.annotations=deque(maxlen=512);self.financial_count=0;self.unresolved=False;self.ended=False;self.last_fill=int(genesis['startNs'])
+
+    def consume(self,e):
+        next_,head=check_events([e],self.genesis,self.next,self.head);kind=e['kind'];oid=e['orderId'];d=e['detail'];p=self.profile.wire
+        if kind in ('ENTRY_FILL','EXIT_FILL','ORDER_CANCELLED','EXPIRED_NO_QUOTE','EXIT_REQUESTED'):require(oid in self.orders,'order','CORRUPT_RECORD')
+        if kind=='ORDER_ACCEPTED':
+            require(oid not in self.orders,'order','CORRUPT_RECORD');plan=deepcopy(d['plan']);require(open_payload(plan,p,policy_from_wire(self.genesis['policy']),d['riskBalance'])==plan,'plan','CORRUPT_RECORD')
+            self.orders[oid]=dict(plan,status='PENDING',availableNs=d['availableNs'],remaining=plan['quantity'],entryPrice=None,entryFillRef=None,entryCost='0',exitRequest=None,grossPosted='0',riskBalance=d['riskBalance'],riskBasisHash=d['riskBasisHash'])
+        elif kind in ('ORDER_CANCELLED','EXPIRED_NO_QUOTE'):
+            o=self.orders[oid];require(o['status']=='PENDING','order','CORRUPT_RECORD');o['status']='CANCELLED' if kind=='ORDER_CANCELLED' else 'EXPIRED'
+        elif kind=='EXIT_REQUESTED':
+            o=self.orders[oid];require(o['status']=='ACTIVE' and o['exitRequest'] is None,'exit','CORRUPT_RECORD');o['exitRequest']=dict(quantity=d['quantity'],availableNs=d['availableNs'])
+        elif kind=='UNRESOLVED':
+            for key in d['affectedOrderIds']:
+                require(key in self.orders,'order','CORRUPT_RECORD');o=self.orders[key];require(o['status'] in ('PENDING','ACTIVE'),'unresolved','CORRUPT_RECORD');o.update(status='UNRESOLVED',exitRequest=None);self.unresolved=True
+        elif kind=='SESSION_ENDED':self.ended=True
+        if kind in ('ENTRY_FILL','EXIT_FILL'):
+            o=self.orders[oid];evidence=d['evidence'];moment=uint(evidence['timeNs']);require(self.last_fill<=moment and int(o['availableNs'])<=moment and d['commission']=='0','fill','CORRUPT_RECORD');self.last_fill=moment
+            expected_side='ask' if (o['side']=='LONG')==(kind=='ENTRY_FILL') else 'bid';require(d['price']==evidence[expected_side],'side','CORRUPT_RECORD')
+            if kind=='ENTRY_FILL':
+                require(o['status']=='PENDING' and d['quantity']==o['quantity'] and d['balanceDelta']=='0','entry','CORRUPT_RECORD');o.update(status='ACTIVE',entryPrice=d['price'],entryFillRef=e['eventId']);self.entry_times[oid]=moment;self.entry_refs[oid]=e['eventId']
+            else:
+                size=Fraction(d['quantity']);remaining=Fraction(o['remaining'])-size
+                require(o['status']=='ACTIVE' and 0<size<=Fraction(o['remaining']) and remaining==Fraction(d['remaining']) and d['entryFillRef']==o['entryFillRef'],'exit','CORRUPT_RECORD')
+                amount=exit_amount(self.profile,side=o['side'],entry_price=o['entryPrice'],exit_price=d['price'],lots=d['quantity'])
+                require(amount['grossExact']==d['grossExact'] and amount['grossPosted']==d['grossPosted']==d['balanceDelta'],'cash','CORRUPT_RECORD')
+                if d['reason']=='MANUAL':
+                    request=o['exitRequest'];require(protective(o,dict(bid=evidence['bid'],ask=evidence['ask'])) is None and request is not None and request['quantity']==d['quantity'] and int(request['availableNs'])<=moment,'exitRequest','CORRUPT_RECORD')
+                else:require(d['reason']==protective(o,dict(bid=evidence['bid'],ask=evidence['ask'])) and size==Fraction(o['remaining']),'protection','CORRUPT_RECORD')
+                posted=Fraction(d['grossPosted']);self.balance+=posted;self.gross+=posted;self.exact_gross[oid]=self.exact_gross.get(oid,Fraction(0))+Fraction(d['grossExact']);self.exit_counts[oid]=self.exit_counts.get(oid,0)+1
+                o.update(remaining=d['remaining'],status='CLOSED' if remaining==0 else 'ACTIVE',exitRequest=None,grossPosted=text(Fraction(o['grossPosted'])+posted));self.exit_times[oid]=moment;self.exit_sequences[oid]=e['sequence'];self.exit_refs[oid]=e['eventId'];self.exit_prices[oid]=d['price'];self.exit_reasons[oid]=d['reason']
+            self.annotations.append(dict(eventId=e['eventId'],orderId=oid,kind=kind,timeNs=evidence['timeNs'],price=d['price'],side=o['side'],reason=d.get('reason'),chronologyLimited=evidence['chronologyLimited']))
+            self.financial_count+=1;self.peak=max(self.peak,self.balance);dd=self.peak-self.balance;self.max_dd=max(self.max_dd,dd);self.max_dd_rate=max(self.max_dd_rate,dd/self.peak)
+            self.curve.append(dict(sequence=e['sequence'],eventId=e['eventId'],orderId=oid,timeNs=str(moment),balance=text(self.balance),drawdown=text(dd)))
+        self.next,self.head=next_,head
+
+    def project(self,state,offset=0,maximum=64,archive_orders=None):
+        validate_state(state,order_retention_policy=self.order_retention_policy);require(all(state[k]==self.genesis[k] for k in ('sessionId','datasetId','datasetVersion','profileHash','profile','policy','initialBalance','startNs','parent')),'context','CORRUPT_RECORD')
+        if state['artifact'] in (STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1):
+            active={oid:o for oid,o in self.orders.items() if o['status'] in ('PENDING','ACTIVE')}
+            terminal={oid:o for oid,o in self.orders.items() if o['status'] not in ('PENDING','ACTIVE')}
+            require(type(archive_orders) is dict and terminal==archive_orders and active==state['orders'],
+                    'archiveLedgerParity','CORRUPT_RECORD')
+        else:
+            terminal={};require(self.orders==state['orders'],'ledgerOrders','CORRUPT_RECORD')
+        require(self.next==state['nextEventIndex'] and self.head==state['eventHash'] and self.balance==Fraction(state['balance']) and self.gross==Fraction(state['realizedGross']) and self.unresolved==state['unresolved'] and self.ended==state['ended'] and state['financial'] is (self.financial_count>0) and self.last_fill<=int(state['throughNs']),'ledgerHead','CORRUPT_RECORD')
+        rows=[]
+        for oid,o in sorted(self.orders.items(),key=lambda pair:self.exit_sequences.get(pair[0],-1)):
+            if o['status']!='CLOSED':continue
+            # Frozen research owner requires immutable PRE-ENTRY confirmation
+            # R0; actual-entry geometry is not a retrospective substitute.
+            r=None;reason='PREENTRY_REVIEW_RISK_NOT_JOINED'
+            rows.append(dict(id=oid,side=o['side'],entryTimeNs=str(self.entry_times[oid]),exitTimeNs=str(self.exit_times[oid]),entryPrice=o['entryPrice'],quantity=o['quantity'],exitFills=self.exit_counts[oid],entryFillRef=self.entry_refs[oid],exitFillRef=self.exit_refs[oid],exitPrice=self.exit_prices[oid],exitReason=self.exit_reasons[oid],commission='0',net=o['grossPosted'],netPosted=o['grossPosted'],grossExact=text(self.exact_gross[oid]),rMultiple=None if r is None else ratio(r),rReason=reason,durationNs=str(self.exit_times[oid]-self.entry_times[oid])))
+        require(type(offset) is int and 0<=offset<=len(rows) and type(maximum) is int and 1<=maximum<=64,'pagination')
+        total=len(rows);page=rows[offset:offset+maximum]
+        # Reuse the frozen pure calculator, including signed average loss,
+        # BE streak reset, duration and null-denominator semantics.
+        metrics=committed_metrics([dict(row,net=row['netPosted']) for row in rows])
+        metrics.update(closed=total,profitFactorReason='NO_REALIZED_LOSSES' if metrics['profitFactor'] is None else None,realizedNetCompleted=text(sum((Fraction(r['netPosted']) for r in rows),Fraction(0))),unresolved=sum(o['status']=='UNRESOLVED' for o in self.orders.values()),expired=sum(o['status']=='EXPIRED' for o in self.orders.values()),cancelled=sum(o['status']=='CANCELLED' for o in self.orders.values()),totalR=None,rAvailable=0,rReason='INCOMPLETE_R_COVERAGE',rBasis='IMMUTABLE_PREENTRY_CONFIRMED_RISK_REQUIRED',maxDrawdown=text(self.max_dd),maxDrawdownRate=ratio(self.max_dd_rate),unrealizedExcluded=True)
+        order_details={row['id']:deepcopy(self.orders[row['id']]) for row in page}
+        return dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='COMPLETE',provenance=dict(sessionId=state['sessionId'],revision=state['revision'],engineVersion=state['engineVersion'],model=MODEL,datasetId=state['datasetId'],datasetVersion=state['datasetVersion'],profileHash=state['profileHash'],methodHash=state['policy']['definitionHash']),metrics=metrics,completed=page,orderDetails=order_details,nextTradeOffset=offset+len(page) if offset+len(page)<total else None,account=dict(currency='USD',initialBalance=state['initialBalance'],balance=state['balance'],realizedGross=state['realizedGross'],commission='0'),balanceCurve=list(self.curve),curveWindowStart=max(0,self.financial_count-256),annotations=list(self.annotations),annotationWindowStart=max(0,self.financial_count-512),markToMarketAvailable=False)
+
+
+class ObservedStatistics:
+    """Source-free, bounded incremental projection of immutable SQL evidence.
+
+    One call consumes at most 1024 events; BUILDING has no partial financial
+    metrics. A 64-session LRU bounds memory without imposing a lifetime event
+    ceiling. Eviction merely rebuilds from SQL. Lock precedes opening the read
+    snapshot, so a cached fold cannot come from a newer concurrent snapshot.
+    This first implementation serializes projection calls, not trading writes.
+    """
+    def __init__(self,store):
+        self.store=store;self._folds=OrderedDict();self._lock=RLock()
+
+    def inspect(self,scope,session_id,offset=0,maximum=64):
+        workspace,session=scoped(scope,session_id)
+        require(type(offset) is int and offset>=0 and type(maximum) is int and 1<=maximum<=64,'pagination')
+        with self._lock,connect(self.store.dsn) as db:
+            db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            state=self.store._read(db,workspace,session)['state']
+            seed=db.execute('SELECT payload,content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s AND session_id=%s AND revision=0',(workspace,session)).fetchone()
+            require(seed is not None,'genesis','CORRUPT_RECORD')
+            seed_wire=unpack(*seed)
+            if seed_wire.get('artifact') in (QA3_CHECKPOINT_BASE,COMPACT_CHECKPOINT_BASE,PROGRESS_BASE):
+                genesis,_=self.store._qa_reconstruct(db,workspace,session,upto_revision=0)
+            else:genesis=read_snapshot(*seed)['state']
+            key=(workspace,session,content_hash(genesis));prior=self._folds.get(key)
+            fold=deepcopy(prior) if prior is not None else LedgerFold(genesis,self.store.order_retention_policy)
+            require(fold.next<=state['nextEventIndex'],'eventRegression','CORRUPT_RECORD')
+            for _ in range(16):
+                if fold.next==state['nextEventIndex']:break
+                rows=db.execute('SELECT payload,content_hash FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s AND sequence>=%s AND sequence<%s ORDER BY sequence LIMIT 64',(workspace,session,fold.next,state['nextEventIndex'])).fetchall()
+                require(len(rows)==min(64,state['nextEventIndex']-fold.next),'eventCount','CORRUPT_RECORD')
+                for row in rows:fold.consume(unpack(*row))
+            if fold.next==state['nextEventIndex']:
+                archive_orders=None
+                if state['artifact'] in (STATE_QA_ARCHIVE_V1,STATE_PRODUCT_ARCHIVE_V1):
+                    self.store._verify_order_archive(db,workspace,session,state,full=True)
+                    archive_orders={row['orderId']:row['order'] for row in self.store._archive_rows(db,workspace,session,state)}
+                result=fold.project(state,offset,maximum,archive_orders=archive_orders)
+            else:
+                result=dict(schemaVersion=1,artifact='BTL-OBSERVED-COMMITTED-STATISTICS-1',status='BUILDING',sessionId=session,revision=state['revision'],processedEvents=fold.next,totalEvents=state['nextEventIndex'],metrics=None,completed=[],nextTradeOffset=None)
+            # Failed validation never replaces an accepted cached prefix.
+            self._folds[key]=fold;self._folds.move_to_end(key)
+            while len(self._folds)>64:self._folds.popitem(last=False)
+            return result

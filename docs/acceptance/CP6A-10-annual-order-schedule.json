@@ -1,0 +1,56 @@
+{
+  "artifact": "RIKSORA-CP6A-10-ANNUAL-ORDER-SCHEDULE-1",
+  "checkpoint": "CP6A-10",
+  "status": "SCHEDULE_DEFINED_NOT_YET_ACCEPTANCE_TESTED",
+  "interval": {
+    "start": "2024-01-01T00:00:00Z",
+    "endInclusive": "2024-12-31T23:59:59.999999999Z",
+    "calendarDays": 366,
+    "sourceProcessing": "ALL_OBSERVED_TIMESTAMP_GROUPS"
+  },
+  "source": {
+    "datasetId": "local:hf-community:XAUUSD:2024:53011f22a5887999a2c883a2",
+    "datasetVersion": "87e3c3355dccc3afafef837a56d24046275dcf8ee6d1173a929a10279f14e743",
+    "archiveSha256": "b8f45551f408021514ab92599bd227eb4bfa9097c865d0084e0a91999c155b94",
+    "sourceManifestHash": "53011f22a5887999a2c883a20cf5702d011a9523cb50578979059f9f3c2bfc5a",
+    "qualificationReceiptSha256": "1ace74978391741f66078b8969a1784229a7c17f07b32f63b7e9e41e148cbb29",
+    "sourceRights": "UNKNOWN",
+    "executionEligibility": "NOT_GRANTED"
+  },
+  "schedule": {
+    "version": "cp6a10-annual-v1",
+    "utcDecisionSlotsHours": [0, 6, 12, 18],
+    "decisionTargetRule": "For each slot, shift the pinned CP6A-9 Jan 2 decision target for that UTC hour by the exact calendar-day offset. All timestamp groups are processed; decisions use only the currently revealed quote basis.",
+    "staleOrUnavailableBasis": "Skip the order submission when the revealed quote basis is absent or older than 60 seconds. Do not substitute another time, quote, candle, or intrabar path.",
+    "orderPlanRotation": ["LONG/LIMIT", "SHORT/STOP", "LONG/STOP", "SHORT/LIMIT"],
+    "rotationIndex": "(dayIndexSinceStart * 4 + slotIndex) mod 4",
+    "firstDayOpening": "If a current revealed quote exists, the existing opening action submits four near plans and two far control orders; the remaining three slots submit at most one rotated plan each. If no opening quote exists (as at the beginning of Jan 1 in the pinned source), no quote or order is fabricated; the slot is skipped.",
+    "subsequentDays": "At most one rotated plan per UTC slot.",
+    "maximumAcceptedOrders": 1469,
+    "qaCumulativeOrderLimit": 4096,
+    "qaActiveOrderLimit": 128,
+    "retention": "Keep all accepted order identities, receipts, events, and checkpoints. No pruning or history reset."
+  },
+  "decisionFixture": {
+    "path": "backend/tests/fixtures/historical_day_v2_decision_schedule.json",
+    "sha256": "9fabe04410060411b19614687b5c82f8221d2e33fa1e8a71c342c387c29d97ed",
+    "datasetVersion": "87e3c3355dccc3afafef837a56d24046275dcf8ee6d1173a929a10279f14e743"
+  },
+  "boundedStages": {
+    "week": {"start": "2024-01-02", "days": 7, "maximumAcceptedOrders": 33},
+    "month": {"start": "2024-01-02", "days": 30, "maximumAcceptedOrders": 125},
+    "year": {"start": "2024-01-01", "days": 366, "maximumAcceptedOrders": 1469}
+  },
+  "gates": {
+    "financial": "Independent reconciliation of every fill, event, command/receipt chain, ending balance and realized gross P&L.",
+    "source": "Independent traversal of all timestamp groups in the requested interval; source gaps remain explicit and no quotes are synthesized.",
+    "recovery": "Process restart and cold resume in the same Session, exact idempotent retry, durable cursor and complete order history.",
+    "integrity": "Shared-source pin mismatch, missing advance commitment, broken hash chain, and persisted database integrity checks must refuse or pass exactly as their assertions require.",
+    "resources": "One CPU equivalent, 1 GiB RAM, 30 GiB free disk reserve at every replay checkpoint; annual hard budgets are 72 hours and 8 GiB artifacts."
+  },
+  "limitations": [
+    "Schedule acceptance and all week/month/year results remain unproven until the corresponding gates complete.",
+    "This is an isolated QA order schedule and does not grant financial execution eligibility or establish broker fills.",
+    "Source rights and underlying feed authority remain UNKNOWN."
+  ]
+}

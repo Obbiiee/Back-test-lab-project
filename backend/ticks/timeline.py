@@ -7,7 +7,7 @@ from copy import deepcopy
 from itertools import groupby, islice, chain
 import json
 
-from contracts.canonical import canonical_bytes, content_hash
+from contracts.canonical import _CanonicalArrayAccumulator, canonical_bytes, content_hash
 from contracts.primitives import require
 from .contracts import uint, keys, tag, validate_chunk, CanonicalTick
 from .provider import Cancellation, validate_provider, empty_diagnostics, diagnostic_counts
@@ -170,7 +170,13 @@ class TickTimeline:
         require(len(records)<=128,"diagnostic_window","REVEAL_LIMIT")
         return dict(records=records, counts=diagnostic_counts(records), truncated=False)
 
-    def advance_through(self, target_ns, expected_cursor, cancellation=None):
+    def advance_through(self, target_ns, expected_cursor, cancellation=None, stop_when=None):
+        """Reveal chronologically, optionally stopping after a private group predicate.
+
+        ``stop_when`` is controller-only and receives one fully validated atomic
+        timestamp group at a time. It never changes which groups the consumer
+        receives, only where this bounded reveal ends.
+        """
         require(self.__active,"timeline","REPLACED_TIMELINE")
         tag(expected_cursor,"BTL-TICK-CURSOR-1",CURSOR_FIELDS)
         target = uint(target_ns)
@@ -182,13 +188,13 @@ class TickTimeline:
         epoch = self.__cancel_epoch
         old = int(self.__cursor["throughNs"])
         groups = []
+        group_limits = _CanonicalArrayAccumulator("BTL-TICK-STEP-CHECK-1", "groups")
         # Speculative consumed groups can be reconstructed after cancellation.
         try:
             while (group := self.__peek()) is not None and int(group["timeNs"]) <= target:
                 cancel.check(); require(epoch == self.__cancel_epoch, "cancel", "CANCELLED")
-                candidate = groups + [group]
                 try:
-                    canonical_bytes(dict(schemaVersion=1, artifact="BTL-TICK-STEP-CHECK-1", groups=candidate))
+                    group_limits.append(group)
                 except ValueError:
                     require(bool(groups), "group", "GROUP_LIMIT")
                     break
@@ -196,6 +202,15 @@ class TickTimeline:
                     break
                 groups.append(group)
                 self.__has_pending = False
+                if stop_when is not None:
+                    stop = stop_when(group)
+                    require(stop is None or type(stop) in (bool, str), "stopWhen")
+                    if type(stop) is str:
+                        require(stop == group["timeNs"], "stopTarget", "INVALID_INPUT")
+                        target_ns, target = stop, int(stop)
+                        break
+                    if stop:
+                        break
             pending = self.__peek()
             done = pending is None or int(pending["timeNs"]) > target
             through = target if done else int(groups[-1]["timeNs"]) if groups else old
@@ -258,10 +273,10 @@ class TickTimeline:
         end = int(self.__cursor["nextGroupIndex"])
         require(start <= end, "index", "UNREVEALED_INDEX")
         groups = []
+        group_limits = _CanonicalArrayAccumulator("BTL-TICK-VIEW-CHECK-1", "groups")
         for group in islice(self.__groups(), start, min(end, start+max_groups)):
-            candidate = groups + [group]
             try:
-                canonical_bytes(dict(schemaVersion=1, artifact="BTL-TICK-VIEW-CHECK-1", groups=candidate))
+                group_limits.append(group)
             except ValueError:
                 require(bool(groups), "group", "GROUP_LIMIT")
                 break

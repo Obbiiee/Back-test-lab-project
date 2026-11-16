@@ -707,3 +707,8 @@ When evidence is incomplete:
 **STOP -> preserve work -> record blocker -> resolve contract/data/test -> continue.**
 
 A slower validated checkpoint is preferred to a fast release that can produce incorrect execution, lose sessions, expose another user's data, or collapse under expected load.
+
+
+### Local CSV importer reuse decision — 2026-10-17
+
+Reuse BTL DatasetBuilder/index/sidecars and Python standard-library CSV/Decimal/datetime/SHA256; no new runtime dependency/downloader. `dukascopy-node` (https://github.com/Leo4815162342/dukascopy-node), inspected reference pin `519a79017b49431c21049944934cce525f708ba5`, package1.50.0, MIT, Copyright2022 Leonid Pyrlia: REFERENCE ONLY, no donor code copied/adopted. Its license grants no provider-data rights; metadata does not verify our scales/ordering. Existing system blueprint owns offline format/bounds and deferred financial integration.

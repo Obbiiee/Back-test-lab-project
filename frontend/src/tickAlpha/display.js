@@ -39,6 +39,12 @@ export function displayBars(view){
 }
 export function replayTarget(view,steps){
   if(![1,4,16].includes(steps))throw Error('Unsupported replay batch');
+  const pending=view.pendingReplayTargetNs;
+  if(pending!=null){
+    if(typeof pending!=='string'||!/^(0|[1-9][0-9]{0,19})$/.test(pending)||
+      BigInt(pending)<=BigInt(view.state.throughNs))throw Error('Invalid pending replay target');
+    return pending;
+  }
   const step=view.replayStepNs===undefined?TICK_STEP_NS:BigInt(view.replayStepNs);
   if(typeof view.replayStepNs!=="undefined"&&(typeof view.replayStepNs!=="string"||!/^[1-9][0-9]{0,10}$/.test(view.replayStepNs)||step>60000000000n))throw Error('Invalid replay interval');
   return String(BigInt(view.state.throughNs)+BigInt(steps)*step);
@@ -50,4 +56,26 @@ export function seekTarget(value){
   const canonical=new Date(milliseconds).toISOString().slice(0,19);
   if(canonical!==(value.length===16?value+':00':value))throw Error('Enter a valid UTC date and time');
   return String(BigInt(milliseconds)*1000000n);
+}
+
+// Instrument shown for a Session, read from its pinned server profile. Returns null
+// when the profile does not state it, so callers fail closed instead of naming one.
+const SYMBOL=/^[A-Z0-9._-]{2,24}$/;
+export function sessionInstrument(view){
+  const profile=view?.state?.profile;
+  if(!profile||!SYMBOL.test(profile.instrumentId??''))return null;
+  return {symbol:profile.instrumentId,quote:typeof profile.quoteCurrency==='string'?profile.quoteCurrency:null,
+    feed:typeof profile.feedInstrumentId==='string'&&profile.feedInstrumentId!==profile.instrumentId?profile.feedInstrumentId:null,
+    provider:typeof profile.providerId==='string'?profile.providerId:null};
+}
+// Exact decimal spread from two wire strings (no float): ask - bid, at the finer of the two precisions.
+export function spreadLabel(bid,ask){
+  const ok=value=>typeof value==='string'&&/^[0-9]+(?:[.][0-9]+)?$/.test(value);
+  if(!ok(bid)||!ok(ask))return null;
+  const places=Math.max((bid.split('.')[1]??'').length,(ask.split('.')[1]??'').length);
+  const scale=value=>{const [whole,fraction='']=value.split('.');return BigInt(whole+fraction.padEnd(places,'0'));};
+  const difference=scale(ask)-scale(bid);
+  if(difference<0n)return null;
+  const text=difference.toString().padStart(places+1,'0');
+  return places?text.slice(0,-places)+'.'+text.slice(-places):text;
 }

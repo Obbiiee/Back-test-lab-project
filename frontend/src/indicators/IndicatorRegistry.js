@@ -22,7 +22,8 @@ export class IndicatorRegistry {
     const frozenOutputs = outputs.map(item => {
       if (!item || !/^[a-z][a-zA-Z0-9_]*$/.test(item.key) || !['line', 'histogram'].includes(item.outputType)) throw Error('Invalid output spec');
       const options = item.options ?? {};
-      if (Object.getPrototypeOf(options) !== Object.prototype || Object.keys(options).some(key => !['color', 'lineWidth'].includes(key))
+      if (Object.getPrototypeOf(options) !== Object.prototype || Object.keys(options).some(key => !['color', 'lineWidth', 'lineType', 'markers'].includes(key))
+        || (options.lineType !== undefined && ![0, 1].includes(options.lineType)) || (options.markers !== undefined && typeof options.markers !== 'boolean')
         || (options.color !== undefined && (typeof options.color !== 'string' || !options.color.trim()))
         || (options.lineWidth !== undefined && (!Number.isInteger(options.lineWidth) || options.lineWidth < 1 || options.lineWidth > 4))) throw Error('Invalid output options');
       return Object.freeze({ key: item.key, outputType: item.outputType, options: Object.freeze({ ...options }) });

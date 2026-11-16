@@ -1,0 +1,23 @@
+{
+    admin off
+    email {$BTL_ACME_EMAIL}
+}
+{$BTL_DOMAIN} {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        Strict-Transport-Security "max-age=31536000"
+    }
+    handle /api/v1/* {
+        reverse_proxy 127.0.0.1:8001 {
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-For {remote_host}
+        }
+    }
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}

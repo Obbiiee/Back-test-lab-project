@@ -197,6 +197,12 @@ class WorkspaceTests(unittest.TestCase):
         for grant in (grant_runtime, grant_identity_runtime, grant_workspace_runtime): grant(DSN, role)
         info = psycopg.conninfo.conninfo_to_dict(DSN)
         restricted = psycopg.conninfo.make_conninfo(**{**info, "user": role, "password": password})
+        with connect(restricted) as db:
+            db.execute("""
+                INSERT INTO btl.research_queue_actor_turns(actor_id,last_claimed_at)
+                VALUES (%s,clock_timestamp())
+                ON CONFLICT(actor_id) DO UPDATE SET last_claimed_at=EXCLUDED.last_claimed_at
+            """, (self.users[0][0],))
         with client(create_app(restricted, self.secret, self.delivery, rate_limit=1000)) as caller:
             response = caller.get(self.base+"/resources/"+rid, headers={"Authorization": "Bearer "+self.users[1][1]})
             self.assertEqual(response.status_code, 200, response.text)

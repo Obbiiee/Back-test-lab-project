@@ -23,4 +23,38 @@
   --rk-muted:#52627a;
   --rk-font-ui:"Inter Variable",Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --rk-font-data:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+
+  /* Semantic layer (2026-11-06): one vocabulary for product pages and terminal chrome.
+     Values are the brand colours above or AA-checked shades of them. Product pages use
+     these names; the terminal keeps its dense sizes and reaches them through --lab-*. */
+  --rk-ink:var(--rk-navy);                 /* text on white/ice cards */
+  --rk-card:var(--rk-white);
+  --rk-ice-tint:#eaf2fd;                   /* quiet buttons, active rows */
+  --rk-soft:var(--rk-ice-soft);            /* fields on white cards */
+  --rk-panel:#0c2655;                      /* navy panels and terminal chrome */
+  --rk-panel-raised:#163566;
+  --rk-selected:#1b4a8c;
+  --rk-line:var(--rk-navy-line);           /* borders on navy */
+  --rk-line-strong:#2b4878;
+  --rk-line-card:var(--rk-ice);            /* borders on white */
+  --rk-text-on-navy:#ffffff;
+  --rk-text-soft-on-navy:#e6edf7;
+  --rk-muted-on-navy:#c3d6f2;              /* 10.9:1 on navy */
+  --rk-subtle-on-navy:#a9bddb;             /*  8.6:1 on navy */
+  --rk-muted-on-white:#4a5b75;             /*  6.9:1 on white */
+  --rk-focus:var(--rk-yellow);
+  --rk-success:#68d6bd;
+  --rk-danger:var(--rk-coral);             /* risk/error accents on navy */
+  --rk-danger-ink:#9e2b33;                 /* error text on white (7.4:1) */
+  --rk-danger-bg:#ffe1e1;
+  --rk-warning-bg:#fff8e1;
+  --rk-radius-pill:999px;
+  --rk-radius-card:24px;
+  --rk-radius-field:16px;
+  --rk-radius-dense:6px;                   /* terminal density */
+  --rk-control:44px;
+  --rk-control-dense:32px;
+  --rk-ease:cubic-bezier(.2,.8,.2,1);
+  --rk-fast:.16s;
+  --rk-mid:.22s;
 }

@@ -1,7 +1,9 @@
 """Actual disk/runtime 42.19 tests; all prices/records are authored synthetic."""
 from copy import deepcopy
+from contextlib import closing
 import json
 import hashlib
+import sqlite3
 import unittest
 
 from ticks.evidence_v2 import WINDOW_NS
@@ -56,6 +58,36 @@ class EvidenceV2Tests(unittest.TestCase):
         return dict(schemaVersion=2, artifact="BTL-TICK-EVIDENCE-REQUEST-2", datasetId=p.dataset_id, datasetVersion=p.dataset_version,
                     manifestHash=p.dataset_version, sessionStartNs="0", fromNs=low, throughNs=high,
                     sourceFence=[] if ordinal is None else [dict(sourceId=source["sourceId"], rawOrdinal=ordinal)], maxRecords=quota, cursor=cursor)
+
+    def test_readonly_snapshot_keeps_causal_sidecar_pages_and_consumer_boundaries(self):
+        _, original, source = self.evidence_build()
+        folder = self.path/"readonly-evidence"
+        folder.mkdir()
+        with closing(sqlite3.connect((self.path/"evidence/archive.sqlite").as_uri()+"?mode=ro", uri=True)) as src:
+            with closing(sqlite3.connect(folder/"archive.sqlite")) as dst:
+                src.backup(dst)
+                dst.execute("PRAGMA journal_mode=DELETE")
+        archive = folder/"archive.sqlite"
+        before = hashlib.sha256(archive.read_bytes()).hexdigest()
+        readonly = DiskTickProvider(folder, original.dataset_version, read_only=True)
+        self.resources.append(readonly)
+        for quota in (1, 2, 128):
+            request = self.request(original, source, quota=quota)
+            for _ in range(16):
+                expected = original.read_evidence_v2(request)
+                self.assertEqual(readonly.read_evidence_v2(request), expected)
+                self.assertTrue(all(int(r["rawOrdinal"]) <= 2 for r in expected["diagnostics"]["records"]))
+                if expected["nextCursor"] is None: break
+                request["cursor"] = expected["nextCursor"]
+            else: self.fail("Sidecar pagination did not terminate")
+        baseline = self.timeline(original, folder="baseline-evidence-log")
+        actual = self.timeline(readonly, folder="readonly-evidence-log")
+        self.assertEqual(actual.advance_through("200", actual.cursor), baseline.advance_through("200", baseline.cursor))
+        view = actual.consumer()
+        for name in ("provider", "manifest", "read_evidence_v2", "locate_v2", "checkpoint", "eof"):
+            self.assertFalse(hasattr(view, name))
+        self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), before)
+        self.assertEqual([p.name for p in folder.iterdir()], ["archive.sqlite"])
 
     def test_nonempty_gap_private_unknown_and_bounded_fenced_pagination(self):
         _, p, source = self.evidence_build()

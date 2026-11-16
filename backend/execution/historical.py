@@ -8,14 +8,16 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import os
 import re
 from threading import RLock
+from tempfile import TemporaryDirectory
 from time import monotonic
 
 from contracts.canonical import canonical_bytes, content_hash
 from contracts.primitives import require
 from ticks.contracts import keys
-from ticks.contracts_v2 import canonical_v2_bytes
+from ticks.contracts_v2 import canonical_v2_bytes, hash_v2
 from ticks.storage_v2 import ArtifactStore, DiskTickProvider
 from ticks.timeline_v2 import IndexedTickTimeline
 from .fixture_demo import fixture_profile
@@ -32,6 +34,10 @@ class HistoricalSource:
             require(root['providerId'] == 'exness' and root['providerSymbol'] == 'XAUUSDm'
                     and root['evidenceClass'] == 'PROVIDER_OBSERVATION', 'historicalSource', 'REFUSED_HISTORICAL_SOURCE')
             self.dataset_id = root['datasetId']
+            self.source_pin = dict(schemaVersion=1, artifact='BTL-TICK-SOURCE-PIN-1',
+                                   datasetId=self.dataset_id, datasetVersion=version,
+                                   manifestHash=version, rootHash=hash_v2(root),
+                                   indexContentHash=root['indexContentHash'])
             self.start_ns = int(root['range']['startNs'])
             self.start_period = datetime.fromtimestamp(self.start_ns//1000000000, timezone.utc).strftime('%Y-%m')
             # Explicit research model inherited from QUOTE_BASELINE, not broker specs.
@@ -151,24 +157,59 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
 """
     indexed = True
 
-    def __init__(self, source):
+    def __init__(self, source, *, timeline_storage_mode='shared-source-v2'):
         self.source = source
+        require(timeline_storage_mode in ('session-log-v2','shared-source-v1','shared-source-v2'),
+                'timelineStorageMode','INVALID_INPUT')
+        self.timeline_storage_mode=timeline_storage_mode
+        self._source_pin = deepcopy(getattr(source, 'source_pin', None))
+        if timeline_storage_mode in ('shared-source-v1','shared-source-v2') and self._source_pin is None:
+            provider = source.provider()
+            try:
+                root = provider.describe_v2(source.dataset_id, source.version)['root']
+                self._source_pin = dict(schemaVersion=1, artifact='BTL-TICK-SOURCE-PIN-1',
+                                        datasetId=source.dataset_id, datasetVersion=source.version,
+                                        manifestHash=source.version, rootHash=hash_v2(root),
+                                        indexContentHash=root['indexContentHash'])
+            finally:
+                provider.close()
         self._lock = RLock()
         self._entries = OrderedDict()
         self._creating = {}
         self._window_key = None
         self._window_rows = None
+        # The product and interactive default is still 64. The isolated QA
+        # fast-forward runner may opt into a larger bounded reveal.
+        self.max_groups_per_advance = 64
+
+    def _checkpoint_mode(self, checkpoint):
+        artifact = checkpoint.get('artifact') if type(checkpoint) is dict else None
+        modes = {'BTL-TICK-CHECKPOINT-2': 'session-log-v2',
+                 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-1': 'shared-source-v1',
+                 'BTL-TICK-SHARED-SOURCE-CHECKPOINT-2': 'shared-source-v2'}
+        require(artifact in modes, 'checkpoint', 'CORRUPT_RECORD')
+        return modes[artifact]
 
     def validate_checkpoint(self, checkpoint):
-        keys(checkpoint, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
-        require(checkpoint['artifact'] == 'BTL-TICK-CHECKPOINT-2', 'checkpoint', 'CORRUPT_RECORD')
+        mode = self._checkpoint_mode(checkpoint)
+        if mode == 'session-log-v2':
+            keys(checkpoint, 'schemaVersion artifact cursor advanceLogHash positionLogHash')
+        elif mode == 'shared-source-v1':
+            keys(checkpoint, 'schemaVersion artifact sourcePin cursor advanceLogHash')
+        else:
+            keys(checkpoint, 'schemaVersion artifact sourcePin cursor nextPosition')
+        if mode != 'session-log-v2':
+            require(checkpoint['schemaVersion']==2 and checkpoint['sourcePin']==self._source_pin,
+                    'checkpoint','REFUSED_DATASET_VERSION')
         canonical_v2_bytes(checkpoint)
         require(checkpoint['cursor']['datasetId'] == self.source.dataset_id and
                 checkpoint['cursor']['datasetVersion'] == self.source.version, 'dataset', 'REFUSED_DATASET_VERSION')
 
-    def _folder(self, scope, session):
+    def _folder(self, scope, session, mode=None):
+        mode = mode or self.timeline_storage_mode
         name = content_hash(dict(schemaVersion=1, artifact='BTL-PRIVATE-SESSION-LOG-1',
-                                 workspace=scope.workspace_id, session=session, datasetVersion=self.source.version))
+                                 workspace=scope.workspace_id, session=session, datasetVersion=self.source.version,
+                                 timelineStorageMode=mode))
         return self.source.log_root/name
 
     def _key(self, scope, session, checkpoint):
@@ -180,7 +221,11 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
             provider = self.source.provider()
             try:
                 timeline = IndexedTickTimeline(provider, self.source.dataset_id, self.source.version, str(start),
-                                               log_folder=self._folder(scope, session), allow_threads=True)
+                                               log_folder=self._folder(scope, session), allow_threads=True,
+                                               log_codec=os.environ.get('BTL_QA_TIMELINE_LOG_CODEC'),
+                                               max_groups_per_advance=self.max_groups_per_advance,
+                                               storage_mode=self.timeline_storage_mode,
+                                               source_pin=self._source_pin if self.timeline_storage_mode in ('shared-source-v1','shared-source-v2') else None)
             except BaseException:
                 provider.close(); raise
             self._creating[id(timeline)] = provider
@@ -214,9 +259,13 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
         key = self._key(scope, session, checkpoint)
         if key not in self._entries:
             provider = self.source.provider()
+            mode = self._checkpoint_mode(checkpoint)
             try:
-                timeline = IndexedTickTimeline.resume(provider, checkpoint, log_folder=self._folder(scope, session),
-                                                       allow_threads=True)
+                timeline = IndexedTickTimeline.resume(provider, checkpoint, log_folder=self._folder(scope, session, mode),
+                                                       allow_threads=True,
+                                                       max_groups_per_advance=self.max_groups_per_advance,
+                                                       storage_mode=mode,
+                                                       source_pin=self._source_pin if mode in ('shared-source-v1','shared-source-v2') else None)
             except BaseException:
                 provider.close(); raise
             self._publish(scope, session, timeline, provider)
@@ -236,6 +285,20 @@ Reconstruction follows only the exact hashes in the committed checkpoint.
                 return result, next_checkpoint
             except BaseException:
                 timeline.close(); provider.close(); raise
+
+    def preview(self, checkpoint, target):
+        """Validate one bounded private candidate page without advancing the accepted tip."""
+        mode=self._checkpoint_mode(checkpoint);provider=self.source.provider()
+        try:
+            with TemporaryDirectory(prefix='btl-next-event-preview-') as folder:
+                timeline=IndexedTickTimeline.resume(provider,checkpoint,log_folder=Path(folder)/'timeline',
+                    allow_threads=True,max_groups_per_advance=self.max_groups_per_advance,
+                    storage_mode=mode,
+                    source_pin=self._source_pin if mode in ('shared-source-v1','shared-source-v2') else None)
+                try:return timeline.advance_through(target,timeline.cursor)
+                finally:timeline.close()
+        finally:
+            provider.close()
 
     def window(self, scope, session, checkpoint, *, last_only=False):
         with self._lock:

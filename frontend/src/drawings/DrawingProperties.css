@@ -1,0 +1,117 @@
+/* Issue #21 shared drawing Properties panel. RIKSORA navy surface, electric
+   blue focus, yellow only for the active choice. Desktop: floating card over
+   the chart's right edge. Phone/tablet portrait: bottom sheet, 44px targets. */
+section.drawing-properties{position:absolute;z-index:80;top:44px;right:12px;width:352px;max-height:calc(100% - 56px);display:flex;flex-direction:column;
+  background:#0e1a33;color:#fff;border:2px solid var(--rk-navy-line,#1d3560);border-radius:28px;box-shadow:0 18px 40px #0009;
+  font:13px/1.45 var(--rk-font-ui,system-ui,sans-serif);overflow:hidden}
+section.drawing-properties button,section.drawing-properties input,section.drawing-properties select,section.drawing-properties textarea{font:inherit;color:inherit}
+section.drawing-properties button{min-height:34px;padding:4px 12px;border-radius:999px;border:2px solid #2b4878;background:transparent;cursor:pointer;font-weight:700;font-size:12px}
+section.drawing-properties button:hover:not(:disabled){border-color:var(--rk-blue-on-dark,#5a9df8);background:var(--rk-navy,#061a3c)}
+section.drawing-properties button:disabled{opacity:.45;cursor:not-allowed}
+section.drawing-properties :focus-visible{outline:3px solid var(--rk-yellow,#ffce55);outline-offset:2px}
+section.drawing-properties input[type=text],section.drawing-properties input:not([type]),section.drawing-properties input[type=datetime-local],section.drawing-properties select,section.drawing-properties textarea{
+  min-height:38px;box-sizing:border-box;padding:4px 12px;border-radius:14px;border:2px solid #2b4878;background:var(--rk-navy,#061a3c);font-family:var(--rk-font-data,monospace);font-weight:500}
+section.drawing-properties select{border-radius:999px;font-family:var(--rk-font-ui,sans-serif);font-weight:600}
+section.drawing-properties :is(input,select,textarea):focus{border-color:var(--rk-blue,#1378f5);outline:none}
+section.drawing-properties input[type=color]{width:36px;height:32px;padding:0;border:2px solid #2b4878;border-radius:10px;background:none}
+section.drawing-properties input[type=range]{flex:1;min-width:90px;accent-color:var(--rk-yellow,#ffce55)}
+.dp-header{flex:none;display:flex;align-items:center;gap:8px;padding:16px 16px 10px}
+.dp-title{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.dp-kind{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#a9bddb}
+section.drawing-properties input.dp-name{color:#fff;width:100%;font:900 20px/1.2 var(--rk-font-ui,sans-serif);letter-spacing:-.01em;background:transparent;border-color:transparent;padding-left:0;min-height:30px}
+section.drawing-properties input.dp-name::placeholder{color:#c3d6f2;opacity:1}
+section.drawing-properties input.dp-name:hover,section.drawing-properties input.dp-name:focus{border-color:#2b4878;background:var(--rk-navy,#061a3c);padding-left:10px}
+section.drawing-properties .dp-close{width:34px;height:34px;min-height:34px;padding:0;border:0;border-radius:50%;background:var(--rk-panel,#0c2655);font-size:18px;font-weight:900}
+.dp-locked{margin:0 16px 8px;padding:8px 12px;border-radius:16px;background:var(--rk-yellow,#ffce55);color:var(--rk-navy,#061a3c);font-size:12px;font-weight:700}
+section.drawing-properties .dp-locked button{margin-left:6px;min-height:28px;border-color:var(--rk-navy,#061a3c)}
+.dp-tabs{flex:none;display:flex;gap:2px;margin:0 16px 10px;padding:4px;background:var(--rk-navy,#061a3c);border:2px solid var(--rk-navy-line,#1d3560);border-radius:999px;overflow-x:auto;scrollbar-width:none}
+section.drawing-properties .dp-tabs button{flex:1 0 auto;min-height:32px;background:transparent;border:0;color:var(--rk-ice,#d9eafe)}
+section.drawing-properties .dp-tabs button[aria-selected=true]{background:#fff;color:var(--rk-navy,#061a3c);font-weight:800}
+.dp-body{flex:1;overflow:auto;padding:4px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.dp-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.dp-label{flex:0 0 100%;font-size:12px;font-weight:700;color:var(--rk-ice,#d9eafe)}
+.dp-value{font:500 12px var(--rk-font-data,monospace);color:#fff;background:var(--rk-panel,#0c2655);border-radius:10px;padding:3px 8px;min-width:28px;text-align:center}
+.dp-hint{margin:0;font-size:11px;color:#a9bddb}
+.dp-segmented{display:inline-flex;flex-wrap:wrap;gap:4px}
+section.drawing-properties .dp-segmented button{min-width:44px;padding:4px 8px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+section.drawing-properties .dp-segmented button.is-active,section.drawing-properties .dp-icon.is-active,section.drawing-properties .dp-color button.is-active{background:var(--rk-yellow,#ffce55);color:var(--rk-navy,#061a3c);border-color:var(--rk-yellow,#ffce55);font-weight:800}
+.dp-preview{width:30px;height:12px;display:block}
+.dp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dp-color{display:flex;flex-wrap:wrap;align-items:center;gap:6px;flex:1}
+section.drawing-properties .dp-swatch{width:24px;height:24px;min-height:24px;padding:0;border-radius:50%;border:2px solid #2b4878}
+section.drawing-properties .dp-swatch.is-active{outline:3px solid var(--rk-yellow,#ffce55);outline-offset:1px;border-color:var(--rk-navy,#061a3c)}
+section.drawing-properties .dp-hex{width:88px}
+section.drawing-properties .dp-toggle{display:inline-flex;flex-direction:row;align-items:center;gap:6px;min-height:34px;padding:0 10px 0 6px;margin:0;cursor:pointer;font-size:12px;font-weight:700;color:#fff;border-radius:999px;background:var(--rk-panel,#0c2655)}
+.dp-toggle input{width:16px;height:16px;accent-color:var(--rk-yellow,#ffce55)}
+.dp-icon{width:38px}
+.dp-anchor{border:0;background:var(--rk-panel,#0c2655);border-radius:20px;padding:10px 12px 12px;margin:0;display:flex;flex-direction:column;gap:8px}
+.dp-anchor legend{float:left;width:100%;padding:0;font-size:13px;font-weight:800;color:#fff}
+.dp-anchor label,.dp-steps label,.dp-block{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:#a9bddb}
+.dp-grow{flex:1;min-width:150px}
+.dp-steps label{width:96px}
+.dp-stepper{display:inline-flex;gap:4px;align-self:flex-end}
+section.drawing-properties .dp-stepper button{min-width:38px;padding:4px 8px;background:var(--rk-navy,#061a3c)}
+.dp-stepper-wide{flex-wrap:wrap;align-self:auto}
+.dp-levels{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:12px}
+.dp-levels th{text-align:left;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#a9bddb;padding:2px 4px}
+.dp-levels td{padding:3px 4px;background:var(--rk-panel,#0c2655)}
+.dp-levels td:first-child{border-radius:12px 0 0 12px}.dp-levels td:last-child{border-radius:0 12px 12px 0}
+section.drawing-properties .dp-levels input[type=text]{width:84px;min-height:32px}
+.dp-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 16px;border-top:2px solid var(--rk-navy-line,#1d3560)}
+section.drawing-properties .dp-primary{background:var(--rk-blue-strong,#0f67d8);border-color:var(--rk-blue-strong,#0f67d8);color:#fff;font-weight:800;box-shadow:0 4px 0 #0b3f8a}
+section.drawing-properties .dp-primary:hover:not(:disabled){background:var(--rk-blue-strong,#0f67d8)}
+section.drawing-properties .dp-primary:active{transform:translateY(3px);box-shadow:0 1px 0 #0b3f8a}
+section.drawing-properties .dp-danger{border-color:#7a3542;color:#ffb3b3}
+.dp-block textarea{min-height:64px;resize:vertical;font-family:var(--rk-font-ui,sans-serif)}
+
+/* Quick floating toolbar for the selected drawing. */
+div.drawing-quickbar{position:absolute;z-index:70;top:8px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px 6px;
+  background:#0e1a33;border:2px solid #2b4878;border-radius:999px;box-shadow:0 8px 24px #0008;color:#fff;font:700 12px var(--rk-font-ui,sans-serif);max-width:calc(100% - 16px);overflow-x:auto}
+div.drawing-quickbar button,div.drawing-quickbar select{min-height:30px;min-width:30px;padding:2px 8px;border-radius:999px;border:1px solid transparent;background:transparent;color:inherit;font:inherit;cursor:pointer}
+div.drawing-quickbar button:hover:not(:disabled){background:var(--rk-panel,#0c2655)}
+div.drawing-quickbar button[aria-pressed=true]{background:var(--rk-yellow,#ffce55);color:#061a3c}
+div.drawing-quickbar input[type=color]{width:28px;height:24px;padding:0;border:0;border-radius:6px;background:none}
+div.drawing-quickbar select{background:var(--rk-navy,#061a3c);border:2px solid #2b4878}
+div.drawing-quickbar .qb-sep{width:1px;height:18px;background:var(--rk-navy-line,#1d3560)}
+
+@media (max-width:760px),(pointer:coarse) and (max-width:1024px){
+  section.drawing-properties{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-height:72vh;border-radius:32px 32px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom)}
+  section.drawing-properties::before{content:"";display:block;width:44px;height:5px;margin:10px auto 0;border-radius:999px;background:#2b4878}
+  section.drawing-properties button,section.drawing-properties input[type=text],section.drawing-properties input:not([type]),section.drawing-properties input[type=datetime-local],section.drawing-properties select{min-height:44px}
+  section.drawing-properties .dp-close{width:44px;height:44px;min-height:44px}
+  section.drawing-properties .dp-tabs button{min-height:44px}
+  section.drawing-properties .dp-swatch{width:32px;height:32px;min-height:32px}
+  section.drawing-properties input[type=color]{width:44px;height:44px}
+  .dp-toggle{min-height:44px}
+  .dp-toggle input{width:22px;height:22px}
+  section.drawing-properties .dp-stepper button{min-width:48px}
+  div.drawing-quickbar{top:auto;bottom:8px}
+  div.drawing-quickbar button,div.drawing-quickbar select{min-height:44px;min-width:44px}
+}
+
+/* Undo/redo/lock strip for research drawings: overlay, never in document
+   flow, so the chart does not jump when the first drawing appears. */
+.chart-wrap{position:relative}
+.chart-wrap div.primitive-drawing-controls{position:absolute;z-index:65;right:76px;top:40px;display:flex;gap:4px;align-items:center;padding:3px;border:2px solid #2b4878;border-radius:999px;background:#0e1a33;font:700 11px var(--rk-font-ui,sans-serif);color:#fff}
+.chart-wrap div.primitive-drawing-controls button{color:inherit;background:transparent;border:0;border-radius:999px;padding:4px 8px;min-height:26px;cursor:pointer}
+.chart-wrap div.primitive-drawing-controls button:disabled{opacity:.35;cursor:default}
+.chart-wrap div.primitive-drawing-controls [role=status]{max-width:260px}
+.chart-wrap div.drawing-quickbar{top:40px}
+@media (max-width:760px){.chart-wrap div.primitive-drawing-controls{top:auto;bottom:60px;right:8px}.chart-wrap div.primitive-drawing-controls button{min-height:44px;min-width:44px}.chart-wrap div.drawing-quickbar{top:auto;bottom:8px}}
+/* C-03 creation bar (Polyline nodes, freehand, 3-anchor tools). */
+.chart-wrap div.drawing-create-bar{position:absolute;z-index:66;left:50%;top:8px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;max-width:calc(100% - 24px);padding:5px 6px 5px 14px;border:2px solid #2b4878;border-radius:999px;background:#0e1a33;color:#fff;font:600 12px var(--rk-font-ui,sans-serif);box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.chart-wrap div.drawing-create-bar span{flex:1;min-width:0}
+.chart-wrap div.drawing-create-bar button{color:inherit;background:var(--rk-panel,#0c2655);border:0;border-radius:999px;padding:4px 14px;min-height:32px;cursor:pointer;font:700 12px var(--rk-font-ui,sans-serif)}
+.chart-wrap div.drawing-create-bar button.dcb-primary{background:var(--rk-blue-strong,#0f67d8);color:#fff;font-weight:800;box-shadow:0 3px 0 #0b3f8a}
+.chart-wrap div.drawing-create-bar button:disabled{opacity:.4;cursor:default}
+.chart-wrap div.drawing-create-bar .dcb-short{display:none}
+@media (max-width:760px){.chart-wrap div.drawing-create-bar{top:6px;left:6px;right:6px;transform:none;max-width:none;border-radius:12px;padding:3px 4px 3px 10px;gap:4px}.chart-wrap div.drawing-create-bar .dcb-long{display:none}.chart-wrap div.drawing-create-bar .dcb-short{display:block;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chart-wrap div.drawing-create-bar button{min-height:44px;padding:6px 12px}}
+/* C-12 · canvas: white quick bar with blue drop shadow (like the replay pill); phone floats sit above the chart so they never cover the replay pill */
+.chart-wrap div.drawing-quickbar{background:#fff;color:#061a3c;border:0;box-shadow:0 4px 0 #1378f5,0 10px 24px #0004}
+.chart-wrap div.drawing-quickbar button:hover:not(:disabled){background:#eaf2fd}
+.chart-wrap div.drawing-quickbar select{background:#eaf2fd;color:#061a3c;border:0}
+.chart-wrap div.drawing-quickbar .qb-sep{background:#d9eafe}
+@media (max-width:760px){
+  .chart-wrap div.primitive-drawing-controls{top:8px;bottom:auto;right:76px}
+  .chart-wrap div.drawing-quickbar{top:64px;bottom:auto;max-width:calc(100% - 90px);overflow-x:auto}
+}

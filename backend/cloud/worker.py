@@ -7,32 +7,87 @@ from pathlib import Path
 import subprocess
 import sys
 import sysconfig
+import traceback
 from threading import Lock
 from time import monotonic
+from time import monotonic_ns, process_time_ns
 import uuid
+
+try:
+    import resource
+except ImportError:  # Windows controller tests expose unsupported RSS as null.
+    resource = None
 
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError, require
+from .worker_config import WORKER_COUNT
 
 MAX_RESULT = 8388608
 DEADLINE = 30
+STARTUP_WARMUP_DEADLINE = 180
 ENTRY = 'import sys; sys.path[:0]=sys.argv[1:]; from cloud.worker import child; child()'
 SERVE_ENTRY = 'import sys; sys.path[:0]=sys.argv[1:]; from cloud.worker import serve; serve()'
-MAX_JOBS = 32
-_exchanges = ThreadPoolExecutor(max_workers=2, thread_name_prefix='btl-native-exchange')
+# Keep the hash-pinned observed archive admitted across replay chunks. The
+# process remains bounded and is still reaped on every timeout/service close;
+# frequent recycling would rehash the entire multi-GB archive every 32 jobs.
+MAX_JOBS = 4096
+WARM_REQUEST = b'{"control":"WARM_OPERATOR_SOURCES","schemaVersion":1}\n'
+_exchanges = ThreadPoolExecutor(max_workers=WORKER_COUNT,
+                                thread_name_prefix='btl-native-exchange')
+
+
+class _MeasuredResult(dict):
+    def __init__(self, result, worker_metrics):
+        super().__init__(result)
+        self.worker_metrics = worker_metrics
+
+
+def _io_counters():
+    try:
+        values = {}
+        with open('/proc/self/io', encoding='ascii') as stream:
+            for line in stream:
+                key, value = line.split(':', 1)
+                if key in ('read_bytes', 'write_bytes', 'syscr', 'syscw'):
+                    values[key] = int(value.strip())
+        return values if len(values) == 4 else None
+    except (OSError, ValueError):
+        return None
+
+
+def _measurement(start_wall_ns, start_cpu_ns, start_io):
+    end_io = _io_counters()
+    def delta(name):
+        return (max(0, end_io[name] - start_io[name])
+                if start_io is not None and end_io is not None else None)
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource is not None else -1
+    return {
+        'schemaVersion': 1,
+        'artifact': 'BTL-NATIVE-WORKER-METRICS-1',
+        'measurementScope': 'ONE_JOB_CPU_IO_PROCESS_LIFETIME_RSS_HIGH_WATER',
+        'wallNs': max(0, monotonic_ns() - start_wall_ns),
+        'cpuNs': max(0, process_time_ns() - start_cpu_ns),
+        'processPeakRssBytes': int(peak * 1024) if peak >= 0 else None,
+        'readBytesDelta': delta('read_bytes'),
+        'writeBytesDelta': delta('write_bytes'),
+        'readSyscallsDelta': delta('syscr'),
+        'writeSyscallsDelta': delta('syscw'),
+    }
 
 
 class _Slot:
-    """One native child; at most two controller slots, never a consumer handle."""
+    """One bounded native child slot; never a consumer handle."""
     def __init__(self):
         self.lock = Lock()
         self.process = None
         self.dsn = None
+        self.environment_pin = None
         self.jobs = 0
+        self.ready = False
 
     def close(self):
         process, self.process = self.process, None
-        self.dsn, self.jobs = None, 0
+        self.dsn, self.environment_pin, self.jobs, self.ready = None, None, 0, False
         if process is not None:
             if process.poll() is None:
                 process.kill()
@@ -41,7 +96,7 @@ class _Slot:
             process.stdout.close()
 
 
-_slots = (_Slot(), _Slot())
+_slots = tuple(_Slot() for _ in range(WORKER_COUNT))
 
 
 def close():
@@ -49,15 +104,84 @@ def close():
     for slot in _slots:
         with slot.lock:
             slot.close()
+    # Do not import the full API/DB stack during process exit when this module
+    # was used only for worker configuration or timeout tests. If research was
+    # already loaded, its pinned source caches are owned by this lifecycle.
+    research = sys.modules.get('cloud.research')
+    if research is not None:
+        research.close_operator_catalogs()
 
 
 atexit.register(close)
 
 
 def _environment(dsn):
+    monthly_names = ('BTL_QA_SYNTHETIC_MONTHLY_ENABLE', 'BTL_QA_SYNTHETIC_MONTHLY_ROOT',
+                     'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID', 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION',
+                     'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256')
+    monthly_values = tuple(os.environ.get(name) for name in monthly_names)
+    from market_data.monthly_root import (monthly_root_from_environment,
+                                          s3_worker_environment)
+    monthly_root = monthly_root_from_environment(monthly_values)
+    if any(monthly_values):
+        require(monthly_values[0] == '1' and all(monthly_values[1:]),
+                'syntheticMonthly', 'REFUSED_SOURCE')
+        require(len(monthly_values[1]) <= 4096 and os.path.isabs(monthly_values[1]),
+                'syntheticMonthlyRoot', 'REFUSED_SOURCE')
+    else:
+        require(monthly_values[0] is None, 'syntheticMonthly', 'REFUSED_SOURCE')
+    catalog_names = ('BTL_MONTHLY_PARQUET_CATALOG',
+                     'BTL_MONTHLY_PARQUET_CATALOG_SHA256')
+    catalog_values = tuple(os.environ.get(name) for name in catalog_names)
+    if any(catalog_values):
+        require(all(catalog_values) and len(catalog_values[0]) <= 4096 and
+                os.path.isabs(catalog_values[0]),
+                'monthlyCatalog', 'REFUSED_OPERATOR_CATALOG')
+        from contracts.primitives import digest
+        digest(catalog_values[1], 'monthlyCatalogHash')
+    s3_names = ('RIKSORA_S3_REGION', 'RIKSORA_S3_ENDPOINT', 'RIKSORA_S3_SCHEME',
+                'RIKSORA_S3_ACCESS_KEY', 'RIKSORA_S3_SECRET_KEY',
+                'RIKSORA_S3_SESSION_TOKEN')
+    s3_values = {name: os.environ.get(name) for name in s3_names}
+    if s3_values['RIKSORA_S3_SCHEME'] is not None:
+        require(s3_values['RIKSORA_S3_SCHEME'] in ('https', 'http'),
+                'objectStoreScheme', 'REFUSED_SOURCE')
+    for name in ('RIKSORA_S3_REGION', 'RIKSORA_S3_ENDPOINT'):
+        value = s3_values[name]
+        require(value is None or (1 <= len(value) <= 2048 and
+                not any(ord(char) < 32 for char in value)),
+                'objectStoreConfig', 'REFUSED_SOURCE')
+    for name in ('RIKSORA_S3_ACCESS_KEY', 'RIKSORA_S3_SECRET_KEY',
+                 'RIKSORA_S3_SESSION_TOKEN'):
+        value = s3_values[name]
+        require(value is None or 1 <= len(value) <= 8192,
+                'objectStoreCredential', 'REFUSED_SOURCE')
+    require((s3_values['RIKSORA_S3_ACCESS_KEY'] is None) ==
+            (s3_values['RIKSORA_S3_SECRET_KEY'] is None),
+            'objectStoreCredential', 'REFUSED_SOURCE')
+    require(s3_values['RIKSORA_S3_SESSION_TOKEN'] is None or
+            s3_values['RIKSORA_S3_ACCESS_KEY'] is not None,
+            'objectStoreCredential', 'REFUSED_SOURCE')
+    require(not (s3_values['RIKSORA_S3_SCHEME'] == 'http' and
+                 s3_values['RIKSORA_S3_ACCESS_KEY'] is not None),
+            'objectStoreScheme', 'REFUSED_SOURCE')
     environment = {k: v for k, v in os.environ.items()
-                   if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')}
+                   if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
+                   or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
+                            'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
+                            'BTL_TICK_SESSION_STORAGE_FORMAT', *monthly_names,
+                            *catalog_names, *s3_names)}
+    if monthly_root is not None:
+        environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
+        environment.update(s3_worker_environment(monthly_root, os.environ))
+    require(environment.get('BTL_OBSERVED_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
+            'stateStorageFormat','REFUSED_STATE_VERSION')
+    require(environment.get('BTL_TICK_SESSION_STORAGE_FORMAT') in (None,'','snapshot-v1','compact-v1'),
+            'tickStateStorageFormat','REFUSED_STATE_VERSION')
+    require(environment.get('BTL_QA_TIMELINE_LOG_CODEC') in (None, 'raw', 'zlib-1'), 'logCodec')
     environment['BTL_WORKER_DATABASE'] = dsn
+    require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')
+    environment['BTL_WORKER_MAX_JOBS'] = str(MAX_JOBS)
     return environment
 
 
@@ -66,19 +190,111 @@ def _argv(entry):
             str(Path(__file__).resolve().parents[1]), sysconfig.get_path('purelib')]
 
 
+def _environment_pin(dsn):
+    return tuple(sorted((key, value) for key, value in _environment(dsn).items()
+                        if key != 'BTL_WORKER_DATABASE'))
+
+
+def _start_slot(slot, dsn, timeout):
+    environment = _environment(dsn)
+    slot.process = subprocess.Popen(_argv(SERVE_ENTRY), stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                    env=environment,
+                                    cwd=Path(__file__).resolve().parents[1])
+    slot.dsn = dsn
+    slot.environment_pin = tuple(sorted((key, value) for key, value in environment.items()
+                                        if key != 'BTL_WORKER_DATABASE'))
+    process = slot.process
+    future = _exchanges.submit(lambda: (process.stdin.write(WARM_REQUEST), process.stdin.flush(),
+                                        process.stdout.readline(MAX_RESULT+2))[2])
+    try:
+        raw = future.result(timeout=timeout)
+    except FutureTimeout:
+        slot.close()
+        try:
+            future.result()
+        except Exception:
+            pass
+        raise ContractError('EXPIRED', 'workerWarmupDeadline') from None
+    try:
+        result = json.loads(raw)
+    except (ValueError, UnicodeError):
+        slot.close()
+        raise ContractError('WORKER_UNAVAILABLE', 'workerWarmup') from None
+    if not (raw.endswith(b'\n') and type(result) is dict and result.get('schemaVersion') == 1
+            and result.get('ready') is True):
+        slot.close()
+        raise ContractError('WORKER_UNAVAILABLE', 'workerWarmup')
+    slot.ready = True
+
+
+def warm_sources(dsn, *, deadline=STARTUP_WARMUP_DEADLINE):
+    """Admit configured sources before queued work starts, outside job deadlines."""
+    require(type(deadline) in (int, float) and 0 < deadline <= STARTUP_WARMUP_DEADLINE, 'deadline')
+    has_monthly = (os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1' or
+                   os.environ.get('BTL_MONTHLY_PARQUET_CATALOG') is not None)
+    if not os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG') and not has_monthly:
+        return False
+    slot = _slots[0]
+    if not slot.lock.acquire(False):
+        raise ContractError('RESEARCH_BUSY', 'workerWarmup')
+    try:
+        if slot.process is not None and (slot.dsn != dsn or slot.environment_pin != _environment_pin(dsn)
+                                         or slot.process.poll() is not None):
+            slot.close()
+        if slot.process is None:
+            _start_slot(slot, dsn, deadline)
+        return slot.ready
+    finally:
+        slot.lock.release()
+
+
 def _result(raw):
     try:
         value = json.loads(raw)
     except (ValueError, UnicodeError):
         raise RuntimeError('Worker result unavailable') from None
     require(type(value) is dict, 'workerResult', 'CORRUPT_RECORD')
+    require(value.get('schemaVersion') == 1, 'workerResult', 'CORRUPT_RECORD')
+    metrics = _validate_metrics(value.get('workerMetrics'))
     if value.get('infrastructureFailure'):
-        raise RuntimeError('Worker infrastructure unavailable')
+        error = RuntimeError('Worker infrastructure unavailable')
+        error.worker_metrics = metrics
+        raise error
     if value.get('error'):
-        raise ContractError(value['error'], 'worker')
-    require(value.get('schemaVersion') == 1 and type(value.get('result')) is dict,
-            'workerResult', 'CORRUPT_RECORD')
-    return value['result']
+        error_field=value.get('errorField','worker')
+        require(type(error_field) is str and 1<=len(error_field)<=80 and error_field.isascii() and
+                all(char.isalnum() or char in '_.:-' for char in error_field),
+                'workerErrorField','CORRUPT_RECORD')
+        error = ContractError(value['error'], error_field)
+        source=value.get('errorSource')
+        if source is not None:
+            require(type(source) is str and len(source)<=128 and source.isascii() and
+                    all(char.isalnum() or char in '_.:-' for char in source),
+                    'workerErrorSource','CORRUPT_RECORD')
+            error.source=source
+        error.worker_metrics = metrics
+        raise error
+    require(type(value.get('result')) is dict, 'workerResult', 'CORRUPT_RECORD')
+    if metrics is None:
+        return value['result']
+    return _MeasuredResult(value['result'], metrics)
+
+
+def _validate_metrics(metrics):
+    if metrics is None:
+        return None
+    fields = {'schemaVersion', 'artifact', 'measurementScope', 'wallNs', 'cpuNs',
+              'processPeakRssBytes', 'readBytesDelta', 'writeBytesDelta',
+              'readSyscallsDelta', 'writeSyscallsDelta'}
+    require(type(metrics) is dict and set(metrics) == fields and metrics.get('schemaVersion') == 1 and
+            metrics.get('artifact') == 'BTL-NATIVE-WORKER-METRICS-1' and
+            metrics.get('measurementScope') == 'ONE_JOB_CPU_IO_PROCESS_LIFETIME_RSS_HIGH_WATER' and
+            all(type(metrics[name]) is int and metrics[name] >= 0 for name in ('wallNs', 'cpuNs')) and
+            all(metrics[name] is None or (type(metrics[name]) is int and metrics[name] >= 0)
+                for name in fields - {'schemaVersion', 'artifact', 'measurementScope', 'wallNs', 'cpuNs'}),
+            'workerMetrics', 'CORRUPT_RECORD')
+    return metrics
 
 
 def pooled_invoke(dsn, payload, *, deadline=DEADLINE):
@@ -90,20 +306,28 @@ def pooled_invoke(dsn, payload, *, deadline=DEADLINE):
     require(type(deadline) in (int, float) and 0 < deadline <= DEADLINE, 'deadline')
     raw = canonical_bytes(payload)
     require(len(raw) <= 32768, 'workerInput')
-    slot = next((candidate for candidate in _slots if candidate.lock.acquire(False)), None)
+    # The configured catalog and its admitted handles live in one controller
+    # process. Keep observed-family work on the warmed slot instead of causing
+    # a second full archive admission in a parallel cold slot.
+    observed_family = (type(payload) is dict and payload.get('operation') in ('apply', 'replay_to', 'jump_next_event')
+                       and type(payload.get('args')) is list and len(payload['args']) == 2
+                       and type(payload['args'][1]) is dict
+                      and payload['args'][1].get('artifact') in ('BTL-OBSERVED-EXECUTION-COMMAND-1', 'BTL-OBSERVED-REPLAY-TO-1', 'BTL-JUMP-NEXT-EVENT-1'))
+    candidates = (_slots[0],) if observed_family and os.environ.get('BTL_OBSERVED_OPERATOR_CATALOG') else _slots
+    slot = next((candidate for candidate in candidates if candidate.lock.acquire(False)), None)
     if slot is None:
         raise RuntimeError('Native worker slots unavailable')
     future = None
     try:
-        began = monotonic()
-        if slot.process is not None and (slot.dsn != dsn or slot.jobs >= MAX_JOBS or slot.process.poll() is not None):
+        if slot.process is not None and (slot.dsn != dsn or slot.environment_pin != _environment_pin(dsn)
+                                         or slot.jobs >= MAX_JOBS or slot.process.poll() is not None):
             slot.close()
         if slot.process is None:
-            slot.process = subprocess.Popen(_argv(SERVE_ENTRY), stdin=subprocess.PIPE,
-                                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                            env=_environment(dsn),
-                                            cwd=Path(__file__).resolve().parents[1])
-            slot.dsn = dsn
+            # Source admission belongs to the startup phase, including safe
+            # slot rotation after MAX_JOBS or a killed worker. It must not eat
+            # into the separate per-job execution deadline.
+            _start_slot(slot, dsn, STARTUP_WARMUP_DEADLINE)
+        began = monotonic()
         process = slot.process
         def exchange():
             process.stdin.write(raw+b'\n')
@@ -153,28 +377,36 @@ def invoke(dsn, payload, *, deadline=DEADLINE):
 
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
-    require(operation in ('workspace', 'bootstrap', 'apply'), 'workerOperation')
+    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'jump_next_event', 'command_result'), 'workerOperation')
     return pooled_invoke(dsn, dict(schemaVersion=1, actor=str(actor_id), workspace=str(workspace_id),
                             operation=operation, args=list(args), write=write))
 
 
 def _execute(raw):
     """Trusted process entry; scope and canonical validation remain in runner."""
+    started_wall, started_cpu, started_io = monotonic_ns(), process_time_ns(), _io_counters()
     try:
         require(len(raw) <= 32768, 'workerInput')
         request = json.loads(raw)
         require(request.get('schemaVersion') == 1 and
-                request.get('operation') in ('workspace', 'bootstrap', 'apply'), 'workerInput')
+                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'jump_next_event', 'command_result'), 'workerInput')
         from .research import run as authorized_run
         result = authorized_run(os.environ['BTL_WORKER_DATABASE'], uuid.UUID(request['actor']),
                                 uuid.UUID(request['workspace']), request['operation'],
                                 tuple(request['args']), write=request['write'])
-        output = canonical_bytes(dict(schemaVersion=1, result=result))
+        output = canonical_bytes(dict(schemaVersion=1, result=result,
+                                      workerMetrics=_measurement(started_wall, started_cpu, started_io)))
         require(len(output) <= MAX_RESULT, 'result', 'REFUSED_RESPONSE_LIMIT')
     except ContractError as error:
-        output = canonical_bytes(dict(schemaVersion=1, error=error.code))
+        frames=traceback.extract_tb(error.__traceback__)
+        caller=frames[-3] if len(frames)>=3 else frames[-1] if frames else None
+        source=(caller.filename.rsplit('/',1)[-1]+':'+caller.name) if caller else None
+        output = canonical_bytes(dict(schemaVersion=1, error=error.code,errorField=error.field,
+                                      errorSource=source,
+                                      workerMetrics=_measurement(started_wall, started_cpu, started_io)))
     except Exception:
-        output = canonical_bytes(dict(schemaVersion=1, infrastructureFailure=True))
+        output = canonical_bytes(dict(schemaVersion=1, infrastructureFailure=True,
+                                      workerMetrics=_measurement(started_wall, started_cpu, started_io)))
     return output
 
 
@@ -184,8 +416,26 @@ def child():
 
 
 def serve():
+    # The first private pipe message warms only operator-pinned source handles.
+    # It is bounded by the parent's startup deadline and never becomes a job.
+    raw = sys.stdin.buffer.readline(32770)
+    if raw != WARM_REQUEST:
+        return
+    try:
+        dsn = os.environ['BTL_WORKER_DATABASE']
+        from .research import warm_worker_sources
+        warm_worker_sources(dsn)
+        ready = True
+    except Exception:
+        ready = False
+    sys.stdout.buffer.write(canonical_bytes(dict(schemaVersion=1, ready=ready))+b'\n')
+    sys.stdout.buffer.flush()
+    if not ready:
+        return
     # EOF on parent exit ends the child; no unrestricted service/socket exists.
-    for _ in range(MAX_JOBS):
+    job_limit = int(os.environ.get('BTL_WORKER_MAX_JOBS', str(MAX_JOBS)))
+    require(1 <= job_limit <= 120000, 'workerJobLimit')
+    for _ in range(job_limit):
         raw = sys.stdin.buffer.readline(32770)
         if not raw:
             return

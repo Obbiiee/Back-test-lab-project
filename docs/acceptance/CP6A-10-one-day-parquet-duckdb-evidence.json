@@ -1,0 +1,558 @@
+{
+  "annualPassUnchanged": true,
+  "annualReportSha256": "cdc65e4c7fd7e65e85fac38726472c2ad92925c502afc2f08482a01b897fc831",
+  "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+  "comparisonReportSha256": "5807a43ac48e49dbf7847fec311a4888b0806de63c73bb5ad75d6bedbd3acad2",
+  "completedTradesEach": 86,
+  "dataStorageProjectionsNotMeasurements": {
+    "annual": {
+      "daily": 3877244296.3087783,
+      "single": 3870527545.6871953
+    },
+    "seven-days": {
+      "daily": 51288657.75091169,
+      "single": 51199807.75913878
+    },
+    "thirty-days": {
+      "daily": 210889945.30536512,
+      "single": 210524609.7569799
+    }
+  },
+  "endingBalanceEach": "9976.38",
+  "executionEligibility": "NOT_GRANTED",
+  "futureStagesAuthorized": false,
+  "groups": 137108,
+  "launcherFailurePreservedAt": "/home/riksora/riksora-qa-evidence/pqduck-20261105",
+  "minimumFreeDiskBytes": 38652440576,
+  "period": "2024-01-02 UTC",
+  "privateEvidence": "/home/riksora/riksora-qa-evidence/pqduck-20261105-r1",
+  "readerCases": [
+    {
+      "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+      "coldRecovery": "PASS",
+      "coldRecoveryWallSeconds": 60.132,
+      "cpuSeconds": 685.299794,
+      "cpuUtilPercent": 96.16746146483753,
+      "endToEndGroupsPerSecond": 192.40233868392122,
+      "firstSeekSeconds": 0.21291494299657643,
+      "groups": 137108,
+      "idempotency": "PASS",
+      "independentVerificationWallSeconds": 80.773,
+      "layout": "sqlite",
+      "observedHostFreeDiskGrowthBytes": 89116672,
+      "parity": {
+        "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+        "eventTranscriptSha256": "367b64c1ace4c132aaab8ff2f9983988850861f01d090229b575f8c7db0a700e",
+        "finalStateSha256": "bcee87baa7582261968163f0cab7a1bf9925434631443bb06c072cb1650cf516",
+        "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+        "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+        "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+        "receiptLedgerSha256": "22409f8714d097adb9ce1015f69b86abab731d80e418eb8b44e198378cc6642e",
+        "resumeStateSha256": "1cd76b2428c75d237ac4c12e2cec626601baab4761399f45f947656fc63a0e50",
+        "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+        "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+      },
+      "period": "2024-01-02 UTC",
+      "processColdOpenSeconds": 0.004877289058640599,
+      "qaAllocatedBytes": 76836864,
+      "readMetrics": [
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 67.53413459199999,
+          "repeat": 0,
+          "ticksPerSecond": 2000.9510988162717,
+          "wallSeconds": 68.52141468180344
+        },
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 68.774164513,
+          "repeat": 1,
+          "ticksPerSecond": 1963.9399961446502,
+          "wallSeconds": 69.81272354000248
+        }
+      ],
+      "reader": "SQLite",
+      "replayGroupsPerSecond": 277.3461284051809,
+      "replayWallSeconds": 494.357,
+      "resourceSampling": {
+        "firstCpuUsec": 279707979,
+        "firstEpoch": 1793856533.5145385,
+        "lastCpuUsec": 964991849,
+        "lastEpoch": 1793857246.0143378,
+        "maxCandidatePeakRssBytes": 222547968,
+        "maxCgroupCurrentBytes": 805814272,
+        "maxSingleProcessPeakRssBytes": 222547968,
+        "maxSupervisorPeakRssBytes": 178884608,
+        "minFreeBytes": 39046914048,
+        "postgresObservedInCgroup": true,
+        "sampleCount": 6898
+      },
+      "sampledProcessIoDelta": {
+        "rchar": 165894117956,
+        "read_bytes": 159108362240,
+        "wchar": 368232547,
+        "write_bytes": 326721536
+      },
+      "sharedFormatAllocatedBytes": 0,
+      "wallSeconds": 712.6108806049451,
+      "warmSeekP50Seconds": 0.10479628795292228,
+      "warmSeekP95Seconds": 0.12039372697472572
+    },
+    {
+      "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+      "coldRecovery": "PASS",
+      "coldRecoveryWallSeconds": 52.813,
+      "cpuSeconds": 636.639322,
+      "cpuUtilPercent": 96.70714053895401,
+      "endToEndGroupsPerSecond": 208.27055707713427,
+      "firstSeekSeconds": 0.23823309899307787,
+      "groups": 137108,
+      "idempotency": "PASS",
+      "independentVerificationWallSeconds": 82.533,
+      "layout": "single",
+      "observedHostFreeDiskGrowthBytes": 81997824,
+      "parity": {
+        "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+        "eventTranscriptSha256": "367b64c1ace4c132aaab8ff2f9983988850861f01d090229b575f8c7db0a700e",
+        "finalStateSha256": "bcee87baa7582261968163f0cab7a1bf9925434631443bb06c072cb1650cf516",
+        "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+        "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+        "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+        "receiptLedgerSha256": "22409f8714d097adb9ce1015f69b86abab731d80e418eb8b44e198378cc6642e",
+        "resumeStateSha256": "1cd76b2428c75d237ac4c12e2cec626601baab4761399f45f947656fc63a0e50",
+        "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+        "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+      },
+      "period": "2024-01-02 UTC",
+      "processColdOpenSeconds": 0.04195779492147267,
+      "qaAllocatedBytes": 77049856,
+      "readMetrics": [
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 16.405563172,
+          "repeat": 0,
+          "ticksPerSecond": 8136.55338587482,
+          "wallSeconds": 16.850869587855414
+        },
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 16.035430821,
+          "repeat": 1,
+          "ticksPerSecond": 8328.222580795513,
+          "wallSeconds": 16.463056633016095
+        }
+      ],
+      "reader": "PyArrow",
+      "replayGroupsPerSecond": 313.0283900868712,
+      "replayWallSeconds": 438.005,
+      "resourceSampling": {
+        "firstCpuUsec": 1010381776,
+        "firstEpoch": 1793857292.2716415,
+        "lastCpuUsec": 1646958828,
+        "lastEpoch": 1793857950.4791393,
+        "maxCandidatePeakRssBytes": 257359872,
+        "maxCgroupCurrentBytes": 805826560,
+        "maxSingleProcessPeakRssBytes": 257359872,
+        "maxSupervisorPeakRssBytes": 178884608,
+        "minFreeBytes": 38965743616,
+        "postgresObservedInCgroup": true,
+        "sampleCount": 6295
+      },
+      "sampledProcessIoDelta": {
+        "rchar": 165330840342,
+        "read_bytes": 158291013632,
+        "wchar": 363657954,
+        "write_bytes": 297771008
+      },
+      "sharedFormatAllocatedBytes": 9441280,
+      "wallSeconds": 658.3167679780163,
+      "warmSeekP50Seconds": 0.16941417043562979,
+      "warmSeekP95Seconds": 0.19612427591346204
+    },
+    {
+      "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+      "coldRecovery": "PASS",
+      "coldRecoveryWallSeconds": 53.2,
+      "cpuSeconds": 643.211966,
+      "cpuUtilPercent": 96.97162882225798,
+      "endToEndGroupsPerSecond": 206.70613712684178,
+      "firstSeekSeconds": 0.2030322791542858,
+      "groups": 137108,
+      "idempotency": "PASS",
+      "independentVerificationWallSeconds": 81.493,
+      "layout": "daily",
+      "observedHostFreeDiskGrowthBytes": 89071616,
+      "parity": {
+        "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+        "eventTranscriptSha256": "367b64c1ace4c132aaab8ff2f9983988850861f01d090229b575f8c7db0a700e",
+        "finalStateSha256": "bcee87baa7582261968163f0cab7a1bf9925434631443bb06c072cb1650cf516",
+        "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+        "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+        "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+        "receiptLedgerSha256": "22409f8714d097adb9ce1015f69b86abab731d80e418eb8b44e198378cc6642e",
+        "resumeStateSha256": "1cd76b2428c75d237ac4c12e2cec626601baab4761399f45f947656fc63a0e50",
+        "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+        "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+      },
+      "period": "2024-01-02 UTC",
+      "processColdOpenSeconds": 0.03517084289342165,
+      "qaAllocatedBytes": 76320768,
+      "readMetrics": [
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 16.682494424,
+          "repeat": 0,
+          "ticksPerSecond": 7886.832863104504,
+          "wallSeconds": 17.384418102912605
+        },
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 17.512334750999997,
+          "repeat": 1,
+          "ticksPerSecond": 7498.736604195754,
+          "wallSeconds": 18.284146681893617
+        }
+      ],
+      "reader": "PyArrow",
+      "replayGroupsPerSecond": 308.13348525607745,
+      "replayWallSeconds": 444.963,
+      "resourceSampling": {
+        "firstCpuUsec": 1695531961,
+        "firstEpoch": 1793857999.7332587,
+        "lastCpuUsec": 2338727536,
+        "lastEpoch": 1793858662.9644327,
+        "maxCandidatePeakRssBytes": 258338816,
+        "maxCgroupCurrentBytes": 805822464,
+        "maxSingleProcessPeakRssBytes": 258338816,
+        "maxSupervisorPeakRssBytes": 178884608,
+        "minFreeBytes": 38874284032,
+        "postgresObservedInCgroup": true,
+        "sampleCount": 6265
+      },
+      "sampledProcessIoDelta": {
+        "rchar": 165321334915,
+        "read_bytes": 158234378240,
+        "wchar": 373100636,
+        "write_bytes": 307191808
+      },
+      "sharedFormatAllocatedBytes": 9457664,
+      "wallSeconds": 663.2991255400702,
+      "warmSeekP50Seconds": 0.18719154549762607,
+      "warmSeekP95Seconds": 0.20933019393123686
+    },
+    {
+      "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+      "coldRecovery": "PASS",
+      "coldRecoveryWallSeconds": 53.212,
+      "cpuSeconds": 629.29331,
+      "cpuUtilPercent": 96.5969161049696,
+      "endToEndGroupsPerSecond": 210.46163629675596,
+      "firstSeekSeconds": 0.3147184569388628,
+      "groups": 137108,
+      "idempotency": "PASS",
+      "independentVerificationWallSeconds": 81.054,
+      "layout": "single",
+      "observedHostFreeDiskGrowthBytes": 84033536,
+      "parity": {
+        "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+        "eventTranscriptSha256": "367b64c1ace4c132aaab8ff2f9983988850861f01d090229b575f8c7db0a700e",
+        "finalStateSha256": "bcee87baa7582261968163f0cab7a1bf9925434631443bb06c072cb1650cf516",
+        "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+        "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+        "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+        "receiptLedgerSha256": "22409f8714d097adb9ce1015f69b86abab731d80e418eb8b44e198378cc6642e",
+        "resumeStateSha256": "1cd76b2428c75d237ac4c12e2cec626601baab4761399f45f947656fc63a0e50",
+        "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+        "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+      },
+      "period": "2024-01-02 UTC",
+      "processColdOpenSeconds": 0.06896717986091971,
+      "qaAllocatedBytes": 76943360,
+      "readMetrics": [
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 21.177108993999997,
+          "repeat": 0,
+          "ticksPerSecond": 6374.84764603903,
+          "wallSeconds": 21.507651258958504
+        },
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 20.985149817,
+          "repeat": 1,
+          "ticksPerSecond": 6434.986017580115,
+          "wallSeconds": 21.306650803191587
+        }
+      ],
+      "reader": "DuckDB",
+      "replayGroupsPerSecond": 316.4186544568348,
+      "replayWallSeconds": 433.312,
+      "resourceSampling": {
+        "firstCpuUsec": 62439345,
+        "firstEpoch": 1793859091.9873586,
+        "lastCpuUsec": 691641169,
+        "lastEpoch": 1793859743.3546438,
+        "maxCandidatePeakRssBytes": 273281024,
+        "maxCgroupCurrentBytes": 805826560,
+        "maxSingleProcessPeakRssBytes": 273281024,
+        "maxSupervisorPeakRssBytes": 74067968,
+        "minFreeBytes": 38742007808,
+        "postgresObservedInCgroup": true,
+        "sampleCount": 6308
+      },
+      "sampledProcessIoDelta": {
+        "rchar": 165320699012,
+        "read_bytes": 156431704064,
+        "wchar": 359880541,
+        "write_bytes": 293412864
+      },
+      "sharedFormatAllocatedBytes": 9441280,
+      "wallSeconds": 651.4631474530324,
+      "warmSeekP50Seconds": 0.2639034455642104,
+      "warmSeekP95Seconds": 0.30111307883635163
+    },
+    {
+      "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+      "coldRecovery": "PASS",
+      "coldRecoveryWallSeconds": 54.345,
+      "cpuSeconds": 651.211942,
+      "cpuUtilPercent": 96.85444846341998,
+      "endToEndGroupsPerSecond": 203.92008904410702,
+      "firstSeekSeconds": 0.287321857875213,
+      "groups": 137108,
+      "idempotency": "PASS",
+      "independentVerificationWallSeconds": 82.776,
+      "layout": "daily",
+      "observedHostFreeDiskGrowthBytes": 89378816,
+      "parity": {
+        "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+        "eventTranscriptSha256": "367b64c1ace4c132aaab8ff2f9983988850861f01d090229b575f8c7db0a700e",
+        "finalStateSha256": "bcee87baa7582261968163f0cab7a1bf9925434631443bb06c072cb1650cf516",
+        "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+        "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+        "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+        "receiptLedgerSha256": "22409f8714d097adb9ce1015f69b86abab731d80e418eb8b44e198378cc6642e",
+        "resumeStateSha256": "1cd76b2428c75d237ac4c12e2cec626601baab4761399f45f947656fc63a0e50",
+        "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+        "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+      },
+      "period": "2024-01-02 UTC",
+      "processColdOpenSeconds": 0.07293518097139895,
+      "qaAllocatedBytes": 77209600,
+      "readMetrics": [
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 20.377915602,
+          "repeat": 0,
+          "ticksPerSecond": 6557.029203480094,
+          "wallSeconds": 20.910079205874354
+        },
+        {
+          "canonicalHash": "4e77bacd7dd3d5f5635d8f16ff5caf6f191810b9c42c82af5c0a2ddde245d15d",
+          "cpuSeconds": 20.467057462999996,
+          "repeat": 1,
+          "ticksPerSecond": 6516.958645914147,
+          "wallSeconds": 21.038648156216368
+        }
+      ],
+      "reader": "DuckDB",
+      "replayGroupsPerSecond": 303.3550750931474,
+      "replayWallSeconds": 451.972,
+      "resourceSampling": {
+        "firstCpuUsec": 752043700,
+        "firstEpoch": 1793859804.5708838,
+        "lastCpuUsec": 1403188695,
+        "lastEpoch": 1793860476.819558,
+        "maxCandidatePeakRssBytes": 274776064,
+        "maxCgroupCurrentBytes": 805830656,
+        "maxSingleProcessPeakRssBytes": 274776064,
+        "maxSupervisorPeakRssBytes": 75251712,
+        "minFreeBytes": 38652440576,
+        "postgresObservedInCgroup": true,
+        "sampleCount": 6436
+      },
+      "sampledProcessIoDelta": {
+        "rchar": 165344391187,
+        "read_bytes": 157514776576,
+        "wchar": 380757820,
+        "write_bytes": 314609664
+      },
+      "sharedFormatAllocatedBytes": 9457664,
+      "wallSeconds": 672.3614168800414,
+      "warmSeekP50Seconds": 0.2595536254812032,
+      "warmSeekP95Seconds": 0.30843058694154024
+    }
+  ],
+  "runtimeScenarioProjectionsNotMeasurements": {
+    "annual": [
+      {
+        "layout": "sqlite",
+        "naiveLinearQABytes": 31499881227.56881,
+        "pointWallSeconds": 235916.58152702966,
+        "reader": "SQLite",
+        "referenceGroups": 56208511,
+        "scenarioHighSeconds": 353806.13185024203,
+        "scenarioLowSeconds": 176971.8063654235,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "single",
+        "naiveLinearQABytes": 31587198985.649387,
+        "pointWallSeconds": 213536.4564448313,
+        "reader": "PyArrow",
+        "referenceGroups": 56208511,
+        "scenarioHighSeconds": 320235.79528325796,
+        "scenarioLowSeconds": 160186.787025618,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "daily",
+        "naiveLinearQABytes": 31288303582.988945,
+        "pointWallSeconds": 215961.65179473517,
+        "reader": "PyArrow",
+        "referenceGroups": 56208511,
+        "scenarioHighSeconds": 323874.05612933275,
+        "scenarioLowSeconds": 162005.4496274364,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "single",
+        "naiveLinearQABytes": 31543540106.609097,
+        "pointWallSeconds": 211005.51451934964,
+        "reader": "DuckDB",
+        "referenceGroups": 56208511,
+        "scenarioHighSeconds": 316439.723205298,
+        "scenarioLowSeconds": 158288.4101763755,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "daily",
+        "naiveLinearQABytes": 31652687304.20982,
+        "pointWallSeconds": 219361.79318923468,
+        "reader": "DuckDB",
+        "referenceGroups": 56208511,
+        "scenarioHighSeconds": 328973.88307541196,
+        "scenarioLowSeconds": 164555.74824614602,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      }
+    ],
+    "seven-days": [
+      {
+        "layout": "sqlite",
+        "naiveLinearQABytes": 416684248.91699976,
+        "pointWallSeconds": 3256.395417247592,
+        "reader": "SQLite",
+        "referenceGroups": 743533,
+        "scenarioHighSeconds": 4815.852685568915,
+        "scenarioLowSeconds": 2476.66678308693,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "single",
+        "naiveLinearQABytes": 417839298.81004757,
+        "pointWallSeconds": 2960.6423554710877,
+        "reader": "PyArrow",
+        "referenceGroups": 743533,
+        "scenarioHighSeconds": 4372.074149217624,
+        "scenarioLowSeconds": 2254.92645859782,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "daily",
+        "naiveLinearQABytes": 413885474.1761531,
+        "pointWallSeconds": 2991.7998680204505,
+        "reader": "PyArrow",
+        "referenceGroups": 743533,
+        "scenarioHighSeconds": 4419.2782392606405,
+        "scenarioLowSeconds": 2278.0606824003553,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "single",
+        "naiveLinearQABytes": 417261773.86352366,
+        "pointWallSeconds": 2926.490144783604,
+        "reader": "DuckDB",
+        "referenceGroups": 743533,
+        "scenarioHighSeconds": 4321.18664344889,
+        "scenarioLowSeconds": 2229.1418954509613,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "daily",
+        "naiveLinearQABytes": 418705586.2298334,
+        "pointWallSeconds": 3037.537452559943,
+        "reader": "DuckDB",
+        "referenceGroups": 743533,
+        "scenarioHighSeconds": 4487.499470399895,
+        "scenarioLowSeconds": 2312.5564436399677,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      }
+    ],
+    "thirty-days": [
+      {
+        "layout": "sqlite",
+        "naiveLinearQABytes": 1713332388.03956,
+        "pointWallSeconds": 12961.909221839593,
+        "reader": "SQLite",
+        "referenceGroups": 3057277,
+        "scenarioHighSeconds": 19374.123392456913,
+        "scenarioLowSeconds": 9755.80213653093,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "single",
+        "naiveLinearQABytes": 1718081750.168568,
+        "pointWallSeconds": 11744.89764525724,
+        "reader": "PyArrow",
+        "referenceGroups": 3057277,
+        "scenarioHighSeconds": 17548.457083896854,
+        "scenarioLowSeconds": 8843.117925937435,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "daily",
+        "naiveLinearQABytes": 1701824318.265426,
+        "pointWallSeconds": 11875.923414888613,
+        "reader": "PyArrow",
+        "referenceGroups": 3057277,
+        "scenarioHighSeconds": 17745.463559562886,
+        "scenarioLowSeconds": 8941.153342551477,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "single",
+        "naiveLinearQABytes": 1715707069.104064,
+        "pointWallSeconds": 11606.59084134398,
+        "reader": "DuckDB",
+        "referenceGroups": 3057277,
+        "scenarioHighSeconds": 17341.33768828945,
+        "scenarioLowSeconds": 8739.217417871243,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      },
+      {
+        "layout": "daily",
+        "naiveLinearQABytes": 1721643771.7653236,
+        "pointWallSeconds": 12061.591311649128,
+        "reader": "DuckDB",
+        "referenceGroups": 3057277,
+        "scenarioHighSeconds": 18023.58025903367,
+        "scenarioLowSeconds": 9080.596837956857,
+        "scope": "projection only; fixed overhead not scaled; command/order policies change beyond one day and require fresh plan; not an acceptance bound"
+      }
+    ]
+  },
+  "sourceRights": "UNKNOWN",
+  "status": "PASS_ONE_DAY_ONLY_STOPPED",
+  "transactionParity": {
+    "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+    "eventTranscriptSha256": "367b64c1ace4c132aaab8ff2f9983988850861f01d090229b575f8c7db0a700e",
+    "finalStateSha256": "bcee87baa7582261968163f0cab7a1bf9925434631443bb06c072cb1650cf516",
+    "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+    "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+    "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+    "receiptLedgerSha256": "22409f8714d097adb9ce1015f69b86abab731d80e418eb8b44e198378cc6642e",
+    "resumeStateSha256": "1cd76b2428c75d237ac4c12e2cec626601baab4761399f45f947656fc63a0e50",
+    "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+    "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+  }
+}

@@ -13,6 +13,7 @@ from contracts.primitives import ContractError
 from infrastructure.database import connect,migrate
 from execution.research import ResearchApplication
 from execution.research_fixture import WARMUP_NS,STEP_NS,research_provider
+from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
 from execution.local_api import create_local_app,body
 from fastapi.testclient import TestClient
 
@@ -31,6 +32,11 @@ class OperationalObservationTests(unittest.TestCase):
         self.assertEqual(set(result['routeCounts']),set(OPERATIONS))
         self.assertEqual((result['active'],result['admitted'],result['statusCounts']['refused']),(0,300,300))
         self.assertNotIn('secret-user',json.dumps(result))
+        self.assertGreater(float(result['processCpuUtilizationCores']),0)
+        self.assertIsInstance(result['cgroup'],dict)
+        self.assertTrue(result['processRssBytes'] is None or type(result['processRssBytes']) is int)
+        self.assertTrue(result['processIoBytes'] is None or type(result['processIoBytes']) is dict)
+        self.assertIn('per-Session attribution',result['interpretation'])
         self.assertIsNone(OperationalMetrics(enabled=False).snapshot()['latencySeconds']['p50'])
         metrics.lock.acquire()
         try:
@@ -68,6 +74,42 @@ class FixturePageTests(unittest.TestCase):
         with self.assertRaises(ContractError):provider.read_page(provider.dataset_id,'0'*64,None,64)
 
 
+class SessionSummaryProjectionTests(unittest.TestCase):
+    def test_exact_committed_cash_count_and_no_market_capabilities(self):
+        from unittest.mock import patch, MagicMock
+        app=ResearchApplication.__new__(ResearchApplication);app.dsn='authored:no-database';app.scope=TrustedScope('workspace:summary','actor:summary')
+        state=dict(sessionId='session:summary',revision=7,throughNs='123',datasetId='fixture:summary',
+                   datasetVersion='a'*64,profileHash='b'*64,profile={'accountCurrency':'USD'},
+                   initialBalance='10000',balance='9999.12345678',
+                   orders={'closed':{'status':'CLOSED'},'partial':{'status':'ACTIVE'},
+                           'cancelled':{'status':'CANCELLED'},'pending':{'status':'PENDING'}},
+                   unresolved=True,ended=False)
+        app._session=MagicMock(return_value=({'id':state['sessionId']},{},state,{}))
+        before=deepcopy(state)
+        with patch('execution.research.connect') as connect_mock, \
+             patch('execution.research.unpack',return_value={'kind':'EXIT_FILL','detail':{'remaining':'0'}}):
+            missing_head=MagicMock();missing_head.fetchone.return_value=None
+            connect_mock.return_value.__enter__.return_value.execute.side_effect=[None,missing_head,[('payload','hash')]]
+            result=app.summary(state['sessionId'])
+        self.assertEqual((result['balance'],result['netCashChange'],result['completedTrades']),('9999.12345678','-0.87654322',1))
+        self.assertEqual((result['revision'],result['throughNs'],result['unresolved']),(7,'123',True))
+        self.assertEqual(state,before)
+        self.assertFalse({'orders','controller','quote'} & result.keys())
+        calls=connect_mock.return_value.__enter__.return_value.execute.call_args_list
+        self.assertEqual(calls[0].args,('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',))
+        self.assertIn('FROM btl.tick_journal_projection_heads',calls[1].args[0])
+        self.assertIn('FROM btl.tick_events',calls[2].args[0])
+
+    def test_missing_or_corrupt_scoped_snapshot_is_not_a_fabricated_summary(self):
+        from unittest.mock import patch, MagicMock
+        app=ResearchApplication.__new__(ResearchApplication);app.dsn='authored:no-database';app.scope=TrustedScope('workspace:summary','actor:summary')
+        for code in ('RESOURCE_UNAVAILABLE','CORRUPT_RECORD','REFUSED_DATASET_VERSION'):
+            app._session=MagicMock(side_effect=ContractError(code,'session'))
+            with patch('execution.research.connect'),self.assertRaises(ContractError) as error:
+                app.summary('session:missing')
+            self.assertEqual(error.exception.code,code)
+
+
 @unittest.skipUnless(DSN,'Real isolated PostgreSQL required; skips are not PASS')
 class ResearchSessionTests(unittest.TestCase):
     @classmethod
@@ -78,6 +120,140 @@ class ResearchSessionTests(unittest.TestCase):
         self.scope=TrustedScope('researchqa:'+uuid.uuid4().hex,'fixture:operator')
         self.app=ResearchApplication(DSN,self.scope)
 
+    def test_product_session_catalog_has_no_128_lifetime_creation_cap(self):
+        record=method();self.app.create_method(record)
+        created=[]
+        for index in range(129):
+            session_id=f'session:lifetime:{index}:'+uuid.uuid4().hex
+            view=self.app.create_session({'id':session_id,'name':f'Session {index+1}',
+                'methodId':record['id'],'initialBalance':'10000','startPeriod':'2020-01'})
+            created.append(view['metadata']['id'])
+        from execution.product_read_model import sessions
+        with connect(DSN) as db:
+            db.row_factory=__import__('psycopg.rows',fromlist=['dict_row']).dict_row
+            first=sessions(db,self.scope.workspace_id,limit=50)
+            collected=[item['metadata']['id'] for item in first['items']]
+            cursor=first['nextCursor']
+            while cursor is not None:
+                page=sessions(db,self.scope.workspace_id,limit=50,after=cursor)
+                collected.extend(item['metadata']['id'] for item in page['items'])
+                cursor=page['nextCursor']
+        self.assertEqual(len(collected),129)
+        self.assertEqual(set(collected),set(created))
+        compatibility=self.app.catalog()
+        self.assertEqual(len(compatibility['sessions']),128)
+
+    def test_product_review_history_has_no_256_item_lifetime_cap(self):
+        record=method();self.app.create_method(record)
+        view=self.app.create_session({'id':'session:review-limit:'+uuid.uuid4().hex,'name':'Review capacity',
+            'methodId':record['id'],'initialBalance':'10000','startPeriod':'2020-01'})
+        for index in range(257):
+            raw=review_request(view)
+            raw['requestId']='order:review-cap:'+str(index)+':'+uuid.uuid4().hex
+            self.app.review(raw)
+        with connect(DSN) as db:
+            count=db.execute('SELECT count(*) FROM btl.tick_order_reviews WHERE workspace_id=%s AND session_id=%s',
+                (self.scope.workspace_id,view['metadata']['id'])).fetchone()[0]
+        self.assertEqual(count,257)
+
+    def test_summary_is_scoped_read_only_and_never_reconstructs_market(self):
+        from unittest.mock import patch
+        view, _ = self.create()
+        session = view['metadata']['id']
+        before = canonical_bytes(self.app.inspect(session))
+        with patch.object(self.app, '_quote', side_effect=AssertionError('no market reads')), \
+             patch.object(self.app, 'inspect', side_effect=AssertionError('no event replay')), \
+             patch.object(self.app, 'workspace', side_effect=AssertionError('no chart reconstruction')):
+            result = self.app.summary(session)
+        self.assertEqual((result['balance'], result['netCashChange'], result['completedTrades']), ('10000','0',0))
+        self.assertEqual(result['revision'], view['state']['revision'])
+        self.assertEqual(result['throughNs'], view['state']['throughNs'])
+        self.assertFalse(result['unresolved'])
+        self.assertEqual(canonical_bytes(self.app.inspect(session)), before)
+        foreign = ResearchApplication(DSN, TrustedScope('foreign:'+uuid.uuid4().hex,'fixture:foreign'))
+        with self.assertRaises(ContractError) as error:
+            foreign.summary(session)
+        self.assertEqual(error.exception.code, 'RESOURCE_UNAVAILABLE')
+        foreign.close()
+
+    def test_monthly_parquet_provider_matches_synthetic_financial_reducer(self):
+        import tempfile
+        from pathlib import Path
+        source=research_provider();token=None;events=[]
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,64)
+            events.extend(page['events'])
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)/'monthly'
+            manifest=write_monthly_parquet(root,iter(events),source.describe(source.dataset_id,source.dataset_version),
+                expected_version=source.dataset_version,row_group_size=128)
+            monthly=MonthlyParquetProvider(root,expected_dataset_id=source.dataset_id,
+                expected_dataset_version=source.dataset_version,expected_manifest_hash=manifest['manifestHash'])
+            monthly_scope=TrustedScope('researchqa:'+uuid.uuid4().hex,'fixture:operator')
+            monthly_app=ResearchApplication(DSN,monthly_scope,synthetic_provider=monthly,
+                                            state_storage_format='compact-v1')
+            try:
+                record=method();self.app.create_method(record);monthly_app.create_method(record)
+                session='session:'+uuid.uuid4().hex
+                request=dict(id=session,name='Monthly Parquet E2E',methodId=record['id'],
+                             initialBalance='10000',startPeriod='2020-01')
+                baseline=self.app.create_session(request);candidate=monthly_app.create_session(request)
+                self.assertEqual(baseline['state'],candidate['state'])
+                review=review_request(baseline)
+                approved=self.app.review(review);candidate_approved=monthly_app.review(review)
+                self.assertEqual(approved['review']['command'],candidate_approved['review']['command'])
+                pin=dict(reviewId=review['requestId'],reviewHash=approved['reviewHash'])
+                baseline_confirmed=self.app.confirm(session,pin)
+                candidate_confirmed=monthly_app.confirm(session,dict(reviewId=review['requestId'],
+                    reviewHash=candidate_approved['reviewHash']))
+                self.assertEqual(baseline_confirmed,candidate_confirmed)
+                candidate_status=monthly_app.command_result(session,review['requestId'])
+                self.assertEqual(candidate_status['status'],'COMMITTED')
+                self.assertEqual(candidate_status['receipt'],candidate_confirmed)
+                state=self.app.inspect(session)['state']
+                command=dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',sessionId=session,
+                    commandId='command:'+uuid.uuid4().hex,expectedRevision=state['revision'],kind='ADVANCE',
+                    payload={'targetNs':str(int(state['throughNs'])+STEP_NS)})
+                baseline_result=self.app.apply(session,command)
+                candidate_result=monthly_app.apply(session,command)
+                self.assertEqual(baseline_result,candidate_result)
+                self.assertEqual(self.app.inspect(session),monthly_app.inspect(session))
+            finally:monthly_app.close()
+
+    def test_summary_counts_closed_positions_not_partial_exits_and_matches_durable_analysis(self):
+        view, _ = self.create()
+        session = view['metadata']['id']
+        request = review_request(view)
+        reviewed = self.app.review(request)
+        self.app.confirm(session, dict(reviewId=request['requestId'], reviewHash=reviewed['reviewHash']))
+        def command(kind, payload):
+            current = self.app.inspect(session)['state']
+            return self.app.apply(session, dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',
+                sessionId=session,commandId='summary:'+uuid.uuid4().hex,expectedRevision=current['revision'],
+                kind=kind,payload=payload))
+        def advance():
+            current = self.app.inspect(session)['state']
+            return command('ADVANCE',{'targetNs':str(int(current['throughNs'])+STEP_NS)})
+        advance()
+        state = self.app.inspect(session)['state']
+        order_id = next(iter(state['orders']))
+        self.assertEqual(state['orders'][order_id]['status'],'ACTIVE')
+        command('CLOSE',dict(orderId=order_id,quantity='0.05'))
+        advance()
+        self.assertEqual(self.app.summary(session)['completedTrades'],0)
+        command('CLOSE',dict(orderId=order_id,quantity=None))
+        advance()
+        summary = self.app.summary(session)
+        workspace = self.app.workspace(session,{'timeframe':'1m'})
+        self.assertEqual(summary['completedTrades'],1)
+        self.assertEqual(summary['completedTrades'],workspace['analysis']['metrics']['tradeCount'])
+        self.assertEqual(summary['balance'],workspace['state']['balance'])
+        cold = ResearchApplication(DSN,self.scope)
+        self.assertEqual(cold.summary(session),summary)
+        cold.close()
+
     def create(self,kind='FREE_STYLE',on=False):
         m=method(kind,on);self.app.create_method(m)
         body=dict(id='session:'+uuid.uuid4().hex,name='QA Session',methodId=m['id'],initialBalance='10000',startPeriod='2020-01')
@@ -87,6 +263,35 @@ class ResearchSessionTests(unittest.TestCase):
         return self.app.apply(view['metadata']['id'],dict(schemaVersion=1,artifact='BTL-TICK-EXECUTION-COMMAND-1',
             sessionId=view['metadata']['id'],commandId='advance:'+uuid.uuid4().hex,expectedRevision=view['state']['revision'],
             kind='ADVANCE',payload={'targetNs':str(int(view['state']['throughNs'])+steps*STEP_NS)}))
+
+    def test_workspace_reports_committed_pending_target_after_reopen(self):
+        view, body = self.create()
+        session = body['id']
+        self.assertIsNone(view['pendingReplayTargetNs'])
+        target = str(int(view['state']['throughNs']) + 80 * STEP_NS)
+        first = self.advance(view, 80)
+        self.assertFalse(first['replay']['exhaustedThroughBoundary'])
+
+        cold_app = ResearchApplication(DSN, self.scope)
+        try:
+            restored = cold_app.workspace(session, {'timeframe':'1h'})
+            self.assertEqual(restored['pendingReplayTargetNs'], target)
+            self.assertLess(int(restored['state']['throughNs']), int(target))
+            command = dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-COMMAND-1',
+                sessionId=session, commandId='advance:'+uuid.uuid4().hex,
+                expectedRevision=restored['state']['revision'], kind='ADVANCE',
+                payload={'targetNs': str(int(target) + STEP_NS)})
+            with self.assertRaisesRegex(ContractError, 'ADVANCE_IN_PROGRESS'):
+                cold_app.apply(session, command)
+            self.assertEqual(cold_app.inspect(session)['pendingReplayTargetNs'], target)
+
+            command['payload']['targetNs'] = restored['pendingReplayTargetNs']
+            receipt = cold_app.apply(session, command)
+            self.assertTrue(receipt['replay']['exhaustedThroughBoundary'])
+            self.assertEqual(cold_app.apply(session, command), receipt)
+            self.assertIsNone(cold_app.workspace(session, {'timeframe':'D'})['pendingReplayTargetNs'])
+        finally:
+            cold_app.close()
 
     def test_method_inheritance_immutable_and_idempotent_creation(self):
         view,body=self.create('PROTOCOL',True)
@@ -145,8 +350,14 @@ class ResearchSessionTests(unittest.TestCase):
     def test_stale_review_and_actual_fill_reload_without_reset(self):
         view,body=self.create();old=self.app.review(review_request(view))
         self.advance(view)
-        with self.assertRaisesRegex(ContractError,'REFUSED_STALE_REVISION'):
-            self.app.confirm(body['id'],dict(reviewId=old['review']['command']['commandId'],reviewHash=old['reviewHash']))
+        with self.assertLogs('execution.postgres',level='WARNING') as stale_log:
+            with self.assertRaisesRegex(ContractError,'REFUSED_STALE_REVISION'):
+                self.app.confirm(body['id'],dict(reviewId=old['review']['command']['commandId'],reviewHash=old['reviewHash']))
+        self.assertIn('requestType=OPEN',stale_log.output[0])
+        self.assertIn('expectedRevision=0',stale_log.output[0])
+        self.assertIn('actualRevision=1',stale_log.output[0])
+        self.assertIn('status=REFUSED_STALE_REVISION',stale_log.output[0])
+        self.assertNotIn(body['id'],stale_log.output[0])
         view=self.app.inspect(body['id']);new=self.app.review(review_request(view))
         self.app.confirm(body['id'],dict(reviewId=new['review']['command']['commandId'],reviewHash=new['reviewHash']))
         view=self.app.inspect(body['id']);self.advance(view)
@@ -159,6 +370,19 @@ class ResearchSessionTests(unittest.TestCase):
         for forbidden in ('controller','advanceTargets','endOfDataset','manifest','chunks','evidenceCatalog'):
             self.assertNotIn(forbidden,repr(saved))
         self.assertGreater(int(saved['state']['throughNs']),WARMUP_NS)
+
+    def test_stale_review_emits_revision_only_diagnostic(self):
+        view,body=self.create()
+        self.advance(view)
+        with self.assertLogs('execution.research',level='WARNING') as stale_log:
+            with self.assertRaisesRegex(ContractError,'REFUSED_STALE_REVISION'):
+                self.app.review(review_request(view))
+        message=stale_log.output[0]
+        self.assertIn('requestType=REVIEW',message)
+        self.assertIn('expectedRevision=0',message)
+        self.assertIn('actualRevision=1',message)
+        self.assertIn('status=REFUSED_STALE_REVISION',message)
+        self.assertNotIn(body['id'],message)
 
     def test_corrupt_and_older_records_preserved_fail_closed(self):
         view,body=self.create();saved=self.app.catalog()
@@ -212,6 +436,22 @@ class LocalAlphaBoundaryTests(unittest.TestCase):
 
     def tearDown(self):
         self.client.close()
+
+    def test_summary_transport_is_read_only_and_local_boundary_is_preserved(self):
+        app=ResearchApplication(DSN);m=method();app.create_method(m)
+        session='session:'+uuid.uuid4().hex
+        app.create_session(dict(id=session,name='Summary transport QA',methodId=m['id'],initialBalance='10000',startPeriod='2020-01'))
+        before=canonical_bytes(app.inspect(session))
+        path='/api/v1/tick-alpha/sessions/'+session+'/summary'
+        response=self.client.get(path)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json(),app.summary(session))
+        self.assertEqual(response.headers['cache-control'],'no-store')
+        measured=self.client.get('/api/v1/tick-alpha/measurement/operational').json()
+        self.assertEqual(measured['routeCounts']['summary'],1)
+        self.assertEqual(self.client.get(path,headers={'Origin':'https://evil.example'}).status_code,403)
+        self.assertEqual(canonical_bytes(app.inspect(session)),before)
+        app.close()
 
     def test_telemetry_sink_failure_cannot_block_or_duplicate_financial_commit(self):
         from unittest.mock import patch

@@ -1,0 +1,57 @@
+name: Exness monthly Parquet pipeline
+
+on:
+  pull_request:
+    paths:
+      - "backend/ticks/exness_monthly.py"
+      - "backend/ticks/exness_v2.py"
+      - "backend/ticks/exness_parquet_pipeline.py"
+      - "backend/market_data/monthly_parquet.py"
+      - "backend/market_data/monthly_root.py"
+      - "backend/tests/test_exness_monthly.py"
+      - "backend/tests/test_exness_parquet_pipeline.py"
+      - "backend/tests/test_monthly_parquet.py"
+      - "backend/requirements.lock"
+      - ".github/workflows/exness-monthly-parquet.yml"
+  push:
+    branches:
+      - codex/exness-monthly-prep-remote-20261109
+    paths:
+      - "backend/ticks/exness_monthly.py"
+      - "backend/ticks/exness_v2.py"
+      - "backend/ticks/exness_parquet_pipeline.py"
+      - "backend/market_data/monthly_parquet.py"
+      - "backend/market_data/monthly_root.py"
+      - "backend/tests/test_exness_monthly.py"
+      - "backend/tests/test_exness_parquet_pipeline.py"
+      - "backend/tests/test_monthly_parquet.py"
+      - "backend/requirements.lock"
+      - ".github/workflows/exness-monthly-parquet.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  monthly-parquet-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Install repository-pinned PyArrow stack
+        run: python -m pip install --requirement backend/requirements.lock
+      - name: Run Exness synthetic ingestion and immutable Parquet regression
+        working-directory: backend
+        run: >-
+          python -m unittest -v
+          tests.test_exness_monthly
+          tests.test_exness_millisecond
+          tests.test_exness_parquet_pipeline
+          tests.test_monthly_parquet
+          tests.test_monthly_catalog

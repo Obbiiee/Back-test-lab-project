@@ -12,7 +12,7 @@ const vector = closes => closes.map((close, i) => ({ time: 100 + i * 60, open: c
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 const values = (points, expected) => { assert.equal(points.length, expected.length); points.forEach((p, i) => near(p.value, expected[i])); };
 const keys = ['SMA','EMA','BOLLINGER_BANDS','RSI','MACD','ATR','STOCHASTIC'];
-assert.deepEqual(productionRegistry.types(), keys);
+assert.deepEqual(productionRegistry.types().slice(0, keys.length), keys, 'Original seven stay first and unchanged; Issue #21 C-06 appends the professional catalog (tests/c06-indicators.test.mjs).');
 for (const type of overlayRegistry.types()) {
   assert.equal(productionRegistry.get(type).placement, 'price');
   assert.equal(productionRegistry.get(type).calculate, overlayRegistry.get(type).calculate);

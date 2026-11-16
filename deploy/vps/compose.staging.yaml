@@ -1,0 +1,13 @@
+services:
+  gateway:
+    environment:
+      BTL_STAGING_AUTH_USER: ${BTL_STAGING_AUTH_USER:?Set a staging-only basic-auth user}
+      BTL_STAGING_AUTH_HASH: ${BTL_STAGING_AUTH_HASH:?Set a Caddy hashed staging password}
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+  db:
+    volumes:
+      - staging_database:/var/lib/postgresql/data
+
+volumes:
+  staging_database:

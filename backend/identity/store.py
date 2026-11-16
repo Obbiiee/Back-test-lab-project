@@ -20,6 +20,7 @@ class User(BaseModel):
     is_active: bool
     is_superuser: bool
     is_verified: bool
+    password_enabled: bool = True
 
 
 class Token(BaseModel):
@@ -59,10 +60,17 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
             row = await (await db.execute("SELECT * FROM btl.users WHERE email=%s", (email.lower(),))).fetchone()
             return User(**row) if row else None
 
+    async def identity_providers(self, user_id):
+        async with connection(self.dsn) as db:
+            rows = await (await db.execute(
+                "SELECT provider FROM btl.account_identities WHERE user_id=%s ORDER BY provider", (user_id,)
+            )).fetchall()
+            return [row["provider"] for row in rows]
+
     async def create(self, create_dict):
         try:
             async with connection(self.dsn) as db:
-                row = await (await db.execute("INSERT INTO btl.users VALUES (%s,%s,%s,true,false,false) RETURNING *",
+                row = await (await db.execute("INSERT INTO btl.users(id,email,hashed_password,is_active,is_superuser,is_verified) VALUES (%s,%s,%s,true,false,false) RETURNING *",
                     (uuid.uuid4(), create_dict["email"].lower(), create_dict["hashed_password"]))).fetchone()
                 await audit(db, "USER_REGISTERED", row["id"])
                 return User(**row)
@@ -73,6 +81,8 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
         allowed = {"email", "hashed_password", "is_active", "is_superuser", "is_verified"}
         if not update_dict or not set(update_dict).issubset(allowed):
             raise ValueError("Unsupported identity update")
+        if "hashed_password" in update_dict and not user.password_enabled:
+            raise exceptions.InvalidResetPasswordToken()
         values = dict(update_dict)
         if "email" in values:
             values["email"] = values["email"].lower()
@@ -88,6 +98,16 @@ class UserStore(BaseUserDatabase[User, uuid.UUID]):
                 raise exceptions.UserNotExists()
             if "hashed_password" in values or values.get("is_active") is False:
                 await db.execute("DELETE FROM btl.auth_sessions WHERE user_id=%s", (user.id,))
+            if row["is_verified"] and row["password_enabled"]:
+                # A verified email/password identity is recorded under the
+                # canonical account map in the same transaction as verification.
+                await db.execute("INSERT INTO btl.account_identities(provider,provider_subject,user_id,linked_by) "
+                                 "VALUES ('EMAIL_PASSWORD',lower(%s),%s,'EMAIL_VERIFICATION') "
+                                 "ON CONFLICT (provider,provider_subject) DO NOTHING", (row["email"], user.id))
+                identity = await (await db.execute("SELECT user_id FROM btl.account_identities "
+                    "WHERE provider='EMAIL_PASSWORD' AND provider_subject=lower(%s)", (row["email"],))).fetchone()
+                if identity is None or identity["user_id"] != user.id:
+                    raise ValueError("Verified email identity is already assigned")
             await audit(db, "IDENTITY_UPDATED", user.id)
             return User(**row)
 

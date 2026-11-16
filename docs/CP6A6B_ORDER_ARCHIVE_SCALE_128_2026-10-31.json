@@ -1,0 +1,129 @@
+{
+  "cache": {
+    "coldStoreAfterReconstruction": {
+      "entries": 1,
+      "evictions": 0,
+      "fullReconstructions": 3,
+      "hits": 0,
+      "maxEntries": 4,
+      "misses": 1
+    },
+    "coldStoreAfterVerifiedRead": {
+      "entries": 1,
+      "evictions": 0,
+      "fullReconstructions": 4,
+      "hits": 2,
+      "maxEntries": 4,
+      "misses": 1
+    },
+    "warmStore": {
+      "entries": 1,
+      "evictions": 0,
+      "fullReconstructions": 4,
+      "hits": 641,
+      "maxEntries": 4,
+      "misses": 1
+    }
+  },
+  "classification": "QA_ARCHIVE_V1_POSTGRESQL_CUMULATIVE_ORDER_STORAGE_RECOVERY",
+  "counts": {
+    "archivedOrders": 128,
+    "cancelledOrders": 128,
+    "commands": 257,
+    "cumulativeOrders": 128,
+    "events": 257,
+    "fills": 0,
+    "financialEventCount": 0,
+    "hotOrders": 0
+  },
+  "evidenceRoot": "/tmp/riksora-cp6a6b-scale-20261031-r2",
+  "financialSemantics": "No fills; cancelled-order storage stress only. Not evidence for 2,000 completed trades.",
+  "fixture": "AUTHORED_QA_TICKS_ORDER_STORAGE_STRESS_NOT_MARKET_TRADES",
+  "latencySeconds": {
+    "cancelMedian": 0.048874486004933715,
+    "cancelP95": 0.0569979801075533,
+    "postCommitWorkerSeconds": 0.9194183909567073
+  },
+  "milestones": {
+    "128": {
+      "activeOrderCount": 0,
+      "cache": {
+        "entries": 1,
+        "evictions": 0,
+        "fullReconstructions": 3,
+        "hits": 640,
+        "maxEntries": 4,
+        "misses": 1
+      },
+      "canonicalHotStateNodes": 81,
+      "measurement": {
+        "databaseBytes": 11262999,
+        "tables": {
+          "sessionPayloadBytes": 1058,
+          "terminalOrderArchive": {
+            "allocatedTupleBytes": 139741,
+            "payloadBytes": 105821,
+            "rows": 128
+          },
+          "tick_checkpoints": {
+            "allocatedTupleBytes": 428381,
+            "payloadBytes": 535367,
+            "rows": 258
+          },
+          "tick_commands": {
+            "allocatedTupleBytes": 450242,
+            "payloadBytes": 386241,
+            "rows": 257
+          },
+          "tick_events": {
+            "allocatedTupleBytes": 308934,
+            "payloadBytes": 245961,
+            "rows": 257
+          },
+          "tick_sessions": {
+            "allocatedTupleBytes": 1351,
+            "payloadBytes": 1058,
+            "rows": 1
+          }
+        }
+      },
+      "medianCancelApplySeconds": 0.048874486004933715,
+      "orderArchiveCount": 128,
+      "revision": 257,
+      "stateBytes": 2578
+    }
+  },
+  "policy": {
+    "artifact": "BTL-QA-ORDER-RETENTION-3",
+    "maxActiveOrders": 128,
+    "maxCumulativeOrders": 1024,
+    "schemaVersion": 1,
+    "scope": "ISOLATED_QA_ONLY"
+  },
+  "productionChanged": false,
+  "resource": {
+    "artifactsAllocatedBytes": 47751168,
+    "capRssBytes": 777908224,
+    "caps": {
+      "artifactBytes": 536870912,
+      "diskReserveBytes": 32212254720,
+      "ramBytes": 1073741824,
+      "wallSeconds": 3600
+    },
+    "cpuSeconds": 11.931,
+    "diskFreeBytes": 51498975232,
+    "elapsedSeconds": 18.334
+  },
+  "status": "PASS",
+  "verification": {
+    "activeOrder129": "REFUSED_WITHOUT_MUTATION",
+    "coldResume": "PASS",
+    "coldResumeSeconds": 0.5928464889293537,
+    "completeOrderHistory": "PASS",
+    "eventChain": "PASS",
+    "identicalRetry": "PASS",
+    "independentDeltaReconstruction": "PASS",
+    "postCommitSigkill": "PASS",
+    "receiptChain": "PASS"
+  }
+}

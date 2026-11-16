@@ -21,8 +21,13 @@ export function measurementLines(points, bars) {
     m.seconds.toFixed(0) + 's · ' + (m.bars==null?'bars n/a':m.bars.toFixed(2)+' bars') ];
 }
 // Match the renderer's fixed 12px monospace font. Bounds are transient CSS pixels.
-export function labelBounds(anchor, lines) {
-  return { x:anchor.x+6, y:anchor.y-4, width:Math.max(...lines.map(line=>Array.from(line).length))*7.2+12, height:lines.length*16+8 };
+// Style-aware since Issue #21: font size scales the box, align/position move it.
+export function labelBounds(anchor, lines, style = {}) {
+  const size = style.fontSize ?? 12, charWidth = size * .6 * (style.bold ? 1.05 : 1), lineHeight = Math.round(size * 4 / 3);
+  const width = Math.max(...lines.map(line=>Array.from(line).length))*charWidth+12, height = lines.length*lineHeight+8;
+  const x = style.align === 'center' ? anchor.x - width / 2 : style.align === 'right' ? anchor.x - width - 6 : anchor.x + 6;
+  const y = style.position === 'top' ? anchor.y - height - 4 : style.position === 'bottom' ? anchor.y + 6 : anchor.y - 4;
+  return { x, y, width, height, lineHeight };
 }
 export function insideLabel(point, bounds) {
   return point.x>=bounds.x && point.x<=bounds.x+bounds.width && point.y>=bounds.y && point.y<=bounds.y+bounds.height;

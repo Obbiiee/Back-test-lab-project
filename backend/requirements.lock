@@ -15,11 +15,15 @@ fastapi-users==15.0.5
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.8.0
+httpx-oauth==0.17.0
 httpx==0.28.1
 idna==3.20
 makefun==1.16.0
+msgspec==0.22.0
+numpy==2.5.4
 psycopg==3.3.6
 psycopg-binary==3.3.6
+pyarrow==26.0.0
 pwdlib==0.3.0
 pycparser==3.0
 pydantic==2.13.5

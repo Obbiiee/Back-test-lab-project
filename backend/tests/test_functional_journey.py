@@ -1,0 +1,297 @@
+"""Integrated sixteen-instrument journey using authored provider/data only.
+
+Requires a fresh exclusive PostgreSQL cluster. No SMTP, actual Google consent,
+historical coverage, browser rendering or sales acceptance is implied.
+"""
+import os
+import secrets
+import unittest
+import uuid
+
+import psycopg
+from psycopg import sql
+
+from cloud.app import create_app
+from contracts.canonical import content_hash
+from deploy.vps.google_staging import create_google_demo_app, create_google_staging_app, grant_google_demo_runtime
+from identity.google_store import grant_google_runtime
+from execution.research_fixture_v2 import START_NS, STEP_NS
+from market_data.instruments import INSTRUMENTS
+from tests import test_google_identity as google_fixture
+from tests.test_identity import client, RecordingDelivery, PASSWORD
+from tests.test_research_sessions import method
+from tests.test_kernel_v2 import opening
+from tests.test_execution_v2_postgres import command
+from fastapi.testclient import TestClient
+
+
+class FunctionalJourneyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.dsn = os.environ.get('BTL_TEST_DATABASE_URL')
+        if not cls.dsn:
+            raise RuntimeError('FRESH_EXCLUSIVE_POSTGRESQL_REQUIRED')
+        google_fixture.GoogleIdentityTests.setUpClass()
+        password = secrets.token_urlsafe(32)
+        with psycopg.connect(cls.dsn, autocommit=True) as db:
+            db.execute('CREATE ROLE btl_owner NOLOGIN')
+            db.execute(sql.SQL('CREATE ROLE btl_app LOGIN NOSUPERUSER NOCREATEDB '
+                               'NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD {}')
+                       .format(sql.Literal(password)))
+        grant_google_runtime(cls.dsn, 'btl_app')
+        grant_google_demo_runtime(cls.dsn)
+        info = psycopg.conninfo.conninfo_to_dict(cls.dsn)
+        cls.runtime = psycopg.conninfo.make_conninfo(**{**info, 'user': 'btl_app', 'password': password})
+
+    def test_sixteen_google_accounts_trade_save_stats_and_relogin_with_tenant_isolation(self):
+        previous = None
+        for index, symbol in enumerate(INSTRUMENTS):
+            with self.subTest(symbol=symbol):
+                qa = google_fixture.GoogleIdentityTests(methodName='runTest')
+                qa.factory = lambda dsn: create_google_demo_app(
+                    self.runtime, qa.auth_secret, rate_limit=1000,
+                    google_client_id=google_fixture.CLIENT,
+                    google_client_secret=google_fixture.SECRET,
+                    google_redirect_uri=google_fixture.REDIRECT)
+                qa.setUp()
+                qa.client.close()
+                qa.client=TestClient(qa.app,base_url='https://testserver',client=('192.0.2.'+str(index+1),50000))
+                headers = qa.login()
+                http = qa.client
+                me = http.get('/api/v1/auth/me', headers=headers).json()
+                self.assertTrue(me['is_verified'])
+                self.assertFalse(me['is_superuser'])
+                workspace = http.post('/api/v1/workspaces', headers=headers,
+                                      json={'name': symbol + ' authored QA'})
+                self.assertEqual(workspace.status_code, 201, workspace.text)
+                wid = workspace.json()['id']
+                root = '/api/v1/workspaces/' + wid + '/research-v2'
+                def get(path):
+                    response = http.get(root + path, headers=headers)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    return response.json()
+                def post(path, body):
+                    response = http.post(root + path, headers=headers, json=body)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    return response.json()
+                catalog = get('/catalog')
+                self.assertIn('SYNTHETIC', str(catalog))
+                self.assertEqual([item['symbol'] for item in catalog['instruments']], list(INSTRUMENTS))
+                self.assertTrue(all(item['model'] == 'AUTHORED_SYNTHETIC_ONLY'
+                                    for item in catalog['instruments']))
+                m = method()
+                post('/methods', m)
+                sid = 'session:journey:' + symbol
+                path = '/sessions/' + sid
+                unavailable = http.post(root + '/sessions', headers=headers, json=dict(
+                    id='session:not-acquired', name='Unavailable history', methodId=m['id'],
+                    symbol=symbol, startPeriod='2025-01', initialBalance='10000'))
+                self.assertEqual(unavailable.status_code, 409, unavailable.text)
+                self.assertEqual(unavailable.json()['detail'], 'REFUSED_FIXTURE_PERIOD')
+                post('/sessions', dict(id=sid, name=symbol, methodId=m['id'], symbol=symbol,
+                                      startPeriod='2020-01', initialBalance='10000'))
+                post(path + '/activate', {})
+                revision = 0
+                def call(kind, payload):
+                    nonlocal revision
+                    raw = command(sid, 'journey:' + str(revision), revision, kind, payload)
+                    receipt = post(path + '/commands', raw)
+                    self.assertEqual(post(path + '/commands', raw), receipt)
+                    revision = receipt['state']['revision']
+                call('ADVANCE', {'targetNs': str(START_NS)})
+                review = post(path + '/review', dict(id='order:journey', expectedRevision=revision,
+                                                   payload=opening(entry='999')))
+                confirm = dict(reviewId=review['id'], reviewHash=content_hash(review))
+                receipt = post(path + '/confirm', confirm)
+                revision = receipt['state']['revision']
+                call('ADVANCE', {'targetNs': str(START_NS + STEP_NS)})
+                call('CLOSE', {'orderId': 'order:journey', 'quantity': None})
+                call('ADVANCE', {'targetNs': str(START_NS + 2 * STEP_NS)})
+                stats = get(path + '/statistics')
+                self.assertEqual(stats['metrics']['tradeCount'], 1)
+                self.assertIsInstance(stats['account']['balance'], str)
+                if symbol == 'EURUSD':
+                    self.assertEqual(stats['account']['balance'], '10000.03')
+                post(path + '/journal', dict(orderId='order:journey', expectedNoteRevision=0,
+                                            text='Authored integrated acceptance', tags=['qa']))
+                notes = get(path + '/journal')
+                self.assertEqual(len(notes['notes']), 1)
+                post(path + '/trash', {})
+                post(path + '/restore', {})
+                self.assertEqual(post(path + '/confirm', confirm), receipt)
+                if previous:
+                    self.assertEqual(http.get(previous, headers=headers).status_code, 404)
+                self.assertEqual(http.get(root + path + '/statistics').status_code, 401)
+                self.assertEqual(http.post('/api/v1/auth/logout', headers=headers).status_code, 204)
+                self.assertEqual(http.get(root + path, headers=headers).status_code, 401)
+                http.close()
+                # New app + cookies: same authored Google subject must recover the account and data.
+                qa.app = qa.factory(self.runtime)
+                qa.client = TestClient(qa.app,base_url='https://testserver',client=('192.0.2.'+str(index+1),50000))
+                qa.app.state.google_verifier.keys.fetch_data = lambda: {'keys': [qa.jwk]}
+                import httpx
+                qa.app.state.google_client.get_httpx_client = lambda: httpx.AsyncClient(
+                    transport=httpx.MockTransport(qa.token_endpoint), follow_redirects=False, timeout=5)
+                headers = qa.login()
+                http = qa.client
+                self.assertEqual(http.get('/api/v1/auth/me', headers=headers).json()['id'], me['id'])
+                self.assertEqual(get(path + '/statistics'), stats)
+                self.assertEqual(get(path + '/journal'), notes)
+                self.assertEqual(get(path)['state']['revision'], revision)
+                previous = root + path + '/statistics'
+                qa.client.close()
+
+    def test_single_instrument_product_v1_login_trade_journal_analytics_resume(self):
+        """One authored synthetic instrument covers the hosted API journey end-to-end."""
+        qa = google_fixture.GoogleIdentityTests(methodName='runTest')
+        qa.factory = lambda dsn: create_google_demo_app(
+            self.runtime, qa.auth_secret, rate_limit=1000,
+            google_client_id=google_fixture.CLIENT,
+            google_client_secret=google_fixture.SECRET,
+            google_redirect_uri=google_fixture.REDIRECT)
+        qa.setUp()
+        qa.client.close()
+        qa.client = TestClient(qa.app, base_url='https://testserver', client=('192.0.2.240', 50000))
+        headers = qa.login()
+        http = qa.client
+        me = http.get('/api/v1/auth/me', headers=headers).json()
+        self.assertTrue(me['is_verified'])
+        workspace = http.post('/api/v1/workspaces', headers=headers, json={'name': 'Single instrument synthetic V1'})
+        self.assertEqual(workspace.status_code, 201, workspace.text)
+        root = '/api/v1/workspaces/' + workspace.json()['id'] + '/research-v2'
+
+        def get(path):
+            response = http.get(root + path, headers=headers)
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        def post(path, body):
+            response = http.post(root + path, headers=headers, json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        catalog = get('/catalog')
+        eurusd = next(item for item in catalog['instruments'] if item['symbol'] == 'EURUSD')
+        self.assertEqual(eurusd['model'], 'AUTHORED_SYNTHETIC_ONLY')
+        trading_method = method()
+        post('/methods', trading_method)
+        sid = 'session:single-v1:' + uuid.uuid4().hex
+        path = '/sessions/' + sid
+        post('/sessions', dict(id=sid, name='Synthetic EURUSD V1', methodId=trading_method['id'],
+                               symbol='EURUSD', startPeriod='2020-01', initialBalance='10000'))
+        post(path + '/activate', {})
+        revision = 0
+
+        def call(kind, payload):
+            nonlocal revision
+            raw = command(sid, 'single-v1:' + str(revision), revision, kind, payload)
+            receipt = post(path + '/commands', raw)
+            self.assertTrue(receipt['durable'])
+            self.assertEqual(post(path + '/commands', raw), receipt)
+            revision = receipt['state']['revision']
+            return receipt
+
+        call('ADVANCE', {'targetNs': str(START_NS)})
+        review = post(path + '/review', dict(id='order:single-v1', expectedRevision=revision,
+                                             payload=opening(entry='999')))
+        confirm = dict(reviewId=review['id'], reviewHash=content_hash(review))
+        order_receipt = post(path + '/confirm', confirm)
+        self.assertTrue(order_receipt['durable'])
+        revision = order_receipt['state']['revision']
+        call('ADVANCE', {'targetNs': str(START_NS + STEP_NS)})
+        call('CLOSE', {'orderId': 'order:single-v1', 'quantity': None})
+        call('ADVANCE', {'targetNs': str(START_NS + 2 * STEP_NS)})
+        stats = get(path + '/statistics')
+        self.assertEqual(stats['metrics']['tradeCount'], 1)
+        self.assertEqual(stats['account']['balance'], '10000.03')
+        post(path + '/journal', dict(orderId='order:single-v1', expectedNoteRevision=0,
+                                     text='Single instrument API journey', tags=['synthetic']))
+        notes = get(path + '/journal')
+        self.assertEqual(len(notes['notes']), 1)
+        self.assertEqual(post(path + '/confirm', confirm), order_receipt)
+        self.assertEqual(http.post('/api/v1/auth/logout', headers=headers).status_code, 204)
+        self.assertEqual(http.get(root + path + '/statistics', headers=headers).status_code, 401)
+        http.close()
+
+        # New application instance and login prove the committed Session survives process refresh.
+        qa.app = qa.factory(self.runtime)
+        qa.client = TestClient(qa.app, base_url='https://testserver', client=('192.0.2.240', 50000))
+        qa.app.state.google_verifier.keys.fetch_data = lambda: {'keys': [qa.jwk]}
+        import httpx
+        qa.app.state.google_client.get_httpx_client = lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(qa.token_endpoint), follow_redirects=False, timeout=5)
+        headers = qa.login()
+        http = qa.client
+        self.assertEqual(http.get('/api/v1/auth/me', headers=headers).json()['id'], me['id'])
+        self.assertEqual(get(path + '/statistics'), stats)
+        self.assertEqual(get(path + '/journal'), notes)
+        self.assertEqual(get(path)['state']['revision'], revision)
+        qa.client.close()
+
+    def test_demo_does_not_open_password_admin_support_billing_or_tier_write(self):
+        qa = google_fixture.GoogleIdentityTests(methodName='runTest')
+        qa.factory = lambda dsn: create_google_demo_app(
+            self.runtime, qa.auth_secret, rate_limit=1000,
+            google_client_id=google_fixture.CLIENT, google_client_secret=google_fixture.SECRET,
+            google_redirect_uri=google_fixture.REDIRECT)
+        qa.setUp()
+        headers = qa.login()
+        self.assertEqual(qa.client.get('/api/v1/auth/providers').json(), {
+            'schemaVersion':1,'password':False,'googleConfigured':True,
+            'billingConfigured':False,'demoConfigured':True})
+        for path in ('/api/v1/auth/login','/api/v1/auth/register','/api/v1/support',
+                     '/api/v1/admin','/api/v1/billing/sandbox/checkout',
+                     '/api/v1/workspaces/00000000-0000-0000-0000-000000000001/members'):
+            self.assertEqual(qa.client.post(path,headers=headers,json={}).status_code,404,path)
+        with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+            with psycopg.connect(self.runtime) as db:
+                db.execute('INSERT INTO btl.sandbox_access_events SELECT * FROM btl.sandbox_access_events LIMIT 0')
+        qa.client.close()
+
+    def test_authentication_keeps_strict_rate_limit_without_blocking_replay_namespace(self):
+        app=create_google_staging_app(self.runtime,secrets.token_urlsafe(48),workspace_metadata=True,
+            rate_limit=30,
+            google_client_id=google_fixture.CLIENT,google_client_secret=google_fixture.SECRET,
+            google_redirect_uri=google_fixture.REDIRECT)
+        http=TestClient(app,base_url='https://testserver',client=('192.0.2.200',50000))
+        # OAuth callback is a credential-completing endpoint and remains under
+        # the default strict 30/IP/min bucket. These invalid callbacks make no
+        # provider network calls and fail closed in the local test app.
+        for _ in range(30):
+            self.assertEqual(http.get('/api/v1/auth/google/callback').status_code,400)
+        refused=http.get('/api/v1/auth/google/callback',headers={'X-Forwarded-For':'192.0.2.201'})
+        self.assertEqual(refused.status_code,429)
+        self.assertEqual(refused.headers['retry-after'],'60')
+        # Routine auth reads use the global API bound, not the sensitive auth
+        # bucket, and do not block product routes under the default limit.
+        self.assertEqual(http.get('/api/v1/auth/providers').status_code,200)
+        self.assertEqual(http.get('/api/v1/workspaces').status_code,401)
+        http.close()
+
+    def test_email_verification_required_before_workspace_and_recovery_revokes_old_session(self):
+        delivery = RecordingDelivery()
+        # Separate email QA needs canonical identity grants only, not public activation.
+        http = client(create_app(self.runtime, secrets.token_urlsafe(48), delivery,
+                                 rate_limit=1000, sandbox_reset_timezone='UTC'))
+        email = uuid.uuid4().hex + '@example.com'
+        response = http.post('/api/v1/auth/register', json={'email': email, 'password': PASSWORD})
+        self.assertEqual(response.status_code, 201, response.text)
+        def login(password=PASSWORD):
+            return http.post('/api/v1/auth/login', data={'username': email, 'password': password})
+        self.assertEqual(login().status_code, 400)
+        verified = http.post('/api/v1/auth/verify', json={'token': delivery.token(email, 'verification')})
+        self.assertEqual(verified.status_code, 200, verified.text)
+        logged = login()
+        self.assertEqual(logged.status_code, 200, logged.text)
+        headers = {'Authorization': 'Bearer ' + logged.json()['access_token']}
+        self.assertEqual(http.post('/api/v1/workspaces', headers=headers, json={'name': 'Verified email QA'}).status_code, 201)
+        response = http.post('/api/v1/auth/forgot-password', json={'email': email})
+        self.assertEqual(response.status_code, 202, response.text)
+        replacement = 'QA-only-Replacement-Password-942!'
+        response = http.post('/api/v1/auth/reset-password', json={
+            'token': delivery.token(email, 'recovery'), 'password': replacement})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(http.get('/api/v1/auth/me', headers=headers).status_code, 401)
+        self.assertEqual(login().status_code, 400)
+        self.assertEqual(login(replacement).status_code, 200)
+        http.close()

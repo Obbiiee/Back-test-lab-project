@@ -1,6 +1,7 @@
+import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {api,command,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
+import {api,command,replayObservedTo,sessionPath,loadResearchContext,noticeText,sourceContext,pagePath} from '../src/tickAlpha/client.js';
 import {syncTickAnnotations,ratioLabel} from '../src/tickAlpha/annotations.js';
 import {displayBars,historyPage,replayTarget,seekTarget} from '../src/tickAlpha/display.js';
 import {KEY,RETENTION,readMeasurement,writeMeasurement,eventTo,saveFeedback,measurementExport,QUESTIONS} from '../src/tickAlpha/measurement.js';
@@ -27,6 +28,84 @@ assert.equal(sourceContext(),'synthetic');
 await api('/catalog');
 assert.equal(accountCalls.at(-1)[0],'/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog');
 assert.equal(accountCalls.at(-1)[1].headers['X-BTL-Source'],undefined);
+const jumpBody={schemaVersion:1,artifact:'BTL-JUMP-NEXT-EVENT-1',requestId:'c'.repeat(32),
+  sessionId:'session:jump',expectedRevision:7,timeframe:'1m'};
+await api('/sessions/session%3Ajump/jump-next-event',jumpBody);
+const jumpCall=accountCalls.at(-1);
+assert.ok(jumpCall[0].endsWith('/sessions/session%3Ajump/jump-next-event'));
+assert.ok(jumpCall[1].headers['X-BTL-Job'],'Next-event mutation is admitted through the durable job protocol');
+const transientReadCalls=[];
+let transientMutationCalls=0;
+const transientReadAccount=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'RETRY-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  if(path.endsWith('/catalog')){
+    transientReadCalls.push(path);
+    if(transientReadCalls.length<3)return {ok:false,status:transientReadCalls.length===1?429:503,
+      json:async()=>({detail:transientReadCalls.length===1?'RESEARCH_BUSY':'SERVICE_BUSY'})};
+    return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Recovered bounded read'})};
+  }
+  if(path.endsWith('/methods')){
+    transientMutationCalls++;
+    if(transientMutationCalls===1)return {ok:false,status:429,json:async()=>({detail:'RESEARCH_BUSY'})};
+    return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Method accepted once'})};
+  }
+  if(path.endsWith('/sessions')){
+    return {ok:false,status:429,json:async()=>({detail:'QUEUE_CAPACITY'})};
+  }
+  return {ok:true,status:200,json:async()=>({schemaVersion:1})};
+}});
+await transientReadAccount.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(transientReadAccount,'11111111-1111-4111-8111-111111111111');
+assert.equal((await api('/catalog')).label,'Recovered bounded read');
+assert.equal(transientReadCalls.length,3,'explicit read-only research contention retries with bounded backoff');
+assert.equal((await api('/methods',{name:'One explicit no-op retry'})).label,'Method accepted once');
+assert.equal(transientMutationCalls,2,'a pre-admission RESEARCH_BUSY refusal may be retried before any operation executes');
+let extendedBusyCalls=0;
+const extendedBusyClient=createAccountClient({secure:()=>true,fetcher:async(path)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'BUSY-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  extendedBusyCalls++;
+  if(extendedBusyCalls<=6)return {ok:false,status:503,headers:{get:name=>name==='Retry-After'?'0':null},json:async()=>({detail:'SERVICE_BUSY'})};
+  return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Recovered after admission pressure'})};
+}});
+await extendedBusyClient.login('qa@example.com','Test fixture passphrase only');
+assert.equal((await extendedBusyClient.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog')).label,
+  'Recovered after admission pressure');
+assert.equal(extendedBusyCalls,7,'bounded SERVICE_BUSY retries can outlast a short admission-pressure burst');
+let retryAfterCalls=0;
+const retryAfterClient=createAccountClient({secure:()=>true,fetcher:async(path)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'RETRY-AFTER-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  retryAfterCalls++;
+  if(retryAfterCalls===1)return {ok:false,status:503,headers:{get:name=>name==='Retry-After'?'0.1':null},json:async()=>({detail:'SERVICE_BUSY'})};
+  return {ok:true,status:200,json:async()=>({schemaVersion:1,label:'Retry-After honored'})};
+}});
+await retryAfterClient.login('qa@example.com','Test fixture passphrase only');
+const retryAfterStart=performance.now();
+assert.equal((await retryAfterClient.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/catalog')).label,
+  'Retry-After honored');
+assert.ok(performance.now()-retryAfterStart>=90,'explicit Retry-After is a minimum delay before a safe retry');
+let queueRefusalCalls=0;
+const queueRefusalJobIds=[];
+const queueRefusalAccount=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(path.endsWith('/login'))return {ok:true,status:200,json:async()=>({access_token:'QUEUE-TOKEN',token_type:'bearer'})};
+  if(path.endsWith('/me'))return {ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})};
+  if(path.endsWith('/sessions')){
+    queueRefusalCalls++;
+    queueRefusalJobIds.push(options.headers['X-BTL-Job']);
+    if(queueRefusalCalls<3)return {ok:false,status:429,headers:{get:name=>name==='Retry-After'?'0':null},json:async()=>({detail:'QUEUE_CAPACITY'})};
+    return {ok:true,status:201,json:async()=>({schemaVersion:1,label:'Session admitted after capacity cleared'})};
+  }
+  return {ok:true,status:200,json:async()=>({schemaVersion:1})};
+}});
+await queueRefusalAccount.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(queueRefusalAccount,'11111111-1111-4111-8111-111111111111');
+assert.equal((await api('/sessions',{name:'Queue refusal keeps the durable command identity'})).label,
+  'Session admitted after capacity cleared');
+assert.equal(queueRefusalCalls,3,'explicit pre-insert queue refusals are retried with a bounded wait');
+assert.equal(new Set(queueRefusalJobIds).size,1,'queue admission retries retain one durable job identity');
+setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 const queuedCalls=[];
 let queuedId;
 const queuedAccount={subject:()=> '22222222-2222-4222-8222-222222222222',request:async(path,options={})=>{
@@ -38,11 +117,57 @@ setAccountTransport(queuedAccount,'11111111-1111-4111-8111-111111111111');
 const queuedResult=await api('/sessions/session:queue/view',{timeframe:'1m'});
 assert.equal(queuedResult.label,'Bounded queued read');
 assert.equal(queuedCalls.length,2);
-assert.match(queuedId,/^[0-9a-f-]{36}$/);
+assert.match(queuedId,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+const pollDelays=[];let pendingPolls=0;let pendingJobId;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  if(path.endsWith('/view')){pendingJobId=options.jobId;return {schemaVersion:1,jobId:pendingJobId,state:'QUEUED',result:null};}
+  pendingPolls++;
+  return pendingPolls<4?{schemaVersion:1,jobId:pendingJobId,state:'RUNNING',result:null}:
+    {schemaVersion:1,jobId:pendingJobId,state:'SUCCEEDED',result:{schemaVersion:1,label:'Backoff poll complete'}};
+}},'11111111-1111-4111-8111-111111111111');
+const nativeSetTimeout=globalThis.setTimeout;
+globalThis.setTimeout=(callback,delay,...args)=>{pollDelays.push(delay);queueMicrotask(()=>callback(...args));return pollDelays.length;};
+let backoffResult;
+try{backoffResult=await api('/sessions/session:poll/view',{timeframe:'1m'});}
+finally{globalThis.setTimeout=nativeSetTimeout;}
+assert.equal(backoffResult.label,'Backoff poll complete');
+assert.equal(pendingPolls,4);
+assert.ok(pollDelays.length===4&&pollDelays[0]>=1000&&pollDelays.every((delay,index)=>
+  delay<=3250&&(index===0||delay>pollDelays[index-1])), 'queued status polls back off with bounded jitter');
+const readRetryIds=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(_path,options={})=>{readRetryIds.push(options.jobId);return {schemaVersion:1,label:'done'};}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions/session:queue/view',{timeframe:'1m'});
+assert.notEqual(readRetryIds[0],queuedId,'a new view read cannot reuse a completed queue result');
 assert.ok(queuedCalls[1][0].endsWith('/jobs/'+queuedId),'Poll stable read identity; never resend the command');
+const additionalQueued=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  additionalQueued.push([path,options]);
+  return path.endsWith('/chart-history')||path.endsWith('/replay-to')
+    ?{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,artifact:'BTL-SYNTHETIC-RESULT-1'}}
+    :{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:created'}}};
+}},'11111111-1111-4111-8111-111111111111');
+assert.equal((await api('/sessions/session:queued/chart-history',{timeframe:'1m',offset:0})).artifact,'BTL-SYNTHETIC-RESULT-1');
+assert.equal((await api('/sessions/session:queued/replay-to',{requestId:'request:stable'})).artifact,'BTL-SYNTHETIC-RESULT-1');
+assert.ok(additionalQueued.every(([,options])=>options.jobId),'chart-history and replay-to use durable queue IDs');
+const observedJump={metadata:{id:'session:jump',artifact:'BTL-OBSERVED-RESEARCH-SESSION-1'},state:{revision:3,throughNs:'100'}};
+const jumpRequests=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(_path,{body,jobId})=>{
+  jumpRequests.push([body.requestId,jobId]);
+  const view={metadata:{id:body.sessionId},state:{throughNs:'150',revision:4}};
+  return {schemaVersion:1,artifact:'BTL-OBSERVED-REPLAY-TO-RESULT-1',requestId:body.requestId,
+    sessionId:body.sessionId,targetNs:body.targetNs,throughNs:'150',targetReached:false,view};
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>replayObservedTo(observedJump,'99','1m'),/after the saved replay/);
+await assert.rejects(()=>replayObservedTo({...observedJump,pendingReplayTargetNs:'175'},'200','1m'),/Continue the saved replay/);
+assert.equal((await replayObservedTo(observedJump,'200','1m')).targetReached,false);
+await replayObservedTo(observedJump,'200','1m');
+assert.equal(jumpRequests.length,2);
+assert.deepEqual(jumpRequests[0],jumpRequests[1],'retry keeps both request and queue identities');
+
 const mismatched={subject:queuedAccount.subject,request:async()=>({schemaVersion:1,jobId:'foreign',state:'SUCCEEDED',result:{schemaVersion:1}})};
 setAccountTransport(mismatched,'11111111-1111-4111-8111-111111111111');
 await assert.rejects(()=>api('/sessions/session:queue/view',{timeframe:'1m'}),/Unexpected research job/);
+await assert.rejects(()=>api('/sessions',{id:'session:uncertain'}),error=>error.code==='UNKNOWN'&&!!error.jobId);
 let replayJob;
 const replayCalls=[];
 const reconciliation={subject:queuedAccount.subject,request:async(path,options={})=>{
@@ -53,31 +178,113 @@ const reconciliation={subject:queuedAccount.subject,request:async(path,options={
 setAccountTransport(reconciliation,'11111111-1111-4111-8111-111111111111');
 const replayBody={kind:'ADVANCE',commandId:'command:retained'};
 await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>
-  error.message.includes('Reload committed Session evidence')&&!error.message.includes('unchanged'));
+  error.code==='UNKNOWN'&&error.jobId===replayJob);
 assert.equal(replayCalls.length,2,'Uncertain replay polls its existing job; never silently resubmits a financial command');
 assert.equal(replayCalls[0][1].body,replayBody,'Preserve canonical financial command identity');
 const lostReplayCalls=[];
+let lostId;
 setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
   lostReplayCalls.push([path,options]);
+  lostId=options.jobId;
   throw new DOMException('Response lost after possible commit','TimeoutError');
 }},'11111111-1111-4111-8111-111111111111');
-await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),/Reload committed Session evidence/);
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===lostId);
 assert.equal(lostReplayCalls.filter(([path])=>path.endsWith('/commands')).length,1);
-assert.ok(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),'Best-effort stop never asserts that an earlier attempt did not commit');
+assert.equal(lostReplayCalls.some(([path])=>path.endsWith('/cancel')),false,'do not cancel an uncertain financial mutation');
+const retried=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  retried.push([path,options]);
+  return path.endsWith('/commands')?{schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,revision:8}}:{schemaVersion:1};
+}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions/session:queue/commands',replayBody);
+assert.equal(retried[0][1].jobId,lostId,'retry reuses the durable financial job ID');
+const createCalls=[];
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  createCalls.push([path,options]);
+  return {schemaVersion:1,jobId:options.jobId,state:'SUCCEEDED',result:{schemaVersion:1,metadata:{id:'session:new'}}};
+}},'11111111-1111-4111-8111-111111111111');
+await api('/sessions',{id:'session:new',name:'Synthetic'});
+assert.ok(createCalls[0][1].jobId,'POST /sessions is submitted with a durable job identity');
+setAccountTransport({subject:queuedAccount.subject,request:async()=>{throw Object.assign(Error('definitive stale request'),{status:409});}},
+  '11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{id:'session:stale',name:'Synthetic'}),error=>error.status===409&&error.code!=='UNKNOWN');
+setAccountTransport({subject:queuedAccount.subject,request:async()=>({schemaVersion:1,state:'QUEUED'})},
+  '11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions',{id:'session:missing-job',name:'Synthetic'}),error=>error.code==='UNKNOWN');
+const cancelUncertainty=[];
+let cancelJob;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  cancelUncertainty.push([path,options]);
+  if(path.endsWith('/commands')){cancelJob=options.jobId;return {schemaVersion:1,jobId:cancelJob,state:'QUEUED',result:null};}
+  return {schemaVersion:1,jobId:cancelJob,state:'RECONCILE_REQUIRED',cancellation:'RECONCILE_REQUIRED',result:null};
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN');
+assert.equal(cancelUncertainty.length,2,'cancellation race remains an explicit unknown until reconciliation');
+const pollTimeout=[];
+let timeoutJob;
+setAccountTransport({subject:queuedAccount.subject,request:async(path,options={})=>{
+  pollTimeout.push([path,options]);
+  if(path.endsWith('/commands')){timeoutJob=options.jobId;return {schemaVersion:1,jobId:timeoutJob,state:'QUEUED',result:null};}
+  throw new DOMException('poll response timed out','TimeoutError');
+}},'11111111-1111-4111-8111-111111111111');
+await assert.rejects(()=>api('/sessions/session:queue/commands',replayBody),error=>error.code==='UNKNOWN'&&error.jobId===timeoutJob);
+assert.equal(pollTimeout.length,2,'poll timeout preserves the durable job for later reconciliation');
 setAccountTransport(account,'11111111-1111-4111-8111-111111111111');
 await account.logout(true);
 await assert.rejects(()=>api('/catalog'),/Sign in/);
 clearAccountTransport();
 assert.equal(accountStorageKey('same-session-id'),'same-session-id');
+// Match the server queue's retained result semantics across sign-out/sign-in.
+const retainedViews=new Map();
+let committedRevision=3;
+const resumeClient=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(!path.endsWith('/view'))return accountFetch(path,options);
+  const jobId=options.headers['X-BTL-Job'];
+  assert.ok(jobId);
+  if(!retainedViews.has(jobId))retainedViews.set(jobId,{schemaVersion:1,state:{revision:committedRevision}});
+  return {ok:true,status:200,json:async()=>retainedViews.get(jobId)};
+}});
+const resumeWorkspace='11111111-1111-4111-8111-111111111111';
+const loadResume=()=>api('/sessions/session:saved/view',{timeframe:'1m'});
+await resumeClient.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(resumeClient,resumeWorkspace);
+assert.equal((await loadResume()).state.revision,3);
+await resumeClient.logout();
+clearAccountTransport();
+committedRevision=4;
+await resumeClient.login('qa@example.com','Test fixture passphrase only');
+setAccountTransport(resumeClient,resumeWorkspace);
+assert.equal((await loadResume()).state.revision,4,'resume must load a newly committed server revision');
+assert.equal(retainedViews.size,2);
+clearAccountTransport();
+
+const failedLogout=createAccountClient({secure:()=>true,fetcher:async(path,options)=>{
+  if(path.endsWith('/logout-all'))throw new DOMException('Response lost','TimeoutError');
+  return accountFetch(path,options);
+}});
+await failedLogout.login('qa@example.com','Test fixture passphrase only');
+await assert.rejects(()=>failedLogout.logout(true),{name:'TimeoutError'});
+assert.equal(failedLogout.hasSession(),false);
+assert.equal(failedLogout.subject(),null);
 const beforeAccountWindow=globalThis.window;
 globalThis.window={location:{href:'https://localhost:5197/?page=account'}};
 await assert.rejects(()=>api('/catalog'),/No private local fallback/);
 assert.equal(pagePath('home'),'/?page=account');
+window.location.href='https://research.example/?tick-alpha=local';
+await assert.rejects(()=>api('/catalog'),/No private local fallback/);
 if(beforeAccountWindow===undefined)delete globalThis.window;else globalThis.window=beforeAccountWindow;
 const insecure=createAccountClient({fetcher:()=>{throw Error('Must not fetch');},secure:()=>false});
 await assert.rejects(()=>insecure.login('qa@example.com','password'),/HTTPS/);
 const refused=createAccountClient({fetcher:async()=>({ok:false,status:400,json:()=>{throw Error('SECRET');}}),secure:()=>true});
 await assert.rejects(()=>refused.login('qa@example.com','SECRET'),error=>!error.message.includes('SECRET'));
+let safeBusyCalls=0;
+const safeBusy=createAccountClient({secure:()=>true,fetcher:async()=>{
+  safeBusyCalls++;
+  return {ok:false,status:503,json:async()=>({detail:'SERVICE_BUSY',secret:'must not escape'})};
+}});
+await assert.rejects(()=>safeBusy.request('/api/v1/auth/providers',{authenticated:false}),error=>
+  error.status===503&&error.code==='SERVICE_BUSY'&&!error.message.includes('secret'));
+assert.equal(safeBusyCalls,9,'only eight bounded retries follow the original SERVICE_BUSY refusal');
 let resolveLogin;
 const obsolete=createAccountClient({fetcher:()=>new Promise(resolve=>{resolveLogin=resolve;}),secure:()=>true});
 const obsoleteLogin=obsolete.login('qa@example.com','password');
@@ -95,6 +302,15 @@ const callerAbort=new AbortController();
 const canceled=createAccountClient({secure:()=>true,fetcher:async(_path,options)=>{assert.equal(options.signal.aborted,true);throw Error('canceled');}});
 callerAbort.abort();
 await assert.rejects(()=>canceled.request('/api/v1/auth/verify',{authenticated:false,signal:callerAbort.signal}),/canceled/);
+const operationDeadline=new AbortController();let forwardedDeadline;
+const inheritedDeadline=createAccountClient({secure:()=>true,fetcher:async(_path,options)=>{
+  forwardedDeadline=options.signal;
+  return {ok:true,status:200,json:async()=>({schemaVersion:1})};
+}});
+await inheritedDeadline.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/journal/pages',
+  {authenticated:false,signal:operationDeadline.signal});
+assert.equal(forwardedDeadline,operationDeadline.signal,
+  'research transport must honor the caller’s bounded job deadline without imposing a shorter nested timeout');
 console.log('PASS account transport: HTTPS-only, memory-only token, strict verified identity, scoped preferences, logout/no local fallback, safe refusals and obsolete-login cancellation.');
 
 const localData=new Map(),localStore={getItem:key=>localData.get(key)??null,setItem:(key,value)=>localData.set(key,value)};
@@ -129,6 +345,7 @@ const quotaStore={getItem:()=>JSON.stringify({...disabledMeasurement,enabled:tru
 assert.equal(eventTo(quotaStore,{id:'event:quota',name:'analysis_opened'},observedNow),false);
 console.log('PASS optional internal measurement: disabled/no-op, typed privacy, idempotent/bounded events, separate feedback/retry/retention, honest cost unknowns and corrupt/denied/quota preservation.');
 
+globalThis.window={location:{href:'http://127.0.0.1:5173/'}};
 const calls=[];
 globalThis.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({schemaVersion:1,reviewHash:'pinned'})};};
 const exact='0.123456789012345678';
@@ -143,9 +360,15 @@ const optionalReadController=new AbortController();
 await api('/measurement/operational',undefined,{signal:optionalReadController.signal});
 assert.equal(calls[2].options.signal,optionalReadController.signal,'Optional observation timeout must abort the actual request');
 assert.equal(sessionPath('session:α'),'/sessions/session%3A%CE%B1');
-const raw=command({metadata:{id:'session:one'},state:{revision:7}},'ADVANCE',{targetNs:'1577838600000000000'});
+const localView={metadata:{id:'session:one',artifact:'BTL-LOCAL-SESSION-1'},state:{revision:7}};
+const observedView={metadata:{id:'session:observed',artifact:'BTL-OBSERVED-RESEARCH-SESSION-1'},state:{revision:7}};
+const raw=command(localView,'ADVANCE',{targetNs:'1577838600000000000'});
+assert.equal(raw.artifact,'BTL-TICK-EXECUTION-COMMAND-1');
+assert.equal(command(observedView,'ADVANCE',{targetNs:'1577838600000000000'}).artifact,'BTL-OBSERVED-EXECUTION-COMMAND-1');
+assert.throws(()=>command(observedView,'SEEK',{targetNs:'1577838600000000000'}),/do not support SEEK/);
+assert.throws(()=>command({metadata:{id:'ambiguous'}},'ADVANCE',{}),/ambiguous Session model/);
 assert.equal(raw.expectedRevision,7);assert.equal(raw.payload.targetNs,'1577838600000000000');
-assert.notEqual(raw.commandId,command({metadata:{id:'session:one'},state:{revision:7}},'ADVANCE',raw.payload).commandId);
+assert.notEqual(raw.commandId,command(localView,'ADVANCE',raw.payload).commandId);
 globalThis.fetch=async()=>({ok:false,json:async()=>({detail:'REFUSED_STALE_REVISION'})});
 await assert.rejects(()=>api('/reviews',{}),/REFUSED_STALE_REVISION/);
 globalThis.fetch=async()=>({ok:true,json:async()=>({schemaVersion:2})});
@@ -154,8 +377,15 @@ const ui=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),
 for(const prohibited of ['useTrading','prototypeModel','localStorage','simulate trigger','manage('])assert.ok(!ui.includes(prohibited),'Alpha must not adopt a second financial truth: '+prohibited);
 assert.ok(ui.includes('review.reviewHash')&&ui.includes("+'/confirm'"));
 assert.ok(ui.includes('flight.current')&&ui.includes('loadWorkspace(view.metadata.id)'));
-const main=readFileSync(new URL('../src/main.jsx',import.meta.url),'utf8');
-assert.ok(main.includes("get('tick-alpha')==='local'"));assert.ok(main.includes('localOrigin?<TickAlphaEntry/>'));
+assert.equal(entryRoute({hostname:'localhost',search:'?tick-alpha=local'}),'workspace');
+assert.equal(entryRoute({hostname:'127.0.0.1',search:'?legacy=local'}),'legacy');
+assert.equal(entryRoute({hostname:'[::1]',search:'?tick-alpha=exness'}),'workspace');
+for(const search of ['', '?legacy=local', '?tick-alpha=local', '?tick-alpha=exness',
+  '?tick-review=local', '?trading-ux=prototype']){
+  assert.equal(entryRoute({hostname:'research.example',search}),'hosted-home',search);
+}
+assert.equal(entryRoute({hostname:'research.example',
+  search:'?page=account&session=saved&legacy=local'}),'account');
 console.log('PASS tick-alpha transport exact strings, explicit revision/command identity, local-only opt-in and durable-review UI boundary.');
 
 const view={state:{throughNs:'1577838600000000000'},chart:{timeframe:'1m',priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable:false,candles:[
@@ -166,6 +396,11 @@ assert.equal(bars[0].open,2000.015);assert.ok(!Object.hasOwn(bars[0],'volume'));
 assert.deepEqual(Object.keys(bars[0]),['time','open','high','low','close']);
 assert.equal(view.chart.candles[0].open,'2000.015');
 assert.equal(replayTarget(view,4),'1577838660000000000');
+const resumedView={...view,pendingReplayTargetNs:'1577838700000000000'};
+for(const steps of [1,4,16])assert.equal(replayTarget(resumedView,steps),resumedView.pendingReplayTargetNs);
+for(const pending of ['1577838600000000000','-1','1.5',1577838700000000000]){
+  assert.throws(()=>replayTarget({...view,pendingReplayTargetNs:pending},1),/Invalid pending replay target/);
+}
 assert.equal(seekTarget('2020-01-01T00:30'),'1577838600000000000');
 assert.equal(seekTarget('2020-02-29T12:34:56'),'1582979696000000000');
 assert.equal(seekTarget('2000-02-29T00:00'),'951782400000000000');
@@ -237,8 +472,17 @@ assert.ok(noticeText('REFUSED_HISTORICAL_PERIOD').includes('no fallback feed'));
 const observed={state:{throughNs:'1439166600000000000'},replayStepNs:'1000000000'};
 assert.equal(replayTarget(observed,4),'1439166604000000000');
 for(const invalid of ['0','-1','1000000000000',1,true,'1e9'])assert.throws(()=>replayTarget({...observed,replayStepNs:invalid},1));
-assert.ok(ui.includes('name="startPeriod"')&&ui.includes('Start month (UTC)'));
+// The Start month field moved from the old Create Session dialog into the New Session wizard.
+const wizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
+assert.ok(wizard.includes('name="startPeriod"')&&wizard.includes('Start month (UTC)'));
+assert.ok(ui.includes("api('/sessions',{id:creationId.current"),'Session creation still sends the existing POST /sessions payload');
 assert.ok(ui.includes("dialog==='ticket'"));
+assert.ok(ui.includes("+'/jump-next-event'"));
+assert.ok(ui.includes("artifact:'BTL-JUMP-NEXT-EVENT-1'"));
+// The replay controls moved out of the workspace file into AlphaReplayControls; the contract checks cover both.
+const workspaceUi=readFileSync(new URL('../src/tickAlpha/AlphaWorkspace.jsx',import.meta.url),'utf8')+readFileSync(new URL('../src/tickAlpha/AlphaReplayControls.jsx',import.meta.url),'utf8');
+assert.ok(workspaceUi.includes('Jump to Next Event')&&workspaceUi.includes('Cancel search'));
+assert.ok(workspaceUi.includes('role="status" aria-live="polite"'));
 assert.ok(!ui.includes('synthetic feed · January 2020 fixture'));
 console.log('PASS explicit historical/synthetic isolation, source period, bounded exact replay interval and one popup ticket.');
 const historyView={metadata:{startPeriod:'2015-09'},state:{datasetId:'test:history',datasetVersion:'test:v1',throughNs:'1441067400000000000'}};

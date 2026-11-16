@@ -1,0 +1,11 @@
+ARG PYTHON_IMAGE
+FROM ${PYTHON_IMAGE}
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/backend
+WORKDIR /app
+COPY backend/requirements.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir -r /tmp/requirements.lock && pip check
+COPY backend /app/backend
+COPY deploy/__init__.py /app/deploy/__init__.py
+COPY deploy/vps /app/deploy/vps
+USER 10001:10001
+CMD ["python", "/app/deploy/vps/runtime.py", "serve"]

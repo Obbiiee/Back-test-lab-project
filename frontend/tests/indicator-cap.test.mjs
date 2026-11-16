@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {capIndicators,PHONE_INDICATOR_CAP} from '../src/tickAlpha/indicatorCap.js';
+const list=n=>Array.from({length:n},(_,i)=>({id:'i'+i,type:'SMA',visible:i!==2}));
+const desk=list(16);assert.equal(capIndicators(desk,false).rendered,desk,'desktop untouched');
+const {rendered,paused}=capIndicators(list(16),true);
+assert.equal(PHONE_INDICATOR_CAP,8);
+assert.equal(rendered.filter(i=>i.visible!==false).length,8,'8 drawn on phone');
+assert.equal(rendered.length,9,'paused ones are not mounted; the user-hidden one stays');
+assert.deepEqual([...paused],['i9','i10','i11','i12','i13','i14','i15'],'user-hidden i2 does not count; the first 8 visible are kept');
+const src=list(16);capIndicators(src,true);assert.ok(src.every((i,k)=>i.visible===(k!==2)),'stored flags never mutated');
+const few=list(5);assert.equal(capIndicators(few,true).rendered,few,'under the cap: same array');
+console.log('indicator cap: ok');

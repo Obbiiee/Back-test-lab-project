@@ -17,7 +17,7 @@ import zlib
 from typing import Protocol
 
 from contracts.primitives import require, digest
-from .contracts import CanonicalTick, TickManifest, uint, keys
+from .contracts import CanonicalTick, TickManifest, uint, keys, validate_source_projection
 from .contracts_v2 import (ZERO_VERSION, canonical_v2_bytes, decode_v2, hash_v2,
                           payload, shape, validate_root, validate_container,
                           descriptors, interval_for, summary)
@@ -33,32 +33,84 @@ class IndexedTickDataProvider(Protocol):
     def read_evidence_v2(self, request: dict) -> dict: ...
 
 
-def connect(path, *, allow_threads=False):
+def connect(path, *, allow_threads=False, read_only=False):
     # Cross-worker use is opt-in and requires the controller's shared RLock.
-    db = sqlite3.connect(path, check_same_thread=not allow_threads)
-    db.execute("PRAGMA journal_mode=WAL")
-    db.execute("PRAGMA synchronous=FULL")
-    db.execute("PRAGMA cache_size=-2048" if allow_threads else "PRAGMA cache_size=-8192")
-    db.execute("PRAGMA temp_store=FILE")
-    db.execute("PRAGMA mmap_size=0")
-    return db
+    require(type(read_only) is bool, "readOnly")
+    if read_only:
+        path = Path(path)
+        require(not path.is_symlink() and path.is_file(), "store", "SOURCE_PATH_REFUSED")
+        # A serving snapshot must be closed and self-contained. Never checkpoint,
+        # change the source journal mode, or ignore a live WAL with immutable=1.
+        require(not any(p.exists() or p.is_symlink() for p in
+                        (Path(str(path)+suffix) for suffix in ("-wal", "-shm", "-journal"))),
+                "snapshot", "READ_ONLY_SNAPSHOT_REQUIRED")
+        with path.open("rb") as stream:
+            header = stream.read(20)
+        require(header[:16] == b"SQLite format 3\x00" and header[18:20] == b"\x01\x01",
+                "snapshot", "READ_ONLY_SNAPSHOT_REQUIRED")
+        db = sqlite3.connect(path.resolve().as_uri()+"?mode=ro", uri=True,
+                             check_same_thread=not allow_threads)
+    else:
+        db = sqlite3.connect(path, check_same_thread=not allow_threads)
+    try:
+        if read_only:
+            db.execute("PRAGMA query_only=ON")
+            require(db.execute("PRAGMA journal_mode").fetchone()[0] == "delete",
+                    "snapshot", "READ_ONLY_SNAPSHOT_REQUIRED")
+        else:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA synchronous=FULL")
+        db.execute("PRAGMA cache_size=-2048" if allow_threads else "PRAGMA cache_size=-8192")
+        db.execute("PRAGMA temp_store=FILE")
+        db.execute("PRAGMA mmap_size=0")
+        return db
+    except BaseException:
+        db.close()
+        raise
 
 
 class ArtifactStore:
-    def __init__(self, folder, *, create=False, allow_threads=False):
+    # None is the original unmarked physical layout. Logical wire identities
+    # are independent of an explicitly selected physical writer layout.
+    LAYOUT = None
+
+    def __init__(self, folder, *, create=False, allow_threads=False, read_only=False):
+        require(type(read_only) is bool, "readOnly")
+        require(not (read_only and create), "create", "READ_ONLY_CREATE_REFUSED")
+        require(not read_only or not Path(folder).is_symlink(), "store", "SOURCE_PATH_REFUSED")
         self.folder = Path(folder).resolve()
         if create:
             self.folder.mkdir(parents=True, exist_ok=True)
         require((self.folder / "archive.sqlite").is_file() or create, "store", "INCOMPLETE_INGESTION")
-        self.db = connect(self.folder / "archive.sqlite", allow_threads=allow_threads)
+        archive = self.folder / "archive.sqlite"
+        if create and archive.is_file():
+            # Inspect before WAL/schema pragmas: choosing the wrong writer must
+            # not mutate an existing archive, including its journal header.
+            peek = sqlite3.connect(archive.as_uri()+"?mode=ro", uri=True)
+            try:
+                marked = peek.execute("SELECT 1 FROM sqlite_master WHERE name='storage_layout' AND type='table'").fetchone()
+                row = peek.execute("SELECT name FROM storage_layout WHERE id=1").fetchone() if marked else None
+                require(not marked or row is not None, "storageLayout", "STORAGE_LAYOUT_MISMATCH")
+                require((row[0] if row else None) == self.LAYOUT,
+                        "storageLayout", "STORAGE_LAYOUT_MISMATCH")
+            finally:
+                peek.close()
+        self.db = connect(archive, allow_threads=allow_threads, read_only=read_only)
         if create:
-            self.db.executescript("""
+            try:
+                self._initialize_schema()
+                self.db.commit()
+            except BaseException:
+                self.db.close()
+                raise
+
+    def _initialize_schema(self):
+        self.db.executescript("""
             CREATE TABLE IF NOT EXISTS objects(hash TEXT PRIMARY KEY, body BLOB NOT NULL, kind TEXT NOT NULL) WITHOUT ROWID;
             CREATE TABLE IF NOT EXISTS publications(version TEXT PRIMARY KEY, root BLOB NOT NULL, receipt BLOB NOT NULL, binding BLOB NOT NULL) WITHOUT ROWID;
             CREATE TABLE IF NOT EXISTS journal(key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
             CREATE TABLE IF NOT EXISTS identities(event BLOB PRIMARY KEY, digest BLOB NOT NULL, source TEXT NOT NULL, ordinal TEXT NOT NULL, UNIQUE(source,ordinal)) WITHOUT ROWID;
-            """)
-            self.db.commit()
+        """)
 
     def close(self):
         self.db.close()
@@ -139,9 +191,11 @@ class DatasetBuilder:
     Checkpoints commit at storage chunks; bounded unfinished tie state persists.
     Generic builder currently rejects malformed input rather than quarantining.
     """
+    STORE_CLASS = ArtifactStore
+
     def __init__(self, folder, metadata, sources, source_pin, *, packing=(256, 256, 1024), resume=False):
         require(len(packing) == 3 and all(type(v) is int and 1 <= v <= limit for v, limit in zip(packing, (256, 256, 1024))), "packing")
-        self.store = ArtifactStore(folder, create=True)
+        self.store = self.STORE_CLASS(folder, create=True)
         try:
             old = self.store.journal()
             pin = dict(metadata=metadata, sources=sources, sourcePin=source_pin, packing=list(packing))
@@ -187,6 +241,7 @@ class DatasetBuilder:
         source = self.source_map.get(row["provenance"]["sourceId"])
         require(source is not None and source[1]["memberHash"] == row["provenance"]["memberHash"]
                 and source[1]["resolutionNs"] == row["resolutionNs"], "source", "IDENTITY_CONFLICT")
+        validate_source_projection(source[1], row)
         ordinal, time = int(row["rawOrdinal"]), int(row["timeNs"])
         require(source[0] >= self.s["previousSource"] and (source[0] != self.s["previousSource"] or ordinal > self.s["previousOrdinal"]), "ordinal", "INVALID_SOURCE_ORDINAL")
         require(self.s["previousTime"] is None or time >= self.s["previousTime"], "time", "ORDER_REVERSAL")
@@ -385,6 +440,9 @@ class DatasetBuilder:
                         original = dict(e, datasetVersion=ZERO_VERSION)
                         accepted = self.store.db.execute("SELECT digest,source,ordinal FROM identities WHERE event=?", (bytes.fromhex(e["eventId"]),)).fetchone()
                         raw = CanonicalTick._validate(original)
+                        source = self.source_map.get(e['provenance']['sourceId'])
+                        require(source is not None, 'source', 'IDENTITY_CONFLICT')
+                        validate_source_projection(source[1], e)
                         require(accepted is not None and accepted[0] == hashlib.sha256(raw).digest()
                                 and accepted[1] == e["provenance"]["sourceId"] and str(accepted[2]) == e["rawOrdinal"], "acceptance", "IDENTITY_CONFLICT")
                         require(int(e["timeNs"]) >= previous, "seam", "ORDER_REVERSAL")
@@ -408,10 +466,13 @@ class DiskTickProvider:
     Host private completion is trusted composition (not remote self-certification).
     Every accessed immutable descendant is checked against its pinned parent.
     No all-history scan, cache or event identity index in process RAM.
+    read_only=True opts into an existing closed DELETE-mode snapshot. It never
+    converts original stores; WAL/SHM/journal companions are explicitly refused.
+    The default writer-compatible connection and every wire/hash stay unchanged.
     """
-    def __init__(self, folder, dataset_version, *, allow_threads=False):
+    def __init__(self, folder, dataset_version, *, allow_threads=False, read_only=False):
         digest(dataset_version, "version")
-        self.__store = ArtifactStore(folder, allow_threads=allow_threads)
+        self.__store = ArtifactStore(folder, allow_threads=allow_threads, read_only=read_only)
         self.__cache_limit = (4 if allow_threads else 16)*1048576
         try:
             self.__open(dataset_version)
@@ -463,6 +524,7 @@ class DiskTickProvider:
                 require(all(event[k] == self.__root[k] for k in ("datasetId", "providerId", "feedId", "instrumentId")), "identity", "IDENTITY_CONFLICT")
                 source = self.__source_map.get(event["provenance"]["sourceId"])
                 require(source is not None and source["memberHash"] == event["provenance"]["memberHash"] and source["resolutionNs"] == event["resolutionNs"], "source", "IDENTITY_CONFLICT")
+                validate_source_projection(source, event)
                 require(int(event["timeNs"]) >= previous, "time", "ORDER_REVERSAL")
                 previous = int(event["timeNs"])
         # Actual recursive Python object sizes, conservatively counting shared
@@ -604,6 +666,16 @@ class DiskTickProvider:
             predecessor = self._by_ordinal(global_ordinal-1)
             require(int(predecessor["timeNs"]) < int(time), "boundary", "INCOMPLETE_ATOMIC_BOUNDARY")
         return dict(position=position, groupTimeNs=time)
+
+    def locate_ordinal_v2(self, dataset_id, version, raw_ordinal):
+        """Locate the atomic timestamp group containing a raw event ordinal."""
+        self._identity(dataset_id, version)
+        ordinal = uint(raw_ordinal)
+        count = int(self.__root["eventCount"])
+        if ordinal >= count:
+            return None
+        event = self._by_ordinal(ordinal)
+        return self.locate_v2(dataset_id, version, event["timeNs"])["position"]
 
     def _by_ordinal(self, ordinal):
         ds = self.__root["directories"]

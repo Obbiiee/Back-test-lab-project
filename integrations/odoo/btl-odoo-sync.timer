@@ -1,0 +1,8 @@
+[Unit]
+Description=Sync Backtest Lab business records every minute
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+Unit=btl-odoo-sync.service
+[Install]
+WantedBy=timers.target

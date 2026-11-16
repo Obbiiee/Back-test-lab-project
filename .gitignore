@@ -14,6 +14,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+!.env.staging.example
 *.pem
 *.key
 .DS_Store
@@ -33,3 +34,11 @@ playwright-report/
 test-results/
 Thumbs.db
 Desktop.ini
+
+# VPS private operator files; only examples and source package are tracked.
+/deploy/vps/runtime.json
+/deploy/vps/owner.json
+/deploy/vps/db_password
+/deploy/vps/secrets/
+
+/integrations/odoo/secrets/

@@ -43,11 +43,24 @@ class GuardedDatabaseStrategy(DatabaseStrategy):
             raise HTTPException(status_code=400, detail="LOGIN_BAD_CREDENTIALS")
 
 
-def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
+def create_app(dsn, secret, delivery, *, rate_limit=30, api_rate_limit=600, session_seconds=1800, sandbox_reset_timezone=None, sandbox_event_secret=None,
+               google_client_id=None, google_client_secret=None, google_redirect_uri=None, sandbox_billing=None):
     if not dsn or type(secret) is not str or len(secret) < 64 or delivery is None:
         raise ValueError("Database, high-entropy auth secret and delivery required")
+    if sandbox_event_secret is not None and sandbox_event_secret == secret:
+        raise ValueError("Sandbox event secret must be separate from identity secret")
     if type(session_seconds) is not int or not 60 <= session_seconds <= 86400:
         raise ValueError("Bounded session lifetime required")
+    google_config=None
+    if any(value is not None for value in (google_client_id,google_client_secret,google_redirect_uri)):
+        from identity.google import GoogleConfig
+        if google_client_secret==secret:
+            raise ValueError("Google secret must be separate from identity secret")
+        google_config=GoogleConfig(google_client_id,google_client_secret,google_redirect_uri)
+    if sandbox_billing is not None:
+        from .billing import SandboxBilling
+        if type(sandbox_billing) is not SandboxBilling or sandbox_reset_timezone is None or sandbox_billing.access.timezone!=sandbox_reset_timezone:
+            raise ValueError("Explicit sandbox billing/reset configuration required")
     user_store, token_store = UserStore(dsn), TokenStore(dsn)
     async def manager():
         return UserManager(user_store, secret, delivery)
@@ -57,15 +70,21 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
     users = FastAPIUsers[User, uuid.UUID](manager, [backend])
     from .queue import lifespan
     app = FastAPI(title="Backtest Lab identity API", version="1", docs_url=None, redoc_url=None, debug=False, lifespan=lifespan)
-    app.add_middleware(IdentityBoundary, dsn=dsn, limit=rate_limit)
+    app.add_middleware(IdentityBoundary, dsn=dsn, limit=rate_limit, api_limit=api_rate_limit)
     app.include_router(users.get_register_router(UserRead, UserCreate), prefix="/api/v1/auth")
     app.include_router(users.get_auth_router(backend, requires_verification=True), prefix="/api/v1/auth")
     app.include_router(users.get_verify_router(UserRead), prefix="/api/v1/auth")
     app.include_router(users.get_reset_password_router(), prefix="/api/v1/auth")
+    @app.get("/api/v1/auth/providers")
+    async def providers():
+        return {"schemaVersion":1,"password":True,"googleConfigured":google_config is not None,"billingConfigured":sandbox_billing is not None}
     current = users.current_user(active=True, verified=True)
     @app.get("/api/v1/auth/me", response_model=UserRead)
     async def me(user: User = Depends(current)):
         return user
+    @app.get("/api/v1/auth/identities")
+    async def identities(user: User = Depends(current)):
+        return {"schemaVersion": 1, "providers": await user_store.identity_providers(user.id)}
     @app.post("/api/v1/auth/logout-all", status_code=204)
     async def logout_all(user: User = Depends(current)):
         await token_store.revoke_all(user.id)
@@ -75,16 +94,41 @@ def create_app(dsn, secret, delivery, *, rate_limit=30, session_seconds=1800):
         return JSONResponse({"detail": "INVALID_REQUEST"}, status_code=422)
     app.state.current_user = current
     app.state.dsn = dsn
+    app.state.product_provider_status = {
+        "emailPasswordConfigured": True,
+        "googleConfigured": google_config is not None,
+        "billingConfigured": sandbox_billing is not None,
+    }
+    from .support import install as install_support
+    install_support(app)
     from .workspaces import install
     install(app)
     from .research import install as install_research
     install_research(app)
+    if sandbox_reset_timezone is not None:
+        from .sandbox_access import SandboxAccess
+        from .research_v2 import install as install_v2
+        install_v2(app,SandboxAccess(dsn,sandbox_reset_timezone,event_secret=sandbox_event_secret,billing=sandbox_billing is not None))
+    if sandbox_billing is not None:
+        from .billing import install as install_billing
+        install_billing(app,sandbox_billing)
+    if google_config is not None:
+        from identity.google import install as install_google
+        install_google(app,google_config,backend,strategy,user_store)
     from infrastructure.resources import ApiAdmission
     app.add_middleware(ApiAdmission)
     return app
 
 
 def from_environment():
+    from .billing import from_config
+    billing=from_config(os.environ)
     delivery = SmtpDelivery(os.environ["BTL_SMTP_HOST"], os.environ["BTL_SMTP_USER"],
                             os.environ["BTL_SMTP_PASSWORD"], os.environ["BTL_SMTP_SENDER"])
-    return create_app(os.environ["BTL_DATABASE_URL"], os.environ["BTL_AUTH_SECRET"], delivery)
+    return create_app(os.environ["BTL_DATABASE_URL"], os.environ["BTL_AUTH_SECRET"], delivery,
+                      sandbox_reset_timezone=os.getenv("BTL_SANDBOX_V2_RESET_TIMEZONE") or None,
+                      sandbox_event_secret=os.getenv("BTL_SANDBOX_EVENT_SECRET") or None,
+                      google_client_id=os.getenv("BTL_GOOGLE_CLIENT_ID") or None,
+                      google_client_secret=os.getenv("BTL_GOOGLE_CLIENT_SECRET") or None,
+                      google_redirect_uri=os.getenv("BTL_GOOGLE_REDIRECT_URI") or None,
+                      sandbox_billing=billing)

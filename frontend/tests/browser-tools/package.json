@@ -1,0 +1,7 @@
+{
+  "name": "riksora-private-browser-acceptance",
+  "private": true,
+  "dependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}

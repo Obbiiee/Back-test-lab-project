@@ -1,3 +1,4 @@
+import {entryRoute} from '../src/entryRoute.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {canonicalBytes,intervalText,isLocalReview,MAX_BYTES,nanoseconds,readLocalFile,ReviewLoader,sha256,utcTime,verifyReview} from '../src/tickReview/ReviewImport.js';
@@ -89,8 +90,8 @@ const replacing=new ReviewLoader(file=>file==='slow'?new Promise(resolve=>{slowF
 const superseded=replacing.load('slow',base.report);
 assert.equal((await replacing.load(base.artifact,base.report)).report.status,base.status);
 slowFinish(bytes(base.artifact));await assert.rejects(()=>superseded,{name:'AbortError'});
-const main=readFileSync(new URL('../src/main.jsx',import.meta.url),'utf8');assert(main.includes("get('tick-review')==='local'"));assert(main.includes('localOrigin?<TickReviewEntry/>'));
-assert(main.includes('localOrigin=isLocalReview(window.location.hostname)'));
+assert.equal(entryRoute({hostname:'localhost',search:'?tick-review=local'}),'review');
+assert.equal(entryRoute({hostname:'research.example',search:'?tick-review=local'}),'hosted-home');
 for(const file of ['ReviewImport.js','LocalTickReview.jsx','TickReviewEntry.jsx']){
   const source=readFileSync(new URL('../src/tickReview/'+file,import.meta.url),'utf8');
   assert(!/from ['"].*(?:trading\/|market\/|drawings\/)/.test(source));

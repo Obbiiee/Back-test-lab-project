@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "artifact": "BTL-HISTORICAL-TECHNICAL-SIMULATION-QA-CONFIG-1",
+  "enabled": true,
+  "executionLabel": "EXPERIMENTAL — UNVERIFIED SOURCE — SIMULATED EXECUTION",
+  "technicalEligibilityPolicy": "BTL-HISTORICAL-TECHNICAL-ELIGIBILITY-1",
+  "gapPolicy": {
+    "schemaVersion": 1,
+    "artifact": "BTL-OBSERVED-GAP-POLICY-2",
+    "version": "2",
+    "mode": "OBSERVED_QUOTES_ONLY",
+    "silenceThresholdNs": "60000000000",
+    "closureEvidence": "SOURCE_QUALITY_ONLY"
+  },
+  "sourceDisclosure": {
+    "provenance": "PROVIDER_OBSERVATION",
+    "completeness": "UNKNOWN",
+    "freshness": "UNKNOWN",
+    "rights": "UNKNOWN"
+  },
+  "productionEnabled": false
+}

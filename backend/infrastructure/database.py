@@ -1,17 +1,63 @@
 """Explicit PostgreSQL lifecycle operations; never automatic on API startup."""
 import argparse
 from contextlib import contextmanager
+import json
 import os
 import subprocess
 from pathlib import Path
+from time import perf_counter_ns
 
 import psycopg
+from psycopg import Cursor, Connection
 from psycopg import sql
 from contracts.primitives import require
+from qa_timing import capture_qa_timing, current_qa_timing, record_qa_timing
 from .codec import fingerprint
 from .resources import DATABASE
 
 MIGRATIONS = Path(__file__).with_name("migrations")
+
+
+@contextmanager
+def capture_database_timing():
+    """Collect bounded, identity-free PostgreSQL timing for explicit QA probes."""
+    with capture_qa_timing() as metrics:
+        yield metrics
+
+
+class _TimedCursor(Cursor):
+    """QA-only cursor timing; never records SQL text or parameters."""
+    def execute(self, query, params=None, *, prepare=None, binary=None):
+        started = perf_counter_ns()
+        try:
+            return super().execute(query, params, prepare=prepare, binary=binary)
+        finally:
+            metrics = current_qa_timing()
+            if metrics is not None:
+                record_qa_timing("sqlNs", perf_counter_ns() - started)
+                record_qa_timing("sqlCount", 1)
+
+    def executemany(self, query, params_seq, *, returning=False):
+        started = perf_counter_ns()
+        try:
+            return super().executemany(query, params_seq, returning=returning)
+        finally:
+            metrics = current_qa_timing()
+            if metrics is not None:
+                record_qa_timing("sqlNs", perf_counter_ns() - started)
+                record_qa_timing("sqlCount", 1)
+
+
+class _TimedConnection(Connection):
+    """Measure transaction-context finalization only for an active QA scope."""
+    def __exit__(self, exc_type, exc, tb):
+        started = perf_counter_ns()
+        try:
+            return super().__exit__(exc_type, exc, tb)
+        finally:
+            metrics = current_qa_timing()
+            if metrics is not None:
+                record_qa_timing("transactionExitNs", perf_counter_ns() - started)
 
 
 def _libpq_env(dsn):
@@ -29,8 +75,19 @@ def _libpq_env(dsn):
 @contextmanager
 def connect(dsn):
     # Caller config owns TLS and credentials. Bound connect/lock/query waits.
+    metrics = current_qa_timing()
+    admission_started = perf_counter_ns() if metrics is not None else None
     with DATABASE.claim():
-        with psycopg.connect(dsn, connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000") as db:
+        if metrics is not None:
+            record_qa_timing("admissionNs", perf_counter_ns() - admission_started)
+        connect_started = perf_counter_ns() if metrics is not None else None
+        connect_type = _TimedConnection if metrics is not None else psycopg
+        kwargs = dict(connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000")
+        if metrics is not None:
+            kwargs["cursor_factory"] = _TimedCursor
+        with connect_type.connect(dsn, **kwargs) as db:
+            if metrics is not None:
+                record_qa_timing("connectNs", perf_counter_ns() - connect_started)
             yield db
 
 
@@ -68,6 +125,7 @@ def grant_identity_runtime(dsn, role):
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE,DELETE ON btl.auth_rate_limits TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT INSERT ON btl.security_events TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT USAGE ON SEQUENCE btl.security_events_id_seq TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.account_identities TO {}").format(sql.Identifier(role)))
 
 
 def grant_workspace_runtime(dsn, role):
@@ -80,6 +138,7 @@ def grant_workspace_runtime(dsn, role):
         db.execute(sql.SQL("GRANT UPDATE(user_id) ON btl.memberships TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.resources TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE,DELETE ON btl.research_jobs TO {}").format(sql.Identifier(role)))
+        db.execute(sql.SQL("GRANT SELECT,INSERT,UPDATE ON btl.research_queue_actor_turns TO {}").format(sql.Identifier(role)))
 
 
 def backup(dsn, target, bin_directory=""):
@@ -109,8 +168,10 @@ def restore(dsn, source, expected_hash, bin_directory=""):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=["migrate", "backup", "restore"])
+    parser.add_argument("operation", choices=["migrate", "backup", "restore", "metrics"])
     parser.add_argument("--file")
+    parser.add_argument("--baseline")
+    parser.add_argument("--job-sample-limit", type=int, default=128)
     parser.add_argument("--hash")
     parser.add_argument("--runtime-role")
     parser.add_argument("--identity-role")
@@ -127,8 +188,17 @@ def main():
             grant_workspace_runtime(dsn, args.workspace_role)
     elif args.operation == "backup":
         print(backup(dsn, args.file, os.getenv("BTL_PG_BIN", "")))
-    else:
+    elif args.operation == "restore":
         restore(dsn, args.file, args.hash, os.getenv("BTL_PG_BIN", ""))
+    else:
+        from .postgres_metrics import collect, collect_job_metrics, compare
+        current = collect(dsn)
+        current["operationalJobMetrics"] = collect_job_metrics(dsn, args.job_sample_limit)
+        report = current
+        if args.baseline:
+            baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+            report = compare(baseline, current)
+        print(json.dumps(report, sort_keys=True, separators=(",", ":")))
 
 
 if __name__ == "__main__":

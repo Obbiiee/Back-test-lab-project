@@ -143,6 +143,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
         except Exception:
             return response({'detail':'MEASUREMENT_UNAVAILABLE'},503)
 
+    @app.get("/api/v1/tick-alpha/sessions/{session_id}/summary")
+    async def summary(session_id: str, request: Request):
+        return await execute(application(request).summary, session_id)
+
     @app.get("/api/v1/tick-alpha/catalog")
     async def catalog(request: Request):
         return await execute(application(request).catalog)
@@ -153,11 +157,18 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
 
     @app.post("/api/v1/tick-alpha/sessions")
     async def create_session(request: Request):
-        return await execute(application(request).create_session,await body(request))
+        service = application(request)
+        raw = await body(request)
+        service.assert_start_month_available(raw.get("startPeriod"))
+        return await execute(service.create_session, raw)
 
     @app.get("/api/v1/tick-alpha/sessions/{session_id}")
     async def session(session_id: str, request: Request):
         return await execute(application(request).inspect,session_id)
+
+    @app.get("/api/v1/tick-alpha/sessions/{session_id}/commands/{command_id}")
+    async def command_result(session_id: str, command_id: str, request: Request):
+        return await execute(application(request).command_result, session_id, command_id)
 
     @app.post("/api/v1/tick-alpha/reviews")
     async def review(request: Request):
@@ -166,6 +177,12 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
     @app.get('/api/v1/tick-alpha/sessions/{session_id}/journal')
     async def journal(session_id: str,request: Request):
         return await execute(application(request).journal,session_id)
+
+    @app.get('/api/v1/tick-alpha/sessions/{session_id}/journal/pages')
+    async def journal_page(session_id: str, request: Request, limit: int = 32,
+                           cursor: str | None = None):
+        return await execute(application(request).journal_page,session_id,
+                             {'limit':limit,'cursor':cursor})
 
     @app.post('/api/v1/tick-alpha/sessions/{session_id}/journal')
     async def note(session_id: str,request: Request):
@@ -190,6 +207,10 @@ def create_local_app(dsn, *, port=5188, historical_source=None, observability=Tr
     @app.post("/api/v1/tick-alpha/sessions/{session_id}/commands")
     async def command(session_id: str,request: Request):
         return await execute(application(request).apply,session_id,await body(request))
+
+    @app.post("/api/v1/tick-alpha/sessions/{session_id}/jump-next-event")
+    async def jump_next_event(session_id: str,request: Request):
+        return await execute(application(request).jump_next_event,session_id,await body(request))
 
     return app
 

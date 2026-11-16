@@ -1,0 +1,88 @@
+"""New-family private orchestration. No HTTP-supplied frames or source paths."""
+from contracts.primitives import require
+from copy import deepcopy
+from .observed_profile import ObservedExecutionProfile
+from .observed_admission import AdmittedObservedSource
+from .observed_kernel import apply,command_wire,seed_state,order_limits
+from .observed_session_dispatch import dispatch_observed_session
+from .next_event import scan_next_group
+from .engine import coverage_complete
+
+
+class ObservedExecutionController:
+    def __init__(self,store,resolve_source,*,order_retention_policy=None):
+        require(callable(resolve_source),'sourceResolver');order_limits(order_retention_policy)
+        require(store.order_retention_policy==order_retention_policy,'orderRetention','REFUSED_POLICY_MISMATCH')
+        self.store=store;self.resolve_source=resolve_source;self.order_retention_policy=order_retention_policy
+
+    def _source(self,profile):
+        source=self.resolve_source(profile.profile_hash)
+        require(type(source) is AdmittedObservedSource and source.profile.profile_hash==profile.profile_hash,'source','REFUSED_OBSERVED_SOURCE_IDENTITY');source.assert_current();return source
+
+    def create(self,scope,session_id,profile,policy,*,period,day=None,balance='10000'):
+        require(type(profile) is ObservedExecutionProfile,'profile');source=self._source(profile);start=source.start_for_period(period,day=day)
+        timeline=source.cache.new_timeline(scope,session_id,start)
+        try:
+            cp=timeline.checkpoint()
+            state=seed_state(session_id,profile,policy,cp, balance,order_retention_policy=self.order_retention_policy,
+                             qa_order_archive_v1=self.store.qa_order_archive_v1,
+                             product_order_archive_v1=self.store.product_order_archive_v1,
+                             terminal_order_archive_v1=self.store.terminal_order_archive_v1)
+            self.store.create(scope,state,cp);source.cache.seed(scope,session_id,timeline)
+        except BaseException:timeline.close();raise
+        return state
+
+    def apply(self,scope,raw):
+        command=command_wire(raw);before,prior=self.store.prepare(scope,command)
+        if prior is not None:return prior
+        state=before['state'];cp=before['controller'];kwargs={};replay=None
+        if command['kind']=='ADVANCE':
+            source=self._source(ObservedExecutionProfile.from_wire(state['profile']))
+            frame,next_cp=source.cache.reveal(scope,state['sessionId'],cp,command['payload']['targetNs'])
+            kwargs=dict(reveal=frame,checkpoint=next_cp);cp=next_cp
+            replay=dict(throughNs=frame['throughNs'],exhaustedThroughBoundary=frame['exhaustedThroughBoundary'])
+        archive_codec=dispatch_observed_session(state).archive_codec
+        if archive_codec!='none':
+            proposed,events,archive_records=apply(state,command,order_retention_policy=self.order_retention_policy,
+                qa_order_archive_v1=archive_codec=='qa-v1',
+                product_order_archive_v1=archive_codec=='p0-v1',
+                terminal_order_archive_v1=archive_codec=='integration-v1',
+                archived_order_lookup=lambda oid:self.store.archive_order(scope,state['sessionId'],oid),**kwargs)
+            return self.store.commit(scope,command,before,proposed,cp,events,replay,archive_records=archive_records)
+        proposed,events=apply(state,command,order_retention_policy=self.order_retention_policy,**kwargs)
+        return self.store.commit(scope,command,before,proposed,cp,events,replay)
+
+    def preview_next_event(self,scope,state,checkpoint,target_ns):
+        source=self._source(ObservedExecutionProfile.from_wire(state['profile']))
+        ack=source.cache.preview(checkpoint,target_ns)
+        supported,candidate=scan_next_group(state,ack['groups'])
+        safe_batch=(supported and candidate is None and not ack['diagnostics']['records'] and
+                    coverage_complete(ack['coverage'],int(state['throughNs']),int(ack['throughNs'])))
+        if candidate is not None and supported:
+            target=ack['groups'][candidate]['timeNs']
+        elif safe_batch and ack['groups']:
+            target=ack['throughNs']
+        elif ack['groups']:
+            target=ack['groups'][0]['timeNs']
+        else:
+            target=ack['throughNs']
+        return dict(targetNs=str(target),previewGroups=len(ack['groups']),
+                    exhaustedThroughBoundary=ack['exhaustedThroughBoundary'])
+
+    def inspect(self,scope,session_id,after_sequence=0,maximum=64):
+        return self.store.inspect(scope,session_id,after_sequence,maximum)
+
+    def order_history(self,scope,session_id,offset=0,maximum=64):
+        """Paged historical orders; terminal records never inflate hot state."""
+        return self.store.order_history(scope,session_id,offset,maximum)
+
+    def order_history_page(self,scope,session_id,*,after_sequence=None,revision_pin=None,maximum=64):
+        return self.store.order_history_page(scope,session_id,after_sequence=after_sequence,
+            revision_pin=revision_pin,maximum=maximum)
+
+    def order(self,scope,session_id,order_id):
+        """Retrieve one hot or archived order without reconstructing the ledger."""
+        state=self.store.inspect(scope,session_id)['state']
+        active=state['orders'].get(order_id)
+        if active is not None:return deepcopy(active)
+        return self.store.archive_order(scope,session_id,order_id)

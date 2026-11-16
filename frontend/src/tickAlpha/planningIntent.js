@@ -1,5 +1,5 @@
 // Geometry is a proposed intent, never a reviewed command, fill or account value.
-function gridIntent(value,tickSize){
+export function gridIntent(value,tickSize){
   if(tickSize===undefined)return String(value);
   const price=String(value);
   if(!/^\d+(\.\d+)?$/.test(price)||!/^\d+(\.\d+)?$/.test(tickSize))throw Error('Enter planning levels manually for this price format.');
@@ -20,4 +20,10 @@ export function planningIntent(drawing,{protocol=false,tickSize}={}){
   const rounded=values.map(Number);
   if(rounded.some(p=>p<=0)||(long?!(rounded[1]<rounded[0]&&rounded[0]<rounded[2]):!(rounded[2]<rounded[0]&&rounded[0]<rounded[1])))throw Error('Planning levels collapse on the Session price grid; move the stop or target.');
   return {side:long?'LONG':'SHORT',workflow:'PLANNED',orderType:'LIMIT',entry:values[0],sl:values[1],...(protocol?{}:{tp:values[2]})};
+}
+
+// A chart pick (float from the price scale) as a draft price on the Session grid, or null.
+export function pickedPrice(price,tickSize){
+  if(!Number.isFinite(Number(price))||Number(price)<=0)return null;
+  try{return gridIntent(Number(price).toFixed(8).replace(/0+$/,'').replace(/\.$/,''),tickSize);}catch{return null;}
 }

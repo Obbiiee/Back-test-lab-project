@@ -2,8 +2,12 @@
 from copy import deepcopy
 from contextlib import closing
 from pathlib import Path
+import hashlib
 import json
+import os
+import signal
 import sqlite3
+import multiprocessing
 import tempfile
 import unittest
 import zlib
@@ -24,6 +28,14 @@ def pump(t, target):
         groups.extend(r["groups"])
         if r["exhaustedThroughBoundary"]:
             return groups
+
+
+def _kill_after_durable_256(source_path, version, log_path, checkpoint_path):
+    provider=DiskTickProvider(source_path,version)
+    timeline=IndexedTickTimeline(provider,provider.dataset_id,version,log_folder=log_path,max_groups_per_advance=256)
+    timeline.advance_through('1000',timeline.cursor)
+    Path(checkpoint_path).write_text(json.dumps(timeline.checkpoint(),sort_keys=True))
+    os.kill(os.getpid(),signal.SIGKILL)
 
 
 class TickStorageV2Tests(unittest.TestCase):
@@ -60,10 +72,106 @@ class TickStorageV2Tests(unittest.TestCase):
         self.resources.append(provider)
         return b, provider
 
-    def timeline(self, p, start="0", folder="logs"):
-        t = IndexedTickTimeline(p, p.dataset_id, p.dataset_version, start, log_folder=self.path/folder)
+    def timeline(self, p, start="0", folder="logs", *, max_groups_per_advance=64):
+        t = IndexedTickTimeline(p, p.dataset_id, p.dataset_version, start, log_folder=self.path/folder,
+                                max_groups_per_advance=max_groups_per_advance)
         self.resources.append(t)
         return t
+
+    def readonly_snapshot(self, provider, folder="readonly #? snapshot"):
+        """New QA copy only; never checkpoint/reconfigure the retained source."""
+        target = self.path/folder
+        target.mkdir()
+        with closing(sqlite3.connect((self.path/"data/archive.sqlite").as_uri()+"?mode=ro", uri=True)) as source:
+            with closing(sqlite3.connect(target/"archive.sqlite")) as copy:
+                source.backup(copy)
+                copy.execute("PRAGMA journal_mode=DELETE")
+        return target, provider.dataset_version
+
+    def test_readonly_permission_restricted_snapshot_exact_pages_groups_and_no_writes(self):
+        _, original = self.build()
+        folder, version = self.readonly_snapshot(original)
+        archive = folder/"archive.sqlite"
+        before = hashlib.sha256(archive.read_bytes()).hexdigest()
+        before_stat = archive.stat()
+        archive.chmod(0o400); folder.chmod(0o500)
+        reader = None
+        try:
+            reader = DiskTickProvider(folder, version, read_only=True)
+            self.assertEqual(reader.describe_v2(reader.dataset_id, version), original.describe_v2(original.dataset_id, version))
+            for ns in ("0", "100", "150", "200", "201", "400", "401"):
+                expected = original.locate_v2(original.dataset_id, version, ns)
+                self.assertEqual(reader.locate_v2(reader.dataset_id, version, ns), expected)
+                self.assertEqual(reader.read_page_v2(reader.dataset_id, version, expected["position"], 2),
+                                 original.read_page_v2(original.dataset_id, version, expected["position"], 2))
+            baseline = pump(self.timeline(original, folder="write-reader-logs"), 400)
+            actual = pump(self.timeline(reader, folder="readonly-reader-logs"), 400)
+            self.assertEqual(actual, baseline)
+            self.assertEqual([len(g["events"]) for g in actual], [1, 3, 1, 1])
+            self.assertTrue(all(e["trustedSequence"] is None for g in actual for e in g["events"]))
+        finally:
+            if reader is not None: reader.close()
+            folder.chmod(0o700); archive.chmod(0o600)
+        self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), before)
+        self.assertEqual(archive.stat().st_mtime_ns, before_stat.st_mtime_ns)
+        self.assertEqual([p.name for p in folder.iterdir()], ["archive.sqlite"])
+
+    def test_readonly_uri_blocks_writes_even_on_writable_fixture_and_query_only_disabled(self):
+        _, original = self.build()
+        folder, _ = self.readonly_snapshot(original)
+        archive = folder/"archive.sqlite"
+        before = hashlib.sha256(archive.read_bytes()).hexdigest()
+        with closing(ArtifactStore(folder, read_only=True)) as store:
+            self.assertEqual(store.db.execute("PRAGMA query_only").fetchone()[0], 1)
+            store.db.execute("PRAGMA query_only=OFF")
+            for statement in ("DELETE FROM objects", "UPDATE journal SET value=value", "CREATE TABLE forbidden(x)"):
+                with self.assertRaises(sqlite3.OperationalError): store.db.execute(statement)
+                store.db.rollback()
+        self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), before)
+        self.assertEqual([p.name for p in folder.iterdir()], ["archive.sqlite"])
+
+    def test_readonly_refuses_wal_or_companions_instead_of_mutating_or_ignoring_them(self):
+        _, original = self.build()
+        with self.assertRaisesRegex(ValueError, "READ_ONLY_SNAPSHOT_REQUIRED"):
+            DiskTickProvider(self.path/"data", original.dataset_version, read_only=True)
+        for suffix in ("-wal", "-shm", "-journal"):
+            folder, version = self.readonly_snapshot(original, "companion"+suffix)
+            companion = folder/("archive.sqlite"+suffix)
+            companion.write_bytes(b"must remain")
+            before = hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest()
+            with self.assertRaisesRegex(ValueError, "READ_ONLY_SNAPSHOT_REQUIRED"):
+                DiskTickProvider(folder, version, read_only=True)
+            self.assertEqual(companion.read_bytes(), b"must remain")
+            self.assertEqual(hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest(), before)
+
+    def test_readonly_missing_create_symlink_and_invalid_root_refused(self):
+        missing = self.path/"missing"
+        with self.assertRaises(ValueError): ArtifactStore(missing, read_only=True)
+        with self.assertRaisesRegex(ValueError, "READ_ONLY_CREATE_REFUSED"):
+            ArtifactStore(missing, create=True, read_only=True)
+        self.assertFalse(missing.exists())
+        _, original = self.build()
+        folder, _ = self.readonly_snapshot(original)
+        before = hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest()
+        with self.assertRaises(ValueError): DiskTickProvider(folder, "f"*64, read_only=True)
+        # Windows symlink creation requires a separate privilege/developer mode.
+        if os.name != "nt":
+            linked = self.path/"linked"
+            linked.symlink_to(folder, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "SOURCE_PATH_REFUSED"):
+                DiskTickProvider(linked, original.dataset_version, read_only=True)
+        self.assertEqual(hashlib.sha256((folder/"archive.sqlite").read_bytes()).hexdigest(), before)
+
+    def test_readonly_still_refuses_corrupt_descendants(self):
+        _, original = self.build()
+        folder, version = self.readonly_snapshot(original)
+        with closing(sqlite3.connect(folder/"archive.sqlite")) as copy:
+            copy.execute("UPDATE objects SET body=? WHERE kind='BTL-TICK-STORAGE-CHUNK-2'", (zlib.compress(b"corrupt"),))
+            copy.commit()
+        reader = DiskTickProvider(folder, version, read_only=True)
+        self.resources.append(reader)
+        with self.assertRaisesRegex(ValueError, "CHILD_HASH_MISMATCH"):
+            reader.read_page_v2(reader.dataset_id, version, reader.locate_v2(reader.dataset_id, version, "0")["position"], 2)
 
     def test_appended_tick_retains_independent_mutable_levels(self):
         p = SyntheticTickProvider([dict(ordinal="0", timeNs="100", bid="1", ask="1.1", sequence=None)])
@@ -208,6 +316,87 @@ class TickStorageV2Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             IndexedTickTimeline.resume(p,bad,log_folder=self.path/"logs")
 
+    def test_bounded_fast_forward_128_groups_preserves_default_results_and_cold_resume(self):
+        rows=[dict(ordinal=str(i),timeNs=str(100+i),bid="1.001",ask="1.003",sequence=None) for i in range(140)]
+        source=SyntheticTickProvider(rows);meta=source.describe(source.dataset_id,source.dataset_version)
+        fields=("datasetId","providerId","feedId","instrumentId","providerSymbol","evidenceClass","adapterVersion","validatorVersion","ordering")
+        builder=DatasetBuilder(self.path/'batch-source',{k:meta[k] for k in fields},meta['sources'],{},packing=(1,1,1));self.resources.append(builder.store)
+        token=None
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,32)
+            for row in page['events']:builder.append(dict(row,datasetVersion=ZERO_VERSION))
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        version=builder.finish();provider=DiskTickProvider(self.path/'batch-source',version);self.resources.append(provider)
+        baseline=self.timeline(provider,folder='batch-default')
+        default_first=baseline.advance_through('1000',baseline.cursor)
+        self.assertEqual(len(default_first['groups']),64)
+        self.assertFalse(default_first['exhaustedThroughBoundary'])
+        baseline_groups=default_first['groups']+pump(baseline,'1000')
+        candidate=self.timeline(provider,folder='batch-128',max_groups_per_advance=128)
+        first=candidate.advance_through('1000',candidate.cursor)
+        self.assertEqual(len(first['groups']),128)
+        self.assertFalse(first['exhaustedThroughBoundary'])
+        checkpoint=candidate.checkpoint()
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.path/'batch-128',max_groups_per_advance=128)
+        self.resources.append(resumed)
+        self.assertEqual(resumed.cursor,candidate.cursor)
+        tail=pump(resumed,'1000')
+        self.assertEqual(first['groups']+tail,baseline_groups)
+        self.assertEqual(len(tail),12)
+
+    def test_bounded_fast_forward_256_groups_preserves_atomicity_and_cold_resume(self):
+        rows=[dict(ordinal=str(i),timeNs=str(100+i),bid="1.001",ask="1.003",sequence=None) for i in range(300)]
+        source=SyntheticTickProvider(rows);meta=source.describe(source.dataset_id,source.dataset_version)
+        fields=("datasetId","providerId","feedId","instrumentId","providerSymbol","evidenceClass","adapterVersion","validatorVersion","ordering")
+        builder=DatasetBuilder(self.path/'batch-256-source',{k:meta[k] for k in fields},meta['sources'],{},packing=(16,1,1));self.resources.append(builder.store)
+        token=None
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,32)
+            for row in page['events']:builder.append(dict(row,datasetVersion=ZERO_VERSION))
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        version=builder.finish();provider=DiskTickProvider(self.path/'batch-256-source',version);self.resources.append(provider)
+        baseline=self.timeline(provider,folder='batch-256-default')
+        expected=pump(baseline,'1000')
+        candidate=self.timeline(provider,folder='batch-256',max_groups_per_advance=256)
+        first=candidate.advance_through('1000',candidate.cursor)
+        self.assertEqual(len(first['groups']),256)
+        self.assertFalse(first['exhaustedThroughBoundary'])
+        checkpoint=candidate.checkpoint()
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.path/'batch-256',max_groups_per_advance=256)
+        self.resources.append(resumed)
+        self.assertEqual(resumed.cursor,candidate.cursor)
+        tail=pump(resumed,'1000')
+        self.assertEqual(first['groups']+tail,expected)
+        self.assertEqual(len(tail),44)
+
+    def test_sigkill_after_256_group_commit_cold_resumes_exactly(self):
+        rows=[dict(ordinal=str(i),timeNs=str(100+i),bid="1.001",ask="1.003",sequence=None) for i in range(300)]
+        source=SyntheticTickProvider(rows);meta=source.describe(source.dataset_id,source.dataset_version)
+        fields=("datasetId","providerId","feedId","instrumentId","providerSymbol","evidenceClass","adapterVersion","validatorVersion","ordering")
+        builder=DatasetBuilder(self.path/'sigkill-256-source',{k:meta[k] for k in fields},meta['sources'],{},packing=(16,1,1));self.resources.append(builder.store)
+        token=None
+        while True:
+            page=source.read_page(source.dataset_id,source.dataset_version,token,32)
+            for row in page['events']:builder.append(dict(row,datasetVersion=ZERO_VERSION))
+            if page['endOfDataset']:break
+            token=page['nextToken']
+        version=builder.finish();provider=DiskTickProvider(self.path/'sigkill-256-source',version);self.resources.append(provider)
+        expected=pump(self.timeline(provider,folder='sigkill-256-baseline'),'1000')
+        log_path=self.path/'sigkill-256';checkpoint_path=self.path/'sigkill-256-checkpoint.json'
+        child=multiprocessing.get_context('fork').Process(target=_kill_after_durable_256,
+            args=(str(self.path/'sigkill-256-source'),version,str(log_path),str(checkpoint_path)))
+        child.start();child.join(10)
+        if child.is_alive():child.kill();child.join();self.fail('SIGKILL_WORKER_TIMEOUT')
+        self.assertEqual(child.exitcode,-signal.SIGKILL)
+        checkpoint=json.loads(checkpoint_path.read_text())
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=log_path,max_groups_per_advance=256)
+        self.resources.append(resumed)
+        self.assertEqual(resumed.cursor,checkpoint['cursor'])
+        self.assertEqual(resumed.read_revealed('0',256),expected[:256])
+        self.assertEqual(pump(resumed,'1000'),expected[256:])
+
     def test_resume_refuses_missing_or_corrupt_original_position_chain(self):
         import json
         _, p = self.build()
@@ -235,6 +424,121 @@ class TickStorageV2Tests(unittest.TestCase):
                     with closing(sqlite3.connect(self.path/case/"timeline.sqlite")) as db:
                         self.assertIsNone(db.execute("SELECT 1 FROM blocks WHERE hash=?", (removed,)).fetchone(),
                                           "Failed resume must not repair the missing acknowledged block")
+
+    def test_lossless_compressed_log_has_exact_wire_checkpoint_and_cold_parity(self):
+        import zlib
+        _, p = self.build()
+        raw = self.timeline(p, folder='raw-parity')
+        packed = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'packed-parity',log_codec='zlib-1')
+        self.resources.append(packed)
+        for target in ('100','200','400'):
+            self.assertEqual(packed.advance_through(target,packed.cursor),raw.advance_through(target,raw.cursor))
+            self.assertEqual(packed.checkpoint(),raw.checkpoint())
+            self.assertEqual(packed.consumer().read_revealed(),raw.consumer().read_revealed())
+        checkpoint=packed.checkpoint();packed.close()
+        with closing(sqlite3.connect(self.path/'raw-parity/timeline.sqlite')) as a, closing(sqlite3.connect(self.path/'packed-parity/timeline.sqlite')) as b:
+            expected=dict(a.execute('SELECT hash,body FROM blocks'))
+            actual={key:zlib.decompress(body[len(b'BTL-TIMELINE-ZLIB-1\0'):]) for key,body in b.execute('SELECT hash,body FROM blocks')}
+            self.assertEqual(expected,actual)
+            self.assertEqual(a.execute('SELECT body FROM heads').fetchall(),b.execute('SELECT body FROM heads').fetchall())
+        restored=IndexedTickTimeline.resume(p,checkpoint,log_folder=self.path/'packed-parity');self.resources.append(restored)
+        self.assertEqual(restored.checkpoint(),raw.checkpoint())
+        self.assertEqual(restored.consumer().read_revealed(),raw.consumer().read_revealed())
+        with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
+            restored.consumer().read_revealed('999')
+
+    def test_delta_dictionary_compressed_log_matches_zlib_logical_history(self):
+        import zlib
+        from ticks.timeline_v2 import _expand_compact_block
+        _, p = self.build()
+        baseline = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'zlib-baseline',log_codec='zlib-1')
+        compact = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'delta-dictionary',log_codec='delta-dict-zlib-1')
+        self.resources.extend((baseline,compact))
+        for target in ('100','200','400'):
+            expected = baseline.advance_through(target,baseline.cursor)
+            actual = compact.advance_through(target,compact.cursor)
+            self.assertEqual(actual,expected)
+            self.assertEqual(compact.checkpoint(),baseline.checkpoint())
+            self.assertEqual(compact.consumer().read_revealed(),baseline.consumer().read_revealed())
+        checkpoint=compact.checkpoint();compact.close()
+        with closing(sqlite3.connect(self.path/'zlib-baseline/timeline.sqlite')) as a, closing(sqlite3.connect(self.path/'delta-dictionary/timeline.sqlite')) as b:
+            zlib_rows=dict(a.execute('SELECT hash,body FROM blocks'))
+            compact_rows=dict(b.execute('SELECT hash,body FROM blocks'))
+            self.assertEqual(set(compact_rows),set(zlib_rows))
+            for block_hash,body in compact_rows.items():
+                encoded=zlib.decompress(body[len(b'BTL-TIMELINE-DDZ-1\0'):])
+                logical=_expand_compact_block(encoded)
+                self.assertEqual(canonical_v2_bytes(logical),zlib.decompress(zlib_rows[block_hash][len(b'BTL-TIMELINE-ZLIB-1\0'):]))
+            self.assertEqual(a.execute('SELECT body FROM heads').fetchall(),b.execute('SELECT body FROM heads').fetchall())
+        restored=IndexedTickTimeline.resume(p,checkpoint,log_folder=self.path/'delta-dictionary')
+        self.resources.append(restored)
+        self.assertEqual(restored.checkpoint(),baseline.checkpoint())
+        self.assertEqual(restored.consumer().read_revealed(),baseline.consumer().read_revealed())
+        with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
+            restored.consumer().read_revealed('999')
+
+    def test_sparse_range_lookup_preserves_exact_reveals_and_cold_resume(self):
+        _, p = self.build(times=tuple([100+i for i in range(160)]), packing=(16, 4, 4))
+        dense = self.timeline(p, folder='dense-lookup')
+        ranged = IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'range-lookup',lookup_layout='range-v1')
+        self.resources.append(ranged)
+        for target in ('160','175','259'):
+            left=dense.advance_through(target,dense.cursor)
+            right=ranged.advance_through(target,ranged.cursor)
+            self.assertEqual(left,right)
+            self.assertEqual(dense.checkpoint(),ranged.checkpoint())
+            end=int(dense.cursor['nextGroupIndex'])
+            probes=[(0,16),(3,19),(63,64),(64,64),(max(0,end-1),8)]
+            for start,maximum in probes:
+                if start>end: continue
+                maximum=max(1,min(maximum,end-start))
+                with self.subTest(target=target,start=start):
+                    self.assertEqual(dense.read_revealed(str(start),maximum),ranged.read_revealed(str(start),maximum))
+        checkpoint=ranged.checkpoint();ranged.close()
+        restored=IndexedTickTimeline.resume(p,checkpoint,log_folder=self.path/'range-lookup',lookup_layout='range-v1')
+        self.resources.append(restored)
+        self.assertEqual(restored.checkpoint(),dense.checkpoint())
+        self.assertEqual(restored.read_revealed('3',64),dense.read_revealed('3',64))
+        with self.assertRaisesRegex(ValueError,'UNREVEALED_INDEX'):
+            restored.read_revealed('999',1)
+        with closing(sqlite3.connect((self.path/'range-lookup/timeline.sqlite').as_uri()+'?mode=ro',uri=True)) as db:
+            rows=db.execute('SELECT count(*) FROM blocks').fetchone()[0]
+            self.assertGreater(rows,0)
+
+    def test_compressed_log_refuses_inflation_trailing_truncation_and_bad_hash(self):
+        import zlib
+        _,p=self.build()
+        prefix=b'BTL-TIMELINE-ZLIB-1\0'
+        for case in ('bomb','trailing','truncated','wrong-prefix','changed-group'):
+            with self.subTest(case=case):
+                folder=self.path/case
+                t=IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=folder,log_codec='zlib-1')
+                t.advance_through('100',t.cursor);cp=t.checkpoint();t.close()
+                with closing(sqlite3.connect(folder/'timeline.sqlite')) as db,db:
+                    body=db.execute('SELECT body FROM blocks WHERE hash=?',(cp['positionLogHash'],)).fetchone()[0]
+                    if case=='bomb':bad=prefix+zlib.compress(b'x'*1048577)
+                    elif case=='trailing':bad=body+b'x'
+                    elif case=='truncated':bad=body[:-1]
+                    elif case=='wrong-prefix':bad=b'x'+body[1:]
+                    else:
+                        value=json.loads(zlib.decompress(body[len(prefix):]));value['records'][0]['groupId']='f'*64
+                        bad=prefix+zlib.compress(canonical_v2_bytes(value))
+                    db.execute('UPDATE blocks SET body=? WHERE hash=?',(bad,cp['positionLogHash']))
+                with self.assertRaises(ValueError):IndexedTickTimeline.resume(p,cp,log_folder=folder)
+
+    def test_compressed_log_missing_evidence_is_not_repaired_and_mixed_layout_refuses(self):
+        _,p=self.build();raw=self.timeline(p,folder='legacy-refuse');raw.advance_through('100',raw.cursor);raw.close()
+        path=self.path/'legacy-refuse/timeline.sqlite';before=hashlib.sha256(path.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(ValueError,'REFUSED_LOG_LAYOUT'):
+            IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=path.parent,log_codec='zlib-1')
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),before)
+        t=IndexedTickTimeline(p,p.dataset_id,p.dataset_version,log_folder=self.path/'packed-missing',log_codec='zlib-1')
+        t.advance_through('100',t.cursor);ancestor=t.checkpoint()['positionLogHash'];t.advance_through('200',t.cursor);cp=t.checkpoint();t.close()
+        path=self.path/'packed-missing/timeline.sqlite'
+        with closing(sqlite3.connect(path)) as db,db:db.execute('DELETE FROM blocks WHERE hash=?',(ancestor,))
+        with self.assertRaisesRegex(ValueError,'INCOMPLETE_INGESTION'):
+            IndexedTickTimeline.resume(p,cp,log_folder=path.parent)
+        with closing(sqlite3.connect(path)) as db:self.assertIsNone(db.execute('SELECT 1 FROM blocks WHERE hash=?',(ancestor,)).fetchone())
 
     def test_cancellation_rolls_back_cursor_and_prefix(self):
         _,p=self.build();t=self.timeline(p)
@@ -514,6 +818,188 @@ class TickStorageV2Tests(unittest.TestCase):
         version=resumed.finish();reader=DiskTickProvider(self.path/"cancel-final",version);self.resources.append(reader)
         self.assertEqual(reader.describe_v2(reader.dataset_id,version)["root"]["eventCount"],"1")
 
+
+
+class SharedSourceTimelineTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture=TickStorageV2Tests();self.fixture.setUp()
+
+    def tearDown(self):
+        self.fixture.tearDown()
+
+    def _pin(self, provider):
+        root=provider.describe_v2(provider.dataset_id,provider.dataset_version)['root']
+        return dict(schemaVersion=1,artifact='BTL-QA-SHARED-SOURCE-PIN-1',
+            datasetId=provider.dataset_id,datasetVersion=provider.dataset_version,
+            manifestHash=provider.dataset_version,rootHash=hash_v2(root),
+            indexContentHash=root['indexContentHash'],archiveSha256='a'*64,
+            qualificationReceiptSha256='b'*64)
+
+    def test_shared_source_checkpoint_reconstructs_without_position_blocks(self):
+        _,provider=self.fixture.build()
+        from ticks.timeline_v2 import IndexedTickTimeline
+        pin=self._pin(provider)
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=self.fixture.path/'shared-log',storage_mode='shared-source-v1',source_pin=pin)
+        self.fixture.resources.append(timeline)
+        observed=pump(timeline,400)
+        checkpoint=timeline.checkpoint()
+        self.assertEqual(checkpoint['artifact'],'BTL-TICK-SHARED-SOURCE-CHECKPOINT-1')
+        self.assertIsNotNone(checkpoint['advanceLogHash'])
+        log=sqlite3.connect(self.fixture.path/'shared-log'/'timeline.sqlite')
+        try:
+            blocks=[json.loads(row[0]) for row in log.execute('SELECT CAST(body AS TEXT) FROM blocks')]
+        finally:log.close()
+        self.assertTrue(blocks)
+        self.assertTrue(all(block['artifact']=='BTL-TICK-ADVANCE-LOG-2' for block in blocks))
+        self.assertEqual(timeline.read_revealed('0',4),observed)
+        self.assertEqual(timeline.read_revealed('2',2),observed[2:4])
+        timeline.close()
+        resumed=IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.fixture.path/'shared-log',
+            storage_mode='shared-source-v1',source_pin=pin)
+        self.fixture.resources.append(resumed)
+        self.assertEqual(resumed.checkpoint(),checkpoint)
+        self.assertEqual(resumed.read_revealed('0',4),observed)
+        with self.assertRaisesRegex(ValueError,'VERSION_MISMATCH'):
+            IndexedTickTimeline.resume(provider,checkpoint,log_folder=self.fixture.path/'shared-log',
+                storage_mode='shared-source-v1',source_pin={**pin,'archiveSha256':'c'*64})
+
+    def test_shared_source_cold_resume_rejects_missing_advance_commitment(self):
+        _,provider=self.fixture.build()
+        from ticks.timeline_v2 import IndexedTickTimeline
+        pin=self._pin(provider);folder=self.fixture.path/'shared-missing'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v1',source_pin=pin)
+        pump(timeline,400);checkpoint=timeline.checkpoint();timeline.close()
+        log=sqlite3.connect(folder/'timeline.sqlite')
+        try:log.execute('DELETE FROM blocks');log.commit()
+        finally:log.close()
+        with self.assertRaisesRegex(ValueError,'INCOMPLETE_INGESTION'):
+            IndexedTickTimeline.resume(provider,checkpoint,log_folder=folder,
+                storage_mode='shared-source-v1',source_pin=pin)
+
+    def test_shared_source_cold_resume_rejects_corrupted_advance_chain(self):
+        _,provider=self.fixture.build()
+        from ticks.timeline_v2 import IndexedTickTimeline
+        pin=self._pin(provider);folder=self.fixture.path/'shared-corrupt'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v1',source_pin=pin,max_groups_per_advance=1)
+        pump(timeline,400);checkpoint=timeline.checkpoint();timeline.close()
+        log=sqlite3.connect(folder/'timeline.sqlite')
+        try:
+            tip=checkpoint['advanceLogHash'];body=log.execute('SELECT body FROM blocks WHERE hash=?',(tip,)).fetchone()[0]
+            block=json.loads(body);block['records'][0]['targetNs']='399'
+            log.execute('UPDATE blocks SET body=? WHERE hash=?',(json.dumps(block,sort_keys=True,separators=(',',':')),tip));log.commit()
+        finally:log.close()
+        with self.assertRaisesRegex(ValueError,'CORRUPT_RECORD'):
+            IndexedTickTimeline.resume(provider,checkpoint,log_folder=folder,
+                storage_mode='shared-source-v1',source_pin=pin)
+
+
+    def test_shared_source_v2_checkpoint_is_direct_and_cache_is_transient(self):
+        _,provider=self.fixture.build()
+        pin=self._pin(provider);folder=self.fixture.path/'shared-v2'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v2',source_pin=pin,max_groups_per_advance=1)
+        self.fixture.resources.append(timeline)
+        observed=pump(timeline,250)
+        checkpoint=timeline.checkpoint()
+        self.assertGreater(int(checkpoint['cursor']['revision']),1)
+        self.assertEqual(checkpoint['artifact'],'BTL-TICK-SHARED-SOURCE-CHECKPOINT-2')
+        self.assertNotIn('advanceLogHash',checkpoint)
+        self.assertIsNotNone(checkpoint['nextPosition'])
+        self.assertFalse(folder.exists())
+        self.assertEqual(timeline.read_revealed('0',4),observed)
+        self.assertEqual(timeline.read_revealed('2',2),observed[2:4])
+        timeline.close()
+
+        class CountingProvider:
+            def __init__(self,inner): self.inner=inner; self.page_reads=0
+            def __getattr__(self,name): return getattr(self.inner,name)
+            def read_page_v2(self,*args,**kwargs):
+                self.page_reads+=1
+                return self.inner.read_page_v2(*args,**kwargs)
+        counted=CountingProvider(provider)
+        resumed=IndexedTickTimeline.resume(counted,checkpoint,log_folder=folder,
+            storage_mode='shared-source-v2',source_pin=pin)
+        self.fixture.resources.append(resumed)
+        self.assertLessEqual(counted.page_reads,4)
+        self.assertEqual(resumed.checkpoint(),checkpoint)
+        self.assertEqual(resumed.read_revealed('0',4),observed)
+
+    def test_shared_source_v2_refuses_corrupt_frontier_and_preserves_empty_progress(self):
+        _, provider = self.fixture.build()
+        pin = self._pin(provider)
+        folder = self.fixture.path/'shared-v2-frontier'
+        options = dict(log_folder=folder, storage_mode='shared-source-v2', source_pin=pin)
+        timeline = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version,
+                                       '150', **options)
+        self.fixture.resources.append(timeline)
+        genesis = timeline.checkpoint()
+        corrupt = deepcopy(genesis)
+        corrupt['cursor']['throughNs'] = '199'
+        with self.assertRaisesRegex(ValueError, 'IDENTITY_CONFLICT'):
+            IndexedTickTimeline.resume(provider, corrupt, **options)
+
+        timeline.advance_through('175', timeline.cursor)
+        empty = timeline.checkpoint()
+        resumed = IndexedTickTimeline.resume(provider, empty, **options)
+        self.fixture.resources.append(resumed)
+        self.assertEqual(resumed.checkpoint(), empty)
+        self.assertEqual(resumed.consumer().read_revealed('0', 1), [])
+
+        timeline.advance_through('200', timeline.cursor)
+        committed = timeline.checkpoint()
+        self.assertEqual(committed['cursor']['nextGroupIndex'], '1')
+        for changes in ({'nextGroupIndex': '0', 'lastGroupId': None},
+                        {'nextGroupIndex': '4'}):
+            corrupt = deepcopy(committed)
+            corrupt['cursor'].update(changes)
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, 'IDENTITY_CONFLICT'):
+                IndexedTickTimeline.resume(provider, corrupt, **options)
+        resumed = IndexedTickTimeline.resume(provider, committed, **options)
+        self.fixture.resources.append(resumed)
+        group, = resumed.consumer().read_revealed('0', 1)
+        self.assertEqual((group['timeNs'], len(group['events'])), ('200', 3))
+        self.assertFalse(folder.exists())
+
+    def test_shared_source_v2_resumes_a_committed_partial_advance(self):
+        _, provider = self.fixture.build()
+        folder = self.fixture.path/'shared-v2-partial'
+        options = dict(log_folder=folder, storage_mode='shared-source-v2',
+                       source_pin=self._pin(provider), max_groups_per_advance=1)
+        timeline = IndexedTickTimeline(provider, provider.dataset_id, provider.dataset_version, '0', **options)
+        self.fixture.resources.append(timeline)
+        first = timeline.advance_through('400', timeline.cursor)
+        self.assertFalse(first['exhaustedThroughBoundary'])
+        checkpoint = timeline.checkpoint()
+        self.assertEqual(checkpoint['cursor']['pendingTargetNs'], '400')
+        for target in ('100', '199'):
+            corrupt = deepcopy(checkpoint)
+            corrupt['cursor']['pendingTargetNs'] = target
+            with self.assertRaisesRegex(ValueError, 'IDENTITY_CONFLICT'):
+                IndexedTickTimeline.resume(provider, corrupt, **options)
+        resumed = IndexedTickTimeline.resume(provider, checkpoint, **options)
+        self.fixture.resources.append(resumed)
+        self.assertEqual(resumed.checkpoint(), checkpoint)
+        self.assertEqual(resumed.consumer().read_revealed('0', 4), first['groups'])
+        self.assertEqual(pump(resumed, 400), pump(timeline, 400))
+        self.assertEqual(resumed.checkpoint(), timeline.checkpoint())
+        self.assertFalse(folder.exists())
+
+    def test_shared_source_v2_rejects_wrong_direct_source_position(self):
+        _,provider=self.fixture.build()
+        pin=self._pin(provider);folder=self.fixture.path/'shared-v2-corrupt'
+        timeline=IndexedTickTimeline(provider,provider.dataset_id,provider.dataset_version,'0',
+            log_folder=folder,storage_mode='shared-source-v2',source_pin=pin,max_groups_per_advance=1)
+        pump(timeline,250);checkpoint=timeline.checkpoint();timeline.close()
+        bad=deepcopy(checkpoint)
+        bad['nextPosition']=dict(schemaVersion=2,artifact='BTL-TICK-POSITION-2',datasetId=provider.dataset_id,
+            datasetVersion=provider.dataset_version,manifestHash=provider.dataset_version,
+            directoryIndex='0',partitionIndex='0',chunkIndex='0',eventOffset='0',globalOrdinal='0')
+        with self.assertRaisesRegex(ValueError,'CORRUPT_INDEX_POINTER'):
+            IndexedTickTimeline.resume(provider,bad,log_folder=folder,
+                storage_mode='shared-source-v2',source_pin=pin)
 
 
 class IncrementalCanonicalBudgetTests(unittest.TestCase):

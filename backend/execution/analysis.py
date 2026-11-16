@@ -101,31 +101,45 @@ def excursions(completed, groups, state):
 
 
 def metrics(completed):
-    nets = [Fraction(row['net']) for row in completed]
-    wins = [n for n in nets if n > 0]
-    losses = [n for n in nets if n < 0]
-    positive, negative = sum(wins, Fraction()), -sum(losses, Fraction())
-    r_values = [Fraction(int(row['rMultiple']['numerator']), int(row['rMultiple']['denominator']))
-                for row in completed if row.get('rMultiple') is not None]
-    durations = [int(row['durationNs']) for row in completed if row.get('durationNs') is not None]
+    trade_count = wins = losses = breakeven = r_eligible = duration_count = 0
+    total_net = positive = negative = total_r = total_duration = Fraction()
     streak_win = streak_loss = maximum_win = maximum_loss = 0
-    for net in nets:
+    for row in completed:
+        net = Fraction(row['net'])
+        trade_count += 1
+        total_net += net
+        if net > 0:
+            wins += 1
+            positive += net
+        elif net < 0:
+            losses += 1
+            negative -= net
+        else:
+            breakeven += 1
         streak_win = streak_win + 1 if net > 0 else 0
         streak_loss = streak_loss + 1 if net < 0 else 0
         maximum_win, maximum_loss = max(maximum_win, streak_win), max(maximum_loss, streak_loss)
-    return dict(tradeCount=len(nets), wins=len(wins), losses=len(losses), breakeven=sum(n == 0 for n in nets),
-        winRate=ratio(Fraction(len(wins), len(nets))) if nets else None,
-        averageWin=ratio(positive / len(wins)) if wins else None,
-        averageLoss=ratio(-negative / len(losses)) if losses else None,
-        expectancy=ratio(sum(nets, Fraction()) / len(nets)) if nets else None,
+        r_multiple = row.get('rMultiple')
+        if r_multiple is not None:
+            total_r += Fraction(int(r_multiple['numerator']), int(r_multiple['denominator']))
+            r_eligible += 1
+        duration = row.get('durationNs')
+        if duration is not None:
+            total_duration += int(duration)
+            duration_count += 1
+    return dict(tradeCount=trade_count, wins=wins, losses=losses, breakeven=breakeven,
+        winRate=ratio(Fraction(wins, trade_count)) if trade_count else None,
+        averageWin=ratio(positive / wins) if wins else None,
+        averageLoss=ratio(-negative / losses) if losses else None,
+        expectancy=ratio(total_net / trade_count) if trade_count else None,
         profitFactor=ratio(positive / negative) if negative else None,
         maxWinStreak=maximum_win, maxLossStreak=maximum_loss,
-        rEligible=len(r_values), rExcluded=len(nets)-len(r_values),
-        rReason=None if r_values else 'PREENTRY_R0_NOT_PINNED',
-        averageR=ratio(sum(r_values, Fraction()) / len(r_values)) if r_values else None,
-        averageDurationNs=ratio(Fraction(sum(durations), len(durations))) if durations else None,
-        monteCarlo=dict(status='INSUFFICIENT_SAMPLE' if len(r_values)<30 else 'NOT_COMPUTED',
-                        eligible=len(r_values), exclusions=len(nets)-len(r_values), minimum=30))
+        rEligible=r_eligible, rExcluded=trade_count-r_eligible,
+        rReason=None if r_eligible else 'PREENTRY_R0_NOT_PINNED',
+        averageR=ratio(total_r / r_eligible) if r_eligible else None,
+        averageDurationNs=ratio(Fraction(total_duration, duration_count)) if duration_count else None,
+        monteCarlo=dict(status='INSUFFICIENT_SAMPLE' if r_eligible<30 else 'NOT_COMPUTED',
+                        eligible=r_eligible, exclusions=trade_count-r_eligible, minimum=30))
 
 
 def project(state, events, quote):
@@ -134,8 +148,6 @@ def project(state, events, quote):
         datasetVersion=state['datasetVersion'], engineVersion=state['engineVersion'], profileHash=state['profileHash'],
         methodHash=state['policy']['definitionHash'], eventHead=state['eventHash'], analysisVersion=ANALYSIS_VERSION,
         model='SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION')
-    if state['nextEventIndex'] > MAX_ANALYSIS_EVENTS:
-        return dict(status='UNAVAILABLE', reason='REFUSED_ANALYSIS_LIMIT', maximumEvents=MAX_ANALYSIS_EVENTS, provenance=provenance)
     require(state['parent'] is None, 'analysisLineage', 'REFUSED_UNSUPPORTED_LINEAGE')
     previous = content_hash(dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-SEED-1', sessionId=state['sessionId'],
         datasetId=state['datasetId'], datasetVersion=state['datasetVersion'], profile=state['profile'],
@@ -154,7 +166,11 @@ def project(state, events, quote):
         previous = event['eventId']; count += 1
         kind, order_id, detail = event['kind'], event['orderId'], event['detail']
         if kind == 'ORDER_ACCEPTED':
-            require(order_id in state['orders'] and order_id not in rows, 'acceptedOrder', 'CORRUPT_RECORD')
+            # The event ledger contains the full lifetime order history. Closed
+            # orders may have been evicted from the bounded hot-state map and
+            # retained in the immutable terminal archive, so membership in
+            # state['orders'] is not a prerequisite for reconstructing history.
+            require(order_id not in rows, 'acceptedOrder', 'CORRUPT_RECORD')
             row = dict(id=order_id, **deepcopy(detail['plan']), entryPrice=None, entryTimeNs=None, entryFillRef=None,
                 entryEvidence=None, exitSlices=[],
                 exitTimeNs=None, exitPrice=None, exitFillRef=None, exitReason=None, gross='0', commission='0', netCashChange='0',
@@ -202,15 +218,22 @@ def project(state, events, quote):
         annotations.append(dict(eventId=event['eventId'], orderId=order_id, kind=kind, timeNs=evidence['timeNs'],
             price=detail['price'], side=row['side'], reason=detail.get('reason'), chronologyLimited=evidence['chronologyLimited']))
     require(count == state['nextEventIndex'] and previous == state['eventHash'] and balance == Fraction(state['balance']) and
-        gross == Fraction(state['realizedGross']) and commission == Fraction(state['commission']) and set(rows) == set(state['orders']),
+        gross == Fraction(state['realizedGross']) and commission == Fraction(state['commission']) and set(state['orders']).issubset(rows),
         'analysisHead', 'CORRUPT_RECORD')
     indicative = Fraction()
     mark_available = not state['unresolved'] and quote is not None and int(quote['timeNs']) <= int(state['throughNs'])
     for order_id, row in rows.items():
-        stored = state['orders'][order_id]
-        require(all(row[k] == stored[k] for k in ('status','quantity','remaining','entryPrice','entryFillRef','side','entry','sl','tp','orderType','workflow')),
-            'orderProjection', 'CORRUPT_RECORD')
-        row['exitRequested'] = stored['exitRequest'] is not None
+        stored = state['orders'].get(order_id)
+        if stored is None:
+            # Only terminal records can be absent from hot state. Their exact
+            # committed outcome is reconstructed from the verified event chain.
+            require(row['status'] in ('CLOSED', 'CANCELLED', 'EXPIRED', 'UNRESOLVED'),
+                    'orderProjection', 'CORRUPT_RECORD')
+            row['exitRequested'] = False
+        else:
+            require(all(row[k] == stored[k] for k in ('status','quantity','remaining','entryPrice','entryFillRef','side','entry','sl','tp','orderType','workflow')),
+                'orderProjection', 'CORRUPT_RECORD')
+            row['exitRequested'] = stored['exitRequest'] is not None
         row['unrealizedIndicative'] = None
         if row['status'] == 'ACTIVE' and mark_available:
             liquidation = Fraction(quote['bid'] if row['side'] == 'LONG' else quote['ask'])

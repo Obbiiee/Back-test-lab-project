@@ -1,0 +1,317 @@
+{
+  "annualProjection": {
+    "annualGroups": 56208511,
+    "baselineTimelineBytes": 34661393619,
+    "cp6a8NonTimelineArtifactsBytes": 4269245605,
+    "method": "Linear scaling of measured one-day timeline bytes by annual groups / 137108 observed day groups; PostgreSQL and non-timeline artifacts retain CP6A-8 16-day extrapolation.",
+    "runtimeWallHours": "~56.2 hours inherited from CP6A-8 projection; no annual speedup demonstrated",
+    "sharedTimelineBytesApprox": 177993891,
+    "sharedTotalApproxBytes": 4447239496,
+    "sharedWith25PercentMarginApproxBytes": 5559049371,
+    "status": "PROJECTION ONLY; annual run not performed; depends on approved annual order schedule and week/month/resource gates"
+  },
+  "artifact": "RIKSORA-CP6A-9-SHARED-CANONICAL-SOURCE-ONE-DAY-EVIDENCE-1",
+  "checkpoint": "CP6A-9",
+  "evidencePaths": {
+    "baselineReport": "/home/riksora/riksora-qa-evidence/cp6a9-xau-day-baseline-r5-20261101/report.json",
+    "qualificationReport": "/home/riksora/riksora-qa-evidence/beta-checkpoints-20261025-jtbqjj1o/xau-binary-recovery-20261026/resumable-parity/final-report.json",
+    "sharedSourceReport": "/home/riksora/riksora-qa-evidence/cp6a9-xau-day-shared-r3-20261101/report.json"
+  },
+  "limitations": [
+    "Historical source provenance remains limited; financial admission remains NOT_GRANTED. Simulation fills are not broker-confirmed fills.",
+    "One unknown-coverage gap was observed and retained explicitly.",
+    "One-day result does not establish week, month, or annual correctness or runtime.",
+    "Shared-source storage savings measured; replay was slightly slower in this paired run.",
+    "CP6A-8 untracked report and inventory are intentionally preserved and excluded from this commit."
+  ],
+  "parity": {
+    "allChecksPass": true,
+    "baseline": {
+      "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+      "eventTranscriptSha256": "2e5178cb4ed3e7e7d8fe8618776afb1bcfbe6a46cd309a9694edc89b844ce59b",
+      "finalStateSha256": "745c9d5185cad372af6de5858e0b7c016750bd21562deb0184a2cd8bf0fed5ba",
+      "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+      "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+      "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+      "receiptLedgerSha256": "fcc4e262aade81c7a4d542a1910a39ec15be2335a9c86e3d006aabe6c32a7bb3",
+      "resumeStateSha256": "009a875148dd1ee86af2fc484578f101cea605d9ce725a6864998d037df78cb4",
+      "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+      "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+    },
+    "checks": {
+      "baseline_runner_pass": true,
+      "independent_verification_both_pass": true,
+      "rights_not_promoted": true,
+      "same_balance_and_gross_pnl": true,
+      "same_event_kind_counts": true,
+      "same_financial_state_hash": true,
+      "same_independent_trade_details_ignoring_session_local_event_ids": true,
+      "same_order_lifecycle": true,
+      "same_period": true,
+      "same_requested_interval": true,
+      "same_semantic_financial_event_hash": true,
+      "same_source_positions_and_group_count": true,
+      "shared_mode_no_position_log_copy": true,
+      "shared_runner_pass": true,
+      "source_and_production_unchanged": true
+    },
+    "eventTranscriptHashDifference": "Expected: session-specific event IDs and checkpoint representation differ. Each run-specific event/receipt chain independently verified; financial-state and semantic-financial-event hashes are byte-identical.",
+    "sharedSource": {
+      "eventTranscriptHashFormat": "BTL-OBSERVED-EVENT-TRANSCRIPT-2-STREAM",
+      "eventTranscriptSha256": "dd717ac736c7b2a06d985fe547ace68b9570187f4f9755d721601c91ffdc49ca",
+      "finalStateSha256": "9f397758267abfd2308cabf3ffc420ee5cdf40efe0334528e46dad6b7d2917df",
+      "financialStateHashFormat": "BTL-OBSERVED-FINANCIAL-STATE-COMPARISON-1",
+      "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+      "receiptLedgerHashFormat": "BTL-OBSERVED-RECEIPT-LEDGER-2-STREAM",
+      "receiptLedgerSha256": "fb3b7e28c406ba234962290da6f0948370917d9a10d27c4c2407c489e9a7a991",
+      "resumeStateSha256": "a5e7a71ca4802cced53b67715928619b9f644b9f8a873453a8ae3776e48595fc",
+      "semanticEventHashFormat": "BTL-OBSERVED-FINANCIAL-TRANSCRIPT-1",
+      "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1"
+    },
+    "tradeAuditHashDifference": "Expected: trade audit includes session-local event IDs; normalized trade records excluding only eventId are identical."
+  },
+  "recoveryAndIntegrity": {
+    "baselineColdResume": {
+      "finalRevision": 639,
+      "processRestarted": true,
+      "resumedFromRevision": 90,
+      "sameSession": "session:hist-v2:cp6a9-baseline-r5",
+      "status": "PASS"
+    },
+    "baselineIdempotencyRetry": "PASS",
+    "postgresRegression": "PASS: 13 tests in a private Unix-socket PostgreSQL cluster, including rollback and shared-source SIGKILL-after-commit/idempotent retry/cold resume; no production DB used",
+    "sharedColdResume": {
+      "finalRevision": 639,
+      "processRestarted": true,
+      "resumedFromRevision": 90,
+      "sameSession": "session:hist-v2:cp6a9-shared-r3",
+      "status": "PASS"
+    },
+    "sharedIdempotencyRetry": "PASS",
+    "sharedSourceCorruptionTests": "PASS: missing advance commitment and corrupted hash-chain tests in SharedSourceTimelineTests"
+  },
+  "regressions": {
+    "gitDiffCheck": "PASS",
+    "postgres": "PASS: 13 tests in 7.725 seconds",
+    "py_compile": "PASS",
+    "tickStorageKernelAndSource": "PASS: 80 tests in 28.067 seconds"
+  },
+  "repository": {
+    "baseCommit": "84909f8d6e5da9bd2ee1c9a6a10258d3177518ae",
+    "branch": "codex/beta-integration-20261028",
+    "productionChanged": false
+  },
+  "result": "PASS",
+  "scenario": {
+    "SL": 65,
+    "TP": 21,
+    "classification": "EXPERIMENTAL — UNVERIFIED SOURCE — SIMULATED EXECUTION",
+    "commissionModel": "NONE",
+    "completedTrades": 86,
+    "endingBalance": "9976.38",
+    "entryFills": 86,
+    "executionModel": "HISTORICAL_TECHNICAL_TICK_SIMULATION_V2",
+    "exitFills": 86,
+    "firstObservedQuoteNs": "1704153600130000000",
+    "gapKinds": {
+      "UNKNOWN_COVERAGE_GAP": 1
+    },
+    "lastObservedQuoteNs": "1704239999191000000",
+    "periodUtc": "2024-01-02",
+    "realizedGross": "-23.62",
+    "requestedEndNs": "1704239999999999999",
+    "requestedStartNs": "1704153600130000000",
+    "startingBalance": "10000",
+    "ticks": 137108,
+    "timestampGroups": 137108,
+    "unknownCoverageGaps": 1
+  },
+  "schemaVersion": 1,
+  "scope": "One-day QA comparison only; no full-year replay",
+  "source": {
+    "archiveSha256": "b8f45551f408021514ab92599bd227eb4bfa9097c865d0084e0a91999c155b94",
+    "datasetId": "local:hf-community:XAUUSD:2024:53011f22a5887999a2c883a2",
+    "datasetVersion": "87e3c3355dccc3afafef837a56d24046275dcf8ee6d1173a929a10279f14e743",
+    "executionEligibility": "NOT_GRANTED",
+    "externalRedistribution": "NOT_ESTABLISHED",
+    "qualificationClassification": "FULL_BINARY_SOURCE_PUBLIC_PAGE_PARITY_NOT_FINANCIAL_ADMISSION",
+    "qualificationReceiptSha256": "1ace74978391741f66078b8969a1784229a7c17f07b32f63b7e9e41e148cbb29",
+    "qualificationStatus": "PASS",
+    "sourceDescription": "HF Community XAUUSD 2024 canonical H1 verified-serving snapshot; provenance limitations retained",
+    "sourceManifestHash": "53011f22a5887999a2c883a20cf5702d011a9523cb50578979059f9f3c2bfc5a",
+    "sourceManifestHashMeaning": "Original source manifest hash in the qualification evidence. The QA shared-source pin separately binds internal canonical root/version; manifestHash in that pin equals datasetVersion.",
+    "sourceRights": "UNKNOWN",
+    "technicalSimulationEligibility": "PASS"
+  },
+  "storageReduction": {
+    "sharedCanonicalDatasetAllocatedBytesExcludedFromSession": 22926401536,
+    "timelineAllocatedBytesBaseline": 84520960,
+    "timelineAllocatedBytesShared": 434176,
+    "timelinePercent": 99.4863,
+    "totalArtifactBytesBaseline": 160935936,
+    "totalArtifactBytesShared": 76664832,
+    "totalArtifactPercent": 52.3631
+  },
+  "variants": {
+    "baseline": {
+      "coldResume": {
+        "finalRevision": 639,
+        "processRestarted": true,
+        "resumedFromRevision": 90,
+        "sameSession": "session:hist-v2:cp6a9-baseline-r5",
+        "status": "PASS"
+      },
+      "commands": 639,
+      "completedTrades": 86,
+      "endingBalance": "9976.38",
+      "eventKinds": {
+        "DATA_GAP_LIMITATION": 1,
+        "ENTRY_FILL": 86,
+        "EXIT_FILL": 86,
+        "ORDER_ACCEPTED": 90,
+        "ORDER_CANCELLED": 4,
+        "REPLAY_ADVANCED": 510
+      },
+      "eventTranscriptSha256": "2e5178cb4ed3e7e7d8fe8618776afb1bcfbe6a46cd309a9694edc89b844ce59b",
+      "events": 777,
+      "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+      "groups": 137108,
+      "idempotencyRetry": "PASS",
+      "independentVerification": "PASS",
+      "independentlyMatchedFills": 172,
+      "performance": {
+        "coldResumeWallSeconds": 57.343,
+        "commandLatencyMs": {
+          "coldResumeFirstCommand": {
+            "count": 1,
+            "p50Ms": 16678.246,
+            "p95Ms": 16678.246
+          },
+          "replay": {
+            "count": 631,
+            "p50Ms": 596.993,
+            "p95Ms": 786.727
+          }
+        },
+        "controllerApplyWallSeconds": 378.92,
+        "endToEndWallSeconds": 657.167,
+        "independentFullVerificationWallSeconds": 72.846,
+        "postgresCommitWallSeconds": 98.729,
+        "postgresPersistenceWallSeconds": 149.523,
+        "postgresPrepareWallSeconds": 50.795,
+        "userFacingReplayWallSeconds": 454.797
+      },
+      "persistenceFormat": "LEGACY_FULL_STATE",
+      "realizedGross": "-23.62",
+      "receiptLedgerSha256": "fcc4e262aade81c7a4d542a1910a39ec15be2335a9c86e3d006aabe6c32a7bb3",
+      "resource": {
+        "artifactLimitBytes": 536870912,
+        "cpuSeconds": 596.573,
+        "elapsedSeconds": 657.203,
+        "finalFreeBytes": 48915271680,
+        "initialFreeBytes": 49077280768,
+        "peakArtifactBytes": 163737600,
+        "peakRamBytes": 798179328,
+        "peakRamLimitBytes": 1073741824,
+        "vCPUEquivalentLimit": 1
+      },
+      "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1",
+      "startingBalance": "10000",
+      "storage": {
+        "perSessionTimelineAllocatedBytes": 84520960,
+        "perSessionTimelineFiles": [
+          {
+            "allocatedBytes": 84520960,
+            "logicalBytes": 84516864,
+            "path": "source-logs/fd09ba057fa3ec21c5f95a3b69bf186be758f9906bf0beaa811f2bb0b9014310/timeline.sqlite"
+          }
+        ],
+        "postgresClusterAllocatedBytes": 76185600,
+        "postgresDatabaseBytes": 26582039,
+        "totalQaArtifactBytes": 160935936
+      },
+      "ticks": 137108,
+      "timelineStorageMode": "session-log-v2"
+    },
+    "sharedSource": {
+      "coldResume": {
+        "finalRevision": 639,
+        "processRestarted": true,
+        "resumedFromRevision": 90,
+        "sameSession": "session:hist-v2:cp6a9-shared-r3",
+        "status": "PASS"
+      },
+      "commands": 639,
+      "completedTrades": 86,
+      "endingBalance": "9976.38",
+      "eventKinds": {
+        "DATA_GAP_LIMITATION": 1,
+        "ENTRY_FILL": 86,
+        "EXIT_FILL": 86,
+        "ORDER_ACCEPTED": 90,
+        "ORDER_CANCELLED": 4,
+        "REPLAY_ADVANCED": 510
+      },
+      "eventTranscriptSha256": "dd717ac736c7b2a06d985fe547ace68b9570187f4f9755d721601c91ffdc49ca",
+      "events": 777,
+      "financialStateSha256": "1a1bfa734ea1c0eb130d4638c642e17551796d0143c1170c4c3f06f1a23dfadf",
+      "groups": 137108,
+      "idempotencyRetry": "PASS",
+      "independentVerification": "PASS",
+      "independentlyMatchedFills": 172,
+      "performance": {
+        "coldResumeWallSeconds": 56.584,
+        "commandLatencyMs": {
+          "coldResumeFirstCommand": {
+            "count": 1,
+            "p50Ms": 14778.09,
+            "p95Ms": 14778.09
+          },
+          "replay": {
+            "count": 631,
+            "p50Ms": 587.038,
+            "p95Ms": 681.928
+          }
+        },
+        "controllerApplyWallSeconds": 358.571,
+        "endToEndWallSeconds": 632.084,
+        "independentFullVerificationWallSeconds": 69.453,
+        "postgresCommitWallSeconds": 94.551,
+        "postgresPersistenceWallSeconds": 143.479,
+        "postgresPrepareWallSeconds": 48.929,
+        "userFacingReplayWallSeconds": 431.921
+      },
+      "persistenceFormat": "LEGACY_FULL_STATE",
+      "realizedGross": "-23.62",
+      "receiptLedgerSha256": "fb3b7e28c406ba234962290da6f0948370917d9a10d27c4c2407c489e9a7a991",
+      "resource": {
+        "artifactLimitBytes": 536870912,
+        "cpuSeconds": 572.536,
+        "elapsedSeconds": 632.123,
+        "finalFreeBytes": 48837398528,
+        "initialFreeBytes": 48914866176,
+        "peakArtifactBytes": 81100800,
+        "peakRamBytes": 796413952,
+        "peakRamLimitBytes": 1073741824,
+        "vCPUEquivalentLimit": 1
+      },
+      "semanticFinancialEventSha256": "600bb68d18d5c8248b1263965de923e2bdfa2546956621c2f088953afc948fc1",
+      "startingBalance": "10000",
+      "storage": {
+        "perSessionTimelineAllocatedBytes": 434176,
+        "perSessionTimelineFiles": [
+          {
+            "allocatedBytes": 434176,
+            "logicalBytes": 434176,
+            "path": "source-logs/6e033ca6d6a7a8367367e634ba5f81f689b3f13d6922d8f464c65f3cb1e3da80/timeline.sqlite"
+          }
+        ],
+        "postgresClusterAllocatedBytes": 76001280,
+        "postgresDatabaseBytes": 26401815,
+        "totalQaArtifactBytes": 76664832
+      },
+      "ticks": 137108,
+      "timelineStorageMode": "shared-source-v1"
+    }
+  }
+}

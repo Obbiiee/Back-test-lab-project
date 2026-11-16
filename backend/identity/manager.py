@@ -25,3 +25,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def on_after_forgot_password(self, user, token, request=None):
         await self.delivery.send(user.email, "recovery", token)
+
+    async def authenticate(self, credentials):
+        user = await super().authenticate(credentials)
+        return user if user is not None and user.password_enabled else None
+
+    async def forgot_password(self, user, request=None):
+        if not user.password_enabled:
+            return
+        return await super().forgot_password(user, request)

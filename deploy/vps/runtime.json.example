@@ -1,0 +1,12 @@
+{
+  "BTL_DATABASE_URL": "host=db dbname=btl user=btl_app password=REPLACE_PRIVATELY",
+  "BTL_AUTH_SECRET": "",
+  "BTL_SMTP_HOST": "",
+  "BTL_SMTP_USER": "",
+  "BTL_SMTP_PASSWORD": "",
+  "BTL_SMTP_SENDER": "",
+  "BTL_SANDBOX_V2_RESET_TIMEZONE": "UTC",
+  "BTL_GOOGLE_CLIENT_ID": "",
+  "BTL_GOOGLE_CLIENT_SECRET": "",
+  "BTL_GOOGLE_REDIRECT_URI": ""
+}

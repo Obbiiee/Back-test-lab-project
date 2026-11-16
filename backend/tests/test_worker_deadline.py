@@ -12,14 +12,133 @@ from unittest.mock import patch
 from cloud import worker
 from contracts.primitives import ContractError
 
+POOL_ENTRY = '''import json,os,sys
+for line in sys.stdin:
+ p=json.loads(line)
+ result={"schemaVersion":1,"ready":True} if p.get("control")=="WARM_OPERATOR_SOURCES" else {"schemaVersion":1,"result":{"pid":os.getpid()}}
+ sys.stdout.write(json.dumps(result)+"\\n");sys.stdout.flush()
+'''
+
 
 class WorkerDeadlineTests(unittest.TestCase):
     def tearDown(self):
         worker.close()
 
+    def test_child_environment_receives_parent_job_limit(self):
+        with patch.object(worker, 'MAX_JOBS', 120000):
+            self.assertEqual(worker._environment('private-dsn')['BTL_WORKER_MAX_JOBS'], '120000')
+        with patch.object(worker, 'MAX_JOBS', 0), self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
+    def test_observed_storage_format_is_server_pinned_and_fail_closed(self):
+        with patch.dict(os.environ,{'BTL_OBSERVED_SESSION_STORAGE_FORMAT':'compact-v1'}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_OBSERVED_SESSION_STORAGE_FORMAT'],'compact-v1')
+        with patch.dict(os.environ,{'BTL_OBSERVED_SESSION_STORAGE_FORMAT':''}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_OBSERVED_SESSION_STORAGE_FORMAT'],'')
+        with patch.dict(os.environ,{'BTL_OBSERVED_SESSION_STORAGE_FORMAT':'unknown-v9'}), \
+                self.assertRaisesRegex(ContractError,'REFUSED_STATE_VERSION'):
+            worker._environment('private-dsn')
+
+    def test_tick_storage_format_is_server_pinned_and_fail_closed(self):
+        with patch.dict(os.environ,{'BTL_TICK_SESSION_STORAGE_FORMAT':'compact-v1'}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_TICK_SESSION_STORAGE_FORMAT'],'compact-v1')
+        with patch.dict(os.environ,{'BTL_TICK_SESSION_STORAGE_FORMAT':''}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_TICK_SESSION_STORAGE_FORMAT'],'')
+        with patch.dict(os.environ,{'BTL_TICK_SESSION_STORAGE_FORMAT':'unknown-v9'}), \
+                self.assertRaisesRegex(ContractError,'REFUSED_STATE_VERSION'):
+            worker._environment('private-dsn')
+
+    def test_private_log_codec_is_propagated_and_unknown_values_refuse(self):
+        with patch.dict(os.environ,{'BTL_QA_TIMELINE_LOG_CODEC':'zlib-1'}):
+            self.assertEqual(worker._environment('private-dsn')['BTL_QA_TIMELINE_LOG_CODEC'],'zlib-1')
+        with patch.dict(os.environ,{'BTL_QA_TIMELINE_LOG_CODEC':'unknown'}),self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
+    def test_synthetic_monthly_pin_is_all_or_nothing_and_server_only(self):
+        names = {
+            'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+            'BTL_QA_SYNTHETIC_MONTHLY_ROOT': '/qa/monthly',
+            'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': 'synthetic:fixture-v1',
+            'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': 'a' * 64,
+            'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': 'b' * 64,
+        }
+        with patch.dict(os.environ, names):
+            child_env = worker._environment('private-dsn')
+            self.assertEqual({name: child_env[name] for name in names}, names)
+        with patch.dict(os.environ, {'BTL_QA_SYNTHETIC_MONTHLY_ROOT': '/qa/monthly'}), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1',
+                                     'BTL_QA_SYNTHETIC_MONTHLY_ROOT': 'relative'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
+    def test_monthly_catalog_pin_and_s3_reader_config_reach_isolated_worker(self):
+        values = {
+            'BTL_MONTHLY_PARQUET_CATALOG': '/srv/riksora/monthly-catalog.json',
+            'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64,
+            'RIKSORA_S3_REGION': 'auto',
+            'RIKSORA_S3_ENDPOINT': 'https://objects.example.test',
+            'RIKSORA_S3_SCHEME': 'https',
+            'RIKSORA_S3_ACCESS_KEY': 'qa-access-key',
+            'RIKSORA_S3_SECRET_KEY': 'qa-secret-key',
+            'RIKSORA_S3_SESSION_TOKEN': 'qa-session-token',
+        }
+        with patch.dict(os.environ, values, clear=True):
+            child_env = worker._environment('private-dsn')
+        self.assertEqual({name: child_env[name] for name in values}, values)
+        self.assertNotIn('BTL_WORKER_DATABASE', values)
+
+    def test_monthly_catalog_pin_and_s3_credentials_refuse_partial_or_invalid_values(self):
+        with patch.dict(os.environ, {'BTL_MONTHLY_PARQUET_CATALOG': '/srv/catalog.json'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': 'relative/catalog.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'RIKSORA_S3_ACCESS_KEY': 'only-half'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'RIKSORA_S3_SCHEME': 'ftp'}, clear=True), \
+                self.assertRaises(ContractError):
+            worker._environment('private-dsn')
+
+    def test_s3_credentials_require_tls_but_anonymous_http_is_supported(self):
+        with patch.dict(os.environ, {'RIKSORA_S3_SCHEME': 'http',
+                                     'RIKSORA_S3_ACCESS_KEY': 'access',
+                                     'RIKSORA_S3_SECRET_KEY': 'secret'}, clear=True), \
+                self.assertRaisesRegex(ContractError, 'REFUSED_SOURCE'):
+            worker._environment('private-dsn')
+        with patch.dict(os.environ, {'RIKSORA_S3_SCHEME': 'http'}, clear=True):
+            self.assertEqual(worker._environment('private-dsn')['RIKSORA_S3_SCHEME'], 'http')
+        with patch.dict(os.environ, {'RIKSORA_S3_SESSION_TOKEN': 'token'}, clear=True), \
+                self.assertRaisesRegex(ContractError, 'REFUSED_SOURCE'):
+            worker._environment('private-dsn')
+
+    def test_actual_serve_crosses_4096_and_recycles_at_propagated_parent_limit(self):
+        # Exercise the production serve loop, with only DB/source work replaced
+        # by authored replies. A child silently retaining 4096 exits early.
+        entry = '''import os,sys
+sys.path[:0]=sys.argv[1:]
+from cloud import worker,research
+from contracts.canonical import canonical_bytes
+research._operator_catalog=lambda dsn:None
+worker._execute=lambda raw:canonical_bytes({"schemaVersion":1,"result":{"pid":os.getpid(),"limit":int(os.environ["BTL_WORKER_MAX_JOBS"])}})
+worker.serve()
+'''
+        with patch.object(worker, 'SERVE_ENTRY', entry), patch.object(worker, 'MAX_JOBS', 4100):
+            first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion':1})
+            self.assertEqual(first['limit'], 4100)
+            for _ in range(4099):
+                self.assertEqual(worker.pooled_invoke('authored-not-a-database', {'schemaVersion':1}), first)
+            recycled = worker.pooled_invoke('authored-not-a-database', {'schemaVersion':1})
+            self.assertNotEqual(recycled['pid'], first['pid'])
+            self.assertEqual(recycled['limit'], 4100)
+
     def test_native_pool_reuses_child_and_recycles_at_its_bound(self):
-        entry='import json,os,sys; [(sys.stdout.write(json.dumps({"schemaVersion":1,"result":{"pid":os.getpid()}})+"\\n"),sys.stdout.flush()) for line in sys.stdin]'
-        with patch.object(worker,'SERVE_ENTRY',entry):
+        with patch.object(worker,'SERVE_ENTRY',POOL_ENTRY):
             first=worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
             second=worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
             self.assertEqual(first,second)
@@ -30,8 +149,30 @@ class WorkerDeadlineTests(unittest.TestCase):
             rebound=worker.pooled_invoke('different-authored-database',{'schemaVersion':1})
             self.assertNotEqual(recycled,rebound)
 
+    def test_pooled_worker_restarts_when_server_source_pin_changes(self):
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), \
+                patch.dict(os.environ, {'BTL_QA_TIMELINE_LOG_CODEC': 'raw'}):
+            first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), \
+                patch.dict(os.environ, {'BTL_QA_TIMELINE_LOG_CODEC': 'zlib-1'}):
+            second = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        self.assertNotEqual(first['pid'], second['pid'])
+
+    def test_pooled_worker_restarts_when_monthly_catalog_or_s3_pin_changes(self):
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': '/srv/catalog-a.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64,
+                'RIKSORA_S3_ENDPOINT': 'https://objects-a.example.test'}, clear=True):
+            first = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': '/srv/catalog-b.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'b' * 64,
+                'RIKSORA_S3_ENDPOINT': 'https://objects-b.example.test'}, clear=True):
+            second = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+        self.assertNotEqual(first['pid'], second['pid'])
+
     def test_pooled_timeout_reaps_child_and_next_job_uses_fresh_process(self):
-        entry='import json,os,sys,time\nfor line in sys.stdin:\n p=json.loads(line)\n if p.get("sleep"): time.sleep(300)\n sys.stdout.write(json.dumps({"schemaVersion":1,"result":{"pid":os.getpid()}})+"\\n");sys.stdout.flush()'
+        entry='import json,os,sys,time\nfor line in sys.stdin:\n p=json.loads(line)\n if p.get("control")=="WARM_OPERATOR_SOURCES": result={"schemaVersion":1,"ready":True}\n else:\n  if p.get("sleep"): time.sleep(300)\n  result={"schemaVersion":1,"result":{"pid":os.getpid()}}\n sys.stdout.write(json.dumps(result)+"\\n");sys.stdout.flush()'
         with patch.object(worker,'SERVE_ENTRY',entry):
             first=worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
             process=next(slot.process for slot in worker._slots if slot.process is not None)
@@ -43,7 +184,7 @@ class WorkerDeadlineTests(unittest.TestCase):
             self.assertNotEqual(first,next_job)
 
     def test_pooled_oversized_response_is_reaped_without_import(self):
-        entry='import sys; sys.stdin.readline();sys.stdout.write("x"*200+"\\n");sys.stdout.flush()'
+        entry='import sys; sys.stdin.readline();sys.stdout.write("{\\"schemaVersion\\":1,\\"ready\\":true}\\n");sys.stdout.flush();sys.stdin.readline();sys.stdout.write("x"*200+"\\n");sys.stdout.flush()'
         with patch.object(worker,'SERVE_ENTRY',entry),patch.object(worker,'MAX_RESULT',64):
             with self.assertRaises(ContractError) as failed:
                 worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
@@ -51,8 +192,7 @@ class WorkerDeadlineTests(unittest.TestCase):
             self.assertTrue(all(slot.process is None for slot in worker._slots))
 
     def test_interrupted_pool_call_reaps_its_native_child(self):
-        entry='import json,os,sys; [(sys.stdout.write(json.dumps({"schemaVersion":1,"result":{"pid":os.getpid()}})+"\\n"),sys.stdout.flush()) for line in sys.stdin]'
-        with patch.object(worker,'SERVE_ENTRY',entry):
+        with patch.object(worker,'SERVE_ENTRY',POOL_ENTRY):
             worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
             process=next(slot.process for slot in worker._slots if slot.process is not None)
             with patch.object(Future,'result',side_effect=KeyboardInterrupt),self.assertRaises(KeyboardInterrupt):
@@ -62,8 +202,7 @@ class WorkerDeadlineTests(unittest.TestCase):
 
     def test_failed_api_lifespan_reaps_retained_native_children(self):
         from cloud import queue
-        entry='import json,os,sys; [(sys.stdout.write(json.dumps({"schemaVersion":1,"result":{"pid":os.getpid()}})+"\\n"),sys.stdout.flush()) for line in sys.stdin]'
-        with patch.object(worker,'SERVE_ENTRY',entry):
+        with patch.object(worker,'SERVE_ENTRY',POOL_ENTRY):
             worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
             process=next(slot.process for slot in worker._slots if slot.process is not None)
             async def fail():
@@ -73,6 +212,29 @@ class WorkerDeadlineTests(unittest.TestCase):
                 asyncio.run(fail())
             self.assertIsNotNone(process.poll())
             self.assertTrue(all(slot.process is None for slot in worker._slots))
+
+    def test_configured_sources_warm_once_outside_replay_job(self):
+        with patch.object(worker,'SERVE_ENTRY',POOL_ENTRY), patch.object(worker,'_start_slot',wraps=worker._start_slot) as start_slot, patch.dict(os.environ,{
+                'BTL_OBSERVED_OPERATOR_CATALOG':'/private/operator-catalog.json',
+                'BTL_OBSERVED_OPERATOR_CATALOG_SHA256':'a'*64}):
+            self.assertTrue(worker.warm_sources('authored-not-a-database'))
+            process=worker._slots[0].process
+            result=worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
+            self.assertEqual(result['pid'],process.pid)
+            worker._slots[0].jobs=worker.MAX_JOBS
+            recycled=worker.pooled_invoke('authored-not-a-database',{'schemaVersion':1})
+            self.assertNotEqual(recycled['pid'],process.pid)
+            self.assertEqual(start_slot.call_count,2)
+            self.assertTrue(all(call.args[2]==worker.STARTUP_WARMUP_DEADLINE for call in start_slot.call_args_list))
+
+    def test_monthly_catalog_source_warms_worker_before_jobs(self):
+        with patch.object(worker, 'SERVE_ENTRY', POOL_ENTRY), patch.dict(os.environ, {
+                'BTL_MONTHLY_PARQUET_CATALOG': '/private/monthly-catalog.json',
+                'BTL_MONTHLY_PARQUET_CATALOG_SHA256': 'a' * 64}):
+            self.assertTrue(worker.warm_sources('authored-not-a-database'))
+            process = worker._slots[0].process
+            result = worker.pooled_invoke('authored-not-a-database', {'schemaVersion': 1})
+            self.assertEqual(result['pid'], process.pid)
 
     def test_native_process_is_reaped_after_deadline(self):
         entry='import json,os,sys,time; p=json.loads(sys.stdin.buffer.read()); open(p["pidPath"],"w").write(str(os.getpid())); time.sleep(300)'
@@ -105,3 +267,34 @@ class WorkerDeadlineTests(unittest.TestCase):
                 with self.assertRaises(ContractError):worker.pooled_invoke('unused',{'schemaVersion':1},deadline=deadline)
             with self.assertRaises(ContractError):worker.invoke('unused',{'schemaVersion':1,'oversize':'a'*32769})
             process.assert_not_called()
+
+    def test_chart_history_is_an_allowed_read_only_worker_operation(self):
+        import json
+        from cloud import research
+        actor='11111111-1111-4111-8111-111111111111';workspace='22222222-2222-4222-8222-222222222222'
+        payload={'schemaVersion':1,'actor':actor,'workspace':workspace,'operation':'chart_history',
+                 'args':['session:qa',{'timeframe':'1m','offset':0}],'write':False}
+        expected={'schemaVersion':1,'artifact':'BTL-OBSERVED-REFERENCE-OHLC-1','candles':[]}
+        with patch.dict(os.environ,{'BTL_WORKER_DATABASE':'authored-qa'}),patch.object(research,'run',return_value=expected):
+            result=json.loads(worker._execute(json.dumps(payload).encode()))
+        self.assertEqual(result['schemaVersion'], 1)
+        self.assertEqual(result['result'], expected)
+        self.assertEqual(result['workerMetrics']['artifact'], 'BTL-NATIVE-WORKER-METRICS-1')
+        self.assertGreater(result['workerMetrics']['wallNs'], 0)
+
+    def test_native_contract_refusal_keeps_measurements_outside_financial_result(self):
+        import json
+        from cloud import research
+        actor='11111111-1111-4111-8111-111111111111';workspace='22222222-2222-4222-8222-222222222222'
+        payload={'schemaVersion':1,'actor':actor,'workspace':workspace,'operation':'workspace',
+                 'args':['session:qa',{'timeframe':'1m'}],'write':False}
+        with patch.dict(os.environ,{'BTL_WORKER_DATABASE':'authored-qa'}), \
+                patch.object(research,'run',side_effect=ContractError('UNAUTHORIZED','scope')):
+            result=json.loads(worker._execute(json.dumps(payload).encode()))
+        self.assertEqual(result['error'], 'UNAUTHORIZED')
+        self.assertEqual(result['workerMetrics']['artifact'], 'BTL-NATIVE-WORKER-METRICS-1')
+        self.assertNotIn('workerMetrics', result.get('result', {}))
+        with self.assertRaises(ContractError) as refused:
+            worker._result(json.dumps(result).encode())
+        self.assertEqual(refused.exception.code, 'UNAUTHORIZED')
+        self.assertGreater(refused.exception.worker_metrics['wallNs'], 0)
