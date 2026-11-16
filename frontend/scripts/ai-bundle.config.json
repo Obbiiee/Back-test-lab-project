@@ -83,6 +83,10 @@
     "frontend/src/tickAlpha/tickAlpha.css",
     "frontend/src/tickAlpha/alphaPhone.css",
     "frontend/src/tickAlpha/alphaLaptop.css",
+    "frontend/src/tickAlpha/alphaChartFirst.css",
+    "frontend/src/tickAlpha/replay.js",
+    "frontend/src/tickAlpha/replayPending.js",
+    "frontend/src/tickAlpha/AlphaReplayControls.jsx",
     "backend/execution/__init__.py",
     "backend/execution/contracts.py",
     "backend/execution/engine.py",
@@ -194,6 +198,7 @@
   ],
   "tests": [
     "frontend/tests/order-estimate.test.mjs",
+    "frontend/tests/replay-controls.test.mjs",
     "frontend/tests/stitch-analytics.test.mjs",
     "backend/tests/stitch_analytics.py",
     "frontend/tests/stitch-trading.test.mjs",

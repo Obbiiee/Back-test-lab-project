@@ -18,6 +18,7 @@
     "test:tick-review": "node tests/tick-review.test.mjs",
     "test:tick-alpha": "node tests/tick-alpha.test.mjs",
     "test:order-estimate": "node tests/order-estimate.test.mjs",
+    "test:replay-controls": "node tests/replay-controls.test.mjs",
     "test:trading-separation": "node tests/trading-separation.test.mjs",
     "history:download": "node scripts/download-history.mjs",
     "history:decade": "node scripts/download-decade.mjs",

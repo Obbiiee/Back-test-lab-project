@@ -1,5 +1,5 @@
 import '../workspace/designTokens.css';
-import {useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import {api,id,sessionPath,selectSessionUrl,loadResearchContext,noticeText,sourceContext,pagePath,sessionsPath} from './client.js';
 import {command} from './client.js';
@@ -13,13 +13,15 @@ import AlphaJournal from './AlphaJournal.jsx';
 import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
 import {emitLocal} from './measurement.js';
+import {readPending,writePending} from './replayPending.js';
 import Icon from '../workspace/WorkspaceIcon.jsx';
 import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
 import './tickAlpha.css';
 import './alphaPhone.css';
 import './alphaLaptop.css';
-import {isAccountPage} from './accountClient.js';
+import './alphaChartFirst.css';
+import {isAccountPage,accountStorageKey} from './accountClient.js';
 
 // Only XAUUSD is admitted for replay today; the others are shown as upcoming, never selectable.
 const PAIRS=[['XAUUSD','Gold / US Dollar','Au'],['EURUSD','Euro / US Dollar','€'],['GBPUSD','Pound / US Dollar','£'],['USDJPY','US Dollar / Yen','¥'],['AUDUSD','Aussie / US Dollar','A$'],['USDCAD','US Dollar / Loonie','C$']]
@@ -39,9 +41,22 @@ export default function TickAlpha(){
   const [timeframe,setTimeframe]=useState('1m'),[pauseToken,setPauseToken]=useState(0);
   const [orderAction,setOrderAction]=useState(null);
   const [selectedMethod,setSelectedMethod]=useState('');
-  const [wide,setWide]=useState(false),[drawRequest,setDrawRequest]=useState(null),[terminalFocus,setTerminalFocus]=useState(null);
+  const [focus,setFocusState]=useState(false),[drawRequest,setDrawRequest]=useState(null),[terminalFocus,setTerminalFocus]=useState(null),[pairQuery,setPairQuery]=useState('');
+  const viewRef=useRef(null),[pendingVersion,setPendingVersion]=useState(0);
+  useEffect(()=>{viewRef.current=view;},[view]);
+  // Focus: the chart fills the screen. Uses the Fullscreen API when permitted, CSS focus otherwise.
+  const setFocus=useCallback(value=>{
+    setFocusState(value);
+    try{if(value&&!document.fullscreenElement)void document.documentElement.requestFullscreen?.().catch(()=>{});else if(!value&&document.fullscreenElement)void document.exitFullscreen().catch(()=>{});}catch{/* CSS focus still applies */}
+  },[]);
+  useEffect(()=>{
+    const onFullscreen=()=>{if(!document.fullscreenElement)setFocusState(false);};
+    const onKey=event=>{if(event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('[role=dialog]'))setFocusState(false);};
+    document.addEventListener('fullscreenchange',onFullscreen);window.addEventListener('keydown',onKey);
+    return()=>{document.removeEventListener('fullscreenchange',onFullscreen);window.removeEventListener('keydown',onKey);};
+  },[]);
   const focusTerminal=tab=>{setTerminalFocus({tab,id:id('tab')});requestAnimationFrame(()=>document.querySelector('.tick-alpha .alpha-terminal')?.scrollIntoView({behavior:'smooth',block:'start'}));};
-  const openPanel=(name,event)=>{if(event)returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog(name);};
+  const openPanel=(name,event)=>{if(name==="pair")setPairQuery("");if(event)returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog(name);};
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
   useEffect(()=>{
     let mounted=true;
@@ -64,6 +79,38 @@ export default function TickAlpha(){
     setNotice('Session reopened from its committed state.');
     emitLocal('session_restored');
   };
+  // Pending replay target. A bounded backend advance may stop before its target and then requires
+  // the SAME target to continue, so the in-flight target is persisted per Session (never the data).
+  const pendingKey=id=>accountStorageKey('replay-pending:'+id);
+  const savePending=(sessionId,value)=>{writePending(pendingKey(sessionId),value);setPendingVersion(n=>n+1);};
+  const sessionIdForPending=view?.metadata.id;
+  // pendingVersion bumps whenever the saved target is written or cleared.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pending=useMemo(()=>sessionIdForPending?readPending(pendingKey(sessionIdForPending)):null,[sessionIdForPending,pendingVersion]);
+  // One backend ADVANCE/SEEK to a canonical UTC target, resumed with the same target until the
+  // cursor reaches it. Resolves {view,reached,cancelled} or false; single-flighted via run().
+  const advanceTo=(kind,targetNs,{signal,onProgress}={})=>run(async()=>{
+    let current=viewRef.current;const sessionId=current.metadata.id;
+    savePending(sessionId,{kind,target:targetNs});
+    try{
+    for(let attempt=0;attempt<1000;attempt++){
+      await api(sessionPath(sessionId)+'/commands',command(current,kind,{targetNs}));
+      const saved=await loadWorkspace(sessionId);
+      viewRef.current=saved;setView(saved);
+      if(saved.state.nextGroupIndex!==current.state.nextGroupIndex){
+        emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
+        if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
+        if(saved.analysis.metrics.tradeCount>current.analysis.metrics.tradeCount)emitLocal('order_outcome_committed');
+      }
+      onProgress?.(saved);
+      if(BigInt(saved.state.throughNs)>=BigInt(targetNs)||saved.state.ended){savePending(sessionId,null);return {view:saved,reached:true,cancelled:false};}
+      if(saved.state.nextGroupIndex===current.state.nextGroupIndex)throw Error('Replay made no progress toward its target. The saved target is kept; use Continue saved.');
+      if(signal?.aborted)return {view:saved,reached:false,cancelled:true};
+      current=saved;
+    }
+    throw Error('Replay target needs more steps than one request budget. Use Continue saved.');
+    }catch(error){if(/^(REFUSED_|BACKWARD_ADVANCE|BEFORE_SESSION_START)/.test(error.message))savePending(sessionId,null);throw error;}
+  });
   const edit=patch=>{setPlan(p=>({...p,...patch}));setPlanRevision(r=>r+1);setReview(null);};
   // Buy/Sell in the order bar only preselect the side; review and confirmation stay mandatory.
   const openTicket=(event,side)=>{returnFocus.current=event.currentTarget;setNotice('');setPauseToken(n=>n+1);if(side&&side!==plan.side)edit({side,...(plan.workflow==='PLANNED'&&plan.orderType==='MARKET'?{entry:quoteFor(side)}:{})});setDialog('ticket');};
@@ -124,7 +171,7 @@ export default function TickAlpha(){
     creationId.current=id(type);if(type==='method')setKind('FREE_STYLE');
     setDialog(type==='method'?'method':'session');
   };
-  return <main className={`tick-alpha${wide&&view?' is-wide':''}`} onClickCapture={event=>{
+  return <main className={`tick-alpha${view?' is-session':''}${focus&&view?' is-focus':''}`} onClickCapture={event=>{
     if(event.target.closest?.('nav[aria-label="Drawing tools"] button'))emitLocal('feature_drawing');
     if(event.target.closest?.('button')?.textContent==='Indicators')emitLocal('feature_indicator');
   }}>
@@ -140,17 +187,9 @@ export default function TickAlpha(){
         setConnecting(true);try{const result=await loadResearchContext(new URL(window.location.href).searchParams.get('session'),{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><button type="button" className="alpha-pair-pill" aria-label="Pair XAUUSD, show pairs" onClick={event=>openPanel('pair',event)}><span aria-hidden="true">Au</span>XAUUSD<span aria-hidden="true">▾</span></button><p><strong>XAUUSD</strong><span className="alpha-source-credit"> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button></span> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
-      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} drawRequest={drawRequest} wide={wide} onWide={setWide} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
+      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} drawRequest={drawRequest} focus={focus} onFocus={setFocus} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onPause={()=>setPauseToken(n=>n+1)} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
-        onReplay={(kind,targetNs)=>run(async()=>{
-          await api(sessionPath(view.metadata.id)+'/commands',command(view,kind,{targetNs}));
-          const saved=await loadWorkspace(view.metadata.id);setView(saved);
-          if(saved.state.nextGroupIndex!==view.state.nextGroupIndex)emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
-          if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
-          if(saved.analysis.metrics.tradeCount>view.analysis.metrics.tradeCount)emitLocal('order_outcome_committed');
-          if(kind==='ADVANCE'&&saved.state.nextGroupIndex===view.state.nextGroupIndex){setNotice('No additional quote was revealed at this requested boundary. Replay paused.');return false;}
-          return true;
-        })} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
+        onAdvance={advanceTo} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');
           try{edit(planningIntent(drawing,{protocol,tickSize:view.state.profile.tickSize}));setNotice('Planning levels rounded to the Session price grid and copied to the draft. Review these proposed values before confirming; quantity and risk use Session rules.');}
           catch(error){setNotice(error.message);}
@@ -172,7 +211,7 @@ export default function TickAlpha(){
         <button type="button" aria-pressed={objectsOpen} onClick={()=>{setObjectsOpen(value=>!value);setDialog(null);}}><Icon name="layers"/><span>Objects</span></button>
         <button type="button" onClick={()=>setDialog('news')}><Icon name="news"/><span>News</span></button>
         <button type="button" onClick={()=>setDialog('journal')}><Icon name="journal"/><span>Journal</span></button>
-        <button type="button" onClick={()=>{setWide(true);setDialog(null);}}><Icon name="expand"/><span>Wide chart</span></button>
+        <button type="button" onClick={()=>{setFocus(true);setDialog(null);}}><Icon name="expand"/><span>Focus chart</span></button>
         <button type="button" onClick={()=>{setDialog(null);focusTerminal('Analysis');}}><Icon name="analytics"/><span>Results</span></button>
         <button type="button" onClick={()=>{setDialog(null);focusTerminal('Evidence');}}><Icon name="search"/><span>Evidence</span></button>
         <button type="button" disabled={busy||!catalog} onClick={event=>openCreation('method',event)}><Icon name="plus"/><span>New strategy</span></button>
@@ -181,7 +220,7 @@ export default function TickAlpha(){
       <div className="alpha-tools-links"><a href={sessionsPath()}>All Sessions</a><button type="button" onClick={()=>setDialog('feedback')}>Research feedback</button><button type="button" onClick={openSource}>About this data</button></div>
     </section></WorkspaceModal>}
     {dialog==='pair'&&view&&<WorkspaceModal returnFocusRef={returnFocus} label="Pair" onClose={()=>setDialog(null)}><section className="alpha-dialog alpha-pair-sheet"><div className="alpha-terminal-heading"><h2>Pair</h2><button onClick={()=>setDialog(null)}>Close</button></div>
-      <ul className="alpha-pair-list">{PAIRS.map(p=><li key={p.symbol}><button type="button" disabled={!p.ready} aria-current={p.ready?'true':undefined} onClick={()=>setDialog(null)}><span className="alpha-pair-badge" aria-hidden="true">{p.badge}</span><span><strong>{p.symbol}</strong><small>{p.name}</small></span><em>{p.ready?'Now':'Soon'}</em></button></li>)}</ul>
+      <label className="alpha-pair-search">Search pairs<input type="search" aria-label="Search pairs" autoFocus value={pairQuery} onChange={e=>setPairQuery(e.target.value)} placeholder="XAU, EUR…"/></label><ul className="alpha-pair-list">{PAIRS.filter(p=>!pairQuery.trim()||(p.symbol+" "+p.name).toLowerCase().includes(pairQuery.trim().toLowerCase())).map(p=><li key={p.symbol}><button type="button" disabled={!p.ready} aria-current={p.ready?'true':undefined} onClick={()=>setDialog(null)}><span className="alpha-pair-badge" aria-hidden="true">{p.badge}</span><span><strong>{p.symbol}</strong><small>{p.name}</small></span><em>{p.ready?'Now':'Soon'}</em></button></li>)}</ul>
       <p>Each Session replays one pair. More pairs open once their data is approved; a new pair starts a new Session.</p>
     </section></WorkspaceModal>}
     {dialog==='feedback'&&<WorkspaceModal returnFocusRef={returnFocus} label="Optional research feedback" onClose={()=>setDialog(null)}><AlphaFeedback onClose={()=>setDialog(null)}/></WorkspaceModal>}

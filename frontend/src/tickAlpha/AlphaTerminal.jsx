@@ -16,11 +16,15 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback,focus=null}
   // The phone session bar can ask for a tab (Positions, Results) without owning terminal state.
   const [seenFocus,setSeenFocus]=useState(focus);
   if(focus!==seenFocus){setSeenFocus(focus);if(focus?.tab)setTab(focus.tab);}
-  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
+  const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));const loaded=store.load();return {store,height:store.raw===null?24:loaded};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
+  // A phone session-bar request (Positions, Results) opens a collapsed terminal.
+  const restoreRef=useRef(null);
+  useEffect(()=>{restoreRef.current=panel.restore;});
+  useEffect(()=>{if(focus?.tab)restoreRef.current?.();},[focus]);
   const evidence=view.analysis;
   if(!evidence||evidence.status!=='COMPLETE')return <section className="alpha-terminal" aria-label="Trading and Analysis"><h2>Analysis unavailable</h2><p>{evidence?.reason??'The local service has no compatible analysis projection.'} No partial history is presented as a complete result. Reload the saved Session after resolving the limit.</p></section>;
   const {account,metrics,provenance}=evidence;
