@@ -1,3 +1,4 @@
+import AccountPlan from './AccountPlan.jsx';
 import {lazy,Suspense,useEffect,useId,useRef,useState} from 'react';
 import {createAccountClient,setAccountTransport,clearAccountTransport} from './accountClient.js';
 import {readRoute,useRoute,navigate} from './productRoute.js';
@@ -26,7 +27,7 @@ export default function AlphaAccount(){
   const [expired,setExpired]=useState(false);
   const [client]=useState(()=>createAccountClient({onExpired:()=>setExpired(true)}));
   const [mode,setMode]=useState('signin'),[user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[capabilities,setCapabilities]=useState(null),[identityProviders,setIdentityProviders]=useState([]);
-  const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[googleAvailable,setGoogleAvailable]=useState(false);
+  const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[googleAvailable,setGoogleAvailable]=useState(false),[billingConfigured,setBillingConfigured]=useState(false);
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
   const route=useRoute();
   // Deep link asked for before sign-in (e.g. a Session or Method); restored after a workspace is chosen.
@@ -61,7 +62,7 @@ export default function AlphaAccount(){
           url.searchParams.delete('auth');url.searchParams.set('page','account');window.history.replaceState(null,'',url.pathname+url.search);
         }else{
           const providers=await client.request('/api/v1/auth/providers',{authenticated:false});
-          if(active)setGoogleAvailable(providers?.googleConfigured===true);
+          if(active){setGoogleAvailable(providers?.googleConfigured===true);setBillingConfigured(providers?.billingConfigured===true);}
         }
       }catch(failure){
         if(active){
@@ -139,7 +140,7 @@ export default function AlphaAccount(){
     <section className="rk-auth-panel">
       <div className="rk-auth-card" aria-live="polite">
         {!secure?<><h2>Use the secure address</h2><p>Accounts only work on the https:// address. The private local workspace is separate.</p><a className="rk-auth-btn rk-auth-primary" href="/">Open local workspace</a></>
-        :user?<AccountPanel user={user} identityProviders={identityProviders} workspaces={workspaces} selected={selected} capabilities={capabilities} busy={busy} googleAvailable={googleAvailable} onLinkGoogle={password=>action(async()=>{const url=await client.startGoogleLink(password);window.location.assign(url);})} onOpen={open} onLogout={logout} onCreate={name=>action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);})} onBack={()=>navigate({screen:'methods'})}/>
+        :user?<AccountPanel client={client} billingConfigured={billingConfigured} user={user} identityProviders={identityProviders} workspaces={workspaces} selected={selected} capabilities={capabilities} busy={busy} googleAvailable={googleAvailable} onLinkGoogle={password=>action(async()=>{const url=await client.startGoogleLink(password);window.location.assign(url);})} onOpen={open} onLogout={logout} onCreate={name=>action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);})} onBack={()=>navigate({screen:'methods'})}/>
         :<>
           {expired&&<div className="rk-auth-safety" role="status"><strong>Signed out for safety</strong><span>Your sign-in ended after a refresh or a while away. Your Sessions are saved.</span></div>}
           {['signin','register'].includes(mode)&&<div className="rk-auth-tabs" role="tablist" aria-label="Account">
@@ -173,7 +174,7 @@ export default function AlphaAccount(){
   </main>;
 }
 
-function AccountPanel({user,identityProviders,workspaces,selected,capabilities,busy,googleAvailable,onLinkGoogle,onOpen,onLogout,onCreate,onBack}){
+function AccountPanel({client,billingConfigured,user,identityProviders,workspaces,selected,capabilities,busy,googleAvailable,onLinkGoogle,onOpen,onLogout,onCreate,onBack}){
   const [linkPassword,setLinkPassword]=useState('');
   return <>
     <h2>{selected?'Account':'Choose a workspace'}</h2>
@@ -183,6 +184,7 @@ function AccountPanel({user,identityProviders,workspaces,selected,capabilities,b
       <button className="rk-auth-btn" disabled={busy}>{busy?'Connecting…':'Link Google account'}</button>
       <p className="rk-auth-hint">Google is linked only after you confirm your password and finish Google sign-in. Matching email addresses alone never combine accounts.</p>
     </form>}
+    <AccountPlan client={client} workspace={selected} billingConfigured={billingConfigured}/>
     {selected&&<button type="button" className="rk-auth-btn rk-auth-primary" onClick={onBack}>Back to My Methods</button>}
     <h3>{selected?'Switch workspace':'Your workspaces'}</h3>
     <p className="rk-auth-hint">Workspaces keep research separate. At most 50 are listed. Research here uses the synthetic test feed.</p>

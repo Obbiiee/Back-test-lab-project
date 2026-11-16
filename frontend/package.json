@@ -62,7 +62,8 @@
     "test:indicator-cap": "node tests/indicator-cap.test.mjs",
     "test:site": "node tests/site-content.test.mjs",
     "verify:site": "node scripts/verify-site-config.mjs",
-    "build:release": "node scripts/verify-site-config.mjs --release && vite build"
+    "build:release": "node scripts/verify-site-config.mjs --release && vite build",
+    "test:account-plan": "node tests/account-plan.test.mjs"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1",
