@@ -1,5 +1,11 @@
 # RIKSORA V1 — frozen-architecture integration register
 
+## Browser rendering and loading checkpoint — 2026-11-16
+
+- My Methods loads the replay workspace only when the user opens replay. On the same cold, local Edge fixture, My Methods requested 434,605 decoded JavaScript bytes versus 817,656 on the preceding PR #53 head (46.8% fewer). Replay opened the chart successfully. This is a resource count, not a production latency or frame-rate result.
+- The collapsed terminal issued zero Journal requests during one synthetic replay advance versus one before, and the unsaved note was still present after restoring the terminal. Journal uses indexed note lookup, defers search work, skips offscreen layout, and cancels obsolete page reads. Mobile Journal search found the matching saved note after loading 64 orders.
+- The chart applies drag and crosshair preferences when those preferences change and skips histogram updates while volume is hidden or unavailable. Focused product, Analytics, and Tick Alpha tests, changed-file ESLint, Vite build, and desktop 1440 px / phone 375 px Edge fixture checks passed. Native PostgreSQL, physical phone performance, and complete design acceptance were not run for this checkpoint.
+
 ## Product frontend links and Method Session pages — 2026-11-16
 
 - Session overview, Journal and Analytics resolve direct links outside the first catalog page. Sign-in restores the selected Session ID. The last Session can be resumed from My Methods even when absent from the catalog page.

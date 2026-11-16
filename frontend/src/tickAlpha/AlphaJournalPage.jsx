@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useDeferredValue,useEffect,useMemo,useRef,useState} from 'react';
 import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
 import {money,utc,lastSession,useSessionRead} from './productData.js';
 import {ratioLabel} from './annotations.js';
@@ -91,6 +91,7 @@ function JournalSelection({catalog,sessionId,onOpen}){
   const [side,setSide]=useState('ALL');
   const [status,setStatus]=useState(null);
   const [query,setQuery]=useState('');
+  const deferredQuery=useDeferredValue(query);
   const [dirty,setDirty]=useState(()=>new Map()); // orderId → 'kept' | 'lost'
   const [loadingMore,setLoadingMore]=useState(false);
   const [pageError,setPageError]=useState('');
@@ -119,9 +120,12 @@ function JournalSelection({catalog,sessionId,onOpen}){
   const journalSessionId=session?.id;
   useEffect(()=>{
     if(!journalSessionId)return undefined;
-    let live=true;
-    loadJournalPage(journalSessionId).then(value=>{if(live)setResult({attempt,status:'ready',value});},failure=>{if(live)setResult({attempt,status:'error',message:noticeText(failure.message)});});
-    return()=>{live=false;};
+    const controller=new AbortController();
+    loadJournalPage(journalSessionId,null,{signal:controller.signal}).then(
+      value=>{if(!controller.signal.aborted)setResult({attempt,status:'ready',value});},
+      failure=>{if(!controller.signal.aborted)setResult({attempt,status:'error',message:noticeText(failure.message)});},
+    );
+    return()=>controller.abort();
   },[journalSessionId,attempt]);
   // A reload after a stale-note refusal keeps the page (and open editors) mounted.
   const state=result.attempt===attempt||result.status==='ready'?result:{status:'loading'};
@@ -143,17 +147,18 @@ function JournalSelection({catalog,sessionId,onOpen}){
     finally{setLoadingMore(false);}
   };
   const statuses=useMemo(()=>[...new Set((journal?.orders??[]).map(order=>order.status))].sort(),[journal]);
+  const notesByOrder=useMemo(()=>new Map((journal?.notes??[]).map(note=>[note.orderId,note])),[journal?.notes]);
   const rows=useMemo(()=>{
     if(!journal)return [];
-    const q=query.trim().toLowerCase();
+    const q=deferredQuery.trim().toLowerCase();
     return journal.orders.filter(order=>{
       if(side!=='ALL'&&order.side!==side)return false;
       if(status&&order.status!==status)return false;
       if(!q)return true;
-      const note=journal.notes.find(item=>item.orderId===order.id);
+      const note=notesByOrder.get(order.id);
       return [note?.text,...(note?.tags??[]),order.orderType,order.status].filter(Boolean).some(text=>text.toLowerCase().includes(q));
     }).slice().reverse();
-  },[journal,side,status,query]);
+  },[journal,notesByOrder,side,status,deferredQuery]);
   const pickerSessions=catalog.sessions.slice().reverse();
   if(session&&!listedSession)pickerSessions.unshift(session);
   const sessionOptions=pickerSessions.map(s=>({value:s.id,label:s.name,description:catalog.methods.find(m=>m.id===s.methodId)?.name}));
@@ -187,7 +192,7 @@ function JournalSelection({catalog,sessionId,onOpen}){
           <span className="rk-count" role="status">{rows.length} shown · {journal.orders.length} loaded of {journal.totalOrders}</span>
         </div>
         {rows.length?<ol className="rk-journal" aria-label={`Orders in ${session.name}`}>{rows.map(order=>{
-          const note=journal.notes.find(item=>item.orderId===order.id);
+          const note=notesByOrder.get(order.id);
           return <li key={order.id} className="rk-card rk-journal-item">
             <div className="rk-journal-head"><span className={`rk-side rk-side-${order.side==='LONG'?'buy':'sell'}`}>{order.side==='LONG'?'Long':'Short'}</span><strong>{order.orderType.charAt(0)+order.orderType.slice(1).toLowerCase()}</strong><span className="rk-tag">{order.status.toLowerCase().replaceAll('_',' ')}</span><span className="rk-num rk-journal-time">{utc(order.entryTimeNs)}</span></div>
             <dl className="rk-facts rk-journal-facts">

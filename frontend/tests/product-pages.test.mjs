@@ -78,6 +78,12 @@ const client={subject:()=>subject,request:async (path,options={})=>{
     schemaVersion:1,artifact:'BTL-TICK-JOURNAL-PAGE-1',sessionId:'session:one',revision:8,
     totalOrders:33,orders:[{id:'order:032',side:'LONG',orderType:'MARKET',status:'CLOSED'}],notes:[],
     provenance:{revision:8},nextCursor:null,complete:true};
+  if(path.endsWith('/sessions/session%3Acancelled/journal/pages?limit=32')){
+    return new Promise((resolve,reject)=>{
+      if(options.signal.aborted){reject(options.signal.reason);return;}
+      options.signal.addEventListener('abort',()=>reject(options.signal.reason),{once:true});
+    });
+  }
   if(path.includes('/method-families/method%3A050/versions'))return {schemaVersion:1,artifact:'BTL-METHOD-FAMILY-1'};
   if(path.includes('/method-families/method%3A050/lifecycle'))return {schemaVersion:1,artifact:'BTL-METHOD-FAMILY-1'};
   throw new Error(`Unexpected path ${path}`);
@@ -118,6 +124,10 @@ try{
   await assert.rejects(loadSessionWithMetadata('session:mismatch'),/invalid Session/);
   await assert.rejects(loadSessionWithMetadata('session:private'),{status:404});
   await assert.rejects(loadJournalPage('session:mismatch'),/Unsupported Journal page/);
+  const controller=new AbortController();
+  const cancelledPage=loadJournalPage('session:cancelled',null,{signal:controller.signal});
+  controller.abort();
+  await assert.rejects(cancelledPage,{name:'AbortError'});
   const journal=await loadJournalPage('session:one','order:031');
   assert.equal(journal.totalOrders,33);
   assert.equal(journal.orders[0].id,'order:032');

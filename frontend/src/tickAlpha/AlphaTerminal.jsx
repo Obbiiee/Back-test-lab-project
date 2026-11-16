@@ -12,15 +12,18 @@ import {accountStorageKey} from './accountClient.js';
 const shown=value=>value??'Unavailable';
 
 export default function AlphaTerminal({view,busy,onAction,onFeedback,request}){
-  const [tab,setTab]=useState('Open positions'),[quantities,setQuantities]=useState({});
+  const [tab,setTab]=useState(request?.tab??'Open positions'),[quantities,setQuantities]=useState({});
+  const [journalVisited,setJournalVisited]=useState(tab==='Journal');
   const root=useRef(null);
   // Phone bottom navigation asks for a tab (e.g. Analysis); show it and bring the terminal into view.
   const [seenRequest,setSeenRequest]=useState(request);
   if(request!==seenRequest){setSeenRequest(request);if(request)setTab(request.tab);}
+  if(tab==='Journal'&&!journalVisited)setJournalVisited(true);
   useEffect(()=>{if(request)root.current?.scrollIntoView({block:'start',behavior:'smooth'});},[request]);
   const [preference]=useState(()=>{const store=new TerminalPreferences(()=>globalThis.localStorage,accountStorageKey(`${view.state.datasetVersion}:${view.metadata.id}`));return {store,height:store.load()};});
   const [preferenceStatus,setPreferenceStatus]=useState(preference.store.status);
   const panel=usePanelResize(preference.height);
+  const journalVisible=tab==='Journal'&&panel.state!=='COLLAPSED';
   useEffect(()=>{const timer=setTimeout(()=>{preference.store.save(Math.round(panel.height));setPreferenceStatus(preference.store.status);},250);return()=>clearTimeout(timer);},[panel.height,preference]);
   const grip=useRef(null);
   const evidence=view.analysis;
@@ -37,7 +40,7 @@ export default function AlphaTerminal({view,busy,onAction,onFeedback,request}){
     <div className="alpha-account" aria-label="Committed account"><span>Balance <strong>${account.balance}</strong></span><span>Net cash change <strong>${account.netCashChange}</strong></span><span>Commission <strong>${account.commission}</strong></span><span>Indicative unrealized <strong>{account.unrealizedIndicative===null?'Unavailable':'$'+account.unrealizedIndicative}</strong></span><span>Indicative equity <strong>{account.equityIndicative===null?'Unavailable':'$'+account.equityIndicative}</strong></span></div>
     <details className="alpha-account-explanation"><summary>How account estimates work</summary><p className="alpha-chart-note">Marks use the last revealed liquidation side: Bid for Long, Ask for Short. Marks are estimates; committed cash and completed-position metrics remain separate.</p></details>
     {tab==='Analysis'&&onFeedback&&view.state.revision>1&&view.analysis.orders.some(order=>typeof order.entryTimeNs==='string'||order.status==='UNRESOLVED')&&<button disabled={busy} onClick={onFeedback}>Optional research feedback</button>}
-    <div hidden={tab!=='Journal'}><AlphaJournal key={view.metadata.id} view={view} active={tab==='Journal'}/></div>
+    {journalVisited&&<AlphaJournal key={view.metadata.id} sessionId={view.metadata.id} revision={journalVisible?view.state.revision:null} active={journalVisible}/>}
     {tab==='Journal'?null:tab==='Analysis'?<div className="alpha-analysis"><AlphaEquityChart view={view}/><h2>Committed position Analysis</h2><dl>{[
       ['Completed trades',metrics.tradeCount],['Wins / losses / breakeven',`${metrics.wins} / ${metrics.losses} / ${metrics.breakeven}`],
       ['Win rate',ratioLabel(metrics.winRate,{percent:true})],['Average win (USD)',ratioLabel(metrics.averageWin)],['Average loss (USD)',ratioLabel(metrics.averageLoss)],

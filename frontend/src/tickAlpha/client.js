@@ -329,10 +329,10 @@ export async function loadMoreProductCatalog(catalog,kind){
   throw Error('Unknown workspace page.');
 }
 
-export async function loadJournalPage(sessionId,cursor=null){
+export async function loadJournalPage(sessionId,cursor=null,{signal}={}){
   if(typeof sessionId!=='string'||!sessionId)throw Error('Journal Session is unavailable.');
   const query=new URLSearchParams({limit:'32'});if(cursor)query.set('cursor',cursor);
-  const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`);
+  const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`,undefined,{signal});
   if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||page.sessionId!==sessionId||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
       !Number.isSafeInteger(page.totalOrders)||typeof page.complete!=='boolean')
     throw Error('Unsupported Journal page; no state was imported.');
