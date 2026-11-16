@@ -1,0 +1,257 @@
+{
+ "scriptSeconds": {
+  "p50": 366.8,
+  "p95": 727.5,
+  "max": 749.1
+ },
+ "pgConnectionsMax": 36,
+ "admissionConfig": {
+  "dbBudget": 24,
+  "apiActive": 16,
+  "apiWait": 32,
+  "clientOpt": true,
+  "fixtureCache": 64,
+  "dbPool": true
+ },
+ "clientRecoveriesDetail": {
+  "summary": 14,
+  "order.review": 13,
+  "setup:register": 22,
+  "setup:verify": 14,
+  "session.create.poll": 29,
+  "setup:workspace": 17,
+  "session.create": 26,
+  "order.confirm": 7,
+  "setup:login": 23,
+  "advance.poll": 34,
+  "advance": 40,
+  "method.create": 14,
+  "step.poll": 2,
+  "step": 244,
+  "view": 1,
+  "play": 13,
+  "jump": 3
+ },
+ "resultShapes": {
+  "session.create": [
+   "artifact",
+   "eventWindowStart",
+   "events",
+   "label",
+   "metadata",
+   "method",
+   "quote",
+   "schemaVersion",
+   "state"
+  ],
+  "advance": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "step": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "jump": [
+   "advances",
+   "artifact",
+   "events",
+   "processedGroups",
+   "requestId",
+   "schemaVersion",
+   "sessionId",
+   "status",
+   "throughNs",
+   "view"
+  ],
+  "play": [
+   "artifact",
+   "balance",
+   "chunks",
+   "ended",
+   "more",
+   "nextGroupIndex",
+   "revision",
+   "runId",
+   "schemaVersion",
+   "segment",
+   "sessionId",
+   "targetNs"
+  ]
+ },
+ "summariesSaved": 3462,
+ "directSlotsConfigured": 6,
+ "directSlotUtilisation": 0.19,
+ "directSlotWaitMs": {
+  "p50": 0.806,
+  "p95": 11.771,
+  "p99": 34.129,
+  "max": 223.8
+ },
+ "directRequests": 5979,
+ "journeySuccessRate": 0.9826,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   0.6745,
+   1.8574,
+   2.4257
+  ],
+  "journal": [
+   0.527,
+   1.8979,
+   2.1826
+  ],
+  "analytics": [
+   0.345,
+   1.6902,
+   1.9183
+  ],
+  "view": [
+   0.6067,
+   1.7022,
+   2.1368
+  ],
+  "jump": [
+   0.7463,
+   1.9218,
+   5.3991
+  ],
+  "step": [
+   0.619,
+   2.4727,
+   4.8961
+  ],
+  "order.confirm": [
+   0.6703,
+   1.8834,
+   2.4646
+  ],
+  "close": [
+   0.6203,
+   1.8975,
+   2.3856
+  ],
+  "export.csv": [
+   1.0045,
+   1.7646,
+   1.8534
+  ]
+ },
+ "name": "fin2-n100",
+ "traders": 100,
+ "wall": 760.3,
+ "scripts": 113,
+ "parityEqual": 113,
+ "parityBad": [],
+ "errors": [
+  "AssertionError: {\"detail\":\"SERVICE_BUSY\"}",
+  "AssertionError: {\"detail\":\"SERVICE_BUSY\"}"
+ ],
+ "sutCpuCores": 1.81,
+ "sutNetCores": 1.54,
+ "throttled": 1,
+ "sutPeakMb": 1515,
+ "byComponent": {
+  "apiAndOther": 512.4,
+  "postgresql": 168.4,
+  "financialWorker": 562.1
+ },
+ "p95": {
+  "journal": 1.8979,
+  "analytics": 1.6902,
+  "jump": 1.9218,
+  "step": 2.4727,
+  "summary": 1.8574,
+  "view": 1.7022,
+  "export.csv": 1.7646,
+  "step.complete": 5.0249,
+  "play.complete": 10.6115,
+  "order.confirm": 1.8834,
+  "close": 1.8975
+ },
+ "queue": {
+  "maxQueued": 16,
+  "maxAge": 9.3,
+  "wait": {
+   "n": 2784,
+   "p50": 0.326,
+   "p95": 4.692,
+   "p99": 6.357,
+   "max": 9.94
+  },
+  "states": {
+   "SUCCEEDED": 2784
+  }
+ },
+ "admissionRefusals": {
+  "SERVICE_BUSY:apiAdmission": 319,
+  "setup:SERVICE_BUSY": 185,
+  "QUEUE_CAPACITY": 559
+ },
+ "recoveries": {
+  "summary": 14,
+  "order.review": 13,
+  "setup:register": 22,
+  "setup:verify": 14,
+  "session.create.poll": 29,
+  "setup:workspace": 17,
+  "session.create": 26,
+  "order.confirm": 7,
+  "setup:login": 23,
+  "advance.poll": 34,
+  "advance": 40,
+  "method.create": 14,
+  "step.poll": 2,
+  "step": 244,
+  "view": 1,
+  "play": 13,
+  "jump": 3
+ },
+ "requests": 15488,
+ "reqPerSec": 20.4,
+ "expectedRefusals": {
+  "CLOSE:503": 120
+ },
+ "generator": {
+  "cpuSeconds": 51.9,
+  "peakRssMb": 116.3,
+  "eventLoopLagMs": {
+   "p50": 0.5,
+   "p95": 1.8,
+   "max": 71.6
+  }
+ },
+ "hostMaxCpu": 80.0,
+ "hostMinMemGiB": 13.11,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": false,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": false,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": false,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": false
+}

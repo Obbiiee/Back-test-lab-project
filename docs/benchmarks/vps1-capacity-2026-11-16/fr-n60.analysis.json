@@ -1,0 +1,246 @@
+{
+ "scriptSeconds": {
+  "p50": 211.5,
+  "p95": 710.6,
+  "max": 714.4
+ },
+ "pgConnectionsMax": 35,
+ "admissionConfig": {
+  "dbBudget": 24,
+  "apiActive": 16,
+  "apiWait": 32,
+  "clientOpt": true,
+  "fixtureCache": 64,
+  "dbPool": true
+ },
+ "clientRecoveriesDetail": {
+  "setup:register": 8,
+  "session.create.poll": 3,
+  "setup:login": 8,
+  "setup:verify": 4,
+  "method.create": 7,
+  "setup:workspace": 9,
+  "session.create": 18,
+  "advance": 39,
+  "summary": 1,
+  "advance.poll": 4,
+  "order.review": 1,
+  "step": 4
+ },
+ "resultShapes": {
+  "session.create": [
+   "artifact",
+   "eventWindowStart",
+   "events",
+   "label",
+   "metadata",
+   "method",
+   "quote",
+   "schemaVersion",
+   "state"
+  ],
+  "advance": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "step": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "play": [
+   "artifact",
+   "balance",
+   "chunks",
+   "ended",
+   "more",
+   "nextGroupIndex",
+   "revision",
+   "runId",
+   "schemaVersion",
+   "segment",
+   "sessionId",
+   "targetNs"
+  ],
+  "jump": [
+   "advances",
+   "artifact",
+   "events",
+   "processedGroups",
+   "requestId",
+   "schemaVersion",
+   "sessionId",
+   "status",
+   "throughNs",
+   "view"
+  ]
+ },
+ "summariesSaved": 2152,
+ "directSlotsConfigured": 6,
+ "directSlotUtilisation": 0.069,
+ "directSlotWaitMs": {
+  "p50": 0.076,
+  "p95": 1.76,
+  "p99": 9.063,
+  "max": 85.3
+ },
+ "directRequests": 3683,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {
+  "ReadError": 1
+ },
+ "latencyP50P95P99": {
+  "summary": [
+   0.0853,
+   0.5165,
+   1.1898
+  ],
+  "journal": [
+   0.101,
+   0.2984,
+   0.3378
+  ],
+  "analytics": [
+   0.0844,
+   0.2237,
+   0.4649
+  ],
+  "view": [
+   0.0941,
+   0.4708,
+   1.3861
+  ],
+  "jump": [
+   0.0261,
+   0.37,
+   0.3959
+  ],
+  "step": [
+   0.0574,
+   0.3543,
+   0.7079
+  ],
+  "order.confirm": [
+   0.1201,
+   0.4498,
+   0.6731
+  ],
+  "close": [
+   0.1363,
+   0.5218,
+   0.8257
+  ],
+  "export.csv": [
+   0.199,
+   0.5899,
+   0.5899
+  ]
+ },
+ "name": "fr-n60",
+ "traders": 60,
+ "wall": 724.2,
+ "scripts": 69,
+ "parityEqual": 69,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 1.02,
+ "sutNetCores": 0.83,
+ "throttled": 0,
+ "sutPeakMb": 1363,
+ "byComponent": {
+  "apiAndOther": 255.7,
+  "postgresql": 84.5,
+  "financialWorker": 289.3
+ },
+ "p95": {
+  "journal": 0.2984,
+  "analytics": 0.2237,
+  "jump": 0.37,
+  "step": 0.3543,
+  "summary": 0.5165,
+  "view": 0.4708,
+  "export.csv": 0.5899,
+  "step.complete": 2.4647,
+  "play.complete": 8.563,
+  "order.confirm": 0.4498,
+  "close": 0.5218
+ },
+ "queue": {
+  "maxQueued": 16,
+  "maxAge": 5.6,
+  "wait": {
+   "n": 1726,
+   "p50": 0.169,
+   "p95": 2.044,
+   "p99": 4.661,
+   "max": 6.773
+  },
+  "states": {
+   "SUCCEEDED": 1726
+  }
+ },
+ "admissionRefusals": {
+  "setup:SERVICE_BUSY": 58,
+  "SERVICE_BUSY:apiAdmission": 41,
+  "QUEUE_CAPACITY": 131
+ },
+ "recoveries": {
+  "setup:register": 8,
+  "session.create.poll": 3,
+  "setup:login": 8,
+  "setup:verify": 4,
+  "method.create": 7,
+  "setup:workspace": 9,
+  "session.create": 18,
+  "advance": 39,
+  "summary": 1,
+  "advance.poll": 4,
+  "order.review": 1,
+  "step": 4
+ },
+ "requests": 8571,
+ "reqPerSec": 11.8,
+ "expectedRefusals": {
+  "CLOSE:503": 72
+ },
+ "generator": {
+  "cpuSeconds": 23.79,
+  "peakRssMb": 112.7,
+  "eventLoopLagMs": {
+   "p50": 0.3,
+   "p95": 1.5,
+   "max": 7.5
+  }
+ },
+ "hostMaxCpu": 70.1,
+ "hostMinMemGiB": 12.89,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": false,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": false
+}

@@ -48,8 +48,18 @@
 | official 6-core, sustained 15 min, m6 config | off6sus | 60 | FAIL | jumpAcceptP95, stepAcceptP95, summaryP95 | 2.53 | 0.12% | 28 | 1.30 | 2.89 | 2.81 | 2.15 | 2.00 | 155/155 | 1.00 |
 | official 6-core, rush, m6 config | off6rush | 60 | FAIL | admissionRate | 2.18 | 2.98% | 200 | 3.62 | 1.66 | 1.65 | 1.05 | 1.03 | 60/60 | 1.00 |
 | official 6-core, 4 workers, m6 config | off6w4 | 60 | FAIL | summaryP95 | 2.32 | 0.02% | 0 | 0.95 | 2.08 | 2.15 | 1.49 | 1.27 | 60/60 | 1.00 |
+| FINAL A: 6 slots + 4 workers + DB 24 + API 16 (6-core budget) | fin1 | 60 | FAIL | jumpAcceptP95 | 2.17 | 0.06% | 0 | 1.42 | 1.59 | 1.57 | 2.08 | 1.44 | 63/63 | 1.00 |
+| FINAL B: A + pool + client + cache 64 (6-core budget) | fin2 | 75 | FAIL | admissionRate | 1.51 | 1.36% | 113 | 3.13 | 1.41 | 1.28 | 1.34 | 1.37 | 86/86 | 1.00 |
+| FINAL B: A + pool + client + cache 64 (6-core budget) | fin2 | 100 | FAIL | parity, stepAcceptP95, admissionRate | 1.81 | 6.86% | 559 | 4.69 | 1.86 | 1.90 | 1.92 | 2.47 | 113/113 | 0.98 |
+| FINAL rush | finrush | 75 | FAIL | parity, admissionRate | 1.29 | 4.57% | 164 | 2.72 | 1.07 | 0.57 | 0.59 | 0.75 | 79/79 | 0.93 |
 | burst | burst | 8 | FAIL | parity | 0.35 | 0.00% | 0 | 0.22 | - | - | - | - | 0/8 | - |
 | burst2 | burst2 | 30 | FAIL | parity | 0.69 | 0.10% | 2 | 0.62 | - | - | - | - | 23/23 | - |
+| fr | fr | 50 | FAIL | admissionRate | 0.89 | 1.67% | 99 | 0.97 | 0.38 | 0.35 | 0.26 | 0.26 | 58/58 | 1.00 |
+| fr | fr | 60 | FAIL | admissionRate | 1.02 | 2.68% | 131 | 2.04 | 0.52 | 0.30 | 0.37 | 0.35 | 69/69 | 1.00 |
+| fs60 | fs60 | 60 | PASS | - | 2.00 | 0.07% | 25 | 1.58 | 0.52 | 0.53 | 0.45 | 0.48 | 272/272 | 1.00 |
+| fs75 | fs75 | 75 | PASS | - | 2.16 | 0.90% | 338 | 2.79 | 0.85 | 0.96 | 1.19 | 0.84 | 308/308 | 1.00 |
+| fs82 | fs82 | 82 | FAIL | admissionRate | 2.10 | 2.29% | 843 | 3.97 | 1.07 | 1.00 | 1.13 | 1.43 | 309/309 | 1.00 |
+| fs90 | fs90 | 90 | FAIL | admissionRate | 2.19 | 3.72% | 1440 | 4.18 | 1.16 | 0.93 | 1.59 | 1.79 | 333/333 | 1.00 |
 | lad | lad | 1 | PASS | - | 0.18 | 0.00% | 0 | 0.26 | - | - | - | - | 1/1 | - |
 | lad | lad | 2 | PASS | - | 0.30 | 0.00% | 0 | 0.20 | - | - | - | - | 3/3 | - |
 | lad | lad | 4 | PASS | - | 0.34 | 0.00% | 0 | 0.20 | - | - | - | - | 6/6 | - |

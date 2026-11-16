@@ -1,0 +1,252 @@
+{
+ "scriptSeconds": {
+  "p50": 297.5,
+  "p95": 649.9,
+  "max": 737.1
+ },
+ "pgConnectionsMax": 37,
+ "admissionConfig": {
+  "dbBudget": 24,
+  "apiActive": 16,
+  "apiWait": 32,
+  "clientOpt": true,
+  "fixtureCache": 64,
+  "dbPool": true
+ },
+ "clientRecoveriesDetail": {
+  "advance.poll": 5,
+  "session.create.poll": 5,
+  "order.review": 2,
+  "setup:register": 1,
+  "method.create": 4,
+  "session.create": 27,
+  "setup:login": 3,
+  "view": 3,
+  "step": 432,
+  "advance": 45,
+  "step.poll": 2,
+  "summary": 3,
+  "play": 23,
+  "jump": 7,
+  "cancel": 1,
+  "play.poll": 1
+ },
+ "resultShapes": {
+  "session.create": [
+   "artifact",
+   "eventWindowStart",
+   "events",
+   "label",
+   "metadata",
+   "method",
+   "quote",
+   "schemaVersion",
+   "state"
+  ],
+  "advance": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "step": [
+   "artifact",
+   "commandHash",
+   "commandId",
+   "durable",
+   "events",
+   "model",
+   "replay",
+   "schemaVersion",
+   "state"
+  ],
+  "jump": [
+   "advances",
+   "artifact",
+   "events",
+   "processedGroups",
+   "requestId",
+   "schemaVersion",
+   "sessionId",
+   "status",
+   "throughNs",
+   "view"
+  ],
+  "play": [
+   "artifact",
+   "balance",
+   "chunks",
+   "ended",
+   "more",
+   "nextGroupIndex",
+   "revision",
+   "runId",
+   "schemaVersion",
+   "segment",
+   "sessionId",
+   "targetNs"
+  ]
+ },
+ "summariesSaved": 8841,
+ "directSlotsConfigured": 6,
+ "directSlotUtilisation": 0.219,
+ "directSlotWaitMs": {
+  "p50": 0.555,
+  "p95": 7.106,
+  "p99": 25.693,
+  "max": 289.0
+ },
+ "directRequests": 15450,
+ "journeySuccessRate": 1.0,
+ "connectionRetries": {},
+ "latencyP50P95P99": {
+  "summary": [
+   0.3344,
+   1.0729,
+   1.4671
+  ],
+  "journal": [
+   0.3218,
+   0.9994,
+   1.3344
+  ],
+  "analytics": [
+   0.3385,
+   1.1961,
+   1.7122
+  ],
+  "view": [
+   0.3271,
+   1.0123,
+   1.5509
+  ],
+  "jump": [
+   0.2353,
+   1.126,
+   1.7718
+  ],
+  "step": [
+   0.3279,
+   1.4345,
+   3.4358
+  ],
+  "order.confirm": [
+   0.3727,
+   1.1056,
+   1.561
+  ],
+  "close": [
+   0.3796,
+   1.0014,
+   1.4659
+  ],
+  "export.csv": [
+   0.4742,
+   1.4778,
+   1.4994
+  ]
+ },
+ "name": "fs82-n82",
+ "traders": 82,
+ "wall": 1379.1,
+ "scripts": 309,
+ "parityEqual": 309,
+ "parityBad": [],
+ "errors": [],
+ "sutCpuCores": 2.1,
+ "sutNetCores": 1.89,
+ "throttled": 0,
+ "sutPeakMb": 1804,
+ "byComponent": {
+  "apiAndOther": 1027.0,
+  "postgresql": 378.7,
+  "financialWorker": 1237.8
+ },
+ "p95": {
+  "journal": 0.9994,
+  "analytics": 1.1961,
+  "jump": 1.126,
+  "step": 1.4345,
+  "summary": 1.0729,
+  "view": 1.0123,
+  "export.csv": 1.4778,
+  "step.complete": 4.4148,
+  "play.complete": 9.7653,
+  "order.confirm": 1.1056,
+  "close": 1.0014
+ },
+ "queue": {
+  "maxQueued": 16,
+  "maxAge": 7.1,
+  "wait": {
+   "n": 3942,
+   "p50": 0.404,
+   "p95": 3.967,
+   "p99": 5.265,
+   "max": 7.34
+  },
+  "states": {
+   "SUCCEEDED": 3942
+  }
+ },
+ "admissionRefusals": {
+  "SERVICE_BUSY:apiAdmission": 42,
+  "setup:SERVICE_BUSY": 4,
+  "QUEUE_CAPACITY": 843
+ },
+ "recoveries": {
+  "advance.poll": 5,
+  "session.create.poll": 5,
+  "order.review": 2,
+  "setup:register": 1,
+  "method.create": 4,
+  "session.create": 27,
+  "setup:login": 3,
+  "view": 3,
+  "step": 432,
+  "advance": 45,
+  "step.poll": 2,
+  "summary": 3,
+  "play": 23,
+  "jump": 7,
+  "cancel": 1,
+  "play.poll": 1
+ },
+ "requests": 38885,
+ "reqPerSec": 28.2,
+ "expectedRefusals": {
+  "CLOSE:503": 432
+ },
+ "generator": {
+  "cpuSeconds": 111.44,
+  "peakRssMb": 118.9,
+  "eventLoopLagMs": {
+   "p50": 0.6,
+   "p95": 1.9,
+   "max": 74.5
+  }
+ },
+ "hostMaxCpu": 79.1,
+ "hostMinMemGiB": 12.63,
+ "stoppedByGate": null,
+ "checks": {
+  "parity": true,
+  "journalP95": true,
+  "analyticsP95": true,
+  "jumpAcceptP95": true,
+  "stepAcceptP95": true,
+  "summaryP95": true,
+  "queueWaitP95": true,
+  "generatorLag": true,
+  "generatorCpu": true,
+  "admissionRate": false,
+  "noGate": true,
+  "queueFence": true
+ },
+ "PASS": false
+}
