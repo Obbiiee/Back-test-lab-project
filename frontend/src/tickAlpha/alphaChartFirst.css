@@ -1,0 +1,272 @@
+/* RIKSORA chart-first workspace. SOLE OWNER of the geometry of an open Session workspace
+   (.tick-alpha.is-session): viewport-height column, chart takes all remaining space, every
+   other band has a fixed small height. Older files keep colours/typography only; their
+   competing sizes for .alpha-workspace / .alpha-chart-body / .alpha-chart-host /
+   .alpha-replay-controls / .alpha-terminal / wide-mode were removed, not overridden.
+   Heights come from the real container (flex), never from a fixed plot pixel size.
+   Phone (<=760px) geometry is owned by alphaPhone.css. */
+
+.tick-alpha.is-session{--cf-line:var(--lab-border,#2a3342);--cf-strip:34px}
+.tick-alpha.is-session .alpha-chart-host .chart-wrap{position:absolute;inset:0}
+.tick-alpha.is-session .alpha-chart-host .chart-canvas-layer{inset:0}
+.tick-alpha.is-session .alpha-chart-host .chart-tools{position:absolute;top:6px;left:8px;right:auto;z-index:6;gap:4px;max-height:none;overflow:visible;background:transparent;pointer-events:none}
+.tick-alpha.is-session .alpha-chart-host .chart-tools>*{pointer-events:auto}
+.tick-alpha.is-session .alpha-chart-host .chart-tools button{min-height:26px;padding:2px 8px;font-size:11px;border-radius:5px;background:color-mix(in srgb,var(--lab-surface-workspace,#10151d) 82%,transparent)}
+
+@media (min-width:761px){
+  .tick-alpha.is-session{height:100dvh;max-height:100dvh;overflow:hidden;display:flex;flex-direction:column;gap:0;padding:0;box-sizing:border-box}
+  .tick-alpha.is-session>*{margin:0;flex:none;min-width:0;box-sizing:border-box}
+
+  /* Top bar: brand + navigation in one 40px row; Session facts in a 28px row. */
+  .tick-alpha.is-session>header{display:flex;flex-wrap:nowrap;align-items:center;gap:10px;min-height:40px;padding:0 10px;border:0;border-bottom:1px solid var(--cf-line);border-radius:0}
+  .tick-alpha.is-session>header nav{display:flex;flex-wrap:nowrap;gap:2px}
+  .tick-alpha.is-session>header nav a{min-height:30px;padding:0 10px;display:inline-flex;align-items:center;border-radius:6px}
+  .tick-alpha.is-session .alpha-workspace-brand{gap:8px;flex-wrap:nowrap}
+  .tick-alpha.is-session .alpha-workspace-brand .alpha-badge{display:none}
+  .tick-alpha.is-session .alpha-session-menu summary{min-height:30px;display:inline-flex;align-items:center;padding:0 10px}
+  .tick-alpha.is-session>.alpha-session{display:flex;align-items:center;gap:12px;min-height:28px;padding:0 10px;overflow:hidden;white-space:nowrap;font-size:12px;border-bottom:1px solid var(--cf-line)}
+  .tick-alpha.is-session>.alpha-session>*{margin:0;min-width:0;text-overflow:ellipsis}
+  .tick-alpha.is-session>.alpha-session h1{font-size:13px;font-weight:600;flex:none;max-width:22ch;overflow:hidden}
+  .tick-alpha.is-session>.alpha-session>p:last-child{margin-left:auto}
+
+  /* Chart workspace: fills everything between the Session row and the order bar. */
+  .tick-alpha.is-session>.alpha-workspace{flex:1 1 0;min-height:200px;display:flex;align-items:stretch;gap:0;position:relative;overflow:hidden}
+  .tick-alpha.is-session .alpha-chart-workspace{flex:1 1 0;min-width:0;min-height:0;width:auto;display:flex;flex-direction:column;gap:0;border:0;border-radius:0;background:transparent;padding:0}
+  .tick-alpha.is-session .alpha-chart-header{flex:none;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;min-height:var(--cf-strip);padding:0 8px;border-block:0;border-bottom:1px solid var(--cf-line);overflow:visible}
+  .tick-alpha.is-session .alpha-chart-header>*{flex:none}
+  .tick-alpha.is-session .alpha-chart-header button{min-height:26px;padding:2px 8px;font-size:12px}
+  .tick-alpha.is-session .alpha-chart-header .alpha-inline-check{display:inline-flex;flex-direction:row;align-items:center;gap:4px;margin:0;font-size:12px}
+  .tick-alpha.is-session .alpha-chart-header .alpha-inline-check input{min-height:0;width:14px;height:14px;padding:0}
+  .tick-alpha.is-session .alpha-chart-header .alpha-focus-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:5px}
+  .tick-alpha.is-session .alpha-tf-buttons{display:inline-flex;gap:2px}
+  .tick-alpha.is-session .alpha-tf-buttons button[aria-pressed=true]{background:var(--lab-selected,#17335c);color:var(--lab-accent,#8fc2ff);border-color:var(--lab-border,#2a3342)}
+  .tick-alpha.is-session .alpha-tf-select{display:none}
+  .tick-alpha.is-session .alpha-chart-note{flex:none;margin:0;padding:2px 10px}
+
+  .tick-alpha.is-session .alpha-chart-body{flex:1 1 0;min-height:0;display:flex;flex-direction:row;position:relative;overflow:visible;border:0;border-radius:0;gap:0}
+  .tick-alpha.is-session .alpha-draw-toggle{display:none}
+  .tick-alpha.is-session .alpha-drawing-tools{flex:none;width:40px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;overflow:visible;border:0;border-right:1px solid var(--cf-line);border-radius:0}
+  .tick-alpha.is-session .alpha-drawing-tools button,.tick-alpha.is-session .alpha-drawing-group summary{width:34px;height:34px;min-height:34px;padding:0;display:grid;place-items:center;border-radius:6px}
+  .tick-alpha.is-session .alpha-chart-host{flex:1 1 0;min-width:0;min-height:0;height:auto;position:relative;overflow:hidden;border:0;border-radius:0}
+  .tick-alpha.is-session .alpha-object-panel{flex:none;width:240px;overflow:auto;border-left:1px solid var(--cf-line)}
+
+  /* Replay bar: one docked strip under the plot (never over it). */
+  .tick-alpha.is-session .alpha-replay-controls{flex:none;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;min-height:var(--cf-strip);padding:2px 8px;margin:0;width:auto;max-width:none;overflow:visible;border:0;border-top:1px solid var(--cf-line);border-radius:0;box-shadow:none;transform:none;translate:none;background:transparent}
+  .tick-alpha.is-session .alpha-replay-controls>*{flex:none}
+  .tick-alpha.is-session .alpha-replay-controls button,.tick-alpha.is-session .alpha-replay-controls select{min-height:26px;padding:2px 10px;font-size:12px;box-shadow:none}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-play{display:inline-flex;align-items:center;gap:6px;min-width:76px;justify-content:center}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-speed{display:inline-flex;flex-direction:row;align-items:center;gap:4px;margin:0;font-size:12px}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;background:transparent;padding:0 4px;border-radius:0;color:var(--lab-text-secondary,#9fb0c6)}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek{position:relative}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>summary{min-height:26px;display:inline-flex;align-items:center;padding:0 8px;cursor:pointer;font-size:12px}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div,.tick-alpha.is-session .alpha-info-pop>div{position:absolute;z-index:40;bottom:calc(100% + 6px);top:auto;left:0;width:260px;padding:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;background:var(--lp-panel,#0c2655);color:var(--lp-ice,#d9eafe);box-shadow:0 8px 24px #0006}
+  .tick-alpha.is-session .alpha-info-pop{position:relative}
+  .tick-alpha.is-session .alpha-info-pop>summary{min-height:26px;min-width:26px;display:inline-grid;place-items:center;border:1px solid var(--cf-line);border-radius:50%;cursor:pointer;font:700 12px/1 serif;list-style:none}
+  .tick-alpha.is-session .alpha-info-pop>div{top:calc(100% + 6px);bottom:auto;left:auto;right:0;width:min(360px,80vw);font-size:12px}
+  .tick-alpha.is-session .alpha-info-pop>div p{margin:0}
+
+  /* Right tool rail, order bar, terminal, status line. */
+  .tick-alpha.is-session .alpha-workspace>.alpha-action-rail{position:static;flex:none;width:40px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border:0;border-left:1px solid var(--cf-line);border-radius:0;box-shadow:none;background:transparent}
+  .tick-alpha.is-session .alpha-action-rail button{width:34px;min-height:34px;padding:0;display:grid;place-items:center;border:0;border-radius:6px;box-shadow:none}
+  .tick-alpha.is-session .alpha-action-rail span{display:none}
+  .tick-alpha.is-session>.alpha-order-bar{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-height:44px;padding:4px 10px;border:0;border-top:1px solid var(--cf-line);border-radius:0;overflow:hidden}
+  .tick-alpha.is-session .alpha-order-bar .alpha-quick-side{min-height:34px;min-width:112px;padding:0 14px;box-shadow:none}
+  .tick-alpha.is-session .alpha-order-bar>button:not(.alpha-quick-side){min-height:34px;padding:0 16px;box-shadow:none}
+  .tick-alpha.is-session .alpha-order-bar>span{margin-left:auto;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tick-alpha.is-session>.alpha-terminal{margin:0;border-radius:0;border-inline:0;border-bottom:0;overflow:auto;max-height:calc(100dvh - 160px)}
+  .tick-alpha.is-session>footer{min-height:24px;padding:2px 10px;border:0;border-top:1px solid var(--cf-line);border-radius:0;font-size:12px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tick-alpha.is-session .alpha-phone-bar{display:none}
+}
+@media (min-width:761px) and (max-width:1100px) and (min-height:521px){
+  .tick-alpha.is-session .alpha-chart-header{flex-wrap:wrap;padding-block:2px}
+  .tick-alpha.is-session .alpha-replay-controls{flex-wrap:wrap}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{flex-basis:100%;order:9}
+}
+@media (min-width:761px) and (max-height:520px){
+  /* Short landscape (phones on their side): drop the Session row and idle status line. */
+  .tick-alpha.is-session{--cf-strip:30px}
+  .tick-alpha.is-session>.alpha-session,.tick-alpha.is-session>footer:not(.has-notice){display:none}
+  .tick-alpha.is-session>header{min-height:32px}
+  .tick-alpha.is-session>header nav a,.tick-alpha.is-session .alpha-session-menu summary{min-height:26px}
+  .tick-alpha.is-session>.alpha-order-bar{min-height:38px;padding-block:2px}
+  .tick-alpha.is-session .alpha-order-bar .alpha-quick-side,.tick-alpha.is-session .alpha-order-bar>button:not(.alpha-quick-side){min-height:30px}
+  .tick-alpha.is-session>.alpha-workspace{min-height:120px}
+}
+/* Short viewports: the terminal becomes an overlay sheet so the plot keeps the whole column. */
+@media (max-height:520px){
+  .tick-alpha.is-session{padding-bottom:24px}
+  .tick-alpha.is-session>.alpha-terminal{position:fixed;left:0;right:0;bottom:0;z-index:35;max-height:calc(100dvh - 40px)}
+}
+@media (pointer:coarse) and (min-width:761px){
+  .tick-alpha.is-session .alpha-chart-header button,.tick-alpha.is-session .alpha-replay-controls button,.tick-alpha.is-session .alpha-replay-controls select{min-height:32px}
+  .tick-alpha.is-session .alpha-drawing-tools button,.tick-alpha.is-session .alpha-drawing-group summary,.tick-alpha.is-session .alpha-action-rail button{min-height:38px;height:38px;width:36px}
+}
+
+/* Tablet/desktop accessibility: visible focus and 24px minimum targets for dense strips. */
+.tick-alpha.is-session :focus-visible{outline:2px solid var(--lab-accent,#5aa2ff);outline-offset:1px}
+.tick-alpha.is-session .alpha-replay-continue{background:var(--rk-blue-strong,#1378f5);color:#fff}
+.tick-alpha.is-session .alpha-replay-cancel{border-color:var(--rk-coral,#f06474);color:var(--rk-coral,#f06474)}
+.alpha-pair-search{margin:0 0 8px}
+@media (prefers-reduced-motion:reduce){.tick-alpha.is-session *{scroll-behavior:auto}}
+
+/* ---- Phone (<=760px): same column model as desktop. The first screen is the whole
+   workspace: compact header, one toolbar row, the chart, one replay row, Sell/Buy, and the
+   collapsed terminal; the fixed session bar sits below. Touch targets stay >=40px. ---- */
+@media (max-width:760px){
+  .tick-alpha.is-session{height:100dvh;max-height:100dvh;overflow:hidden;display:flex;flex-direction:column;gap:0;box-sizing:border-box;padding-top:env(safe-area-inset-top)}
+  .tick-alpha.is-session>*{flex:none;min-width:0;box-sizing:border-box}
+  .tick-alpha.is-session>header{display:flex;flex-wrap:nowrap;align-items:center;padding:4px 10px;min-height:44px}
+  .tick-alpha.is-session>.alpha-session{padding:0 10px 4px;gap:8px;flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+  .tick-alpha.is-session>.alpha-session>p{font-size:11px;overflow:hidden;text-overflow:ellipsis}
+  .tick-alpha.is-session .alpha-workspace-brand .alpha-home-brand span small,.tick-alpha.is-session .alpha-workspace-brand small{display:none}
+  .tick-alpha.is-session .alpha-pair-pill{min-height:36px}
+  .tick-alpha.is-session>.alpha-workspace{flex:1 1 0;min-height:140px;display:flex;overflow:hidden;position:relative}
+  .tick-alpha.is-session .alpha-chart-workspace{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:0;width:auto}
+  .tick-alpha.is-session .alpha-chart-header{flex:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;min-height:44px;align-items:center;scrollbar-width:none}
+  .tick-alpha.is-session .alpha-chart-header>*{flex:none}
+  .tick-alpha.is-session .alpha-chart-header .alpha-focus-toggle{margin-left:auto}
+  .tick-alpha.is-session .alpha-chart-header .alpha-focus-toggle span{display:none}
+  .tick-alpha.is-session .alpha-tf-buttons{display:none}
+  .tick-alpha.is-session .alpha-tf-select{display:inline-block}
+  .tick-alpha.is-session .alpha-info-pop>div{position:fixed;left:10px;right:10px;top:96px;bottom:auto;width:auto;padding:12px;border-radius:14px;background:#0c2655;color:#d9eafe;border:1px solid #2b4878;z-index:60}
+  .tick-alpha.is-session .alpha-info-pop>summary{min-width:40px;min-height:40px;display:inline-grid;place-items:center;border-radius:50%;list-style:none;background:#131a27}
+  .tick-alpha.is-session .alpha-chart-body{flex:1 1 0;min-height:0;position:relative}
+  .tick-alpha.is-session .alpha-chart-host{flex:1 1 0;min-width:0;min-height:0;height:auto;position:relative;overflow:hidden}
+  .tick-alpha.is-session .alpha-replay-controls{flex:none;max-width:100%;overflow-x:auto;overflow-y:hidden;margin:4px 8px;scrollbar-width:none}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{font-size:11px;white-space:nowrap;color:#52627a;padding:0 6px}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-play{display:inline-flex;align-items:center;gap:6px}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div{position:fixed;left:10px;right:10px;width:auto;bottom:calc(150px + env(safe-area-inset-bottom));z-index:60;padding:12px;display:flex;flex-direction:column;gap:8px;border-radius:14px;background:#0c2655;color:#d9eafe;border:1px solid #2b4878;box-shadow:0 8px 24px #0006}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-speed{font-size:12px;gap:4px;color:#52627a}
+  .tick-alpha.is-session>.alpha-order-bar{position:static;padding:6px 10px}
+  .tick-alpha.is-session>.alpha-order-bar .alpha-quick-side{min-height:52px}
+  .tick-alpha.is-session>.alpha-order-bar>span{display:none}
+  .tick-alpha.is-session>.alpha-terminal{margin:0;border-radius:0;max-height:58dvh;overflow:auto;background:#0b0f17;color:#dbe7f7}
+  .tick-alpha.is-session>.alpha-terminal :is(strong,td,th,span,dd,dt,summary,p,h2,h3,label){color:inherit}
+  .tick-alpha.is-session>.alpha-terminal .alpha-account span{background:#131a27}
+  .tick-alpha.is-session>.alpha-terminal .alpha-terminal-tabs button{color:#a9bddb;background:transparent}
+  .tick-alpha.is-session>.alpha-terminal .alpha-terminal-tabs [aria-pressed=true]{background:#fff;color:var(--rk-navy)}
+  .tick-alpha.is-session>.alpha-terminal .alpha-terminal-resize{background:#131a27;color:#a9bddb}
+  .tick-alpha.is-session>footer:not(.has-notice){display:none}
+}
+@media (max-width:760px) and (max-height:420px){
+  .tick-alpha.is-session>.alpha-session{display:none}
+}
+
+/* Focus: the chart fills the screen. Header, Session row, terminal and idle status line leave;
+   toolbar (with Exit focus), replay strip and order bar remain. A message (footer.has-notice)
+   still shows. Kept last so it wins over the breakpoint blocks above at equal specificity. */
+.tick-alpha.is-session.is-focus>header,.tick-alpha.is-session.is-focus>.alpha-session,.tick-alpha.is-session.is-focus>.alpha-terminal,.tick-alpha.is-session.is-focus>.alpha-phone-bar,.tick-alpha.is-session.is-focus>footer:not(.has-notice){display:none}
+.tick-alpha.is-session.is-focus{padding-bottom:env(safe-area-inset-bottom)}
+.tick-alpha.is-focus .alpha-focus-toggle{background:var(--rk-blue-strong,#1378f5);color:#fff;border-color:transparent;font-weight:700}
+@media (max-width:760px){
+  .tick-alpha.is-session.is-focus .alpha-focus-toggle{order:-1;margin-left:0;margin-right:4px}
+  .tick-alpha.is-session.is-focus .alpha-focus-toggle span{display:inline}
+}
+
+/* One popover surface for every small menu (info, Go to time, Session settings). */
+.tick-alpha.is-session .alpha-session-menu .alpha-context{background:var(--lp-panel,#0c2655);border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;color:var(--lp-ice,#d9eafe);box-shadow:0 8px 24px #0006}
+.tick-alpha.is-session .alpha-session-menu .alpha-context label{color:var(--lp-muted,#a9bddb)}
+
+/* Chart-owned popups (Indicators dialog, drawing settings) were legacy neutral grey/green. They
+   take the Alpha surfaces: dialogs = light card with blue lip (like order/journal), small panels
+   over the plot = navy popover. Scoped to .tick-alpha so the legacy workspace is untouched. */
+.tick-alpha .dialog-backdrop>.overlay-indicator-dialog{background:#f3f8ff;color:var(--rk-navy,#061a3c);border:0;border-radius:24px;box-shadow:0 8px 0 #1378f5;padding:20px}
+.tick-alpha .overlay-indicator-dialog :is(h2,h3,p,label,span,small,strong){color:inherit}
+.tick-alpha .overlay-indicator-dialog button{background:#fff;color:var(--rk-navy,#061a3c);border:2px solid var(--rk-ice,#d9eafe);border-radius:999px;font-weight:800;min-height:36px;padding:0 14px}
+.tick-alpha .overlay-indicator-dialog button:hover:not(:disabled){border-color:#9ec5fb;background:#fff}
+.tick-alpha .overlay-indicator-dialog header button{background:transparent;border:0;font-size:22px;min-height:36px}
+.tick-alpha .overlay-indicator-dialog :is(input,select){background:#fff;color:var(--rk-navy,#061a3c);border:2px solid var(--rk-ice,#d9eafe);border-radius:12px;min-height:40px;box-sizing:border-box}
+.tick-alpha .overlay-indicator-dialog form{border-top:2px solid var(--rk-ice,#d9eafe)}
+.tick-alpha .overlay-indicator-dialog form button[type=submit]{background:var(--rk-blue-strong,#1378f5);color:#fff;border-color:transparent}
+.tick-alpha .overlay-indicator-dialog [role=alert]{color:#9e2b33}
+.tick-alpha .drawing-settings{background:var(--lp-panel,#0c2655);border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;box-shadow:0 8px 24px #0006;color:var(--lp-ice,#d9eafe)}
+.tick-alpha .drawing-settings label{color:var(--lp-muted,#a9bddb)}
+.tick-alpha .drawing-settings :is(input,select){background:#0e1a33;color:#fff;border:1px solid var(--lp-line-2,#2b4878);border-radius:8px}
+.tick-alpha .drawing-settings>button[type=submit]{background:var(--rk-blue-strong,#1378f5);color:#fff;border:0;border-radius:999px}
+.tick-alpha .drawing-settings button{border-radius:999px}
+.tick-alpha .overlay-indicator-dialog>header{background:transparent;color:inherit;padding:0;border:0;border-radius:0;min-height:0}
+/* Drawing group menus: full-width labelled items (the 34px tool-button size above is for rail icons only). */
+.tick-alpha.is-session .alpha-drawing-group>div{width:190px;max-width:calc(100vw - 60px)}
+.tick-alpha.is-session .alpha-drawing-group>div button{display:block;width:100%;height:auto;min-height:38px;padding:0 12px;text-align:left;white-space:nowrap}
+/* Objects panel: same navy surface as the tool rail and toolbar. */
+.tick-alpha.is-session .alpha-object-panel{background:var(--lp-panel,#0c2655);color:var(--lp-ice,#d9eafe);border-left:1px solid var(--lp-line-2,#2b4878);padding:10px}
+.tick-alpha.is-session .alpha-object-panel h2{font-size:14px;margin:0 0 6px;color:#fff}
+.tick-alpha.is-session .alpha-object-panel p{font-size:12px;margin:0 0 8px;color:var(--lp-muted,#a9bddb)}
+.tick-alpha.is-session .alpha-object-panel>div{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--lp-line,#1d3560)}
+.tick-alpha.is-session .alpha-object-panel button{min-height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--lp-line-2,#2b4878);background:#0e1a33;color:#fff;font-size:12px;font-weight:700;text-transform:capitalize}
+.tick-alpha.is-session .alpha-object-panel>div>button:first-child{flex:1 1 100%;text-align:left}
+/* Floating drawing controls (undo/redo/Lock/Hide) follow the same navy popover surface. */
+.tick-alpha .primitive-drawing-controls{background:var(--lp-panel,#0c2655);border:1px solid var(--lp-line-2,#2b4878);border-radius:14px;box-shadow:0 8px 24px #0006}
+.tick-alpha .primitive-drawing-controls button{background:#0e1a33;color:#fff;border:1px solid var(--lp-line-2,#2b4878);border-radius:999px}
+.tick-alpha .primitive-drawing-controls button:hover:not(:disabled){background:#12305e}
+@media (max-width:760px){
+  .tick-alpha .dialog-backdrop>.overlay-indicator-dialog{width:100%;max-width:none;box-sizing:border-box;border-radius:24px 24px 0 0;box-shadow:0 -4px 0 #1378f5;padding-bottom:calc(20px + env(safe-area-inset-bottom));max-height:80dvh}
+}
+@media (max-width:760px){
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div button{background:var(--rk-blue-strong,#1378f5);color:#fff;border:0;border-radius:999px;min-height:44px}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div :is(input,label){width:100%;box-sizing:border-box;color:#d9eafe}
+  .tick-alpha.is-session .alpha-replay-controls .alpha-seek>div input{background:#0e1a33;border:1px solid #2b4878;color:#fff}
+}
+
+/* ---- Legend, Session statistics, trade toast, shortcuts (display only) ---- */
+.tick-alpha .alpha-legend{position:absolute;top:36px;left:8px;z-index:5;display:flex;flex-direction:column;gap:2px;pointer-events:none;font:500 11px/1.3 var(--rk-font-data,ui-monospace,monospace);color:#a9bddb;text-shadow:0 1px 2px #000}
+.tick-alpha .alpha-legend i{font-style:normal;color:#6b7a90;margin:0 3px 0 8px}
+.tick-alpha .alpha-legend i:first-child{margin-left:0}
+.tick-alpha .alpha-legend-ohlc.is-up{color:#22c99a}
+.tick-alpha .alpha-legend-ohlc.is-down{color:#f06474}
+.tick-alpha .alpha-legend-ohlc em{font-style:normal;margin-left:8px;padding:0 6px;border-radius:999px;background:#1d3560;color:#d9eafe;font-size:10px}
+.tick-alpha .alpha-legend-quote{color:#d9eafe}
+.tick-alpha .alpha-session-stats{display:flex;gap:6px;margin:0 0 0 auto;font-size:12px}
+.tick-alpha .alpha-session-stats span{padding:1px 9px;border-radius:999px;background:#12305e;color:#a9bddb;white-space:nowrap}
+.tick-alpha .alpha-session-stats strong{color:#fff;font-family:var(--rk-font-data,ui-monospace,monospace)}
+.tick-alpha.is-session>.alpha-session>.alpha-session-stats+p,.tick-alpha.is-session>.alpha-session>p:last-child{margin-left:0}
+.tick-alpha .alpha-shortcuts kbd{padding:0 5px;border:1px solid var(--lp-line-2,#2b4878);border-bottom-width:2px;border-radius:5px;background:#0e1a33;font:600 11px var(--rk-font-data,ui-monospace,monospace);color:#fff}
+.alpha-toast{position:fixed;right:56px;bottom:146px;z-index:36;width:min(320px,calc(100vw - 80px));box-sizing:border-box;display:grid;gap:2px;padding:10px 38px 10px 14px;border-radius:14px;border:1px solid #2b4878;border-left:5px solid #1378f5;background:#0c2655;color:#d9eafe;box-shadow:0 10px 28px #0008;animation:alpha-toast-in .22s ease-out}
+.alpha-toast strong{color:#fff;font-size:13px}
+.alpha-toast span{font:600 15px var(--rk-font-data,ui-monospace,monospace);color:#fff}
+.alpha-toast small{font-size:11px;color:#a9bddb}
+.alpha-toast.is-win{border-left-color:#22c99a}.alpha-toast.is-win .alpha-toast-net{color:#22c99a}
+.alpha-toast.is-loss{border-left-color:#f06474}.alpha-toast.is-loss .alpha-toast-net{color:#f06474}
+.alpha-toast.is-flat{border-left-color:#a9bddb}
+.alpha-toast button{position:absolute;top:6px;right:6px;width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bddb;font-size:18px;line-height:1;cursor:pointer}
+.alpha-toast button:hover{background:#12305e;color:#fff}
+@keyframes alpha-toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.alpha-toast{animation:none}}
+@media (max-width:760px){
+  .tick-alpha .alpha-legend{top:8px;left:72px;font-size:10px}
+  .tick-alpha .alpha-session-stats{display:none}
+  .alpha-toast{left:10px;right:10px;width:auto;bottom:calc(236px + env(safe-area-inset-bottom))}
+}
+
+/* ---- Replay scrubber: lives inside the replay strip (no extra row, no plot height lost) ---- */
+.tick-alpha .alpha-scrub{position:relative;flex:1 1 auto;min-width:0;width:100%}
+.tick-alpha .alpha-scrub-row{display:none}
+.tick-alpha.is-session .alpha-replay-controls>.alpha-scrub-inline{flex:1 1 220px;min-width:140px;display:flex;align-self:center}
+.tick-alpha .alpha-scrub-track{position:relative;height:26px;cursor:pointer;touch-action:none;border-radius:6px;-webkit-tap-highlight-color:transparent}
+.tick-alpha .alpha-scrub-track::before{content:"";position:absolute;left:0;right:0;top:11px;height:4px;border-radius:2px;background:#1d3560}
+.tick-alpha .alpha-scrub-revealed{position:absolute;left:0;top:11px;height:4px;border-radius:2px;background:var(--lp-blue,#0f67d8)}
+.tick-alpha .alpha-scrub-pending{position:absolute;top:11px;height:4px;background:repeating-linear-gradient(45deg,#ffce55 0 4px,transparent 4px 8px)}
+.tick-alpha .alpha-scrub-thumb{position:absolute;top:6px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:3px solid var(--lp-blue,#0f67d8);box-sizing:border-box;box-shadow:0 1px 4px #0008}
+.tick-alpha .alpha-scrub-track:hover .alpha-scrub-thumb,.tick-alpha .alpha-scrub-track:focus-visible .alpha-scrub-thumb{transform:scale(1.15)}
+.tick-alpha .alpha-scrub-ghost{position:absolute;top:3px;width:2px;height:20px;margin-left:-1px;background:#d9eafe;pointer-events:none}
+.tick-alpha .alpha-scrub-ghost.is-future{background:#ffce55}
+.tick-alpha .alpha-scrub-ghost em{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);padding:1px 7px;border-radius:999px;background:#0c2655;border:1px solid #2b4878;color:#fff;font:600 10px var(--rk-font-data,ui-monospace,monospace);white-space:nowrap}
+.tick-alpha .alpha-scrub-confirm{position:absolute;right:0;bottom:calc(100% + 8px);z-index:41;display:flex;align-items:center;gap:6px;padding:6px 8px 6px 12px;border-radius:999px;border:1px solid #2b4878;background:#0c2655;color:#d9eafe;font-size:12px;white-space:nowrap;box-shadow:0 8px 24px #0006}
+.tick-alpha .alpha-scrub-confirm strong{color:#fff;font-family:var(--rk-font-data,ui-monospace,monospace)}
+.tick-alpha .alpha-scrub-confirm button{min-height:26px;padding:0 12px;border-radius:999px;border:1px solid #2b4878;background:#0e1a33;color:#fff;font-weight:700;cursor:pointer}
+.tick-alpha .alpha-scrub-confirm .alpha-scrub-go{background:var(--rk-blue-strong,#1378f5);border-color:transparent}
+.tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{flex:0 1 auto;max-width:38%}
+@media (max-width:760px){
+  .tick-alpha.is-session .alpha-replay-controls>.alpha-scrub-inline{display:none}
+  .tick-alpha.is-session .alpha-scrub-row{display:block;flex:none;margin:0 14px 4px}
+  .tick-alpha .alpha-scrub-track{height:36px}
+  .tick-alpha .alpha-scrub-track::before,.tick-alpha .alpha-scrub-revealed,.tick-alpha .alpha-scrub-pending{top:16px}
+  .tick-alpha .alpha-scrub-thumb{top:8px;width:20px;height:20px;margin-left:-10px}
+  .tick-alpha .alpha-scrub-ghost{top:4px;height:28px}
+  .tick-alpha .alpha-scrub-ghost em{display:none}
+  .tick-alpha .alpha-scrub-confirm{position:fixed;left:10px;right:10px;bottom:calc(150px + env(safe-area-inset-bottom));justify-content:space-between;border-radius:16px;padding:10px 12px}
+  .tick-alpha .alpha-scrub-confirm button{min-height:44px;padding:0 18px}
+}
+@media (min-width:761px) and (max-width:1100px) and (min-height:521px){
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{max-width:none}
+}

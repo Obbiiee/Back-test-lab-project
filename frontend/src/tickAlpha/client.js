@@ -93,6 +93,8 @@ export async function loadResearchContext(selected,{active=()=>true,timeframe='1
 export function noticeText(message){
   const explanations={
     REFUSED_HISTORICAL_PERIOD:'Choose a month with observations in the configured source year. Unavailable months have no fallback feed.',
+    ADVANCE_IN_PROGRESS:'A previous replay request has not finished. Use Continue saved replay or reload the Session; the target must be finished before a different one.',
+    BACKWARD_ADVANCE:'Replay moves forward only. Create a separate Session to replay an earlier time.',
     REFUSED_REWIND_REQUIRES_FORK:'This Session already has financial history. Create a separate Session to replay an earlier time.',
     REFUSED_STALE_REVISION:'The saved Session changed. Reload it and review the action again.',
     REFUSED_STALE_NOTE:'Another edit changed this note. Reload the journal, compare with your retained draft, then explicitly save again.',

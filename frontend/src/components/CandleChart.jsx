@@ -21,7 +21,7 @@ import { NewsMarkerAdapter, markerGroups } from '../news/NewsMarkerAdapter.js';
 const EMPTY_TRADES = [];
 const EMPTY_INDICATORS = Object.freeze([]);
 
-function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
+function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, drawingWorkspace = 'main:XAUUSD', drawingStorageKey, volumeAvailable = true, tickEvidence, researchOnly = false, followLatest = true, onLoadOlder, position, pendingOrder, positions=EMPTY_TRADES, orders=EMPTY_TRADES, simulatedTrades=EMPTY_TRADES, onAmendOrder,onClosePosition,onCancelOrder,onTradingError,onCreateOrder, trades = EMPTY_TRADES, onPriceSelect, drawingMode, onDrawingModeChange, chartPreferences, onChartPreferencesChange, command, onDrawingStateChange, indicatorRegistry, indicatorInstances = EMPTY_INDICATORS, onIndicatorError, news }) {
   const [indicatorEngine] = useState(() => new IndicatorEngine(indicatorRegistry));
   useEffect(() => {
     try { indicatorEngine.replaceInstances(indicatorInstances); }
@@ -282,6 +282,8 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
         if (["hide", "lock"].includes(operation)) { const key = operation === "hide" ? "hidden" : "locked"; commitDrawings(current => current.map(item => item.id === id ? { ...item, [key]: !item[key] } : item)); }
         if (operation === "edit") { const object = objectBridge.objects.find(item => item.id === id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); }
       }
+      if (action.startsWith("goto:")) { const time = Number(action.slice(5)); const scale = chartRef.current?.timeScale(); const range = scale?.getVisibleLogicalRange(); if (scale && range && Number.isFinite(time) && candles.length) { let index = candles.findIndex(bar => bar.time >= time); if (index < 0) index = candles.length - 1; const half = (range.to - range.from) / 2; scale.setVisibleLogicalRange({ from: index - half, to: index + half }); } }
+      if (action === "latest") { chartRef.current?.priceScale("right").applyOptions({ autoScale: true }); chartRef.current?.timeScale().scrollToRealTime(); }
       if (action === "fit" || action === "new-layout") { chartRef.current?.priceScale("right").applyOptions({ autoScale: true, mode: 0 }); chartRef.current?.timeScale().fitContent(); }
       if (action === "percent" || action === "log") chartRef.current?.priceScale("right").applyOptions({ mode: action === "log" ? 1 : 2 });
       if (action === 'news-event' && Number.isFinite(command.time)) {
@@ -466,7 +468,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
       if (candles.length < 60) timeScale.setVisibleLogicalRange({ from: -5, to: 65 });
       else timeScale.setVisibleLogicalRange({from:Math.max(0,candles.length-240),to:candles.length+18});
     } else if (candles.length && visibleRange) {
-      if (wasFollowingLatest) {
+      if (wasFollowingLatest && followLatest) {
         timeScale.scrollToRealTime();
       } else {
         const shift = Math.max(0,prepended);
@@ -477,7 +479,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
     viewportSessionRef.current = viewportKey;
     previousCandleCountRef.current = candles.length;
     previousFirstCandleRef.current = candles[0]?.time ?? null;
-  }, [candles, viewportKey, indicatorEngine, transition, volumeAvailable]);
+  }, [candles, viewportKey, indicatorEngine, transition, volumeAvailable, followLatest]);
 
   useEffect(() => {
     const scale=chartRef.current?.timeScale();
