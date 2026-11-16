@@ -169,7 +169,7 @@ def _environment(dsn):
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
-                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', 'BTL_TICK_CHECKPOINT_FORMAT', 'BTL_SOURCE_ACCEPTANCE_DIR', 'BTL_FIXTURE_CACHE_ENTRIES', *monthly_names,
+                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', 'BTL_TICK_CHECKPOINT_FORMAT', 'BTL_SOURCE_ACCEPTANCE_DIR', 'BTL_FIXTURE_CACHE_ENTRIES', 'BTL_DB_POOL', 'BTL_DB_POOL_MAX_IDLE', *monthly_names,
                             *catalog_names, *s3_names)}
     if monthly_root is not None:
         environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
@@ -188,6 +188,7 @@ def _environment(dsn):
                 raise ContractError('INVALID_INPUT', name) from None
     cache_entries = environment.get('BTL_FIXTURE_CACHE_ENTRIES')
     require(cache_entries in (None, '') or (cache_entries.isascii() and cache_entries.isdigit() and 1 <= int(cache_entries) <= 512), 'fixtureCacheEntries', 'INVALID_INPUT')
+    require(environment.get('BTL_DB_POOL') in (None, '', '0', '1'), 'dbPool', 'INVALID_INPUT')
     environment['BTL_WORKER_DATABASE'] = dsn
     require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')
     environment['BTL_WORKER_MAX_JOBS'] = str(MAX_JOBS)

@@ -35,6 +35,38 @@ class CredentialChanged(ValueError):
 
 @asynccontextmanager
 async def connection(dsn):
+    from infrastructure import db_pool
+    if db_pool.enabled():                           # QA flag BTL_DB_POOL=1 (default off)
+        with DATABASE.claim():
+            entry = await db_pool.ASYNC.take(dsn)
+            if entry is None:
+                conn = await psycopg.AsyncConnection.connect(dsn, row_factory=dict_row, connect_timeout=5,
+                                                             options="-c statement_timeout=15000 -c lock_timeout=10000")
+                entry = db_pool._Entry(conn)
+                db_pool.ASYNC.stats['opened'] += 1
+            db = entry.conn
+            db_pool.reset_async(db)
+            try:
+                yield db
+            except BaseException:
+                try:
+                    await db.rollback()
+                except psycopg.Error:
+                    pass
+                await db_pool.ASYNC.put(dsn, entry)
+                raise
+            try:
+                if not db.closed:
+                    await db.commit()
+            except BaseException:
+                try:
+                    await db.rollback()
+                except psycopg.Error:
+                    pass
+                await db_pool.ASYNC.put(dsn, entry)
+                raise
+            await db_pool.ASYNC.put(dsn, entry)
+        return
     with DATABASE.claim():
         db = await psycopg.AsyncConnection.connect(dsn, row_factory=dict_row, connect_timeout=5,
                                                   options="-c statement_timeout=15000 -c lock_timeout=10000")

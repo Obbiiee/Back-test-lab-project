@@ -75,6 +75,11 @@ def _libpq_env(dsn):
 @contextmanager
 def connect(dsn):
     # Caller config owns TLS and credentials. Bound connect/lock/query waits.
+    from . import db_pool
+    if db_pool.enabled():                           # QA flag BTL_DB_POOL=1 (default off): reuse cleanly returned connections
+        with _connect_pooled(dsn) as db:
+            yield db
+        return
     metrics = current_qa_timing()
     admission_started = perf_counter_ns() if metrics is not None else None
     with DATABASE.claim():
@@ -89,6 +94,49 @@ def connect(dsn):
             if metrics is not None:
                 record_qa_timing("connectNs", perf_counter_ns() - connect_started)
             yield db
+
+
+@contextmanager
+def _connect_pooled(dsn):
+    """Same contract as the direct path: commit on clean exit, rollback on error; the connection is reused only if it ends IDLE and healthy."""
+    from . import db_pool
+    metrics = current_qa_timing()
+    admission_started = perf_counter_ns() if metrics is not None else None
+    with DATABASE.claim():
+        if metrics is not None:
+            record_qa_timing("admissionNs", perf_counter_ns() - admission_started)
+        connect_started = perf_counter_ns() if metrics is not None else None
+        cursor_factory = _TimedCursor if metrics is not None else psycopg.Cursor
+        entry = db_pool.SYNC.take(dsn)
+        if entry is None:
+            conn = psycopg.connect(dsn, connect_timeout=5, options="-c statement_timeout=15000 -c lock_timeout=10000")
+            entry = db_pool._Entry(conn)
+            with db_pool.SYNC.lock:
+                db_pool.SYNC.stats['opened'] += 1
+        db = entry.conn
+        db_pool.reset_sync(db, cursor_factory)
+        if metrics is not None:
+            record_qa_timing("connectNs", perf_counter_ns() - connect_started)
+        try:
+            yield db
+        except BaseException:
+            try:
+                db.rollback()
+            except psycopg.Error:
+                pass
+            db_pool.SYNC.put(dsn, entry)
+            raise
+        try:
+            if not db.closed:                       # same as psycopg's own __exit__: a connection closed inside the block is simply dropped
+                db.commit()
+        except BaseException:
+            try:
+                db.rollback()
+            except psycopg.Error:
+                pass
+            db_pool.SYNC.put(dsn, entry)
+            raise
+        db_pool.SYNC.put(dsn, entry)
 
 
 def migrate(dsn, directory=MIGRATIONS):
