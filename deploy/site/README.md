@@ -31,7 +31,7 @@ Caddy obtains the Let's Encrypt certificate automatically on the first request (
 `curl -sI https://riksora.com` returns 200 with `strict-transport-security`; `curl -sI http://riksora.com` redirects to https; `https://www.riksora.com` redirects to the apex.
 
 ## Update the site
-Rebuild (`cd frontend && npm run build:release`), copy `frontend/dist/` to `~/site/dist/` (rsync), no restart needed. Keep the previous `dist` for rollback.
+Run `deploy/site/publish.sh`: it runs the tests and lint, the release gate and the build, excludes market data (`public/market`, sample CSVs) and any private term, keeps the previous version in `~/site/dist.prev` for rollback, and needs no restart. Rollback: `rm -rf ~/site/dist && mv ~/site/dist.prev ~/site/dist`.
 
 ## Before pointing Midtrans at it
 `npm run verify:site` must report "site configuration complete" (business facts, legal approvals, payment methods, tax note). Email: the MX record of `riksora.com` points to itself, so no mailbox exists on this domain; use an existing mailbox or configure mail first.

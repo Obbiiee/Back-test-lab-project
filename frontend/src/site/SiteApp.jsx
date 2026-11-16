@@ -6,17 +6,8 @@ import {SITE} from './siteConfig.js';
 import {COPY, CLAIMS, fill} from './content.js';
 import {FREE_LIMITS, formatIdr, currentPrice, yearlySavingPercent} from './plans.js';
 
-export const PAGES = ['home', 'pricing', 'about', 'contact', 'terms', 'privacy', 'refund', 'account'];
+import {siteLang, sitePage} from './siteRoute.js';
 const preview = SITE.launchState !== 'live';
-
-export function siteLang(search) {
-  const value = new URLSearchParams(search).get('lang');
-  return value === 'en' ? 'en' : 'id';
-}
-export function sitePage(search) {
-  const value = new URLSearchParams(search).get('page');
-  return PAGES.includes(value) ? value : 'home';
-}
 const href = (page, lang) => (page === 'home' ? '/' : `/?page=${page}`) + (lang === 'en' ? (page === 'home' ? '?lang=en' : '&lang=en') : '');
 const account = '/?page=account';
 const entry = (lang) => (preview ? href('contact', lang) : account);
@@ -134,7 +125,7 @@ function Home({t, lang}) {
 
 function Pricing({t}) {
   const methods = SITE.payment.methods;
-  return <section className="site-page" aria-labelledby="pr-h">
+  return <section className="site-page site-page-wide" aria-labelledby="pr-h">
     <h1 id="pr-h">{t.pricing.title}</h1><p className="site-lead">{t.pricing.lead}</p>
     <PlanCards t={t}/>
     <h2>{t.pricing.rulesTitle}</h2>

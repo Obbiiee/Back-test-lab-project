@@ -79,5 +79,11 @@ Deliberately **not** claimed on the site: licensed real market data, a number of
 5. Wire the sandbox checkout end to end, test pay/fail/expire/duplicate notification, then request production activation.
 6. The in-app plan panel is built (gap 4); verify it in a real browser with the sandbox keys during step 5.
 
-## 8. Verification run for this change
-See the commit that adds this file: `npm run test:site` and the existing `test:tick-alpha` / `test:tick-review` pass; `verify:site` correctly reports 15 missing items and `build:release` refuses; lint, production build and real-browser screenshots are recorded in section 9 when run.
+## 8. Verification run (2026-11-16)
+- **Tests:** `npm run test:site` (evidence files exist, no profit or get-rich phrases, language parity, Free limits equal backend, Rupiah formatting, routing, owner name absent), `test:account-plan` (redirect allow-list, entitlement summary, Rupiah offer), and the existing `test:tick-alpha` and `test:tick-review` all pass. `npm run lint` is clean (the vendored Chromium under `tests/browser-tools` is now excluded from lint).
+- **Release gate:** `npm run build:release` and `deploy/site/publish.sh` correctly REFUSE while the three legal-approval dates are missing (verified by running them).
+- **Real browser (Chromium headless shell, Playwright):** 10 pages x desktop (1280) and mobile (390), Indonesian and English, served under a non-local hostname so the hosted entry route is exercised: **20/20 render with no console errors, no failed requests, no horizontal overflow, and no unresolved "[diisi pemilik]" placeholders**. Two layout defects found and fixed (three plan cards wrapped on desktop; section headings misaligned in the white sections).
+- **Publish safety found by this audit:** `frontend/public/market/xauusd-history.json` (2.3 MB) and `public/sample_XAUUSD_1h.csv` are copied into every build; `deploy/site/publish.sh` excludes them and refuses to publish them (data rights are UNKNOWN), and refuses any file containing a private term from `~/.config/riksora-private-terms.txt` (kept outside the repository).
+- **Live infrastructure:** `https://riksora.com` serves a neutral holding page over HTTPS (Let's Encrypt, valid to 2027-02-14), `www` redirects, `/api/*` answers 404; reachability confirmed from the owner's own network (`Test-NetConnection ... 443 True`).
+- **Not verified:** a real-browser run of the account plan panel against a Midtrans sandbox (needs the owner's sandbox keys); the full site on the live domain (waits for the owner's approval of the legal texts).
+

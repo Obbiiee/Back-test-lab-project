@@ -5,15 +5,16 @@ import {isPaymentRedirect,planOffer,planSummary} from './accountPlan.js';
 // this component only displays it and opens the hosted payment page returned by the server.
 export default function AccountPlan({client,workspace,billingConfigured}){
   const [status,setStatus]=useState(null),[offer,setOffer]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const workspaceId=workspace?.id;
   useEffect(()=>{
-    if(!workspace)return undefined;
+    if(!workspaceId)return undefined;
     let live=true;
     (async()=>{
-      try{const value=await client.request(`/api/v1/workspaces/${workspace.id}/research/entitlements`);if(live)setStatus(planSummary(value));}catch{if(live)setStatus({known:false});}
+      try{const value=await client.request(`/api/v1/workspaces/${workspaceId}/research/entitlements`);if(live)setStatus(planSummary(value));}catch{if(live)setStatus({known:false});}
       if(billingConfigured){try{const value=await client.request('/api/v1/billing/sandbox/plan');if(live)setOffer(planOffer(value));}catch{if(live)setOffer(null);}}
     })();
     return()=>{live=false;};
-  },[client,workspace?.id,billingConfigured]);
+  },[client,workspaceId,billingConfigured]);
   async function buy(){
     if(busy)return;
     setBusy(true);setError('');

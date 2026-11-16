@@ -60,3 +60,6 @@
 @media (prefers-reduced-motion:no-preference){.site-pill,.site-primary,.site-secondary{transition:transform .15s}.site-pill:hover,.site-primary:hover,.site-secondary:hover{transform:translateY(-1px)}}
 .site-was{color:var(--rk-muted-on-white,#4a5b75);font-size:1rem;font-weight:600}
 .site-promo{display:inline-block;background:var(--rk-yellow,#ffce55);color:var(--rk-navy,#061a3c);font-weight:800;border-radius:999px;padding:2px 12px;font-size:.85rem;margin:0 0 8px}
+.site-page-wide{max-width:1040px}
+.site-page-wide .site-plans{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.site .site-alt>*{margin-inline:auto}
