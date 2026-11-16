@@ -27,7 +27,8 @@ export function routeHref(next,href=typeof window==='undefined'?'http://localhos
   if(next.method)url.searchParams.set('method',next.method);
   if(next.family)url.searchParams.set('family',next.family);
   if(next.screen==='method'&&next.tab&&next.tab!=='overview')url.searchParams.set('tab',next.tab);
-  if(next.of)url.searchParams.set('of',next.of);
+  const selected=next.of??next.analyticsSession;
+  if(selected)url.searchParams.set('of',selected);
   return url.pathname+url.search;
 }
 

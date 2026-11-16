@@ -3,7 +3,8 @@ import {PageHead,StatePanel} from './AlphaShell.jsx';
 import {InstrumentPicker,MethodPicker,SearchableSelect} from './AlphaSelect.jsx';
 import {periodAvailability,periodChoiceOk,defaultPeriod,monthLabel,instrumentReason} from './periodAvailability.js';
 import {sourceContext} from './client.js';
-import {money,kindLabel} from './productData.js';
+import {accountTransport} from './accountClient.js';
+import {money,kindLabel,useMethodRead} from './productData.js';
 import {linkTo} from './productRoute.js';
 
 // New Session wizard (founder instruction 2026-11-06 §6E): Method → instrument →
@@ -15,7 +16,21 @@ const BALANCES=['10000','50000','100000'];
 const DECIMAL=/^\d{1,12}(\.\d{1,2})?$/;
 const PERIOD_CODES=['REFUSED_HISTORICAL_PERIOD','REFUSED_FIXTURE_PERIOD'];
 
-export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
+export default function AlphaSessionWizard(props){
+  const {catalog,route}=props;
+  const listed=catalog.methods.some(method=>method.id===route.method);
+  const [attempt,setAttempt]=useState(0);
+  const record=useMethodRead(!listed&&accountTransport()?route.method:null,attempt);
+  if(record.status==='loading')return <StatePanel kind="loading" title="Loading the saved Method…"/>;
+  if(record.status==='error')return <>
+    <PageHead back={{label:'Sessions',to:{screen:'sessions'}}} title="New Session"/>
+    <StatePanel kind="error" title="The Method could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{record.message}</p></StatePanel>
+  </>;
+  const available=record.value?{...catalog,methods:[record.value,...catalog.methods]}:catalog;
+  return <SessionWizard {...props} catalog={available}/>;
+}
+
+function SessionWizard({catalog,route,busy,error,onCreate}){
   const historical=sourceContext()==='historical';
   const [step,setStep]=useState(0);
   const [methodId,setMethodId]=useState(()=>catalog.methods.some(m=>m.id===route.method)?route.method:null);

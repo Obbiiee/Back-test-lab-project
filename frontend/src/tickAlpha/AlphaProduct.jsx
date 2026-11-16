@@ -1,8 +1,8 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {api,id,sessionPath,sourceContext,createMethodVersion,setMethodArchived,
+import {api,id,sourceContext,createMethodVersion,setMethodArchived,
   loadMethodFamily,loadMethodVersionPage} from './client.js';
-import {money,kindLabel,utc,lastSession,useSessionRead} from './productData.js';
+import {money,kindLabel,utc,lastSession,useMethodFamilyRead,useMethodRead,useSessionRead} from './productData.js';
 import {linkTo,navigate,METHOD_TABS} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
 import Segmented from './AlphaSegmented.jsx';
@@ -37,23 +37,17 @@ export function SessionTable({sessions,catalog,onOpen,caption}){
 
 function ContinueCard({catalog,onOpen}){
   const remembered=lastSession();
-  const session=catalog.sessions.find(s=>s.id===remembered);
-  const [state,setState]=useState({status:session?'loading':'none'});
-  useEffect(()=>{
-    if(!session)return;
-    let live=true;
-    api(sessionPath(session.id)).then(value=>{if(live)setState({status:'ready',value});},()=>{if(live)setState({status:'error'});});
-    return()=>{live=false;};
-  },[session]);
-  if(!session)return null;
-  const method=catalog.methods.find(m=>m.id===session.methodId);
+  const record=useSessionRead(remembered,0);
+  if(record.status!=='ready')return null;
+  const {metadata:session,method,state}=record.value;
+  const methodName=method?.name??catalog.methods.find(m=>m.id===session.methodId)?.name;
   return <section className="rk-continue" aria-labelledby="rk-continue-h">
     <div><p className="rk-eyebrow">Continue research · last opened on this device</p><h2 id="rk-continue-h">{session.name}</h2>
       <dl className="rk-facts">
-        <div><dt>Method</dt><dd>{method?.name||'Unavailable'}</dd></div>
-        <div><dt>Instrument</dt><dd>{catalog.profile.instrumentId}</dd></div>
-        <div><dt>Replay time</dt><dd className="rk-num">{state.status==='ready'?utc(state.value.state.throughNs):state.status==='loading'?'Loading…':'Unavailable'}</dd></div>
-        <div><dt>Saved revision</dt><dd className="rk-num">{state.status==='ready'?state.value.state.revision:'—'}</dd></div>
+        <div><dt>Method</dt><dd>{methodName||'Unavailable'}</dd></div>
+        <div><dt>Instrument</dt><dd>{state.profile?.instrumentId??catalog.profile.instrumentId}</dd></div>
+        <div><dt>Replay time</dt><dd className="rk-num">{utc(state.throughNs)}</dd></div>
+        <div><dt>Saved revision</dt><dd className="rk-num">{state.revision}</dd></div>
       </dl>
     </div>
     <button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(session.id)}>Resume replay</button>
@@ -77,6 +71,7 @@ export function MyMethods({catalog,onOpen}){
   const newMethod=<a className="rk-btn rk-btn-primary" {...linkTo({screen:'method-new'})}><Icon name="plus" size={18}/><span>New Method</span></a>;
   if(!catalog.methods.length)return <>
     <PageHead eyebrow="Dashboard" title="My Methods" lead="A Method is the set of rules you want to test. Every Session replays one Method on real-time-ordered history."/>
+    <ContinueCard catalog={catalog} onOpen={onOpen}/>
     <section className="rk-first-use" aria-labelledby="rk-first-h">
       <h2 id="rk-first-h">Create your first Method</h2>
       <p>Write the idea down before you replay, so the result tests the idea and not hindsight.</p>
@@ -114,7 +109,22 @@ export function MyMethods({catalog,onOpen}){
 
 const RISK=['0.5','1','2'],RR=['1.5','2','3'];
 export function MethodNew({catalog,route,onSaved}){
-  const family=catalog.methodFamilies?.find(item=>item.familyId===route.family);
+  const familyId=route.family;
+  const [attempt,setAttempt]=useState(0);
+  const hosted=Boolean(accountTransport());
+  const record=useMethodFamilyRead(hosted?familyId:null,attempt);
+  if(!familyId)return <MethodEditor catalog={catalog} onSaved={onSaved}/>;
+  const back={label:'My Methods',to:{screen:'methods'}};
+  if(record.status!=='ready'||record.value.archived)return <>
+    <PageHead back={back} title="New Method version"/>
+    {record.status==='loading'?<StatePanel kind="loading" title="Loading the Method family…"/>
+      :record.status==='error'?<StatePanel kind="error" title="The Method family could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{record.message}</p></StatePanel>
+      :<StatePanel kind="unavailable" title={record.value?.archived?'Unarchive this Method before creating a version':'Sign in to create a Method version'}/>}
+  </>;
+  return <MethodEditor key={record.value.familyId} catalog={catalog} family={record.value} onSaved={onSaved}/>;
+}
+
+function MethodEditor({catalog,family,onSaved}){
   const initial=family?.current;
   const [kind,setKind]=useState(initial?.kind||'FREE_STYLE'),[name,setName]=useState(initial?.name||''),[risk,setRisk]=useState(initial?.riskPercent||'1'),[rr,setRr]=useState(initial?.rr||'2');
   const [checklist,setChecklist]=useState(initial?.checklistOn??true),[conditions,setConditions]=useState(initial?.conditions?.map(item=>item.label)||['']);
@@ -167,7 +177,20 @@ export function MethodNew({catalog,route,onSaved}){
 }
 
 export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
-  const method=catalog.methods.find(m=>m.id===route.method);
+  const listed=catalog.methods.find(method=>method.id===route.method);
+  const [attempt,setAttempt]=useState(0);
+  const record=useMethodRead(!listed&&accountTransport()?route.method:null,attempt);
+  const method=listed??record.value;
+  const back={label:'My Methods',to:{screen:'methods'}};
+  if(!method)return <><PageHead back={back} title="Method"/>
+    {record.status==='loading'?<StatePanel kind="loading" title="Loading the saved Method…"/>
+      :record.status==='error'?<StatePanel kind="error" title="The Method could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{record.message}</p></StatePanel>
+      :<StatePanel kind="unavailable" title="Choose a Method" action={<a className="rk-btn" {...linkTo(back.to)}>My Methods</a>}/>}
+  </>;
+  return <MethodDetails key={method.id} method={method} catalog={catalog} route={route} onOpen={onOpen} onNewSession={onNewSession} onLifecycle={onLifecycle}/>;
+}
+
+function MethodDetails({method,catalog,route,onOpen,onNewSession,onLifecycle}){
   const familySummary=catalog.methodFamilies?.find(item=>item.familyId===method?.methodFamilyId||item.versions?.some(version=>version.methodId===route.method));
   const [lifecycleError,setLifecycleError]=useState('');
   const [lifecycleBusy,setLifecycleBusy]=useState(false);
@@ -182,15 +205,19 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
     return()=>{live=false;};
   },[familyId]);
   const family=familyDetail?.familyId===familyId?familyDetail:familySummary;
-  if(!method)return <><PageHead back={{label:'My Methods',to:{screen:'methods'}}} title="Method unavailable"/><StatePanel kind="unavailable" title="This Method is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Back to My Methods</a>}><p>It may belong to another workspace or account. Nothing was changed.</p></StatePanel></>;
+  const version=method.methodVersion??family?.versions.find(item=>item.methodId===method.id)?.version;
   const tab=route.tab;
   const newSession=<button type="button" className="rk-btn rk-btn-primary" onClick={event=>onNewSession(method.id,event)}><Icon name="plus" size={18}/><span>New Session</span></button>;
   const createVersion=family&&!family.archived?<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method-new',family:family.familyId})}>Create new version</a>:null;
   async function changeLifecycle(archived){
     if(!family||lifecycleBusy)return;
     setLifecycleBusy(true);setLifecycleError('');
-    try{await setMethodArchived(family,archived);await onLifecycle?.();}
-    catch(error){setLifecycleError(error.message);setLifecycleBusy(false);}
+    try{
+      await setMethodArchived(family,archived);
+      setFamilyDetail(await loadMethodFamily(family.familyId));
+      await onLifecycle?.();
+    }catch(error){setLifecycleError(error.message);}
+    finally{setLifecycleBusy(false);}
   }
   async function loadMoreVersions(){
     if(!family?.nextVersionCursor||versionBusy)return;
@@ -203,7 +230,7 @@ export function MethodOverview({catalog,route,onOpen,onNewSession,onLifecycle}){
   }
   const labels={overview:'Overview',sessions:`Sessions (${sessions.length})`,analytics:'Analytics',rules:'Rules'};
   return <>
-    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={family?`${kindLabel(method.kind)} · v${family.versions.find(version=>version.methodId===method.id)?.version||family.latestVersion}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
+    <PageHead back={{label:'My Methods',to:{screen:'methods'}}} eyebrow={version?`${kindLabel(method.kind)} · v${version}`:kindLabel(method.kind)} title={method.name} actions={<>{family&&accountTransport()&&<button type="button" className="rk-btn rk-btn-quiet" disabled={lifecycleBusy} onClick={()=>changeLifecycle(!family.archived)}>{lifecycleBusy?'Saving…':family.archived?'Unarchive Method':'Archive Method'}</button>}{createVersion}{!family?.archived&&newSession}</>}/>
     {lifecycleError&&<p className="rk-error" role="alert">{lifecycleError}</p>}
     <nav className="rk-tabs" aria-label="Method sections">{METHOD_TABS.map(key=><a key={key} aria-current={tab===key?'page':undefined} {...linkTo({screen:'method',method:method.id,tab:key})}>{labels[key]}</a>)}</nav>
     {tab==='overview'&&<div className="rk-grid-2">

@@ -1,25 +1,37 @@
 import {useEffect,useState} from 'react';
 import {accountStorageKey} from './accountClient.js';
-import {loadSessionWithMetadata,noticeText} from './client.js';
+import {loadMethodFamilyRecord,loadMethodRecord,loadSessionWithMetadata,noticeText} from './client.js';
 
 // A catalog page can omit a Session without making its direct URL invalid.
 // Keep this lookup local to the screen and discard obsolete reads on navigation.
 export function useSessionRead(sessionId,attempt,{analytics=false}={}){
+  return useProductRecord(sessionId,attempt,loadSessionWithMetadata,analytics);
+}
+
+export function useMethodRead(methodId,attempt){
+  return useProductRecord(methodId,attempt,loadMethodRecord);
+}
+
+export function useMethodFamilyRead(familyId,attempt){
+  return useProductRecord(familyId,attempt,loadMethodFamilyRecord);
+}
+
+function useProductRecord(id,attempt,load,analytics=false){
   const [result,setResult]=useState(null);
   useEffect(()=>{
-    if(!sessionId)return;
+    if(!id)return;
     const controller=new AbortController();
     const save=result=>{
-      if(!controller.signal.aborted)setResult({sessionId,attempt,analytics,...result});
+      if(!controller.signal.aborted)setResult({id,attempt,analytics,...result});
     };
-    loadSessionWithMetadata(sessionId,{analytics,signal:controller.signal}).then(
+    load(id,{analytics,signal:controller.signal}).then(
       value=>save({status:'ready',value}),
       error=>save({status:'error',message:noticeText(error.message)}),
     );
     return()=>controller.abort();
-  },[sessionId,attempt,analytics]);
-  if(!sessionId)return {status:'idle'};
-  if(result?.sessionId===sessionId&&result.attempt===attempt&&result.analytics===analytics)return result;
+  },[id,attempt,load,analytics]);
+  if(!id)return {status:'idle'};
+  if(result?.id===id&&result.attempt===attempt&&result.analytics===analytics)return result;
   return {status:'loading'};
 }
 

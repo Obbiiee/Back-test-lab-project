@@ -111,6 +111,13 @@ export async function loadSessionWithMetadata(sessionId,{analytics=false,signal}
     throw Error('The service returned an invalid Session.');
   return view;
 }
+
+export async function loadMethodRecord(methodId,{signal}={}){
+  const value=await api(`/methods/${encodeURIComponent(methodId)}`,undefined,{signal});
+  if(value?.artifact!=='BTL-METHOD-1'||value.method?.id!==methodId||typeof value.method.name!=='string')
+    throw Error('The service returned an invalid Method.');
+  return value.method;
+}
 export function orderHistoryPagePath(sessionId,{limit=64,afterSequence=null,revision=null}={}){
   if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>256)
     throw Error('Invalid order history page request.');
@@ -338,14 +345,23 @@ export async function loadMethodVersionPage(familyId,cursor=null){
   return page;
 }
 
-export async function loadMethodFamily(familyId){
+export async function loadMethodFamilyRecord(familyId,{signal}={}){
   if(typeof familyId!=='string'||!familyId)throw Error('Method family is unavailable.');
-  const [detail,page]=await Promise.all([
-    api(`/method-families/${encodeURIComponent(familyId)}`),loadMethodVersionPage(familyId),
-  ]);
-  if(detail.artifact!=='BTL-METHOD-FAMILY-1'||detail.family?.familyId!==familyId)
+  const value=await api(`/method-families/${encodeURIComponent(familyId)}`,undefined,{signal});
+  const family=value?.family;
+  if(value?.artifact!=='BTL-METHOD-FAMILY-1'||family?.familyId!==familyId||
+     !Number.isSafeInteger(family.revision)||!Number.isSafeInteger(family.latestVersion)||
+     typeof family.archived!=='boolean'||!family.current||family.current.id!==family.latestMethodId)
     throw Error('Unsupported Method family; no state was imported.');
-  return {...detail.family,versions:page.versions,nextVersionCursor:page.nextCursor,revision:page.revision};
+  return family;
+}
+
+export async function loadMethodFamily(familyId){
+  const [detail,page]=await Promise.all([
+    loadMethodFamilyRecord(familyId),loadMethodVersionPage(familyId),
+  ]);
+  if(detail.revision!==page.revision)throw Error('Method versions changed. Reload and try again.');
+  return {...detail,versions:page.versions,nextVersionCursor:page.nextCursor};
 }
 
 export async function setMethodArchived(family,archived){
