@@ -2,7 +2,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
 import {api,id,sessionPath,sourceContext,createMethodVersion,setMethodArchived,
   loadMethodFamily,loadMethodVersionPage} from './client.js';
-import {money,kindLabel,utc,lastSession} from './productData.js';
+import {money,kindLabel,utc,lastSession,useSessionRead} from './productData.js';
 import {linkTo,navigate,METHOD_TABS} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
 import Segmented from './AlphaSegmented.jsx';
@@ -270,33 +270,27 @@ function MethodAnalytics({method,sessions}){
 }
 
 export function Analytics({catalog,route}){
-  const methodId=route.method||catalog.sessions.find(s=>s.id===route.analyticsSession)?.methodId||'';
-  const sessions=catalog.sessions.filter(s=>!methodId||s.methodId===methodId);
   const sessionId=route.analyticsSession;
-  const session=catalog.sessions.find(s=>s.id===sessionId);
-  const [result,setResult]=useState({key:null});
   const [attempt,setAttempt]=useState(0);
-  const key=session?`${session.id}:${attempt}`:null;
-  useEffect(()=>{
-    if(!key)return;
-    let live=true;
-    api(sessionPath(key.slice(0,key.lastIndexOf(':')))+'/view',{timeframe:'1m'}).then(view=>{if(live)setResult({key,status:'ready',view});},error=>{if(live)setResult({key,status:'error',message:error.message});});
-    return()=>{live=false;};
-  },[key]);
-  const state=result.key===key?result:{status:'loading'};
+  const state=useSessionRead(sessionId,attempt,{analytics:true});
+  const view=state.value;
+  const session=view?.metadata??catalog.sessions.find(s=>s.id===sessionId);
+  const methodId=session?.methodId||route.method||'';
+  const sessions=catalog.sessions.filter(s=>!methodId||s.methodId===methodId);
+  const methodInCatalog=catalog.methods.some(method=>method.id===methodId);
   const pick=next=>navigate({screen:'analytics',...next});
   return <>
     <PageHead eyebrow="Analytics" title="Research analytics" lead="Pick a Method and a Session. Statistics come from committed positions only."/>
     <div className="rk-toolbar" role="group" aria-label="Analytics scope">
-      <label className="rk-select">Method<select value={methodId} onChange={e=>pick({method:e.target.value||undefined})}><option value="">All Methods</option>{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-      <label className="rk-select">Session<select value={session?.id||''} onChange={e=>pick({method:methodId||undefined,of:e.target.value||undefined})}><option value="">Choose a Session</option>{sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      {methodId&&<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:methodId,tab:'analytics'})}>Method analytics</a>}
+      <label className="rk-select">Method<select value={methodId} onChange={e=>pick({method:e.target.value||undefined})}><option value="">All Methods</option>{methodId&&!methodInCatalog&&<option value={methodId}>{view?.method?.name??'Linked Method'}</option>}{catalog.methods.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+      <label className="rk-select">Session<select value={sessionId||''} onChange={e=>pick({method:methodId||undefined,of:e.target.value||undefined})}><option value="">Choose a Session</option>{sessionId&&!sessions.some(s=>s.id===sessionId)&&<option value={sessionId}>{session?.name??'Linked Session'}</option>}{sessions.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      {methodInCatalog&&<a className="rk-btn rk-btn-quiet" {...linkTo({screen:'method',method:methodId,tab:'analytics'})}>Method analytics</a>}
     </div>
-    {!catalog.sessions.length?<StatePanel kind="empty" title="No Sessions to analyse" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Analytics appear after you create a Session and close at least one position.</p></StatePanel>
-      :!session?<StatePanel kind="empty" title={sessionId?'This Session is not in this workspace':'Choose a Session'}><p>{sessionId?'It may belong to another workspace. Pick one from the list.':'Session analytics show one Session at a time, so independent balances are never mixed.'}</p></StatePanel>
+    {!sessionId&&!catalog.sessions.length?<StatePanel kind="empty" title="No Sessions to analyse" action={<a className="rk-btn" {...linkTo({screen:'methods'})}>Go to My Methods</a>}><p>Analytics appear after you create a Session and close at least one position.</p></StatePanel>
+      :!sessionId?<StatePanel kind="empty" title="Choose a Session"><p>Session analytics show one Session at a time.</p></StatePanel>
       :state.status==='loading'?<StatePanel kind="loading" title="Loading committed analytics…"/>
       :state.status==='error'?<StatePanel kind="error" title="Analytics could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message} Nothing was changed.</p></StatePanel>
-      :<SessionAnalytics view={state.view} catalog={catalog}/>}
+      :<SessionAnalytics view={view} catalog={catalog}/>}
   </>;
 }
 
@@ -304,7 +298,7 @@ function SessionAnalytics({view,catalog}){
   const analysis=view.analysis;
   if(!analysis||analysis.status!=='COMPLETE')return <StatePanel kind="unavailable" title="Analytics unavailable for this Session"><p>{analysis?.reason??'The service has no compatible analysis for this Session.'} No partial history is shown as a complete result.</p></StatePanel>;
   const {metrics,account}=analysis;
-  const scope=[['Session',view.metadata.name],['Method',`${view.method.name} · ${kindLabel(view.method.kind)}`],['Instrument',catalog.profile.instrumentId],['Range',`${view.metadata.startPeriod} → ${utc(view.state.throughNs)}`],['Completed positions',String(metrics.tradeCount)],['Unresolved / expired',`${metrics.unresolved} / ${metrics.expired}`]];
+  const scope=[['Session',view.metadata.name],['Method',`${view.method.name} · ${kindLabel(view.method.kind)}`],['Instrument',view.state.profile?.instrumentId??catalog.profile.instrumentId],['Range',`${view.metadata.startPeriod} → ${utc(view.state.throughNs)}`],['Completed positions',String(metrics.tradeCount)],['Unresolved / expired',`${metrics.unresolved} / ${metrics.expired}`]];
   const secondary=[['Wins / losses / breakeven',`${metrics.wins} / ${metrics.losses} / ${metrics.breakeven}`],['Average win (USD)',ratioLabel(metrics.averageWin)],['Average loss (USD)',ratioLabel(metrics.averageLoss)],['Longest win / loss streak',`${metrics.maxWinStreak} / ${metrics.maxLossStreak}`],['Mean R',`${ratioLabel(metrics.averageR)} · ${metrics.rEligible} eligible / ${metrics.rExcluded} excluded`],['Commission (USD)',account.commission],['Starting balance',money(view.state.initialBalance)],['Committed balance now',money(account.balance)]];
   return <div className="rk-stack">
     <dl className="rk-scope" aria-label="Scope">{scope.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>

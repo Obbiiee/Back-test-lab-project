@@ -99,6 +99,18 @@ export async function api(path,body,{signal}={}){
   return value;
 }
 export function sessionPath(session){return `/sessions/${encodeURIComponent(session)}`;}
+
+export async function loadSessionWithMetadata(sessionId,{analytics=false,signal}={}){
+  if(typeof sessionId!=='string'||!sessionId)throw Error('Choose a Session.');
+  const path=sessionPath(sessionId);
+  const view=analytics
+    ?await api(`${path}/view`,{timeframe:'1m'},{signal})
+    :await api(path,undefined,{signal});
+  if(view?.metadata?.id!==sessionId||typeof view.metadata.name!=='string'||
+     typeof view.metadata.methodId!=='string'||!view.state)
+    throw Error('The service returned an invalid Session.');
+  return view;
+}
 export function orderHistoryPagePath(sessionId,{limit=64,afterSequence=null,revision=null}={}){
   if(typeof sessionId!=='string'||!sessionId||!Number.isInteger(limit)||limit<1||limit>256)
     throw Error('Invalid order history page request.');
@@ -298,7 +310,7 @@ export async function loadJournalPage(sessionId,cursor=null){
   if(typeof sessionId!=='string'||!sessionId)throw Error('Journal Session is unavailable.');
   const query=new URLSearchParams({limit:'32'});if(cursor)query.set('cursor',cursor);
   const page=await api(`${sessionPath(sessionId)}/journal/pages?${query}`);
-  if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
+  if(page.artifact!=='BTL-TICK-JOURNAL-PAGE-1'||page.sessionId!==sessionId||!Array.isArray(page.orders)||!Array.isArray(page.notes)||
       !Number.isSafeInteger(page.totalOrders)||typeof page.complete!=='boolean')
     throw Error('Unsupported Journal page; no state was imported.');
   if(!page.complete&&(typeof page.nextCursor!=='string'||page.nextCursor===cursor))

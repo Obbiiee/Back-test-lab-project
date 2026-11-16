@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {loadProductCatalog,loadMoreProductCatalog,loadJournalPage,createMethodVersion,setMethodArchived,
-  loadMethodFamily,loadMethodVersionPage} from '../src/tickAlpha/client.js';
+  loadMethodFamily,loadMethodVersionPage,loadSessionWithMetadata} from '../src/tickAlpha/client.js';
 import {setAccountTransport,clearAccountTransport} from '../src/tickAlpha/accountClient.js';
 import {readRoute,routeHref} from '../src/tickAlpha/productRoute.js';
 
@@ -40,6 +40,20 @@ const client={subject:()=>subject,request:async (path,options={})=>{
   if(path.endsWith('/sessions?limit=50'))return {schemaVersion:1,artifact:'BTL-SESSION-PAGE-1',
     items:[{metadata:{id:'session:one',name:'Synthetic QA',methodId:'method:000',startPeriod:'2020-01',initialBalance:'10000'},
       revision:4,financialCountsStatus:'NOT_COMPUTED_ON_LIST'}],complete:true,nextCursor:null};
+  if(path.endsWith('/sessions/session%3Alinked')||path.endsWith('/sessions/session%3Alinked/view')){
+    const analytics=path.endsWith('/view');
+    assert.equal(options.method,analytics?'POST':'GET');
+    assert.deepEqual(options.body,analytics?{timeframe:'1m'}:undefined);
+    assert.ok(options.signal instanceof AbortSignal);
+    return {schemaVersion:1,metadata:{id:'session:linked',name:'Outside the first page',methodId:'method:050'},
+      state:{revision:8},...(analytics?{analysis:{status:'COMPLETE'}}:{})};
+  }
+  if(path.endsWith('/sessions/session%3Amismatch'))return {
+    schemaVersion:1,metadata:{id:'session:linked',name:'Mismatched',methodId:'method:050'},state:{revision:8}};
+  if(path.endsWith('/sessions/session%3Aprivate'))throw Object.assign(Error('This workspace or record is unavailable.'),{status:404});
+  if(path.endsWith('/sessions/session%3Amismatch/journal/pages?limit=32'))return {
+    schemaVersion:1,artifact:'BTL-TICK-JOURNAL-PAGE-1',sessionId:'session:linked',
+    totalOrders:0,orders:[],notes:[],nextCursor:null,complete:true};
   if(path.endsWith('/sessions/session%3Aone/journal/pages?limit=32&cursor=order%3A031'))return {
     schemaVersion:1,artifact:'BTL-TICK-JOURNAL-PAGE-1',sessionId:'session:one',revision:8,
     totalOrders:33,orders:[{id:'order:032',side:'LONG',orderType:'MARKET',status:'CLOSED'}],notes:[],
@@ -65,6 +79,14 @@ try{
     financialCountsStatus:'NOT_COMPUTED_ON_LIST'}]);
   assert.ok(calls.some(path=>path.includes('/method-families?includeArchived=true&limit=50&after=')));
   assert.ok(calls.some(path=>path.includes('/sessions?limit=50')));
+  assert.ok(!catalog.sessions.some(session=>session.id==='session:linked'));
+  const linked=await loadSessionWithMetadata('session:linked');
+  assert.equal(linked.metadata.name,'Outside the first page');
+  const analytics=await loadSessionWithMetadata('session:linked',{analytics:true});
+  assert.equal(analytics.analysis.status,'COMPLETE');
+  await assert.rejects(loadSessionWithMetadata('session:mismatch'),/invalid Session/);
+  await assert.rejects(loadSessionWithMetadata('session:private'),{status:404});
+  await assert.rejects(loadJournalPage('session:mismatch'),/Unsupported Journal page/);
   const journal=await loadJournalPage('session:one','order:031');
   assert.equal(journal.totalOrders,33);
   assert.equal(journal.orders[0].id,'order:032');

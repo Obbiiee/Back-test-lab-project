@@ -1,7 +1,7 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useMemo,useState} from 'react';
 import Icon from '../workspace/WorkspaceIcon.jsx';
-import {api,sessionPath,sourceContext} from './client.js';
-import {money,kindLabel,utc} from './productData.js';
+import {sourceContext} from './client.js';
+import {money,kindLabel,utc,useSessionRead} from './productData.js';
 import {linkTo} from './productRoute.js';
 import {StatePanel,PageHead} from './AlphaShell.jsx';
 import {MethodPicker} from './AlphaSelect.jsx';
@@ -40,38 +40,32 @@ export function SessionsPage({catalog,onOpen}){
 
 export function SessionOverview({catalog,route,onOpen}){
   const sessionId=route.analyticsSession;
-  const session=catalog.sessions.find(s=>s.id===sessionId)||null;
   const [attempt,setAttempt]=useState(0);
-  const [result,setResult]=useState({key:null});
-  const key=`${sessionId}:${attempt}`;
-  useEffect(()=>{
-    if(!session)return undefined;
-    let live=true;
-    api(sessionPath(session.id)).then(value=>{if(live)setResult({key,status:'ready',value});},error=>{if(live)setResult({key,status:'error',message:error.message});});
-    return()=>{live=false;};
-  },[session,key]);
-  if(!session)return <><PageHead back={{label:'Sessions',to:{screen:'sessions'}}} title="Session unavailable"/>
-    <StatePanel kind="unavailable" title="This Session is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'sessions'})}>All Sessions</a>}><p>It may belong to another workspace or the link is incomplete.</p></StatePanel></>;
-  const method=catalog.methods.find(m=>m.id===session.methodId);
-  const state=result.key===key?result:{status:'loading'};
-  const saved=state.status==='ready'?state.value.state:null;
-  return <><PageHead back={method?{label:method.name,to:{screen:'method',method:method.id}}:{label:'Sessions',to:{screen:'sessions'}}} eyebrow="Session" title={session.name}
+  const state=useSessionRead(sessionId,attempt);
+  const back={label:'Sessions',to:{screen:'sessions'}};
+  if(state.status!=='ready')return <><PageHead back={back} title="Session"/>
+    {state.status==='loading'?<StatePanel kind="loading" title="Loading the saved Session…"/>
+      :state.status==='error'?<StatePanel kind="error" title="The Session could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message}</p></StatePanel>
+      :<StatePanel kind="unavailable" title="Choose a Session" action={<a className="rk-btn" {...linkTo(back.to)}>All Sessions</a>}/>}
+  </>;
+  const {metadata:session,state:saved}=state.value;
+  const catalogMethod=catalog.methods.find(m=>m.id===session.methodId);
+  const method=state.value.method??catalogMethod;
+  return <><PageHead back={catalogMethod?{label:catalogMethod.name,to:{screen:'method',method:catalogMethod.id}}:back} eyebrow="Session" title={session.name}
       actions={<><button type="button" className="rk-btn rk-btn-primary" onClick={()=>onOpen(session.id)}><Icon name="candles" size={18}/><span>Resume replay</span></button><a className="rk-btn" {...linkTo({screen:'analytics',method:session.methodId,of:session.id})}>Analytics</a></>}/>
     <div className="rk-grid-2">
       <section className="rk-card" aria-labelledby="rk-so-saved"><h2 id="rk-so-saved">Saved state</h2>
-        {state.status==='loading'?<p className="rk-note" role="status"><span className="rk-spinner" aria-hidden="true"/> Loading the saved state…</p>
-          :state.status==='error'?<div role="alert"><p className="rk-note">The saved state could not load. {state.message}</p><button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button></div>
-          :<dl className="rk-facts">
+        <dl className="rk-facts">
             <div><dt>Replay time</dt><dd className="rk-num">{utc(saved.throughNs)}</dd></div>
             <div><dt>Committed balance</dt><dd className="rk-num">{money(saved.balance)}</dd></div>
             <div><dt>Saved revision</dt><dd className="rk-num">{saved.revision}</dd></div>
             <div><dt>Evidence</dt><dd>{saved.unresolved?'Unresolved: waiting for later quotes':saved.ended?'Replay reached the end of data':'Ready'}</dd></div>
-          </dl>}
+        </dl>
       </section>
       <section className="rk-card" aria-labelledby="rk-so-setup"><h2 id="rk-so-setup">Setup</h2>
         <dl className="rk-facts">
-          <div><dt>Method</dt><dd>{method?<a {...linkTo({screen:'method',method:method.id})}>{method.name}</a>:'Unavailable'} · {kindLabel(method?.kind)}</dd></div>
-          <div><dt>Instrument</dt><dd className="rk-num">{catalog.profile.instrumentId}</dd></div>
+          <div><dt>Method</dt><dd>{catalogMethod?<a {...linkTo({screen:'method',method:catalogMethod.id})}>{catalogMethod.name}</a>:method?.name??'Unavailable'}{method&&` · ${kindLabel(method.kind)}`}</dd></div>
+          <div><dt>Instrument</dt><dd className="rk-num">{saved.profile?.instrumentId??catalog.profile.instrumentId}</dd></div>
           <div><dt>Start month</dt><dd className="rk-num">{session.startPeriod}</dd></div>
           <div><dt>Starting balance</dt><dd className="rk-num">{money(session.initialBalance)}</dd></div>
           <div><dt>Source</dt><dd>{sourceContext()==='historical'?'Historical quotes':'Synthetic test feed'} · {catalog.label}</dd></div>

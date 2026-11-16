@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api,sessionPath,loadJournalPage,noticeText} from './client.js';
-import {money,utc,lastSession} from './productData.js';
+import {money,utc,lastSession,useSessionRead} from './productData.js';
 import {ratioLabel} from './annotations.js';
 import {linkTo,navigate,setLeaveGuard} from './productRoute.js';
 import {readDraft,writeDraft,clearDraft,isDirty,tagList,tagText} from './noteDrafts.js';
@@ -76,10 +76,18 @@ function NoteEditor({order,note,sessionId,path,onSaved,onDirty,onReload}){
 }
 
 export default function AlphaJournalPage({catalog,route,onOpen}){
-  const sessionId=route.analyticsSession||(catalog.sessions.some(s=>s.id===lastSession())?lastSession():null);
-  const session=catalog.sessions.find(s=>s.id===sessionId)||null;
+  const previousSession=lastSession();
+  const sessionId=route.analyticsSession||(catalog.sessions.some(s=>s.id===previousSession)?previousSession:null);
+  return <JournalSelection key={sessionId} catalog={catalog} sessionId={sessionId} onOpen={onOpen}/>;
+}
+
+function JournalSelection({catalog,sessionId,onOpen}){
+  const listedSession=catalog.sessions.find(s=>s.id===sessionId);
   const [attempt,setAttempt]=useState(0);
-  const [result,setResult]=useState({key:null});
+  const [linkAttempt,setLinkAttempt]=useState(0);
+  const linked=useSessionRead(listedSession?null:sessionId,linkAttempt);
+  const session=listedSession??linked.value?.metadata;
+  const [result,setResult]=useState({status:'loading'});
   const [side,setSide]=useState('ALL');
   const [status,setStatus]=useState(null);
   const [query,setQuery]=useState('');
@@ -107,16 +115,16 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
     return()=>{release();globalThis.removeEventListener('beforeunload',unload);};
   },[dirty.size]);
   useEffect(()=>{if(leaving)stay.current?.focus();},[leaving]);
-  const key=`${sessionId}:${attempt}`;
   const path=session?sessionPath(session.id)+'/journal':null;
+  const journalSessionId=session?.id;
   useEffect(()=>{
-    if(!sessionId)return undefined;
+    if(!journalSessionId)return undefined;
     let live=true;
-    loadJournalPage(sessionId).then(value=>{if(live)setResult({key,status:'ready',value});},failure=>{if(live)setResult({key,status:'error',message:noticeText(failure.message)});});
+    loadJournalPage(journalSessionId).then(value=>{if(live)setResult({attempt,status:'ready',value});},failure=>{if(live)setResult({attempt,status:'error',message:noticeText(failure.message)});});
     return()=>{live=false;};
-  },[sessionId,key]);
+  },[journalSessionId,attempt]);
   // A reload after a stale-note refusal keeps the page (and open editors) mounted.
-  const state=result.key===key?result:result.key?.startsWith(`${sessionId}:`)&&result.status==='ready'?result:{status:'loading'};
+  const state=result.attempt===attempt||result.status==='ready'?result:{status:'loading'};
   const journal=state.status==='ready'?state.value:null;
   const loadMore=async()=>{
     if(!session||!journal?.nextCursor||loadingMore)return;
@@ -124,7 +132,7 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
     try{
       const page=await loadJournalPage(session.id,journal.nextCursor);
       setResult(previous=>{
-        if(previous.key!==key||previous.status!=='ready')return previous;
+        if(previous.attempt!==attempt||previous.status!=='ready')return previous;
         const orders=new Map(previous.value.orders.map(order=>[order.id,order]));
         for(const order of page.orders)orders.set(order.id,order);
         const notes=new Map(previous.value.notes.map(note=>[note.orderId,note]));
@@ -146,7 +154,9 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
       return [note?.text,...(note?.tags??[]),order.orderType,order.status].filter(Boolean).some(text=>text.toLowerCase().includes(q));
     }).slice().reverse();
   },[journal,side,status,query]);
-  const sessionOptions=catalog.sessions.slice().reverse().map(s=>({value:s.id,label:s.name,description:catalog.methods.find(m=>m.id===s.methodId)?.name}));
+  const pickerSessions=catalog.sessions.slice().reverse();
+  if(session&&!listedSession)pickerSessions.unshift(session);
+  const sessionOptions=pickerSessions.map(s=>({value:s.id,label:s.name,description:catalog.methods.find(m=>m.id===s.methodId)?.name}));
   const picker=<div className="rk-toolbar-combo rk-toolbar-combo-wide"><SearchableSelect label="Session" placeholder="Search or select Session" searchPlaceholder="Search Sessions…" options={sessionOptions} value={session?.id??null}
     onChange={value=>navigate({screen:'journal',of:value||undefined})} noOptionsText="No Sessions yet."/></div>;
   const savedNote=value=>setResult(previous=>({...previous,value:{...previous.value,notes:[...previous.value.notes.filter(item=>item.orderId!==value.orderId),value]}}));
@@ -162,8 +172,10 @@ export default function AlphaJournalPage({catalog,route,onOpen}){
   return <>{leaveDialog}<PageHead eyebrow="Research" title="Journal" lead="Committed orders of one Session with your notes. Notes never change fills or cash."
       actions={session&&<button type="button" className="rk-btn" onClick={()=>leaveThen(()=>onOpen(session.id))}>Open replay</button>}/>
     <div className="rk-toolbar">{picker}</div>
-    {!catalog.sessions.length?<StatePanel kind="empty" title="Nothing journaled yet" action={<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new'})}>New Session</a>}><p>Journals start when you confirm the first order in a Session.</p></StatePanel>
-      :!session?<StatePanel kind="empty" title={sessionId?'This Session is not in this workspace':'Choose a Session'}><p>{sessionId?'Pick one from the list above.':'A journal across all Sessions needs a server list that is not published yet, so pick one Session.'}</p></StatePanel>
+    {!sessionId&&!catalog.sessions.length?<StatePanel kind="empty" title="Nothing journaled yet" action={<a className="rk-btn rk-btn-primary" {...linkTo({screen:'session-new'})}>New Session</a>}><p>Journals start when you confirm the first order in a Session.</p></StatePanel>
+      :!sessionId?<StatePanel kind="empty" title="Choose a Session"><p>Pick one Session to view its journal.</p></StatePanel>
+      :linked.status==='error'?<StatePanel kind="error" title="The Session could not load" action={<button type="button" className="rk-btn" onClick={()=>setLinkAttempt(n=>n+1)}>Retry</button>}><p>{linked.message}</p></StatePanel>
+      :!session?<StatePanel kind="loading" title="Loading the saved Session…"/>
       :state.status==='loading'?<StatePanel kind="loading" title="Loading the journal…"/>
       :state.status==='error'?<StatePanel kind="error" title="The journal could not load" action={<button type="button" className="rk-btn" onClick={()=>setAttempt(n=>n+1)}>Retry</button>}><p>{state.message}</p></StatePanel>
       :!journal.orders.length?<StatePanel kind="empty" title="No orders yet" action={<button type="button" className="rk-btn rk-btn-primary" onClick={()=>leaveThen(()=>onOpen(session.id))}>Open replay</button>}><p>Review and confirm an order in replay; it appears here with room for a note.</p></StatePanel>
