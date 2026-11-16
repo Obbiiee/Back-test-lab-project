@@ -18,12 +18,14 @@ riksora.com {
 	@shell path / /index.html /sw.js /manifest.webmanifest
 	header @shell Cache-Control "no-cache"
 
-	# only the static build is served; the application API is not proxied from this site
-	@api path /api/*
-	respond @api "Not found" 404
-
-	try_files {path} /index.html
-	file_server
+	# only the static build is served; the application API is not proxied from this site (handle blocks decide before try_files rewrites the path)
+	handle /api/* {
+		respond "Not found" 404
+	}
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 	log {
 		output file {$SITE_LOG:/home/developer/site/access.log} {
 			roll_size 10MiB
