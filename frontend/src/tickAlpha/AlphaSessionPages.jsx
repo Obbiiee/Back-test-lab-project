@@ -47,14 +47,14 @@ export function SessionOverview({catalog,route,onOpen}){
   const listedSession=catalog.sessions.find(s=>s.id===sessionId)||null;
   const [attempt,setAttempt]=useState(0);
   const [result,setResult]=useState({key:null});
-  const key=`${sessionId}:${attempt}`;
+  const key=sessionId?`${sessionId}:${attempt}`:null;
   useEffect(()=>{
     if(!sessionId)return undefined;
     let live=true;
     api(sessionPath(sessionId)).then(value=>{if(live)setResult({key,status:'ready',value});},error=>{if(live)setResult({key,status:'error',message:error.message});});
     return()=>{live=false;};
   },[sessionId,key]);
-  const state=result.key===key?result:{status:'loading'};
+  const state=key?(result.key===key?result:{status:'loading'}):{status:'error',message:'The Session link does not include an ID.'};
   const session=listedSession||(state.status==='ready'?state.value.metadata:null);
   if(!session)return <><PageHead back={{label:'Sessions',to:{screen:'sessions'}}} title={state.status==='loading'?'Loading Session…':'Session unavailable'}/>
     {state.status==='loading'?<StatePanel kind="loading" title="Loading saved Session"/>:<StatePanel kind="unavailable" title="This Session is not in this workspace" action={<a className="rk-btn" {...linkTo({screen:'sessions'})}>All Sessions</a>}><p>{state.message||'It may belong to another workspace or the link is incomplete.'}</p></StatePanel>}
