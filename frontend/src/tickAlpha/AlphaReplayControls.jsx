@@ -18,6 +18,8 @@ export default function AlphaReplayControls({view,timeframe,busy,pauseToken,pend
   const ended=view.state.ended,working=activity!=='';
   const nextCandle=candleTarget(view.state.throughNs,timeframe);
   const unresolvedTarget=pending&&BigInt(pending.target)>BigInt(view.state.throughNs)?pending:null;
+  // An unfinished ADVANCE blocks every other replay action until it is continued.
+  const blocked=unresolvedTarget?.kind==='ADVANCE';
 
   useEffect(()=>{
     if(!playing)return;
@@ -96,10 +98,10 @@ export default function AlphaReplayControls({view,timeframe,busy,pauseToken,pend
   },[]);
 
   const forming=view.chart.candles.at(-1)?.incomplete;
-  const lock=busy||working||playing||ended;
+  const lock=busy||working||playing||ended||blocked;
   const tfLabel=timeframeLabel(timeframe);
   return <div className="alpha-replay-controls" role="group" aria-label="Tick replay controls" data-activity={activity||undefined}>
-    <button type="button" className="alpha-replay-play" disabled={working||(busy&&!playing)||ended} aria-pressed={playing} aria-keyshortcuts="Space" title="Play / Pause (Space)" onClick={toggle}><Icon name="play"/><span>{playing?'Pause':'Play'}</span></button>
+    <button type="button" className="alpha-replay-play" disabled={working||(busy&&!playing)||ended||(blocked&&!playing)} aria-pressed={playing} aria-keyshortcuts="Space" title="Play / Pause (Space)" onClick={toggle}><Icon name="play"/><span>{playing?'Pause':'Play'}</span></button>
     <button type="button" disabled={lock} aria-keyshortcuts="Shift+ArrowRight" title={`Step tick (Shift+→): reveals one replay interval of observed quotes`} onClick={stepTick}>Step tick</button>
     <button type="button" disabled={lock} aria-keyshortcuts="N" title={`Next ${tfLabel} candle (N): reveals ticks up to ${utcLabel(nextCandle)} (UTC bucket end)`} onClick={candle}>Next {tfLabel}</button>
     <button type="button" disabled={lock||!hasWatchedOrders(view)} title={hasWatchedOrders(view)?'Advance candle by candle until a pending or open order changes. Stops at the end of the candle containing the event.':'Needs a pending or open order to wait for.'} onClick={jump}>Next event</button>

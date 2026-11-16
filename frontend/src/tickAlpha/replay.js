@@ -1,7 +1,7 @@
 // Pure replay-navigation helpers. Targets are canonical UTC nanosecond strings sent to the
 // backend ADVANCE/SEEK commands; the backend reveals ticks and settles orders. Nothing here
 // derives a fill, a price or an outcome (never settle from candles).
-export const SPEEDS=[1,2,5,10,20];
+export const SPEEDS=[0.5,1,2,5,10,20];
 // Playback rate: market seconds revealed per wall-clock second. One request is issued per
 // PLAY_INTERVAL_MS, so the batch revealed per request is rate*PLAY_INTERVAL_MS (ms of market time).
 export const PLAY_INTERVAL_MS=500;
@@ -57,3 +57,23 @@ export const pause=(milliseconds,signal)=>new Promise((resolve,reject)=>{
   const timer=setTimeout(done,milliseconds);
   signal?.addEventListener('abort',stop,{once:true});
 });
+// Display-only trade announcements. Everything shown comes from the server's committed
+// projection (fill price, exit price, net, reason); nothing is recomputed here.
+export function tradeEvents(before,after){
+  const a=before?.analysis,b=after?.analysis;
+  if(!a||!b||a.status!=='COMPLETE'||b.status!=='COMPLETE')return [];
+  const knownActive=new Set(a.orders.filter(o=>o.status==='ACTIVE').map(o=>o.id));
+  const knownClosed=new Set(a.completed.map(o=>o.id));
+  const events=[];
+  for(const order of b.orders)if(order.status==='ACTIVE'&&!knownActive.has(order.id)&&!knownClosed.has(order.id))events.push({kind:'FILL',order});
+  for(const order of b.completed)if(!knownClosed.has(order.id))events.push({kind:'EXIT',order});
+  return events;
+}
+export function durationLabel(ns){
+  if(typeof ns!=='string'||!/^\d{1,20}$/.test(ns))return null;
+  let seconds=Number(BigInt(ns)/1000000000n);
+  const days=Math.floor(seconds/86400);seconds%=86400;
+  const hours=Math.floor(seconds/3600);seconds%=3600;
+  const minutes=Math.floor(seconds/60);seconds%=60;
+  return days?`${days}d ${hours}h`:hours?`${hours}h ${minutes}m`:minutes?`${minutes}m ${String(seconds).padStart(2,'0')}s`:`${seconds}s`;
+}

@@ -14,7 +14,9 @@ import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
 import {emitLocal} from './measurement.js';
 import {readPending,writePending,readTimeframe,writeTimeframe} from './replayPending.js';
-import {isLimitError,limitDelayMs,pause} from './replay.js';
+import {isLimitError,limitDelayMs,pause,tradeEvents} from './replay.js';
+import AlphaTradeToast from './AlphaTradeToast.jsx';
+import {ratioLabel} from './annotations.js';
 import Icon from '../workspace/WorkspaceIcon.jsx';
 import {DirectionQuotes,ReviewedIntent} from './AlphaOrderPresentation.jsx';
 import {planningIntent} from './planningIntent.js';
@@ -44,7 +46,8 @@ export default function TickAlpha(){
   const [orderAction,setOrderAction]=useState(null);
   const [selectedMethod,setSelectedMethod]=useState('');
   const [focus,setFocusState]=useState(false),[drawRequest,setDrawRequest]=useState(null),[terminalFocus,setTerminalFocus]=useState(null),[pairQuery,setPairQuery]=useState('');
-  const viewRef=useRef(null),[pendingVersion,setPendingVersion]=useState(0);
+  const viewRef=useRef(null),[pendingVersion,setPendingVersion]=useState(0),[tradeEvent,setTradeEvent]=useState(null);
+  const dismissTrade=useCallback(()=>setTradeEvent(null),[]);
   useEffect(()=>{viewRef.current=view;},[view]);
   // Focus: the chart fills the screen. Uses the Fullscreen API when permitted, CSS focus otherwise.
   const setFocus=useCallback(value=>{
@@ -106,6 +109,9 @@ export default function TickAlpha(){
   // cursor reaches it. Resolves {view,reached,cancelled} or false; single-flighted via run().
   const advanceTo=(kind,targetNs,{signal,onProgress}={})=>run(async()=>{
     let current=viewRef.current;const sessionId=current.metadata.id;
+    // The server holds an unfinished ADVANCE target and refuses any other; keep that saved target intact.
+    const unfinished=readPending(pendingKey(sessionId));
+    if(unfinished?.kind==='ADVANCE'&&unfinished.target!==targetNs&&BigInt(unfinished.target)>BigInt(current.state.throughNs))throw Error('ADVANCE_IN_PROGRESS');
     savePending(sessionId,{kind,target:targetNs});
     try{
     for(let attempt=0;attempt<1000;attempt++){
@@ -123,6 +129,7 @@ export default function TickAlpha(){
         }
       }
       viewRef.current=saved;setView(saved);
+      {const events=tradeEvents(current,saved);if(events.length)setTradeEvent(events.at(-1));}
       if(saved.state.nextGroupIndex!==current.state.nextGroupIndex){
         emitLocal(kind==='ADVANCE'?'replay_advanced':'replay_seeked');
         if(saved.state.unresolved)emitLocal('order_outcome_unresolved');
@@ -212,7 +219,7 @@ export default function TickAlpha(){
     {!catalog?<section className="alpha-empty"><h1>{isAccountPage()?'Connect your workspace':'Connect your local workspace'}</h1><p>{isAccountPage()?'An authorized account connection is required to create or reopen a Session.':'Start the local alpha service and database to create or reopen a Session.'}</p><p>{connecting?'Connecting to the saved workspace…':isAccountPage()?'The account service is unavailable. Retry, or sign out and sign in again.':'Your local service is unavailable. Start it, then retry the connection.'}</p><button disabled={busy||connecting} onClick={()=>run(async()=>{
         setConnecting(true);try{const result=await loadResearchContext(new URL(window.location.href).searchParams.get('session'),{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
-      <section className="alpha-session"><h1>{view.metadata.name}</h1><button type="button" className="alpha-pair-pill" aria-label="Pair XAUUSD, show pairs" onClick={event=>openPanel('pair',event)}><span aria-hidden="true">Au</span>XAUUSD<span aria-hidden="true">▾</span></button><p><strong>XAUUSD</strong><span className="alpha-source-credit"> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button></span> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
+      <section className="alpha-session"><h1>{view.metadata.name}</h1><button type="button" className="alpha-pair-pill" aria-label="Pair XAUUSD, show pairs" onClick={event=>openPanel('pair',event)}><span aria-hidden="true">Au</span>XAUUSD<span aria-hidden="true">▾</span></button><p><strong>XAUUSD</strong><span className="alpha-source-credit"> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button></span> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p>{view.analysis?.status==='COMPLETE'&&<p className="alpha-session-stats" aria-label="Session statistics"><span>Open P/L <strong>{view.analysis.account.unrealizedIndicative===null?'—':view.analysis.account.unrealizedIndicative}</strong></span><span>Trades <strong>{view.analysis.metrics.tradeCount}</strong></span><span>Win <strong>{view.analysis.metrics.winRate?ratioLabel(view.analysis.metrics.winRate,{percent:true}):'—'}</strong></span></p>}</section>
       <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} drawRequest={drawRequest} focus={focus} onFocus={setFocus} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onPause={()=>setPauseToken(n=>n+1)} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);writeTimeframe(timeframeKey(view.metadata.id),tf);})}
         onAdvance={advanceTo} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
@@ -231,6 +238,7 @@ export default function TickAlpha(){
         <button type="button" aria-label="More tools" onClick={event=>openPanel('tools',event)}><Icon name="settings"/><span>More</span></button>
       </nav>
     </>}
+    {view&&<AlphaTradeToast event={tradeEvent} onDismiss={dismissTrade}/>}
     <footer role="status" aria-live="polite" className={notice&&view?'has-notice':undefined}>{noticeText(notice)||(busy?'Processing your request… Replay and order controls will unlock when it finishes.':catalog?`${isAccountPage()?'Verified workspace research':'Private local research'} · source limitations available in Data source`:'Service required. No fallback market feed.')}{notice&&view&&<button type="button" className="alpha-notice-dismiss" aria-label="Dismiss message" onClick={()=>setNotice('')}>×</button>}</footer>
     {dialog==='tools'&&view&&<WorkspaceModal returnFocusRef={returnFocus} label="Tools" onClose={()=>setDialog(null)}><section className="alpha-dialog alpha-tools-sheet"><div className="alpha-terminal-heading"><h2>Tools</h2><button onClick={()=>setDialog(null)}>Close</button></div>
       <div className="alpha-tools-grid">

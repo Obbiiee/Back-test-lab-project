@@ -8,6 +8,7 @@ import {IndicatorPreferences} from '../workspacePreferences.js';
 import {displayBars,historyPage,TIMEFRAMES} from './display.js';
 import {timeframeLabel} from './replay.js';
 import AlphaReplayControls from './AlphaReplayControls.jsx';
+import AlphaLegend from './AlphaLegend.jsx';
 import {api,sessionPath} from './client.js';
 
 import {accountStorageKey,accountTransport} from './accountClient.js';
@@ -85,6 +86,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,pending,o
       <details className="alpha-info-pop"><summary aria-label="Data provenance and chart limitations" title="Data provenance and limitations">i</summary><div role="note">
         <p><strong>{view.label??'Session'}</strong> · Mid-price display · volume unavailable · {view.chart.candles.length} revealed bars{view.chart.windowStartGroup!=='0'?' (bounded window may start inside a bucket)':''}.</p>
         <p>Bid {view.quote?.bid??'unavailable'} / Ask {view.quote?.ask??'unavailable'}. Execution uses observed Bid/Ask ticks; candles are display only. Drawings and indicators are research aids; position drawings are planning estimates. {view.replayStepNs?'Historical candles use recorded row order; order within a timestamp remains unverified. ':''}Committed financial history cannot be rewound; create a separate Session for another experiment.</p>
+        <p className="alpha-shortcuts"><strong>Shortcuts</strong> · <kbd>Space</kbd> play/pause · <kbd>Shift</kbd>+<kbd>→</kbd> step tick · <kbd>N</kbd> next candle · <kbd>Esc</kbd> exit focus / close menus</p>
         {past.key===historyKey&&past.status&&<p role="status">{past.status} <button type="button" onClick={()=>setHistoryRetry(value=>value+1)}>Retry earlier candles</button></p>}
       </div></details>
       {onFocus&&<button type="button" className="alpha-focus-toggle" aria-pressed={focus} title={focus?'Exit focus (Esc)':'Focus: chart fills the screen'} onClick={()=>onFocus(!focus)}><Icon name="expand"/><span>{focus?'Exit focus':'Focus'}</span></button>}
@@ -108,6 +110,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,pending,o
           tickEvidence={view.analysis} researchOnly followLatest={follow}
           drawingMode={mode} onDrawingModeChange={setMode} chartPreferences={preferences} onChartPreferencesChange={setPreferences}
           command={chartCommand} onDrawingStateChange={setDrawingState} indicatorRegistry={productionRegistry} indicatorInstances={instances} onIndicatorError={indicatorError} onPriceSelect={onPriceSelect} onCreateOrder={onPlanDrawing}/>
+        <AlphaLegend view={view}/>
       </div>
       {objectsOpen&&<aside className="alpha-object-panel" aria-label="Drawing objects"><h2>Drawing objects</h2><p>Select a drawing to edit its handles on the chart.</p>{!drawingState.drawings.length&&<p>No drawings yet.</p>}{drawingState.drawings.map((item,index)=><div key={item.id}><button onClick={()=>command(`object:select:${item.id}`)}>{index+1}. {item.type.replaceAll('-',' ')}</button>{['edit','hide','lock','delete'].map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} onClick={()=>command(`object:${action}:${item.id}`)}>{action==='hide'&&item.hidden?'Show':action==='lock'&&item.locked?'Unlock':action}</button>)}</div>)}</aside>}
     </div>

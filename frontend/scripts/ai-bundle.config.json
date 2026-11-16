@@ -87,6 +87,8 @@
     "frontend/src/tickAlpha/replay.js",
     "frontend/src/tickAlpha/replayPending.js",
     "frontend/src/tickAlpha/AlphaReplayControls.jsx",
+    "frontend/src/tickAlpha/AlphaLegend.jsx",
+    "frontend/src/tickAlpha/AlphaTradeToast.jsx",
     "backend/execution/__init__.py",
     "backend/execution/contracts.py",
     "backend/execution/engine.py",

@@ -105,6 +105,10 @@ Phone **Chart** button now collapses the terminal (it was a no-op); a click whil
 
 Still open: needs the real backend — account-transport behaviour of hundreds of sequential commands, the 256-advance-target limit of non-indexed fixture Sessions at Play cadence, loss of the saved target if browser storage is cleared while the server holds a pending target (`ADVANCE_IN_PROGRESS`), a lighter view endpoint to avoid reloading chart+analysis per partial advance. No automated browser tests are committed (manual QA only).
 
+## Polish pass (third)
+
+Chart legend (latest revealed candle O/H/L/C + observed Bid/Ask and exact decimal spread, labelled as the execution basis), Session statistics chips (open P/L, trades, win rate from the server projection), a trade toast for committed fills and exits (server strings only), 0.5x playback speed, shortcut list in the info popover. Bug found and fixed while testing: a rejected Step tick overwrote the saved unfinished ADVANCE target, making Continue saved loop on ADVANCE_IN_PROGRESS; an unfinished ADVANCE target is now never overwritten and blocks other replay actions until continued. Verified in the synthetic harness at 1000x700 and 390x844 (toast, legend, chips, guard); not re-measured at the seven sizes.
+
 ## Roadmap (P2, not built)
 
 Multi-chart layouts, social strategies, drag-to-modify live orders, exact-tick landing for Jump
