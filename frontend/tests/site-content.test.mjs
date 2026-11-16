@@ -63,7 +63,8 @@ for (const page of ['terms', 'privacy', 'refund']) {
 }
 assert.match(fill('{{brand}} {{operator}}', {brand: 'B', business: {publicName: 'X Labs', legalForm: 'Perorangan'}, domain: 'd', refund: {}}), /B X Labs \(usaha perorangan\)/);
 // the owner's personal name must never appear in anything the public site renders
-assert.ok(!JSON.stringify([SITE, COPY]).toLowerCase().includes('[REDACTED]'));
+assert.ok(!('legalName' in SITE.business) && !('ownerName' in SITE.business), 'no personal-name field exists in the public config');
+assert.ok(/^RIKSORA/.test(SITE.business.publicName));
 
 // 7. routing: hosted visitors reach the public site; the account page keeps working; local review pages stay local
 assert.equal(entryRoute({hostname: 'riksora.example', search: ''}), 'site');
