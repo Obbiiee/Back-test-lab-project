@@ -264,6 +264,35 @@ class ResearchSessionTests(unittest.TestCase):
             sessionId=view['metadata']['id'],commandId='advance:'+uuid.uuid4().hex,expectedRevision=view['state']['revision'],
             kind='ADVANCE',payload={'targetNs':str(int(view['state']['throughNs'])+steps*STEP_NS)}))
 
+    def test_workspace_reports_committed_pending_target_after_reopen(self):
+        view, body = self.create()
+        session = body['id']
+        self.assertIsNone(view['pendingReplayTargetNs'])
+        target = str(int(view['state']['throughNs']) + 80 * STEP_NS)
+        first = self.advance(view, 80)
+        self.assertFalse(first['replay']['exhaustedThroughBoundary'])
+
+        cold_app = ResearchApplication(DSN, self.scope)
+        try:
+            restored = cold_app.workspace(session, {'timeframe':'1h'})
+            self.assertEqual(restored['pendingReplayTargetNs'], target)
+            self.assertLess(int(restored['state']['throughNs']), int(target))
+            command = dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-COMMAND-1',
+                sessionId=session, commandId='advance:'+uuid.uuid4().hex,
+                expectedRevision=restored['state']['revision'], kind='ADVANCE',
+                payload={'targetNs': str(int(target) + STEP_NS)})
+            with self.assertRaisesRegex(ContractError, 'ADVANCE_IN_PROGRESS'):
+                cold_app.apply(session, command)
+            self.assertEqual(cold_app.inspect(session)['pendingReplayTargetNs'], target)
+
+            command['payload']['targetNs'] = restored['pendingReplayTargetNs']
+            receipt = cold_app.apply(session, command)
+            self.assertTrue(receipt['replay']['exhaustedThroughBoundary'])
+            self.assertEqual(cold_app.apply(session, command), receipt)
+            self.assertIsNone(cold_app.workspace(session, {'timeframe':'D'})['pendingReplayTargetNs'])
+        finally:
+            cold_app.close()
+
     def test_method_inheritance_immutable_and_idempotent_creation(self):
         view,body=self.create('PROTOCOL',True)
         self.assertEqual(view['state']['policy']['kind'],'PROTOCOL')

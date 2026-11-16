@@ -89,9 +89,9 @@ export function scrubStep(targetNs,timeframe,direction,range){
   return String(moved<range.startNs?range.startNs:moved>range.endNs?range.endNs:moved);
 }
 // Unfinished ADVANCE target reported by the service (the server is the authority; nothing is stored in
-// the browser). Observed Sessions report pendingReplayTargetNs, local ones state.pendingTargetNs.
+// the browser). Older transports may omit the canonical field.
 export function pendingTarget(view){
-  const target=view?.pendingReplayTargetNs??view?.state?.pendingTargetNs;
-  if(typeof target!=='string'||!/^[0-9]{1,20}$/.test(target))return null;
+  const target=view&&Object.hasOwn(view,'pendingReplayTargetNs')?view.pendingReplayTargetNs:view?.state?.pendingTargetNs;
+  if(typeof target!=='string'||!/^(0|[1-9][0-9]{0,19})$/.test(target))return null;
   return BigInt(target)>BigInt(view.state.throughNs)?{kind:'ADVANCE',target}:null;
 }

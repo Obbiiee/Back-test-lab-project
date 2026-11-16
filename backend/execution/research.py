@@ -421,7 +421,8 @@ class ResearchApplication:
                               (self.scope.workspace_id,session_id)).fetchall()
             view = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-VIEW-1", metadata=meta, method=method, state=state,
                         events=[unpack(*row) for row in reversed(rows)], eventWindowStart=max(0,state["nextEventIndex"]-256),
-                        quote=self._quote(state,checkpoint), label=self.__label)
+                        quote=self._quote(state,checkpoint), label=self.__label,
+                        pendingReplayTargetNs=checkpoint['cursor']['pendingTargetNs'])
             if self.__historical:
                 view['replayStepNs'] = '1000000000'
             if timeframe is not None:

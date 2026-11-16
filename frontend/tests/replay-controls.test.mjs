@@ -61,6 +61,9 @@ assert.equal(scrubStep(range.startNs,'1h',-1,range),String(range.startNs));asser
 assert.equal(scrubRange({metadata:{startPeriod:'bogus'}}),null);
 assert.deepEqual(pendingTarget({pendingReplayTargetNs:'9',state:{throughNs:'5'}}),{kind:'ADVANCE',target:'9'},'observed Sessions report pendingReplayTargetNs');
 assert.deepEqual(pendingTarget({state:{throughNs:'5',pendingTargetNs:'9'}}),{kind:'ADVANCE',target:'9'});
+assert.equal(pendingTarget({pendingReplayTargetNs:null,state:{throughNs:'5',pendingTargetNs:'9'}}),null);
+assert.equal(pendingTarget({pendingReplayTargetNs:'4',state:{throughNs:'5',pendingTargetNs:'9'}}),null);
+assert.equal(pendingTarget({pendingReplayTargetNs:'09',state:{throughNs:'5'}}),null);
 assert.equal(pendingTarget({pendingReplayTargetNs:'5',state:{throughNs:'5'}}),null);assert.equal(pendingTarget({pendingReplayTargetNs:null,state:{throughNs:'5'}}),null);assert.equal(pendingTarget({state:{throughNs:'5'}}),null);}
 
 // Source contracts of the replay UI.
