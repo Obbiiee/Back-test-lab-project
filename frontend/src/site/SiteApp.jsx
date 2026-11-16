@@ -4,7 +4,7 @@ import './site.css';
 import {RiksoraMark} from '../tickAlpha/AlphaBrand.jsx';
 import {SITE} from './siteConfig.js';
 import {COPY, CLAIMS, fill} from './content.js';
-import {FREE_LIMITS, formatIdr, currentPrice} from './plans.js';
+import {FREE_LIMITS, formatIdr, currentPrice, yearlySavingPercent} from './plans.js';
 
 export const PAGES = ['home', 'pricing', 'about', 'contact', 'terms', 'privacy', 'refund'];
 
@@ -73,6 +73,7 @@ function ProCard({t, period, withCta}) {
         : <span className="site-pending">{t.pricing.pending}</span>}
     </p>
     {price && price.listPriceIdr && <p className="site-promo">{p.saving} {price.savingPercent}% · {p.until} {price.endsOn}</p>}
+    {price && period === 'yearly' && yearlySavingPercent(SITE) > 0 && <p className="site-promo">{p.saving} {yearlySavingPercent(SITE)}% {p.vsMonthly} · {p.perMonthEquivalent} {formatIdr(Math.round(price.priceIdr / 12))} / {t.lang === 'en' ? 'month' : 'bulan'}</p>}
     <ul>{p.features.map(item => <li key={item}>{item}</li>)}</ul>
     {SITE.pro.taxNote && <p className="site-fine">{SITE.pro.taxNote}</p>}
     {withCta && <a className="site-primary" href={account}>{t.pricing.buy}</a>}

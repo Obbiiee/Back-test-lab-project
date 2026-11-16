@@ -27,3 +27,11 @@ export function currentPrice(site, period, todayIso) {
   }
   return {priceIdr: plan.priceIdr, listPriceIdr: null, savingPercent: 0, periodDays: plan.periodDays, endsOn: null};
 }
+
+// Honest comparison from the prices actually charged: how much cheaper the yearly period is than twelve monthly payments (0 when it is not cheaper).
+export function yearlySavingPercent(site) {
+  const monthly = site.pro.monthly.priceIdr, yearly = site.pro.yearly.priceIdr;
+  if (!Number.isInteger(monthly) || !Number.isInteger(yearly) || monthly <= 0) return 0;
+  const twelve = monthly * 12;
+  return yearly < twelve ? Math.round(100 * (twelve - yearly) / twelve) : 0;
+}
