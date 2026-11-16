@@ -13,7 +13,7 @@ import {api,sessionPath} from './client.js';
 
 import {accountStorageKey,accountTransport} from './accountClient.js';
 
-export default function AlphaWorkspace({view,timeframe,busy,pauseToken,pending,onPause,onTimeframe,onAdvance,onNotice,onPriceSelect,onPlanDrawing,objectsOpen,drawRequest=null,focus=false,onFocus}){
+export default function AlphaWorkspace({view,timeframe,busy,pauseToken,pending,onPause,onTimeframe,onAdvance,onJumpNextEvent,onNotice,onPriceSelect,onPlanDrawing,objectsOpen,drawRequest=null,focus=false,onFocus}){
   const workspaceKey=accountStorageKey(view.replayStepNs?`tick-historical:${view.state.datasetVersion}:${view.metadata.id}`:`tick-alpha:${view.metadata.id}`);
   const [savedIndicators]=useState(()=>{
     const store=new IndicatorPreferences(()=>globalThis.localStorage,workspaceKey,productionRegistry);
@@ -114,6 +114,6 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,pending,o
       </div>
       {objectsOpen&&<aside className="alpha-object-panel" aria-label="Drawing objects"><h2>Drawing objects</h2><p>Select a drawing to edit its handles on the chart.</p>{!drawingState.drawings.length&&<p>No drawings yet.</p>}{drawingState.drawings.map((item,index)=><div key={item.id}><button onClick={()=>command(`object:select:${item.id}`)}>{index+1}. {item.type.replaceAll('-',' ')}</button>{['edit','hide','lock','delete'].map(action=><button key={action} aria-label={`${action} drawing ${index+1}`} onClick={()=>command(`object:${action}:${item.id}`)}>{action==='hide'&&item.hidden?'Show':action==='lock'&&item.locked?'Unlock':action}</button>)}</div>)}</aside>}
     </div>
-    <AlphaReplayControls view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onAdvance={onAdvance} onNotice={onNotice}/>
+    <AlphaReplayControls view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onAdvance={onAdvance} onJumpNextEvent={onJumpNextEvent} onPan={seconds=>command('goto:'+seconds)} onNotice={onNotice}/>
   </section>;
 }

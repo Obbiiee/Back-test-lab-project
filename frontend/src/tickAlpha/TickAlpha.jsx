@@ -14,7 +14,7 @@ import AlphaSourceDetails from './AlphaSourceDetails.jsx';
 import AlphaFeedback from './AlphaFeedback.jsx';
 import {emitLocal} from './measurement.js';
 import {readPending,writePending,readTimeframe,writeTimeframe} from './replayPending.js';
-import {isLimitError,limitDelayMs,pause,tradeEvents} from './replay.js';
+import {isLimitError,limitDelayMs,pause,tradeEvents,effectivePending} from './replay.js';
 import AlphaTradeToast from './AlphaTradeToast.jsx';
 import {ratioLabel} from './annotations.js';
 import Icon from '../workspace/WorkspaceIcon.jsx';
@@ -104,13 +104,15 @@ export default function TickAlpha(){
   const sessionIdForPending=view?.metadata.id;
   // pendingVersion bumps whenever the saved target is written or cleared.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pending=useMemo(()=>sessionIdForPending?readPending(pendingKey(sessionIdForPending)):null,[sessionIdForPending,pendingVersion]);
+  const localPending=useMemo(()=>sessionIdForPending?readPending(pendingKey(sessionIdForPending)):null,[sessionIdForPending,pendingVersion]);
+  // Server first: when the service exposes its unfinished target it is the authority; storage is a hint.
+  const pending=effectivePending(view,localPending);
   // One backend ADVANCE/SEEK to a canonical UTC target, resumed with the same target until the
   // cursor reaches it. Resolves {view,reached,cancelled} or false; single-flighted via run().
   const advanceTo=(kind,targetNs,{signal,onProgress}={})=>run(async()=>{
     let current=viewRef.current;const sessionId=current.metadata.id;
     // The server holds an unfinished ADVANCE target and refuses any other; keep that saved target intact.
-    const unfinished=readPending(pendingKey(sessionId));
+    const unfinished=effectivePending(current,readPending(pendingKey(sessionId)));
     if(unfinished?.kind==='ADVANCE'&&unfinished.target!==targetNs&&BigInt(unfinished.target)>BigInt(current.state.throughNs))throw Error('ADVANCE_IN_PROGRESS');
     savePending(sessionId,{kind,target:targetNs});
     try{
@@ -143,6 +145,41 @@ export default function TickAlpha(){
     }
     throw Error('Replay target needs more steps than one request budget. Use Continue saved.');
     }catch(error){if(/^(REFUSED_|BACKWARD_ADVANCE|BEFORE_SESSION_START)/.test(error.message))savePending(sessionId,null);throw error;}
+  });
+  // Canonical, server-owned Next Event search (BTL-JUMP-NEXT-EVENT-1): the backend processes bounded
+  // chunks of canonical ticks through the ADVANCE reducer and reports committed financial events.
+  // Cancel stops between committed chunks; progress is durable server-side, so Next event simply
+  // continues. Resolves {unsupported:true} when this service has no such route.
+  const jumpSupport=useRef(null);
+  const jumpNextEvent=({signal,onProgress})=>run(async()=>{
+    if(jumpSupport.current===false)return {unsupported:true};
+    let current=viewRef.current,processed=0;
+    const sessionId=current.metadata.id,requestId=crypto.randomUUID().replaceAll('-','');
+    for(let step=0;step<4096;step++){
+      if(signal?.aborted)return {status:'SEARCHING',view:current,cancelled:true};
+      let result;
+      for(let retry=0;result===undefined;retry++){
+        try{
+          result=await api(sessionPath(sessionId)+'/jump-next-event',{schemaVersion:1,artifact:'BTL-JUMP-NEXT-EVENT-1',requestId,sessionId,expectedRevision:current.state.revision,timeframe});
+        }catch(error){
+          if(step===0&&retry===0&&/not found/i.test(error.message)){jumpSupport.current=false;return {unsupported:true};}
+          if(retry>=6||signal?.aborted)throw error;
+          if(isLimitError(error.message)){await pause(limitDelayMs(error.message,retry),signal);continue;}
+          if(error.message==='REFUSED_STALE_REVISION'){current=await loadWorkspace(sessionId);viewRef.current=current;setView(current);continue;}
+          throw error;
+        }
+      }
+      let verified;
+      try{verified=result?.artifact==='BTL-JUMP-NEXT-EVENT-RESULT-1'&&result.requestId===requestId&&result.sessionId===sessionId
+        &&['EVENT_FOUND','SEARCHING','NO_EVENT_UNTIL_SESSION_END','NO_ACTIVE_ORDERS'].includes(result.status)
+        &&result.view?.metadata?.id===sessionId&&BigInt(result.view.state.revision)>=BigInt(current.state.revision)&&result.view.state.throughNs===result.throughNs;}catch{verified=false;}
+      if(!verified)throw Error('Next event result could not be verified. Reload the saved Session before continuing.');
+      {const events=tradeEvents(current,result.view);if(events.length)setTradeEvent(events.at(-1));}
+      current=result.view;viewRef.current=current;setView(current);processed+=Number(result.processedGroups)||0;
+      onProgress?.({throughNs:result.throughNs,processedGroups:processed});
+      if(result.status!=='SEARCHING'){emitLocal('replay_advanced');if(result.events?.some(event=>event.kind==='EXIT_FILL'))emitLocal('order_outcome_committed');if(result.events?.some(event=>event.kind==='UNRESOLVED'))emitLocal('order_outcome_unresolved');return result;}
+    }
+    return {status:'SEARCHING',view:current,limit:true};
   });
   const edit=patch=>{setPlan(p=>({...p,...patch}));setPlanRevision(r=>r+1);setReview(null);};
   // Buy/Sell in the order bar only preselect the side; review and confirmation stay mandatory.
@@ -220,7 +257,7 @@ export default function TickAlpha(){
         setConnecting(true);try{const result=await loadResearchContext(new URL(window.location.href).searchParams.get('session'),{timeframe});setCatalog(result.catalog);setView(result.view);}finally{setConnecting(false);}
       })}>Retry connection</button></section>:!view?<AlphaSessions catalog={catalog} busy={busy} onOpen={session=>run(()=>reopen(session))} onCreate={openCreation} onSource={openSource}/>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><button type="button" className="alpha-pair-pill" aria-label="Pair XAUUSD, show pairs" onClick={event=>openPanel('pair',event)}><span aria-hidden="true">Au</span>XAUUSD<span aria-hidden="true">▾</span></button><p><strong>XAUUSD</strong><span className="alpha-source-credit"> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button></span> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p>{view.analysis?.status==='COMPLETE'&&<p className="alpha-session-stats" aria-label="Session statistics"><span>Open P/L <strong>{view.analysis.account.unrealizedIndicative===null?'—':view.analysis.account.unrealizedIndicative}</strong></span><span>Trades <strong>{view.analysis.metrics.tradeCount}</strong></span><span>Win <strong>{view.analysis.metrics.winRate?ratioLabel(view.analysis.metrics.winRate,{percent:true}):'—'}</strong></span></p>}</section>
-      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} drawRequest={drawRequest} focus={focus} onFocus={setFocus} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onPause={()=>setPauseToken(n=>n+1)} onNotice={setNotice}
+      <div className="alpha-workspace"><AlphaWorkspace objectsOpen={objectsOpen} drawRequest={drawRequest} focus={focus} onFocus={setFocus} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} pending={pending} onJumpNextEvent={jumpNextEvent} onPause={()=>setPauseToken(n=>n+1)} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);writeTimeframe(timeframeKey(view.metadata.id),tf);})}
         onAdvance={advanceTo} onPriceSelect={price=>edit({entry:String(price)})} onPlanDrawing={drawing=>{
           setPauseToken(n=>n+1);returnFocus.current=document.activeElement;setDialog('ticket');

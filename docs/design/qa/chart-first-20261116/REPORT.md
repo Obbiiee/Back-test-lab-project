@@ -109,6 +109,20 @@ Still open: needs the real backend — account-transport behaviour of hundreds o
 
 Chart legend (latest revealed candle O/H/L/C + observed Bid/Ask and exact decimal spread, labelled as the execution basis), Session statistics chips (open P/L, trades, win rate from the server projection), a trade toast for committed fills and exits (server strings only), 0.5x playback speed, shortcut list in the info popover. Bug found and fixed while testing: a rejected Step tick overwrote the saved unfinished ADVANCE target, making Continue saved loop on ADVANCE_IN_PROGRESS; an unfinished ADVANCE target is now never overwritten and blocks other replay actions until continued. Verified in the synthetic harness at 1000x700 and 390x844 (toast, legend, chips, guard); not re-measured at the seven sizes.
 
+## Integration pass: Next event, recovery, scrubber (PR #56 vs PR #53)
+
+**Divergence found.** PR #53 (`58b3cb9`, 397 commits ahead of main, not in main) owns the canonical server-side `jump-next-event` (`BTL-JUMP-NEXT-EVENT-1`, durable, stops on committed ENTRY_FILL/EXIT_FILL/UNRESOLVED) and hosted `replay-to`. This branch is built on main, whose backend has no such route. A real merge was NOT done: a dry run conflicts in the backend (`timeline_v2.py`, `requirements.txt`) and in the frontend (`TickAlpha`, `AlphaWorkspace`, `AlphaTerminal`, `CandleChart`, `display`; `AlphaSessions` is deleted upstream). Main and #53 also conflict with each other in the backend. The integration order needs an owner decision.
+
+**Done instead (contract-compatible, feature-detected).** Next event now calls `POST /sessions/{id}/jump-next-event` with the #53 request/result contract: verified result artifact, requestId, session and monotonic revision; bounded chunks; cancel between committed chunks; busy/limit retry; stale revision reloaded; trade toast from committed rows. Only if the service answers Not Found does it fall back to the approximate candle search, and it says so. Verified in the harness against a mock of that contract (progress, EVENT_FOUND, cancel, resume, fallback). NOT verified against the real #53 backend.
+
+**ADVANCE_IN_PROGRESS / Continue saved audit.** The server is the authority when it reports `state.pendingTargetNs` (even null): it overrides browser storage, so Continue works with empty localStorage and a stale hint never blocks (harness-verified, both cases). Storage is only a hint for services that do not report the field (current main backend: it does not). **Backend blocker (small, read-only):** expose the cursor's `pendingTargetNs` in the Session view; until then a lost hint after a refused advance cannot be recovered from the page. An unfinished ADVANCE target is never overwritten and blocks other replay actions; a timeframe change does not touch it; limit errors retry with bounded back-off.
+
+**Scrubber.** Compact track inside the replay strip (phone: its own 36 px row). Left of the cursor = pan the chart over already revealed candles only (`goto` view command; no Session call). Right of the cursor = proposed future target with a confirm chip; only after Go does it call the existing forward SEEK (single-flight, pending-aware); nothing future is drawn. It shows cursor, % of the month revealed and the unfinished target (hatched); pointer/touch drag; keyboard (arrows by candle, Home/End, Enter, Esc); ARIA slider. End-of-dataset verified (controls disable).
+
+**Plot size after scrubber** (CSS px, plot = `.alpha-chart-host`): 1920×1080 1840×851 (79 %, unchanged); 1440×900 1360×671 (75 %, unchanged); 1366×768 1286×539 (70 %, unchanged); 768×1024 688×732 (71 %, was 75 %: the time label wraps to a second row); 390×844 390×439 (52 %, was 57 %); 360×800 360×396 (50 %, was 54 %); 844×390 764×230 (59 %, unchanged). Phones and tablet portrait lose 4–5 points to the scrubber row; desktop loses nothing.
+
+**Real backend / PostgreSQL:** NOT RUN (none on this machine; VPS1 untouched).
+
 ## Roadmap (P2, not built)
 
 Multi-chart layouts, social strategies, drag-to-modify live orders, exact-tick landing for Jump

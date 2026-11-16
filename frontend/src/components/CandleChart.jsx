@@ -282,6 +282,7 @@ function CandleChart({ candles, transition, sessionId, viewportKey = sessionId, 
         if (["hide", "lock"].includes(operation)) { const key = operation === "hide" ? "hidden" : "locked"; commitDrawings(current => current.map(item => item.id === id ? { ...item, [key]: !item[key] } : item)); }
         if (operation === "edit") { const object = objectBridge.objects.find(item => item.id === id); if (object) setDrawingSettings({ ...object, points: object.points.map(point => ({ ...point })) }); }
       }
+      if (action.startsWith("goto:")) { const time = Number(action.slice(5)); const scale = chartRef.current?.timeScale(); const range = scale?.getVisibleLogicalRange(); if (scale && range && Number.isFinite(time) && candles.length) { let index = candles.findIndex(bar => bar.time >= time); if (index < 0) index = candles.length - 1; const half = (range.to - range.from) / 2; scale.setVisibleLogicalRange({ from: index - half, to: index + half }); } }
       if (action === "latest") { chartRef.current?.priceScale("right").applyOptions({ autoScale: true }); chartRef.current?.timeScale().scrollToRealTime(); }
       if (action === "fit" || action === "new-layout") { chartRef.current?.priceScale("right").applyOptions({ autoScale: true, mode: 0 }); chartRef.current?.timeScale().fitContent(); }
       if (action === "percent" || action === "log") chartRef.current?.priceScale("right").applyOptions({ mode: action === "log" ? 1 : 2 });

@@ -237,3 +237,36 @@
   .tick-alpha .alpha-session-stats{display:none}
   .alpha-toast{left:10px;right:10px;width:auto;bottom:calc(236px + env(safe-area-inset-bottom))}
 }
+
+/* ---- Replay scrubber: lives inside the replay strip (no extra row, no plot height lost) ---- */
+.tick-alpha .alpha-scrub{position:relative;flex:1 1 auto;min-width:0;width:100%}
+.tick-alpha .alpha-scrub-row{display:none}
+.tick-alpha.is-session .alpha-replay-controls>.alpha-scrub-inline{flex:1 1 220px;min-width:140px;display:flex;align-self:center}
+.tick-alpha .alpha-scrub-track{position:relative;height:26px;cursor:pointer;touch-action:none;border-radius:6px;-webkit-tap-highlight-color:transparent}
+.tick-alpha .alpha-scrub-track::before{content:"";position:absolute;left:0;right:0;top:11px;height:4px;border-radius:2px;background:#1d3560}
+.tick-alpha .alpha-scrub-revealed{position:absolute;left:0;top:11px;height:4px;border-radius:2px;background:var(--lp-blue,#0f67d8)}
+.tick-alpha .alpha-scrub-pending{position:absolute;top:11px;height:4px;background:repeating-linear-gradient(45deg,#ffce55 0 4px,transparent 4px 8px)}
+.tick-alpha .alpha-scrub-thumb{position:absolute;top:6px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:3px solid var(--lp-blue,#0f67d8);box-sizing:border-box;box-shadow:0 1px 4px #0008}
+.tick-alpha .alpha-scrub-track:hover .alpha-scrub-thumb,.tick-alpha .alpha-scrub-track:focus-visible .alpha-scrub-thumb{transform:scale(1.15)}
+.tick-alpha .alpha-scrub-ghost{position:absolute;top:3px;width:2px;height:20px;margin-left:-1px;background:#d9eafe;pointer-events:none}
+.tick-alpha .alpha-scrub-ghost.is-future{background:#ffce55}
+.tick-alpha .alpha-scrub-ghost em{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);padding:1px 7px;border-radius:999px;background:#0c2655;border:1px solid #2b4878;color:#fff;font:600 10px var(--rk-font-data,ui-monospace,monospace);white-space:nowrap}
+.tick-alpha .alpha-scrub-confirm{position:absolute;right:0;bottom:calc(100% + 8px);z-index:41;display:flex;align-items:center;gap:6px;padding:6px 8px 6px 12px;border-radius:999px;border:1px solid #2b4878;background:#0c2655;color:#d9eafe;font-size:12px;white-space:nowrap;box-shadow:0 8px 24px #0006}
+.tick-alpha .alpha-scrub-confirm strong{color:#fff;font-family:var(--rk-font-data,ui-monospace,monospace)}
+.tick-alpha .alpha-scrub-confirm button{min-height:26px;padding:0 12px;border-radius:999px;border:1px solid #2b4878;background:#0e1a33;color:#fff;font-weight:700;cursor:pointer}
+.tick-alpha .alpha-scrub-confirm .alpha-scrub-go{background:var(--rk-blue-strong,#1378f5);border-color:transparent}
+.tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{flex:0 1 auto;max-width:38%}
+@media (max-width:760px){
+  .tick-alpha.is-session .alpha-replay-controls>.alpha-scrub-inline{display:none}
+  .tick-alpha.is-session .alpha-scrub-row{display:block;flex:none;margin:0 14px 4px}
+  .tick-alpha .alpha-scrub-track{height:36px}
+  .tick-alpha .alpha-scrub-track::before,.tick-alpha .alpha-scrub-revealed,.tick-alpha .alpha-scrub-pending{top:16px}
+  .tick-alpha .alpha-scrub-thumb{top:8px;width:20px;height:20px;margin-left:-10px}
+  .tick-alpha .alpha-scrub-ghost{top:4px;height:28px}
+  .tick-alpha .alpha-scrub-ghost em{display:none}
+  .tick-alpha .alpha-scrub-confirm{position:fixed;left:10px;right:10px;bottom:calc(150px + env(safe-area-inset-bottom));justify-content:space-between;border-radius:16px;padding:10px 12px}
+  .tick-alpha .alpha-scrub-confirm button{min-height:44px;padding:0 18px}
+}
+@media (min-width:761px) and (max-width:1100px) and (min-height:521px){
+  .tick-alpha.is-session .alpha-replay-controls .alpha-replay-time{max-width:none}
+}

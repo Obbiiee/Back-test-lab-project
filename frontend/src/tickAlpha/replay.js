@@ -77,3 +77,45 @@ export function durationLabel(ns){
   const minutes=Math.floor(seconds/60);seconds%=60;
   return days?`${days}d ${hours}h`:hours?`${hours}h ${minutes}m`:minutes?`${minutes}m ${String(seconds).padStart(2,'0')}s`:`${seconds}s`;
 }
+// ---- Scrubber geometry (presentation + target selection only) ----
+// The track spans the Session's calendar month. Left of the cursor is revealed history (pans the
+// chart only); right of it is future time that can only be reached through a confirmed forward
+// SEEK. No future candle is ever drawn by the scrubber.
+export function scrubRange(view){
+  const match=/^(\d{4})-(\d{2})$/.exec(view?.metadata?.startPeriod??'');
+  if(!match)return null;
+  const year=Number(match[1]),month=Number(match[2]);
+  if(month<1||month>12)return null;
+  return {startNs:BigInt(Date.UTC(year,month-1,1))*1000000n,endNs:BigInt(Date.UTC(year,month,1))*1000000n};
+}
+export function scrubFraction(ns,range){
+  const span=range.endNs-range.startNs;
+  if(span<=0n)return 0;
+  const value=Number((BigInt(ns)-range.startNs)*1000000n/span)/1000000;
+  return Math.min(1,Math.max(0,value));
+}
+export function scrubTarget(fraction,range){
+  const clamped=Math.min(1,Math.max(0,fraction));
+  const span=range.endNs-range.startNs;
+  const ns=range.startNs+span*BigInt(Math.round(clamped*1000000))/1000000n;
+  return String(ns/NS*NS); // whole seconds
+}
+export const scrubKind=(targetNs,throughNs)=>BigInt(targetNs)<=BigInt(throughNs)?'REVEALED':'FUTURE';
+export function scrubStep(targetNs,timeframe,direction,range){
+  const size=timeframeSeconds(timeframe)*NS;
+  const moved=BigInt(targetNs)+(direction<0?-size:size);
+  return String(moved<range.startNs?range.startNs:moved>range.endNs?range.endNs:moved);
+}
+// The server is the authority for an unfinished ADVANCE target when it exposes one
+// (state.pendingTargetNs). Browser storage is only a fallback hint.
+export function serverPendingTarget(view){
+  const target=view?.state?.pendingTargetNs;
+  if(typeof target!=='string'||!/^[0-9]{1,20}$/.test(target))return null;
+  return BigInt(target)>BigInt(view.state.throughNs)?{kind:'ADVANCE',target,source:'server'}:null;
+}
+// Server first: when the service reports pendingTargetNs (even null) it alone decides; the saved
+// browser hint is used only for services that do not report it.
+export function effectivePending(view,localHint){
+  if(view?.state&&Object.hasOwn(view.state,'pendingTargetNs'))return serverPendingTarget(view);
+  return localHint??null;
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {tradeEvents,durationLabel,isLimitError,limitDelayMs,pause,candleTarget,playbackTarget,widenScale,eventSignature,hasWatchedOrders,SPEEDS,PLAY_INTERVAL_MS,timeframeLabel,utcLabel} from '../src/tickAlpha/replay.js';
+import {effectivePending,scrubRange,scrubFraction,scrubTarget,scrubKind,scrubStep,serverPendingTarget,tradeEvents,durationLabel,isLimitError,limitDelayMs,pause,candleTarget,playbackTarget,widenScale,eventSignature,hasWatchedOrders,SPEEDS,PLAY_INTERVAL_MS,timeframeLabel,utcLabel} from '../src/tickAlpha/replay.js';
 import {spreadLabel} from '../src/tickAlpha/display.js';
 import {readPending,writePending,readTimeframe,writeTimeframe} from '../src/tickAlpha/replayPending.js';
 
@@ -105,6 +105,23 @@ assert.equal(durationLabel('7500000000000'),'2h 5m');assert.equal(durationLabel(
 assert.equal(spreadLabel('2003.23','2003.43'),'0.20');assert.equal(spreadLabel('1.1','1.1002'),'0.0002');
 assert.equal(spreadLabel('2','1'),null);assert.equal(spreadLabel('1e3','2'),null);assert.equal(spreadLabel(undefined,'2'),null);
 
+// Scrubber geometry: month track, revealed vs future, server-first pending target.
+{const view={metadata:{startPeriod:'2020-01'},state:{throughNs:'1577923200000000000'}};const range=scrubRange(view);
+assert.equal(String(range.startNs),'1577836800000000000');assert.equal(String(range.endNs),'1580515200000000000');
+assert.equal(scrubFraction(range.startNs,range),0);assert.equal(scrubFraction(range.endNs,range),1);assert.equal(scrubFraction('0',range),0);
+assert.equal(scrubTarget(0,range),'1577836800000000000');assert.equal(scrubTarget(2,range),String(range.endNs));assert.equal(scrubTarget(0.5,range),'1579176000000000000');
+assert.equal(scrubKind('1577923200000000000',view.state.throughNs),'REVEALED');assert.equal(scrubKind('1577923201000000000',view.state.throughNs),'FUTURE');
+assert.equal(scrubStep(range.startNs,'1h',-1,range),String(range.startNs),'never before the month');
+assert.equal(scrubStep(range.endNs,'D',1,range),String(range.endNs),'never after the month');
+assert.equal(BigInt(scrubStep('1577923200000000000','1h',1,range))-1577923200000000000n,3600000000000n);
+assert.equal(scrubRange({metadata:{startPeriod:'bogus'}}),null);assert.equal(scrubRange({}),null);
+assert.deepEqual(serverPendingTarget({state:{throughNs:'5',pendingTargetNs:'9'}}),{kind:'ADVANCE',target:'9',source:'server'});
+assert.equal(serverPendingTarget({state:{throughNs:'9',pendingTargetNs:'9'}}),null);assert.equal(serverPendingTarget({state:{throughNs:'5'}}),null);assert.equal(serverPendingTarget({state:{throughNs:'5',pendingTargetNs:'x'}}),null);
+const hint={kind:'ADVANCE',target:'9'};
+assert.deepEqual(effectivePending({state:{throughNs:'5'}},hint),hint,'service without the field: browser hint');
+assert.equal(effectivePending({state:{throughNs:'5',pendingTargetNs:null}},hint),null,'service reporting null overrides a stale hint');
+assert.equal(effectivePending({state:{throughNs:'5',pendingTargetNs:'7'}},hint).target,'7','service target overrides the hint');}
+
 // Source contracts of the replay UI (no second engine, no OHLC settlement, cleanup).
 const controls=readFileSync(new URL('../src/tickAlpha/AlphaReplayControls.jsx',import.meta.url),'utf8');
 assert.ok(controls.includes("onAdvance('ADVANCE'")&&controls.includes("onAdvance('SEEK'"),'every replay action is a backend ADVANCE/SEEK');
@@ -115,5 +132,8 @@ const workspace=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.met
 assert.ok(workspace.includes('flight.current')&&workspace.includes('savePending(sessionId,{kind,target:targetNs})'));
 assert.ok(workspace.includes('isLimitError(error.message)')&&workspace.includes('REFUSED_STALE_REVISION'),'limits are retried and a stale revision is reconciled, never blindly replayed');
 assert.ok(workspace.includes("unfinished?.kind==='ADVANCE'")&&controls.includes('const blocked='),'an unfinished ADVANCE target is never overwritten and blocks other replay actions');
+const scrubber=readFileSync(new URL('../src/tickAlpha/AlphaReplayScrubber.jsx',import.meta.url),'utf8');
+assert.ok(scrubber.includes('onSeek(target)')&&scrubber.includes('Go')&&!/onAdvance|api[(]/.test(scrubber),'future time needs an explicit confirm and goes through the replay seek, never directly to the API');
+assert.ok(workspace.includes('/jump-next-event')&&workspace.includes('BTL-JUMP-NEXT-EVENT-1')&&workspace.includes('jumpSupport'),'canonical server-side Next event is preferred');
 assert.ok(workspace.includes('Replay made no progress'),'a stalled partial advance is refused, not retried forever');
 console.log('PASS replay controls: UTC candle targets (all timeframes, gaps, boundaries), playback-rate semantics, event detection, pending-target persistence and source contracts.');
