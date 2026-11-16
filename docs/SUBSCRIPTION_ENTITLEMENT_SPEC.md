@@ -12,73 +12,28 @@ Where Precision execution is possible from the selected dataset, entitlement mus
 
 Free/Pro subscription is independent from **Trading Method type (Free Style / Protocol)** and execution workflow (Quick / Planned).
 
-## Free tier — daily tradable research window
+## Free tier - daily historical replay budget
 
-The intended Free experience is a complete, credible Backtest Lab workflow with a capacity limit.
+Commercial policy `BTL-COMMERCIAL-HISTORICAL-REPLAY-BUDGET-1` gives each verified Free account **2,592,000 seconds (30 days) of historical cursor progress per entitlement day**. All workspaces, Sessions, pairs and Trading Methods share that budget. The account may choose any eligible start date and pair, use Protocol or Free Style, and make any number of trades or Methods under operational resource safeguards. Unused time expires at reset.
 
-### Daily allowance
+### Accounting and reset
 
-- A Free user may activate **one tradable historical window of up to one calendar month per daily entitlement period**.
-- The exact reset timezone/time and anti-abuse mechanics are implementation decisions to be defined before launch; they must be deterministic and visible to the user.
-- **Activating the monthly segment immediately consumes that day's Free allowance**, even if the user later trades or replays only part of the activated month. The allowance is not prorated by days used.
-- Once a window is activated, trading/replay execution is allowed inside that window.
-- The user may make multiple valid trades inside the activated window; the limit is the research window, not an arbitrary trade-count penalty.
-- The daily allowance must be enforced server-side once cloud entitlements exist.
+- Debit the positive difference between the old and new committed historical cursor, measured in UTC nanoseconds. Weekends, market gaps, and forward SEEK count by elapsed historical time. Chart pan, prehistory, receipt reads, and reporting consume no budget.
+- Authorize each bounded execution chunk against the account's current verified tier and remaining quota before reading evidence that could advance beyond it. Check the entire atomic timestamp boundary. Budget exhaustion leaves the cursor, positions, orders and evidence at the last committed state.
+- Serialize or reserve spending across Sessions on the account. Cursor progress and its debit belong to the same PostgreSQL transaction, including durable partial advances. Exact receipt retries and duplicate commands cannot spend again.
+- The commercial entitlement day resets at **00:00 Asia/Jakarta (WIB)**. Pin the day when the server admits the individual execution chunk after obtaining the account's budget lock or reservation. A chunk crossing midnight stays assigned to that day. Its next chunk must reauthorize for the new day. Queue arrival and HTTP response time do not determine the charge.
+- The existing `V2_SANDBOX_ONLY` activation policy stays pinned to UTC. Commercial policy uses a separate namespace. Existing sandbox activations and UTC quota rows retain their recorded meaning and never silently become WIB debits.
+- An upgrade or downgrade applies to subsequent research authorization. Previously committed receipts, positions, and evidence retain their history.
 
-### Historical context outside the tradable window
+Example. Ten historical days on EURUSD, twelve on XAUUSD and eight on GBPUSD exhaust the same account's daily budget. Opening another Session or signing in on another device shares that exhausted budget.
 
-Earlier historical data needed for legitimate chart context should remain viewable/read-only where data rights and product availability permit.
+### Review and continuation
 
-The user may use that context for analysis such as:
-- support/resistance;
-- market structure/trend;
-- drawings;
-- indicators;
-- contextual review.
+At exhaustion, the account may read already-revealed charts, results, Journal, Analytics and account settings. Execution and trade mutations are suspended until new capacity becomes available. Pending orders and open positions remain at the committed cursor. Continue resumes that Session with the same balance, Method, positions and evidence. A saved replay target remains server-owned and resumes only within the currently authorized frontier.
 
-Historical context outside the active Free tradable window must not silently become executable/tradable merely because it is visible.
+Free accounts may keep and switch between Sessions subject to measured storage and abuse controls. The legacy five-Session sandbox cap and one-window activation apply only to that sandbox version. Trash and retention remain lifecycle policies. Each rerun starts a separate Session.
 
-The product must visually distinguish **viewable context** from the **active tradable window** without changing the fundamental chart workflow.
-
-### Open-position boundary rule
-
-A subscription/window boundary must never manufacture a trade outcome.
-
-If a valid order/position is opened within the Free tradable window and remains active when the nominal calendar window ends, Backtest Lab may continue consuming the minimum subsequent market data necessary to resolve that already-open lifecycle according to the applicable strategy/protocol and execution rules.
-
-Examples include reaching SL/TP, cancellation/expiry where applicable, or another canonical terminal state permitted by the Trading Method. Protocol positions do not gain a manual-close exception from the entitlement boundary.
-
-This continuation:
-- does not grant a new general tradable month;
-- must not allow unrelated new entries outside the entitled window;
-- must preserve no-look-ahead and normal execution semantics;
-- ends when the outstanding authorized lifecycle is resolved.
-
-The next new Free tradable-window allowance becomes available according to the next daily entitlement period.
-
-## Free account/session capacity rules
-
-- The Free daily tradable allowance does **not** accumulate. If unused for a daily entitlement period, it expires rather than banking additional monthly segments.
-- A Free user may keep a maximum of **5 active/saved Sessions**.
-- At the five-Session limit, creating another active Session requires freeing a slot or upgrading to an applicable paid entitlement.
-- Deleting an active Session moves it to **Trash for 30 days** before permanent deletion. A trashed Session does not consume one of the five active/saved Free Session slots.
-- Restoring a Session from Trash makes it active/saved again and therefore consumes a slot. If the Free account is already at 5/5 active/saved Sessions, restore is blocked until the user frees a slot or obtains an applicable higher entitlement.
-- Session reset/restart is not a product workflow for Free or Pro. A separate experiment starts as a new Session.
-- Session duplication is not part of the intended product workflow.
-- A Free user with an available daily allowance may apply it to continuing an eligible prior Session or to starting an eligible new Session.
-- If a Pro user later returns to Free, prior research/results remain reviewable; new research actions follow current Free entitlements rather than destroying historical evidence.
-
-## Persistent Free backtest sessions
-
-A Backtest Session is a persistent research container, not a disposable one-month backtest.
-
-- A Free user may create a new Backtest Session or reopen a previous session.
-- The daily Free allowance may be applied to one eligible session to add/continue one tradable monthly segment.
-- A previous session remains reviewable after its tradable segment is completed.
-- On a later entitlement day, the user may continue that same session with the next eligible monthly segment, preserving its canonical trade history and cumulative results.
-- Alternatively, the user may spend that day's allowance on a new/different session.
-- The entitlement is account-level daily research capacity; creating many session records must not multiply the daily tradable allowance.
-- Continuation must preserve Trading Method identity, dataset/feed identity, execution profile and other reproducibility metadata. Material Method-rule changes require a new Trading Method rather than silently rewriting prior evidence.
+Earlier chart context is read-only, causally clipped, and subject to source rights and availability. It supports drawings, indicators, market structure and other contextual review.
 
 ### Dashboard and Session Overview
 
@@ -120,10 +75,7 @@ Advanced research visualization and analysis may remain Pro-gated when they repr
 
 ### Continue Session entitlement behavior
 
-When **Continue Session** is selected:
-- if the daily Free allowance is available, the user may activate the next eligible tradable monthly segment for that session and return to the Backtest Workspace;
-- if the daily allowance has already been consumed, the Session Overview and prior results remain accessible, but a new tradable segment cannot be activated until the next allowance or an applicable upgrade;
-- the existing open-position boundary rule still applies and must not manufacture outcomes.
+Continue Session reopens the existing ledger and accepted cursor. The next replay operation may spend the account's available budget. At exhaustion, the Session remains open for review. A later entitlement day supplies fresh capacity on that Session or any other eligible Session.
 
 ## Free trading capabilities
 
@@ -159,21 +111,15 @@ Exact definitions must use the canonical statistics/ledger contracts. Additional
 
 Advanced research surfaces may be Pro-gated or quota-limited, including capabilities such as deeper MAE/MFE analysis, large Monte Carlo workloads, parameter research, robustness analysis, walk-forward research, cross-feed comparison, advanced reporting, larger cloud storage/compute and higher AI-research allowances.
 
-## Pro tier
+## Paid tier and resource protection
 
-Pro uses the **same canonical engine and fundamental UX** without the Free daily one-month tradable-window restriction.
+Paid uses the same canonical engine without the Free daily historical budget. One Session continues from its chosen start through eligible months and years. It keeps the same instrument, feed, Method provenance, execution profile, starting balance, positions and ledger. A market-data partition boundary requires neither a new Session nor a user-selected end date. Signed manifest coverage, source gaps, rights, provider versions, fair-use and operational resource limits still govern availability.
 
-Subject to dataset coverage, licensing, infrastructure safeguards and fair-use/resource policy, Pro users may choose substantially larger/arbitrary research periods and conduct repeated experiments without the Free daily window gate.
+Server-verified Paid entitlement qualifies for protected API admission, direct research slots, durable queue and worker scheduling, PostgreSQL connections, rate and retry budgets, polling and Session views. Add storage/source I/O shielding where measurements identify an I/O bottleneck. Bound Free waiting and reserve Paid capacity. Schedule Free fairly within capacity and use bounded chunk boundaries to dispatch higher-priority work. Jobs already executing continue to a safe transaction boundary. Measure admission, queue wait and latency per tier under mixed load. Sandbox grants apply only in their explicitly isolated test configuration.
 
-Pro should primarily unlock:
-- greater historical research capacity;
-- more/larger saved experiments;
-- advanced analytics/research;
-- greater compute/storage quotas;
-- advanced comparison/validation workflows;
-- higher automation/AI allowances where applicable.
+### Implementation and acceptance status
 
-“Unlimited” in product copy must never override genuine infrastructure, licensing, abuse-prevention or fair-use constraints; those constraints must be transparent and must not falsify research results.
+The commercial ledger, all-route enforcement, verified Paid-first reservation and mixed-tier capacity gates remain pending. Existing sandbox billing and policy state keep their versioned contracts. Synthetic crossing of a partition cannot qualify observed historical coverage or production billing.
 
 ## UX continuity
 
@@ -191,28 +137,15 @@ Upgrade prompts should appear at meaningful entitlement boundaries, not interrup
 4. Never present a deliberately inadequate Free sample as statistically conclusive.
 5. Never conflate Free subscription with the Free Style Trading Method type.
 6. Entitlement checks control access/capacity; canonical domain engines control market/execution/research truth.
-7. Pricing, exact quotas beyond the agreed daily tradable-window concept, daily-entitlement reset timing/anti-abuse mechanics and commercial packaging require separate product decisions.
+7. Pricing and commercial packaging beyond this product policy require separate decisions.
 
 ## Intended product loop
 
-```text
-FREE
-Choose market/context
-    -> activate one-month tradable window
-    -> use the real Backtest Lab workflow/engine
-    -> complete trades/protocol
-    -> receive Basic Statistics
-    -> return on a later daily allowance or upgrade for greater research capacity
-
-PRO
-Same workflow/engine
-    -> broader research periods
-    -> repeated/larger experiments
-    -> advanced research/analytics/compute
-```
-
+Free traders choose an eligible market and start, replay and trade within their account-wide budget, then review results or resume later. Paid traders use the same workflow through continued qualified data coverage.
 
 ## Local sandbox access composition checkpoint - 2026-10-17
+
+This section records the historical sandbox activation policy. The commercial policy above supersedes it for commercial rollout.
 
 Existing journey grant permits an opt-in synthetic-only v2 API using verified identity and WorkspaceUnit membership locks retained through service commits. Enable only with an explicit reset timezone (UTC or Asia/Jakarta); the human reset choice is pending, so tests select their authored timezone and no default activation is assumed. Account-level serialization precedes all writes. Free keeps5 saved Sessions and one new calendar-month activation per local entitlement day across all workspaces; identical activation retries return existing evidence, conflicting same-day windows refuse. Activation consumes capacity immediately and pins Session/profile/dataset/month, independently from financial actions. Existing activated windows remain readable and executable within their immutable bounds. This demo source supports January2020 only; it does not claim a full historical month or support a later month. Outside-window ADVANCE is refused explicitly; open positions are never auto-settled. Source-backed lifecycle continuation is a dependent requirement before real multi-month rollout.
 
@@ -259,7 +192,7 @@ Sources: https://docs.midtrans.com/reference/request-body-json-parameter ; https
 
 ## Human-selected Beta chart prehistory — 2026-10-19
 
-Human requires Free to retain actual backtest trading and adequate earlier chart context for technical analysis/support-resistance drawings. Selected product target: at least two calendar years of qualified OHLC before the initial Session trading start, available to Free and Pro; do not substitute a fixed candle count for a calendar span. Trading allowance and earlier read-only chart context are distinct. One authorized trading month does not imply only one visible chart month. Source acquisition/population may follow on the VPS; this records a requirement, not implemented coverage or acquisition permission.
+Human requires Free to retain actual backtest trading and adequate earlier chart context for technical analysis/support-resistance drawings. Selected product target: at least two calendar years of qualified OHLC before the initial Session trading start, available to Free and Pro; do not substitute a fixed candle count for a calendar span. Trading allowance and earlier read-only chart context are distinct. The historical budget controls forward research progress. It is independent of visible past chart context. Source acquisition/population may follow on the VPS; this records a requirement, not implemented coverage or acquisition permission.
 
 Earlier analysis context may be sourced as qualified OHLC without retaining every historical tick. Preserve instrument/provider/dataset/version, precision/timezone/price basis/calendar and source gaps; disclose differences if chart OHLC and execution tick feeds differ. OHLC never settles an order, invents intrabar chronology or upgrades uncertain tick evidence. No consumer future provider/index/EOF capabilities. Full closed bars must be causally available by the replay cursor; any forming bar includes only already revealed observations, never its later high/low/close. Existing42.17/42.19 bounded sidecar/atomic timestamp contracts remain frozen.
 

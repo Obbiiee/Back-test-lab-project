@@ -8,7 +8,7 @@ Status: cross-phase product/domain authority. This document defines the intended
 User
   -> Trading Method
       -> Session
-          -> Monthly Segment(s)
+          -> Continuous Replay
               -> Trades
                   -> Canonical Events
 ```
@@ -131,17 +131,13 @@ Because the Trading Method identity is shared, Research may compare evidence acr
 
 This supports questions such as which instruments or market conditions show stronger evidence for a given method without conflating differently defined strategies.
 
-## Persistent Sessions and segments
+## Persistent Sessions and partitions
 
-A Session persists beyond a single monthly entitlement segment and has **no product concept of "research finished."** Evidence may continue accumulating over time. The absence of a Finish state must not be interpreted as proof/validation of a strategy.
+A Session follows one instrument, feed, Method provenance and execution profile. It persists across market-data partitions and entitlement days. Starting balance is set at creation. The chronological cursor, balance, open positions, pending orders, Journal, and statistics continue across eligible partitions without resetting.
 
-Within the same Session, appended monthly segments must proceed **chronologically**. A user cannot skip from an earlier completed segment to an arbitrary later month while preserving the same continuous Session equity path. A non-contiguous research period requires a separate Session/research context.
+Free accounts may share one daily historical budget across multiple Sessions. Paid accounts have continuous access while their selected source remains eligible and available. The [Subscription & Entitlement Specification](SUBSCRIPTION_ENTITLEMENT_SPEC.md) defines the account-wide budget, tier changes and exhaustion rules.
 
-For Free entitlement, a later daily allowance may be used to continue an existing Session with another eligible monthly segment, or to create/use a different eligible Session according to the Subscription & Entitlement Specification.
-
-A Session may therefore accumulate evidence over time. **Starting balance is set only when the Session is created. Thereafter balance/equity continues chronologically across appended monthly segments; continuation must not ask for or silently reset starting balance.** Prior evidence must remain immutable/reproducible when later segments are appended.
-
-Pro may expose a long date range as one continuous research experience while the engine internally uses monthly or other deterministic segments for caching, checkpoints, recovery, integrity and compute. Internal segmentation must not force repetitive monthly UX on Pro.
+New monthly or yearly partitions must join the same pinned chronological evidence. A missing or ineligible partition pauses progression. Use a separate Session when changing instruments, feeds, Method provenance or the research start. Retain reproducible checkpoints and immutable prior evidence in each case.
 
 ## Research maturity
 
@@ -186,7 +182,7 @@ Do not conflate:
 - Free Style with Free subscription;
 - Protocol with Pro subscription;
 - Session with Trading Method;
-- monthly entitlement segment with Session lifetime;
+- market-data partition or entitlement day with Session lifetime;
 - planner geometry with executed account state.
 
 ## Trading UX handoff v1 — workflow authority

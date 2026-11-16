@@ -1,3 +1,13 @@
+# Commercial V1 integration candidate - 2026-11-16
+
+[Draft PR #58](https://github.com/Obbiiee/Back-test-lab-project/pull/58) branches from the chart-first port of #53 and includes published main. The merge uses the #57 UI for AlphaAccount, AlphaTerminal, AlphaWorkspace and TickAlpha; it retains the removal of AlphaSessions. Certifi, Vite and Zod match the security-patched pins, including the additional #53 runtime dependencies. Dense timeline block reuse uses the bounded reader from #53 and preserves the range and shared-source paths. AI_HANDOFF was restored from readable tracked history.
+
+Both workspace view families expose the stored `pendingReplayTargetNs` even after reload. The hosted synthetic Monthly Parquet path now starts from the first verified tick of the selected partition, resolves the same pinned provider for replay and journal operations, and rechecks month and rights for every cached selector. Replaying across partitions inside one immutable manifest uses the existing Session and reducer. Multi-year observed production roll-out still depends on approved source coverage and compatibility with Observed V2 admission and recovery. The synthetic fixture recovery limit remains in force.
+
+Commercial decisions live in [Subscription & Entitlement](../docs/SUBSCRIPTION_ENTITLEMENT_SPEC.md) and [Trading Method & Session](../docs/TRADING_METHOD_SESSION_SPEC.md). The account-wide 30-day historical budget with WIB reset, all-route metering and Paid-first resource protection require implementation and native acceptance. Existing UTC sandbox rows retain their policy.
+
+Local validation covers focused financial goldens, the bounded timeline prefix and Jump parity, cloud source routing, frontend lint/build and product replay regressions. The native acceptance step covers the persisted target after a service reopen, the hosted synthetic December-to-January fill and TP, and January-to-February Jump. Keep these PostgreSQL cases, the browser journey, and any size or latency measurements distinct from local unit results. VPS1 capacity experiments remain outside this branch's test environment.
+
 # Validation checkpoint — configurable worker pool and durable-worker capacity boundary (2026-11-12)
 
 Added fail-closed `BTL_RESEARCH_WORKERS=1..4` configuration (default 2), wired consistently to PostgreSQL queue worker slots, native child slots, and exchange threads; documented the setting in `backend/.env.example`. Four focused configuration tests pass. Queue/admission limits (global 16, per-user 2), worker deadline 30 seconds, and queue TTL 60 seconds are unchanged.
