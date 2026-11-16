@@ -22,9 +22,10 @@ if (promo && (promo.startsOn || promo.endsOn)) {
   need(/^\d{4}-\d{2}-\d{2}$/.test(promo.startsOn || '') && /^\d{4}-\d{2}-\d{2}$/.test(promo.endsOn || '') && promo.startsOn <= promo.endsOn, 'promo needs a valid startsOn <= endsOn');
   need(promo.monthlyIdr < SITE.pro.monthly.priceIdr && promo.yearlyIdr < SITE.pro.yearly.priceIdr, 'promo prices must be lower than the list prices');
 }
-need(text(SITE.pro.taxNote), 'pro.taxNote (tax inclusive/exclusive statement) is missing');
+const live = SITE.launchState === 'live';     // purchases open: tax statement, payment methods and the server-plan match become mandatory
+if (live) need(text(SITE.pro.taxNote), 'pro.taxNote (tax inclusive/exclusive statement) is missing');
 need(SITE.pro.autoRenew === false, 'pro.autoRenew must stay false: the implementation sells one period per payment');
-need(Array.isArray(SITE.payment.methods) && SITE.payment.methods.length > 0, 'payment.methods (the methods actually enabled at Midtrans) is missing');
+if (live) need(Array.isArray(SITE.payment.methods) && SITE.payment.methods.length > 0, 'payment.methods (the methods actually enabled at Midtrans) is missing');
 need(Number.isInteger(SITE.refund.windowDays) && SITE.refund.windowDays >= 0, 'refund.windowDays is missing (owner decision)');
 need(text(SITE.refund.conditions), 'refund.conditions is missing (owner decision)');
 for (const key of ['terms', 'privacy', 'refund']) need(/^\d{4}-\d{2}-\d{2}$/.test(SITE.legalApproval[key] || ''), `legalApproval.${key} (ISO date of the owner's approval) is missing`);
@@ -32,7 +33,9 @@ for (const key of ['terms', 'privacy', 'refund']) need(/^\d{4}-\d{2}-\d{2}$/.tes
 // Server plans: the checkout charges exactly what the server is configured with. The server supports ONE plan today (BTL_BILLING_AMOUNT_IDR + BTL_BILLING_DURATION_SECONDS),
 // so a site that sells two periods cannot be released until the server offers both (BTL_BILLING_PLANS, not implemented yet) or the second period is removed.
 const env = process.env;
-if (env.BTL_BILLING_PLANS) {
+if (!live) {
+  // preview: nothing can be bought, so the server plans are not compared yet
+} else if (env.BTL_BILLING_PLANS) {
   let plans = [];
   try { plans = JSON.parse(env.BTL_BILLING_PLANS); } catch { need(false, 'BTL_BILLING_PLANS is not valid JSON'); }
   for (const period of ['monthly', 'yearly']) {
