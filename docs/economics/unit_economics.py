@@ -33,7 +33,7 @@ CONVERSION = 0.03                                                       # ASSUMP
 PAY_MIX = [("QRIS", .40, .007, 0), ("Virtual account", .30, 0, 4000), ("E-wallet", .20, .02, 0), ("Card", .10, .029, 2000)]
 FEE_VAT = 0.11
 INCOME_TAX = 0.005                                                      # ASSUMPTION UMKM final tax on gross; confirm with an accountant
-PRICES = [49_000, 99_000, 149_000, 199_000, 299_000]                    # candidate prices per month (not decided)
+PLANS = [("Pro Bulanan", 87_000, 1), ("Pro Tahunan", 400_000, 12)]            # GIVEN: real prices paid (owner 2026-11-16); label, price, months covered; no auto-renew
 
 def rp(x): return f"{x:,.0f}"
 
@@ -95,20 +95,22 @@ def main():
     print(f"Hot-tier limit: {room:,.0f} GB free on this SSD / {per_payer_gb:,.2f} GB = **about {room / per_payer_gb:,.0f} paying subscribers** (with their free users) before the SSD is full. Retention, cap and archiving are therefore product decisions; checkpoint bytes per tick are MEASURED, everything else ASSUMPTION. Immutable financial evidence must not be deleted, so growth is handled by archiving to R2, not by pruning.")
     store_cost = per_payer_gb * R2_USD_GB_MONTH * USD_IDR
     print(f"Archive cost if all of it sat on R2: {per_payer_gb:,.2f} GB x ${R2_USD_GB_MONTH}/GB-month x {USD_IDR:,} = **Rp {store_cost:,.0f} per paying subscriber per month** (PUBLIC price; first 10 GB free ignored).\n")
-    print("## 4. Revenue per subscriber after payment fee and tax\nPayment mix (ASSUMPTION): " + ", ".join(f"{n} {s:.0%}" for n, s, _, _ in PAY_MIX) + f". Fee includes {FEE_VAT:.0%} VAT on the fee; income tax {INCOME_TAX:.1%} of gross (ASSUMPTION, confirm with an accountant); non-PKP (no output VAT) assumed.\n| Price Rp / month | Payment fee | Fee % | Income tax | R2 storage | **Net per subscriber** |\n|---:|---:|---:|---:|---:|---:|")
+    print("## 4. Revenue per subscriber after payment fee and tax\nPayment mix (ASSUMPTION): " + ", ".join(f"{n} {s:.0%}" for n, s, _, _ in PAY_MIX) + f". Fee includes {FEE_VAT:.0%} VAT on the fee; income tax {INCOME_TAX:.1%} of gross (ASSUMPTION, confirm with an accountant); non-PKP (no output VAT) assumed.")
     net = {}
-    for p in PRICES:
-        f = fee(p); t = p * INCOME_TAX; n = p - f - t - store_cost; net[p] = n; print(f"| {rp(p)} | {rp(f)} | {f / p:.1%} | {rp(t)} | {rp(store_cost)} | **{rp(n)}** |")
+    print("| Plan | Price | Payment fee (once) | Income tax | Storage x months | **Net per month of service** |\n|---|---:|---:|---:|---:|---:|")
+    for name, p, m in PLANS:
+        f = fee(p); t = p * INCOME_TAX; n = (p - f - t - store_cost * m) / m; net[name] = n
+        print(f"| {name} | {rp(p)} | {rp(f)} ({f / p:.1%}) | {rp(t)} | {rp(store_cost * m)} | **{rp(n)}** |")
     print()
     print(f"## 5. Break-even and profit (fixed total {rp(total)}; one more VPS of {rp(VPS_RP)} each time CPU capacity is exceeded)\nCapacity used for stepping: conservative, abusive capped, with free users = {cap[list(cap)[2]][1]:,.0f} paying subscribers per VPS.\n")
-    print("| Price | Break-even paying subs (one VPS) | Profit @ 50 | @ 100 | @ 250 | @ 500 | @ 1,000 |\n|---:|---:|---:|---:|---:|---:|---:|")
+    print("| Plan (all subscribers on it) | Net / month | Break-even subs (one VPS) | Profit @ 50 | @ 100 | @ 250 | @ 500 | @ 1,000 |\n|---|---:|---:|---:|---:|---:|---:|---:|")
     per_vps = cap[list(cap)[2]][1]
-    for p in PRICES:
-        be = math.ceil(total / net[p]); cells = []
-        for s in (50, 100, 250, 500, 1000):
-            vps = max(1, math.ceil(s / per_vps)); cost = total + (vps - 1) * VPS_RP
-            cells.append(rp(s * net[p] - cost))
-        print(f"| {rp(p)} | {be} | " + " | ".join(cells) + " |")
+    for name, p, m in PLANS:
+        be = math.ceil(total / net[name]); cells = []
+        for s_ in (50, 100, 250, 500, 1000):
+            vps = max(1, math.ceil(s_ / per_vps)); cost = total + (vps - 1) * VPS_RP
+            cells.append(rp(s_ * net[name] - cost))
+        print(f"| {name} | {rp(net[name])} | {be} | " + " | ".join(cells) + " |")
     print("\nCompare, not a decision: TradingView (public list, verify) Essential $14.95, Plus $34.95, Premium $69.95 per month, i.e. about Rp " + rp(14.95 * USD_IDR) + ", " + rp(34.95 * USD_IDR) + ", " + rp(69.95 * USD_IDR) + " at the assumed rate.")
 if __name__ == "__main__":
     main()

@@ -49,23 +49,17 @@ Archive cost if all of it sat on R2: 2.56 GB x $0.015/GB-month x 16,500 = **Rp 6
 
 ## 4. Revenue per subscriber after payment fee and tax
 Payment mix (ASSUMPTION): QRIS 40%, Virtual account 30%, E-wallet 20%, Card 10%. Fee includes 11% VAT on the fee; income tax 0.5% of gross (ASSUMPTION, confirm with an accountant); non-PKP (no output VAT) assumed.
-| Price Rp / month | Payment fee | Fee % | Income tax | R2 storage | **Net per subscriber** |
-|---:|---:|---:|---:|---:|---:|
-| 49,000 | 2,082 | 4.2% | 245 | 633 | **46,040** |
-| 99,000 | 2,620 | 2.6% | 495 | 633 | **95,252** |
-| 149,000 | 3,158 | 2.1% | 745 | 633 | **144,463** |
-| 199,000 | 3,697 | 1.9% | 995 | 633 | **193,675** |
-| 299,000 | 4,773 | 1.6% | 1,495 | 633 | **292,098** |
+| Plan | Price | Payment fee (once) | Income tax | Storage x months | **Net per month of service** |
+|---|---:|---:|---:|---:|---:|
+| Pro Bulanan | 87,000 | 2,491 (2.9%) | 435 | 633 | **83,441** |
+| Pro Tahunan | 400,000 | 5,861 (1.5%) | 2,000 | 7,600 | **32,045** |
 
 ## 5. Break-even and profit (fixed total 993,667; one more VPS of 270,000 each time CPU capacity is exceeded)
 Capacity used for stepping: conservative, abusive capped, with free users = 172 paying subscribers per VPS.
 
-| Price | Break-even paying subs (one VPS) | Profit @ 50 | @ 100 | @ 250 | @ 500 | @ 1,000 |
-|---:|---:|---:|---:|---:|---:|---:|
-| 49,000 | 22 | 1,308,338 | 3,610,342 | 10,246,356 | 21,486,378 | 43,696,423 |
-| 99,000 | 11 | 3,768,920 | 8,531,507 | 22,549,268 | 46,092,203 | 92,908,073 |
-| 149,000 | 7 | 6,229,503 | 13,452,672 | 34,852,181 | 70,698,028 | 142,119,723 |
-| 199,000 | 6 | 8,690,085 | 18,373,837 | 47,155,093 | 95,303,853 | 191,331,373 |
-| 299,000 | 4 | 13,611,250 | 28,216,167 | 71,760,918 | 144,515,503 | 289,754,673 |
+| Plan (all subscribers on it) | Net / month | Break-even subs (one VPS) | Profit @ 50 | @ 100 | @ 250 | @ 500 | @ 1,000 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Pro Bulanan | 83,441 | 12 | 3,178,381 | 7,350,428 | 19,596,569 | 40,186,805 | 81,097,277 |
+| Pro Tahunan | 32,045 | 32 | 608,580 | 2,210,827 | 6,747,568 | 14,488,803 | 29,701,273 |
 
 Compare, not a decision: TradingView (public list, verify) Essential $14.95, Plus $34.95, Premium $69.95 per month, i.e. about Rp 246,675, 576,675, 1,154,175 at the assumed rate.
