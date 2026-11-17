@@ -2,6 +2,9 @@
 
 Status: **IMPLEMENTATION REGISTER / AUDIT, not an architecture authority.** Scope: the public website a payment-gateway reviewer sees, its truthfulness against the repository, and what still blocks a Midtrans application. Legal texts are **drafts for the owner and a legal adviser**, not legal advice. Commercial V1 stays **BLOCKED**; this document does not change any gate.
 
+## 0. Update 2026-11-17: the full public site is LIVE at https://riksora.com
+The owner approved the three legal texts (Terms, Privacy, Refund; date 2026-11-17, recorded in `siteConfig.js`), the release gate passed, and `deploy/site/publish.sh` published 54 files (market data and any private term excluded; previous version kept in `~/site/dist.prev`). Verified in a real browser against the live domain over the Let's Encrypt certificate: **18/18 checks pass** (9 pages x desktop and mobile; expected prices Rp 87.000 and Rp 400.000, the yearly saving, the support email and city, no draft banner, no placeholder, no overflow, no console error, no failed request). Still true: the application is in preview (sign-in replaced by a beta-access notice), purchases are not open, billing is one-plan and sandbox-only, data-source rights are UNKNOWN, and Commercial V1 is BLOCKED.
+
 ## 1. Verdict
 - **Website content: built and tested (draft).** Landing, Pricing (Rupiah), About, Contact, Terms, Privacy and Refund pages exist in `frontend/src/site/`, Indonesian default plus English for the marketing pages.
 - **Ready to submit to Midtrans: NO.** Blockers are owner-supplied facts (15 fields enforced by a release gate), a live public HTTPS domain, owner approval of the legal texts, and a decision on data-source rights (section 6). Nothing below invents those facts.

@@ -35,7 +35,7 @@ export const SITE = {
     conditions: 'Pro belum dipakai untuk membuat Sesi di luar kuota Free sejak pembayaran; pembayaran ganda atau Pro yang tidak aktif setelah pembayaran lunas dikembalikan penuh',
   },
   legalApproval: {                    // diisi owner setelah teks ditinjau (penasihat hukum disarankan); tanggal ISO, mis. '2026-12-01'
-    terms: null, privacy: null, refund: null,
+    terms: '2026-11-17', privacy: '2026-11-17', refund: '2026-11-17',   // owner menyetujui draf (2026-11-17, balasan "setuju" di chat)
   },
   lastUpdated: '2026-11-16',
 };
