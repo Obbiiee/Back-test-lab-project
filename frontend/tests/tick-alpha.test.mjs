@@ -406,7 +406,7 @@ for(const search of ['', '?legacy=local', '?tick-alpha=local', '?tick-alpha=exne
   assert.equal(entryRoute({hostname:'research.example',search}),'site',search);
 }
 assert.equal(entryRoute({hostname:'research.example',
-  search:'?page=account&session=saved&legacy=local'}),(await import('../src/site/siteConfig.js')).SITE.launchState==='live'?'account':'site');   // preview: the public app is not open yet
+  search:'?page=account&session=saved&legacy=local'}),(await import('../src/site/siteConfig.js')).SITE.launchState!=='preview'?'account':'site');   // preview: the public app is not open yet
 console.log('PASS tick-alpha transport exact strings, explicit revision/command identity, local-only opt-in and durable-review UI boundary.');
 
 const view={state:{throughNs:'1577838600000000000'},chart:{timeframe:'1m',priceBasis:'EXACT_REVEALED_MID_DISPLAY_ONLY',volumeAvailable:false,candles:[

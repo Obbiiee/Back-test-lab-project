@@ -69,8 +69,8 @@ assert.ok(/^RIKSORA/.test(SITE.business.publicName));
 // 7. routing: hosted visitors reach the public site; the account page keeps working; local review pages stay local
 assert.equal(entryRoute({hostname: 'riksora.example', search: ''}), 'site');
 assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=pricing'}), 'site');
-assert.equal(SITE.launchState, 'preview');
-assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=account'}), 'site');      // preview: no sign-in against an API that is not public
+assert.equal(SITE.launchState, 'beta');
+assert.equal(entryRoute({hostname: 'riksora.example', search: '?page=account'}), 'account');   // beta: Google sign-in is open (purchases are not)
 assert.equal(entryRoute({hostname: 'localhost', search: '?page=account'}), 'account');          // local review keeps the real account page
 assert.equal(entryRoute({hostname: 'riksora.example', search: '?legacy=local'}), 'site');
 

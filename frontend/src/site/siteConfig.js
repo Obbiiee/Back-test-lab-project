@@ -5,7 +5,7 @@ export const SITE = {
   brand: 'RIKSORA Backtest Lab',
   // 'preview': the application is not open to the public yet; the site shows product, prices and policies and replaces sign-in with a beta-access notice.
   // 'live': sign-in and Buy Pro are offered. Switch only when the app, billing (multi-plan) and the production payment switch are approved and deployed.
-  launchState: 'preview',
+  launchState: 'beta',
   domain: 'riksora.com',              // owner's domain (2026-11-16)
   business: {
     publicName: 'RIKSORA Labs',        // nama yang tampil di situs (owner memilih tidak menampilkan nama pribadi; identitas pemilik hanya untuk dokumen Midtrans)

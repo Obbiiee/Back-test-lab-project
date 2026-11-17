@@ -10,7 +10,8 @@ import {siteLang, sitePage} from './siteRoute.js';
 const preview = SITE.launchState !== 'live';
 const href = (page, lang) => (page === 'home' ? '/' : `/?page=${page}`) + (lang === 'en' ? (page === 'home' ? '?lang=en' : '&lang=en') : '');
 const account = '/?page=account';
-const entry = (lang) => (preview ? href('contact', lang) : account);
+const signInOpen = SITE.launchState !== 'preview';   // beta/live: Google sign-in is open; purchases stay closed until live
+const entry = (lang) => (signInOpen ? account : href('contact', lang));
 
 function Header({t, lang, page}) {
   return <header className="site-nav">
@@ -23,7 +24,7 @@ function Header({t, lang, page}) {
     </nav>
     <div className="site-nav-actions">
       <a className="site-lang" href={href(page, t.other)} hrefLang={t.other} lang={t.other}>{t.otherLabel}</a>
-      <a className="site-pill" href={entry(lang)}>{preview ? t.preview.nav : t.nav.open}</a>
+      <a className="site-pill" href={entry(lang)}>{signInOpen ? t.nav.open : t.preview.nav}</a>
     </div>
   </header>;
 }
@@ -79,7 +80,7 @@ function PlanCards({t, withCta = true}) {
       <h3>{t.pricing.free.name}</h3>
       <p className="site-price">{t.pricing.free.price} <small>{t.pricing.free.per}</small></p>
       <ul>{t.pricing.free.features.map(item => <li key={item}>{item}</li>)}</ul>
-      {withCta && <a className="site-secondary" href={entry(t.lang)}>{preview ? t.hero.previewPrimary : t.hero.primary}</a>}
+      {withCta && <a className="site-secondary" href={entry(t.lang)}>{signInOpen ? t.hero.primary : t.hero.previewPrimary}</a>}
     </article>
     <ProCard t={t} period="monthly" withCta={withCta}/>
     <ProCard t={t} period="yearly" withCta={withCta}/>
@@ -92,7 +93,7 @@ function Home({t, lang}) {
       <p className="site-badge">{t.hero.badge}</p>
       <h1>{t.hero.title}</h1>
       <p className="site-lead">{t.hero.lead}</p>
-      <div className="site-actions"><a className="site-primary" href={entry(lang)}>{preview ? t.hero.previewPrimary : t.hero.primary}</a><a className="site-secondary" href={href('pricing', lang)}>{t.hero.secondary}</a></div>
+      <div className="site-actions"><a className="site-primary" href={entry(lang)}>{signInOpen ? t.hero.primary : t.hero.previewPrimary}</a><a className="site-secondary" href={href('pricing', lang)}>{t.hero.secondary}</a></div>
       <p className="site-fine">{t.hero.caption}</p>
     </section>
     <section id="purpose" className="site-section" aria-labelledby="purpose-h">

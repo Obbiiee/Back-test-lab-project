@@ -199,3 +199,7 @@ Owner menetapkan: (1) domain publik **riksora.com**; (2) harga yang benar-benar 
 ## OWNER ADDENDUM — PUBLIC SITE PUBLISHED (2026-11-17, instruksi owner di chat)
 
 Owner menyetujui teks Syarat dan Ketentuan, Kebijakan Privasi, dan Kebijakan Pengembalian Dana (balasan "setuju" di chat, 2026-11-17), dan meminta situs diterbitkan. Situs statis penuh diterbitkan ke https://riksora.com lewat `deploy/site/publish.sh` (mode preview: aplikasi belum dibuka, pembelian belum dibuka). Pengaman tetap berlaku: data pasar dan data pribadi pemilik (nama, KTP, NPWP) tidak pernah masuk situs; API aplikasi tidak dibuka dari situs ini; tanpa pembayaran produksi; konfirmasi kategori usaha ke Midtrans dan semua dokumen identitas adalah urusan owner. Commercial V1 tetap BLOCKED.
+
+## OWNER ADDENDUM — GOOGLE SIGN-IN OPEN ON riksora.com (2026-11-17, instruksi owner di chat)
+
+Owner meminta login Google dibuka untuk semua akun agar evaluator dapat masuk ("harus beres semua, sisakan Midtrans"). Dibuka: API Google-only (`deploy/site/accounts_api.py`, loopback 127.0.0.1:8010, PostgreSQL 17 akun terpisah dengan hak akses sempit) lewat Caddy hanya untuk `/api/v1/auth/*` dan `/api/v1/workspaces*`; semua `/api` lain 404. `launchState: 'beta'`: login terbuka, pembelian tetap tertutup. Aplikasi backtest/riset BELUM dibuka (tidak ada jalur riset, billing, atau kata sandi di proses ini); engine dan kontrak finansial tidak diubah. Rahasia Google hanya di `~/.config/riksora-google.env` (0600). Commercial V1 tetap BLOCKED.

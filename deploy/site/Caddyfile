@@ -19,6 +19,12 @@ riksora.com {
 	header @shell Cache-Control "no-cache"
 
 	# only the static build is served; the application API is not proxied from this site (handle blocks decide before try_files rewrites the path)
+	handle /api/v1/auth/* {
+		reverse_proxy 127.0.0.1:8010
+	}
+	handle /api/v1/workspaces* {
+		reverse_proxy 127.0.0.1:8010
+	}
 	handle /api/* {
 		respond "Not found" 404
 	}

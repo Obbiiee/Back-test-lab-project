@@ -103,7 +103,8 @@ def create_google_staging_app(dsn, auth_secret, *, workspace_metadata=False, **g
     @app.get('/api/v1/auth/providers')
     async def providers():
         return {'schemaVersion': 1, 'password': False,
-                'googleConfigured': True, 'billingConfigured': False}
+                'googleConfigured': True, 'billingConfigured': False,
+                'researchConfigured': False}
     return app
 
 

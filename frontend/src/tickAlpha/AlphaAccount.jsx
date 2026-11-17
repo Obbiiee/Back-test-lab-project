@@ -27,7 +27,7 @@ export default function AlphaAccount(){
   const [expired,setExpired]=useState(false);
   const [client]=useState(()=>createAccountClient({onExpired:()=>setExpired(true)}));
   const [mode,setMode]=useState('signin'),[user,setUser]=useState(null),[workspaces,setWorkspaces]=useState([]),[capabilities,setCapabilities]=useState(null),[identityProviders,setIdentityProviders]=useState([]);
-  const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[googleAvailable,setGoogleAvailable]=useState(false),[billingConfigured,setBillingConfigured]=useState(false);
+  const [selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[googleAvailable,setGoogleAvailable]=useState(false),[billingConfigured,setBillingConfigured]=useState(false),[capability,setCapability]=useState({password:true,research:true});
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
   const route=useRoute();
   // Deep link asked for before sign-in (e.g. a Session or Method); restored after a workspace is chosen.
@@ -78,6 +78,13 @@ export default function AlphaAccount(){
     }
     void load();return()=>{active=false;};
   },[client]);
+  // What this server offers (Google-only beta: no password and no research API yet). Public, unauthenticated, so it also works after the Google redirect.
+  useEffect(()=>{
+    if(window.location.protocol!=='https:')return;
+    let active=true;
+    client.request('/api/v1/auth/providers',{authenticated:false}).then(p=>{if(active)setCapability({password:p?.password!==false,research:p?.researchConfigured!==false});}).catch(()=>{});
+    return()=>{active=false;};
+  },[client]);
   function switchMode(next){setMode(next);setNotice('');setError('');setPassword('');}
   async function submit(event){
     event.preventDefault();
@@ -117,6 +124,7 @@ export default function AlphaAccount(){
     });
   }
   function open(workspace){
+    if(!capability.research){setNotice('The backtest workspace is not open yet (beta). Your account and Free plan are active; we will announce when it opens.');return;}
     void action(async()=>{
       const status=await client.request(`/api/v1/workspaces/${workspace.id}/capabilities`);
       clearAccountTransport();setAccountTransport(client,workspace.id,{chartHistory:status?.chartHistory?.available===true});
@@ -143,16 +151,16 @@ export default function AlphaAccount(){
         :user?<AccountPanel client={client} billingConfigured={billingConfigured} user={user} identityProviders={identityProviders} workspaces={workspaces} selected={selected} capabilities={capabilities} busy={busy} googleAvailable={googleAvailable} onLinkGoogle={password=>action(async()=>{const url=await client.startGoogleLink(password);window.location.assign(url);})} onOpen={open} onLogout={logout} onCreate={name=>action(async()=>{await client.request('/api/v1/workspaces',{method:'POST',body:{name}});const list=await client.request('/api/v1/workspaces');if(live.current)setWorkspaces(list);})} onBack={()=>navigate({screen:'methods'})}/>
         :<>
           {expired&&<div className="rk-auth-safety" role="status"><strong>Signed out for safety</strong><span>Your sign-in ended after a refresh or a while away. Your Sessions are saved.</span></div>}
-          {['signin','register'].includes(mode)&&<div className="rk-auth-tabs" role="tablist" aria-label="Account">
+          {['signin','register'].includes(mode)&&capability.password&&<div className="rk-auth-tabs" role="tablist" aria-label="Account">
             {[['signin','Sign in'],['register','Create account']].map(([key,text])=><button key={key} type="button" role="tab" aria-selected={mode===key} disabled={busy} onClick={()=>switchMode(key)}>{text}</button>)}
           </div>}
           {['verify','forgot','reset'].includes(mode)&&<h2>{TITLES[mode]}</h2>}
           {['signin','register'].includes(mode)&&<><button type="button" className="rk-auth-btn rk-auth-google" disabled={!googleAvailable||busy} aria-describedby="rk-google-note" onClick={()=>{window.location.assign('/api/v1/auth/google/start');}}><span aria-hidden="true">G</span>Continue with Google</button>
-            <p id="rk-google-note" className="rk-auth-hint">{googleAvailable?'Use the Google account linked to your RIKSORA account.':'Google sign-in is not configured yet.'}</p>
-            <div className="rk-auth-or" aria-hidden="true"><span/>or with email<span/></div></>}
+            <p id="rk-google-note" className="rk-auth-hint">{googleAvailable?(capability.password?'Use the Google account linked to your RIKSORA account.':'Sign in or create your account with your Google account. We receive only your verified email address.'):'Google sign-in is not configured yet.'}</p>
+            {capability.password&&<div className="rk-auth-or" aria-hidden="true"><span/>or with email<span/></div>}</>}
           {mode==='verify'&&<p className="rk-auth-hint">Open the link in the email, or paste the code from it below.</p>}
           {mode==='forgot'&&<p className="rk-auth-hint">Enter your email. If the account exists, we send a reset code.</p>}
-          <form key={mode} onSubmit={submit} className="rk-auth-form" noValidate={false}>
+          <form key={mode} style={!capability.password&&['signin','register'].includes(mode)?{display:'none'}:undefined} onSubmit={submit} className="rk-auth-form" noValidate={false}>
             {['signin','register','forgot'].includes(mode)&&<label className="rk-auth-field">Email<input name="email" type="email" autoComplete="email" maxLength={320} required disabled={busy} value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label>}
             {['verify','reset'].includes(mode)&&<label className="rk-auth-field">{mode==='verify'?'Verification code':'Reset code'}<input name="token" type="password" autoComplete="one-time-code" maxLength={4096} required disabled={busy}/></label>}
             {['signin','register','reset'].includes(mode)&&<>
