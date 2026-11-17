@@ -1,16 +1,20 @@
-# Public Google-only API (loopback). systemd USER unit; Caddy proxies only the allowed paths to it.
+# Public application API (loopback; Google-only sign-in). systemd USER unit; Caddy proxies only the allowed paths to it.
 [Unit]
-Description=RIKSORA Google-only accounts API (127.0.0.1:8010)
+Description=RIKSORA application API + native workers (127.0.0.1:8010)
 After=riksora-pg.service
 Requires=riksora-pg.service
 
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/riksora-google.env
-ExecStart=%h/tools/venv313/bin/python %h/projects/Back-test-lab-project/deploy/site/accounts_api.py
+EnvironmentFile=%h/prod/app.env
+Environment=BTL_PG_BIN=%h/tools/pg17/bin
+Environment=PATH=%h/tools/pg17/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/tools/venv313/bin/python %h/projects/Back-test-lab-project/deploy/site/app_api.py
 Restart=on-failure
 RestartSec=5
-MemoryMax=1G
+MemoryMax=8G
+CPUQuota=400%
 
 [Install]
 WantedBy=default.target

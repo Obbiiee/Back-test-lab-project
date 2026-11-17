@@ -60,7 +60,7 @@ def sut(a):
     ls.setup(argparse.Namespace(pg_port=a.pg_port))
     os.environ.update({'BTL_QA_SYNTHETIC_MONTHLY_ENABLE': '1', 'BTL_QA_SYNTHETIC_MONTHLY_ROOT': str(src_dir / 'monthly'), 'BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID': info['datasetId'],
                        'BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION': info['version'], 'BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256': info['manifestHash'],
-                       'BTL_TICK_SESSION_STORAGE_FORMAT': 'compact-v1', 'BTL_TICK_CHECKPOINT_FORMAT': 'compact-v2', 'BTL_SOURCE_ACCEPTANCE_DIR': str(src_dir / 'accepted'),
+                       'BTL_TICK_SESSION_STORAGE_FORMAT': 'compact-v1', 'BTL_TICK_CHECKPOINT_FORMAT': os.environ.get('BTL_CAP_CHECKPOINT_FORMAT', 'compact-v2'), 'BTL_SOURCE_ACCEPTANCE_DIR': str(src_dir / 'accepted'),
                        'BTL_RESEARCH_WORKERS': str(a.workers), 'BTL_QA_VIRTUAL_TRADER_USERS': '200'})
     ls.STATE = work / 'state'
     import asyncio
