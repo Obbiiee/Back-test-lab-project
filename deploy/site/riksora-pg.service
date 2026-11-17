@@ -1,0 +1,16 @@
+# Accounts database (separate from the QA clusters). systemd USER unit.
+[Unit]
+Description=RIKSORA accounts PostgreSQL (127.0.0.1:54450)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/tools/pg17/bin/postgres -D %h/prod/pg
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+KillSignal=SIGINT
+
+[Install]
+WantedBy=default.target
