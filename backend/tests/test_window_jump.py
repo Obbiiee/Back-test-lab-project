@@ -193,6 +193,59 @@ class WindowJumpTests(unittest.TestCase):
         self.assertEqual(self.live(free), [("PENDING", "SHORT")])
         self.assertLess(int(after_again["throughNs"]), int(st["throughNs"]) + 10 * STEP_NS)
 
+    def test_take_profit_on_the_boundary_tick_is_outside_the_window_and_one_ns_later_is_inside(self):
+        """The window is enforced by a PENDING order (a bare ACTIVE position is continued unbounded by design; see test_active_position_*). A chronological
+        control gives the TP tick. With a PENDING order present and the window ending exactly on that tick, the TP is not taken, the position stays ACTIVE
+        and unrealised; with the window one ns later the same TP is taken and equals the control."""
+        def open_pair(sid):
+            self.open_order(sid, dict(side="SHORT", orderType="MARKET", workflow="PLANNED", entry="2006.00", quantity="0.1", riskPercent="1", sl="2008", tp="2005.0"))
+            self.advance_to(sid, int(self.state(sid)["throughNs"]) + STEP_NS)
+            self.open_order(sid, dict(side="SHORT", orderType="STOP", workflow="PLANNED", entry="2004.5", quantity="0.1", riskPercent="1", sl="2007", tp="2001"))
+        control = self.session(self.free)
+        start = int(self.state(control)["throughNs"])
+        open_pair(control)
+        status, _ = self.jump_until_done(control)
+        self.assertEqual(status, "EVENT_FOUND")
+        exit_ns = int(self.state(control)["throughNs"])
+        self.assertGreater(exit_ns, start)
+        outside = self.session(self.free, end_ns=exit_ns - start)
+        open_pair(outside)
+        status, _ = self.jump_until_done(outside)
+        self.assertEqual(status, "NO_EVENT_UNTIL_SESSION_END", "the TP tick at the window end must not be taken while a pending order exists")
+        self.assertEqual(self.live(outside), [("ACTIVE", "SHORT"), ("PENDING", "SHORT")])
+        self.assertEqual(self.state(outside)["balance"], "10000")
+        self.assertLess(int(self.state(outside)["throughNs"]), exit_ns)
+        inside = self.session(self.free, end_ns=exit_ns - start + 1)
+        open_pair(inside)
+        status, _ = self.jump_until_done(inside)
+        self.assertEqual(status, "EVENT_FOUND")
+        self.assertEqual(self.live(inside), [("PENDING", "SHORT")])
+        self.advance_to(control, int(self.state(inside)["throughNs"]))
+        self.assertEqual(self.ledger(inside), self.ledger(control))
+
+    def test_two_open_positions_one_closes_inside_the_window_and_the_other_stays_active(self):
+        """Window of 15 steps. LONG stop-loss (about 10 steps after the fill) lies inside; the SHORT take-profit (about 20 steps) lies outside. A far pending
+        STOP keeps the window binding, so after the LONG exit the jump stops at the window end with the SHORT still ACTIVE, equal to the chronological control."""
+        free, control = self.session(self.free, end_steps=15), self.session(self.free)
+        for sid in (free, control):
+            self.open_order(sid, dict(side="LONG", orderType="MARKET", workflow="PLANNED", entry="2006.10", quantity="0.1", riskPercent="1", sl="2005.5", tp="2010"))
+            self.advance_to(sid, int(self.state(sid)["throughNs"]) + STEP_NS)
+            self.open_order(sid, dict(side="SHORT", orderType="MARKET", workflow="PLANNED", entry="2006.00", quantity="0.1", riskPercent="1", sl="2008", tp="2005.0"))
+            self.advance_to(sid, int(self.state(sid)["throughNs"]) + STEP_NS)
+            self.open_order(sid, dict(side="SHORT", orderType="STOP", workflow="PLANNED", entry="2004.5", quantity="0.1", riskPercent="1", sl="2007", tp="2001"))
+        self.assertEqual(self.live(free), [("ACTIVE", "LONG"), ("ACTIVE", "SHORT"), ("PENDING", "SHORT")])
+        status, _ = self.jump_until_done(free)
+        self.assertEqual(status, "EVENT_FOUND", "the LONG stop-loss inside the window is taken")
+        self.assertEqual(self.live(free), [("ACTIVE", "SHORT"), ("PENDING", "SHORT")])
+        status, _ = self.jump_until_done(free)
+        self.assertEqual(status, "NO_EVENT_UNTIL_SESSION_END", "the SHORT take-profit lies outside the window and must not be taken")
+        self.assertEqual(self.live(free), [("ACTIVE", "SHORT"), ("PENDING", "SHORT")])
+        journal_rows, _balance = self.ledger(free)                                   # committed journal rows (any status)
+        self.assertEqual(sorted(r[1] for r in journal_rows), sorted(["CLOSED", "ACTIVE", "PENDING"]), "one realised trade, one active and one pending order")
+        self.assertNotEqual(self.state(free)["balance"], "10000", "the LONG stop-loss realised PnL inside the window")
+        self.advance_to(control, int(self.state(free)["throughNs"]))
+        self.assertEqual((self.live(control), self.ledger(control)), (self.live(free), self.ledger(free)))
+
     def test_an_unreadable_billing_ledger_is_treated_as_free_and_a_session_without_claim_is_unrestricted(self):
         from execution.free_window import free_window_end
         free = self.session(self.free, end_steps=10)
