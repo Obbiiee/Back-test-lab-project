@@ -59,13 +59,8 @@ def create(state, cursor):
     return dict(body, checkpointHash=content_hash(body))
 
 
-def restore(checkpoint, sources, *, verified_source_pins):
-    """Validate a checkpoint before reopening indexed sources at the saved cursors.
-
-    Hashes here detect corruption/mix-ups; they are not signatures. `verified_source_pins`
-    must come from the provider that has verified the source manifest/files, not from
-    this checkpoint or an untrusted client.
-    """
+def validate(checkpoint):
+    """Check the envelope without opening or exposing historical sources."""
     fields = {"schemaVersion", "artifact", "sessionId", "revision", "profileSetHash", "sourcePins", "stateHash", "state", "cursor", "checkpointHash"}
     require(type(checkpoint) is dict and set(checkpoint) == fields, "checkpoint", "REFUSED_MI_CHECKPOINT")
     body = {key: value for key, value in checkpoint.items() if key != "checkpointHash"}
@@ -76,8 +71,16 @@ def restore(checkpoint, sources, *, verified_source_pins):
             and checkpoint["profileSetHash"] == state["profileSetHash"]
             and checkpoint["stateHash"] == content_hash(state), "checkpoint", "REFUSED_MI_CHECKPOINT")
     pins = pins_from_state(state)
-    require(checkpoint["sourcePins"] == pins and verified_source_pins == pins, "sourcePins", "REFUSED_DATASET_MISMATCH")
+    require(checkpoint["sourcePins"] == pins, "sourcePins", "REFUSED_DATASET_MISMATCH")
     _validate_cursor(state, checkpoint["cursor"])
+    return state
+
+
+def restore(checkpoint, sources, *, verified_source_pins):
+    """Restore from a verified provider's pins, never from client metadata."""
+    state = validate(checkpoint)
+    pins = checkpoint["sourcePins"]
+    require(verified_source_pins == pins, "sourcePins", "REFUSED_DATASET_MISMATCH")
     require(type(sources) is dict and set(sources) == set(pins), "sources", "REFUSED_DATASET_MISMATCH")
-    timeline = MultiTimeline(list(pins), sources, cursor=deepcopy(checkpoint["cursor"]))
+    timeline = MultiTimeline(list(checkpoint["cursor"]["instruments"]), sources, cursor=deepcopy(checkpoint["cursor"]))
     return state, timeline
