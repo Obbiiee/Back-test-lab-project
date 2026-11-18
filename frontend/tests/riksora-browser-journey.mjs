@@ -488,7 +488,7 @@ try{
     }
     if(process.env.RIKSORA_QA_E2E_ENTITLEMENT==='1')try{
       const hook=async(need,extra={})=>{process.stdout.write(JSON.stringify({need,...extra})+'\n');return await read();};
-      const nextMonthText=()=>{const n=new Date();return new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth()+1,1)).toLocaleString('en',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC',timeZoneName:'short'});};
+      const nextMonthText=()=>{const n=new Date();return new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate()+1)).toLocaleString('en',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC',timeZoneName:'short'});};
       const tryCreate=async(methodName,name)=>{
         await page.getByRole('button',{name:'New Session',exact:true}).or(page.getByRole('link',{name:/New Session/})).first().click();
         await page.locator('.rk-wizard .rk-combo button.rk-combo-trigger').click();
