@@ -132,6 +132,49 @@ class Compat(MonthBase):
             dup = db.execute("SELECT count(*) FROM (SELECT command_id FROM btl.tick_commands WHERE session_id=%s GROUP BY 1 HAVING count(*)>1) d", (sid,)).fetchone()[0]
         self.assertEqual(dup, 0)
 
+    def test_rollback_to_v1_never_corrupts_a_v2_session(self):
+        """Rollback rehearsal: a process with V2 disabled meets a V2 Session. Whatever it does (continue or refuse), re-enabling V2 finishes the Session identically to a control."""
+        self.grant_pro()
+        control = self.new_session()
+        self.drive(control, self.end)
+        sid = self.new_session()
+        self.drive(sid, self.start + 3000 * 60 * NS)
+        outcome = "CONTINUED"
+        with patch.dict(os.environ, {"BTL_TICK_CHECKPOINT_FORMAT": ""}):
+            worker.close()
+            try:
+                self.drive(sid, self.start + 5000 * 60 * NS)
+            except AssertionError:
+                outcome = "REFUSED_BY_V1_PROCESS"
+        print("ROLLBACK_REHEARSAL outcome=" + outcome)
+        worker.close()                                                              # V2 enabled again
+        self.drive(sid, self.end)
+        self.assertEqual(leaf_diff(self.facts(sid), self.facts(control)), [], "re-enabling V2 did not restore an identical Session")
+        with connect(self.dsn) as db:
+            dup = db.execute("SELECT count(*) FROM (SELECT command_id FROM btl.tick_commands WHERE session_id=%s GROUP BY 1 HAVING count(*)>1) d", (sid,)).fetchone()[0]
+        self.assertEqual(dup, 0)
+
+    def test_report_v1_versus_v2_cost_of_the_same_session(self):
+        """Measurement only (no assertion on speed): the same 8,192-tick Session under V1 and under V2, worker CPU, wall time, peak RSS and database growth."""
+        import time
+        self.grant_pro()
+        rows = {}
+        for label, fmt in (("V1", ""), ("V2", "compact-v2")):
+            with patch.dict(os.environ, {"BTL_TICK_CHECKPOINT_FORMAT": fmt}):
+                worker.close()
+                self.metrics = []
+                with connect(self.dsn) as db:
+                    before = db.execute("SELECT pg_database_size(current_database())").fetchone()[0]
+                started = time.perf_counter()
+                sid = self.new_session()
+                self.drive(sid, self.end)
+                wall = time.perf_counter() - started
+                with connect(self.dsn) as db:
+                    after = db.execute("SELECT pg_database_size(current_database())").fetchone()[0]
+                    checkpoint_bytes = db.execute("SELECT coalesce(sum(octet_length(payload)),0) FROM btl.tick_checkpoints WHERE session_id=%s", (sid,)).fetchone()[0]
+                rows[label] = dict(totalWallSeconds=round(wall, 1), dbGrowthKiB=round((after - before) / 1024), checkpointBytes=int(checkpoint_bytes), **self.resource_summary())
+        print("V1_VS_V2_EVIDENCE " + str(rows))
+
 
 if __name__ == "__main__":
     unittest.main()
