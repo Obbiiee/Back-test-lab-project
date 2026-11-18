@@ -32,6 +32,14 @@ def live_orders(dsn, workspace_id, actor_id, session_id):
                 pending=sum(o["status"] == "PENDING" for o in orders), ended=bool(state["ended"]))
 
 
+def chart_floor_ns(entitlements, workspace_id, session_id):
+    """Earliest instant a Free account may see on a chart for this Session (the start of its activated month); None for Pro or a Session without a claim."""
+    window = entitlements.session_window(workspace_id, session_id)
+    if window is None or window["tier"] == "PRO":
+        return None
+    return int(window["startNs"])
+
+
 def check(entitlements, dsn, actor_id, workspace_id, session_id, kind, target_ns=None):
     """kind: OPEN | ADVANCE | JUMP | (CANCEL/CLOSE/END are always allowed). Raises WindowRefused; returns None when the command may proceed."""
     if kind in ("CANCEL", "CLOSE", "END", "FORK"):
@@ -40,6 +48,8 @@ def check(entitlements, dsn, actor_id, workspace_id, session_id, kind, target_ns
     if window is None or window["tier"] == "PRO":
         return
     end = int(window["endNs"])
+    if kind == "CHART_CONTEXT":                                        # candles of the month BEFORE the activated one are Pro-only (owner decision 2026-11-18)
+        raise WindowRefused("CHART_CONTEXT_PRO_ONLY", dict(windowStartNs=str(int(window["startNs"])), windowEndNs=str(end)))
     state = live_orders(dsn, workspace_id, actor_id, session_id)
     through, after = state["throughNs"], state["throughNs"] >= end - 1       # window = ticks with time < end; end-1 is the last allowed cursor
     base = dict(windowEndNs=str(end), throughNs=str(through), activeOrders=state["active"], pendingOrders=state["pending"])

@@ -70,7 +70,7 @@ class ChartHistory:
         return self._tick_readers[key]
 
     # ---- request ----------------------------------------------------------------------------------------------------
-    def page(self, actor_id, workspace_id, session_id, *, timeframe, limit=None, before=None):
+    def page(self, actor_id, workspace_id, session_id, *, timeframe, limit=None, before=None, floor_ns=None):
         require(timeframe in _API_TIMEFRAMES, "timeframe", "INVALID_INPUT")
         tf = _API_TIMEFRAMES[timeframe]
         require(limit is None or (type(limit) is int and 1 <= limit <= _PAGE_MAX), "limit", "INVALID_INPUT")
@@ -104,11 +104,25 @@ class ChartHistory:
         if out.get("active"):
             a = out["active"]
             forming = dict(time=int(a["t"]) // 10**9, open=_decimal(a["o"], den), high=_decimal(a["h"], den), low=_decimal(a["l"], den), close=_decimal(a["c"], den))
+        next_before = (int(bars["t"][0]) // 10**9) if out["count"] and out["hasMore"] else None
+        has_more = bool(out["hasMore"])
+        candles, forming, next_before, has_more = clip_to_floor(candles, forming, next_before, has_more, floor_ns)
         return dict(schemaVersion=1, artifact="BTL-CHART-HISTORY-PAGE-1", sessionId=session_id, revision=pin["revision"], timeframe=timeframe,
                     priceBasis=self._basis, evidence="DERIVED_NON_AUTHORITATIVE_DISPLAY_ONLY", executionAuthority=False, volumeAvailable=False,
                     cursorNs=str(pin["through"]), candles=candles, forming=forming,
-                    nextBefore=(int(bars["t"][0]) // 10**9) if out["count"] and out["hasMore"] else None,
-                    hasMore=bool(out["hasMore"]), historyExhausted=not bool(out["hasMore"]), windowCap=_WINDOW_CAP)
+                    nextBefore=next_before, hasMore=has_more, historyExhausted=not has_more, windowCap=_WINDOW_CAP)
+
+
+def clip_to_floor(candles, forming, next_before, has_more, floor_ns):
+    """Free accounts: drop every candle that starts before the activated month and end paging there (a pure function, unit-tested).
+    The clipping happens on the server for every response, so the browser, a cache or a prefetch never receives an older candle."""
+    if floor_ns is None:
+        return candles, forming, next_before, has_more
+    floor = int(floor_ns) // 10**9
+    kept = [c for c in candles if c["time"] >= floor]
+    if len(kept) != len(candles) or (next_before is not None and next_before <= floor):
+        return kept, forming, None, False
+    return kept, forming, next_before, has_more
 
 
 def from_environment(dsn):

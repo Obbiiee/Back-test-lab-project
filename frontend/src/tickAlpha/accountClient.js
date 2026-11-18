@@ -12,6 +12,7 @@ export function entitlementRefusal(body){
     WINDOW_ENDED:'This Free window has ended: new orders cannot be opened. Open positions can still be resolved. Pro has no one-month window limit.',
     WINDOW_BOUNDARY:'This step would cross the end of your Free window. Step to the last tick of the window, or use Jump to Next Event while an order is open. Pro has no one-month window limit.',
     WINDOW_ENDED_CONTINUATION_ONLY:'This Free window has ended. Only Jump to Next Event (with an open position), Close, Cancel and End are available. Pro has no one-month window limit.',
+    CHART_CONTEXT_PRO_ONLY:'Candles from before this month are part of Pro. Your Free Session shows the month you opened.',
     PENDING_AT_WINDOW_END:'A pending order is still waiting at the end of your Free window. Cancel it before continuing.',
     WINDOW_COMPLETED:'This Free window is complete: no open or pending orders remain.',
     TRASH_EXPIRED:'The 30-day restore window for this Session has passed.',

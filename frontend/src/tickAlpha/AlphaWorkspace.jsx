@@ -103,7 +103,7 @@ export default function AlphaWorkspace({view,timeframe,busy,pauseToken,onTimefra
           offset=page.nextOffset;
         }
         throw Error('Past candle context did not finish within the work budget');
-      }catch(error){if(!controller.signal.aborted)setPast({key,bars:[],status:`Earlier candles unavailable: ${error.message}. Retry earlier candles when the service is ready.`});}
+      }catch(error){if(!controller.signal.aborted)setPast({key,bars:[],status:error.code==='CHART_CONTEXT_PRO_ONLY'?error.message:`Earlier candles unavailable: ${error.message}. Retry earlier candles when the service is ready.`});}
     };
     void load();return()=>controller.abort();
   // Session/timeframe own this request; cursor changes must not restart it.

@@ -17,11 +17,12 @@ DEFAULT_SEED = 20261112
 DEFAULT_DATASET_ID = "synthetic:financial-active-v1"
 CHUNK_SIZE = 256
 START_NS = int(datetime(2020, 1, 30, tzinfo=timezone.utc).timestamp()) * 1_000_000_000
+STEP_NS = 60_000_000_000
 _SOURCE_ID = "synthetic:financial-active:source-0"
 _MEMBER_NAME = "RIKSORA_SYNTHETIC_FINANCIAL_ACTIVE_JSONL_V1"
 
 
-def _raw_row(index: int, count: int, seed: int):
+def _raw_row(index: int, count: int, seed: int, start_ns: int = START_NS, step_ns: int = STEP_NS):
     # A deterministic, bounded oscillation, occasional explicit gap/spread
     # changes, followed by an authored limit-entry and TP sequence. This is a
     # software workload, not a market model.
@@ -42,16 +43,16 @@ def _raw_row(index: int, count: int, seed: int):
         "ordinal": str(index),
         # One authored observation per synthetic minute creates sparse
         # multi-day spans and monthly partition crossings at modest row count.
-        "timeNs": str(START_NS + index * 60_000_000_000),
+        "timeNs": str(start_ns + index * step_ns),
         "bid": f"{bid_units // 100}.{bid_units % 100:02d}".rstrip("0").rstrip("."),
         "ask": f"{(bid_units + spread_units) // 100}.{(bid_units + spread_units) % 100:02d}".rstrip("0").rstrip("."),
     }
 
 
-def _member_hash(event_count, seed):
+def _member_hash(event_count, seed, start_ns=START_NS, step_ns=STEP_NS):
     digest = hashlib.sha256()
     for index in range(event_count):
-        digest.update(canonical_bytes(_raw_row(index, event_count, seed)))
+        digest.update(canonical_bytes(_raw_row(index, event_count, seed, start_ns, step_ns)))
         digest.update(b"\n")
     return digest.hexdigest()
 
@@ -73,7 +74,7 @@ def _event(row, member_hash, quality_hash, dataset_id, dataset_version):
 
 
 def build_manifest(event_count, seed=DEFAULT_SEED, dataset_id=DEFAULT_DATASET_ID,
-                   chunk_size=CHUNK_SIZE):
+                   chunk_size=CHUNK_SIZE, start_ns=START_NS, step_ns=STEP_NS):
     """Return a canonical source manifest while retaining only one chunk."""
     if type(event_count) is not int or not 512 <= event_count <= 1_048_576:
         raise ValueError("event_count must be between 512 and 1,048,576")
@@ -81,7 +82,7 @@ def build_manifest(event_count, seed=DEFAULT_SEED, dataset_id=DEFAULT_DATASET_ID
         raise ValueError("event_count/chunk_size must satisfy canonical chunk bounds")
     if type(seed) is not int or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
-    member_hash = _member_hash(event_count, seed)
+    member_hash = _member_hash(event_count, seed, start_ns, step_ns)
     quality_hash = content_hash(dict(schemaVersion=1, artifact="BTL-SYNTHETIC-QUALITY-1",
         label="SYNTHETIC / TEST ONLY", generator=GENERATOR_VERSION, seed=seed,
         memberHash=member_hash, assertion="AUTHORED_FIXTURE_COMPLETE_FRESH_QUOTES"))
@@ -89,7 +90,7 @@ def build_manifest(event_count, seed=DEFAULT_SEED, dataset_id=DEFAULT_DATASET_ID
     first_ns = last_ns = None
     batch = []
     for index in range(event_count):
-        row = _raw_row(index, event_count, seed)
+        row = _raw_row(index, event_count, seed, start_ns, step_ns)
         event = _event(row, member_hash, quality_hash, dataset_id, "0" * 64)
         if first_ns is None:
             first_ns = row["timeNs"]
@@ -123,7 +124,7 @@ def build_manifest(event_count, seed=DEFAULT_SEED, dataset_id=DEFAULT_DATASET_ID
     return source_manifest.wire, member_hash, quality_hash
 
 
-def iter_events(event_count, source_manifest, seed=DEFAULT_SEED):
+def iter_events(event_count, source_manifest, seed=DEFAULT_SEED, start_ns=START_NS, step_ns=STEP_NS):
     """Regenerate verified synthetic ticks one at a time for Parquet writer."""
     manifest = TickManifest.from_wire(source_manifest)
     if len(manifest.wire["sources"]) != 1 or sum(c["eventCount"] for c in manifest.wire["chunks"]) != event_count:
@@ -133,7 +134,7 @@ def iter_events(event_count, source_manifest, seed=DEFAULT_SEED):
         label="SYNTHETIC / TEST ONLY", generator=GENERATOR_VERSION, seed=seed,
         memberHash=member_hash, assertion="AUTHORED_FIXTURE_COMPLETE_FRESH_QUOTES"))
     for index in range(event_count):
-        yield _event(_raw_row(index, event_count, seed), member_hash, quality_hash,
+        yield _event(_raw_row(index, event_count, seed, start_ns, step_ns), member_hash, quality_hash,
                      manifest.wire["datasetId"], manifest.version)
 
 

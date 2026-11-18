@@ -64,7 +64,10 @@ class YearBoundaryArithmetic(unittest.TestCase):
 
 
 @unittest.skipUnless(DSN, "Real isolated PostgreSQL required; skip is not PASS")
-class MonthContract(unittest.TestCase):
+class MonthBase(unittest.TestCase):
+    """Real-stack fixture. Subclasses choose the synthetic source through SPEC (tick count, start, step); the default is the 65,536-tick Jan 30 - Mar 15 2020 source."""
+    SPEC = dict(name="m65536", ticks=TICKS, gen={}, period="2020-01")
+
     @classmethod
     def setUpClass(cls):
         name = "btl_fp_months_" + uuid.uuid4().hex
@@ -78,16 +81,21 @@ class MonthContract(unittest.TestCase):
         from market_data.monthly_parquet import write_monthly_parquet
         from tests.synthetic_financial_monthly import build_manifest, iter_events
         cls.tmp = tempfile.TemporaryDirectory(prefix="riksora-fp-")
-        cls.manifest, _m, _q = build_manifest(TICKS)
+        spec = cls.SPEC
+        cls.period = spec["period"]
+        cls.manifest, _m, _q = build_manifest(spec["ticks"], **spec["gen"])
         cls.version = content_hash(cls.manifest)
-        cache = os.environ.get("BTL_FP_DATA_CACHE")                      # optional: reuse the deterministic synthetic Parquet between runs (derived data, never committed)
+        cache = os.environ.get("BTL_FP_DATA_CACHE")
+        cache = os.path.join(cache, spec["name"]) if cache else None
+        if cache:
+            os.makedirs(cache, exist_ok=True)                      # optional: reuse the deterministic synthetic Parquet between runs (derived data, never committed)
         root = os.path.join(cache or cls.tmp.name, "monthly")
         marker = os.path.join(cache, "manifest-hash") if cache else None
         if marker and os.path.exists(marker):
             with open(marker) as handle:
                 parquet = {"manifestHash": handle.read().strip()}
         else:
-            parquet = write_monthly_parquet(root, iter_events(TICKS, cls.manifest), cls.manifest, expected_version=cls.version, row_group_size=4096)
+            parquet = write_monthly_parquet(root, iter_events(spec["ticks"], cls.manifest, **spec["gen"]), cls.manifest, expected_version=cls.version, row_group_size=4096)
             if marker:
                 open(marker, "w").write(parquet["manifestHash"])
         accepted = os.path.join(cache or cls.tmp.name, "accepted")
@@ -141,7 +149,20 @@ class MonthContract(unittest.TestCase):
 
     def work(self, job_id):
         self.assertTrue(queue.work_one(self.dsn, worker.run))
-        return self.client.get(self.path + "/jobs/" + job_id, headers=self.headers).json()
+        done = self.client.get(self.path + "/jobs/" + job_id, headers=self.headers).json()
+        with connect(self.dsn) as db:                                   # bounded worker telemetry, captured before queue retention can prune the row
+            row = db.execute("SELECT worker_metrics FROM btl.research_jobs WHERE id=%s", (job_id,)).fetchone()
+        if row and row[0]:
+            import json
+            self.metrics = getattr(self, "metrics", [])
+            self.metrics.append(json.loads(bytes(row[0])))
+        return done
+
+    def resource_summary(self):
+        """CPU seconds, wall seconds and peak RSS of the worker over every job this test ran (host-specific, synthetic, not a capacity claim)."""
+        items = getattr(self, "metrics", [])
+        return dict(jobs=len(items), cpuSeconds=round(sum(i.get("cpuNs", 0) for i in items) / 1e9, 2), wallSeconds=round(sum(i.get("wallNs", 0) for i in items) / 1e9, 2),
+                    peakRssMiB=round(max([i.get("processPeakRssBytes", 0) or 0 for i in items] or [0]) / 2**20, 1))
 
     def post(self, url, body, expect=202):
         job = str(uuid.uuid4())
@@ -171,7 +192,8 @@ class MonthContract(unittest.TestCase):
             self.assertEqual(self.work(job)["state"], "SUCCEEDED")
         return r
 
-    def new_session(self, period="2020-01", with_orders=True, expect_created=True):
+    def new_session(self, period=None, with_orders=True, expect_created=True):
+        period = period or self.period
         sid = "session:" + uuid.uuid4().hex
         job, r = self.post("/sessions", {"id": sid, "name": "fp", "methodId": self.record["id"], "initialBalance": "10000", "startPeriod": period}, expect=202 if expect_created else 409)
         if not expect_created:
@@ -187,7 +209,7 @@ class MonthContract(unittest.TestCase):
             self.confirm(sid, pending)
             market = review_request(self.view(sid))                      # a QUICK market LONG, no SL/TP: stays ACTIVE across every boundary
             self.confirm(sid, market)
-            self.command(sid, "ADVANCE", {"targetNs": str(self.start + 60 * NS)})      # the next tick fills the market order: ACTIVE position + PENDING limit
+            self.command(sid, "ADVANCE", {"targetNs": str(self.start + self.SPEC["gen"].get("step_ns", 60 * NS))})      # the next tick fills the market order: ACTIVE position + PENDING limit
         return sid
 
     def confirm(self, sid, review):
@@ -222,6 +244,9 @@ class MonthContract(unittest.TestCase):
             n_events = db.execute("SELECT count(*) FROM btl.tick_events WHERE workspace_id=%s AND session_id=%s", (self.f.workspace, sid)).fetchone()[0]
         return dict(through=st["throughNs"], balance=st["balance"], orderStatus=sorted(v["status"] for v in st["orders"].values()), journal=orders, summary=summ, events=n_events)
 
+
+@unittest.skipUnless(DSN, "Real isolated PostgreSQL required; skip is not PASS")
+class MonthContract(MonthBase):
     # ---- PRO ----------------------------------------------------------------------------------------------------------
     def test_pro_one_session_runs_through_three_months_with_parity_and_restart(self):
         self.grant_pro()

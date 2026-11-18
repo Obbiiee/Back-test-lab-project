@@ -543,8 +543,13 @@ def install(app):
         """BTL-CHART-HISTORY-PAGE-1: cursor-bound precomputed OHLC (additive; BTL-PAST-CHART-CONTEXT-1 is unchanged). Read-only, no queue slot."""
         chart = getattr(app.state, 'chart_history', None)
         require(chart is not None, 'chart', 'RESOURCE_UNAVAILABLE')
+        floor = None
+        entitlements = getattr(app.state, 'entitlements', None)
+        if entitlements is not None:                  # Free: nothing older than the start of the activated month leaves the server (clipped here, not in the browser)
+            from . import window_guard
+            floor = await anyio.to_thread.run_sync(partial(window_guard.chart_floor_ns, entitlements, workspace_id, session_id), limiter=limiter)
         value = await anyio.to_thread.run_sync(
-            partial(chart.page, user.id, workspace_id, session_id, timeframe=timeframe, limit=limit, before=before), limiter=chart_limiter)
+            partial(chart.page, user.id, workspace_id, session_id, timeframe=timeframe, limit=limit, before=before, floor_ns=floor), limiter=chart_limiter)
         return Response(canonical_bytes(value), media_type='application/json', headers={'X-Content-Type-Options': 'nosniff'})
 
     async def _lifecycle(workspace_id, session_id, user, trashed):
@@ -785,6 +790,10 @@ def install(app):
         raw = await json_body(request)
         if name == 'confirm':
             refused = await _window_guard(user, workspace_id, session_id, 'OPEN')
+            if refused is not None:
+                return refused
+        elif name == 'chart_history':
+            refused = await _window_guard(user, workspace_id, session_id, 'CHART_CONTEXT')
             if refused is not None:
                 return refused
         elif name == 'apply' and type(raw) is dict and raw.get('kind') in ('OPEN', 'ADVANCE', 'SEEK', 'CANCEL', 'CLOSE', 'END'):
