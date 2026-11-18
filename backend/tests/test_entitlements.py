@@ -109,14 +109,16 @@ class EntitlementTests(unittest.TestCase):
         f = self.fixture
         job = uuid.uuid4()
         with connect(DSN) as db:
-            db.execute("INSERT INTO btl.research_jobs(id,actor_id,workspace_id,operation,input,input_hash,state) VALUES (%s,%s,%s,'workspace',%s,%s,'QUEUED')",
+            # A RUNNING job with a live lease cannot be claimed by the fixture's real workers (a QUEUED row could be picked up and failed first: a race in the test, not in the product).
+            db.execute("INSERT INTO btl.research_jobs(id,actor_id,workspace_id,operation,input,input_hash,state,lease_owner,lease_until,heartbeat_at) "
+                       "VALUES (%s,%s,%s,'workspace',%s,%s,'RUNNING','b7e2995a-d532-476f-acdc-fdf361f13de3',clock_timestamp()+interval '1 hour',clock_timestamp())",
                        (job, f.actor, f.workspace, b"{}", "0" * 64))
         self.ent.reserve(f.actor, f.workspace, self.body(), job)
         with connect(DSN) as db:
             db.execute("UPDATE btl.entitlement_claims SET reserved_at = clock_timestamp() - interval '10 minutes' WHERE actor_id=%s", (f.actor,))
-        self.assertEqual(self.status()["sessions"]["used"], 1, "QUEUED job still owns the reservation")
+        self.assertEqual(self.status()["sessions"]["used"], 1, "a live job still owns the reservation")
         with connect(DSN) as db:
-            db.execute("UPDATE btl.research_jobs SET state='FAILED', finished_at=clock_timestamp() WHERE id=%s", (job,))
+            db.execute("UPDATE btl.research_jobs SET state='FAILED', finished_at=clock_timestamp(), lease_owner=NULL, lease_until=NULL, heartbeat_at=NULL WHERE id=%s", (job,))
         self.assertEqual(self.status()["sessions"]["used"], 0, "a failed job releases immediately")
 
     def test_parallel_requests_cannot_activate_twice(self):
