@@ -101,6 +101,11 @@ class MultiTimeline:
     def last_quotes(self):
         return {name: (None if q is None else dict(q)) for name, q in self.quotes.items()}
 
+    def _controller_next_time(self):
+        """Private scheduling peek for trusted controller code; never pass this to a consumer/view."""
+        values = [source.next_time() for source in self._src]
+        return min((value for value in values if value is not None), default=None)
+
     def cursor(self):
         return dict(schemaVersion=1, artifact="BTL-MULTI-TIMELINE-CURSOR-1", instruments=list(self.instruments), frontierNs=str(self.frontier_ns),
                     consumed={s.name: s.consumed for s in self._src}, quotes=self.last_quotes())
