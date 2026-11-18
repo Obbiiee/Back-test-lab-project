@@ -1,3 +1,11 @@
+# Validation checkpoint — native MI queue and immutable terminal archive (isolated QA)
+
+MI commands use the existing durable replay queue with a distinct request artifact and private native-worker dispatch. The Session pins the operator-supplied synthetic manifest hash at creation. The worker rechecks workspace membership, write authority, development profile and source hash before executing the MI command. This is an internal queue path for QA-created Sessions. No HTTP route, frontend or production setting was added.
+
+Disposable PostgreSQL 17 tests exercised the native worker with SIGKILL before transaction, during replay and after commit before acknowledgement. Test-controlled lease expiry exercised production reclaim and bounded retry. A real PostgreSQL backend disconnect was followed by a successful new connection. Duplicate delivery and two claiming workers preserved exact receipts and the chronological MI state/events. Cold resume retained 16 instruments and simultaneous ACTIVE/PENDING orders.
+
+The terminal order archive appends immutable records with pair and Method in the financial transaction. Revision-pinned keyset pages expose terminal orders and event-ledger slices. Existing aggregate Analytics remains limited to 4,096 events. MI still retains terminal orders in financial state, so the reducer's 128-order lifetime bound is unchanged. No web entitlement/API, browser, benchmark or production acceptance.
+
 # Validation checkpoint — versioned MI PostgreSQL store (isolated QA)
 
 Owner approved the additive durable MI integration. `execution/mi_postgres.py` uses the existing PostgreSQL Session, checkpoint, command and event tables with a separate MI envelope, tenant-scoped row locks, one revision per committed command, and exact retry receipts. The envelope preserves order creation order across canonical serialization, and MI checkpoint restoration uses the pinned instrument order. The Journal/Analytics projection reads the immutable event ledger in one repeatable read transaction. Product V1/MM/Observed routes, reducers and migrations are unchanged.

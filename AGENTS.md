@@ -258,3 +258,7 @@ Added `backend/execution/mi_projection.py`, a read-only QA projection for the is
 ## OWNER ADDENDUM — DURABLE MI STORE CHECKPOINT (QA only)
 
 Owner authorized the additive versioned MI Session and PostgreSQL integration. The isolated store binds checkpoint, workspace, source pins and creation order. Shared tables retain immutable checkpoints, commands and events. Disposable PostgreSQL 17 verified exact receipt retry, atomic rollback before and during COMMIT, lost acknowledgement after commit, instrument and order tie ordering, source pin refusal, and workspace scope. No public entry point or service queue/worker binding yet. Native queue recovery is the next gate. No push, rewrite, deploy, margin enforcement or production changes.
+
+## OWNER ADDENDUM — MI NATIVE QUEUE AND ARCHIVE CHECKPOINT (QA only)
+
+Owner requested MI native worker and durable queue recovery before public-facing integration. Native MI uses a distinct request artifact, a development-only operator manifest pin and existing owner/queue admission. Disposable PostgreSQL 17 tests exercised SIGKILL before transaction, during replay and after commit, database disconnect, lease reclaim, duplicate delivery and cold 16-instrument resume. Terminal archive and event ledger have scoped revision-pinned keyset pages. Aggregate Analytics and hot order-state limits remain. No API routes, frontend activation, production changes, push or rewrite.

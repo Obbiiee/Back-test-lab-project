@@ -6,11 +6,11 @@ public entry point. A PostgreSQL row lock serializes a Session's commands.
 from fractions import Fraction
 
 from contracts.canonical import content_hash
-from contracts.primitives import digest, require
+from contracts.primitives import digest, require, revision
 from infrastructure.database import connect
 from ticks.contracts import tag, uint
 
-from . import mi_checkpoint, mi_jump, mi_kernel, mi_projection
+from . import mi_archive, mi_checkpoint, mi_jump, mi_kernel, mi_projection
 from .postgres import pack, scoped, unpack
 
 SESSION = "BTL-TICK-DURABLE-SESSION-MI-1"
@@ -214,12 +214,67 @@ class MultiInstrumentStore:
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace, session, command["commandId"], event["eventId"],
                             event["sequence"], blob, digest))
+            mi_archive.append(db, workspace, session, before, after, events)
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                        (workspace, session, after["revision"], raw, sha))
             db.execute("UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s "
                        "WHERE workspace_id=%s AND session_id=%s",
                        (after["revision"], raw, sha, workspace, session))
         return result
+
+    def terminal_page(self, scope, session_id, *, after_sequence=None, revision_pin=None, limit=32):
+        workspace, session = scoped(scope, session_id)
+        require(type(limit) is int and 1 <= limit <= 64, "limit")
+        require(after_sequence is None or revision_pin is not None, "cursor", "INVALID_CURSOR")
+        if after_sequence is not None:
+            revision(after_sequence)
+        if revision_pin is not None:
+            revision(revision_pin)
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            state = self._read(db, workspace, session)[0]["state"]
+            require(revision_pin is None or revision_pin == state["revision"], "revision", "STALE_REVISION")
+            after = -1 if after_sequence is None else after_sequence
+            return mi_archive.page(db, workspace, session, state, after, limit)
+
+    def event_page(self, scope, session_id, *, after_sequence=None, revision_pin=None, limit=32):
+        """Read a bounded verified slice of Journal's authoritative event ledger."""
+        workspace, session = scoped(scope, session_id)
+        require(type(limit) is int and 1 <= limit <= 64, "limit")
+        require(after_sequence is None or revision_pin is not None, "cursor", "INVALID_CURSOR")
+        if after_sequence is not None:
+            revision(after_sequence)
+        if revision_pin is not None:
+            revision(revision_pin)
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            state = self._read(db, workspace, session)[0]["state"]
+            require(revision_pin is None or revision_pin == state["revision"], "revision", "STALE_REVISION")
+            start = 0 if after_sequence is None else after_sequence + 1
+            require(after_sequence is None or after_sequence < state["nextEventIndex"], "cursor", "INVALID_CURSOR")
+            first = max(0, start - 1)
+            rows = db.execute(
+                "SELECT sequence,event_id,payload,content_hash FROM btl.tick_events "
+                "WHERE workspace_id=%s AND session_id=%s AND sequence >= %s ORDER BY sequence LIMIT %s",
+                (workspace, session, first, limit + (start > 0))).fetchall()
+            require(len(rows) == min(state["nextEventIndex"] - first, limit + (start > 0)),
+                    "miPageLength", "CORRUPT_RECORD")
+            head = mi_kernel.seed_hash(state) if first == 0 else None
+            events = []
+            for expected, (sequence, event_id, payload, sha) in enumerate(rows, start=first):
+                event = unpack(payload, sha)
+                require(expected == sequence == event["sequence"] and event["eventId"] == event_id and
+                        event["artifact"] == mi_kernel.MI_EVENT and event["sessionId"] == session and
+                        event["profileSetHash"] == state["profileSetHash"] and
+                        event_id == content_hash({key: value for key, value in event.items() if key != "eventId"}) and
+                        (head is None or event["previousHash"] == head), "miPageChain", "CORRUPT_RECORD")
+                head = event_id
+                if sequence >= start:
+                    events.append(event)
+            more = start + len(events) < state["nextEventIndex"]
+            require(more or head == state["eventHash"], "miPageHead", "CORRUPT_RECORD")
+            return dict(schemaVersion=1, artifact="BTL-MI-EVENT-PAGE-1", revision=state["revision"],
+                        events=events, nextAfterSequence=events[-1]["sequence"] if more else None)
 
     def project(self, scope, session_id):
         workspace, session = scoped(scope, session_id)

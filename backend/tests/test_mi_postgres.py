@@ -110,6 +110,39 @@ class MultiInstrumentPostgres(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "RESOURCE_UNAVAILABLE"):
             cold.project(TrustedScope("other", self.scope.actor_ref), self.sid)
 
+    def test_terminal_archive_is_revision_pinned_and_retry_safe(self):
+        self.open_both()
+        self.apply("CANCEL", {"orderId": "GBPUSD"}, "cancel")
+        self.apply("ADVANCE", {"targetNs": str(self.model.at(2))}, "entries")
+        self.apply("CLOSE", {"orderId": "EURUSD", "quantity": None}, "close")
+        payload = {"targetNs": str(self.model.at(4))}
+        cmd = self.cmd("ADVANCE", payload, "exits")
+        result = self.apply("ADVANCE", payload, "exits")
+        self.assertEqual(self.store.apply(self.scope, cmd, self.open_sources), result)
+        first = self.store.terminal_page(self.scope, self.sid, limit=1)
+        self.assertEqual(first["orders"][0]["order"]["status"], "CANCELLED")
+        options = dict(limit=1, after_sequence=first["nextAfterSequence"], revision_pin=first["revision"])
+        last = self.store.terminal_page(self.scope, self.sid, **options)
+        order = last["orders"][0]["order"]
+        self.assertEqual((order["status"], order["symbol"], order["methodId"]),
+                         ("CLOSED", "EURUSD", FREE.method_id))
+        self.assertIsNone(last["nextAfterSequence"])
+        self.assertEqual(self.store.project(self.scope, self.sid)["metrics"]["tradeCount"], 1)
+        self.apply("ADVANCE", {"targetNs": str(self.model.at(5))}, "more")
+        with self.assertRaisesRegex(ContractError, "STALE_REVISION"):
+            self.store.terminal_page(self.scope, self.sid, **options)
+
+    def test_ledger_pages_reproduce_exact_ordered_events(self):
+        self.open_both()
+        self.apply("ADVANCE", {"targetNs": str(self.model.at(2))}, "entries")
+        page = self.store.event_page(self.scope, self.sid, limit=1)
+        combined = list(page["events"])
+        while page["nextAfterSequence"] is not None:
+            page = self.store.event_page(self.scope, self.sid, limit=1,
+                after_sequence=page["nextAfterSequence"], revision_pin=page["revision"])
+            combined.extend(page["events"])
+        self.assertEqual(combined, self.model.events)
+
     def test_concurrent_delivery_conflict_and_stale_revision(self):
         command = self.cmd("ADVANCE", {"targetNs": str(self.model.at(0))}, "same")
         with ThreadPoolExecutor(max_workers=3) as pool:

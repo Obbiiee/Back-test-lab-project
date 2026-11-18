@@ -147,6 +147,41 @@ serve()
         self.assertEqual(self.finish(exits), receipt)
         self.assertEqual(self.store.project(self.scope, self.sid)["metrics"]["tradeCount"], 1)
 
+    def test_native_pretransaction_sigkill_and_postgres_disconnect_reclaim(self):
+        request = self.command("ADVANCE", {"targetNs": str(self.model.at(0))}, "recover-first")
+        job_id = self.submit_mi(request)
+        pretransaction = """import os, signal, sys
+sys.path[:0] = sys.argv[1:]
+from execution.mi_postgres import MultiInstrumentStore
+from cloud.worker import serve
+def kill(self, *args, **kwargs):
+    os.kill(os.getpid(), signal.SIGKILL)
+MultiInstrumentStore.apply = kill
+serve()
+"""
+        disconnect = """import sys
+from contextlib import contextmanager
+sys.path[:0] = sys.argv[1:]
+from execution import mi_postgres
+from cloud.worker import serve
+native = mi_postgres.connect
+@contextmanager
+def interrupted(dsn):
+    with native(dsn, pooled=False) as db:
+        db.execute("SELECT pg_terminate_backend(pg_backend_pid())")
+        yield db
+mi_postgres.connect = interrupted
+serve()
+"""
+        for entry, message in ((pretransaction, "MI native worker interrupted"),
+                               (disconnect, "Worker infrastructure unavailable")):
+            worker.close()
+            with patch.object(worker, "SERVE_ENTRY", entry), self.assertRaisesRegex(RuntimeError, message):
+                queue.work_one(self.dsn, worker.run)
+            self.reclaim(job_id)
+        self.expect(request, self.finish(request, job_id))
+        self.assertEqual(self.inspect(job_id)["attempt"], 3)
+
     def test_native_mi_development_gate(self):
         request = self.command("ADVANCE", {"targetNs": str(self.model.at(0))}, "first")
         with patch.dict(os.environ, {"BTL_PRODUCT_PROFILE": "commercial"}):
