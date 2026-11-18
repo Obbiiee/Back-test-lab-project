@@ -211,3 +211,7 @@ Owner menginstruksikan "kerjakan semua, tinggal sisa Midtrans" agar evaluator da
 ## OWNER ADDENDUM — FREE QUOTA CHANGED TO PER DAY (2026-11-18, instruksi owner di chat)
 
 Owner menetapkan kuota Free: 1 Sesi baru per hari UTC, tiap Sesi memakai data 1 bulan (1 bulan historis baru diaktifkan per hari UTC tetap berlaku); Pro tanpa batas Sesi baru dan bulan data selama paket aktif. Menggantikan aturan 1 Sesi per bulan kalender UTC (2026-11-15). Kode refusal berganti `SESSION_MONTH_LIMIT` -> `SESSION_DAY_LIMIT`. Tanpa migrasi (kolom period sudah teks). Batas antrean/TTL/deadline, kontrak finansial tidak berubah. Teks Syarat dan Ketentuan bagian 4 mengikuti aturan baru (perubahan isi di bawah tanggal persetujuan 2026-11-17; owner perlu menyetujui ulang). Commercial V1 tetap BLOCKED.
+
+## OWNER ADDENDUM — FREE/PRO AUDIT AND FINALISATION (2026-11-18, instruksi owner di chat)
+
+Owner menginstruksikan audit dan finalisasi aturan Free/Pro dari commit `539a936` (korektness, integritas finansial, keamanan, efisiensi, UX), termasuk regresi, journey browser, dan laporan berbasis evidence: `docs/acceptance/RIKSORA-FREE-PRO-AUDIT-20261118.md`. Dikerjakan di QA disposable; tanpa perubahan kontrak finansial, antrean/TTL/deadline/worker, dan tanpa mengubah tanggal persetujuan hukum owner. Promosi checkpoint compact-v2 ke aplikasi publik (diperlukan agar satu Session Pro dapat berjalan lintas bulan secara panjang) TIDAK diterapkan: menunggu persetujuan owner (proposal delta di laporan, bagian 5). Commercial V1 tetap BLOCKED.

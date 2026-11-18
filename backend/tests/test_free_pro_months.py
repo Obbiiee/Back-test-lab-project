@@ -46,6 +46,23 @@ def leaf_diff(a, b, path=""):
     return [] if a == b else [(path, a, b)]
 
 
+class YearBoundaryArithmetic(unittest.TestCase):
+    """Pure month/day arithmetic of the quota layer across December -> January and a leap February (no database needed)."""
+    def test_december_to_january_windows_and_resets(self):
+        from cloud.entitlements import month_bounds, next_day, next_month
+        start, end = month_bounds("2023-12")
+        self.assertEqual(start, int(datetime(2023, 12, 1, tzinfo=timezone.utc).timestamp()) * NS)
+        self.assertEqual(end, int(datetime(2024, 1, 1, tzinfo=timezone.utc).timestamp()) * NS)       # the window of December ends exactly at January 1 00:00 UTC
+        self.assertEqual(month_bounds("2024-01")[0], end)                                              # consecutive months are gapless: no tick can fall between them
+        self.assertEqual(next_day(datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)), datetime(2024, 1, 1, tzinfo=timezone.utc))
+        self.assertEqual(next_month(datetime(2023, 12, 15, tzinfo=timezone.utc)), datetime(2024, 1, 1, tzinfo=timezone.utc))
+        feb = month_bounds("2024-02")                                                                  # leap year: February has 29 days
+        self.assertEqual((feb[1] - feb[0]) // NS // 86400, 29)
+        for bad in ("2023-13", "2023-00", "23-12", "2023-1"):
+            with self.assertRaises(Exception):
+                month_bounds(bad)
+
+
 @unittest.skipUnless(DSN, "Real isolated PostgreSQL required; skip is not PASS")
 class MonthContract(unittest.TestCase):
     @classmethod
@@ -81,7 +98,8 @@ class MonthContract(unittest.TestCase):
             source_acceptance.accept_offline(provider, cls.manifest["datasetId"], cls.version, accepted)
         cls.pins = {"BTL_SOURCE_ACCEPTANCE_DIR": accepted, "BTL_QA_SYNTHETIC_MONTHLY_ENABLE": "1", "BTL_QA_SYNTHETIC_MONTHLY_ROOT": root, "BTL_QA_SYNTHETIC_MONTHLY_DATASET_ID": cls.manifest["datasetId"],
                     "BTL_QA_SYNTHETIC_MONTHLY_DATASET_VERSION": cls.version, "BTL_QA_SYNTHETIC_MONTHLY_MANIFEST_SHA256": parquet["manifestHash"],
-                    "BTL_TICK_SESSION_STORAGE_FORMAT": "compact-v1", "BTL_TICK_CHECKPOINT_FORMAT": "compact-v2",
+                    "BTL_TICK_SESSION_STORAGE_FORMAT": "compact-v1", "BTL_TICK_CHECKPOINT_FORMAT": os.environ.get("BTL_FP_CHECKPOINT", "compact-v2"),   # compact-v2 = QA opt-in; anything else = the production default (V1)
+                    
                     "BTL_ENTITLEMENT_ENFORCE": "1", "BTL_ENTITLEMENT_RESET_TIMEZONE": "UTC", "BTL_REPLAY_RUN_BUDGET_S": "20"}
         cls.end = int(cls.manifest["range"]["endNs"]) - 1
         cls.start = int(cls.manifest["range"]["startNs"])
@@ -186,7 +204,7 @@ class MonthContract(unittest.TestCase):
         last = None
         for _ in range(segments):
             done = self.work(job)
-            self.assertEqual(done["state"], "SUCCEEDED", done)
+            self.assertEqual(done["state"], "SUCCEEDED", (done, "cursor reached", self.summary(sid)["throughNs"], "of", self.end))
             last = done["result"]
             if not last.get("continuationJobId"):
                 return last
