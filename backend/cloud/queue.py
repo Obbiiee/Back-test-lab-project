@@ -114,6 +114,10 @@ def _expire_queued(db):
 
 def replay_command(raw, session_id, session_artifact):
     """Validate the command dialect against authenticated durable Session metadata."""
+    from . import mi_qa
+    from execution.mi_postgres import SESSION as MI_SESSION
+    if session_artifact == MI_SESSION:
+        return mi_qa.request(raw, session_id)
     if session_artifact == 'BTL-OBSERVED-RESEARCH-SESSION-1':
         from execution.observed_kernel import command_wire as validate
         expected = 'BTL-OBSERVED-EXECUTION-COMMAND-1'
@@ -133,8 +137,19 @@ def _persisted_session_artifact(db, workspace_id, session_id):
     """Return a model only after workspace-scoped canonical payload verification."""
     row = db.execute('SELECT payload,content_hash FROM btl.tick_research_sessions '
                      'WHERE workspace_id=%s AND session_id=%s', (workspace_id, session_id)).fetchone()
-    require(row is not None, 'session', 'RESOURCE_UNAVAILABLE')
     from execution.postgres import unpack
+    if row is None:
+        from . import mi_qa
+        if mi_qa.enabled():
+            from execution.mi_postgres import SESSION as MI_SESSION
+            mi_row = db.execute('SELECT payload,content_hash FROM btl.tick_sessions '
+                                'WHERE workspace_id=%s AND session_id=%s',
+                                (workspace_id, session_id)).fetchone()
+            if mi_row is not None:
+                value = unpack(mi_row['payload'], mi_row['content_hash'])
+                if value.get('artifact') == MI_SESSION and value.get('workspaceId') == workspace_id:
+                    return MI_SESSION
+    require(row is not None, 'session', 'RESOURCE_UNAVAILABLE')
     try:
         metadata = unpack(row['payload'], row['content_hash'])
     except (TypeError, ValueError, UnicodeError, KeyError) as error:
@@ -239,6 +254,9 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
             owner(unit.role)
         if operation in ('replay', 'replay_to', 'replay_run', 'jump_next_event'):
             session_artifact = _persisted_session_artifact(db, str(workspace_id), args[0])
+            from execution.mi_postgres import SESSION as MI_SESSION
+            require(session_artifact != MI_SESSION or operation == 'replay',
+                    'miOperation', 'REFUSED_SESSION_MODEL')
             if operation == 'replay':
                 replay_command(args[1], args[0], session_artifact)
             elif operation == 'replay_to':
@@ -389,6 +407,7 @@ def work_one(dsn, runner):
         heartbeat_thread.start()
         worker_metrics_raw = worker_metrics_hash = None
         continuation = None
+        args = ()
         try:
             try:
                 payload = json.loads(bytes(row['input']))
@@ -400,7 +419,9 @@ def work_one(dsn, runner):
             if row['operation'] == 'replay':
                 # Existing permanent command dedup recovers an inner COMMIT if
                 # the process died before this operational job acknowledgement.
-                result = runner(dsn, row['actor_id'], row['workspace_id'], 'apply', tuple(args), write=True)
+                from .mi_qa import REQUEST as MI_REQUEST
+                operation = 'mi_apply' if args[1].get('artifact') == MI_REQUEST else 'apply'
+                result = runner(dsn, row['actor_id'], row['workspace_id'], operation, tuple(args), write=True)
             elif row['operation'] == 'replay_to':
                 result = runner(dsn, row['actor_id'], row['workspace_id'], 'replay_to', tuple(args), write=True)
                 # The native worker applies its 30s execution deadline after
@@ -425,6 +446,12 @@ def work_one(dsn, runner):
             worker_metrics_raw, worker_metrics_hash = _worker_measurements(result)
             state = 'SUCCEEDED'
         except ContractError as error:
+            from .mi_qa import REQUEST as MI_REQUEST
+            if (row['operation'] == 'replay' and len(args) == 2 and isinstance(args[1], dict) and args[1].get('artifact') == MI_REQUEST
+                    and error.code == 'WORKER_UNAVAILABLE' and error.field == 'workerResult'):
+                # Lost pipe: a financial commit may already exist. Leave the
+                # leased job eligible for bounded redelivery and receipt dedup.
+                raise RuntimeError('MI native worker interrupted') from error
             logging.getLogger(__name__).warning(
                 'research_job_failed job_id=%s operation=%s error_code=%s error_field=%s error_source=%s',
                 row['id'], row['operation'], error.code, error.field,

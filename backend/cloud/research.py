@@ -203,6 +203,14 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
         unit = WorkspaceUnit(db, actor_id, workspace_id)
         if write:
             owner(unit.role)
+        from . import mi_qa
+        if operation == 'mi_apply':
+            require(write and len(args) == 2, 'miOperation', 'REFUSED_SESSION_MODEL')
+            command = mi_qa.request(args[1], args[0])
+            from execution.mi_postgres import MultiInstrumentStore
+            return MultiInstrumentStore(dsn).apply(
+                TrustedScope(str(workspace_id), str(actor_id)), command, mi_qa.open_sources,
+                jump=args[1]['jump'], required_manifest_sha=os.environ[mi_qa.ENVIRONMENT[2]])
         if operation in ('method_page', 'method_detail', 'session_page',
                          'method_family_page', 'method_family_detail',
                          'method_family_versions_page', 'method_new_version',

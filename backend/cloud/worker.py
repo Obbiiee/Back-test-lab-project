@@ -189,6 +189,9 @@ def _environment(dsn):
     cache_entries = environment.get('BTL_FIXTURE_CACHE_ENTRIES')
     require(cache_entries in (None, '') or (cache_entries.isascii() and cache_entries.isdigit() and 1 <= int(cache_entries) <= 512), 'fixtureCacheEntries', 'INVALID_INPUT')
     require(environment.get('BTL_DB_POOL') in (None, '', '0', '1'), 'dbPool', 'INVALID_INPUT')
+    from .mi_qa import ENVIRONMENT, enabled
+    if enabled():
+        environment.update({name: os.environ[name] for name in ENVIRONMENT})
     environment['BTL_WORKER_DATABASE'] = dsn
     require(type(MAX_JOBS) is int and 1 <= MAX_JOBS <= 120000, 'workerJobLimit')
     environment['BTL_WORKER_MAX_JOBS'] = str(MAX_JOBS)
@@ -387,7 +390,7 @@ def invoke(dsn, payload, *, deadline=DEADLINE):
 
 
 def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
-    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'replay_run', 'jump_next_event', 'command_result'), 'workerOperation')
+    require(operation in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'replay_run', 'jump_next_event', 'command_result', 'mi_apply'), 'workerOperation')
     return pooled_invoke(dsn, dict(schemaVersion=1, actor=str(actor_id), workspace=str(workspace_id),
                             operation=operation, args=list(args), write=write))
 
@@ -399,7 +402,7 @@ def _execute(raw):
         require(len(raw) <= 32768, 'workerInput')
         request = json.loads(raw)
         require(request.get('schemaVersion') == 1 and
-                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'replay_run', 'jump_next_event', 'command_result'), 'workerInput')
+                request.get('operation') in ('create_session', 'workspace', 'bootstrap', 'chart_history', 'apply', 'replay_to', 'replay_run', 'jump_next_event', 'command_result', 'mi_apply'), 'workerInput')
         from .research import run as authorized_run
         result = authorized_run(os.environ['BTL_WORKER_DATABASE'], uuid.UUID(request['actor']),
                                 uuid.UUID(request['workspace']), request['operation'],

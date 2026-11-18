@@ -6,7 +6,7 @@ public entry point. A PostgreSQL row lock serializes a Session's commands.
 from fractions import Fraction
 
 from contracts.canonical import content_hash
-from contracts.primitives import require
+from contracts.primitives import digest, require
 from infrastructure.database import connect
 from ticks.contracts import tag, uint
 
@@ -60,15 +60,19 @@ def _source_hash(checkpoint):
                              pins=checkpoint["sourcePins"]))
 
 
-def _envelope(workspace, checkpoint):
+def _envelope(workspace, checkpoint, manifest_sha):
     # The reducer iterates orders in creation order. Canonical JSON sorts map
     # keys, so persist that order explicitly rather than changing execution.
-    return dict(schemaVersion=1, artifact=SESSION, workspaceId=workspace,
-                checkpoint=checkpoint, orderIds=list(checkpoint["state"]["orders"]))
+    envelope = dict(schemaVersion=1, artifact=SESSION, workspaceId=workspace,
+                    checkpoint=checkpoint, orderIds=list(checkpoint["state"]["orders"]))
+    if manifest_sha is not None:
+        envelope["manifestSha"] = manifest_sha
+    return envelope
 
 
 def _checkpoint(envelope, workspace):
-    tag(envelope, SESSION, "workspaceId checkpoint orderIds")
+    tag(envelope, SESSION, "workspaceId checkpoint orderIds" +
+        (" manifestSha" if "manifestSha" in envelope else ""))
     checkpoint = envelope["checkpoint"]
     state = mi_checkpoint.validate(checkpoint)
     order_ids = envelope["orderIds"]
@@ -103,9 +107,14 @@ class MultiInstrumentStore:
             "SELECT content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s "
             "AND session_id=%s AND revision=%s", (workspace, session, state["revision"])).fetchone()
         require(tip == (row[1],), "miCheckpointTip", "CORRUPT_RECORD")
-        return checkpoint
+        manifest_sha = envelope.get("manifestSha")
+        if manifest_sha is not None:
+            digest(manifest_sha, "miManifest")
+        return checkpoint, manifest_sha
 
-    def create(self, scope, profile_set, policies, active_method_id, balance, start_ns, session_id):
+    def create(self, scope, profile_set, policies, active_method_id, balance, start_ns, session_id, *, manifest_sha=None):
+        if manifest_sha is not None:
+            digest(manifest_sha, "miManifest")
         workspace, session = scoped(scope, session_id)
         state = mi_kernel.seed_state(session, profile_set, policies, active_method_id, balance, start_ns)
         require(Fraction(balance) == Fraction(state["initialBalance"]), "moneyPrecision")
@@ -114,7 +123,7 @@ class MultiInstrumentStore:
                       instruments=symbols, frontierNs="0", consumed=dict.fromkeys(symbols, 0),
                       quotes=dict.fromkeys(symbols))
         checkpoint = mi_checkpoint.create(state, cursor)
-        raw, sha = pack(_envelope(workspace, checkpoint))
+        raw, sha = pack(_envelope(workspace, checkpoint, manifest_sha))
         with connect(self.dsn) as db:
             inserted = db.execute(
                 "INSERT INTO btl.tick_sessions VALUES (%s,%s,%s,%s,0,%s,%s) "
@@ -125,20 +134,21 @@ class MultiInstrumentStore:
                 db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,0,%s,%s)",
                            (workspace, session, raw, sha))
                 return state
-            current = self._read(db, workspace, session, lock=True)
+            current, _ = self._read(db, workspace, session, lock=True)
             genesis = db.execute(
                 "SELECT content_hash FROM btl.tick_checkpoints "
                 "WHERE workspace_id=%s AND session_id=%s AND revision=0", (workspace, session)).fetchone()
             require(genesis == (sha,), "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
             return current["state"]
 
-    def apply(self, scope, raw_command, open_sources, *, jump=False):
+    def apply(self, scope, raw_command, open_sources, *, jump=False, required_manifest_sha=None):
         command = mi_kernel.command_wire(raw_command)
         require(type(jump) is bool and (not jump or command["kind"] == "ADVANCE"), "miJump")
         workspace, session = scoped(scope, command["sessionId"])
         command_hash = content_hash(dict(schemaVersion=1, artifact="BTL-MI-COMMAND-REQUEST-1", command=command, jump=jump))
         with connect(self.dsn) as db:
-            checkpoint = self._read(db, workspace, session, lock=True)
+            checkpoint, manifest_sha = self._read(db, workspace, session, lock=True)
+            require(manifest_sha == required_manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
             prior = db.execute(
                 "SELECT revision,command_hash,payload,content_hash FROM btl.tick_commands "
                 "WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
@@ -165,7 +175,11 @@ class MultiInstrumentStore:
             after, events = mi_kernel.submit(before, command)
             cursor, replay = checkpoint["cursor"], None
             if command["kind"] == "ADVANCE":
-                sources, verified_pins = open_sources()
+                if manifest_sha is None:
+                    sources, verified_pins = open_sources()
+                else:
+                    sources, verified_pins, admitted_sha = open_sources(checkpoint["sourcePins"])
+                    require(admitted_sha == manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
                 _, timeline = mi_checkpoint.restore(checkpoint, sources, verified_source_pins=verified_pins)
                 target = uint(command["payload"]["targetNs"])
                 if jump:
@@ -187,7 +201,7 @@ class MultiInstrumentStore:
             _validate_transition(before, after, events)
             after["revision"] = before["revision"] + 1
             new = mi_checkpoint.create(after, cursor)
-            raw, sha = pack(_envelope(workspace, new))
+            raw, sha = pack(_envelope(workspace, new, manifest_sha))
             result = dict(schemaVersion=1, artifact=RECEIPT, sessionId=session,
                           commandId=command["commandId"], commandHash=command_hash,
                           revision=after["revision"], state=after, events=events,
@@ -211,7 +225,7 @@ class MultiInstrumentStore:
         workspace, session = scoped(scope, session_id)
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-            state = self._read(db, workspace, session)["state"]
+            state = self._read(db, workspace, session)[0]["state"]
             require(state["nextEventIndex"] <= MAX_PROJECTION_EVENTS, "miProjection", "REFUSED_ANALYSIS_LIMIT")
             rows = db.execute(
                 "SELECT payload,content_hash FROM btl.tick_events "
