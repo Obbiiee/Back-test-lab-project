@@ -78,6 +78,51 @@ class MultiInstrumentPostgres(unittest.TestCase):
         self.assertEqual(result["events"], expected)
         return result
 
+    def test_durable_review_requires_original_basis_actor_payload_and_expiry(self):
+        self.apply("ADVANCE", {"targetNs": str(self.model.at(0))}, "initial")
+        payload = dict(symbol="EURUSD", side="LONG", orderType="MARKET", workflow="QUICK",
+                       entry=self.model.quote("EURUSD")[1], quantity="0.1", sl=None, tp=None,
+                       riskPercent="1", observations=[])
+        cmd = self.cmd("OPEN", payload, "reviewed")
+        authorize = lambda *args: None
+        def review(command):
+            return self.store.review(self.scope, command, required_manifest_sha=None,
+                                     authorize=authorize)
+        def confirm(command, review_hash, scope=None):
+            return self.store.apply(scope or self.scope, command, self.open_sources,
+                                    require_review=True, review_hash=review_hash)
+        saved = review(cmd)
+        self.assertEqual(review(cmd), saved)
+        bad_quote = dict(cmd, commandId="bad-quote", payload=dict(payload, entry="2"))
+        with self.assertRaisesRegex(ContractError, "MI_REVIEW_MISMATCH"):
+            review(bad_quote)
+        with self.assertRaisesRegex(ContractError, "MI_REVIEW_REQUIRED"):
+            confirm(cmd, None)
+        with self.assertRaisesRegex(ContractError, "MI_REVIEW_MISMATCH"):
+            confirm(dict(cmd, payload=dict(payload, quantity="0.2")), saved["reviewHash"])
+        with self.assertRaisesRegex(ContractError, "MI_REVIEW_MISMATCH"):
+            confirm(cmd, saved["reviewHash"], TrustedScope(self.scope.workspace_id, "fixture:other"))
+        expired_cmd = dict(cmd, commandId="expired")
+        with patch.object(mi_postgres, "_db_seconds", return_value=1):
+            expired = review(expired_cmd)
+        with self.assertRaisesRegex(ContractError, "MI_REVIEW_EXPIRED"):
+            confirm(expired_cmd, expired["reviewHash"])
+        stale_cmd = dict(cmd, commandId="stale")
+        stale = review(stale_cmd)
+        receipt = confirm(cmd, saved["reviewHash"])
+        self.assertEqual(self.store.command_status(
+            self.scope, cmd, jump=False, required_manifest_sha=None,
+            review_hash=saved["reviewHash"])["status"], "COMMITTED")
+        with self.assertRaisesRegex(ContractError, "RESOURCE_UNAVAILABLE"):
+            self.store.command_status(
+                TrustedScope(self.scope.workspace_id, "fixture:other"), cmd, jump=False,
+                required_manifest_sha=None, review_hash=saved["reviewHash"])
+        with patch.object(mi_postgres, "_db_seconds", return_value=saved["expiresAt"]):
+            self.assertEqual(confirm(cmd, saved["reviewHash"]), receipt)
+        with self.assertRaisesRegex(ContractError, "REFUSED_STALE_REVISION"):
+            confirm(stale_cmd, stale["reviewHash"])
+        self.assertEqual(self.records(), (2, 1, 3))
+
     def open_both(self):
         self.apply("ADVANCE", {"targetNs": str(self.model.at(0))}, "initial")
         for symbol in self.model.symbols:

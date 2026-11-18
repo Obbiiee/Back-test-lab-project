@@ -65,6 +65,11 @@ class ProductMI(unittest.TestCase):
             cmd = dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-COMMAND-MI-1", sessionId=raw["id"],
                        commandId=cid, expectedRevision=revision, kind=kind, payload=payload)
             request = dict(schemaVersion=1, artifact="BTL-MI-QUEUE-REQUEST-1", command=cmd, jump=jump)
+            if kind == "OPEN":
+                reviewed = client.post(uri + "/reviews", headers=headers, json=cmd)
+                self.assertEqual(reviewed.status_code, 200, reviewed.text)
+                self.assertEqual(reviewed.json()["command"], cmd)
+                request["reviewHash"] = reviewed.json()["reviewHash"]
             admitted = client.post(uri + "/commands", headers=headers, json=request)
             self.assertEqual(admitted.status_code, 202, admitted.text)
             self.assertTrue(queue.work_one(self.dsn, worker.run))
@@ -106,24 +111,31 @@ class ProductMI(unittest.TestCase):
         boundary = 31 * 86400 * 10**9
         symbols = ["EURUSD", "GBPUSD"]
         model = MI(symbols, steps=4, rows_override={
-            symbol: [(boundary - 10, "1.25", "1.2502"), (boundary + 10, "1.26", "1.2602")]
+            symbol: [(boundary - 10, "1.25", "1.2502"), (boundary - 5, "1.25", "1.2502"),
+                     (boundary + 10, "1.26", "1.2602")]
             for symbol in symbols})
         self.configure(model)
         client, headers, base = self.fixture.client, self.fixture.headers, self.fixture.root
         record = method("PROTOCOL", on=True)
         created_method = client.post(base + "/methods", headers=headers, json=record)
         self.assertEqual(created_method.status_code, 200, created_method.text)
+        free = method()
+        self.assertEqual(client.post(base + "/methods", headers=headers, json=free).status_code, 200)
         raw = dict(schemaVersion=1, artifact="BTL-MI-SESSION-CREATE-1", id="session:mi-pro",
-                   instrumentIds=symbols, methodIds=[record["id"]],
+                   instrumentIds=symbols, methodIds=[record["id"], free["id"]],
                    activeMethodId=record["id"], initialBalance="10000")
         created = client.post(base + "/mi/sessions", headers=headers, json=raw)
         self.assertEqual(created.status_code, 200, created.text)
         path = base + "/mi/sessions/" + raw["id"]
 
-        def execute(kind, payload, expected, cid):
-            request = dict(schemaVersion=1, artifact="BTL-MI-QUEUE-REQUEST-1", jump=False,
+        def execute(kind, payload, expected, cid, jump=False):
+            request = dict(schemaVersion=1, artifact="BTL-MI-QUEUE-REQUEST-1", jump=jump,
                 command=dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-COMMAND-MI-1", sessionId=raw["id"],
                              commandId=cid, expectedRevision=expected, kind=kind, payload=payload))
+            if kind == "OPEN":
+                review = client.post(path + "/reviews", headers=headers, json=request["command"])
+                self.assertEqual(review.status_code, 200, review.text)
+                request["reviewHash"] = review.json()["reviewHash"]
             accepted = client.post(path + "/commands", headers=headers, json=request)
             self.assertEqual(accepted.status_code, 202, accepted.text)
             self.assertTrue(queue.work_one(self.dsn, worker.run))
@@ -146,6 +158,32 @@ class ProductMI(unittest.TestCase):
         refused = execute("ADVANCE", target, 2, "free-feb")
         self.assertEqual(refused["state"], "RECONCILE_REQUIRED")
         self.assertEqual(client.get(path, headers=headers).json()["state"]["revision"], 2)
+        self.assertEqual(refused["result"]["code"], "WINDOW_BOUNDARY")
+        self.assertEqual(execute("SET_METHOD", {"methodId": free["id"]}, 2, "free-style")["state"], "SUCCEEDED")
+        quick = dict(planned, symbol="GBPUSD", workflow="QUICK", orderType="MARKET", entry="1.2502",
+                     sl=None, tp=None, quantity="0.1", observations=[])
+        self.assertEqual(execute("OPEN", quick, 3, "live")["state"], "SUCCEEDED")
+        self.assertEqual(execute("ADVANCE", {"targetNs": str(boundary - 5)}, 4, "fill")["state"], "SUCCEEDED")
+        bounded = execute("ADVANCE", target, 5, "clamp", jump=True)
+        self.assertEqual(bounded["result"]["state"]["throughNs"], str(boundary - 1))
+        self.assertEqual(bounded["result"]["state"]["orders"]["protocol"]["status"], "PENDING")
+        blocked = execute("ADVANCE", target, 6, "pending-blocks-jump", jump=True)
+        self.assertEqual(blocked["result"]["code"], "PENDING_AT_WINDOW_END")
+        self.assertEqual(execute("CANCEL", {"orderId": "protocol"}, 6, "cancel")["state"], "SUCCEEDED")
+        self.assertEqual(execute("CLOSE", {"orderId": "live", "quantity": None}, 7, "close")["state"], "SUCCEEDED")
+        continued = execute("ADVANCE", target, 8, "continuation", jump=True)
+        receipt = continued["result"]
+        self.assertEqual(receipt["state"]["groups"], dict.fromkeys(symbols))
+        self.assertEqual(receipt["state"]["balance"], "10098")
+        self.assertEqual([event["kind"] for event in receipt["events"]], ["EXIT_FILL"])
+        self.assertEqual(execute("ADVANCE", target, 8, "continuation", jump=True)["result"], receipt)
+        resumed_free = client.get(path + "?instrument=GBPUSD", headers=headers).json()
+        self.assertEqual(resumed_free["state"]["revision"], 9)
+        self.assertTrue(resumed_free["equity"]["complete"])
+        self.assertEqual(resumed_free["equity"]["equityUsd"], "10098")
+        self.assertTrue(resumed_free["marketViewRestricted"])
+        self.assertTrue(all(int(bar["timeNs"]) < boundary for bar in resumed_free["chart"]))
+        self.assertEqual(client.get(path + "/analytics", headers=headers).json()["metrics"]["tradeCount"], 1)
         now = int(time.time())
         with connect(self.dsn) as db:
             db.execute("INSERT INTO btl.sandbox_billing_orders(order_id,actor_id,request_id,merchant_id,"
@@ -153,7 +191,7 @@ class ProductMI(unittest.TestCase):
                        "VALUES (%s,%s,%s,'m','p',1000,2592000,'PAID',%s,%s,%s,1)",
                        ("btl-sbx-" + uuid.uuid4().hex, self.fixture.actor, uuid.uuid4(),
                         "t" + uuid.uuid4().hex, now - 10, now - 10 + 2592000))
-        resumed = execute("ADVANCE", target, 2, "pro-feb")
+        resumed = execute("ADVANCE", target, 9, "pro-feb")
         self.assertEqual(resumed["state"], "SUCCEEDED", resumed)
         self.assertEqual(resumed["result"]["state"]["throughNs"], target["targetNs"])
-        self.assertEqual(resumed["result"]["state"]["orders"]["protocol"]["status"], "PENDING")
+        self.assertEqual(resumed["result"]["state"]["groups"]["GBPUSD"]["timeNs"], target["targetNs"])

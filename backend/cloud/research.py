@@ -208,14 +208,16 @@ def run(dsn, actor_id, workspace_id, operation, args=(), *, write=False):
             require(write and len(args) == 2, 'miOperation', 'REFUSED_SESSION_MODEL')
             command = mi_qa.request(args[1], args[0])
             from .mi_product import guard_worker
-            guard_worker(dsn, str(workspace_id), args[0], command)
+            authorize = guard_worker(dsn, str(workspace_id), args[0])
             from execution.mi_postgres import MultiInstrumentStore
             return MultiInstrumentStore(dsn).apply(
                 TrustedScope(str(workspace_id), str(actor_id)), command, mi_qa.open_sources,
-                jump=args[1]['jump'], required_manifest_sha=os.environ[mi_qa.ENVIRONMENT[2]])
-        if operation in ("mi_catalog", "mi_create", "mi_snapshot", "mi_analytics", "mi_terminal", "mi_events", "mi_command_status"):
+                jump=args[1]['jump'], required_manifest_sha=os.environ[mi_qa.ENVIRONMENT[2]],
+                review_hash=args[1].get('reviewHash'), require_review=authorize is not None,
+                authorize=authorize)
+        if operation in ("mi_catalog", "mi_create", "mi_snapshot", "mi_analytics", "mi_terminal", "mi_events", "mi_command_status", "mi_review"):
             require(mi_qa.enabled(), "miQa", "RESOURCE_UNAVAILABLE")
-            require(operation != "mi_create" or write, "miOperation", "RESOURCE_UNAVAILABLE")
+            require(operation not in ("mi_create", "mi_review") or write, "miOperation", "RESOURCE_UNAVAILABLE")
             from .mi_product import run as run_mi
             return run_mi(db, dsn, TrustedScope(str(workspace_id), str(actor_id)), actor_id,
                           operation, args)

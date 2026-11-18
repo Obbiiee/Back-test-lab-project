@@ -86,11 +86,13 @@ export default function MIWorkspace({methods,sessionId}){
     await reload();
     if(status.status==='NOT_COMMITTED')setNotice('The command was not committed. Review the current Session before retrying.');
   });
+  const command=(kind,payload)=>({schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-MI-1',
+    sessionId,commandId:id('mi'),expectedRevision:state.revision,kind,payload});
   const dispatch=(kind,payload,jump=false)=>run(()=>send({
-    schemaVersion:1,artifact:'BTL-MI-QUEUE-REQUEST-1',jump,
-    command:{schemaVersion:1,artifact:'BTL-TICK-EXECUTION-COMMAND-MI-1',sessionId,commandId:id('mi'),
-      expectedRevision:state.revision,kind,payload}
+    schemaVersion:1,artifact:'BTL-MI-QUEUE-REQUEST-1',jump,command:command(kind,payload)
   }));
+  const confirm=()=>run(()=>send({schemaVersion:1,artifact:'BTL-MI-QUEUE-REQUEST-1',jump:false,
+    command:review.command,reviewHash:review.reviewHash}));
   const toggle=(list,value)=>list.includes(value)?list.filter(item=>item!==value):[...list,value];
 
   if(!catalog)return <section className="mi-workspace"><h1>Multi-instrument QA</h1><p role="status">{notice||'Loading…'}</p><a {...linkTo({screen:'sessions'})}>All Sessions</a></section>;
@@ -129,16 +131,19 @@ export default function MIWorkspace({methods,sessionId}){
       <button disabled={busy} onClick={()=>run(reload)}>Reload Session</button>
     </div>
     <p>Balance {state.balance} USD · Equity {session.equity.complete?session.equity.equityUsd+' USD':'Unavailable'} · Revision {state.revision}</p>
+    {session.window&&<p>{session.window.tier==='FREE'?'Free window ends ':'Activated month ends '}
+      {new Date(Number(BigInt(session.window.endNs)/1000000n)).toISOString().slice(0,10)} UTC</p>}
+    {session.marketViewRestricted&&<p>Market quotes outside your Free window are hidden.</p>}
     <BidChart rows={session.activeInstrument===selected?(session.chart||[]):[]} symbol={selected}/>
     <div className="mi-controls"><label>Replay target (ns UTC)<input inputMode="numeric" value={target} onChange={event=>setTarget(event.target.value)}/></label>
       <button disabled={blocked||!target} onClick={()=>dispatch('ADVANCE',{targetNs:target})}>Replay</button>
       <button disabled={blocked||!target} onClick={()=>dispatch('ADVANCE',{targetNs:target},true)}>Jump</button>
     </div>
     <h2>Order ticket</h2>
-    <form onSubmit={event=>{event.preventDefault();setReview({...plan,symbol:selected,
+    <form onSubmit={event=>{event.preventDefault();if(!quote||blocked)return;run(async()=>setReview(await api(path+'/reviews',command('OPEN',{...plan,symbol:selected,
       workflow:plan.orderType==='MARKET'?'QUICK':'PLANNED',entry:plan.orderType==='MARKET'?(plan.side==='LONG'?quote.ask:quote.bid):plan.entry,
       sl:plan.sl||null,tp:plan.tp||null,riskPercent:policy.riskPercent??plan.riskPercent,
-      observations:policy.kind==='PROTOCOL'?policy.conditions.filter(key=>conditions.includes(key)).map(conditionId=>({conditionId,outcome:'PASS'})):[]});}}>
+      observations:policy.kind==='PROTOCOL'?policy.conditions.filter(key=>conditions.includes(key)).map(conditionId=>({conditionId,outcome:'PASS'})):[]}))));}}>
       <div className="mi-controls">
         <label>Side<select value={plan.side} onChange={event=>change('side',event.target.value)}><option>LONG</option><option>SHORT</option></select></label>
         <label>Order type<select value={plan.orderType} onChange={event=>change('orderType',event.target.value)}><option>MARKET</option><option>LIMIT</option><option>STOP</option></select></label>
@@ -152,11 +157,13 @@ export default function MIWorkspace({methods,sessionId}){
       </label>)}</fieldset>}
       <button disabled={!quote||blocked||(policy.kind==='PROTOCOL'&&plan.orderType==='MARKET')}>Review order</button>
     </form>
-    {review&&<p>Review {review.symbol} {review.side} {review.orderType} · {review.quantity} lots at {review.entry}
-      {' '}<button disabled={blocked} onClick={()=>dispatch('OPEN',review)}>Confirm order</button></p>}
+    {review&&<p>Review {review.command.payload.symbol} {review.command.payload.side} {review.command.payload.orderType} · {review.command.payload.quantity} lots at {review.command.payload.entry}
+      {' '}<button disabled={blocked} onClick={confirm}>Confirm order</button></p>}
     <h2>Positions and pending orders</h2>
     {Object.keys(state.orders).length===0?<p>No open or pending orders.</p>:<ul>{Object.entries(state.orders).map(([key,order])=><li key={key}>{order.symbol} · {order.status} · {order.remaining} lots {' '}
-      <button disabled={blocked} onClick={()=>dispatch(order.status==='ACTIVE'?'CLOSE':'CANCEL',order.status==='ACTIVE'?{orderId:key,quantity:null}:{orderId:key})}>{order.status==='ACTIVE'?'Close':'Cancel'} {order.symbol}</button></li>)}</ul>}
+      {order.status==='ACTIVE'&&state.methods[order.methodId]?.kind==='PROTOCOL'
+        ?<span>Exit follows the Method stop or target.</span>
+        :<button disabled={blocked} onClick={()=>dispatch(order.status==='ACTIVE'?'CLOSE':'CANCEL',order.status==='ACTIVE'?{orderId:key,quantity:null}:{orderId:key})}>{order.status==='ACTIVE'?'Close':'Cancel'} {order.symbol}</button>}</li>)}</ul>}
     <button disabled={busy} onClick={()=>run(async()=>setJournal(await api(path+'/journal')))}>Journal</button>
     <button disabled={busy} onClick={()=>run(async()=>setAnalytics(await api(path+'/analytics')))}>Analytics</button>
     {journal&&<section><h2>Journal</h2><label>Pair filter<select value={journalPair} onChange={event=>setJournalPair(event.target.value)}><option value="">All</option>{pairs(state).map(symbol=><option key={symbol}>{symbol}</option>)}</select></label>

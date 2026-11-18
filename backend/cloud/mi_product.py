@@ -88,19 +88,26 @@ def run(db, dsn, scope, actor_id, operation, args):
         return store.snapshot(scope, raw["id"], required_manifest_sha=sha)
 
     session, *options = args
+    if operation == "mi_review":
+        command, = options
+        require(type(command) is dict and command.get("sessionId") == session, "sessionId")
+        return store.review(scope, command, required_manifest_sha=sha,
+                            authorize=window_policy(entitlements, scope.workspace_id, session))
     window = entitlements.session_window(scope.workspace_id, session)
     require(window is not None, "miWindow", "RESOURCE_UNAVAILABLE")
     focus = options[0] if operation == "mi_snapshot" and options else None
     view = store.snapshot(scope, session, required_manifest_sha=sha,
                           focus=focus, open_sources=mi_qa.open_sources)
-    require(window["tier"] == "PRO" or int(view["state"]["throughNs"]) < window["endNs"],
-            "miWindow", "REFUSED_SOURCE")
+    restrict_market_view(view, window)
     if operation == "mi_snapshot":
+        view["window"] = {key: str(window[key]) for key in ("startNs", "endNs")}
+        view["window"]["tier"] = window["tier"]
         return view
     if operation == "mi_command_status":
         raw, = options
         command = mi_qa.request(raw, session)
-        return store.command_status(scope, command, jump=raw["jump"], required_manifest_sha=sha)
+        return store.command_status(scope, command, jump=raw["jump"], required_manifest_sha=sha,
+                                    review_hash=raw.get("reviewHash"))
     if operation == "mi_analytics":
         return store.project(scope, session)
     arguments, = options
@@ -110,22 +117,67 @@ def run(db, dsn, scope, actor_id, operation, args):
     return reader(scope, session, **arguments)
 
 
-def guard_worker(dsn, workspace_id, session_id, command):
-    """Product manifest jobs recheck the durable historical entitlement at execution."""
-    catalog, sha = mi_qa.manifest()
-    if catalog["artifact"] != PRODUCT_SOURCE:
+def restrict_market_view(view, window):
+    """Hide restricted quotes while retaining the account and its immutable fills."""
+    if window["tier"] != "FREE":
         return
-    window = Entitlements(dsn).session_window(workspace_id, session_id)
-    require(window is not None, "miWindow", "RESOURCE_UNAVAILABLE")
-    if window["tier"] != "PRO":
-        view = MultiInstrumentStore(dsn).snapshot(
-            TrustedScope(workspace_id, "internal:mi"), session_id, required_manifest_sha=sha)
-        require(int(view["state"]["throughNs"]) < window["endNs"], "miWindow", "REFUSED_SOURCE")
-    if command["kind"] == "ADVANCE":
+    start, end = int(window["startNs"]), int(window["endNs"])
+
+    def allowed(stamp):
+        return start <= int(stamp) < end
+
+    groups = view["state"]["groups"]
+    masked = False
+    for symbol, group in groups.items():
+        if group is not None and not allowed(group["timeNs"]):
+            groups[symbol] = None
+            masked = True
+    if "chart" in view:
+        view["chart"] = [bar for bar in view["chart"] if allowed(bar["timeNs"])]
+    if masked:
+        view["marketViewRestricted"] = True
+        if "equity" in view and any(order["status"] == "ACTIVE" for order in view["state"]["orders"].values()):
+            view["equity"] = {"complete": False, "reason": "FREE_WINDOW_MARKET_DATA_RESTRICTED"}
+
+
+def window_policy(entitlements, workspace_id, session_id):
+    """Run on the locked checkpoint before new evidence can be consumed."""
+    def authorize(db, state, command, jump):
+        window = entitlements.session_window_in(db, workspace_id, session_id)
+        require(window is not None, "miWindow", "RESOURCE_UNAVAILABLE")
+        if window["tier"] == "PRO":
+            return None
+        kind = command["kind"]
+        end = window["endNs"] - 1
+        through = int(state["throughNs"])
+        if kind == "OPEN":
+            require(through < end, "miWindow", "WINDOW_ENDED")
+        if kind != "ADVANCE":
+            return None  # CANCEL/CLOSE retain order lifecycle, without fetching a quote.
         target = uint(command["payload"]["targetNs"])
-        require(target >= window["startNs"] and
-                (window["tier"] == "PRO" or target < window["endNs"]),
-                "miWindow", "REFUSED_SOURCE")
+        require(target >= window["startNs"], "miWindow", "WINDOW_BOUNDARY")
+        orders = state["orders"].values()
+        pending = any(order["status"] == "PENDING" for order in orders)
+        active = any(order["status"] == "ACTIVE" for order in orders)
+        if through >= end:
+            if not jump:
+                require(False, "miWindow", "WINDOW_ENDED_CONTINUATION_ONLY")
+            require(not pending, "miWindow", "PENDING_AT_WINDOW_END")
+            require(active, "miWindow", "WINDOW_COMPLETED")
+        if jump:
+            # A pending fill would create fresh exposure. Active-only
+            # continuation may read evidence internally as legacy does.
+            return target if active and not pending else min(target, end)
+        require(target <= end, "miWindow", "WINDOW_BOUNDARY")
+        return target
+    return authorize
+
+
+def guard_worker(dsn, workspace_id, session_id):
+    catalog, _ = mi_qa.manifest()
+    if catalog["artifact"] != PRODUCT_SOURCE:
+        return None
+    return window_policy(Entitlements(dsn), workspace_id, session_id)
 
 
 def install(app, prefix, current, execute, json_body):
@@ -147,13 +199,19 @@ def install(app, prefix, current, execute, json_body):
     @app.post(path + "/sessions/{session_id}/commands")
     async def command(workspace_id: uuid.UUID, session_id: str, request: Request, user=Depends(current)):
         raw = await json_body(request)
-        mi_qa.request(raw, session_id)
+        command = mi_qa.request(raw, session_id)
+        require(command["kind"] != "OPEN" or "reviewHash" in raw, "review", "MI_REVIEW_REQUIRED")
         job_id = request.headers.get("x-btl-job")
         try:
             job_id = uuid.UUID(job_id) if job_id is not None else uuid.uuid4()
         except ValueError:
             require(False, "jobId")
         return await execute(user, workspace_id, "replay", session_id, raw, write=True, job_id=job_id)
+
+    @app.post(path + "/sessions/{session_id}/reviews")
+    async def review(workspace_id: uuid.UUID, session_id: str,
+                     request: Request, user=Depends(current)):
+        return await execute(user, workspace_id, "mi_review", session_id, await json_body(request), write=True)
 
     @app.post(path + "/sessions/{session_id}/command-status")
     async def command_status(workspace_id: uuid.UUID, session_id: str,

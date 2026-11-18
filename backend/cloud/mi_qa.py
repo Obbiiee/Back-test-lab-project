@@ -22,10 +22,14 @@ def enabled():
 
 def request(raw, session_id):
     require(enabled(), "miQa", "REFUSED_SESSION_MODEL")
-    tag(raw, REQUEST, "command jump")
+    has_review = type(raw) is dict and "reviewHash" in raw
+    tag(raw, REQUEST, "command jump" + (" reviewHash" if has_review else ""))
     command = mi_kernel.command_wire(raw["command"])
     require(command["sessionId"] == session_id and type(raw["jump"]) is bool and
             (not raw["jump"] or command["kind"] == "ADVANCE"), "miRequest")
+    if has_review:
+        digest(raw["reviewHash"], "miReview")
+        require(command["kind"] == "OPEN", "reviewKind")
     return command
 
 

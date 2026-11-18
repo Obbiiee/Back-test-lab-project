@@ -163,13 +163,22 @@ class Entitlements:
                         windows=dict(limit=FREE_LIMITS["WINDOW"] if limited else None, used=used["WINDOW"], period=now.strftime("%Y-%m-%d"), resetsAt=next_day(now).isoformat()))
 
     def session_window(self, workspace_id, session_id):
-        """(window_end_ns, tier_now) of a Session, or None when it has no recorded claim (created before enforcement)."""
+        """Return current entitlement for a committed or reserved Session claim."""
         with connect(self.dsn) as db:
-            row = db.execute("SELECT actor_id,window_start_ns,window_end_ns FROM btl.entitlement_claims WHERE kind='SESSION' AND workspace_id=%s AND session_id=%s "
-                             "AND status IN ('RESERVED','COMMITTED') LIMIT 1", (str(workspace_id), session_id)).fetchone()
-            if row is None:
-                return None
-            return dict(startNs=row[1], endNs=row[2], tier=self.tier(db, row[0]))
+            return self.session_window_in(db, workspace_id, session_id)
+
+    def session_window_in(self, db, workspace_id, session_id):
+        # Use an explicit tuple cursor even when called from a dict-row API/job.
+        from psycopg.rows import tuple_row
+        with db.cursor(row_factory=tuple_row) as cursor:
+            cursor.execute("SELECT actor_id,window_start_ns,window_end_ns FROM btl.entitlement_claims "
+                           "WHERE kind='SESSION' AND workspace_id=%s AND session_id=%s "
+                           "AND status IN ('RESERVED','COMMITTED') LIMIT 1",
+                           (str(workspace_id), session_id))
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return dict(startNs=row[1], endNs=row[2], tier=self.tier(db, row[0]))
 
 
 def from_environment(dsn):

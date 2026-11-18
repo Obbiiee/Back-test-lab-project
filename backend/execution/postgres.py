@@ -638,6 +638,7 @@ class PostgresExecutionStore:
 def grant_execution_runtime(dsn, role):
     """Explicit operator action; no automatic role creation or credentials."""
     with connect(dsn) as db:
+        db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_mi_order_reviews TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT USAGE ON SCHEMA btl TO {}").format(sql.Identifier(role)))
         db.execute(sql.SQL("GRANT SELECT,INSERT ON btl.tick_sessions,btl.tick_commands,btl.tick_events,btl.tick_checkpoints,btl.tick_terminal_orders,btl.tick_recovery_bases TO {}").format(sql.Identifier(role)))
         # Product Method lifecycle metadata is part of Session admission. Keep

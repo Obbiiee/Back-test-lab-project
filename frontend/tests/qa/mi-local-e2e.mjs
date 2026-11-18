@@ -13,6 +13,12 @@ const browser=await chromium.launch({
        FONTCONFIG_FILE:join(process.env.HOME,'tools/fonts.conf')},
   args:['--no-sandbox'],
 });
+function latency(samples){
+  const sorted=[...samples].sort((a,b)=>a-b);
+  assert.ok(sorted.length>0);
+  return {requests:sorted.length,...Object.fromEntries([50,95,99].map(percentile=>
+    ['p'+percentile+'Ms',Math.round(sorted[Math.ceil(sorted.length*percentile/100)-1])]))};
+}
 try{
   for(const account of config.accounts){
     const mobile=account.viewport==='mobile';
@@ -22,6 +28,15 @@ try{
       const page=await context.newPage();
       const errors=[];
       const jobs=[];
+      const interactive=[];
+      const asyncJobs=[];
+      context.on('requestfinished',request=>{
+        const pathname=new URL(request.url()).pathname;
+        const elapsed=request.timing().responseEnd;
+        if(elapsed<0)return;
+        if(/\/jobs\/[0-9a-f-]+$|\/mi\/sessions\/[^/]+\/commands$/.test(pathname))asyncJobs.push(elapsed);
+        else if(pathname.includes('/mi/'))interactive.push(elapsed);
+      });
       page.on('response',async response=>{
         if(response.ok()&&/\/jobs\/[0-9a-f-]+$/.test(response.url())){
           const job=await response.json().catch(()=>null);
@@ -66,6 +81,9 @@ try{
       await page.getByRole('button',{name:'Confirm order'}).click();
       await revision(4);
       await replay('150',5,'Jump');
+      await page.getByLabel('Active pair').selectOption('EURUSD');
+      await page.getByRole('img',{name:'EURUSD revealed bid chart'}).waitFor();
+      await page.getByText(/GBPUSD · ACTIVE/).waitFor();
       await page.getByRole('button',{name:'Close EURUSD'}).click();
       await revision(6);
       if(!mobile)await writeFile(join(process.env.MI_BROWSER_QA,'crash-on-exit'),'armed');
@@ -76,6 +94,8 @@ try{
         assert.deepEqual(recovered?.result.events.filter(event=>event.kind==='EXIT_FILL').map(event=>event.eventId),ids);
       }
       if(mobile){
+        await page.getByLabel('Active pair').selectOption('GBPUSD');
+        await page.getByRole('img',{name:'GBPUSD revealed bid chart'}).waitFor();
         await page.getByLabel('Order type').selectOption('LIMIT');
         await page.getByLabel('Entry',{exact:true}).fill('1');
         await page.getByLabel('Stop Loss').fill('0.9');
@@ -123,8 +143,28 @@ try{
       await login();
       await revision(mobile?11:7);
       await page.getByRole('button',{name:'Close GBPUSD'}).waitFor();
+      if(mobile){
+        await replay(String(BigInt(config.boundaries.feb)+10n),12);
+        await replay(String(BigInt(config.boundaries.dec)+10n),13);
+        await replay(String(BigInt(config.boundaries.jan)+10n),14);
+        await page.getByText(/GBPUSD · PENDING/).waitFor();
+      }else{
+        await replay(String(BigInt(config.boundaries.feb)-1n),8);
+        await page.getByLabel('Replay target (ns UTC)').fill(String(BigInt(config.boundaries.feb)+10n));
+        await page.getByRole('button',{name:'Replay',exact:true}).click();
+        await page.getByRole('alert').filter({hasText:/Free window has ended/}).waitFor();
+        await revision(8);
+        await page.getByRole('button',{name:'Close GBPUSD'}).click();
+        await revision(9);
+        await replay(String(BigInt(config.boundaries.feb)+10n),10,'Jump');
+        await page.getByText(/Market quotes outside your Free window are hidden/).waitFor();
+        await page.getByRole('button',{name:'Analytics',exact:true}).click();
+        await page.getByText(/Closed trades 2 · Net/).waitFor();
+      }
       assert.deepEqual(errors,[]);
-      console.log(JSON.stringify({viewport:account.viewport,completed:true,revision:mobile?11:7,closedTrades:1,nativeCrashRecovered:!mobile}));
+      console.log(JSON.stringify({viewport:account.viewport,completed:true,revision:mobile?14:10,closedTrades:mobile?1:2,nativeCrashRecovered:!mobile,
+        windowCase:mobile?'PRO_DECEMBER_JANUARY':'FREE_BOUNDARY_AND_CLOSE',
+        latency:{interactive:latency(interactive),asyncJobs:latency(asyncJobs)}}));
     } finally {
       await context.close();
     }

@@ -1,5 +1,9 @@
 """Native MI service child through the actual PostgreSQL scheduler (QA only)."""
 import hashlib
+import json
+from statistics import median
+from time import perf_counter
+from fractions import Fraction
 import os
 import unittest
 from pathlib import Path
@@ -27,20 +31,25 @@ class NativeMIQueue(unittest.TestCase):
     submit = test_research_queue.QueueTests.submit
     def setUp(self):
         test_research_queue.QueueTests.setUp(self)
-        root = self.enterContext(TemporaryDirectory())
-        self.model = MI(ORDER, steps=12)
+        self.root = Path(self.enterContext(TemporaryDirectory()))
         self.scope = TrustedScope(str(self.workspace), str(self.actor))
         self.store = mi_postgres.MultiInstrumentStore(self.dsn)
-        self.sid = self.model.state["sessionId"]
+        self.addCleanup(worker.close)
+        self.configure(ORDER, steps=12, session="mi:session")
+
+    def configure(self, symbols, *, steps, session):
+        self.model = MI(symbols, steps=steps)
+        self.model.state = mi_kernel.seed_state(session, self.model.pset, [FREE], FREE.method_id,
+                                                "10000", self.model.state["startNs"])
+        self.sid = session
         pins = mi_checkpoint.pins_from_state(self.model.state)
         blob = canonical_bytes(dict(schemaVersion=1, artifact="BTL-MI-QA-SOURCE-1",
                                     pins=pins, ticks=self.model.ticks))
-        path = Path(root) / "fixture.json"
+        path = self.root / (session.replace(":", "-") + ".json")
         path.write_bytes(blob)
         sha = hashlib.sha256(blob).hexdigest()
         self.enterContext(patch.dict(os.environ, dict(BTL_PRODUCT_PROFILE="development",
                           BTL_QA_MI_MANIFEST=str(path), BTL_QA_MI_MANIFEST_SHA256=sha)))
-        self.addCleanup(worker.close)
         self.store.create(self.scope, self.model.pset, [FREE], FREE.method_id, "10000",
                           self.model.state["startNs"], self.sid, manifest_sha=sha, compact=True)
 
@@ -193,6 +202,73 @@ serve()
             self.reclaim(job_id)
         self.expect(request, self.finish(request, job_id))
         self.assertEqual(self.inspect(job_id)["attempt"], 3)
+
+    @unittest.skipUnless(os.getenv("BTL_QA_MI_MEASURE") == "1", "explicit measurement only")
+    def test_native_mi_bounded_scaling_smoke(self):
+        """Same EURUSD trade and timestamp count, adding idle instruments."""
+        sets = [
+            ["EURUSD"],
+            ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"],
+            ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "XAUUSD", "USDJPY", "EURJPY", "USDCHF"],
+            list(ORDER),
+        ]
+        print(json.dumps({"benchmark": "MI_NATIVE_SYNTHETIC_SMOKE", "concurrency": 1, "timestamps": 24}), flush=True)
+        for symbols in sets:
+            samples = []
+            for replicate in range(3):
+                with connect(self.dsn) as db:
+                    database_before = db.execute("SELECT pg_database_size(current_database())").fetchone()[0]
+                self.configure(symbols, steps=24, session=f"mi:bench:{len(symbols)}:{replicate}")
+                ids = []
+                moments = {}
+                journey_start = perf_counter()
+                def step(kind, payload, cid, *, jump=False, stop_at=None):
+                    request = dict(self.command(kind, payload, cid), jump=jump)
+                    began = perf_counter()
+                    job = self.submit_mi(request)
+                    ids.append(job)
+                    receipt = self.finish(request, job)
+                    moments[cid] = perf_counter() - began
+                    reference_request = request
+                    if stop_at is not None:
+                        reference_request = dict(request, command=dict(request["command"],
+                            payload={"targetNs": str(self.model.at(stop_at))}))
+                    self.expect(reference_request, receipt)
+                    return receipt
+
+                step("ADVANCE", {"targetNs": str(self.model.at(0))}, "initial")
+                step("OPEN", dict(symbol="EURUSD", side="LONG", orderType="MARKET", workflow="QUICK",
+                                  entry=self.model.quote("EURUSD")[1], quantity="0.1", sl=None,
+                                  tp=None, riskPercent="1", observations=[]), "order")
+                step("ADVANCE", {"targetNs": str(self.model.at(23))}, "jump-entry", jump=True, stop_at=1)
+                step("CLOSE", {"orderId": "order", "quantity": None}, "close")
+                result = step("ADVANCE", {"targetNs": str(self.model.at(23))}, "replay-exit")
+                total_wall = perf_counter() - journey_start
+                # Independent exact EURUSD cash oracle for the identical trade.
+                bid = Fraction(self.model.rows["EURUSD"][2][1])
+                ask = Fraction(self.model.rows["EURUSD"][1][2])
+                self.assertEqual(Fraction(result["state"]["balance"]), 10000 + (bid - ask) * 10000)
+                ticks = int(result["state"]["nextGroupIndex"])
+                self.assertEqual(ticks, len(symbols) * 24)
+                with connect(self.dsn) as db:
+                    records = db.execute(
+                        "SELECT worker_metrics,queue_metrics FROM btl.research_jobs WHERE id=ANY(%s::uuid[])",
+                        (ids,)).fetchall()
+                    worker_rows = [json.loads(bytes(row[0])) for row in records]
+                    queue_rows = [json.loads(bytes(row[1])) for row in records]
+                    size = db.execute("SELECT octet_length(payload) FROM btl.tick_checkpoints "
+                                      "WHERE workspace_id=%s AND session_id=%s ORDER BY revision DESC LIMIT 1",
+                                      (str(self.workspace), self.sid)).fetchone()[0]
+                    database_after = db.execute("SELECT pg_database_size(current_database())").fetchone()[0]
+                samples.append(dict(ticks=ticks, wallSeconds=total_wall, journeyTicksPerSecond=ticks / total_wall,
+                    workerCpuSeconds=sum(row["cpuNs"] for row in worker_rows) / 1e9,
+                    workerWallSeconds=sum(row["wallNs"] for row in worker_rows) / 1e9,
+                    peakWorkerRssBytes=max(row["processPeakRssBytes"] for row in worker_rows),
+                    queueWaitMillis=sum(row["waitMicroseconds"] for row in queue_rows) / 1000,
+                    jumpWallSeconds=moments["jump-entry"], replayWallSeconds=moments["replay-exit"],
+                    finalCheckpointBytes=size, databaseGrowthBytes=database_after-database_before))
+            print(json.dumps(dict(instruments=len(symbols),
+                median={key: median(s[key] for s in samples) for key in samples[0]}, samples=samples)), flush=True)
 
     def test_native_mi_development_gate(self):
         request = self.command("ADVANCE", {"targetNs": str(self.model.at(0))}, "first")

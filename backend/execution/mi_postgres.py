@@ -56,8 +56,33 @@ def _validate_transition(before, after, events):
             "miPostings", "CORRUPT_RECORD")
 
 
-def _request_hash(command, jump):
-    return content_hash(dict(schemaVersion=1, artifact="BTL-MI-COMMAND-REQUEST-1", command=command, jump=jump))
+def _request_hash(command, jump, review_hash=None):
+    value = dict(schemaVersion=1, artifact="BTL-MI-COMMAND-REQUEST-1", command=command, jump=jump)
+    if review_hash is not None:
+        value["reviewHash"] = review_hash
+    return content_hash(value)
+
+
+REVIEW = "BTL-MI-ORDER-REVIEW-1"
+REVIEW_TTL_SECONDS = 300
+
+
+def _review_record(db, workspace, session, review_id):
+    row = db.execute("SELECT basis_revision,payload,content_hash FROM btl.tick_mi_order_reviews "
+                     "WHERE workspace_id=%s AND session_id=%s AND review_id=%s",
+                     (workspace, session, review_id)).fetchone()
+    if row is None:
+        return None
+    value = unpack(*row[1:])
+    tag(value, REVIEW, "actorRef command basisHash expiresAt")
+    command = mi_kernel.command_wire(value["command"])
+    require((command["sessionId"], command["commandId"], command["expectedRevision"]) ==
+            (session, review_id, row[0]), "review", "CORRUPT_RECORD")
+    return value, row[2]
+
+
+def _db_seconds(db):
+    return db.execute("SELECT floor(extract(epoch FROM clock_timestamp()))::bigint").fetchone()[0]
 
 
 def _source_hash(checkpoint):
@@ -159,11 +184,43 @@ class MultiInstrumentStore:
             require(genesis == (sha,), "sessionId", "REFUSED_IDEMPOTENCY_CONFLICT")
             return current["state"]
 
-    def apply(self, scope, raw_command, open_sources, *, jump=False, required_manifest_sha=None):
+    def review(self, scope, raw_command, *, required_manifest_sha, authorize):
+        command = mi_kernel.command_wire(raw_command)
+        require(command["kind"] == "OPEN", "reviewKind")
+        workspace, session = scoped(scope, command["sessionId"])
+        with connect(self.dsn) as db:
+            checkpoint, sha = self._read(db, workspace, session, lock=True)
+            require(sha == required_manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
+            review_id = command["commandId"]
+            prior = _review_record(db, workspace, session, review_id)
+            if prior is not None:
+                value, review_hash = prior
+                require(value["actorRef"] == scope.actor_ref and value["command"] == command,
+                        "review", "REFUSED_IDEMPOTENCY_CONFLICT")
+            else:
+                state = checkpoint["state"]
+                authorize(db, state, command, False)
+                mi_kernel.submit(state, command)  # exact reducer validation, discard proposed state
+                plan = command["payload"]
+                if plan["orderType"] == "MARKET":
+                    side = "ask" if plan["side"] == "LONG" else "bid"
+                    ticks = state["groups"][plan["symbol"]]["events"]
+                    quotes = {Fraction(tick[side]) for tick in ticks}
+                    require(quotes == {Fraction(plan["entry"])}, "quote", "MI_REVIEW_MISMATCH")
+                value = dict(schemaVersion=1, artifact=REVIEW, actorRef=scope.actor_ref,
+                             command=command, basisHash=checkpoint["checkpointHash"],
+                             expiresAt=_db_seconds(db) + REVIEW_TTL_SECONDS)
+                payload, review_hash = pack(value)
+                db.execute("INSERT INTO btl.tick_mi_order_reviews VALUES (%s,%s,%s,%s,%s,%s)",
+                           (workspace, session, review_id, state["revision"], payload, review_hash))
+            return {key: item for key, item in dict(value, reviewHash=review_hash).items() if key != "actorRef"}
+
+    def apply(self, scope, raw_command, open_sources, *, jump=False, required_manifest_sha=None,
+              review_hash=None, require_review=False, authorize=None):
         command = mi_kernel.command_wire(raw_command)
         require(type(jump) is bool and (not jump or command["kind"] == "ADVANCE"), "miJump")
         workspace, session = scoped(scope, command["sessionId"])
-        command_hash = _request_hash(command, jump)
+        command_hash = _request_hash(command, jump, review_hash)
         with connect(self.dsn) as db:
             checkpoint, manifest_sha = self._read(db, workspace, session, lock=True)
             require(manifest_sha == required_manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
@@ -172,6 +229,10 @@ class MultiInstrumentStore:
                 "WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
                 (workspace, session, command["commandId"])).fetchone()
             if prior:
+                if review_hash is not None:
+                    reviewed = _review_record(db, workspace, session, command["commandId"])
+                    require(reviewed is not None and reviewed[0]["actorRef"] == scope.actor_ref,
+                            "review", "RESOURCE_UNAVAILABLE")
                 require(prior[1] == command_hash, "commandId", "REFUSED_IDEMPOTENCY_CONFLICT")
                 result = unpack(*prior[2:])
                 tag(result, RECEIPT, "sessionId commandId commandHash revision state events replay durable")
@@ -190,6 +251,17 @@ class MultiInstrumentStore:
                 result["state"] = committed_state
                 return result
             before = checkpoint["state"]
+            if command["kind"] == "OPEN" and (require_review or review_hash is not None):
+                require(review_hash is not None, "review", "MI_REVIEW_REQUIRED")
+                reviewed = _review_record(db, workspace, session, command["commandId"])
+                require(reviewed is not None, "review", "RESOURCE_UNAVAILABLE")
+                value, expected_hash = reviewed
+                require(expected_hash == review_hash and value["actorRef"] == scope.actor_ref and
+                        value["command"] == command, "review", "MI_REVIEW_MISMATCH")
+                require(value["basisHash"] == checkpoint["checkpointHash"],
+                        "revision", "REFUSED_STALE_REVISION")
+                require(_db_seconds(db) < value["expiresAt"], "review", "MI_REVIEW_EXPIRED")
+            effective_target = authorize(db, before, command, jump) if authorize else None
             if "archived" in before and command["kind"] == "OPEN":
                 terminal = db.execute(
                     "SELECT 1 FROM btl.tick_terminal_orders WHERE workspace_id=%s "
@@ -204,7 +276,7 @@ class MultiInstrumentStore:
                     sources, verified_pins, admitted_sha = open_sources(checkpoint["sourcePins"])
                     require(admitted_sha == manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
                 _, timeline = mi_checkpoint.restore(checkpoint, sources, verified_source_pins=verified_pins)
-                target = uint(command["payload"]["targetNs"])
+                target = uint(command["payload"]["targetNs"]) if effective_target is None else effective_target
                 if jump:
                     after, replay = mi_jump.run(after, timeline, target, max_timestamps=MAX_ADVANCE_TIMESTAMPS)
                     events = replay.pop("events")
@@ -247,7 +319,7 @@ class MultiInstrumentStore:
                        (after["revision"], raw, sha, workspace, session))
         return result
 
-    def command_status(self, scope, raw_command, *, jump, required_manifest_sha):
+    def command_status(self, scope, raw_command, *, jump, required_manifest_sha, review_hash=None):
         command = mi_kernel.command_wire(raw_command)
         workspace, session = scoped(scope, command["sessionId"])
         with connect(self.dsn) as db:
@@ -260,7 +332,11 @@ class MultiInstrumentStore:
                              (workspace, session, command["commandId"])).fetchone()
             committed_revision = None
             if row is not None:
-                expected = _request_hash(command, jump)
+                if review_hash is not None:
+                    reviewed = _review_record(db, workspace, session, command["commandId"])
+                    require(reviewed is not None and reviewed[0]["actorRef"] == scope.actor_ref,
+                            "review", "RESOURCE_UNAVAILABLE")
+                expected = _request_hash(command, jump, review_hash)
                 require(row[1] == expected, "commandId", "REFUSED_IDEMPOTENCY_CONFLICT")
                 receipt = unpack(*row[2:])
                 require(receipt.get("artifact") == RECEIPT and receipt.get("durable") is True and

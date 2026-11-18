@@ -266,3 +266,7 @@ Owner requested MI native worker and durable queue recovery before public-facing
 ## OWNER ADDENDUM — MI COMPACT LIFECYCLE AND QA BROWSER CHECKPOINT
 
 Owner requested complete MI product acceptance in QA. This checkpoint adds compact MI state and archive reconciliation, HTTP routes behind the explicit development source manifest, and the authenticated QA workspace. Product browser faults are exercised on disposable HTTPS/PostgreSQL only. The native child was killed after durable commit and reclaimed through the existing lease with exact event identity. This is not authorization to deploy MI or change legacy source qualification, margin, published history or production configuration.
+
+## MI final hardening checkpoint (2026-11-18, isolated QA)
+
+The owner requested durable review and legacy-equivalent Free month handling for MI. Review and confirmation are bound to the actor and exact immutable checkpoint. Active-only continuation handles settlement with the existing reducer and masks restricted market quotes in public views. The disposable browser fixture exercises Free desktop, native crash recovery and Pro mobile December–January rollover. MI stays QA-only. No production changes, Git push, history rewrite or release of unqualified market data.

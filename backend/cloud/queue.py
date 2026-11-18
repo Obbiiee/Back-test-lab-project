@@ -65,13 +65,23 @@ def scoped(db, actor_id, workspace_id):
     return WorkspaceUnit(db, actor_id, workspace_id)
 
 
-def view(row):
+def view(row, db=None, dsn=None):
+    result = json.loads(bytes(row['result'])) if row['result'] is not None else None
+    if isinstance(result, dict) and result.get('artifact') == 'BTL-TICK-DURABLE-RESULT-MI-1':
+        from .entitlements import Entitlements
+        from .mi_product import restrict_market_view
+        require(db is not None, 'miJobView', 'RESOURCE_UNAVAILABLE')
+        window = Entitlements(dsn).session_window_in(db, row['workspace_id'], result['sessionId'])
+        if window is not None:
+            restrict_market_view(result, window)
+    if row.get('mi_refusal_code') is not None:
+        result = dict(schemaVersion=1, artifact='BTL-MI-COMMAND-REFUSAL-1', code=row['mi_refusal_code'])
     cancellation = ('CANCELLED' if row['state'] == 'CANCELLED' else 'NOT_REQUESTED')
     if row.get('cancel_requested_at') is not None and row['state'] != 'CANCELLED':
         cancellation = ('REQUESTED' if row['state'] == 'RUNNING' else
                         'TOO_LATE' if row['state'] == 'SUCCEEDED' else 'RECONCILE_REQUIRED')
     return {'schemaVersion': 1, 'jobId': str(row['id']), 'state': row['state'],
-            'result': json.loads(bytes(row['result'])) if row['result'] is not None else None,
+            'result': result,
             'attempt': row.get('attempts', 0), 'heartbeatAt': row.get('heartbeat_at'),
             'cancellation': cancellation}
 
@@ -272,7 +282,7 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
         if previous:
             require((previous['actor_id'], previous['workspace_id']) == (actor_id, workspace_id), 'job', 'RESOURCE_UNAVAILABLE')
             require(previous['input_hash'] == digest, 'jobInput', 'IDEMPOTENCY_CONFLICT')
-            return view(previous)
+            return view(previous, db, dsn)
         _reap_expired_leases(db)
         _expire_queued(db)
         counts = db.execute("SELECT count(*) AS global_count,count(*) FILTER (WHERE actor_id=%s) AS user_count FROM btl.research_jobs WHERE state='QUEUED'", (actor_id,)).fetchone()
@@ -282,7 +292,7 @@ def submit(dsn, actor_id, workspace_id, job_id, operation, args):
         db.execute("DELETE FROM btl.research_jobs WHERE id IN (SELECT id FROM btl.research_jobs WHERE state NOT IN ('QUEUED','RUNNING') ORDER BY finished_at DESC,id OFFSET %s)", (RETAINED_LIMIT,))
         row = db.execute("INSERT INTO btl.research_jobs(id,actor_id,workspace_id,operation,input,input_hash,state) VALUES (%s,%s,%s,%s,%s,%s,'QUEUED') RETURNING *",
                          (job_id, actor_id, workspace_id, operation, raw, digest)).fetchone()
-        return view(row)
+        return view(row, db, dsn)
 
 
 def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
@@ -301,7 +311,7 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
                 WHERE id=%s AND actor_id=%s AND workspace_id=%s AND state='QUEUED'
                   AND expires_at <= clock_timestamp() RETURNING *
             """, (state, job_id, actor_id, workspace_id)).fetchone()
-            return view(recovered or row)
+            return view(recovered or row, db, dsn)
         if not cancel and row['state'] == 'RUNNING':
             # Recover just this expired lease if it is the polled job. A
             # heartbeat/finalizer racing this update wins by changing the
@@ -321,15 +331,15 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
                   AND lease_until <= clock_timestamp() RETURNING *
             """, (state, state == 'QUEUED', QUEUE_TTL_SECONDS, state == 'QUEUED',
                   job_id, actor_id, workspace_id)).fetchone()
-            return view(recovered or row)
+            return view(recovered or row, db, dsn)
         if row['state'] == 'QUEUED':
             # SKIP LOCKED: a claim that won the race is reported as RUNNING, never cancelled falsely.
             claimed = db.execute("SELECT * FROM btl.research_jobs WHERE id=%s FOR UPDATE SKIP LOCKED", (job_id,)).fetchone()
             if not claimed:
-                return {**view(row), 'state': 'RUNNING', 'cancellation': 'WAIT_FOR_RESULT'}
+                return {**view(row, db, dsn), 'state': 'RUNNING', 'cancellation': 'WAIT_FOR_RESULT'}
             row = claimed
             if row['state'] != 'QUEUED':
-                return view(row)
+                return view(row, db, dsn)
             if cancel:
                 state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS or row['operation']=='create_session' else 'CANCELLED'
                 row = db.execute("UPDATE btl.research_jobs SET state=%s,cancel_requested_at=clock_timestamp(),finished_at=clock_timestamp() WHERE id=%s AND state='QUEUED' RETURNING *", (state, job_id)).fetchone() or row
@@ -339,7 +349,7 @@ def inspect(dsn, actor_id, workspace_id, job_id, *, cancel=False):
         elif row['state'] == 'RUNNING' and cancel:
             row = db.execute("UPDATE btl.research_jobs SET cancel_requested_at=COALESCE(cancel_requested_at,clock_timestamp()) WHERE id=%s AND state='RUNNING' RETURNING *",
                              (job_id,)).fetchone() or row
-        return view(row)
+        return view(row, db, dsn)
 
 
 def work_one(dsn, runner):
@@ -407,6 +417,7 @@ def work_one(dsn, runner):
         heartbeat_thread.start()
         worker_metrics_raw = worker_metrics_hash = None
         continuation = None
+        mi_refusal = None
         args = ()
         try:
             try:
@@ -447,8 +458,9 @@ def work_one(dsn, runner):
             state = 'SUCCEEDED'
         except ContractError as error:
             from .mi_qa import REQUEST as MI_REQUEST
-            if (row['operation'] == 'replay' and len(args) == 2 and isinstance(args[1], dict) and args[1].get('artifact') == MI_REQUEST
-                    and error.code == 'WORKER_UNAVAILABLE' and error.field == 'workerResult'):
+            is_mi = (row['operation'] == 'replay' and len(args) == 2 and isinstance(args[1], dict)
+                     and args[1].get('artifact') == MI_REQUEST)
+            if is_mi and error.code == 'WORKER_UNAVAILABLE' and error.field == 'workerResult':
                 # Lost pipe: a financial commit may already exist. Leave the
                 # leased job eligible for bounded redelivery and receipt dedup.
                 raise RuntimeError('MI native worker interrupted') from error
@@ -458,6 +470,12 @@ def work_one(dsn, runner):
                 getattr(error,'source','worker'))
             worker_metrics_raw, worker_metrics_hash = _worker_measurements(error)
             raw = None
+            if is_mi and error.code in ('WINDOW_BOUNDARY', 'WINDOW_ENDED', 'WINDOW_ENDED_CONTINUATION_ONLY',
+                                        'PENDING_AT_WINDOW_END', 'WINDOW_COMPLETED', 'MI_REVIEW_REQUIRED',
+                                        'MI_REVIEW_EXPIRED', 'MI_REVIEW_MISMATCH', 'REFUSED_STALE_REVISION'):
+                # These refusals are checked before execution under the
+                # locked checkpoint, so the client may discard the attempt.
+                mi_refusal = error.code
             state = 'RECONCILE_REQUIRED' if row['operation'] in MUTATING_OPERATIONS else ('EXPIRED' if error.code == 'EXPIRED' else 'FAILED')
         except BaseException:
             # Leave RUNNING durable. Lease expiry performs the bounded retry or
@@ -477,11 +495,11 @@ def work_one(dsn, runner):
         elif cancelled and state != 'SUCCEEDED':
             state, raw = 'RECONCILE_REQUIRED', None
         db.execute("""
-            UPDATE btl.research_jobs SET state=%s,result=%s,worker_metrics=%s,worker_metrics_hash=%s,
+            UPDATE btl.research_jobs SET state=%s,result=%s,worker_metrics=%s,worker_metrics_hash=%s,mi_refusal_code=%s,
                 finished_at=clock_timestamp(),
                 lease_owner=NULL,lease_until=NULL,heartbeat_at=NULL
             WHERE id=%s AND state='RUNNING' AND lease_owner=%s
-        """, (state, raw, worker_metrics_raw, worker_metrics_hash, row['id'], lease_owner))
+        """, (state, raw, worker_metrics_raw, worker_metrics_hash, mi_refusal, row['id'], lease_owner))
         if continuation is not None and state == 'SUCCEEDED' and not cancelled:
             # Same transaction as the finalisation above: either both the result and the follow-on exist, or neither (a lease retry then redoes the segment, which is idempotent).
             payload_next = {'schemaVersion': 1, 'operation': 'replay_run', 'args': continuation['args']}

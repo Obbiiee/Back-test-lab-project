@@ -2,6 +2,12 @@
 
 Status: **IMPLEMENTATION REGISTER, not an architecture authority.** Facts only; nothing here promotes a data right or invents a broker profile. Evidence: `docs/benchmarks/data-verification/verify_v2_16pairs_2026-11-14.jsonl` (544 verified datasets), `verify_prehistory_16pairs.jsonl`, `docs/benchmarks/financial-real-v2/`, code paths cited below.
 
+## Recheck on 2026-11-18
+
+The versioned verifier report (SHA-256 `d88445c8cdf1a47c8164ab522134e2bb3e64901fae20b020202c56c6aecc012f`) records 544 distinct instrument-months across the 16 symbols, 1,331,417,302 ticks, 544 `OK` records with rights `UNKNOWN`, and no crossed quotes reported. It records 272 datasets at price scale 3 and 272 at scale 5. These counts come from the existing report. This checkpoint did not reread the raw archives or independently quantify gaps, duplicates or spread distributions. Feed precision alone does not establish tick value, lot size, or executable broker terms. Commercial profiles for the other 15 instruments and qualified FX conversion sources remain missing from acceptance.
+
+The isolated MI product browser now exercises Free continuation and Pro December–January rollover using pinned synthetic data. This closes the synthetic calendar-boundary test. Real multi-month coverage, qualification and SaaS delivery rights remain open.
+
 ## 1. What the product actually runs (engine audit)
 | Layer | Implementation used by the hosted product | Evidence |
 |---|---|---|

@@ -5,7 +5,7 @@ const ROOT='http://127.0.0.1:5188/api/v1/tick-alpha';
 // 5 s polling/transport observation margin; a 30 s client abort orphaned
 // valid reads under concurrent traders and left the UI on a stale revision.
 const PRODUCT_JOB_DEADLINE_MS=95000;
-import {accountTransport,isAccountPage} from './accountClient.js';
+import {accountTransport,isAccountPage,entitlementRefusal} from './accountClient.js';
 import {isLocalReview} from '../tickReview/LocalOrigin.js';
 export function id(prefix){return `${prefix}:${crypto.randomUUID()}`;}
 function stableValue(value){
@@ -55,6 +55,16 @@ export async function api(path,body,{signal}={}){
         throw Error('Unexpected research job; no state was imported.');
       }
       if(value.state==='SUCCEEDED'){value=value.result;break;}
+      if(miCommand&&value.state==='RECONCILE_REQUIRED'&&value.result?.artifact==='BTL-MI-COMMAND-REFUSAL-1'){
+        const code=value.result.code;
+        const message=entitlementRefusal({detail:code})?.message??({
+          MI_REVIEW_EXPIRED:'This review expired. Review the order again.',
+          MI_REVIEW_REQUIRED:'Review the order before confirming.',
+          MI_REVIEW_MISMATCH:'This confirmation differs from its review.',
+          REFUSED_STALE_REVISION:'The Session changed. Reload and review the order again.',
+        })[code];
+        if(message)throw Object.assign(Error(message),{code,status:409});
+      }
       if(!['QUEUED','RUNNING'].includes(value.state)){
         if(mutating)throw uncertain();
         throw Object.assign(Error(`Research job ended in ${value.state}.`),{code:value.state,jobId});
