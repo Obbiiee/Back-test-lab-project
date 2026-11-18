@@ -27,7 +27,8 @@ class MultiInstrumentProjection(unittest.TestCase):
     def test_journal_and_analytics_group_by_order_pair_and_creation_method(self):
         m = self._portfolio()
         result = mi_projection.project(m.state, m.events)
-        self.assertEqual(result["artifact"], "BTL-MI-COMMITTED-PROJECTION-1")
+        self.assertEqual(result["artifact"], "BTL-MI-QA-VERIFIED-PROJECTION-1")
+        self.assertEqual(result["provenance"]["financialAuthority"], "QA_VERIFIED_SYNTHETIC_EVENT_LEDGER_ONLY")
         self.assertEqual({row["id"]: row["symbol"] for row in result["orders"]},
                          {"eur-order": "EURUSD", "gbp-order": "GBPUSD"})
         self.assertEqual({row["id"]: row["methodId"] for row in result["orders"]},

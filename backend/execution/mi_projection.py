@@ -1,8 +1,9 @@
 """Read-only Journal and Analytics views for the isolated MI reducer.
 
-This module consumes a complete committed MI event ledger plus its validated
+This module consumes a complete validated MI event ledger plus its validated
 state. It never has provider/tick access and cannot execute or settle orders.
-It is not routed through Product/API storage yet.
+The ledger is in-memory QA evidence, not a durable Product commit, and this
+module is not routed through Product/API storage.
 """
 from collections import defaultdict
 from fractions import Fraction
@@ -15,11 +16,11 @@ from .contracts import text
 from . import mi_kernel
 
 
-ARTIFACT = "BTL-MI-COMMITTED-PROJECTION-1"
+ARTIFACT = "BTL-MI-QA-VERIFIED-PROJECTION-1"
 
 
 def project(state, events):
-    """Verify the full MI chain and return symbol/Method-attributed views."""
+    """Verify the full MI chain and return symbol/Method-attributed QA views."""
     mi_kernel.validate_state(state)
     require(type(events) is list and len(events) == state["nextEventIndex"],
             "miProjection", "REFUSED_INCOMPLETE_EVENT_LEDGER")
@@ -131,4 +132,4 @@ def project(state, events):
                 byPair=grouped("symbol"), byMethod=grouped("methodId"), account=account,
                 provenance=dict(engineVersion=state["engineVersion"], profileSetHash=state["profileSetHash"],
                                 eventHead=state["eventHash"], throughNs=state["throughNs"],
-                                financialAuthority="VERIFIED_COMMITTED_MI_EVENTS_ONLY"))
+                                financialAuthority="QA_VERIFIED_SYNTHETIC_EVENT_LEDGER_ONLY"))
