@@ -878,9 +878,9 @@ class ResearchApplication:
                 advances=0, processed_groups=0, events=[], view=view)
         end_exclusive = int(self.__provider.describe(state['datasetId'], state['datasetVersion'])['range']['endNs'])
         target = str(end_exclusive - 1)
-        if window_end is not None and any(order['status'] == 'PENDING' for order in state['orders'].values()):
-            # Free window: a PENDING order may not fill outside the activated month. The search is bounded BEFORE any tick that could fill is processed;
-            # the reducer is untouched (this only lowers the upper bound of an ordinary canonical ADVANCE). Active-only continuation is not bounded.
+        if window_end is not None:
+            # Free window (owner decision 2026-11-18): no replay may pass the end of the activated month, with PENDING or ACTIVE orders alike. The search is bounded
+            # BEFORE any tick is processed; the reducer is untouched (this only lowers the upper bound of an ordinary canonical ADVANCE). Open positions are not closed.
             target = str(min(end_exclusive, window_end) - 1)
         require(state['revision'] in (raw['expectedRevision'], raw['expectedRevision'] + 1),
                 'revision', 'REFUSED_STALE_REVISION')

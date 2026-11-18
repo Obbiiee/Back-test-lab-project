@@ -52,38 +52,18 @@ class Api(MonthBase):
         self.assertEqual(r.status_code, expect, r.text)
         return r
 
-    def test_switch_keeps_the_trade_state_and_new_orders_follow_the_active_method(self):
+    def test_switch_is_refused_and_the_session_keeps_its_method(self):
+        # owner decision 2026-11-18: no method change inside a Session; a different method is a new Session
         a, b = self.two_methods()
         sid = self.create(a, [a, b])
-        first = self.open_market(sid)                                                      # under Free style
+        first = self.open_market(sid)
         self.command(sid, "ADVANCE", {"targetNs": str(self.start + 60 * NS)})
         before = self.view(sid)["state"]
-        self.switch(sid, b)
+        r = self.switch(sid, b, expect=409)
+        self.assertEqual(r.json()["detail"], "METHOD_CHANGE_REQUIRES_NEW_SESSION")
         after = self.view(sid)["state"]
-        for key in ("balance", "throughNs"):
-            self.assertEqual(before[key], after[key], key)
-        self.assertEqual(before["orders"][first]["status"], after["orders"][first]["status"])
-        self.assertEqual((after["activeMethodId"], after["orders"][first]["methodId"]), (b, a))
-        # under Protocol a QUICK market order is refused; a planned limit with the policy's risk and R:R is accepted
-        self.review(sid, review_request(self.view(sid))["draft"], expect=409) if False else None
-        r = self.client.post(self.path + "/reviews", headers=self.headers, json=dict(sessionId=sid, requestId="order:" + uuid.uuid4().hex, expectedRevision=self.view(sid)["state"]["revision"],
-                                                                                       planId=None, planRevision=None, draft=review_request(self.view(sid))["draft"]))
-        self.assertNotEqual(r.status_code, 200, "Protocol must refuse a QUICK market order")
-        planned = dict(side="LONG", orderType="LIMIT", workflow="PLANNED", entry="1998.90", quantity=None, sl="1998.00", tp=None, riskPercent=None,
-                       observations=[dict(conditionId="condition", outcome="PASS")])
-        body, rr = self.review(sid, planned, plan="plan:mm")
-        c = self.client.post(self.path + "/sessions/" + sid + "/confirm", headers=self.headers, json={"reviewId": body["requestId"], "reviewHash": rr.json()["reviewHash"]})
-        self.assertEqual(c.status_code, 200, c.text)
-        second = body["requestId"]
-        self.switch(sid, a)                                                                # back to Free style: the Protocol order is NOT re-attributed
-        state = self.view(sid)["state"]
-        self.assertEqual({k: o["methodId"] for k, o in state["orders"].items()}, {first: a, second: b})
-        journal = self.client.get(self.path + "/sessions/" + sid + "/journal", headers=self.headers)
-        self.assertEqual(journal.status_code, 200)
-        self.assertEqual({r["id"]: r.get("methodId") for r in journal.json()["orders"]}, {first: a, second: b}, "the Journal must say which Method each order was created under")
-        self.switch(sid, a, expect=409)                                                    # same Method again: refused
-        worker.close()                                                                     # cold read after a worker restart
-        self.assertEqual({k: o["methodId"] for k, o in self.view(sid)["state"]["orders"].items()}, {first: a, second: b})
+        self.assertEqual((before["balance"], before["throughNs"], before["activeMethodId"]), (after["balance"], after["throughNs"], a))
+        self.assertEqual(after["orders"][first]["status"], before["orders"][first]["status"])
 
     def test_a_session_that_never_switches_equals_the_legacy_session(self):
         a, b = self.two_methods()
@@ -112,12 +92,13 @@ class Api(MonthBase):
             else:
                 self.assertGreaterEqual(r.status_code, 400, ids)
 
-    def test_pro_and_free_both_switch(self):
+    def test_pro_and_free_both_refuse_a_method_switch(self):
         a, b = self.two_methods()
         sid = self.create(a, [a, b])
-        self.switch(sid, b)                                                                # Free
+        self.switch(sid, b, expect=409)                                                    # Free
         self.grant_pro()
-        self.switch(sid, a)                                                                # Pro: same behaviour
+        self.switch(sid, b, expect=409)                                                    # Pro: the same rule
+        self.assertEqual(self.view(sid)["state"]["activeMethodId"], a)
 
 
 if __name__ == "__main__":

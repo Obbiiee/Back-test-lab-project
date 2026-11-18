@@ -10,11 +10,12 @@ export function entitlementRefusal(body){
     WINDOW_DAY_LIMIT:`Free plan: one newly opened historical month per day (UTC).${at?` Another month can be opened from ${at}.`:''} Continuing a month you already opened is free.`,
     ACTIVATION_IN_PROGRESS:'Another Session is still being created. Wait a moment and check your Sessions before trying again.',
     WINDOW_ENDED:'This Free window has ended: new orders cannot be opened. Open positions can still be resolved. Pro has no one-month window limit.',
-    WINDOW_BOUNDARY:'This step would cross the end of your Free window. Step to the last tick of the window, or use Jump to Next Event while an order is open. Pro has no one-month window limit.',
-    WINDOW_ENDED_CONTINUATION_ONLY:'This Free window has ended. Only Jump to Next Event (with an open position), Close, Cancel and End are available. Pro has no one-month window limit.',
+    WINDOW_BOUNDARY:'This step would cross the end of your Free window. Step to the last tick of the window instead. Pro has no one-month window limit.',
+    WINDOW_ENDED_CONTINUATION_ONLY:'This Free window has ended. Replay cannot continue past it. Cancel and End remain available, open positions stay open, and results stay visible. Pro has no one-month window limit.',
+    WINDOW_CLOSE_REFUSED:'Close is not available after the end of this Free window: the position stays open and replay cannot continue. Cancel pending orders or End the Session. A new month needs a new Free Session.',
     CHART_CONTEXT_PRO_ONLY:'Candles from before this month are part of Pro. Your Free Session shows the month you opened.',
-    PENDING_AT_WINDOW_END:'A pending order is still waiting at the end of your Free window. Cancel it before continuing.',
-    WINDOW_COMPLETED:'This Free window is complete: no open or pending orders remain.',
+    PENDING_AT_WINDOW_END:'A pending order is still waiting at the end of your Free window. Cancel it. Replay cannot continue past the window.',
+    WINDOW_COMPLETED:'This Free window has ended: replay cannot continue past it. Results and statistics stay visible; open positions stay open until you close them.',
     TRASH_EXPIRED:'The 30-day restore window for this Session has passed.',
   };
   return messages[code]?{code,message:messages[code]}:null;

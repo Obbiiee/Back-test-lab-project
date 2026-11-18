@@ -181,14 +181,15 @@ class WindowJumpRecovery(unittest.TestCase):
         self.expire_lease(job)
         self.assertEqual(self.worker().returncode, 0)
         result = queue.inspect(self.dsn, self.actor, self.workspace, job['jobId'])
-        # the killed worker had already committed the exit that ended the last live order: the retry returns the ORIGINAL committed outcome
-        self.assertEqual((result['state'], result['result']['status']), ('SUCCEEDED', 'EVENT_FOUND'))
+        # owner decision 2026-11-18: the stop lies beyond the window, so the committed command is bounded to the window end. The retry returns the ORIGINAL
+        # committed outcome, and nothing settles past the window
+        self.assertEqual((result['state'], result['result']['status']), ('SUCCEEDED', 'NO_EVENT_UNTIL_SESSION_END'))
         self.assertEqual(self.commands(free, raw['requestId']), 1)
         facts = self.facts(free)
-        self.assertEqual(facts['live'], [])
+        self.assertTrue(facts['live'], "the open position stays open past the window")
+        self.assertEqual(facts['balance'], "10000", "no PnL realised past the window")
         self.advance_to(control, int(facts['through']))
         self.assertEqual(self.facts(control), facts)
-        self.assertNotEqual(facts['balance'], "10000")
 
     def test_two_workers_reconcile_the_same_request_to_the_same_original_result(self):
         free, control = self.session(self.free, 5), self.session(self.free)
@@ -196,7 +197,7 @@ class WindowJumpRecovery(unittest.TestCase):
             self.plan(sid, dict(side="LONG", orderType="MARKET", workflow="PLANNED", entry="2006.10", quantity="0.1", riskPercent="1", sl="2005.5", tp="2010"))
             self.advance_to(sid, int(self.state(sid)["throughNs"]) + STEP_NS)
         job_a, raw = self.submit_jump(free)
-        self.assertEqual(self.worker('after_commit').returncode, -9)             # committed (the exit fill), job A not finalised
+        self.assertEqual(self.worker('after_commit').returncode, -9)             # committed (the bounded advance), job A not finalised
         # a second job carrying the very same request (another worker / a client retry with a new job id) is admitted and reconciled first
         job_b = queue.submit(self.dsn, self.actor, self.workspace, uuid.uuid4(), 'jump_next_event', (free, raw))
         self.expire_lease(job_a)
@@ -207,7 +208,7 @@ class WindowJumpRecovery(unittest.TestCase):
             row = queue.inspect(self.dsn, self.actor, self.workspace, job['jobId'])
             outcomes[name] = (row['state'], row['result']['status'], row['result']['throughNs'])
         self.assertEqual(outcomes["A"], outcomes["B"])
-        self.assertEqual(outcomes["A"][:2], ("SUCCEEDED", "EVENT_FOUND"))
+        self.assertEqual(outcomes["A"][:2], ("SUCCEEDED", "NO_EVENT_UNTIL_SESSION_END"), "bounded at the window end: no fill past it")
         self.assertEqual(self.commands(free, raw['requestId']), 1, "one committed command for one request, however many workers saw it")
         self.advance_to(control, int(self.state(free)["throughNs"]))
         self.assertEqual(self.facts(control), self.facts(free))

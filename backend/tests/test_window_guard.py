@@ -93,13 +93,16 @@ class WindowGuardTests(unittest.TestCase):
         self.assertEqual((refused_open.status_code, refused_open.json()["detail"]), (409, "WINDOW_ENDED"))
         step = self.command("ADVANCE", {"targetNs": str(end + STEP_NS)})
         self.assertEqual((step.status_code, step.json()["detail"]), (409, "WINDOW_ENDED_CONTINUATION_ONLY"))
-        # continuation: Jump to Next Event is allowed with an ACTIVE position; CLOSE stays allowed
-        closed = self.command("CLOSE", {"orderId": next(iter(self.state()["orders"])), "quantity": None})
-        self.assertNotEqual(closed.status_code, 409, closed.text)                    # the close intent is accepted after the boundary...
-        resolved = self.jump()                                                      # ...and settles at the next committed quote through Jump (ADVANCE stays refused)
-        self.assertIn(resolved.status_code, (200, 202), resolved.text)
-        f.completed_job_result(resolved)
-        self.assertEqual(sum(o["status"] == "ACTIVE" for o in self.state()["orders"].values()), 0)
+        # owner decision 2026-11-18: Jump to Next Event is refused past the boundary even with an ACTIVE position; the position stays open and unsettled
+        refused_jump = self.jump()
+        self.assertEqual((refused_jump.status_code, refused_jump.json()["detail"]), (409, "WINDOW_COMPLETED"))
+        self.assertEqual(sum(o["status"] == "ACTIVE" for o in self.state()["orders"].values()), 1, "no settlement past the window")
+        # owner decision 2026-11-18: a CLOSE after the boundary is refused explicitly (never accepted and left pending); the repeat is refused the same way
+        oid = next(iter(self.state()["orders"]))
+        for _ in range(2):
+            closed = self.command("CLOSE", {"orderId": oid, "quantity": None})
+            self.assertEqual((closed.status_code, closed.json()["detail"]), (409, "WINDOW_CLOSE_REFUSED"), closed.text)
+        self.assertEqual(sum(o["status"] == "ACTIVE" for o in self.state()["orders"].values()), 1, "the refused CLOSE changed nothing")
         done = self.jump()
         self.assertEqual((done.status_code, done.json()["detail"]), (409, "WINDOW_COMPLETED"))
         # Free -> Pro with the window already over: Pro is not limited by the Free window
@@ -163,22 +166,27 @@ class WindowGuardTests(unittest.TestCase):
         start = int(self.state()["throughNs"])
         self.set_end(start + STEP_NS)
         self.advance_to(start + 2 * STEP_NS)
-        for kind in ("CANCEL", "CLOSE", "END"):
+        for kind in ("CANCEL", "END"):
             self.assertIsNone(window_guard.check(Entitlements(DSN), DSN, self.f.actor, self.f.workspace, self.sid, kind))
+        # owner decision 2026-11-18: CLOSE at/after the boundary is refused explicitly, never accepted and left pending
+        with self.assertRaises(window_guard.WindowRefused) as refused:
+            window_guard.check(Entitlements(DSN), DSN, self.f.actor, self.f.workspace, self.sid, "CLOSE")
+        self.assertEqual(refused.exception.code, "WINDOW_CLOSE_REFUSED")
 
 
 class WindowGuardRuleTable(unittest.TestCase):
     """Every rule branch with a stubbed ledger view (the real reducer path is exercised above)."""
     END = 10**15
 
-    def run_check(self, kind, *, through, active=0, pending=0, tier="FREE", target=None, window=True):
+    def run_check(self, kind, *, through, active=0, pending=0, tier="FREE", target=None, window=True, command_id=None, committed=False):
         from cloud import window_guard
         class Stub:
             def session_window(_self, ws, sid):
                 return dict(startNs=0, endNs=self.END, tier=tier) if window else None
-        with patch.object(window_guard, "live_orders", return_value=dict(throughNs=through, active=active, pending=pending, ended=False)):
+        with patch.object(window_guard, "live_orders", return_value=dict(throughNs=through, active=active, pending=pending, ended=False)), \
+             patch.object(window_guard, "command_committed", return_value=committed):
             try:
-                window_guard.check(Stub(), "dsn", "a", "w", "s", kind, target)
+                window_guard.check(Stub(), "dsn", "a", "w", "s", kind, target, command_id=command_id)
                 return None
             except window_guard.WindowRefused as refused:
                 return refused.code
@@ -193,10 +201,19 @@ class WindowGuardRuleTable(unittest.TestCase):
         self.assertEqual(R("ADVANCE", through=self.END, target=self.END + 1), "WINDOW_ENDED_CONTINUATION_ONLY")
         self.assertEqual(R("JUMP", through=self.END, pending=1, active=1), "PENDING_AT_WINDOW_END")
         self.assertEqual(R("JUMP", through=self.END), "WINDOW_COMPLETED")
-        self.assertIsNone(R("JUMP", through=self.END, active=2))
+        self.assertEqual(R("JUMP", through=self.END, active=2), "WINDOW_COMPLETED")     # owner decision 2026-11-18: no replay past the activated month, even with open positions
         self.assertIsNone(R("JUMP", through=10, pending=1))                     # before the boundary a Jump is allowed; the orchestration bounds it
-        for kind in ("CANCEL", "CLOSE", "END"):
+        for kind in ("CANCEL", "END"):
             self.assertIsNone(R(kind, through=self.END + 5000, pending=3))
+        # CLOSE (owner decision 2026-11-18): allowed while the next tick is still inside the window; refused at and after the boundary, explicitly
+        self.assertIsNone(R("CLOSE", through=self.END - 2, active=1))
+        self.assertEqual(R("CLOSE", through=self.END - 1, active=1), "WINDOW_CLOSE_REFUSED")     # the next tick would be outside the window
+        self.assertEqual(R("CLOSE", through=self.END, active=1), "WINDOW_CLOSE_REFUSED")
+        self.assertEqual(R("CLOSE", through=self.END + 5000, active=2), "WINDOW_CLOSE_REFUSED")
+        # an exact retry of a CLOSE that was already committed returns its original receipt (no new refusal)
+        self.assertIsNone(R("CLOSE", through=self.END, active=1, command_id="command:x", committed=True))
+        self.assertEqual(R("CLOSE", through=self.END, active=1, command_id="command:y", committed=False), "WINDOW_CLOSE_REFUSED")
+        self.assertIsNone(R("CLOSE", through=self.END, active=1, tier="PRO"))                  # Pro is not limited by the window
         self.assertIsNone(R("OPEN", through=self.END + 5000, tier="PRO"))
         self.assertIsNone(R("ADVANCE", through=self.END + 5000, tier="PRO", target=self.END + 9999))
         self.assertIsNone(R("OPEN", through=self.END + 5000, window=False))

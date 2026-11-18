@@ -28,14 +28,16 @@ export const SITE = {
   },
   payment: {
     provider: 'Midtrans',
-    methods: null,                    // metode yang benar-benar diaktifkan di akun Midtrans, mis. ['QRIS','Transfer bank (Virtual Account)','E-wallet','Kartu']
+    // Diisi owner (2026-11-18): QRIS dinamis (QR baru per transaksi, sekali bayar), dan semua metode lain yang aktif di akun Midtrans.
+    // Daftar ini harus dicocokkan dengan dashboard Midtrans sebelum review.
+    methods: ['QRIS dinamis (sekali bayar per transaksi)', 'E-wallet', 'Transfer bank (Virtual Account)', 'Kartu kredit dan debit'],
   },
   refund: {
     windowDays: 7,                    // diserahkan owner kepada Claude (2026-11-16); ubah di sini bila ingin lain
     conditions: 'Pro belum dipakai untuk membuat Sesi di luar kuota Free sejak pembayaran; pembayaran ganda atau Pro yang tidak aktif setelah pembayaran lunas dikembalikan penuh',
   },
   legalApproval: {                    // diisi owner setelah teks ditinjau (penasihat hukum disarankan); tanggal ISO, mis. '2026-12-01'
-    terms: '2026-11-17', privacy: '2026-11-17', refund: '2026-11-17',   // owner menyetujui draf (2026-11-17, balasan "setuju" di chat)
+    terms: '2026-11-18', privacy: '2026-11-17', refund: '2026-11-17',   // Syarat bagian 4 disetujui owner 2026-11-18 (persetujuan tertulis di chat); privasi dan pengembalian dana tetap 2026-11-17
   },
   lastUpdated: '2026-11-16',
 };

@@ -83,15 +83,15 @@ export const COPY = {
     pricing: {
       title: 'Harga dan paket', lead: 'Harga dalam Rupiah (IDR). Mulai gratis, tingkatkan ke Pro bila perlu.',
       free: {name: 'Free', price: 'Rp 0', per: 'selamanya', features: [
-        '1 Sesi baru per hari (UTC), tiap Sesi memakai data 1 bulan', '1 bulan historis baru diaktifkan per hari (UTC)', 'Melanjutkan Sesi yang ada tidak mengurangi kuota',
+        '1 Sesi baru per hari (UTC), tiap Sesi memakai data 1 bulan', '1 bulan historis baru diaktifkan per hari (UTC)', 'Melanjutkan Sesi di dalam bulan yang sudah diaktifkan tidak mengurangi kuota',
         'Memakai ulang bulan yang sudah diaktifkan tidak mengurangi kuota', 'Replay tick, order, Jump, jurnal, analitik, dan ekspor CSV/PDF']},
       pro: {name: 'Pro', monthlyName: 'Pro Bulanan', yearlyName: 'Pro Tahunan', perMonth: 'per bulan (30 hari)', perYear: 'per tahun (365 hari)', was: 'harga normal', saving: 'hemat', until: 'sampai', vsMonthly: 'dibanding membayar paket bulanan 12 kali', perMonthEquivalent: 'setara', per: 'per periode', features: [
         'Sesi baru tanpa batas, kapan saja', 'Bulan data historis baru tanpa batas', 'Semua fitur Free',
         'Aktif sampai masa berlaku habis, tidak diperpanjang otomatis']},
       pending: 'Harga akan diumumkan', buy: 'Masuk untuk membeli Pro',
       rulesTitle: 'Aturan kuota dengan jelas', rules: [
-        'Free: satu Sesi baru per hari UTC, dan tiap Sesi memakai data satu bulan (satu bulan historis baru diaktifkan per hari UTC). Pro: tanpa batas Sesi baru dan bulan data.',
-        'Melanjutkan Sesi yang sudah ada dan memakai ulang bulan yang sudah diaktifkan tidak memakai kuota.',
+        'Free: satu Sesi baru per hari UTC, dan tiap Sesi memakai data satu bulan (satu bulan historis baru diaktifkan per hari UTC). Sesi Free tidak berlanjut ke bulan berikutnya; bulan berikutnya memerlukan Sesi baru. Pro: tanpa batas Sesi baru dan bulan data.',
+        'Melanjutkan Sesi di dalam bulan yang sudah diaktifkan dan memakai ulang bulan tersebut tidak memakai kuota. Setelah akhir bulan, Sesi tidak dapat dilanjutkan (tidak ada replay dan trade baru); hasil dan statistik tetap dapat dilihat.',
         'Kuota diatur ulang pada pukul 00.00 UTC, yaitu pukul 07.00 WIB.',
         'Status Pro hanya berasal dari pembayaran yang sudah lunas dan belum kedaluwarsa, dan ditegakkan oleh server.',
         'Pro tidak diperpanjang otomatis.'],
@@ -110,7 +110,15 @@ export const COPY = {
       ['1. Layanan', ['{{brand}} ({{domain}}) adalah layanan simulasi backtest berbasis data tick historis, dikelola oleh {{operator}}. Layanan ini untuk berlatih dan riset.']],
       ['2. Bukan nasihat investasi', ['Layanan ini tidak menyediakan nasihat investasi, rekomendasi transaksi, atau eksekusi order di pasar sungguhan. Semua saldo dan order adalah simulasi.', 'Kinerja masa lalu tidak menjamin hasil di masa depan. Hasil simulasi dapat berbeda dari trading nyata.']],
       ['3. Akun', ['Anda bertanggung jawab atas kerahasiaan akun dan atas aktivitas di dalamnya. Anda harus memberikan informasi yang benar dan berusia di atas 18 tahun atau cakap hukum menurut hukum yang berlaku.']],
-      ['4. Paket Free dan Pro', ['Free dibatasi satu Sesi baru per hari UTC, dan tiap Sesi memakai data satu bulan (satu bulan historis baru diaktifkan per hari UTC). Pro tidak dibatasi kuota tersebut selama paketnya aktif.', 'Pro dibeli per periode, tidak diperpanjang otomatis, dan aktif sampai masa berlakunya habis. Harga dan periode tercantum di halaman Harga.']],
+      ['4. Paket Free dan Pro', [
+        'Free: paling banyak satu Sesi baru per hari UTC.',
+        'Satu Sesi Free hanya mencakup satu bulan historis. Bulan berikutnya memerlukan Sesi baru; Sesi Free tidak berlanjut lintas bulan.',
+        'Setiap hari UTC, paling banyak satu bulan historis baru dapat diaktifkan. Di dalam bulan yang sudah diaktifkan, tidak ada batas jumlah trade.',
+        'Sesi yang belum mencapai akhir bulan historisnya dapat dilanjutkan. Setelah akhir bulan, replay tidak dapat dilanjutkan dan trade baru tidak dapat dibuka. Posisi yang masih terbuka tetap terbuka dan dapat Anda tutup secara manual; hasil dan statistik tetap dapat dilihat.',
+        'Kuota diperbarui pukul 00.00 UTC (07.00 WIB). Kuota pembuatan Sesi, kuota aktivasi bulan historis, dan hak melanjutkan Sesi adalah tiga hal yang berbeda.',
+        'Pro: Sesi baru dan bulan data tanpa batas selama paket aktif. Satu Sesi Pro dapat dilanjutkan melewati batas bulan tanpa membuat Sesi baru.',
+        'Pair dan metode terikat pada satu Sesi. Untuk mengganti pair atau metode, keluar dari Sesi; Sesi yang sudah ada tetap tersimpan dan dapat dilanjutkan kembali.',
+        'Pro dibeli per periode, tidak diperpanjang otomatis, dan aktif sampai masa berlakunya habis. Harga dan periode tercantum di halaman Harga.']],
       ['5. Pembayaran', ['Pembayaran diproses oleh Midtrans dalam Rupiah. Kami tidak menyimpan data kartu atau rekening Anda.', 'Pro aktif setelah pembayaran terkonfirmasi lunas oleh penyedia pembayaran.']],
       ['6. Penggunaan yang dilarang', ['Dilarang mengganggu layanan, mengakses data pengguna lain, mengambil data secara massal, atau memakai layanan untuk tujuan melanggar hukum.']],
       ['7. Data dan hak kekayaan intelektual', ['Perangkat lunak dan antarmuka adalah milik {{operator}}. Data pasar historis tunduk pada ketentuan sumbernya dan tidak boleh disalin atau didistribusikan ulang. Catatan Sesi Anda adalah milik Anda.']],
@@ -171,15 +179,15 @@ export const COPY = {
     pricing: {
       title: 'Pricing and plans', lead: 'Prices are in Indonesian Rupiah (IDR). Start free, upgrade to Pro when you need to.',
       free: {name: 'Free', price: 'Rp 0', per: 'forever', features: [
-        '1 new Session per day (UTC), each using 1 month of data', '1 newly activated historical month per day (UTC)', 'Continuing an existing Session uses no quota',
+        '1 new Session per day (UTC), each using 1 month of data', '1 newly activated historical month per day (UTC)', 'Continuing a Session within an activated month uses no quota',
         'Re-using an already activated month uses no quota', 'Tick replay, orders, Jump, journal, analytics and CSV/PDF export']},
       pro: {name: 'Pro', monthlyName: 'Pro Monthly', yearlyName: 'Pro Yearly', perMonth: 'per month (30 days)', perYear: 'per year (365 days)', was: 'regular price', saving: 'save', until: 'until', vsMonthly: 'compared with twelve monthly payments', perMonthEquivalent: 'equal to', per: 'per period', features: [
         'Unlimited new Sessions, any time', 'Unlimited newly activated months of data', 'Everything in Free',
         'Active until the period ends, no automatic renewal']},
       pending: 'Price to be announced', buy: 'Sign in to buy Pro',
       rulesTitle: 'The quota rules, plainly', rules: [
-        'Free: one new Session per UTC day, each Session using one month of data (one newly activated historical month per UTC day). Pro: no limit on new Sessions or months.',
-        'Continuing an existing Session and re-using an already activated month uses no quota.',
+        'Free: one new Session per UTC day, each Session using one month of data (one newly activated historical month per UTC day). A Free Session does not continue into the next month; the next month needs a new Session. Pro: no limit on new Sessions or months.',
+        'Continuing a Session within an already activated month and re-using that month uses no quota. After the month ends, a Session cannot continue (no replay, no new trades); results and statistics stay visible.',
         'Quotas reset at 00:00 UTC, which is 07:00 WIB.',
         'Pro status comes only from a paid, unexpired payment and is enforced by the server.',
         'Pro does not renew automatically.'],

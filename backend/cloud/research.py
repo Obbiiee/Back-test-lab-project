@@ -746,13 +746,14 @@ def install(app):
         return await execute(user, workspace_id, 'terminal_order_page', session_id,
                              {'limit': limit, 'afterSequence': after_sequence})
 
-    async def _window_guard(user, workspace_id, session_id, kind, target_ns=None):
+    async def _window_guard(user, workspace_id, session_id, kind, target_ns=None, command_id=None):
         entitlements = getattr(app.state, 'entitlements', None)
         if entitlements is None:
             return None
         from . import window_guard
         try:
-            await anyio.to_thread.run_sync(partial(window_guard.check, entitlements, app.state.dsn, user.id, workspace_id, session_id, kind, target_ns), limiter=limiter)
+            await anyio.to_thread.run_sync(partial(window_guard.check, entitlements, app.state.dsn, user.id, workspace_id, session_id, kind, target_ns,
+                                                   command_id=command_id), limiter=limiter)
         except window_guard.WindowRefused as refused:
             return Response(canonical_bytes({'schemaVersion': 1, 'detail': refused.code, **refused.detail}), status_code=409, media_type='application/json')
         return None
@@ -817,9 +818,13 @@ def install(app):
             refused = await _window_guard(user, workspace_id, session_id, 'CHART_CONTEXT')
             if refused is not None:
                 return refused
+        elif name == 'apply' and type(raw) is dict and raw.get('kind') == 'SET_METHOD':
+            # Owner decision 2026-11-18: a Session keeps one pair and one method. Changing the method means a new Session (the reducer is not changed).
+            return Response(canonical_bytes({'schemaVersion': 1, 'detail': 'METHOD_CHANGE_REQUIRES_NEW_SESSION'}), status_code=409, media_type='application/json')
         elif name == 'apply' and type(raw) is dict and raw.get('kind') in ('OPEN', 'ADVANCE', 'SEEK', 'CANCEL', 'CLOSE', 'END'):
             refused = await _window_guard(user, workspace_id, session_id, 'ADVANCE' if raw['kind'] in ('ADVANCE', 'SEEK') else raw['kind'],
-                                          (raw.get('payload') or {}).get('targetNs') if raw['kind'] in ('ADVANCE', 'SEEK') else None)
+                                          (raw.get('payload') or {}).get('targetNs') if raw['kind'] in ('ADVANCE', 'SEEK') else None,
+                                          command_id=raw.get('commandId') if raw['kind'] == 'CLOSE' else None)
             if refused is not None:
                 return refused
         queued = name in queue.OPERATIONS or (name == 'apply' and raw.get('kind') in ('ADVANCE','SEEK'))

@@ -103,15 +103,7 @@ export default function TickAlpha(){
   const activeId=view?.state?.activeMethodId;
   const activeMethod=view?((activeId&&catalog?.methods?.find(m=>m.id===activeId))||view.method):null;
   const protocol=activeMethod?.kind==='PROTOCOL';
-  const methodIds=view?.state?.methods?Object.keys(view.state.methods).sort():[];
   const methodName=mid=>catalog?.methods?.find(m=>m.id===mid)?.name||mid;
-  const switchMethod=methodId=>run(async()=>{
-    await api(sessionPath(view.metadata.id)+'/commands',command(view,'SET_METHOD',{methodId}));
-    const saved=await loadWorkspace(view.metadata.id);
-    setView(saved);setPlan(initialPlan(saved));setPlanRevision(0);
-    setNotice(`Now trading with ${methodName(methodId)}. Open positions and pending orders keep the Method they were created with.`);
-  });
-  const methodSwitch=methodIds.length>1?<label className="alpha-method-switch">Method <select aria-label="Active Method" value={activeId||''} disabled={busy} onChange={e=>switchMethod(e.target.value)}>{methodIds.map(mid=><option key={mid} value={mid}>{methodName(mid)}</option>)}</select></label>:null;
   const planned=protocol||plan.workflow==='PLANNED';
   const openSource=event=>{returnFocus.current=event.currentTarget;setPauseToken(n=>n+1);setDialog('source');emitLocal('feature_source');};
   const openReview=()=>{return run(async()=>{
@@ -251,7 +243,7 @@ export default function TickAlpha(){
     </AlphaShell>:<>
       <section className="alpha-session"><h1>{view.metadata.name}</h1><p><strong>{symbolText}</strong> · <button onClick={openSource} aria-label="Data source">{sourceContext()==='historical'?'Exness':'Synthetic fixture'}</button> · {view.metadata.startPeriod} · {view.method.name}</p><p>Saved balance <strong>${view.state.balance}</strong> · {view.state.unresolved?'Unresolved evidence':'Ready'}</p></section>
       <div className="alpha-workspace"><AlphaWorkspace lead={<><a className="alpha-ws-back" {...linkTo({screen:'method',method:view.method.id})} aria-label={`Back to ${view.method.name}`}><span aria-hidden="true">‹</span><RiksoraMark size={26}/></a><button className="alpha-symbol-chip" onClick={openSource} aria-label={`${symbolText} data source`} title={sourceContext()==='historical'?'Exness source':'Synthetic fixture'}><span aria-hidden="true">{symbolGlyph}</span>{symbolText}</button><span className="alpha-ws-phone-title"><strong>{symbolText} · {timeframe}</strong><small>{new Date(Number(BigInt(view.state.throughNs)/1000000n)).toISOString().slice(0,16).replace("T"," ")} UTC</small></span></>}
-        trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {activeMethod.name} · {activeMethod.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{methodSwitch}{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
+        trail={<><span className="alpha-ws-title"><strong>{view.metadata.name}</strong> <span>· {activeMethod.name} · {activeMethod.kind==='PROTOCOL'?'Protocol':'Free Style'}{view.state.unresolved?' · evidence unresolved':''}</span></span>{sessionMenu}</>} objectsOpen={objectsOpen} onToggleObjects={()=>setObjectsOpen(value=>!value)} key={view.metadata.id} view={view} timeframe={timeframe} busy={busy} pauseToken={pauseToken} onNotice={setNotice}
         onTimeframe={tf=>run(async()=>{const saved=await loadWorkspace(view.metadata.id,tf);setView(saved);setTimeframe(tf);})}
         canJump={!view.state.ended&&!view.state.unresolved&&(view.analysis?.orders??[]).some(order=>['PENDING','ACTIVE'].includes(order.status))}
         onJump={({view:initial,cancelled,onProgress})=>run(async()=>{

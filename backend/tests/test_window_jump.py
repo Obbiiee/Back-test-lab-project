@@ -153,12 +153,11 @@ class WindowJumpTests(unittest.TestCase):
                 self.open_order(sid, dict(orderType="MARKET", workflow="PLANNED", quantity="0.1", riskPercent="1", **draft))
                 self.advance_to(sid, int(self.state(sid)["throughNs"]) + STEP_NS)      # the market order fills at the next quote
             self.assertEqual(self.live(free), [("ACTIVE", "LONG" if kind_side == "sl" else "SHORT")])
-            status, _ = self.jump_until_done(free)                                     # exit lies after the 5-step window: continuation of the already-open lifecycle
-            self.assertEqual(status, "EVENT_FOUND", kind_side)
-            self.assertEqual(self.live(free), [])
-            self.advance_to(control, int(self.state(free)["throughNs"]))
-            self.assertEqual(self.ledger(free), self.ledger(control), kind_side)
-            self.assertNotEqual(self.state(free)["balance"], "10000", "the exit really realised PnL")
+            status, _ = self.jump_until_done(free)                                     # owner decision 2026-11-18: the exit lies after the 5-step window; Jump is bounded to the window end
+            self.assertEqual(status, "NO_EVENT_UNTIL_SESSION_END", kind_side)
+            self.assertEqual(self.live(free), [("ACTIVE", "LONG" if kind_side == "sl" else "SHORT")], "nothing settled past the window")
+            self.assertEqual(self.state(free)["balance"], "10000", "no PnL realised past the window")
+            self.assertEqual([row for row in self.ledger(free) if "CLOSED" in row], [], "no exit event was committed past the window")
 
     def test_mixed_active_and_pending_orders_stop_at_the_boundary_then_cancel_and_continue(self):
         free, control = self.session(self.free, end_steps=8), self.session(self.free)
@@ -174,10 +173,9 @@ class WindowJumpTests(unittest.TestCase):
             self.advance_to(sid, int(self.state(free)["throughNs"]))
             pending = next(oid for oid, o in self.state(sid)["orders"].items() if o["status"] == "PENDING")
             self.app.apply(sid, command(sid, self.state(sid), "CANCEL", {"orderId": pending}))
-        status, _ = self.jump_until_done(free)                                         # now only the active position is left: continuation, unbounded
-        self.assertEqual(status, "EVENT_FOUND")
-        self.advance_to(control, int(self.state(free)["throughNs"]))
-        self.assertEqual(self.ledger(free), self.ledger(control))
+        status, _ = self.jump_until_done(free)                                         # only the active position is left: still bounded to the window end (owner decision 2026-11-18)
+        self.assertEqual(status, "NO_EVENT_UNTIL_SESSION_END")
+        self.assertEqual(self.live(free), [("ACTIVE", "LONG")], "nothing settled past the window")
 
     def test_a_pending_stop_order_is_bounded_too_and_a_retry_is_idempotent(self):
         free = self.session(self.free, end_steps=10)
