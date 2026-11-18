@@ -47,3 +47,34 @@ Principle: keep `BTL-TICK-EXECUTION-COMMAND-1` and every existing Session byte-f
 
 ## 6. Status
 **BLOCKED / NOT IMPLEMENTED.** No partial multi-pair or multi-method behaviour was added to the product, deliberately: a half implementation would put unvalidated money logic in front of users.
+
+
+---
+## 7. Revision (2026-11-18, later): corrections and a first implemented stage
+### 7.1 Correction to section 1
+The first audit examined only the v1 path. The repository also holds an **additive, versioned v2 execution engine** (`BTL-TICK-EXECUTION-2`: `execution/kernel_v2.py`, `profile_v2.py`, `finance_v2.py`, `conversion.py`, `sources_v2.py`, `controller_v2.py`; catalogue of the 16 symbols in `market_data/instruments.py`). It is authored-synthetic-only and not wired to the product frontend, but it already has:
+* a per-instrument profile with contract convention (100 for gold, 100,000 for FX), lot rules, commission and a **currency conversion route** for non-USD quotes (GBP and NZD via the xxxUSD pair, JPY, CAD and CHF via the USDxxx pair, with a maximum rate age);
+* a source join of a primary tick timeline and a conversion timeline.
+Evidence run today: `test_conversion` 8, `test_profile_v2` 6, `test_finance_v2` 10, `test_kernel_v2` 8, `test_sources_v2` 11 all PASS, and `test_functional_journey...sixteen_google_accounts...` PASS (16 symbols, **one symbol per Session**, synthetic, with tenant isolation).
+What v2 does **not** have: more than one instrument inside one Session, and **any margin or leverage model** (neither v1 nor v2 contains one; `grep margin|leverage` in the engines returns nothing). Margin, free margin, margin call and stop-out are therefore a product decision (leverage per instrument, call and stop-out levels) that has to be specified before it can be built; it is not an existing feature to extend.
+
+### 7.2 Multi-method: where the coupling really is (v1 path)
+* The Method's rules enter the money path in exactly two places: `open_payload(payload, profile, policy, balance)` (Protocol requires PLANNED LIMIT/STOP, risk equal to the policy, reward ratio, quantity from risk, checklist PASS) and `validate_action(policy, "CANCEL_PENDING" | "MANUAL_CLOSE" | "PARTIAL_CLOSE")`, both fed from `state["policy"]` (`execution/engine.py`, `execution/contracts.py`).
+* The order record (`plan` and fills) carries no Method id; Method analytics aggregate by the Session's Method (`method_analytics_store`, `method_session_query`).
+* A switch must therefore be a recorded, ordered, replay-safe fact. A side table written by the API would make recovery depend on something the reducer cannot see; applying the chosen policy only in the API would also fail for observations, because the reducer checks that submitted observations are a subset of the Session policy's conditions.
+Recommended architecture (versioned, new Sessions only): state carries `policies` (a map of the Session's allowed Methods) and an active pointer; OPEN carries `methodId` and the order stores `methodId` and `methodHash` at creation; a new command `SET_METHOD` records the pointer; every projection (journal, analytics, incremental analytics, observed variants, Method rollups) reads the order's own `methodId`. Free and Pro behave the same. Old Sessions and the XAUUSD parity vectors stay byte-identical because the new keys exist only in the new state version.
+Blast radius to schedule and test: `engine.py` OPEN/CANCEL/CLOSE, `contracts.py` (`open_payload`, `seed_state`, state validation), `analysis.py`, `analytics_projection.py`, `journal_projection.py`, `incremental_analytics.py`, the `observed_*` mirrors, the compact V2 checkpoint encoding of state, `method_analytics_*`, the review/confirm routes, and the frontend (Method selector, journal and analytics grouping). Gates: XAUUSD golden vectors unchanged, attribution immutability across switches, Protocol rules enforced per active Method, Free/Pro parity, SIGKILL and V1→V2 checkpoint tests, browser E2E.
+**Status: NOT implemented** (a change to the frozen reducer state is not a patch to make at the end of a long working session).
+
+### 7.3 Multi-pair: stage plan and status
+| Stage | Content | Status |
+|---|---|---|
+| 1 | Deterministic multi-instrument timeline: total order `(timeNs, instrumentIndex, rawOrdinal)`, atomic groups, no look-ahead, last-quote frontier, exact cursor/resume (`ticks/multi_timeline.py`, `tests/test_multi_timeline.py`, `tests/synthetic_multi_instrument.py`) | **DONE, isolated and not wired**: 12 tests PASS (16 catalogue instruments against an independent sort; shuffled sources; equal-timestamp tie by pinned index; atomic groups; no group after the target; stepwise equals whole; resume at 12 random cuts equals the uninterrupted stream; rewind and backwards sources refused) |
+| 2 | Per-instrument profile set and conversion pins from v2 (`profile_v2`, `conversion`), account-level cash in USD | NOT STARTED (needs the stage-1 timeline wired into a new versioned state) |
+| 3 | Multi-instrument state: quotes map, orders with `instrumentId`, pending and active positions evaluated on every tick of their own instrument, equity from the last quotes and conversion | NOT STARTED |
+| 4 | Checkpoint (V2 compact) with per-instrument cursors; SIGKILL, V1→V2 | NOT STARTED |
+| 5 | Jump to Next Event across instruments (next fill or exit among all active and pending orders) | NOT STARTED |
+| 6 | Journal and analytics per pair and Method; frontend selector, per-instrument chart, position list | NOT STARTED |
+| 7 | Margin model | BLOCKED: needs the owner's leverage, margin-call and stop-out rules |
+| 8 | Real instruments | BLOCKED: rights UNKNOWN, specifications MISSING for 15 pairs, conversion rate source for point-in-time FX |
+Parity gates that every stage must keep: XAUUSD single-instrument golden vectors unchanged; a multi-instrument Session equals N single-instrument references on fills, prices and PnL; cross-instrument no-look-ahead; month and year boundary parity.
