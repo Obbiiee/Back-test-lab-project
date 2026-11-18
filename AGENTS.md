@@ -227,3 +227,7 @@ Owner menginstruksikan: (P1) siapkan promosi V2 produksi tanpa mengaktifkannya s
 ## OWNER ADDENDUM — LANJUT SEMUA: MULTI-METHOD BACKEND (2026-11-18, instruksi owner di chat)
 
 Owner menginstruksikan melanjutkan semua pekerjaan sampai selesai. Dikerjakan secara internal dan tanpa risiko produksi: multi-method pada state berversi MM (hanya Session baru dengan `methodIds`; Session lama tidak berubah) beserta jalur produk, lengkap dengan tes paritas terhadap 24 skenario golden. TIDAK diubah: konfigurasi produksi (V2 tetap nonaktif), kontrak keuangan Session lama, antrean/TTL/deadline/worker. Tetap menunggu otorisasi eksplisit owner: aktivasi V2 produksi, sanitasi/push Git, aturan margin. Frontend multi-method dan multi-pair tahap 2 dst. belum dikerjakan. Commercial V1 tetap BLOCKED.
+
+## OWNER ADDENDUM — V2 DIAKTIFKAN DI PRODUKSI (2026-11-18, persetujuan owner di chat)
+
+Owner menyetujui promosi checkpoint V2 ("setuju", 2026-11-18). Diterapkan lewat `deploy/site/v2_promote.sh apply` setelah semua gate PASS dan backup terverifikasi (`~/backups/prod-btl-20261118T051057Z.dump`, drill restore OK): `BTL_TICK_CHECKPOINT_FORMAT=compact-v2` di `~/prod/app.env`, smoke test `--expect v2` PASS. Rollback: `v2_promote.sh rollback`. Pantau 48 jam dengan `v2_promote.sh status`. Owner juga menyatakan TIDAK untuk sanitasi/push Git (poin 2) dan memberi lampu hijau untuk margin, frontend multi-method, dan multi-pair tahap lanjut. Commercial V1 tetap BLOCKED.
