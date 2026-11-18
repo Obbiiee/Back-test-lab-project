@@ -235,3 +235,8 @@ Owner menyetujui promosi checkpoint V2 ("setuju", 2026-11-18). Diterapkan lewat 
 ## OWNER ADDENDUM — LANJUT: FRONTEND MULTI-METHOD, MARGIN DAN MULTI-PAIR TAHAP 2 (2026-11-18, "gas" owner di chat)
 
 Dikerjakan: frontend multi-method (wizard set Method, pemilih Method aktif, Journal menyebut Method per order) dengan E2E browser produksi desktop dan mobile; margin tahap pertama HANYA informasional (`execution/margin.py`, default 1:100, margin call 100 %, stop-out 50 % adalah placeholder implementer, bukan keputusan owner; tidak ada gerbang order dan tidak ada stop-out paksa); multi-pair tahap 2 (`execution/profile_set.py`). Tidak dipasang ke Session apa pun. Git: owner menolak sanitasi/push; tidak ada perubahan riwayat. Commercial V1 tetap BLOCKED.
+
+
+## OWNER ADDENDUM — MULTI-PAIR STAGE 3 ORACLE FIX (2026-11-18, local QA checkpoint)
+
+Stage 3 `backend/execution/mi_kernel.py` remains isolated QA-only and is not wired into the product. Fixed only the synthetic test harness/oracle: replay-to-frontier now retains the full authored fixture source, and the equity oracle uses only timeline groups already revealed at that frontier. Verified class runs: `SingleInstrumentParity` 1/1, `Portfolio` 4/4, and `Determinism` + `NoLookAheadAndNoSyntheticPrices` + `MethodsAndPairs` + `Refusals` 10/10 PASS. This establishes synthetic Stage 3 tests only. Stage 4 multi-instrument checkpoint, cold worker recovery and compatibility remain pending; no production configuration changed. Commit locally only; no push, deploy, merge or history rewrite.

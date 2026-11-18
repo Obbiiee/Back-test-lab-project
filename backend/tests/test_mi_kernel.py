@@ -39,10 +39,12 @@ def script(symbol, rows_):
             22: [("CLOSE", dict(orderId="b", quantity=None), None)]}
 
 
-def run_mi(symbols, steps=STEPS, scripts=None, only=None, **kw):
+def run_mi(symbols, steps=STEPS, scripts=None, only=None, through_steps=None, **kw):
     m = MI(symbols, steps=steps, **kw)
     scripts = scripts or {s: (script(s, m.rows[s]) if only in (None, s) else {}) for s in symbols}
-    for step in range(steps):
+    # Keep the canonical source long enough to build the complete command script;
+    # callers may stop the replay early without truncating source evidence.
+    for step in range(steps if through_steps is None else through_steps):
         m.to(m.at(step))
         for s in symbols:
             for kind, payload, cid in scripts[s].get(step, []):
@@ -130,26 +132,42 @@ class Portfolio(unittest.TestCase):
 
     def test_equity_oracle_at_several_times(self):
         for stop in (8, 14, 20, STEPS - 1):
-            m, _ = run_mi(syn.ORDER, steps=stop + 1)
+            m, _ = run_mi(syn.ORDER, through_steps=stop + 1)
             eq = mik.equity(m.state)
             total = Fraction(0)
             by_wire = {w["symbol"]: w for w in m.wires}
-            rows = {s: [(t, Fraction(b), Fraction(a)) for t, b, a in m.rows[s]] for s in syn.ORDER}
+            complete = True
             for oid, o in m.state["orders"].items():
                 if o["status"] != "ACTIVE":
                     continue
                 w, now = by_wire[o["symbol"]], int(m.state["throughNs"])
-                _, bid, ask = [r for r in rows[o["symbol"]] if r[0] <= now][-1]
+                # The oracle may use only quotes the timeline has revealed. Looking
+                # up the generated source rows by timestamp leaked a same-time route
+                # quote when that instrument had not yet been consumed in total order.
+                primary = m.state["groups"][o["symbol"]]
+                if primary is None:
+                    complete = False
+                    continue
+                bid, ask = Fraction(primary["events"][-1]["bid"]), Fraction(primary["events"][-1]["ask"])
                 q = (1 if o["side"] == "LONG" else -1) * ((bid if o["side"] == "LONG" else ask) - Fraction(o["entryPrice"])) * Fraction(w["contractSize"]) * Fraction(o["remaining"])
                 if w["quoteCurrency"] != "USD":
                     route = w["conversion"]["symbol"]
-                    _, rb, ra = [r for r in rows[route] if r[0] <= now][-1]
+                    route_group = m.state["groups"][route]
+                    if route_group is None:
+                        # Missing revealed conversion evidence must make equity
+                        # incomplete; it must never be filled from future source rows.
+                        complete = False
+                        continue
+                    if now - int(route_group["timeNs"]) > int(w["conversion"]["maxAgeNs"]):
+                        complete = False
+                        continue
+                    rb, ra = Fraction(route_group["events"][-1]["bid"]), Fraction(route_group["events"][-1]["ask"])
                     multiply = route.endswith("USD")
                     side = (rb if q >= 0 else ra) if multiply else (ra if q >= 0 else rb)
                     q = q * side if multiply else q / side
                 total += q
-            self.assertTrue(eq["complete"])
-            self.assertEqual(Fraction(eq["unrealizedUsdExact"]["numerator"], eq["unrealizedUsdExact"]["denominator"]), total, stop)
+            self.assertEqual(eq["complete"], complete, stop)
+            self.assertEqual(Fraction(int(eq["unrealizedUsdExact"]["numerator"]), int(eq["unrealizedUsdExact"]["denominator"])), total, stop)
             self.assertEqual(Fraction(eq["equityUsd"]), half_even(Fraction(m.state["balance"]) + total))
 
 

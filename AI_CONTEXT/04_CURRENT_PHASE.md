@@ -1,3 +1,7 @@
+# Validation checkpoint — multi-pair Stage 3 oracle correction (2026-11-18)
+
+On local branch `claude/dual-engine-v1-20261114`, Stage 3 multi-instrument reducer remains QA-only and unwired. Corrected `backend/tests/test_mi_kernel.py`: the short-frontier equity oracle now uses only revealed timeline groups (no look-ahead), and the helper keeps the full fixture source while stopping replay at the requested step. Evidence on the synthetic fixture: `SingleInstrumentParity` 1/1 PASS; `Portfolio` 4/4 PASS; `Determinism`, `NoLookAheadAndNoSyntheticPrices`, `MethodsAndPairs`, and `Refusals` 10/10 PASS. The isolated equity test also passes. No reducer or product runtime was changed. Stage 4 checkpoint/cold-resume work is next; no push/deploy/production change.
+
 # Validation checkpoint — Commercial V1 audit and approved slices (2026-11-15)
 
 Audit report: `docs/acceptance/RIKSORA-COMMERCIAL-V1-AUDIT-20261115.md` (readiness BLOCKED; sections A–F). Implemented on `claude/dual-engine-v1-20261114`: server-side CSV export, hosted chart history page route and frontend use, opt-in Free/Pro window admission (migration 033), Session trash/restore (034), append-only audit events (035). No contract, reducer, queue limit or rights class changed. Synthetic/QA evidence only.
