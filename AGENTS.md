@@ -231,3 +231,7 @@ Owner menginstruksikan melanjutkan semua pekerjaan sampai selesai. Dikerjakan se
 ## OWNER ADDENDUM — V2 DIAKTIFKAN DI PRODUKSI (2026-11-18, persetujuan owner di chat)
 
 Owner menyetujui promosi checkpoint V2 ("setuju", 2026-11-18). Diterapkan lewat `deploy/site/v2_promote.sh apply` setelah semua gate PASS dan backup terverifikasi (`~/backups/prod-btl-20261118T051057Z.dump`, drill restore OK): `BTL_TICK_CHECKPOINT_FORMAT=compact-v2` di `~/prod/app.env`, smoke test `--expect v2` PASS. Rollback: `v2_promote.sh rollback`. Pantau 48 jam dengan `v2_promote.sh status`. Owner juga menyatakan TIDAK untuk sanitasi/push Git (poin 2) dan memberi lampu hijau untuk margin, frontend multi-method, dan multi-pair tahap lanjut. Commercial V1 tetap BLOCKED.
+
+## OWNER ADDENDUM — LANJUT: FRONTEND MULTI-METHOD, MARGIN DAN MULTI-PAIR TAHAP 2 (2026-11-18, "gas" owner di chat)
+
+Dikerjakan: frontend multi-method (wizard set Method, pemilih Method aktif, Journal menyebut Method per order) dengan E2E browser produksi desktop dan mobile; margin tahap pertama HANYA informasional (`execution/margin.py`, default 1:100, margin call 100 %, stop-out 50 % adalah placeholder implementer, bukan keputusan owner; tidak ada gerbang order dan tidak ada stop-out paksa); multi-pair tahap 2 (`execution/profile_set.py`). Tidak dipasang ke Session apa pun. Git: owner menolak sanitasi/push; tidak ada perubahan riwayat. Commercial V1 tetap BLOCKED.
