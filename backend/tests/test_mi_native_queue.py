@@ -12,6 +12,7 @@ from cloud import mi_qa, queue, worker
 from contracts.canonical import canonical_bytes
 from contracts.primitives import ContractError
 from execution import mi_checkpoint, mi_kernel, mi_postgres
+from execution.terminal_order_archive import TERMINAL
 from infrastructure.database import connect
 from tests.mi_harness import FREE, MI
 from tests.synthetic_mi import ORDER
@@ -41,7 +42,7 @@ class NativeMIQueue(unittest.TestCase):
                           BTL_QA_MI_MANIFEST=str(path), BTL_QA_MI_MANIFEST_SHA256=sha)))
         self.addCleanup(worker.close)
         self.store.create(self.scope, self.model.pset, [FREE], FREE.method_id, "10000",
-                          self.model.state["startNs"], self.sid, manifest_sha=sha)
+                          self.model.state["startNs"], self.sid, manifest_sha=sha, compact=True)
 
     def command(self, kind, payload, cid):
         cmd = dict(schemaVersion=1, artifact=mi_kernel.MI_COMMAND, sessionId=self.sid,
@@ -64,7 +65,15 @@ class NativeMIQueue(unittest.TestCase):
     def expect(self, request, receipt):
         command = request["command"]
         events = self.model.apply(command["kind"], command["payload"], command["commandId"])
-        self.assertEqual(receipt["state"], self.model.state)
+        observed = receipt["state"]
+        archived = {key for key, order in self.model.state["orders"].items()
+                    if order["status"] in TERMINAL}
+        self.assertEqual(observed["artifact"], mi_kernel.MI_COMPACT_STATE)
+        self.assertEqual(observed["archived"]["count"], len(archived))
+        expected = dict(self.model.state, orders={key: order for key, order in self.model.state["orders"].items()
+                                                 if key not in archived})
+        self.assertEqual({key: value for key, value in observed.items() if key not in ("artifact", "archived")},
+                         {key: value for key, value in expected.items() if key != "artifact"})
         self.assertEqual(receipt["events"], events)
 
     def reclaim(self, job_id):
@@ -146,6 +155,9 @@ serve()
         self.assertEqual(receipt["state"]["orders"]["GBPUSD"]["status"], "ACTIVE")
         self.assertEqual(self.finish(exits), receipt)
         self.assertEqual(self.store.project(self.scope, self.sid)["metrics"]["tradeCount"], 1)
+        archive = self.store.terminal_page(self.scope, self.sid)
+        self.assertEqual([row["orderId"] for row in archive["orders"]], ["EURUSD"])
+        self.assertNotIn("EURUSD", receipt["state"]["orders"])
 
     def test_native_pretransaction_sigkill_and_postgres_disconnect_reclaim(self):
         request = self.command("ADVANCE", {"targetNs": str(self.model.at(0))}, "recover-first")

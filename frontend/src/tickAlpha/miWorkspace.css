@@ -1,0 +1,8 @@
+.mi-workspace { max-width: 58rem; margin: auto; padding: 1rem; }
+.mi-workspace :is(form, figure, fieldset) { margin-block: .75rem; }
+.mi-workspace :is(label, button, a) { margin: .25rem; }
+.mi-workspace label { display: inline-flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.mi-controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.mi-workspace figure { max-width: 36rem; color: var(--rk-accent, currentColor); }
+.mi-workspace figure svg { display: block; width: 100%; }
+.mi-workspace code { overflow-wrap: anywhere; }

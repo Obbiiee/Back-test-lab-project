@@ -21,9 +21,10 @@ MAX_PROJECTION_EVENTS = 4096
 
 def _validate_transition(before, after, events):
     require(all(before[key] == after[key] for key in
-                ("sessionId", "engineVersion", "profiles", "profileSetHash",
+                ("sessionId", "artifact", "engineVersion", "profiles", "profileSetHash",
                  "methods", "initialBalance", "startNs")),
             "miPins", "CORRUPT_RECORD")
+    require(before.get("archived") == after.get("archived"), "miArchiveMutation", "CORRUPT_RECORD")
     require(len(events) <= mi_kernel.MAX_EVENTS, "miEvents", "REFUSED_EVENT_LIMIT")
     for order_id, order in before["orders"].items():
         new = after["orders"].get(order_id)
@@ -53,6 +54,10 @@ def _validate_transition(before, after, events):
             all(Fraction(after[key]) - Fraction(before[key]) == delta for key, delta in
                 (("balance", cash), ("commission", fees), ("realizedGross", gross))),
             "miPostings", "CORRUPT_RECORD")
+
+
+def _request_hash(command, jump):
+    return content_hash(dict(schemaVersion=1, artifact="BTL-MI-COMMAND-REQUEST-1", command=command, jump=jump))
 
 
 def _source_hash(checkpoint):
@@ -107,16 +112,29 @@ class MultiInstrumentStore:
             "SELECT content_hash FROM btl.tick_checkpoints WHERE workspace_id=%s "
             "AND session_id=%s AND revision=%s", (workspace, session, state["revision"])).fetchone()
         require(tip == (row[1],), "miCheckpointTip", "CORRUPT_RECORD")
+        if "archived" in state:
+            from .terminal_order_archive import GENESIS
+            archive_tip = db.execute(
+                "SELECT sequence,record_hash FROM btl.tick_terminal_orders WHERE workspace_id=%s "
+                "AND session_id=%s ORDER BY sequence DESC LIMIT 1", (workspace, session)).fetchone()
+            expected = state["archived"]
+            require((archive_tip or (-1, GENESIS)) == (expected["count"] - 1, expected["head"]),
+                    "miArchiveTip", "CORRUPT_RECORD")
         manifest_sha = envelope.get("manifestSha")
         if manifest_sha is not None:
             digest(manifest_sha, "miManifest")
         return checkpoint, manifest_sha
 
-    def create(self, scope, profile_set, policies, active_method_id, balance, start_ns, session_id, *, manifest_sha=None):
+    def create(self, scope, profile_set, policies, active_method_id, balance, start_ns, session_id, *, manifest_sha=None, compact=False):
         if manifest_sha is not None:
             digest(manifest_sha, "miManifest")
         workspace, session = scoped(scope, session_id)
         state = mi_kernel.seed_state(session, profile_set, policies, active_method_id, balance, start_ns)
+        require(type(compact) is bool, "miCompact")
+        if compact:
+            from .terminal_order_archive import GENESIS
+            state.update(artifact=mi_kernel.MI_COMPACT_STATE,
+                         archived=dict(count=0, filled=0, gross="0", fees="0", head=GENESIS))
         require(Fraction(balance) == Fraction(state["initialBalance"]), "moneyPrecision")
         symbols = list(profile_set.symbols)
         cursor = dict(schemaVersion=1, artifact="BTL-MULTI-TIMELINE-CURSOR-1",
@@ -145,7 +163,7 @@ class MultiInstrumentStore:
         command = mi_kernel.command_wire(raw_command)
         require(type(jump) is bool and (not jump or command["kind"] == "ADVANCE"), "miJump")
         workspace, session = scoped(scope, command["sessionId"])
-        command_hash = content_hash(dict(schemaVersion=1, artifact="BTL-MI-COMMAND-REQUEST-1", command=command, jump=jump))
+        command_hash = _request_hash(command, jump)
         with connect(self.dsn) as db:
             checkpoint, manifest_sha = self._read(db, workspace, session, lock=True)
             require(manifest_sha == required_manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
@@ -172,6 +190,11 @@ class MultiInstrumentStore:
                 result["state"] = committed_state
                 return result
             before = checkpoint["state"]
+            if "archived" in before and command["kind"] == "OPEN":
+                terminal = db.execute(
+                    "SELECT 1 FROM btl.tick_terminal_orders WHERE workspace_id=%s "
+                    "AND session_id=%s AND order_id=%s", (workspace, session, command["commandId"])).fetchone()
+                require(terminal is None, "commandId", "REFUSED_IDEMPOTENCY_CONFLICT")
             after, events = mi_kernel.submit(before, command)
             cursor, replay = checkpoint["cursor"], None
             if command["kind"] == "ADVANCE":
@@ -200,6 +223,9 @@ class MultiInstrumentStore:
 
             _validate_transition(before, after, events)
             after["revision"] = before["revision"] + 1
+            # Event FK is deferred, and archive/checkpoint/receipt share this
+            # transaction. Fold only after validating the financial transition.
+            mi_archive.append(db, workspace, session, before, after, events)
             new = mi_checkpoint.create(after, cursor)
             raw, sha = pack(_envelope(workspace, new, manifest_sha))
             result = dict(schemaVersion=1, artifact=RECEIPT, sessionId=session,
@@ -214,13 +240,65 @@ class MultiInstrumentStore:
                 db.execute("INSERT INTO btl.tick_events VALUES (%s,%s,%s,%s,%s,%s,%s)",
                            (workspace, session, command["commandId"], event["eventId"],
                             event["sequence"], blob, digest))
-            mi_archive.append(db, workspace, session, before, after, events)
             db.execute("INSERT INTO btl.tick_checkpoints VALUES (%s,%s,%s,%s,%s)",
                        (workspace, session, after["revision"], raw, sha))
             db.execute("UPDATE btl.tick_sessions SET revision=%s,payload=%s,content_hash=%s "
                        "WHERE workspace_id=%s AND session_id=%s",
                        (after["revision"], raw, sha, workspace, session))
         return result
+
+    def command_status(self, scope, raw_command, *, jump, required_manifest_sha):
+        command = mi_kernel.command_wire(raw_command)
+        workspace, session = scoped(scope, command["sessionId"])
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            checkpoint, sha = self._read(db, workspace, session)
+            require(sha == required_manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
+            current = checkpoint["state"]["revision"]
+            row = db.execute("SELECT revision,command_hash,payload,content_hash FROM btl.tick_commands "
+                             "WHERE workspace_id=%s AND session_id=%s AND command_id=%s",
+                             (workspace, session, command["commandId"])).fetchone()
+            committed_revision = None
+            if row is not None:
+                expected = _request_hash(command, jump)
+                require(row[1] == expected, "commandId", "REFUSED_IDEMPOTENCY_CONFLICT")
+                receipt = unpack(*row[2:])
+                require(receipt.get("artifact") == RECEIPT and receipt.get("durable") is True and
+                        receipt["sessionId"] == session and receipt["commandId"] == command["commandId"] and
+                        receipt["commandHash"] == expected and receipt["revision"] == row[0] <= current,
+                        "miReceipt", "CORRUPT_RECORD")
+                status, committed_revision = "COMMITTED", row[0]
+            else:
+                status = "NOT_COMMITTED" if current > command["expectedRevision"] else "UNKNOWN"
+            return dict(schemaVersion=1, artifact="BTL-MI-COMMAND-STATUS-1", status=status,
+                        revision=current, committedRevision=committed_revision)
+
+    def snapshot(self, scope, session_id, *, required_manifest_sha, focus=None, open_sources=None):
+        workspace, session = scoped(scope, session_id)
+        with connect(self.dsn) as db:
+            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            checkpoint, manifest_sha = self._read(db, workspace, session)
+            require(manifest_sha == required_manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
+            state = checkpoint["state"]
+            view = dict(schemaVersion=1, artifact="BTL-MI-SESSION-VIEW-1", state=state,
+                        equity=mi_kernel.equity(state))
+            if focus is not None:
+                require(focus in state["groups"], "symbol", "REFUSED_INSTRUMENT_SET")
+                view["activeInstrument"] = focus
+                view["chart"] = []
+                consumed = checkpoint["cursor"]["consumed"][focus]
+                if consumed and open_sources is not None:
+                    from itertools import groupby, islice
+                    sources, _, sha = open_sources(checkpoint["sourcePins"])
+                    require(sha == manifest_sha, "miManifest", "REFUSED_DATASET_MISMATCH")
+                    start = max(0, consumed - 64)
+                    groups = groupby(sources[focus](start), key=lambda tick: tick["timeNs"])
+                    for stamp, ticks in islice(groups, consumed - start):
+                        require(int(stamp) <= int(state["throughNs"]), "miChart", "REFUSED_FUTURE_EVIDENCE")
+                        close_bid = list(ticks)[-1]["bid"]
+                        view["chart"].append(dict(timeNs=stamp, bid=close_bid))
+                    require(len(view["chart"]) == consumed - start, "miChart", "CORRUPT_RECORD")
+            return view
 
     def terminal_page(self, scope, session_id, *, after_sequence=None, revision_pin=None, limit=32):
         workspace, session = scoped(scope, session_id)
@@ -281,6 +359,8 @@ class MultiInstrumentStore:
         with connect(self.dsn) as db:
             db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             state = self._read(db, workspace, session)[0]["state"]
+            if "archived" in state:
+                return mi_archive.summary(db, workspace, session, state)
             require(state["nextEventIndex"] <= MAX_PROJECTION_EVENTS, "miProjection", "REFUSED_ANALYSIS_LIMIT")
             rows = db.execute(
                 "SELECT payload,content_hash FROM btl.tick_events "

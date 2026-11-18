@@ -28,6 +28,7 @@ from .profile_v2 import ExecutionProfileV2
 
 MI_ENGINE = "BTL-TICK-EXECUTION-MI-1"
 MI_STATE = "BTL-TICK-EXECUTION-STATE-MI-1"
+MI_COMPACT_STATE = "BTL-TICK-EXECUTION-STATE-MI-COMPACT-1"
 MI_COMMAND = "BTL-TICK-EXECUTION-COMMAND-MI-1"
 MI_EVENT = "BTL-TICK-EXECUTION-EVENT-MI-1"
 MAX_EVENTS, MAX_ORDERS, MAX_METHODS = 256, 128, 16
@@ -116,7 +117,8 @@ def ratio(raw):
 
 
 def validate_state(state):
-    tag(state, MI_STATE, STATE_FIELDS)
+    compact = type(state) is dict and state.get("artifact") == MI_COMPACT_STATE
+    tag(state, MI_COMPACT_STATE if compact else MI_STATE, STATE_FIELDS + (" archived" if compact else ""))
     require(state["engineVersion"] == MI_ENGINE, "engine", "REFUSED_ENGINE_VERSION")
     pset = ProfileSet(state["profiles"])
     require(pset.profile_set_hash == state["profileSetHash"], "profiles", "CORRUPT_RECORD")
@@ -134,6 +136,18 @@ def validate_state(state):
     for field in ("initialBalance", "balance", "realizedGross", "commission"):
         require(type(state[field]) is str and text(exact(state[field], field)) == state[field], field, "CORRUPT_RECORD")
     gross = fees = Fraction(0)
+    archived_fills = 0
+    if compact:
+        archived = state["archived"]
+        keys(archived, "count gross fees filled head")
+        revision(archived["count"]); revision(archived["filled"]); digest(archived["head"], "archiveHead")
+        require(archived["filled"] <= archived["count"] <= state["nextEventIndex"],
+                "archiveCount", "CORRUPT_RECORD")
+        gross = exact(archived["gross"], "archiveGross")
+        fees = exact(archived["fees"], "archiveFees")
+        require(fees >= 0 and (archived["filled"] > 0 or (fees == gross == 0)),
+                "archivePosting", "CORRUPT_RECORD")
+        archived_fills = archived["filled"]
     for oid, o in state["orders"].items():
         identifier(oid, "orderId"); keys(o, ORDER_FIELDS)
         require(o["symbol"] in pset.symbols and o["methodId"] in methods, "order", "CORRUPT_RECORD")
@@ -155,7 +169,7 @@ def validate_state(state):
         gross += exact(o["grossPosted"], "gross"); fees += cost + exit_cost
     require(exact(state["initialBalance"], "initial", True) + gross - fees == exact(state["balance"], "balance")
             and gross == exact(state["realizedGross"], "gross") and fees == exact(state["commission"], "fees"), "account", "CORRUPT_RECORD")
-    require(state["financial"] == any(o["entryPrice"] is not None for o in state["orders"].values()), "financial")
+    require(state["financial"] == (archived_fills > 0 or any(o["entryPrice"] is not None for o in state["orders"].values())), "financial")
     for symbol, group in state["groups"].items():
         require(group is None or (int(group["timeNs"]) <= int(state["throughNs"])), "groups", "REFUSED_FUTURE_EVIDENCE")
     canonical_bytes(state)

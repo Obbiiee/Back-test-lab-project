@@ -1,5 +1,5 @@
 import '../workspace/designTokens.css';
-import {useEffect,useRef,useState} from 'react';
+import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import WorkspaceModal from '../workspace/WorkspaceModal.jsx';
 import AlphaReviewSheet from './AlphaReviewSheet.jsx';
 import AlphaPickTicket from './AlphaPickTicket.jsx';
@@ -31,6 +31,8 @@ import {classifyConfirmError,committedReceipt,classifyCommandResult,UNKNOWN_TEXT
 import './tickAlpha.css';
 import {isAccountPage} from './accountClient.js';
 
+const MIWorkspace=lazy(()=>import('./MIWorkspace.jsx'));
+
 const initialPlan=view=>({side:'LONG',orderType:'MARKET',workflow:'QUICK',entry:view?.quote?.ask??'2000',sl:view?.replayStepNs?'':'1998',tp:view?.replayStepNs?'':'2004',
   quantity:'0.1',riskPercent:'1',observations:[]});
 
@@ -50,6 +52,15 @@ export default function TickAlpha(){
   const [selectedMethod,setSelectedMethod]=useState('');
   const [createError,setCreateError]=useState(null);
   const route=useRoute();
+  const [miAvailable,setMiAvailable]=useState(false);
+  useEffect(()=>{
+    if(!isAccountPage()||route.screen!=='sessions')return;
+    const request=new AbortController();
+    api('/mi/catalog',undefined,{signal:request.signal}).then(value=>{
+      if(value.artifact==='BTL-MI-QA-CATALOG-1')setMiAvailable(true);
+    }).catch(()=>{});
+    return ()=>request.abort();
+  },[route.screen]);
   const showWorkspace=Boolean(view&&route.screen==='replay'&&route.session===view.metadata.id);
   const loadWorkspace=(session,tf=timeframe)=>api(sessionPath(session)+'/view',{timeframe:tf});
   // Opening a Session starts at the chart, not wherever the Sessions list was scrolled to.
@@ -60,7 +71,7 @@ export default function TickAlpha(){
     let mounted=true;
     (async()=>{try{
       const selected=new URL(window.location.href).searchParams.get('session');
-      const result=await loadResearchContext(selected,{active:()=>mounted});
+      const result=await loadResearchContext(new URL(window.location.href).searchParams.get('screen')==='mi'?null:selected,{active:()=>mounted});
       if(result){setCatalog(result.catalog);setView(result.view);if(result.viewError)setNotice(result.viewError);emitLocal('workspace_opened');}
     }catch(error){if(mounted)setNotice(error.message);}finally{if(mounted)setConnecting(false);}})();
     return ()=>{mounted=false;};
@@ -226,7 +237,8 @@ export default function TickAlpha(){
       :route.screen==='methods'?<MyMethods catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))}/>
       :route.screen==='method-new'?<MethodNew key={route.family||'new'} catalog={catalog} route={route} onSaved={async methodId=>{setCatalog(await loadProductCatalog());setSelectedMethod(methodId);navigate({screen:'method',method:methodId},{replace:true});setNotice(route.family?'New immutable Method version saved.':'Method saved. Create a Session to start replay.');}}/>
       :route.screen==='method'?<MethodOverview catalog={catalog} route={route} onLifecycle={async()=>setCatalog(await loadProductCatalog())} onOpen={sessionId=>run(()=>reopen(sessionId))} onNewSession={methodId=>{setSelectedMethod(methodId);setNotice(null);creationId.current=id('session');navigate({screen:'session-new',method:methodId});}}/>
-      :route.screen==='sessions'?<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))} onChanged={async()=>setCatalog(await loadProductCatalog())}/>
+      :route.screen==='sessions'?<>{miAvailable&&<a className="rk-btn" {...linkTo({screen:'mi'})}>Multi-instrument QA</a>}<SessionsPage catalog={catalog} onOpen={sessionId=>run(()=>reopen(sessionId))} onChanged={async()=>setCatalog(await loadProductCatalog())}/></>
+      :route.screen==='mi'?<Suspense fallback={<StatePanel kind="loading" title="Opening multi-instrument workspace…"/>}><MIWorkspace key={route.session||'new'} methods={catalog.methods} sessionId={route.session}/></Suspense>
       :route.screen==='session'?<SessionOverview catalog={catalog} route={route} onOpen={sessionId=>run(()=>reopen(sessionId))} onTrashed={async()=>{setCatalog(await loadProductCatalog());navigate({screen:'sessions'});}}/>
       :route.screen==='session-new'?<AlphaSessionWizard key={route.method||'any'} catalog={catalog} route={route} busy={busy} error={createError} onCreate={createSession}/>
       :route.screen==='catalog'?<CatalogPage catalog={catalog} onSource={openSource}/>

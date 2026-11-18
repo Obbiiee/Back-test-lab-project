@@ -30,7 +30,8 @@ export async function api(path,body,{signal}={}){
   const account=accountTransport();
   if(account){
     const replay=/\/sessions\/[^/]+\/commands$/.test(path)&&['ADVANCE','SEEK'].includes(body?.kind);
-    const mutating=replay||(path==='/sessions'&&body!==undefined)||/\/(?:replay-to|jump-next-event)$/.test(path);
+    const miCommand=/^\/mi\/sessions\/[^/]+\/commands$/.test(path)&&body?.artifact==='BTL-MI-QUEUE-REQUEST-1';
+    const mutating=miCommand||replay||(path==='/sessions'&&body!==undefined)||/\/(?:replay-to|jump-next-event)$/.test(path);
     const queuedRead=/\/sessions\/[^/]+\/(view|bootstrap|chart-history)$/.test(path);
     // The queue reuses completed results by job ID. A new read must see the
     // current committed revision; only retries of a mutation reuse its ID.

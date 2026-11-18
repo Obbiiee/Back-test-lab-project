@@ -12,7 +12,7 @@ from contracts.primitives import require
 
 from ticks.multi_timeline import MultiTimeline
 
-from .mi_kernel import validate_state
+from .mi_kernel import MI_COMPACT_STATE, validate_state
 
 ARTIFACT = "BTL-TICK-EXECUTION-CHECKPOINT-MI-1"
 _PIN_FIELDS = ("datasetId", "datasetVersion", "providerId", "feedId", "feedInstrumentId")
@@ -48,9 +48,16 @@ def _validate_cursor(state, cursor):
     require(cursor["quotes"] == expected_quotes, "cursor", "REFUSED_MI_CHECKPOINT")
 
 
+def _require_folded(state):
+    if state["artifact"] == MI_COMPACT_STATE:
+        require(all(order["status"] in ("ACTIVE", "PENDING") for order in state["orders"].values()),
+                "miActiveOrders", "REFUSED_MI_CHECKPOINT")
+
+
 def create(state, cursor):
     """Create an immutable-by-convention checkpoint with integrity hashes."""
     state = validate_state(deepcopy(state))
+    _require_folded(state)
     cursor = deepcopy(cursor)
     _validate_cursor(state, cursor)
     body = dict(schemaVersion=1, artifact=ARTIFACT, sessionId=state["sessionId"], revision=state["revision"],
@@ -67,6 +74,7 @@ def validate(checkpoint):
     require(checkpoint["schemaVersion"] == 1 and checkpoint["artifact"] == ARTIFACT
             and checkpoint["checkpointHash"] == content_hash(body), "checkpoint", "REFUSED_MI_CHECKPOINT")
     state = validate_state(deepcopy(checkpoint["state"]))
+    _require_folded(state)
     require(checkpoint["sessionId"] == state["sessionId"] and checkpoint["revision"] == state["revision"]
             and checkpoint["profileSetHash"] == state["profileSetHash"]
             and checkpoint["stateHash"] == content_hash(state), "checkpoint", "REFUSED_MI_CHECKPOINT")

@@ -29,8 +29,8 @@ def request(raw, session_id):
     return command
 
 
-def open_sources(expected_pins):
-    """Resolve a local synthetic fixture only. Command inputs cannot select a path."""
+def manifest():
+    """Read the exact operator-pinned bytes. No request can select a file."""
     require(enabled(), "miQa", "REFUSED_SESSION_MODEL")
     sha = os.environ[ENVIRONMENT[2]]
     digest(sha, "miManifest")
@@ -41,15 +41,27 @@ def open_sources(expected_pins):
     require(len(blob) <= MAX_BYTES and hashlib.sha256(blob).hexdigest() == sha,
             "miManifest", "REFUSED_SOURCE")
     value = json.loads(blob)
-    tag(value, "BTL-MI-QA-SOURCE-1", "pins ticks")
+    version = value.get("artifact") if type(value) is dict else None
+    if version == "BTL-MI-QA-PRODUCT-SOURCE-1":
+        tag(value, version, "pins ticks profiles startPeriod")
+    else:
+        tag(value, "BTL-MI-QA-SOURCE-1", "pins ticks")
+    require(canonical_bytes(value) == blob, "miManifest", "REFUSED_SOURCE")
+    return value, sha
+
+
+def open_sources(expected_pins):
+    """Resolve the Session's pinned synthetic instruments, never client rows."""
+    value, sha = manifest()
     pins, ticks = value["pins"], value["ticks"]
-    require(type(pins) is dict and pins == expected_pins and type(ticks) is dict and
+    require(type(pins) is dict and type(expected_pins) is dict and bool(expected_pins) and
+            all(pins.get(key) == pin for key, pin in expected_pins.items()) and type(ticks) is dict and
             set(ticks) == set(pins), "miManifestPins", "REFUSED_DATASET_MISMATCH")
     require(all(type(rows) is list and rows for rows in ticks.values()) and
             sum(map(len, ticks.values())) <= MAX_SOURCE_TICKS, "miManifestTicks", "REFUSED_SOURCE")
-    require(canonical_bytes(value) == blob, "miManifest", "REFUSED_SOURCE")
     sources = {}
-    for symbol, rows in ticks.items():
+    for symbol in expected_pins:
+        rows = ticks[symbol]
         pin = pins[symbol]
         require(pin["providerId"] == "SYNTHETIC" and pin["datasetId"].startswith("synthetic:"),
                 "miSource", "REFUSED_SOURCE")
@@ -65,7 +77,7 @@ def open_sources(expected_pins):
                 starts.append(index)
             last_time, last_ordinal = time, ordinal
         sources[symbol] = _opener(rows, starts)
-    return sources, pins, sha
+    return sources, expected_pins, sha
 
 
 def _opener(rows, starts):

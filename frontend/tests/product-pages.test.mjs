@@ -17,8 +17,9 @@ const sessionWizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.js
 const terminal=readFileSync(new URL('../src/tickAlpha/TickAlpha.jsx',import.meta.url),'utf8');
 assert.match(terminal,/<a \{\.\.\.linkTo\(\{screen:'sessions'\}\)\}>All Sessions<\/a>/);
 assert.match(terminal,/isAccountPage\(\)\?linkTo\(\{screen:'account'\}\)/);
-assert.match(sessionWizard,/onCreate\(\{name:finalName,methodId:method\.id,symbol:instrument,/);
-assert.match(terminal,/api\('\/sessions',\{id:creationId\.current,name:fields\.name,methodId:fields\.methodId,\s*initialBalance:fields\.initialBalance,startPeriod:fields\.startPeriod\?\?catalog\.startPeriod\}\)/);
+assert.match(sessionWizard,/onCreate\(\{name:finalName,methodId:method\.id,/);
+assert.match(sessionWizard,/methodIds:extraIds\.length\?\[method\.id,.*\]:undefined,symbol:instrument,/);
+assert.match(terminal,/api\('\/sessions',\{id:creationId\.current,name:fields\.name,methodId:fields\.methodId,\s*initialBalance:fields\.initialBalance,startPeriod:fields\.startPeriod\?\?catalog\.startPeriod,\s*\.\.\.\(fields\.methodIds\?\.length>1\?\{methodIds:fields\.methodIds\}:\{\}\)\}\)/);
 assert.doesNotMatch(terminal,/api\('\/sessions',[^\n]*symbol:/);
 const calls=[];
 const client={subject:()=>subject,request:async (path,options={})=>{

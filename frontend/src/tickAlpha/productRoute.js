@@ -4,7 +4,7 @@ import {isAccountPage} from './accountClient.js';
 // Product routes live in query parameters so the same build serves the local
 // workspace (?tick-alpha=local) and the account page (?page=account) without a
 // server rewrite. Old links keep working: ?session=<id> still opens replay.
-export const SCREENS=['account','methods','method','method-new','sessions','session','session-new','analytics','journal','catalog','help','replay'];
+export const SCREENS=['account','methods','method','method-new','sessions','session','session-new','analytics','journal','catalog','help','replay','mi'];
 export const METHOD_TABS=['overview','sessions','analytics','rules'];
 const EVENT='riksora:route';
 
@@ -23,6 +23,7 @@ export function routeHref(next,href=typeof window==='undefined'?'http://localhos
   const url=new URL(href);
   for(const key of ['screen','method','family','tab','of','session'])url.searchParams.delete(key);
   if(next.screen==='replay'&&next.session){url.searchParams.set('session',next.session);return url.pathname+url.search;}
+  if(next.screen==='mi'&&next.session)url.searchParams.set('session',next.session);
   if(next.screen&&next.screen!=='methods')url.searchParams.set('screen',next.screen);
   if(next.method)url.searchParams.set('method',next.method);
   if(next.family)url.searchParams.set('family',next.family);

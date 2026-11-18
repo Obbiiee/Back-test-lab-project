@@ -1,3 +1,11 @@
+# Validation checkpoint — MI compact lifecycle and authenticated QA browser
+
+New MI Sessions use a versioned compact state with an immutable terminal archive. Archive head and exact gross/fee totals are pinned in the checkpoint; live orders retain the existing 128-order bound. The 131-terminal-record test keeps the pending order live and matches an independent exact balance calculation. Streaming Analytics reads fixed batches of archive rows and verifies the chain/totals. A disposable PostgreSQL run committed more than 10,000 real MI events and matched the independent closed-trade oracle (174.538 s with the existing QA DB pool, one idle connection).
+
+The opt-in development manifest enables authenticated MI create, inspect/chart, queue commands, command status, Journal, Analytics and ledger pages. Workspace access, quota reservation, source pinning and historical window guards are server-side. Browser QA uses the same-origin authenticated application on disposable HTTPS/PostgreSQL. Desktop and mobile completed two-pair trading and resume. Desktop SIGKILL was injected after financial COMMIT and before worker acknowledgement; the live lease expired normally and the second attempt returned the same EXIT_FILL ID. API QA also covers a valid Protocol order and Free refusal then synthetic Pro continuation across a month. Legacy V2 remains intact. No production change, push or deploy.
+
+This is bounded synthetic QA. Analytics still reads the terminal archive linearly even though memory is bounded. Session resume uses its URL or ID and the MI chart shows a bounded revealed Bid window. Full historical coverage/rights and the complete hosted acceptance and performance/capacity exercise are still pending.
+
 # Validation checkpoint — native MI queue and immutable terminal archive (isolated QA)
 
 MI commands use the existing durable replay queue with a distinct request artifact and private native-worker dispatch. The Session pins the operator-supplied synthetic manifest hash at creation. The worker rechecks workspace membership, write authority, development profile and source hash before executing the MI command. This is an internal queue path for QA-created Sessions. No HTTP route, frontend or production setting was added.
