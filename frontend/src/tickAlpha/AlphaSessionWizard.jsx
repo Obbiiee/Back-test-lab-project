@@ -19,6 +19,7 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
   const historical=sourceContext()==='historical';
   const [step,setStep]=useState(0);
   const [methodId,setMethodId]=useState(()=>catalog.methods.some(m=>m.id===route.method)?route.method:null);
+  const [extraIds,setExtraIds]=useState([]);                 // other Methods this Session may switch to (opt-in multi-method Session)
   const [instrument,setInstrument]=useState(catalog.profile?.instrumentId??null);
   const [period,setPeriod]=useState(()=>defaultPeriod(periodAvailability(catalog,catalog.profile?.instrumentId,historical)));
   const [otherMonth,setOtherMonth]=useState(false);
@@ -46,7 +47,7 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
     event.preventDefault();
     if(step<4){if(ready[step])setStep(step+1);return;}
     if(!ready.every(Boolean)||busy)return;
-    onCreate({name:finalName,methodId:method.id,symbol:instrument,initialBalance:balance,
+    onCreate({name:finalName,methodId:method.id,methodIds:extraIds.length?[method.id,...extraIds.filter(m=>m!==method.id)]:undefined,symbol:instrument,initialBalance:balance,
       startPeriod:availability.mode==='fixed'?catalog.startPeriod:period});
   };
   return <>
@@ -57,7 +58,11 @@ export default function AlphaSessionWizard({catalog,route,busy,error,onCreate}){
         <span aria-hidden="true">{index<step&&ready[index]?'✓':index+1}</span>{label}</button></li>)}</ol>
     <form className="rk-card rk-form rk-wizard" onSubmit={submit} noValidate>
       {step===0&&<fieldset className="rk-wizard-step"><legend>Which Method should this Session replay?</legend>
-        <MethodPicker methods={catalog.methods} value={methodId} onChange={setMethodId} disabled={busy}/>
+        <MethodPicker methods={catalog.methods} value={methodId} onChange={id=>{setMethodId(id);setExtraIds(list=>list.filter(m=>m!==id));}} disabled={busy}/>
+        {method&&catalog.methods.length>1&&<fieldset className="rk-wizard-extra"><legend>Also allow switching to (optional)</legend>
+          <p className="rk-wizard-note">Switching Methods inside the Session never resets balance, positions, pending orders or history. Each trade keeps the Method it was created with.</p>
+          {catalog.methods.filter(m=>m.id!==method.id).slice(0,15).map(m=><label key={m.id} className="rk-check"><input type="checkbox" disabled={busy} checked={extraIds.includes(m.id)} onChange={e=>setExtraIds(list=>e.target.checked?[...list,m.id]:list.filter(x=>x!==m.id))}/> {m.name} · {m.kind==='PROTOCOL'?'Protocol':'Free Style'}</label>)}
+        </fieldset>}
         {method&&<p className="rk-wizard-note">{method.kind==='PROTOCOL'?`Protocol rules are copied into the Session: risk ${method.riskPercent}% and R:R ${method.rr}, planned entries only. They cannot be changed inside the Session.`:'Free Style: quick or planned orders, with stop and target chosen per order.'}</p>}
       </fieldset>}
       {step===1&&<fieldset className="rk-wizard-step"><legend>What do you want to replay?</legend>

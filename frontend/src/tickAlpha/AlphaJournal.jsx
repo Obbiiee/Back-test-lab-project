@@ -1,7 +1,9 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,sessionPath,loadJournalPage,exportSessionCsv,exportSessionPdf,noticeText} from './client.js';
 
-export default function AlphaJournal({view,active=true}){
+export default function AlphaJournal({view,active=true,methodName=null}){
+  // Multi-method Sessions: the Method each order was created with comes from the committed analysis (absent for normal Sessions).
+  const methodOf=new Map((view?.analysis?.orders||[]).filter(order=>order.methodId).map(order=>[order.id,order.methodId]));
   const [journal,setJournal]=useState(null),[error,setError]=useState(''),[saving,setSaving]=useState(false),[drafts,setDrafts]=useState({});
   const [loadingMore,setLoadingMore]=useState(false);
   const sessionId=view.metadata.id;
@@ -86,7 +88,7 @@ export default function AlphaJournal({view,active=true}){
     {journal&&!journal.orders.length&&<p>No canonical orders yet. Review and confirm an intent before adding an order note.</p>}
     {journal?.orders.map(order=>{
       const note=journal.notes.find(item=>item.orderId===order.id),draft=drafts[order.id];
-      return <article key={order.id}><h3>{order.side} · {order.status}</h3><code>{order.id}</code><p>Entry evidence: {order.entryFillRef??'No fill'} · Exit evidence: {order.exitFillRef??'No fill'}</p>
+      return <article key={order.id}><h3>{order.side} · {order.status}{methodOf.has(order.id)?` · Method: ${methodName?methodName(methodOf.get(order.id)):methodOf.get(order.id)}`:''}</h3><code>{order.id}</code><p>Entry evidence: {order.entryFillRef??'No fill'} · Exit evidence: {order.exitFillRef??'No fill'}</p>
         <label>Research note<textarea aria-label={`Research note ${order.id}`} maxLength={4096} disabled={saving} value={draft?.text??note?.text??''} onChange={event=>setDrafts(previous=>({...previous,[order.id]:{text:event.target.value,tags:draft?.tags??(note?.tags??[]).join(', ')}}))}/></label>
         <label>Tags (up to 8, comma separated)<input aria-label={`Journal tags ${order.id}`} disabled={saving} value={draft?.tags??(note?.tags??[]).join(', ')} onChange={event=>setDrafts(previous=>({...previous,[order.id]:{text:draft?.text??note?.text??'',tags:event.target.value}}))}/></label>
         {draft&&note&&<details><summary>Compare latest saved note (revision {note.noteRevision})</summary><p style={{whiteSpace:'pre-wrap'}}>{note.text||'Empty saved note'}</p><p>Saved tags: {note.tags.join(', ')||'None'}</p></details>}
