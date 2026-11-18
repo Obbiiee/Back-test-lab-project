@@ -21,10 +21,10 @@ def build(ticks, *, pair_up=False, row_group_size=256):
     tmp = tempfile.TemporaryDirectory(prefix="riksora-cc-")
     original = syn._raw_row
 
-    def paired(index, count, seed):
-        row = original(index, count, seed)
+    def paired(index, count, seed, start_ns=syn.START_NS, step_ns=syn.STEP_NS):
+        row = original(index, count, seed, start_ns, step_ns)
         if pair_up:
-            row = dict(row, timeNs=str(syn.START_NS + (index // 2) * 60_000_000_000))
+            row = dict(row, timeNs=str(start_ns + (index // 2) * step_ns))
         return row
     with patch.object(syn, "_raw_row", paired):
         manifest, _m, _q = syn.build_manifest(ticks)

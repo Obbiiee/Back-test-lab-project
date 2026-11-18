@@ -13,16 +13,18 @@ PROTO = MethodPolicy("method:proto", "2" * 64, "PROTOCOL", True, ("c1",), "1", "
 
 
 class MI:
-    def __init__(self, symbols, steps=40, balance="10000", policies=None, active="method:free", seed=11, gaps=None, extra=None, rows_override=None):
+    def __init__(self, symbols, steps=40, balance="10000", policies=None, active="method:free", seed=11, gaps=None, extra=None, rows_override=None,
+                 state_override=None, cursor=None, event_prefix=None, timeline_override=None):
         self.symbols = list(symbols)
         self.wires = syn.wires(self.symbols)
         self.rows = {s: (rows_override or {}).get(s) or syn.rows(s, steps, seed, (gaps or {}).get(s, ())) for s in self.symbols}
         self.ticks = {w["symbol"]: syn.canonical(w, self.rows[w["symbol"]], (extra or {}).get(w["symbol"])) for w in self.wires}
-        self.timeline = MultiTimeline(self.symbols, {s: source(t) for s, t in self.ticks.items()})
+        sources = {s: source(t) for s, t in self.ticks.items()}
+        self.timeline = timeline_override or MultiTimeline(self.symbols, sources, cursor=cursor)
         self.pset = ProfileSet(self.wires)
-        self.state = mi.seed_state("mi:session", self.pset, policies or [FREE], active, balance, str(syn.T0))
-        self.events = []
-        self.n = 0
+        self.state = deepcopy(state_override) if state_override is not None else mi.seed_state("mi:session", self.pset, policies or [FREE], active, balance, str(syn.T0))
+        self.events = list(event_prefix or [])
+        self.n = int(self.state["nextEventIndex"])
 
     def apply(self, kind, payload=None, cid=None):
         self.n += 1
