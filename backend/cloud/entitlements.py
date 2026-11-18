@@ -1,6 +1,6 @@
 """Server-side Free/Pro admission for new research Sessions with a durable, idempotent reservation ledger.
 
-Quotas (Free; Pro is unlimited but still recorded): one NEW Session per UTC calendar month, and one NEWLY ACTIVATED historical month per UTC day.
+Quotas (Free; Pro is unlimited but still recorded): one NEW Session per UTC day (owner decision 2026-11-18; was per calendar month), and one NEWLY ACTIVATED historical month per UTC day.
 Continuing a Session or re-using an already activated month consumes nothing. Tier comes only from PAID, unexpired server-side billing orders.
 Lifecycle of a claim: RESERVED (admitted) -> COMMITTED (the Session exists in the ledger) | RELEASED (failed before commit; token available again).
 All transitions run under a per-actor advisory lock, and the database itself refuses a second active Free claim per period (partial unique index).
@@ -102,8 +102,8 @@ class Entitlements:
             self._settle(db, actor_id)
             now = datetime.now(timezone.utc)
             tier = self.tier(db, actor_id)
-            self._claim(db, actor_id, "SESSION", session_key, now.strftime("%Y-%m"), tier, workspace_id, body["id"], job_id, start_ns, end_ns,
-                        refusal=("SESSION_MONTH_LIMIT", next_month(now)))
+            self._claim(db, actor_id, "SESSION", session_key, now.strftime("%Y-%m-%d"), tier, workspace_id, body["id"], job_id, start_ns, end_ns,
+                        refusal=("SESSION_DAY_LIMIT", next_day(now)))
             self._claim(db, actor_id, "WINDOW", window_key, now.strftime("%Y-%m-%d"), tier, workspace_id, body["id"], job_id, start_ns, end_ns,
                         refusal=("WINDOW_DAY_LIMIT", next_day(now)), reuse_committed=True)
             return {"session": session_key, "window": window_key}
@@ -154,12 +154,12 @@ class Entitlements:
             now = datetime.now(timezone.utc)
             tier = self.tier(db, actor_id)
             used = {}
-            for kind, period in (("SESSION", now.strftime("%Y-%m")), ("WINDOW", now.strftime("%Y-%m-%d"))):
+            for kind, period in (("SESSION", now.strftime("%Y-%m-%d")), ("WINDOW", now.strftime("%Y-%m-%d"))):
                 used[kind] = db.execute("SELECT count(*) FROM btl.entitlement_claims WHERE actor_id=%s AND kind=%s AND period=%s AND status IN ('RESERVED','COMMITTED')",
                                         (str(actor_id), kind, period)).fetchone()[0]
             limited = tier == "FREE"
             return dict(schemaVersion=1, artifact="BTL-ENTITLEMENT-STATUS-1", tier=tier, resetTimezone="UTC", observedAt=now.isoformat(),
-                        sessions=dict(limit=FREE_LIMITS["SESSION"] if limited else None, used=used["SESSION"], period=now.strftime("%Y-%m"), resetsAt=next_month(now).isoformat()),
+                        sessions=dict(limit=FREE_LIMITS["SESSION"] if limited else None, used=used["SESSION"], period=now.strftime("%Y-%m-%d"), resetsAt=next_day(now).isoformat()),
                         windows=dict(limit=FREE_LIMITS["WINDOW"] if limited else None, used=used["WINDOW"], period=now.strftime("%Y-%m-%d"), resetsAt=next_day(now).isoformat()))
 
     def session_window(self, workspace_id, session_id):

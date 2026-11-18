@@ -554,16 +554,16 @@ console.log('PASS past OHLC context identity, exact price display, Session bound
 }
 
 {
-  const refusal=entitlementRefusal({detail:'SESSION_MONTH_LIMIT',resetsAt:'2026-12-01T00:00:00+00:00'});
-  assert.equal(refusal.code,'SESSION_MONTH_LIMIT');
-  assert.match(refusal.message,/one new Session per calendar month \(UTC\)/);
+  const refusal=entitlementRefusal({detail:'SESSION_DAY_LIMIT',resetsAt:'2026-12-01T00:00:00+00:00'});
+  assert.equal(refusal.code,'SESSION_DAY_LIMIT');
+  assert.match(refusal.message,/one new Session per day \(UTC\)/);
   assert.match(refusal.message,/Dec 1, 2026/);assert.match(refusal.message,/UTC/);
   assert.match(entitlementRefusal({detail:'WINDOW_DAY_LIMIT',resetsAt:'2026-11-16T00:00:00+00:00'}).message,/Nov 16, 2026/);
   assert.equal(entitlementRefusal({detail:'SOMETHING_ELSE'}),null);
   assert.equal(entitlementRefusal({detail:'WINDOW_ENDED'}).code,'WINDOW_ENDED');
   // a 409 from the API with a quota code reaches the caller with that code and the exact reset, not the generic "record changed" text
-  const refusing=createAccountClient({secure:()=>true,fetcher:async(path)=>path.endsWith('/login')?{ok:true,status:200,json:async()=>({access_token:'T',token_type:'bearer'})}:path.endsWith('/me')?{ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})}:{ok:false,status:409,headers:{get:()=>null},json:async()=>({detail:'SESSION_MONTH_LIMIT',resetsAt:'2026-12-01T00:00:00+00:00'})}});
+  const refusing=createAccountClient({secure:()=>true,fetcher:async(path)=>path.endsWith('/login')?{ok:true,status:200,json:async()=>({access_token:'T',token_type:'bearer'})}:path.endsWith('/me')?{ok:true,status:200,json:async()=>({id:'22222222-2222-4222-8222-222222222222',is_verified:true,is_active:true})}:{ok:false,status:409,headers:{get:()=>null},json:async()=>({detail:'SESSION_DAY_LIMIT',resetsAt:'2026-12-01T00:00:00+00:00'})}});
   await refusing.login('qa@example.com','Test fixture passphrase only');
-  await assert.rejects(()=>refusing.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/sessions',{method:'POST',body:{}}),error=>error.code==='SESSION_MONTH_LIMIT'&&/Dec 1, 2026/.test(error.message));
+  await assert.rejects(()=>refusing.request('/api/v1/workspaces/11111111-1111-4111-8111-111111111111/research/sessions',{method:'POST',body:{}}),error=>error.code==='SESSION_DAY_LIMIT'&&/Dec 1, 2026/.test(error.message));
   console.log('PASS Free plan and window refusals are explained with the exact UTC reset.');
 }

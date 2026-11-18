@@ -65,13 +65,13 @@ export const COPY = {
       ['Tulis aturan, mulai Sesi', 'Tulis aturan Anda sekali, lalu pilih instrumen, bulan awal, dan saldo. Grafik berhenti tepat di titik itu.'],
       ['Putar dan trading', 'Tekan Play, Step, atau Jump. Pasang order pasar atau rencana dengan stop dan target saat setup Anda muncul.'],
       ['Belajar dari hasilnya', 'Setiap trade masuk ke jurnal dan analitik: win rate, profit factor, drawdown, dan kurva saldo.']]},
-    plans: {title: 'Paket Free dan Pro', lead: 'Mulai gratis. Pro membuka kuota tanpa batas bila Anda ingin berlatih lebih banyak.', cta: 'Lihat harga dan aturan lengkap'},
+    plans: {title: 'Paket Free dan Pro', lead: 'Free: 1 Sesi baru per hari, dan tiap Sesi memakai data 1 bulan. Pro: Sesi baru dan bulan data tanpa batas selama paket aktif.', cta: 'Lihat harga dan aturan lengkap'},
     limits: {title: 'Yang perlu Anda ketahui', items: [
       'Ini simulasi untuk berlatih dan riset. Tidak ada uang sungguhan, tidak ada eksekusi di broker, dan bukan nasihat investasi.',
       'Kinerja masa lalu tidak menjamin hasil di masa depan. Hasil simulasi dapat berbeda dari trading nyata (spread, slippage, likuiditas, dan faktor psikologis).',
       'Produk dalam tahap awal (beta). Saat ini fokus pada XAUUSD; instrumen lain menyusul setelah profil dan datanya disetujui.',
       'Periode dan instrumen yang tersedia ditampilkan di dalam aplikasi sesuai katalog data dan persetujuan sumber data.',
-      'Batas Free dan Pro dihitung berdasarkan hari dan bulan UTC.']},
+      'Batas Free dihitung per hari UTC; Pro tidak memiliki batas jumlah Sesi baru.']},
     faq: {title: 'Pertanyaan umum', items: [
       ['Apakah ini broker atau menggunakan uang sungguhan?', 'Bukan. RIKSORA adalah simulator. Saldo di dalamnya adalah saldo latihan dan tidak ada order yang dikirim ke pasar.'],
       ['Data apa yang dipakai?', 'Data historis tick bid/ask. Instrumen dan periode yang tersedia ditampilkan di aplikasi sesuai katalog. Saat ini fokus pada XAUUSD.'],
@@ -83,14 +83,14 @@ export const COPY = {
     pricing: {
       title: 'Harga dan paket', lead: 'Harga dalam Rupiah (IDR). Mulai gratis, tingkatkan ke Pro bila perlu.',
       free: {name: 'Free', price: 'Rp 0', per: 'selamanya', features: [
-        '1 Sesi baru per bulan kalender (UTC)', '1 bulan historis baru diaktifkan per hari (UTC)', 'Melanjutkan Sesi yang ada tidak mengurangi kuota',
+        '1 Sesi baru per hari (UTC), tiap Sesi memakai data 1 bulan', '1 bulan historis baru diaktifkan per hari (UTC)', 'Melanjutkan Sesi yang ada tidak mengurangi kuota',
         'Memakai ulang bulan yang sudah diaktifkan tidak mengurangi kuota', 'Replay tick, order, Jump, jurnal, analitik, dan ekspor CSV/PDF']},
       pro: {name: 'Pro', monthlyName: 'Pro Bulanan', yearlyName: 'Pro Tahunan', perMonth: 'per bulan (30 hari)', perYear: 'per tahun (365 hari)', was: 'harga normal', saving: 'hemat', until: 'sampai', vsMonthly: 'dibanding membayar paket bulanan 12 kali', perMonthEquivalent: 'setara', per: 'per periode', features: [
-        'Sesi baru tanpa batas kuota', 'Bulan historis baru tanpa batas kuota', 'Semua fitur Free',
+        'Sesi baru tanpa batas, kapan saja', 'Bulan data historis baru tanpa batas', 'Semua fitur Free',
         'Aktif sampai masa berlaku habis, tidak diperpanjang otomatis']},
       pending: 'Harga akan diumumkan', buy: 'Masuk untuk membeli Pro',
       rulesTitle: 'Aturan kuota dengan jelas', rules: [
-        'Free: satu Sesi baru per bulan kalender UTC dan satu bulan historis baru per hari UTC.',
+        'Free: satu Sesi baru per hari UTC, dan tiap Sesi memakai data satu bulan (satu bulan historis baru diaktifkan per hari UTC). Pro: tanpa batas Sesi baru dan bulan data.',
         'Melanjutkan Sesi yang sudah ada dan memakai ulang bulan yang sudah diaktifkan tidak memakai kuota.',
         'Kuota diatur ulang pada pukul 00.00 UTC, yaitu pukul 07.00 WIB.',
         'Status Pro hanya berasal dari pembayaran yang sudah lunas dan belum kedaluwarsa, dan ditegakkan oleh server.',
@@ -110,7 +110,7 @@ export const COPY = {
       ['1. Layanan', ['{{brand}} ({{domain}}) adalah layanan simulasi backtest berbasis data tick historis, dikelola oleh {{operator}}. Layanan ini untuk berlatih dan riset.']],
       ['2. Bukan nasihat investasi', ['Layanan ini tidak menyediakan nasihat investasi, rekomendasi transaksi, atau eksekusi order di pasar sungguhan. Semua saldo dan order adalah simulasi.', 'Kinerja masa lalu tidak menjamin hasil di masa depan. Hasil simulasi dapat berbeda dari trading nyata.']],
       ['3. Akun', ['Anda bertanggung jawab atas kerahasiaan akun dan atas aktivitas di dalamnya. Anda harus memberikan informasi yang benar dan berusia di atas 18 tahun atau cakap hukum menurut hukum yang berlaku.']],
-      ['4. Paket Free dan Pro', ['Free dibatasi satu Sesi baru per bulan kalender UTC dan satu bulan historis baru per hari UTC. Pro tidak dibatasi kuota tersebut.', 'Pro dibeli per periode, tidak diperpanjang otomatis, dan aktif sampai masa berlakunya habis. Harga dan periode tercantum di halaman Harga.']],
+      ['4. Paket Free dan Pro', ['Free dibatasi satu Sesi baru per hari UTC, dan tiap Sesi memakai data satu bulan (satu bulan historis baru diaktifkan per hari UTC). Pro tidak dibatasi kuota tersebut selama paketnya aktif.', 'Pro dibeli per periode, tidak diperpanjang otomatis, dan aktif sampai masa berlakunya habis. Harga dan periode tercantum di halaman Harga.']],
       ['5. Pembayaran', ['Pembayaran diproses oleh Midtrans dalam Rupiah. Kami tidak menyimpan data kartu atau rekening Anda.', 'Pro aktif setelah pembayaran terkonfirmasi lunas oleh penyedia pembayaran.']],
       ['6. Penggunaan yang dilarang', ['Dilarang mengganggu layanan, mengakses data pengguna lain, mengambil data secara massal, atau memakai layanan untuk tujuan melanggar hukum.']],
       ['7. Data dan hak kekayaan intelektual', ['Perangkat lunak dan antarmuka adalah milik {{operator}}. Data pasar historis tunduk pada ketentuan sumbernya dan tidak boleh disalin atau didistribusikan ulang. Catatan Sesi Anda adalah milik Anda.']],
@@ -153,13 +153,13 @@ export const COPY = {
       ['Write rules, start a Session', 'Write your rules once, then pick the instrument, start month and balance. The chart stops right there.'],
       ['Replay and trade', 'Press Play, Step or Jump. Place a market or planned order with stop and target when your setup appears.'],
       ['Learn from the results', 'Every trade lands in the journal and analytics: win rate, profit factor, drawdown and the balance curve.']]},
-    plans: {title: 'Free and Pro plans', lead: 'Start free. Pro removes the quotas when you want to practice more.', cta: 'See pricing and full rules'},
+    plans: {title: 'Free and Pro plans', lead: 'Free: 1 new Session per day, each Session using 1 month of data. Pro: unlimited new Sessions and months of data while your plan is active.', cta: 'See pricing and full rules'},
     limits: {title: 'What you should know', items: [
       'This is simulation for practice and research. No real money, no broker execution, and not investment advice.',
       'Past performance does not guarantee future results. Simulated results can differ from real trading (spread, slippage, liquidity and psychology).',
       'The product is in an early (beta) stage. It currently focuses on XAUUSD; other instruments follow once their profiles and data are approved.',
       'Available periods and instruments are shown inside the app according to the data catalog and data-source approval.',
-      'Free and Pro limits are counted by UTC day and month.']},
+      'Free limits are counted per UTC day; Pro has no limit on new Sessions.']},
     faq: {title: 'Frequently asked questions', items: [
       ['Is this a broker, or does it use real money?', 'No. RIKSORA is a simulator. The balance is a practice balance and no order is sent to any market.'],
       ['What data does it use?', 'Historical bid/ask tick data. Available instruments and periods are shown in the app according to the catalog. It currently focuses on XAUUSD.'],
@@ -171,14 +171,14 @@ export const COPY = {
     pricing: {
       title: 'Pricing and plans', lead: 'Prices are in Indonesian Rupiah (IDR). Start free, upgrade to Pro when you need to.',
       free: {name: 'Free', price: 'Rp 0', per: 'forever', features: [
-        '1 new Session per calendar month (UTC)', '1 newly activated historical month per day (UTC)', 'Continuing an existing Session uses no quota',
+        '1 new Session per day (UTC), each using 1 month of data', '1 newly activated historical month per day (UTC)', 'Continuing an existing Session uses no quota',
         'Re-using an already activated month uses no quota', 'Tick replay, orders, Jump, journal, analytics and CSV/PDF export']},
       pro: {name: 'Pro', monthlyName: 'Pro Monthly', yearlyName: 'Pro Yearly', perMonth: 'per month (30 days)', perYear: 'per year (365 days)', was: 'regular price', saving: 'save', until: 'until', vsMonthly: 'compared with twelve monthly payments', perMonthEquivalent: 'equal to', per: 'per period', features: [
-        'New Sessions with no quota', 'Newly activated historical months with no quota', 'Everything in Free',
+        'Unlimited new Sessions, any time', 'Unlimited newly activated months of data', 'Everything in Free',
         'Active until the period ends, no automatic renewal']},
       pending: 'Price to be announced', buy: 'Sign in to buy Pro',
       rulesTitle: 'The quota rules, plainly', rules: [
-        'Free: one new Session per UTC calendar month and one newly activated historical month per UTC day.',
+        'Free: one new Session per UTC day, each Session using one month of data (one newly activated historical month per UTC day). Pro: no limit on new Sessions or months.',
         'Continuing an existing Session and re-using an already activated month uses no quota.',
         'Quotas reset at 00:00 UTC, which is 07:00 WIB.',
         'Pro status comes only from a paid, unexpired payment and is enforced by the server.',

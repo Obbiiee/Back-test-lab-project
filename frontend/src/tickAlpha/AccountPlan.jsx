@@ -34,7 +34,7 @@ export default function AccountPlan({client,workspace,billingConfigured}){
       {status.pro
         ?<p className="rk-auth-hint">Pro has no quota on new Sessions or newly activated historical months.</p>
         :<ul className="rk-auth-hint">
-          <li>New Sessions this month (UTC): {quota(status.sessions)}.</li>
+          <li>New Sessions today (UTC): {quota(status.sessions)}.</li>
           <li>New historical months today (UTC): {quota(status.windows)}.</li>
           <li>Continuing a Session or re-using an activated month uses no quota. Quotas reset at 00:00 UTC (07:00 WIB).</li>
         </ul>}

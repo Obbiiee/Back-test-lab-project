@@ -6,7 +6,7 @@ export function entitlementRefusal(body){
   const code=body?.detail;
   const at=typeof body?.resetsAt==='string'&&!Number.isNaN(Date.parse(body.resetsAt))?new Date(body.resetsAt).toLocaleString('en',RESET_FORMAT):null;
   const messages={
-    SESSION_MONTH_LIMIT:`Free plan: one new Session per calendar month (UTC).${at?` Your next Session is available from ${at}.`:''} Existing Sessions stay open.`,
+    SESSION_DAY_LIMIT:`Free plan: one new Session per day (UTC), each using one month of data. Pro has no limit.${at?` Your next Session is available from ${at}.`:''} Existing Sessions stay open.`,
     WINDOW_DAY_LIMIT:`Free plan: one newly opened historical month per day (UTC).${at?` Another month can be opened from ${at}.`:''} Continuing a month you already opened is free.`,
     ACTIVATION_IN_PROGRESS:'Another Session is still being created. Wait a moment and check your Sessions before trying again.',
     WINDOW_ENDED:'This Free window has ended: new orders cannot be opened. Open positions can still be resolved.',

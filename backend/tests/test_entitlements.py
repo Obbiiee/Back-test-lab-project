@@ -4,7 +4,7 @@ import threading
 import time
 import unittest
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from contracts.primitives import ContractError
@@ -68,9 +68,9 @@ class EntitlementTests(unittest.TestCase):
         refused = self.post(self.body())
         self.assertEqual(refused.status_code, 409, refused.text)
         out = refused.json()
-        self.assertEqual((out["detail"], out["quota"], out["resetTimezone"]), ("SESSION_MONTH_LIMIT", "SESSION", "UTC"))
+        self.assertEqual((out["detail"], out["quota"], out["resetTimezone"]), ("SESSION_DAY_LIMIT", "SESSION", "UTC"))
         now = datetime.now(timezone.utc)
-        want = datetime(now.year + (now.month == 12), now.month % 12 + 1, 1, tzinfo=timezone.utc)
+        want = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
         self.assertEqual(datetime.fromisoformat(out["resetsAt"]), want)
 
     def test_retry_after_commit_returns_the_same_result_and_no_second_token(self):
@@ -92,7 +92,7 @@ class EntitlementTests(unittest.TestCase):
         deadline = time.monotonic() + 20
         while self.status()["sessions"]["used"] and time.monotonic() < deadline:          # the worker refuses it asynchronously; the job ends FAILED/RECONCILE_REQUIRED
             time.sleep(0.5)
-        self.assertEqual(self.status()["sessions"]["used"], 0, "a failed creation must not consume the monthly token")
+        self.assertEqual(self.status()["sessions"]["used"], 0, "a failed creation must not consume the daily token")
         self.assertTrue(all(c[1] == "RELEASED" for c in self.claims()))
         # (b) admitted but the worker never produced the Session: stale RESERVED with no live job is released by settlement
         keys = self.ent.reserve(f.actor, f.workspace, self.body("2020-01"))
@@ -136,14 +136,14 @@ class EntitlementTests(unittest.TestCase):
     def test_window_quota_is_one_new_month_per_utc_day_and_reuse_is_free(self):
         f = self.fixture
         f.completed_job_result(self.post(self.body("2020-01")))
-        self.backdate("SESSION", "2000-01")                                       # the monthly Session token is a separate quota
+        self.backdate("SESSION", "2000-01-01")                                    # the daily Session token is a separate quota
         other_month = self.post(self.body("2020-02"))
         self.assertEqual((other_month.status_code, other_month.json()["detail"], other_month.json()["quota"]), (409, "WINDOW_DAY_LIMIT", "WINDOW"))
         again = self.post(self.body("2020-01"))                                  # the already activated month: no new window token
         self.assertIn(again.status_code, OK, again.text)
         f.completed_job_result(again)
         self.assertEqual(self.status()["windows"]["used"], 1)
-        self.backdate("WINDOW", "2000-01-01"); self.backdate("SESSION", "2000-02")   # the UTC day and month turned over
+        self.backdate("WINDOW", "2000-01-01"); self.backdate("SESSION", "2000-02-01")   # the UTC day turned over
         self.assertEqual(self.status()["windows"]["used"], 0)
         self.assertIn(self.post(self.body("2020-01", "again")).status_code, OK)
 

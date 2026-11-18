@@ -1,5 +1,5 @@
 // Free/Pro rules shown to users. Single source for the site; the numbers mirror backend/cloud/entitlements.py (FREE_LIMITS) and a test keeps them equal.
-// Rules: Free = one NEW Session per UTC calendar month and one NEWLY ACTIVATED historical month per UTC day. Continuing a Session or re-using an
+// Rules: Free = one NEW Session per UTC day (each Session uses one month of data; owner decision 2026-11-18, was per calendar month) and one NEWLY ACTIVATED historical month per UTC day. Continuing a Session or re-using an
 // already activated month consumes nothing. Pro = no quota on new Sessions or newly activated months (still recorded). Tier comes only from a paid,
 // unexpired server-side order. Reset time is UTC: 00:00 UTC = 07:00 WIB.
 export const FREE_LIMITS = {SESSION: 1, WINDOW: 1};

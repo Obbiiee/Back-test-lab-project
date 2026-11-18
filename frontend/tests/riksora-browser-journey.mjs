@@ -510,7 +510,7 @@ try{
       await page.getByRole('link',{name:/^Back to /}).click();
       const refused=await tryCreate('Ent Free Style','Ent session 2');
       expect(refused.outcome).toBe('refused');
-      expect(refused.text).toContain('one new Session per calendar month (UTC)');
+      expect(refused.text).toContain('one new Session per day (UTC)');
       expect(refused.text).toContain(nextMonthText());
       await shot('ent-refused');
       step('ent_second_refused');
@@ -542,7 +542,7 @@ try{
       expect((await hook('qa_reverse_pro',{email:config.email})).ok).toBe(true);
       await page.getByRole('link',{name:/^Back to /}).click();
       const third=await tryCreate('Ent Free Style','Ent session 3');
-      expect(third.outcome).toBe('refused');expect(third.text).toContain('one new Session per calendar month (UTC)');
+      expect(third.outcome).toBe('refused');expect(third.text).toContain('one new Session per day (UTC)');
       await page.keyboard.press('Escape');
       await mainNav('Sessions').click();
       await expect(page.getByRole('link',{name:'Ent session 1'}).first()).toBeVisible();
@@ -572,7 +572,7 @@ try{
       const before=(await hook('qa_claims',{email:config.email})).active;
       const attempt=await post(`/api/v1/workspaces/${seen.ws}/research/sessions`,tokenB,{id:'session:attack',name:'attack',methodId:'method:x',initialBalance:'10000',startPeriod:'2020-01'});
       expect([401,403,404,422]).toContain(attempt.status());
-      expect((await attempt.text())).not.toContain('SESSION_MONTH_LIMIT');
+      expect((await attempt.text())).not.toContain('SESSION_DAY_LIMIT');
       expect((await hook('qa_claims',{email:config.email})).active).toBe(before);
       expect((await hook('qa_claims',{email:config.email2})).active).toBe(0);
       const ent2=await context.request.get(`${base}/api/v1/workspaces/${seen.ws}/research/entitlements`,{headers:{Authorization:'Bearer '+tokenB},failOnStatusCode:false});
