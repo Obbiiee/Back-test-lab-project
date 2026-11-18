@@ -139,6 +139,9 @@ class Switch(unittest.TestCase):
         rows = {r["id"]: r for r in history["orders"]}
         self.assertEqual({k: (r["methodId"], r["status"]) for k, r in rows.items()}, {"order:1": ("method:free", "CLOSED"), "order:2": ("method:free-b", "CLOSED")})
         self.assertEqual(inspected["state"]["balance"], "10020")                                    # 10000 + 30 - 10, exactly as a single-method Session would give
+        by = history["byMethod"]
+        self.assertEqual({m: (v["completedTrades"], v["netCashChange"]) for m, v in by.items()}, {"method:free": (1, "30"), "method:free-b": (1, "-10")})
+        self.assertEqual(sum(v["completedTrades"] for v in by.values()), history["metrics"]["tradeCount"])
         self.assertEqual([e["kind"] for e in inspected["events"] if e["kind"] == "METHOD_SWITCHED"], ["METHOD_SWITCHED"])
 
     def test_a_tampered_method_hash_breaks_the_event_chain(self):
@@ -158,6 +161,13 @@ class Switch(unittest.TestCase):
             h.call("SET_METHOD", {"methodId": "method:nope"})
         with self.assertRaises(ContractError):
             h.call("SET_METHOD", {"methodId": "method:free"})
+
+    def test_legacy_projection_has_no_by_method_key(self):
+        from execution.analysis import project
+        case = next(c for c in te.goldens()["scenarios"] if c["id"] == "market-long")
+        h = te.exercise(case)
+        inspected = h.controller.inspect(h.scope, h.session, maximum=256)
+        self.assertNotIn("byMethod", project(inspected["state"], iter(inspected["events"]), None))
 
     def test_legacy_sessions_refuse_set_method(self):
         case = case_rows()

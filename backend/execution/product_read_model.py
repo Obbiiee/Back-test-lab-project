@@ -85,7 +85,7 @@ def sessions(db, workspace_id, *, limit=25, after=None, method_id=None, trashed=
         if artifact == "BTL-LOCAL-SESSION-1":
             from ticks.contracts import tag
             tag(meta, artifact, "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance" +
-                (" sourceKey monthlyManifestHash" if "sourceKey" in meta or "monthlyManifestHash" in meta else ""))
+                (" sourceKey monthlyManifestHash" if "sourceKey" in meta or "monthlyManifestHash" in meta else "") + (" methodIds" if "methodIds" in meta else ""))
         elif artifact == "BTL-OBSERVED-RESEARCH-SESSION-1":
             from execution.observed_research import META
             from ticks.contracts import tag

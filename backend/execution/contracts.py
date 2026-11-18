@@ -18,6 +18,13 @@ MAX_METHODS = 16
 
 def is_mm(state):
     return state.get("artifact") == MM_STATE
+
+
+def method_hash_ok(state, method_hash):
+    """Legacy: the hash must be the Session's Method. MM: it must belong to the Session's Method set (which one was active at that moment is verified by the event chain)."""
+    if is_mm(state):
+        return any(w["definitionHash"] == method_hash for w in state["methods"].values())
+    return method_hash == state["policy"]["definitionHash"]
 MAX_ORDERS = 128
 MAX_EVENTS = 256
 MAX_STEPS = 256

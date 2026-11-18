@@ -14,7 +14,7 @@ from contracts.primitives import require, identifier, revision, digest
 from ticks.contracts import keys, tag, TickManifest
 from ticks.timeline import TickTimeline, compact_requested
 from infrastructure.database import connect
-from .contracts import seed_state, policy_wire, open_payload, exact, text, price, risk_quantity, MAX_ORDERS
+from .contracts import policy_from_wire, seed_state, seed_state_mm, is_mm, method_hash_ok, MAX_METHODS, policy_wire, open_payload, exact, text, price, risk_quantity, MAX_ORDERS
 from .controller import ExecutionController
 from .postgres import PostgresExecutionStore, pack, unpack, snapshot
 from .research_fixture import research_provider, research_profile, START_NS, STEP_NS, WARMUP_NS
@@ -119,7 +119,7 @@ class ResearchApplication:
         meta = unpack(*meta_row[:2])
         monthly = 'sourceKey' in meta or 'monthlyManifestHash' in meta
         tag(meta, "BTL-LOCAL-SESSION-1", "id name methodId methodHash datasetId datasetVersion profileHash startPeriod initialBalance" +
-            (" sourceKey monthlyManifestHash" if monthly else ""))
+            (" sourceKey monthlyManifestHash" if monthly else "") + (" methodIds" if "methodIds" in meta else ""))
         require(meta["id"] == session_id and meta["methodId"] == meta_row[2], "session", "CORRUPT_RECORD")
         method = self._method(db, meta["methodId"])
         policy = method_policy(method)
@@ -129,8 +129,13 @@ class ResearchApplication:
         saved = self.store.read_session(db, self.scope, session_id, row)
         state, checkpoint = saved["state"], saved["controller"]
         snapshot(state, checkpoint)
+        if "methodIds" in meta:                                            # multi-method Session: the state holds the whole Method set; `policy` mirrors the active one
+            require(is_mm(state) and meta["methodIds"] == sorted(state["methods"]) and meta["methodId"] in state["methods"] and
+                    all(state["methods"][mid] == policy_wire(method_policy(self._method(db, mid))) for mid in meta["methodIds"]) and
+                    state["methods"][meta["methodId"]]["definitionHash"] == meta["methodHash"], "sessionPins", "CORRUPT_RECORD")
+        else:
+            require(not is_mm(state) and state["policy"] == policy_wire(policy) and meta["methodHash"] == policy.definition_hash, "sessionPins", "CORRUPT_RECORD")
         require(state["sessionId"] == session_id and state["revision"] == row[2] and
-                state["policy"] == policy_wire(policy) and meta["methodHash"] == policy.definition_hash and
                 (meta["datasetId"],meta["datasetVersion"],meta["profileHash"],meta["initialBalance"]) ==
                 (state["datasetId"],state["datasetVersion"],state["profileHash"],state["initialBalance"]), "sessionPins", "CORRUPT_RECORD")
         if monthly:
@@ -314,7 +319,8 @@ class ResearchApplication:
                         aggregate.exclude(dict(sessionId=session_id,
                             reason=analysis.get('reason', 'ANALYSIS_UNAVAILABLE')))
                         continue
-                    aggregate.include(legacy_session_item(state, analysis['completed']))
+                    own = [row for row in analysis['completed'] if row.get('methodId', method_id) == method_id]     # MM: only trades created under this Method (legacy rows carry no methodId)
+                    aggregate.include(legacy_session_item(state, own))
                 if not more:
                     break
                 require(rows and after, 'methodSessions', 'CORRUPT_RECORD')
@@ -341,8 +347,12 @@ class ResearchApplication:
 
     def create_session(self, raw):
         require(type(raw) is dict and {'id','name','methodId','initialBalance','startPeriod'} <= set(raw) and
-                set(raw) <= {'id','name','methodId','initialBalance','startPeriod','sourceKey'},
+                set(raw) <= {'id','name','methodId','initialBalance','startPeriod','sourceKey','methodIds'},
                 'sessionRequest', 'SCHEMA_MISMATCH')
+        multi = 'methodIds' in raw                                        # opt-in multi-method Session: `methodId` starts active, `methodIds` is the allowed set
+        if multi:
+            require(type(raw['methodIds']) is list and 2 <= len(raw['methodIds']) <= MAX_METHODS and len(set(raw['methodIds'])) == len(raw['methodIds']) and
+                    raw['methodId'] in raw['methodIds'] and all(type(m) is str for m in raw['methodIds']), 'methodIds', 'REFUSED_METHOD_SET')
         identifier(raw["id"], "sessionId"); label(raw["name"])
         monthly = self.__monthly_source_key is not None
         if monthly:
@@ -370,12 +380,22 @@ class ResearchApplication:
                 from .product_method_lifecycle import require_active_method
                 require_active_method(db, self.scope.workspace_id, raw["methodId"])
                 method = self._method(db, raw["methodId"]); policy = method_policy(method)
-                state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
-                                   str(start), self.__profile, policy, raw["initialBalance"])
+                if multi:
+                    policies = []
+                    for mid in raw["methodIds"]:
+                        require_active_method(db, self.scope.workspace_id, mid)
+                        policies.append(method_policy(self._method(db, mid)))
+                    state = seed_state_mm(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
+                                          str(start), self.__profile, policies, raw["methodId"], raw["initialBalance"])
+                else:
+                    state = seed_state(raw["id"], self.__provider.dataset_id, self.__provider.dataset_version,
+                                       str(start), self.__profile, policy, raw["initialBalance"])
                 require(exact(raw["initialBalance"],"initialBalance",True) == Fraction(state["initialBalance"]), "moneyPrecision")
                 meta = dict(schemaVersion=1, artifact="BTL-LOCAL-SESSION-1", id=raw["id"], name=label(raw["name"]), methodId=raw["methodId"],
                             methodHash=policy.definition_hash, datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
                             profileHash=state["profileHash"], startPeriod=raw["startPeriod"], initialBalance=state["initialBalance"])
+                if multi:
+                    meta['methodIds'] = sorted(raw['methodIds'])
                 if monthly:
                     meta['sourceKey'] = self.__monthly_source_key
                     meta['monthlyManifestHash'] = selected['manifestSha256']
@@ -456,7 +476,7 @@ class ResearchApplication:
                     committed_revision==command['expectedRevision']+1 and committed_revision<=state['revision'] and
                     all(order[k]==v for k,v in command['payload'].items()) and
                     reviewed['profileHash']==state['profileHash'] and
-                    reviewed['methodHash']==state['policy']['definitionHash'] and
+                    method_hash_ok(state, reviewed['methodHash']) and
                     int(reviewed['throughNs'])<=int(state['throughNs']), 'riskReview','CORRUPT_RECORD')
                 # Existing pinless reviews remain excluded. No historical retrofit.
                 if 'researchRisk' not in reviewed:
@@ -588,10 +608,9 @@ class ResearchApplication:
             event = unpack(event_raw, event_digest)
             require(event['sequence'] == sequence and event['eventId'] == event_id and
                     event['kind'] == event_kind and event['sessionId'] == state['sessionId'] and
-                    (event['datasetId'], event['datasetVersion'], event['profileHash'],
-                     event['methodHash'], event['engineVersion']) ==
-                    (state['datasetId'], state['datasetVersion'], state['profileHash'],
-                     state['policy']['definitionHash'], state['engineVersion']) and
+                    (event['datasetId'], event['datasetVersion'], event['profileHash'], event['engineVersion']) ==
+                    (state['datasetId'], state['datasetVersion'], state['profileHash'], state['engineVersion']) and
+                    method_hash_ok(state, event['methodHash']) and
                     event['eventId'] == content_hash({key: value for key, value in event.items()
                                                        if key != 'eventId'}) and
                     (event.get('orderId') == order_id or
@@ -784,7 +803,7 @@ class ResearchApplication:
             for observation in draft["observations"]:
                 keys(observation,"conditionId outcome"); Observation(observation["conditionId"],observation["outcome"])
             require(len({o["conditionId"] for o in draft["observations"]}) == len(draft["observations"]),"duplicateObservations")
-            policy = method_policy(method)
+            policy = policy_from_wire(state["policy"]) if is_mm(state) else method_policy(method)     # MM: orders are reviewed under the ACTIVE Method
             quote = self._quote(state,checkpoint)
             require(quote is not None,"quote","UNRESOLVED_NO_QUOTE")
             side = quote["ask"] if draft["side"] == "LONG" else quote["bid"]
@@ -813,7 +832,7 @@ class ResearchApplication:
                               raw["planId"],raw["planRevision"],tuple(Observation(o["conditionId"],o["outcome"]) for o in payload["observations"]))
             validate_command(request,context)
             reviewed = dict(schemaVersion=1,artifact="BTL-LOCAL-ORDER-REVIEW-1",requestHash=request_hash,command=command,
-                            contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=meta["methodHash"],profileHash=state["profileHash"],
+                            contractRequest=json.loads(canonical_bytes(request.identity_payload())),methodHash=policy.definition_hash,profileHash=state["profileHash"],
                             throughNs=state["throughNs"],riskBasis=state["balance"],model="SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION")
             reviewed['researchRisk'] = planned_risk(state,command)
             blob, sha = pack(reviewed)
@@ -833,7 +852,7 @@ class ResearchApplication:
         return self.controller.apply(self.scope,reviewed["command"])
 
     def apply(self, session_id, command):
-        require(command.get("sessionId") == session_id and command.get("kind") in ("ADVANCE","SEEK","CANCEL","CLOSE"),"command","REFUSED_UNREVIEWED_COMMAND")
+        require(command.get("sessionId") == session_id and command.get("kind") in ("ADVANCE","SEEK","CANCEL","CLOSE","SET_METHOD"),"command","REFUSED_UNREVIEWED_COMMAND")
         with connect(self.dsn) as db:
             self._session(db,session_id)
         return self.controller.apply(self.scope,command)

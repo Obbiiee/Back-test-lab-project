@@ -264,7 +264,11 @@ def project(state, events, quote):
     result.update(maxDrawdown=text(maximum_drawdown), maxDrawdownRate=ratio(maximum_percent), unresolved=sum(r['status']=='UNRESOLVED' for r in rows.values()),
         unrealizedExcluded=True, equityBasis='COMMITTED_CASH_POSTINGS', equityWindowStart=max(0,financial_count-256),
         expired=sum(r['status']=='EXPIRED' for r in rows.values()))
-    return dict(status='COMPLETE', provenance=provenance, orders=list(rows.values()), completed=completed, metrics=result,
+    extra = {}
+    if mm:                                                      # statistics separated by the Method each trade was created under (legacy Sessions: key absent)
+        extra['byMethod'] = {mid: dict(completedTrades=len(sub), netCashChange=text(sum((Fraction(r['netCashChange']) for r in sub), Fraction())), metrics=metrics(sub))
+                             for mid in sorted(state['methods']) for sub in [[r for r in completed if r.get('methodId') == mid]]}
+    return dict(status='COMPLETE', provenance=provenance, orders=list(rows.values()), completed=completed, metrics=result, **extra,
         account=dict(balance=state['balance'], realizedGross=state['realizedGross'], commission=state['commission'],
             netCashChange=text(balance-Fraction(state['initialBalance'])), unrealizedIndicative=text(indicative) if mark_available else None,
             equityIndicative=text(balance+indicative) if mark_available else None, quoteTimeNs=quote['timeNs'] if mark_available else None),
