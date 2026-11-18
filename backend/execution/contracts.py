@@ -9,6 +9,15 @@ from contracts.primitives import decimal, digest, identifier, require, revision
 from ticks.contracts import keys, tag, uint
 
 ENGINE_VERSION = "BTL-TICK-EXECUTION-1"
+# Multi-method variant (versioned, opt-in at Session creation; legacy Sessions never see it). The state additionally holds the Session's allowed Methods and the active
+# Method pointer; `policy` always mirrors the ACTIVE Method so every legacy reader keeps working. Each order records the Method it was created under.
+MM_ENGINE_VERSION = "BTL-TICK-EXECUTION-1-MM"
+MM_STATE = "BTL-TICK-EXECUTION-STATE-MM-1"
+MAX_METHODS = 16
+
+
+def is_mm(state):
+    return state.get("artifact") == MM_STATE
 MAX_ORDERS = 128
 MAX_EVENTS = 256
 MAX_STEPS = 256
@@ -118,7 +127,7 @@ def command_wire(raw):
         "OPEN": "side orderType workflow entry quantity sl tp riskPercent observations",
         "CANCEL": "orderId", "CLOSE": "orderId quantity", "ADVANCE": "targetNs",
         "SEEK": "targetNs", "END": "",
-        "FORK": "parentSessionId parentRevision",
+        "FORK": "parentSessionId parentRevision", "SET_METHOD": "methodId",
     }
     require(raw["kind"] in fields, "kind", "REFUSED_COMMAND")
     keys(raw["payload"], fields[raw["kind"]])
@@ -126,6 +135,8 @@ def command_wire(raw):
         uint(raw["payload"]["targetNs"])
     if raw["kind"] in ("CANCEL", "CLOSE"):
         identifier(raw["payload"]["orderId"], "orderId")
+    if raw["kind"] == "SET_METHOD":
+        identifier(raw["payload"]["methodId"], "methodId")
     if raw["kind"] == "FORK":
         identifier(raw["payload"]["parentSessionId"], "parentSessionId")
         revision(raw["payload"]["parentRevision"])
@@ -181,7 +192,49 @@ def seed_state(session_id, dataset_id, dataset_version, start_ns, profile, polic
                 eventHash=content_hash(seed), parent=None)
 
 
+def mm_seed(session_id, dataset_id, dataset_version, profile, methods, initial_balance):
+    """The MM seed identifies the Session by its Method SET (not by which one starts active), so a projection can rebuild it from the state alone."""
+    return dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-SEED-MM-1", sessionId=session_id, datasetId=dataset_id, datasetVersion=dataset_version,
+                profile=profile, methods=methods, initialBalance=initial_balance)
+
+
+def seed_state_mm(session_id, dataset_id, dataset_version, start_ns, profile, policies, active_method_id, balance="10000"):
+    """New multi-method Session: `policies` is a list of MethodPolicy (1..MAX_METHODS, unique ids), `active_method_id` one of them."""
+    require(type(policies) is list and 1 <= len(policies) <= MAX_METHODS and all(type(p) is MethodPolicy for p in policies), "policies", "REFUSED_METHOD_SET")
+    require(len({p.method_id for p in policies}) == len(policies), "policies", "REFUSED_METHOD_SET")
+    by_id = {p.method_id: p for p in policies}
+    require(active_method_id in by_id, "activeMethodId", "REFUSED_METHOD_SET")
+    state = seed_state(session_id, dataset_id, dataset_version, start_ns, profile, by_id[active_method_id], balance)
+    methods = {mid: policy_wire(p) for mid, p in sorted(by_id.items())}
+    seed = mm_seed(session_id, dataset_id, dataset_version, state["profile"], methods, state["initialBalance"])
+    state.update(artifact=MM_STATE, engineVersion=MM_ENGINE_VERSION, methods=methods, activeMethodId=active_method_id, eventHash=content_hash(seed))
+    return validate_state(state)
+
+
+def _validate_mm(state):
+    tag(state, MM_STATE, "sessionId datasetId datasetVersion engineVersion profile profileHash policy revision initialBalance balance realizedGross commission throughNs orders unresolved ended financial nextGroupIndex nextEventIndex eventHash parent methods activeMethodId")
+    require(state["engineVersion"] == MM_ENGINE_VERSION, "engine", "REFUSED_ENGINE_VERSION")
+    methods = state["methods"]
+    require(type(methods) is dict and 1 <= len(methods) <= MAX_METHODS and state["activeMethodId"] in methods, "methods", "CORRUPT_RECORD")
+    for method_id, wire in methods.items():
+        require(policy_from_wire(wire).method_id == method_id, "methods", "CORRUPT_RECORD")
+    require(state["policy"] == methods[state["activeMethodId"]], "policy", "CORRUPT_RECORD")
+    require(all(type(o) is dict and o.get("methodId") in methods for o in state["orders"].values()), "orders", "CORRUPT_RECORD")
+
+
 def validate_state(state):
+    if is_mm(state):
+        return _validate_state_common(state, mm=True)
+    return _validate_state_common(state, mm=False)
+
+
+def _validate_state_common(state, mm):
+    if mm:
+        _validate_mm(state)
+        base = {k: v for k, v in state.items() if k not in ("methods", "activeMethodId")}
+        base.update(artifact="BTL-TICK-EXECUTION-STATE-1", engineVersion=ENGINE_VERSION)
+        validate_state(base)
+        return state
     tag(state, "BTL-TICK-EXECUTION-STATE-1", "sessionId datasetId datasetVersion engineVersion profile profileHash policy revision initialBalance balance realizedGross commission throughNs orders unresolved ended financial nextGroupIndex nextEventIndex eventHash parent")
     require(state["engineVersion"] == ENGINE_VERSION, "engine", "REFUSED_ENGINE_VERSION")
     revision(state["revision"]); revision(state["nextEventIndex"])

@@ -10,7 +10,7 @@ from fractions import Fraction
 
 from contracts.canonical import content_hash
 from contracts.primitives import require
-from .contracts import text, validate_state
+from .contracts import text, validate_state, is_mm, mm_seed
 
 MAX_ANALYSIS_EVENTS = 4096
 ANALYSIS_VERSION = 'BTL-COMMITTED-ANALYSIS-1'
@@ -149,19 +149,37 @@ def project(state, events, quote):
         methodHash=state['policy']['definitionHash'], eventHead=state['eventHash'], analysisVersion=ANALYSIS_VERSION,
         model='SIMULATED_QUOTE_BASELINE_NOT_BROKER_EXECUTION')
     require(state['parent'] is None, 'analysisLineage', 'REFUSED_UNSUPPORTED_LINEAGE')
-    previous = content_hash(dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-SEED-1', sessionId=state['sessionId'],
-        datasetId=state['datasetId'], datasetVersion=state['datasetVersion'], profile=state['profile'],
-        policy=state['policy'], initialBalance=state['initialBalance']))
+    mm = is_mm(state)
+    if mm:
+        previous = content_hash(mm_seed(state['sessionId'], state['datasetId'], state['datasetVersion'], state['profile'], state['methods'], state['initialBalance']))
+        by_hash = {w['definitionHash']: mid for mid, w in state['methods'].items()}
+        current_hash = None                                           # the Method identity every event carries; it changes only at METHOD_SWITCHED
+    else:
+        previous = content_hash(dict(schemaVersion=1, artifact='BTL-TICK-EXECUTION-SEED-1', sessionId=state['sessionId'],
+            datasetId=state['datasetId'], datasetVersion=state['datasetVersion'], profile=state['profile'],
+            policy=state['policy'], initialBalance=state['initialBalance']))
     balance = peak = Fraction(state['initialBalance'])
     gross = commission = maximum_drawdown = maximum_percent = Fraction()
     rows, completed = {}, []
     equity, annotations = deque(maxlen=256), deque(maxlen=512)
     count = financial_count = 0
     for event in events:
+        if mm:
+            require(event['methodHash'] in by_hash, 'eventChain', 'CORRUPT_RECORD')
+            if event['kind'] == 'METHOD_SWITCHED':
+                to_hash = state['methods'][event['detail']['toMethodId']]['definitionHash']
+                from_hash = state['methods'][event['detail']['fromMethodId']]['definitionHash']
+                require(event['methodHash'] == to_hash and (current_hash is None or current_hash == from_hash), 'eventChain', 'CORRUPT_RECORD')
+            else:
+                require(current_hash is None or event['methodHash'] == current_hash, 'eventChain', 'CORRUPT_RECORD')
+            current_hash = event['methodHash']
+            identity_ok = (event['sessionId'],event['datasetId'],event['datasetVersion'],event['profileHash'],event['engineVersion']) == \
+                (state['sessionId'],state['datasetId'],state['datasetVersion'],state['profileHash'],state['engineVersion'])
+        else:
+            identity_ok = (event['sessionId'],event['datasetId'],event['datasetVersion'],event['profileHash'],event['methodHash'],event['engineVersion']) == \
+                (state['sessionId'],state['datasetId'],state['datasetVersion'],state['profileHash'],state['policy']['definitionHash'],state['engineVersion'])
         require(event['sequence'] == count and event['previousHash'] == previous and
-            event['eventId'] == content_hash({k:v for k,v in event.items() if k != 'eventId'}) and
-            (event['sessionId'],event['datasetId'],event['datasetVersion'],event['profileHash'],event['methodHash'],event['engineVersion']) ==
-            (state['sessionId'],state['datasetId'],state['datasetVersion'],state['profileHash'],state['policy']['definitionHash'],state['engineVersion']),
+            event['eventId'] == content_hash({k:v for k,v in event.items() if k != 'eventId'}) and identity_ok,
             'eventChain', 'CORRUPT_RECORD')
         previous = event['eventId']; count += 1
         kind, order_id, detail = event['kind'], event['orderId'], event['detail']
@@ -176,6 +194,8 @@ def project(state, events, quote):
                 exitTimeNs=None, exitPrice=None, exitFillRef=None, exitReason=None, gross='0', commission='0', netCashChange='0',
                 status='PENDING', remaining=detail['plan']['quantity'], rMultiple=None, rReason='PREENTRY_R0_NOT_PINNED',
                 mae=None, mfe=None, excursionReason='NOT_COMPUTED_IN_FUNCTIONAL_ALPHA')
+            if 'methodId' in detail:                                  # MM Sessions only: the Method the order was created under (absent for legacy rows, so they stay identical)
+                row['methodId'] = detail['methodId']
             rows[order_id] = row
         elif kind in ('ORDER_CANCELLED', 'EXPIRED_NO_QUOTE'):
             require(order_id in rows, 'order', 'CORRUPT_RECORD')
@@ -217,6 +237,7 @@ def project(state, events, quote):
         equity.append(dict(eventId=event['eventId'], sequence=event['sequence'], timeNs=evidence['timeNs'], balance=text(balance)))
         annotations.append(dict(eventId=event['eventId'], orderId=order_id, kind=kind, timeNs=evidence['timeNs'],
             price=detail['price'], side=row['side'], reason=detail.get('reason'), chronologyLimited=evidence['chronologyLimited']))
+    require(not mm or current_hash is None or current_hash == state['policy']['definitionHash'], 'eventChain', 'CORRUPT_RECORD')
     require(count == state['nextEventIndex'] and previous == state['eventHash'] and balance == Fraction(state['balance']) and
         gross == Fraction(state['realizedGross']) and commission == Fraction(state['commission']) and set(state['orders']).issubset(rows),
         'analysisHead', 'CORRUPT_RECORD')

@@ -14,7 +14,7 @@ class ExecutionController:
         self.__store, self.__provider = store, provider
         self.__fixture_cache = fixture_cache
 
-    def create(self, scope, session_id, profile, policy=None, balance="10000"):
+    def create(self, scope, session_id, profile, policy=None, balance="10000", *, methods=None, active_method_id=None):
         profile = profile_wire(profile)
         provider = self.__provider
         manifest = provider.describe(provider.dataset_id, provider.dataset_version)
@@ -26,7 +26,11 @@ class ExecutionController:
         start = manifest["range"]["startNs"]
         timeline = TickTimeline(provider, provider.dataset_id, provider.dataset_version, start, compact=compact_requested(provider))
         policy = policy or MethodPolicy("fixture:free", "0"*64, "FREE_STYLE", False, ())
-        state = seed_state(session_id, provider.dataset_id, provider.dataset_version, start, profile, policy, balance)
+        if methods is not None:                                   # multi-method Session (versioned state, new Sessions only)
+            from .contracts import seed_state_mm
+            state = seed_state_mm(session_id, provider.dataset_id, provider.dataset_version, start, profile, list(methods), active_method_id, balance)
+        else:
+            state = seed_state(session_id, provider.dataset_id, provider.dataset_version, start, profile, policy, balance)
         self.__store.create(scope, state, timeline.checkpoint())
         return state
 

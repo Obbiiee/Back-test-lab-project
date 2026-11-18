@@ -11,14 +11,14 @@ from contracts.models import validate_action
 from contracts.primitives import require, ContractError, digest
 from ticks.contracts import CanonicalTick, keys, uint
 from ticks.timeline import make_group
-from .contracts import (ENGINE_VERSION, MAX_EVENTS, MAX_ORDERS, command_wire, exact,
+from .contracts import (ENGINE_VERSION, is_mm, MAX_EVENTS, MAX_ORDERS, command_wire, exact,
                         money, open_payload, policy_from_wire, price, text, validate_state)
 from .next_event import scan_next_group, scan_untrusted_tie
 
 
 def emit(state, events, kind, *, order_id=None, classification="OBSERVED_FEED_EVENT", **detail):
     require(len(events) < MAX_EVENTS, "events", "REFUSED_EVENT_LIMIT")
-    event = dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-EVENT-1", engineVersion=ENGINE_VERSION,
+    event = dict(schemaVersion=1, artifact="BTL-TICK-EXECUTION-EVENT-1", engineVersion=state["engineVersion"],
                  sessionId=state["sessionId"], datasetId=state["datasetId"], datasetVersion=state["datasetVersion"],
                  profileHash=state["profileHash"], methodHash=state["policy"]["definitionHash"],
                  sequence=state["nextEventIndex"], previousHash=state["eventHash"],
@@ -67,14 +67,18 @@ def submit(state, raw):
         plan = open_payload(payload, state["profile"], policy, state["balance"])
         order = dict(plan, status="PENDING", availableNs=state["throughNs"], remaining=plan["quantity"],
                      entryPrice=None, entryFillRef=None, entryCost="0", exitRequest=None)
+        extra = {}
+        if is_mm(state):                                                  # the order keeps the Method it was created under, whatever is active later
+            order["methodId"] = extra["methodId"] = state["activeMethodId"]
         state["orders"][order_id] = order
         emit(state, events, "ORDER_ACCEPTED", order_id=order_id, classification="ACCEPTED_COMMAND",
-             commandId=command["commandId"], availableNs=order["availableNs"], plan=plan)
+             commandId=command["commandId"], availableNs=order["availableNs"], plan=plan, **extra)
     elif kind in ("CANCEL", "CLOSE"):
         order_id = payload["orderId"]
         order = state["orders"].get(order_id)
         require(order is not None, "order", "REFUSED_ORDER_UNAVAILABLE")
-        policy = policy_from_wire(state["policy"])
+        # MM: the rules that govern a trade are those of the Method it was created under (switching Method cannot be used to bypass a Protocol rule)
+        policy = policy_from_wire(state["methods"][order["methodId"]] if is_mm(state) else state["policy"])
         if kind == "CANCEL":
             require(order["status"] == "PENDING", "order", "REFUSED_NOT_PENDING")
             validate_action(policy, "CANCEL_PENDING")
@@ -89,6 +93,14 @@ def submit(state, raw):
                 require((size / Fraction(state["profile"]["lotStep"])).denominator == 1, "quantity", "REFUSED_LOT_PRECISION")
             order["exitRequest"] = dict(quantity=text(size), availableNs=state["throughNs"], commandId=command["commandId"])
             emit(state, events, "EXIT_REQUESTED", order_id=order_id, classification="ACCEPTED_COMMAND", request=order["exitRequest"])
+    elif kind == "SET_METHOD":
+        require(is_mm(state), "kind", "REFUSED_COMMAND")
+        target = payload["methodId"]
+        require(target in state["methods"], "methodId", "REFUSED_METHOD_UNKNOWN")
+        require(target != state["activeMethodId"], "methodId", "REFUSED_METHOD_UNCHANGED")
+        previous = state["activeMethodId"]
+        state["activeMethodId"], state["policy"] = target, deepcopy(state["methods"][target])
+        emit(state, events, "METHOD_SWITCHED", classification="ACCEPTED_COMMAND", fromMethodId=previous, toMethodId=target)
     elif kind == "END":
         for order_id, order in state["orders"].items():
             if order["status"] == "PENDING":
