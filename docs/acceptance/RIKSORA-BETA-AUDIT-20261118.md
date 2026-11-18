@@ -60,3 +60,19 @@ Bukti: `tests.test_free_pro_months` (`test_free_session_stops_at_the_end_of_its_
 2. Commit backend yang sudah diuji, lalu restart API dengan persetujuan owner, dan jalankan smoke test untuk Jump setelah batas dan `SET_METHOD`.
 3. Tambahkan dua tes yang belum ada.
 4. Baru lakukan `publish.sh`, dengan rollback tersedia (`~/site/dist.prev`).
+
+## Status rilis (2026-11-18)
+
+- Commit rilis: `090bad5` (lokal, belum di-push). Berisi perubahan backend yang diaudit dan diuji. `research_v2.py` sengaja tidak ikut.
+- Worktree siap: `~/releases/riksora-090bad5` (rilis) dan `~/releases/riksora-c82bd85` (rollback). Keduanya bersih.
+- Produksi: job durable tidak ada yang berjalan (11 job, semua SUCCEEDED), sehingga restart tidak memutus pekerjaan.
+- **Restart API: SELESAI** (proses baru dari `~/releases/riksora-090bad5`, port 8010 mendengarkan). Preflight lulus: 0 job QUEUED/RUNNING, tidak ada koneksi aktif ke 8010, tidak ada benchmark, dan rilis tidak mengubah skema.
+- **Smoke test tanpa login: PASS.** Password endpoint tidak terbuka di jalur publik (404). `/api/v1/workspaces` tanpa login 401. Jalur yang ditutup 404. `/api/v1/auth/providers` masih 200 (catatan: `prune` tidak membuangnya, tapi Caddy memang mengizinkan `/api/v1/auth/*`).
+- **Belum dijalankan: publikasi, dan smoke test dengan login Google** (kuota Free, guard window, CLOSE setelah batas, SET_METHOD, Jump, resume, Journal, Analytics, idempotensi). Ini hanya bisa dijalankan lewat browser oleh owner.
+
+Langkah restart (setelah persetujuan dan akun uji):
+1. Buat drop-in `~/.config/systemd/user/riksora-api.service.d/release.conf` dengan `ExecStart=` kosong lalu `ExecStart=%h/tools/venv313/bin/python %h/releases/riksora-090bad5/deploy/site/app_api.py`.
+2. `systemctl --user daemon-reload && systemctl --user restart riksora-api`.
+3. Verifikasi `/proc/<pid>/cwd` mengarah ke worktree rilis, lalu jalankan smoke test.
+
+Rollback: hapus drop-in, ganti `riksora-090bad5` dengan `riksora-c82bd85` di `release.conf`, `daemon-reload`, `restart`.

@@ -28,6 +28,16 @@ riksora.com {
 	handle /api/* {
 		respond "Not found" 404
 	}
+	# Protected QA preview (owner decision 2026-11-18): the release frontend built with base /preview/. The Basic Auth credential is kept OUTSIDE the repository
+	# (~/.config/riksora-preview-auth.caddy). OAuth callbacks under /api/v1/auth are not behind it. Remove this block after the production route is verified.
+	redir /preview /preview/ 308
+	handle /preview/* {
+		import /home/developer/.config/riksora-preview-auth.caddy
+		uri strip_prefix /preview
+		root * {$PREVIEW_ROOT:/home/developer/site/preview}
+		try_files {path} /index.html
+		file_server
+	}
 	handle {
 		try_files {path} /index.html
 		file_server

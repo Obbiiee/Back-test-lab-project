@@ -87,7 +87,8 @@ export function createAccountClient({fetcher=fetch,secure=()=>window.location.pr
         headers:{'Content-Type':'application/json','X-BTL-Google-Exchange':'1'},body:'{}'});
       if(!response.ok)throw Error('Google sign-in could not be completed. Start again.');
       const result=await response.json();
-      if(result?.schemaVersion!==1||typeof result.access_token!=='string'||result.token_type!=='bearer')
+      // The backend returns the standard bearer login body (no schemaVersion), the same shape the password login accepts below.
+      if(typeof result?.access_token!=='string'||result.token_type!=='bearer')
         throw Error('Unsupported Google sign-in response.');
       token=result.access_token;generation++;
       const me=await request('/api/v1/auth/me');
