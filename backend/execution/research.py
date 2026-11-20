@@ -10,7 +10,7 @@ import logging
 from application.models import TrustedScope
 from contracts.canonical import content_hash, canonical_bytes
 from contracts.models import MethodPolicy, Command, SessionContext, Observation, validate_command
-from contracts.primitives import require, identifier, revision, digest
+from contracts.primitives import ContractError, require, identifier, revision, digest
 from ticks.contracts import keys, tag, TickManifest
 from ticks.timeline import TickTimeline, compact_requested
 from infrastructure.database import connect
@@ -166,7 +166,13 @@ class ResearchApplication:
                 method_policy(value)
             metas = [unpack(*row) for row in sessions]
             for meta in metas:
-                self._session(db, meta["id"])
+                try:
+                    self._session(db, meta["id"])
+                except ContractError as error:
+                    # A Session pinned to an earlier dataset version stays listed (its Journal and statistics are immutable records) but cannot be
+                    # replayed with the current source. Any other integrity failure still fails the catalog.
+                    if error.code != "REFUSED_DATASET_VERSION":
+                        raise
             public_metas = [{key: value for key, value in meta.items()
                              if key != 'monthlyManifestHash'} for meta in metas]
             return dict(schemaVersion=1, artifact="BTL-LOCAL-CATALOG-1", methods=parsed, sessions=public_metas,

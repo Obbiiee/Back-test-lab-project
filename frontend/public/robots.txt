@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /preview/
+Disallow: /api/
+Disallow: /app
+Sitemap: https://riksora.com/sitemap.xml

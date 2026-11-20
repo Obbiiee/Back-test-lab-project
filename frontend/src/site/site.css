@@ -139,3 +139,5 @@ html{scroll-behavior:smooth}
 .lp-rules{max-width:1040px;margin:32px auto 0;color:#d9eafe}
 .lp-rules h3{color:#fff;margin:22px 0 8px;font-size:1.15rem}
 .lp-rules ul{padding-left:20px;margin:0}.lp-rules li{margin:6px 0;line-height:1.5}.lp-rules p{margin:6px 0;color:#c3d6f2}
+
+.site-price small{display:block;margin-top:2px;line-height:1.3}

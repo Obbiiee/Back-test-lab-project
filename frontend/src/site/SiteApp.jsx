@@ -200,7 +200,7 @@ function Pricing({t}) {
     <PlanCards t={t}/>
     <h2>{t.pricing.rulesTitle}</h2>
     <ul className="site-list">{t.pricing.rules.map(item => <li key={item}>{item}</li>)}</ul>
-    <p className="site-fine">Free: {FREE_LIMITS.SESSION} / {t.lang === 'en' ? 'month' : 'bulan'} · {FREE_LIMITS.WINDOW} / {t.lang === 'en' ? 'day' : 'hari'} (UTC)</p>
+    <p className="site-fine">Free: {FREE_LIMITS.SESSION} {t.lang === 'en' ? 'new Session / day' : 'Sesi baru / hari'} · {FREE_LIMITS.WINDOW} {t.lang === 'en' ? 'new historical month / day' : 'bulan historis baru / hari'} (UTC)</p>
     <h2>{t.pricing.payTitle}</h2>
     <p>{t.pricing.payLead}</p>
     {Array.isArray(methods) && methods.length > 0
@@ -264,6 +264,9 @@ function Legal({t, page}) {
 
 export default function SiteApp({location}) {
   const lang = siteLang(location.search), page = sitePage(location.search), t = COPY[lang];
+  useEffect(() => {   // pricing, about and contact are sections of the landing now; old links keep working
+    if (['pricing', 'about', 'contact'].includes(page)) window.location.replace(anchor(page === 'pricing' ? 'pricing' : page, lang));
+  }, [page, lang]);
   useEffect(() => {
     const names = {account: t.preview.title, home: t.hero.badge, pricing: t.pricing.title, about: t.about.title, contact: t.contact.title, terms: COPY.id.terms.title, privacy: COPY.id.privacy.title, refund: COPY.id.refund.title};
     document.title = page === 'home' ? `${SITE.brand} — ${t.hero.badge}` : `${names[page]} — ${SITE.brand}`;

@@ -214,8 +214,8 @@
 .rk-auth{min-height:100dvh;display:flex;flex-wrap:wrap;background:var(--rk-navy);color:#fff;font-family:var(--rk-font-ui,Inter,system-ui,sans-serif)}
 .rk-auth-loading{margin:auto;color:var(--rk-muted-on-navy)}
 .rk-auth-hero{position:relative;overflow:hidden;flex:1 1 480px;padding:40px clamp(20px,5vw,64px);display:flex;flex-direction:column;justify-content:space-between;gap:32px;min-height:360px;box-sizing:border-box}
-.rk-auth-hero::before{content:"";position:absolute;right:-80px;top:140px;width:320px;height:320px;border-radius:50%;background:var(--rk-blue);opacity:.9}
-.rk-auth-hero::after{content:"";position:absolute;left:80px;bottom:-40px;width:120px;height:120px;border-radius:34px;background:var(--rk-coral);transform:rotate(16deg)}
+.rk-auth-hero::before{content:"";position:absolute;right:48px;top:150px;width:280px;height:280px;border-radius:50%;background:var(--rk-blue);opacity:.9}
+.rk-auth-hero::after{content:"";position:absolute;right:200px;bottom:70px;width:96px;height:96px;border-radius:34px;background:var(--rk-coral);transform:rotate(16deg)}
 .rk-auth-hero>*{position:relative;z-index:1}
 .rk-auth-brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:900;letter-spacing:.06em;font-size:17px;align-self:flex-start}
 .rk-auth-hero h1{margin:0;font-size:clamp(38px,5vw,56px);font-weight:900;line-height:1.04;letter-spacing:-.035em}

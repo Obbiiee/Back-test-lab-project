@@ -185,7 +185,7 @@ export default function AlphaAccount(){
             <button type="submit" className="rk-auth-btn rk-auth-primary" disabled={busy}>{busy?'Working…':mode==='signin'?'Sign in':mode==='register'?'Create account':mode==='verify'?'Verify email':mode==='forgot'?'Send reset code':'Save password'}</button>
           </form>
           {mode==='verify'&&<button type="button" className="rk-auth-btn" disabled={busy||!email.trim()} onClick={resend}>Resend code</button>}
-          {mode==='signin'&&<button type="button" className="rk-auth-link" disabled={busy} onClick={()=>switchMode('verify')}>Have a verification code?</button>}
+          {mode==='signin'&&capability.password&&<button type="button" className="rk-auth-link" disabled={busy} onClick={()=>switchMode('verify')}>Have a verification code?</button>}
           {['verify','forgot','reset'].includes(mode)&&<button type="button" className="rk-auth-link" disabled={busy} onClick={()=>switchMode('signin')}>Back to sign in</button>}
           <p className="rk-auth-small rk-auth-foot">For your safety you sign in again after closing or refreshing the tab.</p>
         </>}
