@@ -55,6 +55,7 @@ export default function AlphaAccount(){
           const me=await client.completeGoogleLogin();
           const [list,providers]=await Promise.all([client.request('/api/v1/workspaces'),client.identityProviders()]);
           if(active){setGoogleAvailable(true);setUser(me);setWorkspaces(list);setIdentityProviders(providers);setNotice('Signed in with Google. Choose a workspace to continue.');}
+          if(active){try{await enter(list);}catch{/* auto-entry is a convenience: fall back to the workspace chooser */}}
           url.searchParams.delete('auth');url.searchParams.set('page','account');window.history.replaceState(null,'',url.pathname+url.search);
         }else if(flow==='google-linked'){
           const result=await client.completeGoogleLink();
@@ -77,6 +78,7 @@ export default function AlphaAccount(){
       }
     }
     void load();return()=>{active=false;};
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- enter() only uses client and live refs; the sign-in flow must run once per client
   },[client]);
   // What this server offers (Google-only beta: no password and no research API yet). Public, unauthenticated, so it also works after the Google redirect.
   useEffect(()=>{
@@ -122,6 +124,16 @@ export default function AlphaAccount(){
         }
       }
     });
+  }
+  // One workspace is all a normal user needs: create it when missing and open it, instead of asking them to manage workspaces.
+  async function enter(list){
+    let spaces=list;
+    if(spaces.length===0){
+      await client.request('/api/v1/workspaces',{method:'POST',body:{name:'My workspace'}});
+      spaces=await client.request('/api/v1/workspaces');
+      if(live.current)setWorkspaces(spaces);
+    }
+    if(live.current&&spaces.length===1)open(spaces[0]);
   }
   function open(workspace){
     if(!capability.research){setNotice('The backtest workspace is not open yet (beta). Your account and Free plan are active; we will announce when it opens.');return;}
