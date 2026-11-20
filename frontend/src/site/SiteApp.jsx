@@ -9,7 +9,7 @@ import {FREE_LIMITS, formatIdr, currentPrice, yearlySavingPercent} from './plans
 import {siteLang, sitePage} from './siteRoute.js';
 const preview = SITE.launchState !== 'live';
 const href = (page, lang) => (page === 'home' ? '/' : `/?page=${page}`) + (lang === 'en' ? (page === 'home' ? '?lang=en' : '&lang=en') : '');
-const account = '/?page=account';
+const account = '/app';
 const anchor = (id, lang) => (lang === 'en' ? '/?lang=en' : '/') + '#' + id;   // the landing is one page: pricing, about and contact are sections of it
 const signInOpen = SITE.launchState !== 'preview';   // beta/live: Google sign-in is open; purchases stay closed until live
 const entry = (lang) => (signInOpen ? account : href('contact', lang));

@@ -201,7 +201,16 @@ export default function TickAlpha(){
       const workspace=await loadWorkspace(saved.metadata.id);
       setCatalog(await loadProductCatalog());setView(workspace);rememberSession(saved.metadata.id);navigate({screen:'replay',session:saved.metadata.id});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
       setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');
-     }catch(error){setCreateError({code:error.message,text:noticeText(error.message)});return false;}
+     }catch(error){
+      if(error?.code==='UNKNOWN'&&creationId.current){
+        // The outcome is unknown, not refused: look for the Session under the SAME id before reporting a failure.
+        try{
+          const sid=creationId.current,workspace=await loadWorkspace(sid);
+          setCatalog(await loadProductCatalog());setView(workspace);rememberSession(sid);navigate({screen:'replay',session:sid});setDialog(null);creationId.current=null;setPlan(initialPlan(workspace));setPlanRevision(0);
+          setNotice('Session saved. The chart begins with observed history; orders use subsequent quotes.');return;
+        }catch{/* not saved (yet): keep the explanation; pressing Create again reuses the same id, so it cannot create a duplicate */}
+      }
+      setCreateError({code:error.message,text:noticeText(error.message)});return false;}
     });
   };
   const openCreation=(type,event)=>{

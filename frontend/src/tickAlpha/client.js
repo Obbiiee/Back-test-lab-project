@@ -431,5 +431,6 @@ export function noticeText(message){
     PROTOCOL_BLOCKED:'Protocol rules blocked this order. Check the checklist and locked entry/exit rules.',
     LOCAL_BUSY:'The local service is busy. Wait for the current request, then retry.',
   };
+  if(typeof message==='string'&&message.startsWith('UNKNOWN:'))return 'We could not confirm that your Session was created. Open Sessions to check. Pressing Create again is safe: it reuses the same request and cannot create a duplicate.';
   return explanations[message]?`${explanations[message]} (${message})`:message;
 }
