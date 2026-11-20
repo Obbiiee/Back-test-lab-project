@@ -53,7 +53,10 @@ export const COPY = {
       lead: 'RIKSORA Backtest Lab memutar ulang data tick bid/ask historis. Anda menulis aturan, menjalankan Sesi, lalu server menghitung hasilnya dari bukti tick, bukan dari tebakan pada candle.',
       primary: 'Mulai gratis', secondary: 'Lihat harga',
       previewPrimary: 'Minta akses beta',
-      caption: 'Simulasi untuk berlatih. Tanpa uang sungguhan, tanpa eksekusi di broker, bukan nasihat investasi.'},
+      caption: 'Simulasi untuk berlatih. Tanpa uang sungguhan, tanpa eksekusi di broker, bukan nasihat investasi.', mark: 'kemarin'},
+    lp: {badgeTag: 'Beta', previewLabel: 'Ilustrasi tampilan aplikasi. Bukan hasil nyata.', previewNote: 'Ilustrasi tampilan, bukan hasil nyata.', replaying: '▶ memutar',
+      buyChip: 'Beli · terisi di Ask', hitTitle: 'Target tercapai', hitValue: '+2,00R', fillsTitle: 'Isi order yang jujur',
+      fills: ['Beli terisi di Ask', 'Jual terisi di Bid'], ctaTitle: 'Latihan berikutnya bisa dimulai malam ini.', ctaLead: 'Gratis untuk mulai. Tanpa uang sungguhan, tanpa kartu.'},
     purpose: {
       title: 'Untuk apa produk ini dibuat',
       body: [
@@ -149,7 +152,10 @@ export const COPY = {
       lead: 'RIKSORA Backtest Lab replays historical bid/ask tick data. You write your rules, run a Session, and the server computes the result from tick evidence, not from guesses on candles.',
       primary: 'Start free', secondary: 'See pricing',
       previewPrimary: 'Request beta access',
-      caption: 'Simulation for practice. No real money, no broker execution, not investment advice.'},
+      caption: 'Simulation for practice. No real money, no broker execution, not investment advice.', mark: 'yesterday’s'},
+    lp: {badgeTag: 'Beta', previewLabel: 'Illustration of the app. Not real results.', previewNote: 'Illustration of the app, not real results.', replaying: '▶ replaying',
+      buyChip: 'Buy · filled at Ask', hitTitle: 'Target hit', hitValue: '+2.00R', fillsTitle: 'Honest fills',
+      fills: ['Buys fill at Ask', 'Sells fill at Bid'], ctaTitle: 'Your next practice session can start tonight.', ctaLead: 'Free to start. No real money, no card.'},
     purpose: {
       title: 'Why this product exists',
       body: [
