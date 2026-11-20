@@ -10,6 +10,7 @@ import {siteLang, sitePage} from './siteRoute.js';
 const preview = SITE.launchState !== 'live';
 const href = (page, lang) => (page === 'home' ? '/' : `/?page=${page}`) + (lang === 'en' ? (page === 'home' ? '?lang=en' : '&lang=en') : '');
 const account = '/?page=account';
+const anchor = (id, lang) => (lang === 'en' ? '/?lang=en' : '/') + '#' + id;   // the landing is one page: pricing, about and contact are sections of it
 const signInOpen = SITE.launchState !== 'preview';   // beta/live: Google sign-in is open; purchases stay closed until live
 const entry = (lang) => (signInOpen ? account : href('contact', lang));
 
@@ -17,10 +18,10 @@ function Header({t, lang, page}) {
   return <header className="site-nav">
     <a className="site-brand" href={href('home', lang)} aria-label={SITE.brand}><RiksoraMark size={36}/><span>RIKSORA <small>BACKTEST LAB</small></span></a>
     <nav aria-label="Main">
-      <a href={href('home', lang) + (lang === 'en' ? '#how' : '#how')} aria-current={page === 'home' ? 'page' : undefined}>{t.nav.how}</a>
-      <a href={href('pricing', lang)} aria-current={page === 'pricing' ? 'page' : undefined}>{t.nav.pricing}</a>
-      <a href={href('about', lang)} aria-current={page === 'about' ? 'page' : undefined}>{t.nav.about}</a>
-      <a href={href('contact', lang)} aria-current={page === 'contact' ? 'page' : undefined}>{t.nav.contact}</a>
+      <a href={anchor('how', lang)} aria-current={page === 'home' ? 'page' : undefined}>{t.nav.how}</a>
+      <a href={anchor('pricing', lang)}>{t.nav.pricing}</a>
+      <a href={anchor('about', lang)}>{t.nav.about}</a>
+      <a href={anchor('contact', lang)}>{t.nav.contact}</a>
     </nav>
     <div className="site-nav-actions">
       <a className="site-lang" href={href(page, t.other)} hrefLang={t.other} lang={t.other}>{t.otherLabel}</a>
@@ -42,9 +43,9 @@ function Footer({t, lang}) {
         {b.nib && <span>NIB {b.nib}</span>}
       </div>
       <nav aria-label="Legal">
-        <a href={href('pricing', lang)}>{t.nav.pricing}</a>
-        <a href={href('about', lang)}>{t.nav.about}</a>
-        <a href={href('contact', lang)}>{t.nav.contact}</a>
+        <a href={anchor('pricing', lang)}>{t.nav.pricing}</a>
+        <a href={anchor('about', lang)}>{t.nav.about}</a>
+        <a href={anchor('contact', lang)}>{t.nav.contact}</a>
         <a href={href('terms', 'id')} hrefLang="id">{t.nav.terms}</a>
         <a href={href('privacy', 'id')} hrefLang="id">{t.nav.privacy}</a>
         <a href={href('refund', 'id')} hrefLang="id">{t.nav.refund}</a>
@@ -156,11 +157,20 @@ function Home({t, lang}) {
       <h2 id="purpose-h">{t.purpose.title}</h2>
       {t.purpose.body.map(text => <p key={text}>{text}</p>)}
     </section>
-    <section id="plans" className="lp-plans" aria-labelledby="plans-h">
+    <section id="pricing" className="lp-plans" aria-labelledby="plans-h">
       <div className="lp-wrap">
         <h2 id="plans-h">{t.plans.title}</h2><p className="lp-plans-lead">{t.plans.lead}</p>
         <PlanCards t={t} withCta={false}/>
-        <p><a className="lp-link" href={href('pricing', lang)}>{t.plans.cta} →</a></p>
+        <div className="lp-rules">
+          <h3>{t.pricing.rulesTitle}</h3>
+          <ul>{t.pricing.rules.map(item => <li key={item}>{item}</li>)}</ul>
+          <h3>{t.pricing.payTitle}</h3>
+          <p>{t.pricing.payLead}</p>
+          {Array.isArray(SITE.payment.methods) && SITE.payment.methods.length > 0
+            ? <ul>{SITE.payment.methods.map(item => <li key={item}>{item}</li>)}</ul>
+            : <p>{t.pricing.taxNone}</p>}
+          {SITE.pro.taxNote && <p>{SITE.pro.taxNote}</p>}
+        </div>
       </div>
     </section>
     <section id="limits" className="site-section" aria-labelledby="limits-h">
@@ -171,6 +181,8 @@ function Home({t, lang}) {
       <h2 id="faq-h">{t.faq.title}</h2>
       {t.faq.items.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
     </section>
+    <About t={t} embedded/>
+    <Contact t={t} embedded/>
     <section className="lp-final-wrap" aria-labelledby="final-h">
       <div className="lp-final">
         <span className="lp-blob lp-blob-yellow" aria-hidden="true"/><span className="lp-blob lp-blob-red2" aria-hidden="true"/>
@@ -198,14 +210,14 @@ function Pricing({t}) {
   </section>;
 }
 
-function About({t}) {
-  const b = SITE.business;
-  return <section className="site-page" aria-labelledby="ab-h">
-    <h1 id="ab-h">{t.about.title}</h1>
+function About({t, embedded = false}) {
+  const b = SITE.business, H = embedded ? 'h2' : 'h1', H2 = embedded ? 'h3' : 'h2';
+  return <section id={embedded ? 'about' : undefined} className={embedded ? 'site-section' : 'site-page'} aria-labelledby="ab-h">
+    <H id="ab-h">{t.about.title}</H>
     {t.about.body.map(text => <p key={text}>{text}</p>)}
-    <h2>{t.about.principlesTitle}</h2>
+    <H2>{t.about.principlesTitle}</H2>
     <ul className="site-list">{t.about.principles.map(item => <li key={item}>{item}</li>)}</ul>
-    <h2>{t.about.identityTitle}</h2>
+    <H2>{t.about.identityTitle}</H2>
     <dl className="site-facts">
       <dt>{t.lang === 'en' ? 'Name' : 'Nama'}</dt><dd>{b.publicName || '—'}</dd>
       {b.legalForm && <><dt>{t.lang === 'en' ? 'Form' : 'Bentuk usaha'}</dt><dd>{b.legalForm}</dd></>}
@@ -216,10 +228,10 @@ function About({t}) {
   </section>;
 }
 
-function Contact({t}) {
-  const b = SITE.business;
-  return <section className="site-page" aria-labelledby="ct-h">
-    <h1 id="ct-h">{t.contact.title}</h1><p className="site-lead">{t.contact.lead}</p>
+function Contact({t, embedded = false}) {
+  const b = SITE.business, H = embedded ? 'h2' : 'h1';
+  return <section id={embedded ? 'contact' : undefined} className={embedded ? 'site-section site-alt' : 'site-page'} aria-labelledby="ct-h">
+    <H id="ct-h">{t.contact.title}</H><p className="site-lead">{t.contact.lead}</p>
     <dl className="site-facts">
       <dt>{t.contact.email}</dt><dd>{b.email ? <a href={`mailto:${b.email}`}>{b.email}</a> : '—'}</dd>
       {b.phone && <><dt>{t.contact.phone}</dt><dd>{b.phone}</dd></>}
