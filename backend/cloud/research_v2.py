@@ -52,7 +52,7 @@ def run(access,actor,workspace,operation,args):
                     retry=db.execute('SELECT 1 FROM btl.tick_commands WHERE workspace_id=%s AND session_id=%s AND command_id=%s',(str(workspace),sid,raw['reviewId'])).fetchone() is not None
             if operation=='review' or operation=='confirm' and not retry:
                 require(int(window['startNs'])<=int(state['throughNs'])<int(window['endNs']),'window','OUTSIDE_TRADABLE_WINDOW')
-            if operation=='apply' and args[1].get('kind')=='ADVANCE':
+            if operation=='apply' and args[1].get('kind') in ('ADVANCE','SEEK'):      # SEEK moves the cursor forward too when nothing is live: same boundary
                 target=args[1].get('payload',{}).get('targetNs')
                 require(type(target) is str and target.isdigit() and len(target)<=24,'target')
                 require(int(window['startNs'])<=int(target)<int(window['endNs']),'window','WINDOW_CONTINUATION_UNAVAILABLE')
