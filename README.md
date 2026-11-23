@@ -1,4 +1,6 @@
-# Backtest Lab
+# Backtest Lab (RIKSORA)
+
+**Coba produk saat ini di laptop, dari nol, satu perintah:** `python deploy/local/dev_stack.py up` — panduan lengkap (Windows via WSL2) di [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md).
 
 Aplikasi utama: React 19, Vite 8, TradingView Lightweight Charts 5.2.1.
 Default lokal: workspace tick Exness melalui `frontend/src/main.jsx` → `TickAlphaEntry.jsx`. UI v1 tetap tersedia secara eksplisit pada `/?legacy=local`; fixture sintetis pada `/?tick-alpha=local` memakai UI tick yang sama.

@@ -46,3 +46,6 @@ Desktop.ini
 # Generated XAUUSD decade archive (npm run history:decade). manifest.json stays tracked as the provenance record.
 /frontend/public/market/decade/*.json
 !/frontend/public/market/decade/manifest.json
+
+# Local stack (deploy/local/dev_stack.py): database, generated data, build, secrets, certificate
+.local/
