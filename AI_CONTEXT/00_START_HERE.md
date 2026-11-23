@@ -6,6 +6,7 @@ Read these existing owners in order before work:
 
 | Responsibility | Single owner |
 | --- | --- |
+| One-page live status (what runs, trunk branch, pending owner decisions) | [STATUS.md](../STATUS.md) |
 | Onboarding | This file |
 | Factual product/repository state | [01_PROJECT_STATE](01_PROJECT_STATE.md) |
 | Architecture | [02_ARCHITECTURE](02_ARCHITECTURE.md) |

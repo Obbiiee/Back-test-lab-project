@@ -88,7 +88,12 @@ class Home:
 
 
 def run(command, **kwargs):
-    return subprocess.run([str(part) for part in command], check=True, capture_output=True, text=True, **kwargs)
+    try:
+        return subprocess.run([str(part) for part in command], check=True, capture_output=True, text=True, **kwargs)
+    except subprocess.CalledProcessError as error:
+        detail = ((error.stderr or '') + (error.stdout or '')).strip()[-1500:]
+        raise SystemExit(f'ERROR: command failed: {" ".join(str(part) for part in command[:3])} ...\n{detail}\n'
+                         'Hint: if it says "Address already in use", another program holds that port; pick another with --port / --pg-port.')
 
 
 # ---------------------------------------------------------------------------------------------------------------- PostgreSQL
