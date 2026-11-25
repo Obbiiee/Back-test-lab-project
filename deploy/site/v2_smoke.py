@@ -60,7 +60,7 @@ def main():
     step("session create accepted", s in (200, 202), s)
     if s == 202: step("session create job", poll(r["jobId"], root).get("state") == "SUCCEEDED", "job")
     s, sm = call("GET", root + f"/sessions/{sid}/summary"); step("summary", s == 200, s)
-    start_ns = 1580342400 * 10**9
+    start_ns = (1577836800 + 1800) * 10**9      # 2020-01-01 00:30 UTC, the first replay position the UI uses; a large first ADVANCE leaves a pending target that replay-run correctly refuses (ADVANCE_IN_PROGRESS)
     s, r = call("POST", root + f"/sessions/{sid}/commands", {"schemaVersion": 1, "artifact": "BTL-TICK-EXECUTION-COMMAND-1", "sessionId": sid, "commandId": "command:" + uuid.uuid4().hex,
                 "expectedRevision": sm["revision"], "kind": "ADVANCE", "payload": {"targetNs": str(start_ns)}}, job=str(uuid.uuid4()))
     step("advance to first tick", s in (200, 202) and (s == 200 or poll(r["jobId"], root).get("state") == "SUCCEEDED"), s)

@@ -74,5 +74,5 @@ assert.equal(monthLabel('2025-01'),'January 2025');
 // approved fields into the unchanged Session API payload.
 const wizard=readFileSync(new URL('../src/tickAlpha/AlphaSessionWizard.jsx',import.meta.url),'utf8');
 assert.doesNotMatch(wizard,/maxPeriod|slice\(0,4\)/);
-assert.match(wizard,/onCreate\(\{name:finalName,methodId:method\.id,symbol:instrument,initialBalance:balance,\s*startPeriod:/);
+assert.match(wizard,/onCreate\(\{name:finalName,methodId:method\.id,(?:methodIds:[^\n]*?,)?symbol:instrument,initialBalance:balance,\s*startPeriod:/);
 console.log('period availability: ok');

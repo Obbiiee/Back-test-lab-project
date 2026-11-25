@@ -33,5 +33,8 @@
 - Data pasar nyata (hak data UNKNOWN), pembayaran produksi, margin, aktivasi MI.
 - Commercial V1 tetap **BLOCKED**.
 
-## 6. Dokumen lama
+## 6. Audit cabang dan tes (2026-11-25)
+Ringkasan: `docs/acceptance/RIKSORA-BRANCH-CONSOLIDATION-20261125.md` — kode di VPS1 cocok dengan GitHub, 26 cabang remote aman diarsipkan lalu dihapus, 8 cabang HistData ditahan (hak data), 3 cabang UI menunggu keputusan owner; semua gerbang tes yang dijalankan lulus.
+
+## 7. Dokumen lama
 Laporan di `docs/acceptance/` dan `docs/*` adalah bukti historis, bukan instruksi. Bila ragu, ikuti halaman ini lalu `AI_CONTEXT/04_CURRENT_PHASE.md`.
