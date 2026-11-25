@@ -29,12 +29,12 @@
 
 ## 5. Keputusan yang menunggu owner
 - Push `main` ke GitHub (fast-forward, tanpa force). Catatan: tiga commit historis memuat nama pribadi owner (lihat `docs/acceptance/RIKSORA-GIT-AUDIT-20261118.md`); owner menolak sanitasi 2026-11-18.
-- Menghapus branch remote lama (tidak bisa dibatalkan).
+- Nasib 34 branch remote yang tersisa: 26 dipakai 24 PR draf/terbuka (rantai Codex #16–#58; menghapus head/base-nya menutup PR itu, jadi owner yang memutuskan menutup PR atau tidak) dan 8 branch HistData (hak data). 27 branch lain sudah dihapus 2026-11-25; 15 di antaranya diarsipkan sebagai tag remote `archive/remote/<nama>`.
 - Data pasar nyata (hak data UNKNOWN), pembayaran produksi, margin, aktivasi MI.
 - Commercial V1 tetap **BLOCKED**.
 
 ## 6. Audit cabang dan tes (2026-11-25)
-Ringkasan: `docs/acceptance/RIKSORA-BRANCH-CONSOLIDATION-20261125.md` — kode di VPS1 cocok dengan GitHub, 26 cabang remote aman diarsipkan lalu dihapus, 8 cabang HistData ditahan (hak data), 3 cabang UI menunggu keputusan owner; semua gerbang tes yang dijalankan lulus.
+Ringkasan: `docs/acceptance/RIKSORA-BRANCH-CONSOLIDATION-20261125.md` — kode di VPS1 cocok dengan GitHub, 27 cabang remote aman sudah dihapus (15 diarsipkan sebagai tag), 8 cabang HistData ditahan (hak data), 3 cabang UI menunggu keputusan owner; semua gerbang tes yang dijalankan lulus.
 
 ## 7. Dokumen lama
 Laporan di `docs/acceptance/` dan `docs/*` adalah bukti historis, bukan instruksi. Bila ragu, ikuti halaman ini lalu `AI_CONTEXT/04_CURRENT_PHASE.md`.

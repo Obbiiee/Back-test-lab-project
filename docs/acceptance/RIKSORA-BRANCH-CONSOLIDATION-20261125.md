@@ -84,3 +84,9 @@ Measured 2026-11-25 on VPS1: frontend `test:*` 46/46, `lint` clean, `test_author
 
 ## 8. Single authoritative branch (item 5)
 `main` (local) is the trunk. It includes the old `main` history by an `ours` merge, so it fast-forwards onto `origin/main`. Pushing it and deleting remote branches are owner actions.
+
+## 9. Executed on GitHub (2026-11-25, owner approval "ya harus ada 1 kebenaran")
+- `main` pushed as a plain fast-forward (`4fc9939..42fda85`; later docs commit on top).
+- 24 open PRs exist (#16-#58, mostly a Codex draft chain). Branches used as head or base of an open PR were **kept**, because deleting them would close the PR.
+- **27 remote branches deleted** (12 fully contained in `main`, 15 archived first as remote tags `archive/remote/<branch>`; the tags were verified on GitHub before deleting).
+- Kept: 26 branches tied to open PRs, and the 8 HistData branches (data-rights gate).
