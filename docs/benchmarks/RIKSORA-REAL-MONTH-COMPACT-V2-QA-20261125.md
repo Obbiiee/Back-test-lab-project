@@ -60,7 +60,9 @@ v2 + archive events: 1,412 ORDER_ACCEPTED, 1,196 ENTRY_FILL, 1,195 EXIT_FILL, 11
 
 The raw event lists differ only by the 1,156 (300k run) / 1,172 (SEEK) non-financial `REPLAY_ADVANCED` progress records the canonical timeline emits and the direct path does not. **A product integration of the direct path must reconcile that bookkeeping record (ledger and hash chain) first; that is an owner/contract decision, not made here.**
 
-**Full-month canonical baseline: NOT RUN.** A first attempt was cut off when its session ended after seconds (no result). **HYPOTHESIS** from the measured rates (ingest 1,984 ticks/s, reducer 1,065 ticks/s): about 18 min ingest plus about 33 min reducer for 2.13 M ticks, one core. Month-scale parity therefore rests on the 300,000-tick windows plus the full-month direct runs, not on a month-long canonical run.
+**Full-month canonical reducer: NOT RUN (stopped by the owner).** Its tier rate is already known from the 300,000-tick window above and from the 14-15 Nov reports (about 1,000-1,290 ticks/s per core), so a month-long run was judged a repeat. Month-scale parity therefore rests on the 300,000-tick windows plus the full-month direct runs. **HYPOTHESIS** from the measured rates only: about 33 min of reducer time for 2.13 M ticks on one core.
+
+**Full-month canonical ingest: MEASURED (it completed before the stop).** 2,126,396 ticks in 1,213.6 s wall (1,767 ticks/s), 1,128.6 s CPU, peak RSS 261 MB (cgroup peak 912 MB), **25,089 MB written to the SSD** for a final 653 MB store (about 38x write amplification; the cause is not instrumented here: the code uses SQLite WAL with `synchronous=FULL` and small commits, which is a HYPOTHESIS for the split), 97.8 MB CSV in. Light functional tests (a PostgreSQL test run and a local stack) ran on other cores during this phase, so its timing may include some contention.
 
 Canonical ingest cost that the direct path does not pay (300,000 ticks): 152.8 s, **2,050 MB written to the SSD**, 92 MB final store (13.8 MB CSV in).
 
@@ -92,7 +94,7 @@ Reading: the slow part of the canonical path is **canonical JSON encoding and ha
 
 - **Proven (this host, engine-only, one real month, one pair, rights UNKNOWN, private QA):** the product reducer can be fed directly from Compact V2 with no conversion or dataset copy; on 300,000-tick windows it equals the canonical reducer (including Jump, SEEK, pending, market, SL, TP); the full month runs in about 13 s with 1,412 orders and 2,391 fills, 364 MB, one core; checkpoint and resume reproduce the uninterrupted result.
 - **Prototype:** the direct path is QA tooling (`tools/claude_exp`), not wired to the product, the queue or PostgreSQL. Identity labels (`datasetId` and the like) were chosen by the harness, because the compact file does not carry the original `memberHash`.
-- **Not proven / NOT RUN:** the complete product path with real data (worker, API, PostgreSQL, Journal, browser); a month-long canonical baseline; other months (the largest XAUUSD month in the folder has 9.4 M ticks, median 5.8 M); other pairs or instruments (the product has a XAUUSD profile only); more than one strategy or the real activity of a person; concurrency; rights, completeness and accuracy of the data.
+- **Not proven / NOT RUN:** the complete product path with real data (worker, API, PostgreSQL, Journal, browser); a month-long canonical reducer run; other months (the largest XAUUSD month in the folder has 9.4 M ticks, median 5.8 M); other pairs or instruments (the product has a XAUUSD profile only); more than one strategy or the real activity of a person; concurrency; rights, completeness and accuracy of the data.
 - **Decisions for the owner, not taken:** making the v2 model the default for rights-UNKNOWN data (frozen financial contract); reconciling `REPLAY_ADVANCED` for the direct path; any source-admission or eligibility change that would let the website or the laptop stack use this data.
 
 Commercial V1 stays BLOCKED.

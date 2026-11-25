@@ -36,7 +36,7 @@
 ## 6. Audit cabang dan tes (2026-11-25)
 Ringkasan: `docs/acceptance/RIKSORA-BRANCH-CONSOLIDATION-20261125.md` — kode di VPS1 cocok dengan GitHub, 27 cabang remote aman sudah dihapus (15 diarsipkan sebagai tag), 8 cabang HistData ditahan (hak data), 3 cabang UI menunggu keputusan owner; semua gerbang tes yang dijalankan lulus.
 
-QA data asli (2026-11-25, engine saja, privat, hak UNKNOWN): `docs/benchmarks/RIKSORA-REAL-MONTH-COMPACT-V2-QA-20261125.md` — reducer produk bisa membaca Compact V2 langsung (satu bulan XAUUSD 2,13 juta tick dalam sekitar 13 detik, paritas dengan reducer kanonik pada jendela 300.000 tick). Belum diuji: jalur produk lengkap dan baseline kanonik satu bulan penuh.
+QA data asli (2026-11-25, engine saja, privat, hak UNKNOWN): `docs/benchmarks/RIKSORA-REAL-MONTH-COMPACT-V2-QA-20261125.md` — reducer produk bisa membaca Compact V2 langsung (satu bulan XAUUSD 2,13 juta tick dalam sekitar 13 detik, paritas dengan reducer kanonik pada jendela 300.000 tick). Belum diuji: jalur produk lengkap dan reducer kanonik satu bulan penuh (dihentikan owner; laju sudah diketahui dari irisan).
 
 ## 7. Dokumen lama
 Laporan di `docs/acceptance/` dan `docs/*` adalah bukti historis, bukan instruksi. Bila ragu, ikuti halaman ini lalu `AI_CONTEXT/04_CURRENT_PHASE.md`.
