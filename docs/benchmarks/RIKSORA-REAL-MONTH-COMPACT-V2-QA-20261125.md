@@ -9,7 +9,7 @@ Labels used below: **MEASURED** (actual run on this host), **HYPOTHESIS** (not m
 | Item | Value |
 |---|---|
 | Data | One real month, XAUUSD 2024-02, Compact Tick V2 (`BTL-COMPACT-TICK-2`, `authoritative: false`, derived), 2,126,396 ticks, 7.79 MB, source recorded as Dukascopy, rights UNKNOWN |
-| Reducer | The product's `execution/observed_kernel.apply`, unchanged. One financial reducer. |
+| Reducer | `execution/observed_kernel.apply`, unchanged (the **observed-data** execution path, one of several in the repository; see section 9). The path measured here is **not** the one the website runs for its synthetic sessions. |
 | Baseline path | Temporary canonical store (`DukascopyCsvIngestion` -> `DatasetBuilder`) -> `IndexedTickTimeline` -> `observed_kernel.apply` (what the repo's QA baseline uses) |
 | Direct path | `open_compact` on the real Compact V2 directory -> `AdmittedSource` -> `ClaudeSession` -> the same `observed_kernel` functions. `ClaudeSession` computes no fill or money amount itself; it only supplies the tick source and the event search (skipping is allowed only over spans proven to contain no event the reference loop would act on). |
 | Strategy | Scripted trader of `tools/claude_exp/common.drive` (`mix=True`): market, limit, stop, manual close, cancel, with TP and SL; one live order at a time; 300 s step. Same strategy on both paths. |
@@ -92,9 +92,22 @@ Reading: the slow part of the canonical path is **canonical JSON encoding and ha
 
 ## 8. What this does and does not establish
 
-- **Proven (this host, engine-only, one real month, one pair, rights UNKNOWN, private QA):** the product reducer can be fed directly from Compact V2 with no conversion or dataset copy; on 300,000-tick windows it equals the canonical reducer (including Jump, SEEK, pending, market, SL, TP); the full month runs in about 13 s with 1,412 orders and 2,391 fills, 364 MB, one core; checkpoint and resume reproduce the uninterrupted result.
+- **Proven (this host, engine-only, one real month, one pair, rights UNKNOWN, private QA):** the observed-data reducer (`observed_kernel`) can be fed directly from Compact V2 with no conversion or dataset copy; on 300,000-tick windows it equals the canonical reducer (including Jump, SEEK, pending, market, SL, TP); the full month runs in about 13 s with 1,412 orders and 2,391 fills, 364 MB, one core; checkpoint and resume reproduce the uninterrupted result.
 - **Prototype:** the direct path is QA tooling (`tools/claude_exp`), not wired to the product, the queue or PostgreSQL. Identity labels (`datasetId` and the like) were chosen by the harness, because the compact file does not carry the original `memberHash`.
 - **Not proven / NOT RUN:** the complete product path with real data (worker, API, PostgreSQL, Journal, browser); a month-long canonical reducer run; other months (the largest XAUUSD month in the folder has 9.4 M ticks, median 5.8 M); other pairs or instruments (the product has a XAUUSD profile only); more than one strategy or the real activity of a person; concurrency; rights, completeness and accuracy of the data.
 - **Decisions for the owner, not taken:** making the v2 model the default for rights-UNKNOWN data (frozen financial contract); reconciling `REPLAY_ADVANCED` for the direct path; any source-admission or eligibility change that would let the website or the laptop stack use this data.
+
+## 9. Correction (2026-11-25): there is not one execution path in the repository
+
+An earlier version of this report, and chat statements the same day, called the measured reducer "the product reducer" and "one financial reducer for every path". That was too broad. Read from the code (`cloud/research.py`, `execution/*`):
+
+| Path | Files | Used by |
+|---|---|---|
+| Default controller | `execution/controller.py` + `engine.py` (`ResearchApplication`) | **The website's synthetic sessions** |
+| Observed kernel | `execution/observed_kernel.py` (`ObservedResearchApplication`) | Observed/real-source path; **every measurement in this report** |
+| Kernel v2 | `execution/kernel_v2.py` (`research_v2`, `controller_v2`) | Sandbox v2 path |
+| MI kernel | `execution/mi_kernel.py` | Multi-pair, QA only, not wired to the product |
+
+They share low-level pieces (`engine.crossing/protective/can_change`, parts of `finance_v2`) but are separate state machines. Consequences for this report: (1) the real-month results (13 s, parity on 300,000-tick windows, Jump, SEEK, checkpoint) prove the **observed** path, not the website path; (2) the Compact-source proof with identical golden hashes (`tests/test_compact_monthly_provider.py`) was run on `ExecutionController`, which **is** the website path; (3) the "one financial source of truth" rule in `docs/CLAUDE_ENGINE_ARCHITECTURE.md` is a narrow claim about `ClaudeSession` reusing `observed_kernel`, not about the whole repository. Choosing one primary execution path and retiring or thinning the others is an architecture decision for the owner (it touches frozen contracts) and has not been made.
 
 Commercial V1 stays BLOCKED.

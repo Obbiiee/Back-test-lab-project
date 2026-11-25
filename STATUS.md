@@ -21,6 +21,8 @@
 - Jalur multi-pair `backend/execution/mi_*` — terisolasi, belum terhubung ke produk.
 - `deploy/local/dev_stack.py` — menjalankan produk yang sama di laptop (`docs/LOCAL_RUN.md`).
 
+**Jalur eksekusi di repo (BUKAN satu; dibaca dari kode 2026-11-25):** (1) `execution/controller.py` + `engine.py` = **jalur website** untuk sesi sintetis; (2) `observed_kernel.py` = jalur data observed/nyata (semua pengukuran QA data asli); (3) `kernel_v2.py` = sandbox v2; (4) `mi_kernel.py` = multi-pair, QA saja. Berbagi potongan kecil tapi mesin statusnya terpisah. Memilih satu jalur utama = **keputusan arsitektur owner** (menyentuh kontrak beku), belum diambil. Rincian dan koreksi: `docs/benchmarks/RIKSORA-REAL-MONTH-COMPACT-V2-QA-20261125.md` bagian 9.
+
 ## 4. Satu jalur kerja
 1. Ubah kode di branch kerja → tes terarah → commit.
 2. Salin ke `~/releases/riksora-<sha>` → arahkan API ke sana → smoke test.
