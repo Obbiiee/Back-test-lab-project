@@ -29,7 +29,14 @@ PostgreSQL dari apt tidak perlu dijalankan sebagai service; launcher memakai bin
 python deploy/local/dev_stack.py up
 ```
 
-Menit pertama membangun semuanya (npm ci, build frontend, data). Setelah itu terminal menampilkan alamat `https://localhost:8443/`, email dan kata sandi akun siap pakai. Browser akan memperingatkan sertifikat self-signed: lanjutkan sekali. Buka alamat itu, tekan Masuk, lalu buat Session pada **Januari 2020** (data sintetis 2020-01-01 s.d. 2020-02-15, satu tick per menit).
+Menit pertama membangun semuanya (npm ci, build frontend, data). Setelah itu terminal menampilkan alamat `https://localhost:8443/`, email dan kata sandi akun siap pakai. Browser akan memperingatkan sertifikat self-signed: lanjutkan sekali. Buka alamat itu, tekan **Masuk**, lalu masukkan email dan kata sandi yang dicetak terminal. Langkah berikutnya (diverifikasi di browser, 2026-11-25):
+
+1. **Workspace:** pada "Choose a workspace" isi nama (mis. `My lab`), tekan *Create workspace*, lalu klik workspace itu untuk membukanya.
+2. **Method:** di *My Methods* tekan *Create your first Method*, beri nama, pilih *Free Style*, tekan *Save Method*.
+3. **Session:** tekan *New Session*, lanjutkan 4 langkah wizard (Method, Instrument, Period, Capital), lalu *Create Session* dengan periode **Januari 2020**.
+4. Tekan tombol Play. Waktu replay mulai 2020-01-01 00:30 UTC.
+
+Data sintetis, satu tick per menit. Dengan `--ticks` bawaan (131072) cakupannya 2020-01-01 s.d. 2020-04-01; tanggal persisnya selalu dicetak di terminal (mis. `--ticks 65536` berakhir 2020-02-15).
 
 Kode verifikasi email untuk pendaftaran lain dicetak di terminal yang sama.
 
