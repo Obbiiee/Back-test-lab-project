@@ -7,14 +7,14 @@
 - Semua pekerjaan baru langsung di `main`; jangan membuat branch baru untuk pekerjaan rutin.
 - Branch lama (`codex/*`, `claude/*` lama, `main` lama) hanya ada sebagai tag `archive/<nama>`. Belum di-port dari `main` lama: commit `0b9fbc8` (cache blok posisi di `timeline_v2.py`, optimasi performa; perlu tes engine sendiri). Lihat: `git show archive/main-20261109`.
 
-## 2. Apa yang live di https://riksora.com (diverifikasi 2026-11-23)
+## 2. Apa yang live di https://riksora.com (diverifikasi 2026-11-25)
 | Bagian | Fakta |
 |---|---|
 | Landing + halaman publik | `frontend/src/site`, dibangun dan diterbitkan oleh `deploy/site/publish.sh` ke `~/site/dist`, dilayani Caddy |
 | Aplikasi `/app` | Login Google; API `deploy/site/app_api.py` (127.0.0.1:8010), 3 worker native, PostgreSQL 17 (`~/prod/pg`, port 54450) |
-| Kode yang berjalan | `~/releases/riksora-ec79afd` (bukan working tree) |
+| Kode yang berjalan | `~/releases/current` (rilis dari commit `main`; diperiksa 2026-11-25: 0 file berbeda dari repo) |
 | Engine | Jalur single-instrument: replay tick bid/ask, reducer finansial beku, checkpoint **compact-v2**, multi-method |
-| Data | HANYA sintetis: Parquet bulanan (`~/prod/data/*/monthly/YYYY-MM/ticks.parquet`) berlabel SYNTHETIC / TEST ONLY. Tidak ada data pasar |
+| Data | HANYA sintetis, **kini dibaca langsung dari Parquet Compact sederhana** (`~/prod/data/131072-jan-compact`, 1,95 MB; dataset id dan versi sama, jadi Session lama tetap terbuka). Salinan Monthly lama `~/prod/data/131072-jan/monthly` disimpan sementara sebagai jalan mundur. Berlabel SYNTHETIC / TEST ONLY. Tidak ada data pasar |
 | Pembelian Pro | Tertutup (Midtrans urusan owner) |
 
 ## 3. Yang BUKAN produk (QA saja)
