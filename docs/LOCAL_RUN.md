@@ -13,7 +13,7 @@ sudo apt update
 sudo apt install -y git python3.12 python3.12-venv postgresql-16 nodejs npm   # Node harus 20+; bila lebih lama, pasang dari nodejs.org atau nvm
 git clone https://github.com/Obbiiee/Back-test-lab-project.git riksora
 cd riksora
-git checkout claude/dual-engine-v1-20261114
+git checkout main
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r backend/requirements.lock
 ```

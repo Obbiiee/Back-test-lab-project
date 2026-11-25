@@ -270,3 +270,7 @@ Owner requested complete MI product acceptance in QA. This checkpoint adds compa
 ## MI final hardening checkpoint (2026-11-18, isolated QA)
 
 The owner requested durable review and legacy-equivalent Free month handling for MI. Review and confirmation are bound to the actor and exact immutable checkpoint. Active-only continuation handles settlement with the existing reducer and masks restricted market quotes in public views. The disposable browser fixture exercises Free desktop, native crash recovery and Pro mobile December–January rollover. MI stays QA-only. No production changes, Git push, history rewrite or release of unqualified market data.
+
+## OWNER ADDENDUM — SINGLE LOCAL BRANCH `main` (2026-11-25, instruksi owner di chat)
+
+Owner meminta repo lokal dirapikan agar tidak banyak cabang. Dilakukan secara lokal dan reversibel: `main` kini adalah trunk produk (bekas `claude/dual-engine-v1-20261114`), riwayat `main` lama digabung dengan strategi `ours`, dan branch lama diarsipkan sebagai tag `archive/*`. Semua addendum di atas yang dibatasi pada branch `claude/dual-engine-v1-20261114` berlaku untuk `main` hasil penyatuan ini, dengan batas yang sama. Tidak ada push, force-push, atau penghapusan branch remote yang diizinkan oleh addendum ini; itu menunggu instruksi eksplisit owner. Commercial V1 tetap BLOCKED.
