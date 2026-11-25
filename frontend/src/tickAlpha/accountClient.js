@@ -17,6 +17,7 @@ export function entitlementRefusal(body){
     PENDING_AT_WINDOW_END:'A pending order is still waiting at the end of your Free window. Cancel it. Replay cannot continue past the window.',
     WINDOW_COMPLETED:'This Free window has ended: replay cannot continue past it. Results and statistics stay visible; open positions stay open until you close them.',
     TRASH_EXPIRED:'The 30-day restore window for this Session has passed.',
+    REFUSED_DATASET_VERSION:'This Session was created on an earlier version of the market data and cannot be replayed on the current one. Its Journal and results stay as they were. Create a new Session to keep testing.',
   };
   return messages[code]?{code,message:messages[code]}:null;
 }

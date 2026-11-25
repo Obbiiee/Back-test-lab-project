@@ -52,7 +52,8 @@ def domain_error_response(error):
                 "MI_REVIEW_REQUIRED": 422, "MI_REVIEW_MISMATCH": 409, "MI_REVIEW_EXPIRED": 409,
                 "WINDOW_ENDED": 409, "WINDOW_BOUNDARY": 409, "WINDOW_CONTINUATION_UNAVAILABLE": 409,
                 "WINDOW_ENDED_CONTINUATION_ONLY": 409, "PENDING_AT_WINDOW_END": 409, "WINDOW_COMPLETED": 409,
-                "REFUSED_METHOD_UNCHANGED": 409, "REFUSED_METHOD_UNKNOWN": 422, "REFUSED_METHOD_SET": 422}
+                "REFUSED_METHOD_UNCHANGED": 409, "REFUSED_METHOD_UNKNOWN": 422, "REFUSED_METHOD_SET": 422,
+                "REFUSED_DATASET_VERSION": 409}   # a Session pinned to an earlier dataset version: a clear refusal, not an outage
     status = statuses.get(error.code, 503)
     body = {"detail": error.code if status != 503 else "SERVICE_UNAVAILABLE"}
     return Response(canonical_bytes({"schemaVersion": 1, **body}), status_code=status,

@@ -1,0 +1,8 @@
+[Unit]
+Description=RIKSORA daily database backup (verified pg_dump, keeps the newest 14)
+After=riksora-pg.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/projects/Back-test-lab-project/deploy/site/backup_daily.sh
+Nice=10
