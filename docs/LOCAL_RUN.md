@@ -46,6 +46,7 @@ Kode verifikasi email untuk pendaftaran lain dicetak di terminal yang sama.
 | --- | --- |
 | `--enforce` | Aktifkan aturan Free/Pro seperti produksi (Free: 1 Session baru per hari UTC, satu bulan data). Tanpa opsi ini semua dibuka untuk uji. |
 | `--port 8443` / `--pg-port 54460` | Ganti port bila bentrok. |
+| `--source-format compact` | Simpan tick sintetis **hanya** sebagai Parquet Compact sederhana (`BTL-COMPACT-TICK-1`) dan baca langsung oleh engine tanpa salinan Monthly Parquet. Hasil replay sama dengan bawaan (`parquet`); diverifikasi di browser 2026-11-25. |
 | `--ticks N` | Jumlah tick sintetis (default 131072). |
 | `--workers 2` | Jumlah worker. |
 | `--rebuild-frontend` | Paksa build ulang frontend setelah mengubah kode. |

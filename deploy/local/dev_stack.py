@@ -249,7 +249,7 @@ def up(arguments):
     try:
         provision_database(home, arguments.pg_port)
         from deploy.local.synthetic_source import ensure_source
-        info = ensure_source(home.path / 'data', arguments.ticks, log=say)
+        info = ensure_source(home.path / 'data', arguments.ticks, log=say, source_format=arguments.source_format)
         web = build_frontend(home, arguments.rebuild_frontend)
         cert, key = ensure_certificate(home)
         app, delivery = build_app(home, arguments.pg_port, arguments.enforce, arguments.workers, info, web)
@@ -308,6 +308,7 @@ def main():
     parser.add_argument('--ticks', type=int, default=131072, help='synthetic ticks (131072 = Jan-Mar 2020; 65536 is faster to generate)')
     parser.add_argument('--workers', type=int, default=2, choices=[1, 2, 3, 4], help='research worker slots (default 2)')
     parser.add_argument('--email', default=FIXED_EMAIL, help='email of the ready-made account')
+    parser.add_argument('--source-format', choices=['parquet', 'compact'], default='parquet', help='storage of the synthetic ticks: Monthly Parquet (default) or plain Compact Tick Parquet read directly by the engine')
     parser.add_argument('--enforce', action='store_true', help='enforce the Free/Pro rules (default: off locally so you can test freely)')
     parser.add_argument('--rebuild-frontend', action='store_true', help='rebuild the frontend even if a build exists')
     parser.add_argument('--keep-db', action='store_true', help='leave PostgreSQL running when the app stops')

@@ -93,20 +93,32 @@ def _synthetic_monthly_provider():
     require(os.environ.get('BTL_QA_SYNTHETIC_MONTHLY_ENABLE') == '1' and all(values),
             'syntheticMonthly', 'REFUSED_SOURCE')
     root, dataset_id, dataset_version, manifest_hash = values
+    # Opt-in (default OFF): read the same pinned dataset from plain Compact Tick files instead of Monthly Parquet.
+    # Both pins are required together; the canonical manifest remains the authority (see market_data/compact_monthly_provider.py).
+    compact = tuple(os.environ.get(name) for name in ('BTL_QA_SYNTHETIC_COMPACT_MANIFEST_SHA256', 'BTL_QA_SYNTHETIC_COMPACT_QUALITY_SHA256'))
+    require(all(compact) or not any(compact), 'syntheticCompact', 'REFUSED_SOURCE')
     require(len(root) <= 4096, 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
     from market_data.monthly_root import pin_monthly_root
     pinned_root = pin_monthly_root(root)
     from contracts.primitives import digest
     digest(dataset_version, 'syntheticMonthlyVersion')
     digest(manifest_hash, 'syntheticMonthlyManifestHash')
-    pin = (pinned_root, dataset_id, dataset_version, manifest_hash)
+    for value in compact:
+        if value:
+            digest(value, 'syntheticCompactPin')
+    pin = (pinned_root, dataset_id, dataset_version, manifest_hash, *compact)
     global _MONTHLY_PROVIDER, _MONTHLY_PIN
     with _MONTHLY_LOCK:
         require(_MONTHLY_PIN in (None, pin), 'syntheticMonthly', 'SOURCE_PIN_CHANGED')
         if _MONTHLY_PROVIDER is None:
-            from market_data.monthly_parquet import MonthlyParquetProvider
-            provider = MonthlyParquetProvider(pin[0], expected_dataset_id=dataset_id,
-                expected_dataset_version=dataset_version, expected_manifest_hash=manifest_hash)
+            if all(compact):
+                from market_data.compact_monthly_provider import CompactBackedMonthlyProvider, admission_record
+                provider = CompactBackedMonthlyProvider(pin[0], admission=admission_record(compact[1]), expected_manifest_hash=manifest_hash,
+                    expected_compact_manifest_hash=compact[0], expected_dataset_id=dataset_id, expected_dataset_version=dataset_version)
+            else:
+                from market_data.monthly_parquet import MonthlyParquetProvider
+                provider = MonthlyParquetProvider(pin[0], expected_dataset_id=dataset_id,
+                    expected_dataset_version=dataset_version, expected_manifest_hash=manifest_hash)
             manifest = provider.describe(dataset_id, dataset_version)
             require(manifest['evidenceClass'] == 'SYNTHETIC_CONTRACT_ONLY' and
                     manifest['rights']['class'] == 'SYNTHETIC' and not manifest['diagnostics'],

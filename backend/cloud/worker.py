@@ -130,6 +130,13 @@ def _environment(dsn):
                 'syntheticMonthlyRoot', 'REFUSED_SOURCE')
     else:
         require(monthly_values[0] is None, 'syntheticMonthly', 'REFUSED_SOURCE')
+    compact_names = ('BTL_QA_SYNTHETIC_COMPACT_MANIFEST_SHA256', 'BTL_QA_SYNTHETIC_COMPACT_QUALITY_SHA256')
+    compact_values = tuple(os.environ.get(name) for name in compact_names)
+    if any(compact_values):
+        from contracts.primitives import digest as _digest
+        require(all(compact_values) and any(monthly_values), 'syntheticCompact', 'REFUSED_SOURCE')
+        for _value in compact_values:
+            _digest(_value, 'syntheticCompactPin')
     catalog_names = ('BTL_MONTHLY_PARQUET_CATALOG',
                      'BTL_MONTHLY_PARQUET_CATALOG_SHA256')
     catalog_values = tuple(os.environ.get(name) for name in catalog_names)
@@ -169,7 +176,7 @@ def _environment(dsn):
                    if k.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TEMP', 'TMP')
                    or k in ('BTL_OBSERVED_OPERATOR_CATALOG','BTL_OBSERVED_OPERATOR_CATALOG_SHA256',
                             'BTL_QA_TIMELINE_LOG_CODEC','BTL_OBSERVED_SESSION_STORAGE_FORMAT',
-                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', 'BTL_TICK_CHECKPOINT_FORMAT', 'BTL_SOURCE_ACCEPTANCE_DIR', 'BTL_FIXTURE_CACHE_ENTRIES', 'BTL_DB_POOL', 'BTL_DB_POOL_MAX_IDLE', *monthly_names,
+                            'BTL_TICK_SESSION_STORAGE_FORMAT', 'BTL_REPLAY_RUN_BUDGET_S', 'BTL_REPLAY_RUN_MAX_CHUNKS', 'BTL_TICK_CHECKPOINT_FORMAT', 'BTL_SOURCE_ACCEPTANCE_DIR', 'BTL_FIXTURE_CACHE_ENTRIES', 'BTL_DB_POOL', 'BTL_DB_POOL_MAX_IDLE', *monthly_names, *compact_names,
                             *catalog_names, *s3_names)}
     if monthly_root is not None:
         environment['BTL_QA_SYNTHETIC_MONTHLY_ROOT'] = monthly_root
