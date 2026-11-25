@@ -10,23 +10,36 @@ from pathlib import Path
 DEFAULT_TICKS = 131072        # January + February + March 2020 in full (about three months at one tick per minute)
 
 
-def ensure_source(data_dir, ticks=DEFAULT_TICKS, log=print, source_format='parquet'):
+def _generator(profile):
+    """(build_manifest(ticks), iter_events(ticks, manifest), default ticks, seconds per tick, directory prefix) of a source profile."""
+    if profile == 'financial-active':
+        from execution.research_fixture import START_NS
+        from tests.synthetic_financial_monthly import build_manifest, iter_events
+        return (lambda t: build_manifest(t, start_ns=START_NS), lambda t, m: iter_events(t, m, start_ns=START_NS), DEFAULT_TICKS, 60, '')
+    if profile == 'visual':
+        from deploy.local import visual_source as v
+        return (lambda t: v.build_manifest(t), lambda t, m: v.iter_events(t, m), v.DEFAULT_TICKS, 12, 'visual-')
+    raise SystemExit(f'unknown source profile {profile!r}')
+
+
+def ensure_source(data_dir, ticks=None, log=print, source_format='compact', profile='financial-active'):
     """Create (or reuse) the source under `<data_dir>/<ticks>/` and return {ticks, datasetId, version, manifestHash, monthly, accepted}.
 
-    source_format='compact' (opt-in) stores the ticks ONLY as plain Compact Tick Parquet under `<data_dir>/<ticks>-compact/`."""
+    source_format='compact' (DEFAULT, owner decision 2026-11-25) stores the ticks ONLY as plain Compact Tick Parquet under `<data_dir>/<ticks>-compact/`;
+    'parquet' keeps the older canonical Monthly Parquet under `<data_dir>/<ticks>/` (used by tests and fixtures)."""
+    build, events, default_ticks, step_seconds, prefix = _generator(profile)
+    ticks = ticks or default_ticks
     if source_format == 'compact':
-        return _ensure_compact_source(data_dir, ticks, log)
+        return _ensure_compact_source(data_dir, ticks, log, profile)
     if source_format != 'parquet':
         raise SystemExit(f'unknown source format {source_format!r}')
     from contracts.canonical import content_hash
-    from execution.research_fixture import START_NS
     from market_data.monthly_parquet import MonthlyParquetProvider, write_monthly_parquet
-    from tests.synthetic_financial_monthly import build_manifest, iter_events
     from ticks import source_acceptance
-    base = Path(data_dir) / str(ticks)
+    base = Path(data_dir) / f'{prefix}{ticks}'
     info_file = base / 'source.json'
     monthly, accepted = base / 'monthly', base / 'accepted'
-    manifest, _m, _q = build_manifest(ticks, start_ns=START_NS)
+    manifest, _m, _q = build(ticks)
     version = content_hash(manifest)
     if info_file.exists():
         info = json.loads(info_file.read_text())
@@ -35,27 +48,26 @@ def ensure_source(data_dir, ticks=DEFAULT_TICKS, log=print, source_format='parqu
         raise SystemExit(f'{info_file} holds another dataset version; remove {base} to regenerate')
     base.mkdir(parents=True, exist_ok=True)
     log(f'Generating the synthetic source ({ticks} ticks); this is a one-time step...')
-    parquet = write_monthly_parquet(str(monthly), iter_events(ticks, manifest, start_ns=START_NS), manifest, expected_version=version, row_group_size=8192)
+    parquet = write_monthly_parquet(str(monthly), events(ticks, manifest), manifest, expected_version=version, row_group_size=8192)
     provider = MonthlyParquetProvider(str(monthly), expected_dataset_id=manifest['datasetId'], expected_dataset_version=version,
                                       expected_manifest_hash=parquet['manifestHash'])
     source_acceptance.accept_offline(provider, manifest['datasetId'], version, str(accepted))
-    info = dict(ticks=ticks, datasetId=manifest['datasetId'], version=version, manifestHash=parquet['manifestHash'])
+    info = dict(ticks=ticks, datasetId=manifest['datasetId'], version=version, manifestHash=parquet['manifestHash'], profile=profile, stepSeconds=step_seconds)
     info_file.write_text(json.dumps(info))
     return {**info, 'monthly': str(monthly), 'accepted': str(accepted)}
 
 
-def _ensure_compact_source(data_dir, ticks, log):
+def _ensure_compact_source(data_dir, ticks, log, profile='financial-active'):
     import shutil
     from contracts.canonical import content_hash
-    from execution.research_fixture import START_NS
     from market_data.compact_monthly_provider import CompactBackedMonthlyProvider, admission_record, write_adopted_manifest
     from market_data.compact_tick import write_compact
     from market_data.monthly_parquet import write_monthly_parquet
-    from tests.synthetic_financial_monthly import build_manifest, iter_events
     from ticks import source_acceptance
-    base = Path(data_dir) / f'{ticks}-compact'
+    build, events, _default, step_seconds, prefix = _generator(profile)
+    base = Path(data_dir) / f'{prefix}{ticks}-compact'
     info_file, root, accepted = base / 'source.json', base / 'compact', base / 'accepted'
-    manifest, _m, quality = build_manifest(ticks, start_ns=START_NS)
+    manifest, _m, quality = build(ticks)
     version = content_hash(manifest)
     if info_file.exists():
         info = json.loads(info_file.read_text())
@@ -65,8 +77,8 @@ def _ensure_compact_source(data_dir, ticks, log):
     base.mkdir(parents=True, exist_ok=True)
     log(f'Generating the synthetic source as plain Compact Tick Parquet ({ticks} ticks); this is a one-time step...')
     scratch = base / 'reference-monthly'     # temporary: only to compute the canonical row-group hashes; deleted below
-    reference = write_monthly_parquet(str(scratch), iter_events(ticks, manifest, start_ns=START_NS), manifest, expected_version=version, row_group_size=8192)
-    compact = write_compact(str(root), iter_events(ticks, manifest, start_ns=START_NS), parent=dict(datasetId=manifest['datasetId'], datasetVersion=version),
+    reference = write_monthly_parquet(str(scratch), events(ticks, manifest), manifest, expected_version=version, row_group_size=8192)
+    compact = write_compact(str(root), events(ticks, manifest), parent=dict(datasetId=manifest['datasetId'], datasetVersion=version),
                             scale=2, evidence_class='SYNTHETIC_CONTRACT_ONLY', rights={'class': 'SYNTHETIC', 'evidenceHash': None})
     adopted = write_adopted_manifest(root, json.loads((scratch / 'manifest.json').read_bytes()), compact)
     assert reference['manifestHash'] != adopted['manifestHash']            # storage identity differs, canonical authority is identical
@@ -76,7 +88,7 @@ def _ensure_compact_source(data_dir, ticks, log):
                                             expected_dataset_version=version)
     source_acceptance.accept_offline(provider, manifest['datasetId'], version, str(accepted))
     info = dict(ticks=ticks, datasetId=manifest['datasetId'], version=version, manifestHash=adopted['manifestHash'], format='compact',
-                compactManifestHash=compact['manifestHash'], qualityHash=quality)
+                compactManifestHash=compact['manifestHash'], qualityHash=quality, profile=profile, stepSeconds=step_seconds)
     info_file.write_text(json.dumps(info))
     return {**info, 'monthly': str(root), 'accepted': str(accepted)}
 

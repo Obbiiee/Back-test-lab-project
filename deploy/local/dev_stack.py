@@ -249,7 +249,7 @@ def up(arguments):
     try:
         provision_database(home, arguments.pg_port)
         from deploy.local.synthetic_source import ensure_source
-        info = ensure_source(home.path / 'data', arguments.ticks, log=say, source_format=arguments.source_format)
+        info = ensure_source(home.path / 'data', arguments.ticks, log=say, source_format=arguments.source_format, profile=arguments.source_profile)
         web = build_frontend(home, arguments.rebuild_frontend)
         cert, key = ensure_certificate(home)
         app, delivery = build_app(home, arguments.pg_port, arguments.enforce, arguments.workers, info, web)
@@ -266,8 +266,10 @@ def up(arguments):
             say('  The browser warns about the self-signed certificate once: continue anyway.')
             say(f"  Free/Pro rules:       {'ENFORCED (1 new Session per UTC day for Free)' if arguments.enforce else 'not enforced locally (use --enforce to test Free/Pro)'}")
             import datetime
-            last = (datetime.datetime(2020, 1, 1) + datetime.timedelta(minutes=arguments.ticks - 1)).strftime('%Y-%m-%d')
-            say(f'  Data: SYNTHETIC / TEST ONLY, 2020-01-01 to {last}, one tick per minute (start a Session in January 2020).')
+            step = info.get('stepSeconds', 60)
+            last = (datetime.datetime(2020, 1, 1) + datetime.timedelta(seconds=(info['ticks'] - 1) * step)).strftime('%Y-%m-%d')
+            density = 'one tick per minute' if step == 60 else f'one tick every {step} seconds'
+            say(f'  Data: SYNTHETIC / TEST ONLY, 2020-01-01 to {last}, {density} (start a Session in January 2020).')
             say('  Stop with Ctrl+C.')
             say('=' * 72)
             if not ready['ok']:
@@ -305,10 +307,11 @@ def main():
     parser.add_argument('--port', type=int, default=8443, help='HTTPS port of the app (default 8443)')
     parser.add_argument('--pg-port', type=int, default=54460, help='port of the private PostgreSQL (default 54460)')
     parser.add_argument('--pg-bin', help='directory with initdb and pg_ctl (default: PATH, PG_BIN or the usual install locations)')
-    parser.add_argument('--ticks', type=int, default=131072, help='synthetic ticks (131072 = Jan-Mar 2020; 65536 is faster to generate)')
+    parser.add_argument('--source-profile', choices=['financial-active', 'visual'], default='financial-active', help='synthetic data profile: the golden fixture (1 tick/min, flat) or `visual` (5 ticks/min with candle-like volatility)')
+    parser.add_argument('--ticks', type=int, default=None, help='synthetic ticks (131072 = Jan-Mar 2020; 65536 is faster to generate)')
     parser.add_argument('--workers', type=int, default=2, choices=[1, 2, 3, 4], help='research worker slots (default 2)')
     parser.add_argument('--email', default=FIXED_EMAIL, help='email of the ready-made account')
-    parser.add_argument('--source-format', choices=['parquet', 'compact'], default='parquet', help='storage of the synthetic ticks: Monthly Parquet (default) or plain Compact Tick Parquet read directly by the engine')
+    parser.add_argument('--source-format', choices=['parquet', 'compact'], default='compact', help='storage of the synthetic ticks: plain Compact Tick Parquet read directly by the engine (default) or the older canonical Monthly Parquet')
     parser.add_argument('--enforce', action='store_true', help='enforce the Free/Pro rules (default: off locally so you can test freely)')
     parser.add_argument('--rebuild-frontend', action='store_true', help='rebuild the frontend even if a build exists')
     parser.add_argument('--keep-db', action='store_true', help='leave PostgreSQL running when the app stops')
